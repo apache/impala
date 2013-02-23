@@ -25,7 +25,6 @@ add_library(Exec STATIC
   aggregation-node.cc
   aggregation-node-ir.cc
   base-sequence-scanner.cc
-  buffered-byte-stream.cc
   data-sink.cc
   ddl-executor.cc
   delimited-text-parser.cc

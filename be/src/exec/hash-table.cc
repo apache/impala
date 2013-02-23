@@ -17,6 +17,7 @@
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.inline.h"
+#include "runtime/mem-limit.h"
 #include "util/debug-util.h"
 
 using namespace impala;
@@ -28,15 +29,18 @@ const char* HashTable::LLVM_CLASS_NAME = "class.impala::HashTable";
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& probe_exprs,
-    int num_build_tuples, bool stores_nulls, int64_t num_buckets) :
-    build_exprs_(build_exprs),
+    int num_build_tuples, bool stores_nulls, const vector<MemLimit*>& mem_limits,
+    int64_t num_buckets)
+  : build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
     node_byte_size_(sizeof(Node) + sizeof(Tuple*) * num_build_tuples_),
     num_filled_buckets_(0),
     nodes_(NULL),
-    num_nodes_(0) {
+    num_nodes_(0),
+    mem_limits_(mem_limits),
+    exceeded_limit_(false) {
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
   buckets_.resize(num_buckets);
   num_buckets_ = num_buckets;
@@ -50,7 +54,21 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
   expr_value_null_bits_ = new uint8_t[build_exprs_.size()];
 
   nodes_capacity_ = 1024;
-  nodes_ = reinterpret_cast<uint8_t*>(malloc(node_byte_size_ * nodes_capacity_));
+  nodes_ = reinterpret_cast<uint8_t*>(malloc(nodes_capacity_ * node_byte_size_));
+
+  // update mem_limits_
+  MemLimit::UpdateLimits(num_buckets * sizeof(Bucket), &mem_limits_);
+  MemLimit::UpdateLimits(nodes_capacity_ * node_byte_size_, &mem_limits_);
+  exceeded_limit_ = MemLimit::LimitExceeded(mem_limits_);
+}
+
+HashTable::~HashTable() {
+  // TODO: use tr1::array?
+  delete[] expr_values_buffer_;
+  delete[] expr_value_null_bits_;
+  free(nodes_);
+  MemLimit::UpdateLimits(-1 * nodes_capacity_ * node_byte_size_, &mem_limits_);
+  MemLimit::UpdateLimits(-1 * buckets_.size() * sizeof(Bucket), &mem_limits_);
 }
 
 bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
@@ -576,15 +594,22 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
     AddToBucket(&new_buckets[bucket_idx], node_idx, node);
   }
 
+  int64_t delta_bytes = (new_buckets.size() - buckets_.size()) * sizeof(Bucket);
+  MemLimit::UpdateLimits(delta_bytes, &mem_limits_);
+  exceeded_limit_ = MemLimit::LimitExceeded(mem_limits_);
+
   buckets_.swap(new_buckets);
   num_buckets_ = buckets_.size();
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
 }
   
 void HashTable::GrowNodeArray() {
+  int64_t old_size = nodes_capacity_ * node_byte_size_;
   nodes_capacity_ = nodes_capacity_ + nodes_capacity_ / 2;
   int64_t new_size = nodes_capacity_ * node_byte_size_;
   nodes_ = reinterpret_cast<uint8_t*>(realloc(nodes_, new_size));
+  MemLimit::UpdateLimits(new_size - old_size, &mem_limits_);
+  exceeded_limit_ = MemLimit::LimitExceeded(mem_limits_);
 }
 
 string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {

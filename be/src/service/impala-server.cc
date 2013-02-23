@@ -87,8 +87,6 @@ DECLARE_int32(nn_port);
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
 
-// TODO: not yet implemented - add to bootstrap CM
-DEFINE_int64(mem_limit, -1, "Process memory limit in bytes");
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
 DEFINE_int32(be_service_threads, 64,
@@ -1320,6 +1318,11 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
   return Status::OK;
 }
 
+static int64_t ParseMemLimit(const string& str_val) {
+  // TODO: implement
+  return atoi(str_val.c_str());
+}
+
 Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
     TQueryOptions* query_options) {
   int option = GetQueryOption(key);
@@ -1342,6 +1345,9 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::BATCH_SIZE:
         query_options->batch_size = atoi(value.c_str());
+        break;
+      case TImpalaQueryOptions::MEM_LIMIT:
+        query_options->mem_limit = ParseMemLimit(value);
         break;
       case TImpalaQueryOptions::NUM_NODES:
         query_options->num_nodes = atoi(value.c_str());
@@ -1596,6 +1602,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::BATCH_SIZE:
         val << query_option.batch_size;
+        break;
+      case TImpalaQueryOptions::MEM_LIMIT:
+        val << query_option.mem_limit;
         break;
       case TImpalaQueryOptions::NUM_NODES:
         val << query_option.num_nodes;

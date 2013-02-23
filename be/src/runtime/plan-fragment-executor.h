@@ -85,6 +85,9 @@ class PlanFragmentExecutor {
   // Prepare for execution. Call this prior to Open().
   // This call won't block.
   // runtime_state() and row_desc() will not be valid until Prepare() is called.
+  // If request.query_options.mem_limit > 0, it is used as an approximate limit on the
+  // number of bytes this query can consume at runtime.
+  // The query will be aborted (MEM_LIMIT_EXCEEDED) if it goes over that limit.
   Status Prepare(const TExecPlanFragmentParams& request);
 
   // Start execution. Call this prior to GetNext().
@@ -122,6 +125,7 @@ class PlanFragmentExecutor {
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
   TUniqueId query_id_;
+  boost::scoped_ptr<MemLimit> mem_limit_;
 
   // profile reporting-related
   ReportStatusCallback report_status_cb_;

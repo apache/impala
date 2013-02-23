@@ -42,17 +42,13 @@ ScanRangeContext::ScanRangeContext(RuntimeState* state, HdfsScanNode* scan_node,
     done_(false),
     read_eosr_(false),
     current_buffer_(NULL) {
-
+  boundary_pool_->set_limits(*state->mem_limits());
   compact_data_ = scan_node->compact_data() || 
       scan_node->tuple_desc()->string_slots().empty();
-
   scan_range_start_ = initial_buffer->scan_range()->offset();
   scan_range_ = initial_buffer->scan_range();
-
   AddBuffer(initial_buffer);
-
   NewRowBatch();
-  
   template_tuple_ = 
       scan_node_->InitTemplateTuple(state, partition_desc_->partition_key_values());
 }
@@ -63,6 +59,7 @@ ScanRangeContext::~ScanRangeContext() {
 
 void ScanRangeContext::NewRowBatch() {
   current_row_batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size());
+  current_row_batch_->tuple_data_pool()->set_limits(*state_->mem_limits());
   tuple_mem_ = current_row_batch_->tuple_data_pool()->Allocate(
       state_->batch_size() * tuple_byte_size_);
 }

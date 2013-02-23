@@ -90,10 +90,10 @@ bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* cons
 
 Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  
   tuple_descs_ = child(0)->row_desc().tuple_descriptors();
   Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc());
   Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc());
+  tuple_pool_->set_limits(*state->mem_limits());
   return Status::OK;
 }
 
@@ -112,6 +112,7 @@ Status TopNNode::Open(RuntimeState* state) {
     for (int i = 0; i < batch.num_rows(); ++i) {
       InsertTupleRow(batch.GetRow(i));
     }
+    RETURN_IF_LIMIT_EXCEEDED(state);
   } while (!eos);
   
   DCHECK_LE(priority_queue_.size(), limit_);

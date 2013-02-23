@@ -25,10 +25,18 @@
 
 namespace impala {
 
+class MemLimit;
+
 // A MemPool maintains a list of memory chunks from which it allocates memory in
 // response to Allocate() calls;
 // Chunks stay around for the lifetime of the mempool or until they are passed on to
 // another mempool.
+//
+// The caller can register a set of MemLimits with the pool, in which case chunk
+// allocations are counted against those limits. If chunks get moved between pools
+// during AcquireData() calls, the respective MemLimits are updated accordingly.
+// Chunks freed up in the d'tor are subtracted from the registered limits.
+//
 // An Allocate() call will attempt to allocate memory from the chunk that was most
 // recently added; if that chunk doesn't have enough memory to
 // satisfy the allocation request, the free chunks are searched for one that is
@@ -67,11 +75,10 @@ namespace impala {
 
 class MemPool {
  public:
-  MemPool();
-
   // Allocates mempool with fixed-size chunks of size 'chunk_size'.
-  // Chunk_size must be > 0.
-  MemPool(int chunk_size);
+  // Chunk_size must be >= 0; 0 requests automatic doubling of chunk sizes,
+  // up to a limit.
+  MemPool(int chunk_size = 0);
 
   // Construct a mempool by initializing the chunk data with a copy of the data
   // backing the strings (each chunk's allocated_bytes == size).
@@ -79,7 +86,8 @@ class MemPool {
   // TODO: fix this so we don't need to make a copy
   MemPool(const std::vector<std::string>& chunks);
 
-  // Frees all chunks of memory.
+  // Frees all chunks of memory and subtracts the total allocated bytes
+  // from the registered limits.
   ~MemPool();
 
   // Allocates 8-byte aligned section of memory of 'size' bytes at the end
@@ -134,6 +142,8 @@ class MemPool {
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
   int64_t peak_allocated_bytes() const { return peak_allocated_bytes_; }
+  void set_limits(const std::vector<MemLimit*>& limits) { limits_ = limits; }
+  bool exceeded_limit() const { return exceeded_limit_; }
 
   // Return sum of chunk_sizes_.
   int64_t GetTotalChunkSizes() const;
@@ -208,6 +218,12 @@ class MemPool {
   int64_t peak_allocated_bytes_;
 
   std::vector<ChunkInfo> chunks_;
+
+  std::vector<MemLimit*> limits_;
+
+  // true if one of the registered limits was exceeded during an Allocate()
+  // call
+  bool exceeded_limit_;
 
   // Find or allocated a chunk with at least min_size spare capacity and update
   // current_chunk_idx_. Also updates chunks_, chunk_sizes_ and allocated_bytes_

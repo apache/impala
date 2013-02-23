@@ -33,6 +33,7 @@ class LlvmCodeGen;
 class RowDescriptor;
 class Tuple;
 class TupleRow;
+class MemLimit;
 
 // Hash table implementation designed for hash aggregation and hash joins.  This is not
 // templatized and is tailored to the usage pattern for aggregation and joins.  The
@@ -74,15 +75,14 @@ class HashTable {
   //  - num_build_tuples: number of Tuples in the build tuple row
   //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   //  - num_buckets: number of buckets that the hash table should be initialized to
+  //  - mem_limits: if non-empty, all memory allocation for nodes and for buckets is
+  //    tracked against those limits; the limits must be valid until the d'tor is called
   HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
-      int num_build_tuples, bool stores_nulls, int64_t num_buckets = 1024);
+      int num_build_tuples, bool stores_nulls,
+      const std::vector<MemLimit*>& mem_limits = std::vector<MemLimit*>(),
+      int64_t num_buckets = 1024);
 
-  ~HashTable() {
-    // TODO: use tr1::array?
-    delete[] expr_values_buffer_;
-    delete[] expr_value_null_bits_;
-    free(nodes_);
-  }
+  ~HashTable();
 
   // Insert row into the hash table.  Row will be evaluated over build_exprs_
   // This will grow the hash table if necessary
@@ -110,6 +110,9 @@ class HashTable {
 
   // Returns the number of buckets
   int64_t num_buckets() { return buckets_.size(); }
+
+  // true if any of the MemLimits was exceeded
+  bool exceeded_limit() const { return exceeded_limit_; }
 
   // Returns the load factor (the number of non-empty buckets)
   float load_factor() { 
@@ -330,6 +333,9 @@ class HashTable {
   int64_t num_nodes_;
   // max number of nodes that can be stored in 'nodes_' before realloc
   int64_t nodes_capacity_;
+
+  std::vector<MemLimit*> mem_limits_;  // saved c'tor param
+  bool exceeded_limit_;   // true if any of mem_limits_[].LimitExceeded()
 
   std::vector<Bucket> buckets_;
   

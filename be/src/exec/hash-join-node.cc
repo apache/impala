@@ -109,8 +109,12 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
   }
 
+  build_pool_->set_limits(*state->mem_limits());
+
   // TODO: default buckets
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_, false));
+  hash_tbl_.reset(
+      new HashTable(
+        build_exprs_, probe_exprs_, build_tuple_size_, false, *state->mem_limits()));
   
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
   
@@ -188,6 +192,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
     SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
+    RETURN_IF_LIMIT_EXCEEDED(state);
 
     // Call codegen version if possible
     if (process_build_batch_fn_ == NULL) {

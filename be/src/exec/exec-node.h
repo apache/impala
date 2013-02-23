@@ -21,6 +21,7 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
+#include "runtime/mem-limit.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -187,6 +188,13 @@ class ExecNode {
   // 'phase' must not be INVALID.
   Status ExecDebugAction(TExecNodePhase::type phase);
 };
+
+#define RETURN_IF_LIMIT_EXCEEDED(state) \
+  do { \
+    if (UNLIKELY(MemLimit::LimitExceeded(*(state)->mem_limits()))) { \
+      return Status(TStatusCode::MEM_LIMIT_EXCEEDED); \
+    } \
+  } while (false)
 
 }
 #endif

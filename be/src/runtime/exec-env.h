@@ -35,6 +35,7 @@ class SubscriptionManager;
 class TestExecEnv;
 class Webserver;
 class Metrics;
+class MemLimit;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -56,6 +57,7 @@ class ExecEnv {
   DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   Metrics* metrics() { return metrics_.get(); }
+  MemLimit* mem_limit() { return mem_limit_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -78,6 +80,7 @@ class ExecEnv {
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<Metrics> metrics_;
+  boost::scoped_ptr<MemLimit> mem_limit_;
 
   bool enable_webserver_;
 

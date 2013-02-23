@@ -126,8 +126,11 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
   RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc()));
 
+  tuple_pool_->set_limits(*state->mem_limits());
+
   // TODO: how many buckets?
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true));
+  hash_tbl_.reset(
+      new HashTable(build_exprs_, probe_exprs_, 1, true, *state->mem_limits()));
   
   // Determine the number of string slots in the output
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
@@ -191,6 +194,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     } else {
       ProcessRowBatchWithGrouping(&batch);
     }
+    RETURN_IF_LIMIT_EXCEEDED(state);
     COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
     COUNTER_SET(memory_used_counter(), 
         tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());

@@ -31,6 +31,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/row-batch.h"
+#include "runtime/mem-limit.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/container-util.h"
@@ -83,7 +84,16 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
-          request.query_globals.now_string, exec_env_));
+        request.query_globals.now_string, exec_env_));
+  if (exec_env_->mem_limit() != NULL) {
+    // we have a global limit
+    runtime_state_->mem_limits()->push_back(exec_env_->mem_limit());
+  }
+  if (request.query_options.mem_limit > 0) {
+    // we have a per-query limit
+    mem_limit_.reset(new MemLimit(request.query_options.mem_limit));
+    runtime_state_->mem_limits()->push_back(mem_limit_.get());
+  }
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;
@@ -164,6 +174,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
+  row_batch_->tuple_data_pool()->set_limits(*runtime_state_->mem_limits());
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;

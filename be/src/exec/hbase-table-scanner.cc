@@ -77,7 +77,8 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
   }
 }
 
-HBaseTableScanner::HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htable_cache)
+HBaseTableScanner::HBaseTableScanner(
+    ScanNode* scan_node, HBaseTableCache* htable_cache, RuntimeState* state)
   : scan_node_(scan_node),
     htable_cache_(htable_cache),
     htable_(NULL),
@@ -99,6 +100,8 @@ HBaseTableScanner::HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htabl
     rows_cached_(DEFAULT_ROWS_CACHED),
     scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
       "HBaseTableScanner.ScanSetup")) {
+  value_pool_->set_limits(*state->mem_limits());
+  buffer_pool_->set_limits(*state->mem_limits());
 }
 
 Status HBaseTableScanner::Init() {

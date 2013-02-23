@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "runtime/mem-pool.h"
-
+#include "runtime/mem-limit.h"
 
 using namespace std;
 
@@ -114,7 +114,7 @@ TEST(MemPoolTest, Offsets) {
   }
 }
 
-// Test that we can keep an allocted chunk and a free chunk.
+// Test that we can keep an allocated chunk and a free chunk.
 // This case verifies that when chunks are acquired by another memory pool the
 // remaining chunks are consistent if there were more than one used chunk and some
 // free chunks.
@@ -138,8 +138,64 @@ TEST(MemPoolTest, Keep) {
   EXPECT_EQ(p.GetTotalChunkSizes(), (8 + 16) * 1024);
   EXPECT_EQ(p2.total_allocated_bytes(), 1 * 1024);
   EXPECT_EQ(p2.GetTotalChunkSizes(), 4 * 1024);
-
 }
+
+TEST(MemPoolTest, Limits) {
+  MemLimit limit1(160);
+  MemLimit limit2(240);
+  MemLimit limit3(320);
+
+  MemPool* p1 = new MemPool(80);
+  vector<MemLimit*> limits;
+  limits.push_back(&limit1);
+  limits.push_back(&limit3);
+  p1->set_limits(limits);
+  EXPECT_FALSE(p1->exceeded_limit());
+
+  MemPool* p2 = new MemPool(80);
+  limits.clear();
+  limits.push_back(&limit2);
+  limits.push_back(&limit3);
+  p2->set_limits(limits);
+  EXPECT_FALSE(p2->exceeded_limit());
+
+  // p1 exceeds a non-shared limit
+  p1->Allocate(80);
+  EXPECT_FALSE(p1->exceeded_limit());
+  EXPECT_FALSE(limit1.LimitExceeded());
+  EXPECT_EQ(limit1.consumption(), 80);
+  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_EQ(limit3.consumption(), 80);
+
+  p1->Allocate(88);
+  EXPECT_TRUE(p1->exceeded_limit());
+  EXPECT_TRUE(limit1.LimitExceeded());
+  EXPECT_EQ(limit1.consumption(), 168);
+  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_EQ(limit3.consumption(), 168);
+
+  // p2 exceeds a shared limit
+  p2->Allocate(80);
+  EXPECT_FALSE(p2->exceeded_limit());
+  EXPECT_FALSE(limit2.LimitExceeded());
+  EXPECT_EQ(limit2.consumption(), 80);
+  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_EQ(limit3.consumption(), 248);
+
+  p2->Allocate(80);
+  EXPECT_TRUE(p2->exceeded_limit());
+  EXPECT_FALSE(limit2.LimitExceeded());
+  EXPECT_EQ(limit2.consumption(), 160);
+  EXPECT_TRUE(limit3.LimitExceeded());
+  EXPECT_EQ(limit3.consumption(), 328);
+
+  // deleting pools reduces consumption
+  delete p1;
+  EXPECT_EQ(limit1.consumption(), 0);
+  EXPECT_EQ(limit2.consumption(), 160);
+  EXPECT_EQ(limit3.consumption(), 160);
+}
+
 }
 
 int main(int argc, char **argv) {

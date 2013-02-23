@@ -24,6 +24,7 @@
 #include "exprs/expr.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
+#include "runtime/mem-limit.h"
 #include "util/cpu-info.h"
 #include "util/runtime-profile.h"
 
@@ -250,7 +251,12 @@ TEST_F(HashTableTest, GrowTableTest) {
   int build_row_val = 0;
   int num_to_add = 5;
   int expected_size = 0;
-  HashTable hash_table(build_expr_, probe_expr_, 1, false, num_to_add);
+  MemLimit mem_limit(1024 * 1024);
+  vector<MemLimit*> mem_limits;
+  mem_limits.push_back(&mem_limit);
+  HashTable hash_table(
+      build_expr_, probe_expr_, 1, false, mem_limits, num_to_add);
+  EXPECT_TRUE(!mem_limit.LimitExceeded());
 
   // This inserts about 5M entries
   for (int i = 0; i < 20; ++i) {
@@ -261,6 +267,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     num_to_add *= 2;
     EXPECT_EQ(hash_table.size(), expected_size);
   }
+  EXPECT_TRUE(mem_limit.LimitExceeded());
 
   // Validate that we can find the entries
   for (int i = 0; i < expected_size * 5; i += 100000) {

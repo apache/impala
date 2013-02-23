@@ -25,6 +25,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-cache.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/mem-limit.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/subscription-manager.h"
 #include "util/metrics.h"
@@ -40,6 +41,7 @@ DEFINE_bool(use_statestore, true,
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DECLARE_int32(be_port);
 DECLARE_string(ipaddress);
+DECLARE_int64(mem_limit);
 
 namespace impala {
 
@@ -52,6 +54,7 @@ ExecEnv::ExecEnv()
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     metrics_(new Metrics()),
+    mem_limit_(FLAGS_mem_limit > 0 ? new MemLimit(FLAGS_mem_limit) : NULL),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with

@@ -296,8 +296,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
-
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
+  tuple_pool_->set_limits(*state->mem_limits());
+  partition_key_pool_->set_limits(*state->mem_limits());
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.

@@ -47,12 +47,13 @@ void BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 }
   
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,
-                                         bool marker_precedes_sync) :
-  HdfsScanner(node, state),
-  header_(NULL),
-  block_start_(0),
-  data_buffer_pool_(new MemPool()),
-  marker_precedes_sync_(marker_precedes_sync) {
+                                         bool marker_precedes_sync)
+  : HdfsScanner(node, state),
+    header_(NULL),
+    block_start_(0),
+    data_buffer_pool_(new MemPool()),
+    marker_precedes_sync_(marker_precedes_sync) {
+  data_buffer_pool_->set_limits(*state->mem_limits());
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {

@@ -161,6 +161,9 @@ public class ImpaladClientExecutor {
         case BATCH_SIZE:
           optionValue = String.valueOf(queryOptions.getBatch_size());
           break;
+        case MEM_LIMIT:
+          optionValue = String.valueOf(queryOptions.getMem_limit());
+          break;
         case NUM_NODES:
           optionValue = String.valueOf(queryOptions.getNum_nodes());
           break;

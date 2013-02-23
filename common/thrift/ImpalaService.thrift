@@ -27,8 +27,8 @@ include "cli_service.thrift"
 // - ImpalaService.DEFAULT_QUERY_OPTIONS
 // - ImpalaInternalService.thrift: TQueryOptions
 // - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
-// - ImpalaServer::QueryToTClientRequest()
-// - ImpalaServer::InitializeConfigVariables()
+// - ImpalaServer::SetQueryOptions()
+// - ImpalaServer::TQueryOptionsToMap()
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error
   ABORT_ON_ERROR,
@@ -42,6 +42,13 @@ enum TImpalaQueryOptions {
   // batch size to be used by backend; Unspecified or a size of 0 indicates backend
   // default
   BATCH_SIZE,
+
+  // a per-machine approximate limit on the memory consumption of this query;
+  // unspecified or a limit of 0 means no limit;
+  // otherwise specified either as:
+  // a) an int (= number of bytes);
+  // b) a float followed by "M" (MB) or "G" (GB)
+  MEM_LIMIT,
    
   // specifies the degree of parallelism with which to execute the query;
   // 1: single-node execution
@@ -96,6 +103,7 @@ const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   TImpalaQueryOptions.ALLOW_UNSUPPORTED_FORMATS : "false"
   TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
   TImpalaQueryOptions.DEBUG_ACTION : ""
+  TImpalaQueryOptions.MEM_LIMIT : "0"
 }
 
 // The summary of an insert.

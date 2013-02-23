@@ -42,6 +42,7 @@ class ExecEnv;
 class Expr;
 class LlvmCodeGen;
 class TimestampValue;
+class MemLimit;
 
 // Counts how many rows an INSERT query has added to a particular partition
 // (partitions are identified by their partition keys: k1=v1/k2=v2
@@ -93,6 +94,7 @@ class RuntimeState {
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
   ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
+  std::vector<MemLimit*>* mem_limits() { return &mem_limits_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
@@ -174,6 +176,9 @@ class RuntimeState {
   PartitionRowCount num_appended_rows_;
 
   RuntimeProfile profile_;
+
+  // all mem limits that apply to this query
+  std::vector<MemLimit*> mem_limits_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

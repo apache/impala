@@ -46,7 +46,8 @@ class HBaseTableScanner {
   // Initialize all members to NULL, except ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
-  HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htable_cache);
+  HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htable_cache,
+                    RuntimeState* state);
 
   // JNI setup. Create global references to classes,
   // and find method ids.
