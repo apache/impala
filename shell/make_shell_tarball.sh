@@ -99,6 +99,7 @@ else
 fi
 cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/thrift_sasl.py ${TARBALL_ROOT}/lib
+cp ${SHELL_HOME}/pkg_resources.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
 
