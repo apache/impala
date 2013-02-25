@@ -1,7 +1,20 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # The base class that should be used for almost all Impala tests
+
 import logging
 import os
 import pprint
@@ -85,7 +98,7 @@ class ImpalaTestSuite(BaseTestSuite):
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
     # Change the database to reflect the file_format, compression codec etc.
-    self.change_database(table_format_info, exec_options)
+    self.change_database(self.client, table_format_info)
     sections = self.__load_query_test_file(self.get_workload(), test_file_name)
     updated_sections = list()
     for test_section in sections:
@@ -149,10 +162,11 @@ class ImpalaTestSuite(BaseTestSuite):
       else:
         assert False, 'Unsupported setup command: %s' % row
 
-  def change_database(self, table_format, exec_options):
+  @classmethod
+  def change_database(cls, impala_client, table_format):
     db_name =  QueryTestSectionReader.get_db_name(table_format)
     query = 'use %s' % db_name
-    self.__execute_query(IMPALAD, query, exec_options)
+    impala_client.execute(query)
 
   def execute_wrapper(function):
     """
@@ -165,14 +179,16 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     @wraps(function)
     def wrapper(*args, **kwargs):
+      table_format = None
       if kwargs.get('table_format'):
         table_format = kwargs.get('table_format')
-        # Make sure the table_format is not None
-        assert table_format is not None
         del kwargs['table_format']
-        query_exec_options = kwargs.get('query_exec_options')
+      if kwargs.get('vector'):
+        table_format = kwargs.get('vector').get_value('table_format')
+        del kwargs['vector']
         # self is the implicit first argument
-        args[0].change_database(table_format, query_exec_options)
+      if table_format is not None:
+        args[0].change_database(args[0].client, table_format)
       return function(*args, **kwargs)
     return wrapper
 
@@ -187,9 +203,14 @@ class ImpalaTestSuite(BaseTestSuite):
   def execute_query(self, query, query_exec_options=None):
     return self.__execute_query(IMPALAD, query, query_exec_options)
 
+  def execute_query_using_client(self, client, query, vector):
+    self.change_database(client, vector.get_value('table_format'))
+    client.execute(query)
+
   @execute_wrapper
-  def execute_query_async(self, query, query_exec_options=None):
-    self.__set_exec_options(query_exec_options)
+  def execute_query_async(self, query, query_exec_options=None, impalad=None):
+    if impalad is not None:
+      return self.__execute_query_new_client(impalad, query, query_exec_options)
     return self.client.execute_query_async(query)
 
   @execute_wrapper
@@ -209,6 +230,17 @@ class ImpalaTestSuite(BaseTestSuite):
     LOG.info('Executing Query: \n%s\n' % query)
     self.__set_exec_options(query_exec_options)
     return self.client.execute(query)
+
+  def __execute_query_new_client(self, impalad, query, query_exec_options=None,
+      use_kerberos=False):
+    """Executes the given query against the specified Impalad"""
+    LOG.info('Targeting: %s Executing Query: \n%s\n' % (impalad, query))
+    new_client = self.create_impala_client(impalad)
+    new_client.clear_query_options()
+    if query_exec_options is not None and len(query_exec_options.keys()) > 0:
+      for exec_option in query_exec_options.keys():
+        new_client.set_query_option(exec_option, query_exec_options[exec_option])
+    return new_client.execute(query)
 
   def __set_exec_options(self, query_exec_options):
     # Set the specified query exec options, if specified

@@ -38,7 +38,9 @@ do
 done
 
 LOG_DIR=${IMPALA_HOME}/tests/results
+FE_LOG_DIR=${IMPALA_HOME}/tests/results/fe
 mkdir -p ${LOG_DIR}
+mkdir -p ${FE_LOG_DIR}
 
 # Enable core dumps
 ulimit -c unlimited
@@ -62,12 +64,17 @@ ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1
 ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
     --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
+${IMPALA_HOME}/tests/run-process-failure-tests.sh
+
 # Run JUnit frontend tests
 # Requires a running impalad cluster because some tests (such as DataErrorTest and
 # JdbcTest) queries against an impala cluster.
 # TODO: Currently planner tests require running the end-to-end tests first
 # so data is inserted into tables. This will go away once we move the planner
 # tests to the new python framework.
+${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${FE_LOG_DIR}\
+    --wait_for_cluster --cluster_size=3
+
 cd $IMPALA_FE_DIR
 mvn test
 

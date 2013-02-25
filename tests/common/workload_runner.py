@@ -169,7 +169,7 @@ class WorkloadRunner(object):
         LOG.error("Thread: %s returned with error. Exiting." % thread.name)
         raise RuntimeError, "Error executing query. Aborting"
 
-      results.append((thread.get_results()))
+      results.append(thread.get_results())
       LOG.debug(thread.name + " completed")
     return self.__get_median_execution_result(results)
 
