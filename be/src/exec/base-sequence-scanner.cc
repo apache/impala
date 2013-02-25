@@ -56,9 +56,6 @@ BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {
-  // Collect the maximum amount of memory we used to process this file.
-  COUNTER_UPDATE(scan_node_->memory_used_counter(),
-      data_buffer_pool_->peak_allocated_bytes());
 }
 
 Status BaseSequenceScanner::Prepare() {
@@ -74,6 +71,9 @@ Status BaseSequenceScanner::Close() {
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(header_->file_type, header_->compression_type);
   }
+  // Collect the maximum amount of memory we used to process this file.
+  COUNTER_UPDATE(scan_node_->memory_used_counter(),
+      data_buffer_pool_->peak_allocated_bytes());
   return Status::OK;
 }
 

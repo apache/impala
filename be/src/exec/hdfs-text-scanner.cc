@@ -46,8 +46,6 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
 }
 
 HdfsTextScanner::~HdfsTextScanner() {
-  COUNTER_UPDATE(scan_node_->memory_used_counter(),
-      boundary_mem_pool_->peak_allocated_bytes());
 }
 
 void HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
@@ -87,6 +85,9 @@ Status HdfsTextScanner::Close() {
   // the range is complete. 
   context_->Flush();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, THdfsCompression::NONE);
+  
+  COUNTER_UPDATE(scan_node_->memory_used_counter(),
+      boundary_mem_pool_->peak_allocated_bytes());
   return Status::OK;
 }
 
