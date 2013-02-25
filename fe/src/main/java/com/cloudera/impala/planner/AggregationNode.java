@@ -18,6 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.thrift.TAggregationNode;
@@ -112,8 +113,8 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void getMaterializedIds(List<SlotId> ids) {
-    super.getMaterializedIds(ids);
+  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
+    super.getMaterializedIds(analyzer, ids);
 
     // we indirectly reference all grouping slots (because we write them)
     // so they're all materialized.

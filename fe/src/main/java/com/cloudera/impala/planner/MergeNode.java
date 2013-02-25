@@ -14,12 +14,15 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TMergeNode;
@@ -31,6 +34,8 @@ import com.google.common.collect.Lists;
 /**
  * Node that merges the results of its child plans by materializing
  * the corresponding result exprs.
+ * If no result exprs are specified for a child, it simply passes on the child's
+ * results.
  */
 public class MergeNode extends PlanNode {
   // Expr lists corresponding to the input query stmts.
@@ -42,28 +47,22 @@ public class MergeNode extends PlanNode {
   protected final List<List<Expr>> constExprLists = Lists.newArrayList();
 
   // Output tuple materialized by this node.
-  protected final TupleDescriptor tupleDesc;
+  protected final List<TupleDescriptor> tupleDescs = Lists.newArrayList();
 
-  protected MergeNode(PlanNodeId id, TupleDescriptor tupleDesc) {
-    super(id, tupleDesc.getId().asList());
-    this.tupleDesc = tupleDesc;
-    this.rowTupleIds.addAll(tupleDesc.getId().asList());
+  protected MergeNode(PlanNodeId id, TupleId tupleId) {
+    super(id, Lists.newArrayList(tupleId));
+    this.rowTupleIds.add(tupleId);
   }
 
-  /**
-   * C'tor for distributed merge operation: the child fragment corresponding to child i
-   * of singleNodeMerge performs a "merge"/tuple materialization operation, but only
-   * for child i of singleNodeMerge.
-   */
-  protected MergeNode(
-      PlanNodeId id, MergeNode singleNodeMerge, int childIdx, PlanNode childPlan) {
-    super(id, singleNodeMerge);
-    Preconditions.checkState(singleNodeMerge.constExprLists.isEmpty());
-    this.tupleDesc = singleNodeMerge.tupleDesc;
-    addChild(childPlan);
-    List<Expr> resultExprs =
-        Expr.cloneList(singleNodeMerge.resultExprLists.get(childIdx), null);
-    resultExprLists.add(resultExprs);
+  /*
+  protected MergeNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
+    super(id, tupleIds);
+    this.rowTupleIds.addAll(tupleIds);
+  }
+  */
+
+  protected MergeNode(PlanNodeId id, MergeNode node) {
+    super(id, node);
   }
 
   public void addConstExprList(List<Expr> exprs) {
@@ -73,6 +72,11 @@ public class MergeNode extends PlanNode {
   public void addChild(PlanNode node, List<Expr> resultExprs) {
     addChild(node);
     resultExprLists.add(resultExprs);
+    if (resultExprs != null) {
+      // if we're materializing output, we can only do that into a single
+      // output tuple
+      Preconditions.checkState(tupleIds.size() == 1);
+    }
   }
 
   public List<List<Expr>> getResultExprLists() {
@@ -86,14 +90,16 @@ public class MergeNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     List<List<TExpr>> texprLists = Lists.newArrayList();
-    List<List<TExpr>> noFromTexprLists = Lists.newArrayList();
+    List<List<TExpr>> constTexprLists = Lists.newArrayList();
     for (List<Expr> exprList : resultExprLists) {
-      texprLists.add(Expr.treesToThrift(exprList));
+      if (exprList != null) {
+        texprLists.add(Expr.treesToThrift(exprList));
+      }
     }
-    for (List<Expr> noFromTexprList : constExprLists) {
-      noFromTexprLists.add(Expr.treesToThrift(noFromTexprList));
+    for (List<Expr> constTexprList : constExprLists) {
+      constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
-    msg.merge_node = new TMergeNode(texprLists, noFromTexprLists);
+    msg.merge_node = new TMergeNode(texprLists, constTexprLists);
     msg.node_type = TPlanNodeType.MERGE_NODE;
   }
 
@@ -117,8 +123,8 @@ public class MergeNode extends PlanNode {
   }
 
   @Override
-  public void getMaterializedIds(List<SlotId> ids) {
-    super.getMaterializedIds(ids);
+  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
+    super.getMaterializedIds(analyzer, ids);
 
     for (List<Expr> resultExprs: resultExprLists) {
       Expr.getIds(resultExprs, null, ids);
@@ -127,8 +133,11 @@ public class MergeNode extends PlanNode {
     // for now, also mark all of our output slots as materialized
     // TODO: fix this, it's not really necessary, but it breaks the logic
     // in MergeNode (c++)
-    for (SlotDescriptor desc: tupleDesc.getSlots()) {
-      ids.add(desc.getId());
+    for (TupleId tupleId: tupleIds) {
+      TupleDescriptor tupleDesc = analyzer.getTupleDesc(tupleId);
+      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+        ids.add(slotDesc.getId());
+      }
     }
   }
 }

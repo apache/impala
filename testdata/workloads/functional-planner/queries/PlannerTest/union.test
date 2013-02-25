@@ -90,44 +90,45 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (6)
+  EXCHANGE (9)
     TUPLE IDS: 3 
 
 Plan Fragment 1
-  RANDOM
+  UNPARTITIONED
   STREAM DATA SINK
-    EXCHANGE ID: 6
+    EXCHANGE ID: 9
     UNPARTITIONED
 
-  MERGE (9)
+  MERGE (12)
     TUPLE IDS: 3 
-    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (4)
+    EXCHANGE (8)
       LIMIT: 1
       TUPLE IDS: 2 
 
 Plan Fragment 2
-  UNPARTITIONED
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
+    EXCHANGE ID: 8
     UNPARTITIONED
 
-  MERGE (8)
+  SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (4)
+    LIMIT: 1
+    TUPLE IDS: 2 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
     TUPLE IDS: 3 
     TOP-N
     ORDER BY: int_col ASC
     LIMIT: 1
     TUPLE IDS: 1 
-      EXCHANGE (5)
+      EXCHANGE (6)
         TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
-    TUPLE IDS: 1 
 
 Plan Fragment 4
   RANDOM
@@ -135,11 +136,34 @@ Plan Fragment 4
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  MERGE (7)
+  TOP-N
+  ORDER BY: int_col ASC
+  LIMIT: 1
+  TUPLE IDS: 1 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
     TUPLE IDS: 3 
-    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+    EXCHANGE (5)
       LIMIT: 1
       TUPLE IDS: 0 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+    LIMIT: 1
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115

@@ -53,6 +53,7 @@ add_library(Exec STATIC
   hbase-table-scanner.cc
   read-write-util.cc
   scan-range-context.cc
+  select-node.cc
   serde-utils.cc
   scan-node.cc
   text-converter.cc

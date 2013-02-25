@@ -27,8 +27,12 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    TUPLE IDS: 0 
+  TOP-N
+  ORDER BY: name ASC
+  LIMIT: 1
+  TUPLE IDS: 0 
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+      TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====

@@ -31,7 +31,8 @@ enum TPlanNodeType {
   AGGREGATION_NODE,
   SORT_NODE,
   EXCHANGE_NODE,
-  MERGE_NODE
+  MERGE_NODE,
+  SELECT_NODE
 }
 
 // phases of an execution node

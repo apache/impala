@@ -42,6 +42,9 @@ class TestQueries(ImpalaTestSuite):
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
 
+  def test_subquery_limit(self, vector):
+    self.run_test_case('QueryTest/subquery-limit', vector)
+
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 

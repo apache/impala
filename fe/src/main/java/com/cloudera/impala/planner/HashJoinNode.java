@@ -16,6 +16,7 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.Predicate;
@@ -88,8 +89,8 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  public void getMaterializedIds(List<SlotId> ids) {
-    super.getMaterializedIds(ids);
+  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
+    super.getMaterializedIds(analyzer, ids);
     // we also need to materialize everything referenced by eqJoinConjuncts
     // and otherJoinConjuncts
     for (Pair<Expr, Expr> p: eqJoinConjuncts) {

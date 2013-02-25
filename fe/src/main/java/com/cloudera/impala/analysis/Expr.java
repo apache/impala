@@ -440,6 +440,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static <C extends Expr> void getIds(List<? extends Expr> exprs,
       List<TupleId> tupleIds, List<SlotId> slotIds) {
+    if (exprs == null) return;
     for (Expr e: exprs) {
       e.getIds(tupleIds, slotIds);
     }

@@ -248,6 +248,10 @@ public class Analyzer {
     return aliasMap.get(name.toString().toLowerCase());
   }
 
+  public TupleDescriptor getTupleDesc(TupleId id) {
+    return descTbl.getTupleDesc(id);
+  }
+
   /**
    * Given a "table alias"."column alias", return the SlotDescriptor
    * @param qualifiedColumnName table qualified column name
@@ -513,7 +517,9 @@ public class Analyzer {
    */
   public List<Predicate> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
     List<ExprId> conjunctIds = eqJoinConjuncts.get(id);
-    if (conjunctIds == null) return null;
+    if (conjunctIds == null) {
+      return null;
+    }
     List<Predicate> result = Lists.newArrayList();
     List<ExprId> ojClauseConjuncts = null;
     if (rhsRef != null) {

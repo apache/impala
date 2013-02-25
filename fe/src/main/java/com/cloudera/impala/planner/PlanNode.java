@@ -25,7 +25,6 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -65,6 +64,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // (the same RowBatch passes through multiple nodes; for instances, join nodes
   // form a left-deep chain and pass RowBatches on to their left children).
   // rowTupleIds[0] is the first tuple in the row, rowTupleIds[1] the second, etc.
+  // Set in PlanFragment.finalize()
   protected ArrayList<TupleId> rowTupleIds = Lists.newArrayList();
 
   // A set of nullable TupleId produced by this node. It is a subset of tupleIds.
@@ -117,6 +117,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   public long getLimit() {
     return limit;
+  }
+
+  public boolean hasLimit() {
+    return limit > 0;
   }
 
   /** Set the value of compactData in all children. */
@@ -245,9 +249,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * (the rationale being that only conjuncts need to be evaluated explicitly;
    * exprs that are turned into scan predicates, etc., are evaluated implicitly).
    */
-  public void getMaterializedIds(List<SlotId> ids) {
+  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
     for (PlanNode childNode: children) {
-      childNode.getMaterializedIds(ids);
+      childNode.getMaterializedIds(analyzer, ids);
     }
     Expr.getIds(getConjuncts(), null, ids);
   }

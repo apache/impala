@@ -303,16 +303,20 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      t1.p_partkey = t2.p_partkey
-      t1.ps_supplycost = t2.ps_min_supplycost
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
-        TUPLE IDS: 0 
-      EXCHANGE (4)
-        TUPLE IDS: 1 
+  TOP-N
+  ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
+  LIMIT: 100
+  TUPLE IDS: 0 1 
+    HASH JOIN
+      JOIN OP: INNER JOIN
+      HASH PREDICATES:
+        t1.p_partkey = t2.p_partkey
+        t1.ps_supplycost = t2.ps_min_supplycost
+      TUPLE IDS: 0 1 
+        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
+          TUPLE IDS: 0 
+        EXCHANGE (4)
+          TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
@@ -2214,22 +2218,26 @@ Plan Fragment 1
     EXCHANGE ID: 8
     UNPARTITIONED
 
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      r.total_revenue = m.max_revenue
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          s.s_suppkey = r.supplier_no
-        TUPLE IDS: 0 1 
-          SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
-            TUPLE IDS: 0 
-          EXCHANGE (6)
-            TUPLE IDS: 1 
-      EXCHANGE (7)
-        TUPLE IDS: 2 
+  TOP-N
+  ORDER BY: s_suppkey ASC
+  LIMIT: 100
+  TUPLE IDS: 0 1 2 
+    HASH JOIN
+      JOIN OP: INNER JOIN
+      HASH PREDICATES:
+        r.total_revenue = m.max_revenue
+      TUPLE IDS: 0 1 2 
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            s.s_suppkey = r.supplier_no
+          TUPLE IDS: 0 1 
+            SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
+              TUPLE IDS: 0 
+            EXCHANGE (6)
+              TUPLE IDS: 1 
+        EXCHANGE (7)
+          TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
@@ -3105,22 +3113,26 @@ Plan Fragment 1
     EXCHANGE ID: 8
     UNPARTITIONED
 
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      s.s_suppkey = t4.ps_suppkey
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          s.s_nationkey = n.n_nationkey
-        TUPLE IDS: 0 1 
-          SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
-            TUPLE IDS: 0 
-          EXCHANGE (6)
-            TUPLE IDS: 1 
-      EXCHANGE (7)
-        TUPLE IDS: 2 
+  TOP-N
+  ORDER BY: s_name ASC
+  LIMIT: 100
+  TUPLE IDS: 0 1 2 
+    HASH JOIN
+      JOIN OP: INNER JOIN
+      HASH PREDICATES:
+        s.s_suppkey = t4.ps_suppkey
+      TUPLE IDS: 0 1 2 
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            s.s_nationkey = n.n_nationkey
+          TUPLE IDS: 0 1 
+            SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
+              TUPLE IDS: 0 
+            EXCHANGE (6)
+              TUPLE IDS: 1 
+        EXCHANGE (7)
+          TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM

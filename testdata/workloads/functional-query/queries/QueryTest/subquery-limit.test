@@ -1,0 +1,80 @@
+# limit in subquery
+---- QUERY
+select count(*) from (select * from functional.alltypessmall limit 10) a
+---- TYPES
+BIGINT
+---- RESULTS
+10
+====
+# order by/limit in subquery, followed by addititional selection predicate;
+# predicate is not applied in subquery
+---- QUERY
+select *
+from (select * from functional.alltypessmall order by id limit 10) a
+where bool_col = true
+---- TYPES
+INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
+---- RESULTS
+2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
+2009,1,2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000
+2009,1,4,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4',2009-01-01 00:04:00.600000000
+2009,1,6,true,6,6,6,60,6.599999904632568,60.6,'01/01/09','6',2009-01-01 00:06:00.150000000
+2009,1,8,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8',2009-01-01 00:08:00.280000000
+====
+# order by/limit in subquery, followed by addititional selection predicate;
+# variant w/ join
+---- QUERY
+select *
+from (
+    select a.* from functional.alltypessmall a join functional.alltypessmall using (id)
+    order by a.id limit 10
+  ) a
+where bool_col = true
+---- TYPES
+INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
+---- RESULTS
+2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
+2009,1,2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000
+2009,1,4,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4',2009-01-01 00:04:00.600000000
+2009,1,6,true,6,6,6,60,6.599999904632568,60.6,'01/01/09','6',2009-01-01 00:06:00.150000000
+2009,1,8,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8',2009-01-01 00:08:00.280000000
+====
+---- QUERY
+# join against subquery with limit creates a merge fragment that applies the limit
+select functional.alltypes.id, a.id
+from functional.alltypes
+join (select id from functional.alltypessmall order by id limit 10) a using (id)
+---- TYPES
+INT, INT
+---- RESULTS
+0,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+9,9
+====
+---- QUERY
+# join against subquery with limit;
+# predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
+select functional.alltypes.id, a.id
+from functional.alltypes
+  join (
+    select a.id, a.bool_col
+    from functional.alltypessmall a join functional.alltypessmall using (id)
+    order by a.id limit 10
+  ) a using (id)
+where a.bool_col = true order by a.id limit 5
+---- TYPES
+INT, INT
+---- RESULTS
+0,0
+2,2
+4,4
+6,6
+8,8
+====

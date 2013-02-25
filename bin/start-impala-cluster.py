@@ -31,7 +31,7 @@ parser.add_option("--impalad_args", dest="impalad_args", default="",
                   help="Additional arguments to pass to each Impalad during startup")
 parser.add_option("--state_store_args", dest="state_store_args", default="",
                   help="Additional arguments to pass to State Store during startup")
-parser.add_option("--kill_only", dest="kill_only", action="store_true", default=False,
+parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true", default=False,
                   help="Instead of starting the cluster, just kill all running Impalad"\
                   " and State Store processes.")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,

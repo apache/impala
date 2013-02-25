@@ -58,6 +58,7 @@ public class PlannerTest {
 
   private StringBuilder PrintScanRangeLocations(TQueryExecRequest execRequest) {
     StringBuilder result = new StringBuilder();
+    if (execRequest.per_node_scan_ranges == null) return result;
     for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
         execRequest.per_node_scan_ranges.entrySet()) {
       result.append("NODE " + entry.getKey().toString() + ":\n");
@@ -148,7 +149,8 @@ public class PlannerTest {
           errorLog.append("section " + Section.PLAN.toString() + " of query:\n" + query
               + "\n" + result);
         }
-        locationsStr = PrintScanRangeLocations(execRequest.query_exec_request).toString();
+        locationsStr =
+            PrintScanRangeLocations(execRequest.query_exec_request).toString();
       }
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
@@ -265,6 +267,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testConstant() {
+    runPlannerTestFile("constant");
+  }
+
+  @Test
   public void testDistinct() {
     runPlannerTestFile("distinct");
   }
@@ -312,6 +319,11 @@ public class PlannerTest {
   @Test
   public void testSubquery() {
     runPlannerTestFile("subquery");
+  }
+
+  @Test
+  public void testSubqueryLimit() {
+    runPlannerTestFile("subquery-limit");
   }
 
   @Test

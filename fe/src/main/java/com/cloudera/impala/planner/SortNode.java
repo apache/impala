@@ -17,6 +17,7 @@ package com.cloudera.impala.planner;
 import java.util.Iterator;
 import java.util.List;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
@@ -48,9 +49,19 @@ public class SortNode extends PlanNode {
         info.getOrderingExprs().size() == info.getIsAscOrder().size());
   }
 
+  /**
+   * Clone 'inputSortNode' for distributed Top-N
+   */
+  public SortNode(PlanNodeId id, SortNode inputSortNode, PlanNode child) {
+    super(id, inputSortNode);
+    this.info = inputSortNode.info;
+    this.useTopN = inputSortNode.useTopN;
+    this.children.add(child);
+  }
+
   @Override
-  public void getMaterializedIds(List<SlotId> ids) {
-    super.getMaterializedIds(ids);
+  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
+    super.getMaterializedIds(analyzer, ids);
     Expr.getIds(info.getOrderingExprs(), null, ids);
   }
 

@@ -56,7 +56,7 @@ import com.google.common.collect.Sets;
  */
 public class PlanFragment {
   private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
-
+  
   // root of plan tree executed by this fragment
   private PlanNode planRoot;
 
@@ -164,6 +164,10 @@ public class PlanFragment {
       // top-n only materializes rows as wide as the input
       node.rowTupleIds = node.tupleIds;
       setRowTupleIds(node.getChild(0), null);
+    } else if (node instanceof SelectNode) {
+      // propagate parent's row composition to child
+      Preconditions.checkState(node.getChildren().size() == 1);
+      setRowTupleIds(node.getChild(0), node.rowTupleIds);
     } else if (node instanceof HashJoinNode) {
       // propagate parent's row composition only to left child
       Preconditions.checkState(node.getChildren().size() == 2);
@@ -270,7 +274,7 @@ public class PlanFragment {
       return;
     }
     List<SlotId> refdIdList = Lists.newArrayList();
-    planRoot.getMaterializedIds(refdIdList);
+    planRoot.getMaterializedIds(analyzer, refdIdList);
 
     if (outputExprs != null) {
       Expr.getIds(outputExprs, null, refdIdList);

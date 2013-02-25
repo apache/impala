@@ -29,7 +29,9 @@ not implemented
 ====
 # Test correct identification of the implicit aliasing of int_col in the select
 # list to t1.int_col
-select t1.int_col from functional.alltypessmall t1, functional.alltypessmall t2 where t1.id = t2.id 
+select t1.int_col
+from functional.alltypessmall t1, functional.alltypessmall t2
+where t1.id = t2.id 
 order by int_col
 limit 2
 ---- PLAN
@@ -64,15 +66,19 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      t1.id = t2.id
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-        TUPLE IDS: 0 
-      EXCHANGE (4)
-        TUPLE IDS: 1 
+  TOP-N
+  ORDER BY: t1.int_col ASC
+  LIMIT: 2
+  TUPLE IDS: 0 1 
+    HASH JOIN
+      JOIN OP: INNER JOIN
+      HASH PREDICATES:
+        t1.id = t2.id
+      TUPLE IDS: 0 1 
+        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+          TUPLE IDS: 0 
+        EXCHANGE (4)
+          TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
@@ -129,8 +135,12 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-    TUPLE IDS: 0 
+  TOP-N
+  ORDER BY: int_col ASC
+  LIMIT: 2
+  TUPLE IDS: 0 
+    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+      TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -169,8 +179,12 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-    TUPLE IDS: 0 
+  TOP-N
+  ORDER BY: functional.alltypessmall.id ASC
+  LIMIT: 2
+  TUPLE IDS: 0 
+    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+      TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610

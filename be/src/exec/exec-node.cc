@@ -28,6 +28,7 @@
 #include "exec/exchange-node.h"
 #include "exec/merge-node.h"
 #include "exec/topn-node.h"
+#include "exec/select-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
@@ -175,6 +176,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       return Status::OK;
     case TPlanNodeType::EXCHANGE_NODE:
       *node = pool->Add(new ExchangeNode(pool, tnode, descs));
+      return Status::OK;
+    case TPlanNodeType::SELECT_NODE:
+      *node = pool->Add(new SelectNode(pool, tnode, descs));
       return Status::OK;
     case TPlanNodeType::SORT_NODE:
       if (tnode.sort_node.use_top_n) {
