@@ -164,6 +164,9 @@ class BaseSequenceScanner : public HdfsScanner {
   // buffer of the _end_ of sync if it is found, otherwise, returns -1.
   int FindSyncBlock(const uint8_t* buffer, int buffer_len, const uint8_t* sync,
                     int sync_len);
+
+  // Number of bytes skipped when advancing to next sync on error.
+  RuntimeProfile::Counter* bytes_skipped_counter_;
 };
 
 }

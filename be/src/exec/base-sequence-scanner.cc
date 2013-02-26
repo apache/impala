@@ -62,6 +62,8 @@ Status BaseSequenceScanner::Prepare() {
   RETURN_IF_ERROR(HdfsScanner::Prepare());
   decompress_timer_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "DecompressionTime", TCounterType::CPU_TICKS);
+  bytes_skipped_counter_ = ADD_COUNTER(
+      scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
   return Status::OK;
 }
 
@@ -148,7 +150,9 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
       parse_status_ = Status::OK;
       ++num_errors;
       // Recover by skipping to the next sync.
+      int64_t error_offset = context_->file_offset();
       status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
+      COUNTER_UPDATE(bytes_skipped_counter_, context_->file_offset() - error_offset);
       if (status.IsCancelled()) return status;
       if (context_->eosr()) break;
 
