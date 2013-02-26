@@ -19,7 +19,9 @@
 import csv
 import math
 import os
+import re
 import sys
+import texttable
 from datetime import date, datetime
 from itertools import groupby
 from optparse import OptionParser
@@ -49,6 +51,9 @@ parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
 parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
                   help="Information about the lab run (name/id) that published "\
                   "the results.")
+parser.add_option("--tval_threshold", dest="tval_threshold", default=None,
+                  type="float", help="The ttest t-value at which a performance change "\
+                  "will be flagged as sigificant.")
 
 # These parameters are specific to recording results in a database. This is optional
 parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
@@ -65,8 +70,9 @@ parser.add_option("--db_password", dest="db_password", default='password',
                   help="Password used to connect to the the database.")
 options, args = parser.parse_args()
 
+VERBOSE = options.verbose
 COL_WIDTH = 18
-TOTAL_WIDTH = 132 if options.verbose else 96
+TOTAL_WIDTH = 135 if VERBOSE else 110
 
 # These are the indexes in the input row for each column value
 EXECUTOR_IDX = 0
@@ -79,8 +85,9 @@ COMPRESSION_IDX = 6
 AVG_IDX = 7
 STDDEV_IDX = 8
 NUM_CLIENTS_IDX = 9
-HIVE_AVG_IDX = 10
-HIVE_STDDEV_IDX = 11
+NUM_ITERS_IDX = 10
+HIVE_AVG_IDX = 11
+HIVE_STDDEV_IDX = 12
 
 # Formats a string so that is is wrapped across multiple lines with no single line
 # being longer than the given width
@@ -109,6 +116,7 @@ def find_matching_row_in_reference_results(search_row, reference_results):
         row[FILE_FORMAT_IDX] == search_row[FILE_FORMAT_IDX] and
         row[COMPRESSION_IDX] == search_row[COMPRESSION_IDX] and
         row[SCALE_FACTOR_IDX] == search_row[SCALE_FACTOR_IDX] and
+        row[NUM_CLIENTS_IDX] == search_row[NUM_CLIENTS_IDX] and
         row[WORKLOAD_IDX] == search_row[WORKLOAD_IDX]):
       return row
   return None
@@ -129,43 +137,93 @@ def calculate_geomean(times):
   return 'N/A'
 
 def build_table_header(verbose):
-  table_header = ['File Format', 'Compression', 'Avg(s)', 'StdDev(s)']
+  table_header =\
+      ['File Format', 'Compression', 'Avg(s)', 'StdDev(s)', 'Num Clients', 'Iters']
   if verbose:
     table_header += ['Hive Avg(s)', 'Hive StdDev(s)']
-  return table_header + ['Impala Speedup (vs Hive)']
+  return table_header + ['Speedup (vs Hive)']
 
-# Prints out the given result set in table format, grouped by query
 def build_table(results, verbose, reference_results = None):
+  """ Builds a table of query execution results, grouped by query name """
   output = str()
+  perf_changes = str()
+
+  # Group the results by query name
   sort_key = lambda x: (x[QUERY_NAME_IDX])
   results.sort(key = sort_key)
   for query_group, group in groupby(results, key = sort_key):
     output += 'Query: ' + wrap_text(query_group, TOTAL_WIDTH) + '\n'
-    output += build_padded_row_string(build_table_header(verbose), COL_WIDTH) + '\n'
-    output += "-" * TOTAL_WIDTH + '\n'
+    table = texttable.Texttable(max_width=TOTAL_WIDTH)
+    table.set_deco(table.HEADER | table.VLINES | table.BORDER)
+    table.header(build_table_header(verbose))
 
+    # Add reach result to the output table
     for row in group:
       full_row = list(row)
-      if not options.verbose:
+      # Don't show the hive execution times in verbose mode.
+      if not VERBOSE:
         del full_row[HIVE_STDDEV_IDX]
         del full_row[HIVE_AVG_IDX]
 
-      full_row += [format_if_float(calculate_impala_hive_speedup(row)) + 'X']
-      if reference_results is not None:
-        comparison_row = find_matching_row_in_reference_results(row, reference_results)
-        # There wasn't a matching row so don't display speedup information
-        if comparison_row is None:
-          output += build_padded_row_string(full_row[FILE_FORMAT_IDX:], COL_WIDTH) + '\n'
-          continue
+      # Show Impala speedup over Hive
+      full_row.append(format_if_float(calculate_impala_hive_speedup(row)) + 'X')
 
-        speedup = calculate_speedup(float(comparison_row[AVG_IDX]), float(row[AVG_IDX]))
-        full_row[AVG_IDX] = format_if_float(full_row[AVG_IDX])
-        full_row[AVG_IDX] = full_row[AVG_IDX] + ' (%sX)' % format_if_float(speedup)
-        output += build_padded_row_string(full_row[FILE_FORMAT_IDX:], COL_WIDTH) + '\n'
-      else:
-        output += build_padded_row_string(full_row[FILE_FORMAT_IDX:], COL_WIDTH) + '\n'
-    output +=  "-" * TOTAL_WIDTH + '\n\n'
-  return output
+      # If a reference result was specified, search for the matching record and display
+      # the speedup versus the reference.
+      if reference_results is not None:
+        ref_row = find_matching_row_in_reference_results(row, reference_results)
+
+        # Found a matching row in the reference results, format and display speedup
+        # information and check for significant performance changes, if enabled.
+        if ref_row is not None:
+          was_change_significant, is_regression =\
+              check_perf_change_significance(full_row, ref_row)
+          if was_change_significant:
+            perf_changes += build_perf_change_str(full_row, ref_row, is_regression)
+
+          speedup =\
+              format_if_float(calculate_speedup(ref_row[AVG_IDX], full_row[AVG_IDX]))
+          full_row[AVG_IDX] = format_if_float(full_row[AVG_IDX])
+          full_row[AVG_IDX] = full_row[AVG_IDX] + ' (%sX)' % speedup
+      table.add_row(full_row[FILE_FORMAT_IDX:])
+
+    output += table.draw() + '\n'
+  return output, perf_changes
+
+def build_perf_change_str(row, ref_row, regression):
+  perf_change_type = "regression" if regression else "improvement"
+  return "Significant perf %s detected: %s [%s/%s] (%ss -> %ss)\n" %\
+      (perf_change_type, row[QUERY_NAME_IDX], row[FILE_FORMAT_IDX], row[COMPRESSION_IDX],
+       format_if_float(ref_row[AVG_IDX]), format_if_float(row[AVG_IDX]))
+
+def check_perf_change_significance(row, ref_row):
+  if options.tval_threshold:
+    # Cast values to the proper types
+    avg, ref_avg = map(float, [row[AVG_IDX], ref_row[AVG_IDX]])
+    iters, ref_iters = map(int, [row[NUM_ITERS_IDX], ref_row[NUM_ITERS_IDX]])
+    ref_stddev = 0.0 if ref_row[STDDEV_IDX] == 'N/A' else float(ref_row[STDDEV_IDX])
+    stddev = 0.0 if row[STDDEV_IDX] == 'N/A' else float(row[STDDEV_IDX])
+
+    tval = calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters)
+    # TODO: Currently, this doesn't take into account the degrees of freedom
+    # (number of iterations). In the future the regression threshold could be updated to
+    # specify the confidence interval, and based on the tval result we can lookup whether
+    # we are in/not in that interval.
+    return abs(tval) > options.tval_threshold, tval > options.tval_threshold
+  return False, False
+
+def calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters):
+  """
+  Calculates the t-test t value for the given result and refrence.
+
+  Uses the Welch's t-test formula. For more information see:
+  http://en.wikipedia.org/wiki/Student%27s_t-distribution#Table_of_selected_values
+  http://en.wikipedia.org/wiki/Student's_t-test
+  """
+  # SEM (standard error mean) = sqrt(var1/N1 + var2/N2)
+  # t = (X1 - X2) / SEM
+  sem = math.sqrt((math.pow(stddev, 2) / iters) + (math.pow(ref_stddev, 2) / ref_iters))
+  return (avg - ref_avg) / sem
 
 def geometric_mean_execution_time(results):
   """
@@ -262,11 +320,26 @@ def write_junit_output_file(results, output_file):
 def read_csv_result_file(file_name):
   results = []
   for row in csv.reader(open(file_name, 'rb'), delimiter='|'):
-    # Older results may not have num_clients, so default to 1
+    # Backwards compatibility:
+    # Older results sets may not have num_clients, so default to 1. Older results also
+    # may not contain num_iterations, so fill that in if needed.
+    # TODO: This can be removed once all results are in the new format.
     if len(row) == STDDEV_IDX + 1:
       row.append('1')
+      row.append(get_num_iterations())
+    elif len(row) == NUM_CLIENTS_IDX + 1:
+      row.append(get_num_iterations())
     results.append(row)
   return results
+
+def get_num_iterations():
+  # This is for backwards compatibility only - older results may not contain the
+  # num_iterations record. In this case try to get it from the report description. If it
+  # is not available there, default to 2 iterations which is the minimum for all current
+  # runs.
+  description = options.report_description if options.report_description else str()
+  match = re.search(r'Iterations: (\d+)', description)
+  return 2 if match is None else match.group(1)
 
 def filter_sort_results(results, workload, scale_factor, key):
   filtered_res = [result for result in results if (
@@ -294,7 +367,7 @@ def write_results_to_datastore(results):
 
   run_info_id = data_store.insert_run_info(options.lab_run_info)
   for row in results:
-    # We ignore everything aver the stddev column
+    # We ignore everything after the stddev column
     executor, workload, scale_factor, query_name, query, file_format,\
         compression, avg_time, stddev = row[0:STDDEV_IDX + 1]
 
@@ -321,7 +394,7 @@ def write_results_to_datastore(results):
         executor_name=executor, avg_time=avg_time, stddev=stddev,
         run_date=current_date, version=options.build_version,
         notes=options.report_description, run_info_id=run_info_id,
-        is_official=options.is_official)
+        num_iterations=int(row[NUM_ITERS_IDX]), is_official=options.is_official)
 
 def build_summary_header():
   summary = "Execution Summary (%s)\n" % date.today()
@@ -335,9 +408,10 @@ def build_summary_header():
     summary += 'Lab Run Info: %s\n' % options.lab_run_info
   return summary
 
-reference_results = []
-hive_reference_results = []
-results = []
+reference_results = list()
+hive_reference_results = list()
+results = list()
+perf_changes_detected = True
 if os.path.isfile(options.result_file):
   results = read_csv_result_file(options.result_file)
 else:
@@ -397,8 +471,11 @@ if not options.no_output_table:
     table_output += "-" * TOTAL_WIDTH + '\n'
 
     # Build a table with detailed execution results for the workload/scale factor
-    table_output += build_table(filtered_results, options.verbose,
-                                reference_results) + '\n'
+    output, perf_changes = build_table(filtered_results, VERBOSE, reference_results)
+    table_output += output + '\n'
+    if perf_changes:
+      perf_changes_detected = True
+      summary += '\n'.join(['  !! ' + l for l in perf_changes.split('\n') if l]) + '\n\n'
   print summary, table_output
   print 'Total Avg Execution Time: ' + str(sum_avg_execution_time(results)[0])
 
@@ -409,3 +486,5 @@ if options.save_to_db:
   print 'Saving perf results to database'
   from perf_result_datastore import PerfResultDataStore
   write_results_to_datastore(results)
+
+exit(911 if perf_changes_detected else 0)
