@@ -30,16 +30,17 @@ using namespace boost::posix_time;
 using namespace boost::gregorian;
 
 // Benchmark for parsing timestamps.
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // ParseDate:            Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                BoostStringDate               0.668                  1X
-//                      BoostDate              0.6456             0.9664X
-//                         Impala               28.84              43.18X
+//                BoostStringDate              0.6793                  1X
+//                      BoostDate              0.6583             0.9691X
+//                         Impala               28.75              42.32X
 // 
 // ParseTimestamp:       Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                      BoostTime              0.4684                  1X
-//                         Impala               28.33              60.49X
+//                      BoostTime               0.455                  1X
+//                         Impala               28.39              62.39X
 
 #define VALIDATE 0
 
@@ -138,6 +139,7 @@ void TestBoostTime(int batch_size, void* d) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
 
   TestData dates, times;
 

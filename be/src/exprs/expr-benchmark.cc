@@ -125,7 +125,7 @@ void BenchmarkQueryFn(int batch_size, void* d) {
 
 #define BENCHMARK(name, stmt)\
   suite->AddBenchmark(name, BenchmarkQueryFn, GenerateBenchmarkExprs(stmt, false))
-
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Literals:             Function                Rate          Comparison
 // ----------------------------------------------------------------------
 //                            int                2154                  1X
@@ -159,6 +159,7 @@ Benchmark* BenchmarkArithmetic() {
 //                         strstr               141.8             0.6857X
 //                       strncmp1               300.3              1.452X
 //                       strncmp2               300.4              1.453X
+//                       strncmp3               8.341            0.03925X
 //                          regex               6.027            0.02915X
 Benchmark* BenchmarkLike() {
   Benchmark* suite = new Benchmark("Like");
@@ -167,6 +168,7 @@ Benchmark* BenchmarkLike() {
   BENCHMARK("strstr", "'abcdefghijklmnopqrstuvwxyz' LIKE '%lmnopq%'");
   BENCHMARK("strncmp1", "'abcdefghijklmnopqrstuvwxyz' LIKE '%xyz'");
   BENCHMARK("strncmp2", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc%'");
+  BENCHMARK("strncmp3", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc'");
   BENCHMARK("regex", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc%z'");
   return suite;
 }
@@ -244,7 +246,6 @@ Benchmark* BenchmarkConditionalFunctions() {
   BENCHMARK("case_int", "case 21 when 20 then 1 when 19 then 2 when 21 then 3 end");
   return suite;
 }
-
 
 // StringFunctions:      Function                Rate          Comparison
 // ----------------------------------------------------------------------
@@ -507,6 +508,7 @@ int main(int argc, char** argv) {
   Benchmark* math_fns = BenchmarkMathFunctions();
   Benchmark* timestamp_fns = BenchmarkTimestampFunctions();
 
+  cout << Benchmark::GetMachineInfo() << endl;
   cout << literals->Measure() << endl;
   cout << arithmetics->Measure() << endl;
   cout << like->Measure() << endl;

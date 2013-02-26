@@ -51,19 +51,20 @@ using namespace std;
 //                      = lim n->inf n(1 - 1/n) ^n
 //                      = n / e 
 //                      = 367
-// Results:
+
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Int Hash:             Function                Rate          Comparison
 // ----------------------------------------------------------------------
 //                            Fvn               96.35                  1X
-//                          Boost               176.2              1.828X
+//                          Boost                 176              1.826X
 //                            Crc               375.6              3.898X
 //                        Codegen               890.2               9.24X
 // 
 // Mixed Hash:           Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                            Fvn               81.21                  1X
-//                          Boost               76.79             0.9455X
-//                            Crc               271.1              3.339X
+//                            Fvn               82.01                  1X
+//                          Boost               82.71              1.008X
+//                            Crc               271.1              3.305X
 //                        Codegen                 215              2.647X
 
 typedef uint32_t (*CodegenHashFn)(int rows, char* data, int32_t* results);
@@ -334,7 +335,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   Value* result = builder.CreateGEP(args[2], counter);
   builder.CreateStore(seed, result);
 
-  counter_check = builder.CreateICmpSLT(counter, args[0]);
+  counter_check = builder.CreateICmpSLT(next_counter, args[0]);
   builder.CreateCondBr(counter_check, loop_body, loop_exit);
 
   // Loop exit
@@ -346,6 +347,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
   LlvmCodeGen::InitializeLlvm();
 
   const int NUM_ROWS = 1024;

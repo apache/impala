@@ -29,12 +29,14 @@ using namespace std;
 // strings into floats on what we expect to be typical data.  The data
 // is mostly positive numbers with just a couple of them in scientific
 // notation.  
-// Results:
+//
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // atof:                 Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                         Strtod               8.271                  1X
-//                           Atof               8.224             0.9944X
-//                         Impala               69.51              8.404X
+//                         Strtod               8.171                  1X
+//                           Atof               8.057             0.9861X
+//                         Impala               67.86              8.306X
+
 #define VALIDATE 0
 
 #if VALIDATE
@@ -109,6 +111,7 @@ void TestStrtod(int batch_size, void* d) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
 
   TestData data;
 

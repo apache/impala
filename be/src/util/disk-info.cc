@@ -92,7 +92,6 @@ void DiskInfo::GetDeviceNames() {
 void DiskInfo::Init() {
   GetDeviceNames();
   initialized_ = true;
-  LOG(INFO) << DiskInfo::DebugString();
 }
 
 int DiskInfo::disk_id(const char* path) {

@@ -24,15 +24,16 @@ using namespace impala;
 using namespace std;
 
 // Benchmark tests for padded & aligned vs unpadded tuple layouts.
-// Results:
+
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Tuple Layout:         Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//               SequentialPadded              0.4167                  1X
-//               SequentialImpala              0.4261              1.023X
-//            SequentialUnaligned              0.4316              1.036X
-//                   RandomPadded              0.1302             0.3125X
-//                   RandomImpala              0.1439             0.3453X
-//                RandomUnaligned              0.1471             0.3531X
+//               SequentialPadded              0.4013                  1X
+//               SequentialImpala              0.4374               1.09X
+//            SequentialUnaligned              0.4286              1.068X
+//                   RandomPadded              0.1342             0.3345X
+//                   RandomImpala              0.1437              0.358X
+//                RandomUnaligned              0.1452             0.3619X
 
 #define VALIDATE 0
 
@@ -208,6 +209,7 @@ void TestRandomUnaligned(int batch_size, void* d) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
 
   DCHECK_EQ(sizeof(UnpaddedTupleStruct), 24);
   DCHECK_EQ(sizeof(PaddedTupleStruct), 32);

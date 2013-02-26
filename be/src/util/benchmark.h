@@ -45,6 +45,9 @@ class Benchmark {
   // Runs all the benchmarks and returns the result in a formatted string.
   std::string Measure();
 
+  // Output machine/build configuration as a string
+  static std::string GetMachineInfo();
+
  private:
   friend class BenchmarkTest;
 

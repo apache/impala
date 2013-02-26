@@ -77,6 +77,12 @@ class CpuInfo {
     return num_cores_; 
   }
 
+  // Returns the model name of the cpu (e.g. Intel i7-2600)
+  static std::string model_name() { 
+    DCHECK(initialized_);
+    return model_name_;
+  }
+
   static std::string DebugString();
 
  private:
@@ -86,6 +92,7 @@ class CpuInfo {
   static long cache_sizes_[L3_CACHE + 1];
   static int64_t cycles_per_ms_;
   static int num_cores_;
+  static std::string model_name_;
 };
 
 }

@@ -18,6 +18,7 @@
 
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/stopwatch.h"
 
 using namespace std;
@@ -105,6 +106,13 @@ string Benchmark::Measure() {
        << (benchmarks_[i].rate / base_line) << "X" << endl;
   }
   
+  return ss.str();
+}
+
+// TODO: maybe add other things like amount of RAM, etc
+string Benchmark::GetMachineInfo() {
+  stringstream ss;
+  ss << "Machine Info: " << CpuInfo::model_name();
   return ss.str();
 }
 

@@ -35,6 +35,7 @@ int64_t CpuInfo::original_hardware_flags_;
 long CpuInfo::cache_sizes_[L3_CACHE + 1];
 int64_t CpuInfo::cycles_per_ms_;
 int CpuInfo::num_cores_ = 1;
+string CpuInfo::model_name_ = "unknown";
 
 static struct {
   string name;
@@ -80,11 +81,10 @@ void CpuInfo::Init() {
       name = line.substr(0, colon - 1);
       value = line.substr(colon + 1, string::npos);
       trim(name);
+      trim(value);
       if (name.compare("flags") == 0) {
-        trim(value);
         hardware_flags_ |= ParseCPUFlags(value);
       } else if (name.compare("cpu MHz") == 0) {
-        trim(value);
         // Every core will report a different speed.  We'll take the max, assuming
         // that when impala is running, the core will not be in a lower power state.
         // TODO: is there a more robust way to do this, such as
@@ -93,6 +93,8 @@ void CpuInfo::Init() {
         max_mhz = max(mhz, max_mhz);
       } else if (name.compare("processor") == 0) {
         ++num_cores;
+      } else if (name.compare("model name") == 0) {
+        model_name_ = value;
       }
     }
   }
@@ -118,7 +120,6 @@ void CpuInfo::Init() {
   }
   
   initialized_ = true;
-  LOG(INFO) << DebugString();
 }
 
 void CpuInfo::EnableFeature(long flag, bool enable) {
@@ -139,6 +140,7 @@ string CpuInfo::DebugString() {
   int64_t L2 = CacheSize(L2_CACHE);
   int64_t L3 = CacheSize(L3_CACHE);
   stream << "Cpu Info:" << endl
+         << "  Model: " << model_name_ << endl
          << "  Cores: " << num_cores_ << endl
          << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl
          << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl

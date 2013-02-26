@@ -28,15 +28,17 @@ using namespace std;
 // Benchmark for doing atoi.  This benchmark compares various implementations
 // to convert string to int32s.  The data is mostly positive, relatively small
 // numbers.
-// Results:
+//
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // atoi:                 Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                         strtol               58.59                  1X
-//                           atoi               58.75              1.003X
-//                         impala               180.3              3.078X
-//                  impala_unsafe               186.2              3.179X
-//                impala_unrolled               176.1              3.006X
-//                   impala_cased               217.8              3.718X
+//                         strtol               58.49                  1X
+//                           atoi               58.64              1.003X
+//                         impala               184.2              3.149X
+//                  impala_unsafe               207.7              3.551X
+//                impala_unrolled               196.8              3.365X
+//                   impala_cased               203.1              3.473X
+
 #define VALIDATE 0
 
 #if VALIDATE
@@ -234,6 +236,7 @@ void TestImpalaCased(int batch_size, void* d) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
 
   TestData data;
 

@@ -38,4 +38,7 @@ void impala::InitDaemon(int argc, char** argv) {
   InitThriftLogging();
   CpuInfo::Init();
   DiskInfo::Init();
+
+  LOG(INFO) << CpuInfo::DebugString();
+  LOG(INFO) << DiskInfo::DebugString();
 }

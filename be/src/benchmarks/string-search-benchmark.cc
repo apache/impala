@@ -159,6 +159,7 @@ void InitTestData(TestData* data) {
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
+  cout << Benchmark::GetMachineInfo() << endl;
 
   TestData data;
   InitTestData(&data);
