@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 # Loads a test-warehouse snapshot file into HDFS. Test-warehouse snapshot files
-# are produced as an artifact of each successfull master Jenkins build and can be
+# are produced as an artifact of each successful master Jenkins build and can be
 # downloaded from the Jenkins job webpage.
 #
 # NOTE: Running this script will remove your existing test-warehouse directory. Be sure
@@ -69,7 +69,7 @@ hadoop fs -put ${SNAPSHOT_STAGING_DIR}/test-warehouse/* ${TEST_WAREHOUSE_HDFS_DI
 echo "Generating HBase data and forcing reload"
 ${IMPALA_HOME}/bin/create_testdata.sh
 ${IMPALA_HOME}/testdata/bin/create-hbase.sh
-hadoop fs -rm -r ${TEST_WAREHOUSE_HDFS_DIR}/hbase*
+hadoop fs -rm -r -f ${TEST_WAREHOUSE_HDFS_DIR}/functional.db/hbase*
 
 echo "Cleaning up workspace"
 rm -rf ${SNAPSHOT_STAGING_DIR}
