@@ -31,6 +31,13 @@ namespace impala {
 // Period to update rate counters in ms.  
 static const int RATE_COUNTER_UPDATE_PERIOD = 500;
 
+// Thread counters name
+static const string THREAD_TOTAL_TIME = "TotalWallClockTime";
+static const string THREAD_USER_TIME = "UserCpuTime";
+static const string THREAD_SYS_TIME = "SysCpuTime";
+static const string THREAD_VOLUNTARY_CONTEXT_SWITCH = "VoluntaryContextSwitch";
+static const string THREAD_INVOLUNTARY_CONTEXT_SWITCH = "InvoluntaryContextSwitch";
+
 RuntimeProfile::RateCounterUpdateState RuntimeProfile::rate_counters_state_;
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
@@ -289,6 +296,19 @@ RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
   DerivedCounter* counter = pool_->Add(new DerivedCounter(type, counter_fn));
   counter_map_[name] = counter;
+  return counter;
+}
+
+RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
+    const std::string& prefix) {
+  ThreadCounters* counter = pool_->Add(new ThreadCounters());
+  counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TCounterType::TIME_MS);
+  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_MS);
+  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_MS);
+  counter->voluntary_context_switch_counter_ =
+      AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCH, TCounterType::UNIT);
+  counter->involuntary_context_switch_counter_ =
+      AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCH, TCounterType::UNIT);
   return counter;
 }
 

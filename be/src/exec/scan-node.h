@@ -55,6 +55,9 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* scan_ranges_complete_counter() const {
     return scan_ranges_complete_counter_;
   }
+  RuntimeProfile::ThreadCounters* scanner_thread_counters() const {
+    return scanner_thread_counters_;
+  }
 
   // names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
@@ -63,6 +66,7 @@ class ScanNode : public ExecNode {
   static const std::string PER_THREAD_THROUGHPUT_COUNTER;
   static const std::string MATERIALIZE_TUPLE_TIMER;
   static const std::string SCAN_RANGES_COMPLETE_COUNTER;
+  static const std::string SCANNER_THREAD_COUNTERS_PREFIX;
 
  private:
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
@@ -73,6 +77,8 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* per_thread_throughput_counter_;
   RuntimeProfile::Counter* materialize_tuple_timer_;  // time writing tuple slots
   RuntimeProfile::Counter* scan_ranges_complete_counter_;
+  // Aggregated scanner thread counters
+  RuntimeProfile::ThreadCounters* scanner_thread_counters_;
 };
 
 }

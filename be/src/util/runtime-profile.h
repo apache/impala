@@ -21,6 +21,8 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "common/logging.h"
 #include "common/object-pool.h"
@@ -44,11 +46,17 @@ namespace impala {
       ScopedTimer<StopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
   #define COUNTER_UPDATE(c, v) (c)->Update(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
+  #define ADD_THREAD_COUNTERS(profile, prefix) (profile)->AddThreadCounters(prefix)
+  #define SCOPED_THREAD_COUNTER_MEASUREMENT(c) \
+    ThreadCounterMeasurement \
+      MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
 #else
   #define ADD_COUNTER(profile, name, type) NULL
   #define SCOPED_TIMER(c)
   #define COUNTER_UPDATE(c, v)
   #define COUNTER_SET(c, v)
+  #define ADD_THREADCOUNTERS(profile, prefix) NULL
+  #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
 #endif
 
 class ObjectPool;
@@ -110,6 +118,25 @@ class RuntimeProfile {
     DerivedCounterFunction counter_fn_;
   };
 
+  // A set of counters that measures thread info, such as total time, user time, sys time.
+  class ThreadCounters {
+   private:
+    friend class ThreadCounterMeasurement;
+    friend class RuntimeProfile;
+
+    Counter* total_time_; // total wall clock time
+    Counter* user_time_;  // user CPU time
+    Counter* sys_time_;   // system CPU time
+
+    // The number of times a context switch resulted due to a process voluntarily giving
+    // up the processor before its time slice was completed.
+    Counter* voluntary_context_switch_counter_;
+
+    // The number of times a context switch resulted due to a higher priority process
+    // becoming runnable or because the current process exceeded its time slice.
+    Counter* involuntary_context_switch_counter_;
+  };
+
   // Create a runtime profile object with 'name'.  Counters and merged profile are
   // allocated from pool.
   RuntimeProfile(ObjectPool* pool, const std::string& name);
@@ -151,6 +178,10 @@ class RuntimeProfile {
   // Returns NULL if the counter already exists.
   DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type, 
       const DerivedCounterFunction& counter_fn);
+
+  // Add a set of thread counters prefixed with 'prefix'. Returns a ThreadCounters object
+  // that the caller can update.  The counter is owned by the RuntimeProfile object.
+  ThreadCounters* AddThreadCounters(const std::string& prefix);
 
   // Gets the counter object with 'name'.  Returns NULL if there is no counter with
   // that name.
@@ -312,7 +343,7 @@ class RuntimeProfile {
 };
 
 // Utility class to update time elapsed when the object goes out of scope.
-// 'T' must implement the Stopwatch "interface" (Start,Stop,ElapsedTime) but
+// 'T' must implement the StopWatch "interface" (Start,Stop,ElapsedTime) but
 // we use templates not to not for virtual function overhead.
 template<class T>
 class ScopedTimer {
@@ -346,6 +377,58 @@ class ScopedTimer {
 
   T sw_;
   RuntimeProfile::Counter* counter_;
+};
+
+// Utility class to update ThreadCounter when the object goes out of scope or when Stop is
+// called. Threads measurements will then be taken using getrusage.
+// This is ~5x slower than ScopedTimer due to calling getrusage.
+class ThreadCounterMeasurement {
+ public:
+  ThreadCounterMeasurement(RuntimeProfile::ThreadCounters* counter) :
+    stop_(false), counter_(counter) {
+    DCHECK(counter != NULL);
+    sw_.Start();
+    int ret = getrusage(RUSAGE_THREAD, &usage_base_);
+    DCHECK_EQ(ret, 0);
+  }
+
+  // Stop and update the counter
+  void Stop() {
+    if (stop_) return;
+    stop_ = true;
+    sw_.Stop();
+    rusage usage;
+    int ret = getrusage(RUSAGE_THREAD, &usage);
+    DCHECK_EQ(ret, 0);
+    int64_t utime_begin =
+        usage_base_.ru_utime.tv_sec * 1000L + usage_base_.ru_utime.tv_usec / 1000;
+    int64_t stime_begin =
+        usage_base_.ru_stime.tv_sec * 1000L + usage_base_.ru_stime.tv_usec / 1000;
+    int64_t utime_end = usage.ru_utime.tv_sec * 1000L + usage.ru_utime.tv_usec / 1000;
+    int64_t stime_end = usage.ru_stime.tv_sec * 1000L + usage.ru_stime.tv_usec / 1000;
+    counter_->total_time_->Update(sw_.ElapsedTime());
+    counter_->user_time_->Update(utime_end - utime_begin);
+    counter_->sys_time_->Update(stime_end - stime_begin);
+    counter_->voluntary_context_switch_counter_->Update(
+        usage.ru_nvcsw - usage_base_.ru_nvcsw);
+    counter_->involuntary_context_switch_counter_->Update(
+        usage.ru_nivcsw - usage_base_.ru_nivcsw);
+  }
+
+  // Update counter when object is destroyed
+  ~ThreadCounterMeasurement() {
+    Stop();
+  }
+
+ private:
+  // Disable copy constructor and assignment
+  ThreadCounterMeasurement(const ThreadCounterMeasurement& timer);
+  ThreadCounterMeasurement& operator=(const ThreadCounterMeasurement& timer);
+
+  bool stop_;
+  rusage usage_base_;
+  WallClockStopWatch sw_;
+  RuntimeProfile::ThreadCounters* counter_;
 };
 
 }

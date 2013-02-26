@@ -75,7 +75,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       counters_reported_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
-    max_materialized_row_batches_ = 10 * DiskInfo::num_disks();
+    max_materialized_row_batches_ = 50 * DiskInfo::num_disks();
   }
 }
 
@@ -666,11 +666,12 @@ void HdfsScanNode::DiskThread() {
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   {
     unique_lock<mutex> l(row_batches_lock_);
-    while (materialized_row_batches_.size() >= max_materialized_row_batches_ && !done_) {
+    while (UNLIKELY(materialized_row_batches_.size() >= max_materialized_row_batches_
+        && !done_)) {
       row_batch_consumed_cv_.wait(l);
     }
 
-    if (done_) {
+    if (UNLIKELY(done_)) {
       delete row_batch;
       return;
     }
@@ -683,8 +684,12 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
 void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context) {
   // Call into the scanner to process the range.  From the scanner's perspective,
   // everything is single threaded.
-  Status status = scanner->ProcessScanRange(context);
-  scanner->Close();
+  Status status;
+  {
+    SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
+    status = scanner->ProcessScanRange(context);
+    scanner->Close();
+  }
 
   // Scanner thread completed. Take a look and update the status 
   unique_lock<recursive_mutex> l(lock_);
