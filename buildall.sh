@@ -124,7 +124,7 @@ then
   cd $IMPALA_FE_DIR
   rm -rf target
   rm -f src/test/resources/{core,hbase,hive}-site.xml
-  rm -rf src/generated-sources/*
+  rm -rf generated-sources/*
 
   # clean be
   cd $IMPALA_HOME/be
