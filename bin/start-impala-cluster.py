@@ -95,7 +95,10 @@ def start_impalad_instances(cluster_size):
     execute_cmd_with_redirect(IMPALAD_PATH, args, output_file)
 
 def execute_cmd_with_redirect(cmd, args, output_file):
-  redirect_str = '' if options.verbose else REDIRECT_STR % {'file_name': output_file}
+  if options.verbose:
+    redirect_str = ''
+  else:
+    redirect_str = REDIRECT_STR % {'file_name': output_file}
   os.system("%s %s %s &" % (cmd, args, redirect_str))
 
 def wait_for_cluster(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
