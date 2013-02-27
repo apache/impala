@@ -33,6 +33,9 @@ SNAPSHOT_FILE=
 # Exit on reference to uninitialized variable
 set -u
 
+# Exit on non-zero return value
+set -e
+
 # parse command line options
 for ARG in $*
 do
@@ -137,11 +140,15 @@ then
   git clean -Xdf
 
   # clean llvm
-  rm $IMPALA_HOME/llvm-ir/impala*.ll
+  rm -f $IMPALA_HOME/llvm-ir/impala*.ll
 
   # Cleanup the version.info file so it will be regenerated for the next build.
   rm -f $IMPALA_HOME/bin/version.info
 fi
+
+# Kill any processes that may be accessing postgres metastore
+# TODO: figure out how to make postgres ignore other users
+${IMPALA_HOME}/testdata/bin/kill-all.sh
 
 # Generate the Hadoop configs needed by Impala
 if [ $FORMAT_CLUSTER -eq 1 ]; then
@@ -149,9 +156,6 @@ if [ $FORMAT_CLUSTER -eq 1 ]; then
 else
   ${IMPALA_HOME}/bin/create-test-configuration.sh
 fi
-
-# Exit on non-true return value
-set -e
 
 # build common and backend
 cd $IMPALA_HOME
