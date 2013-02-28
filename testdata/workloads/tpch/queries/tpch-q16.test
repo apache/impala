@@ -9,8 +9,7 @@ where not s_comment like '%Customer%Complaints%'
 RESET tpch.supplier_tmp
 RELOAD tpch.supplier_tmp
 ---- RESULTS
----- PARTITIONS
-/: 9996
+: 9996
 ====
 ---- QUERY : TPCH-Q16_QUERY_2
 insert overwrite table tpch.q16_tmp
@@ -26,8 +25,7 @@ join tpch.supplier_tmp s
 RESET tpch.q16_tmp
 RELOAD tpch.q16_tmp
 ---- RESULTS
----- PARTITIONS
-/: 741971
+: 741971
 ====
 ---- QUERY : TPCH-Q16_QUERY_3
 # Modifications: Added limit

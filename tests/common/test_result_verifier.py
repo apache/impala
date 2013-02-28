@@ -158,29 +158,11 @@ def verify_raw_results(test_section, exec_result):
   Accepts a raw exec_result object and verifies it matches the expected results
 
   This process includes the parsing/transformation of the raw data results into the
-  result format used in the tests. It also chooses the appropriate result section to
-  verify from the test case because insert tests need to verify different things
-  than select tests.
+  result format used in the tests.
   """
   expected_results = None
 
-  # If there is a 'PARTITIONS' section then assume this is an insert test and get the
-  # expected results from there
-  if 'PARTITIONS' in test_section:
-    partition_results = list()
-    for row in test_section['PARTITIONS'].split('\n'):
-      # TODO: Currently we don't get the partition names back so strip these out of the
-      # expected results
-      if ':' in row:
-        partition_results.append(row.split(':')[1].strip())
-      elif row.strip():
-        partition_results.append(row.strip())
-
-    # TODO: Currently we just return the total number of rows inserted rather than
-    # rows per partition. This should be updated to validated on a per-partition
-    # basis.
-    expected_results = str(sum([int(p_count) for p_count in partition_results]))
-  elif 'RESULTS' in test_section:
+  if 'RESULTS' in test_section:
     expected_results = remove_comments(test_section['RESULTS'])
   else:
     LOG.info("No results found. Skipping verification");

@@ -12,8 +12,7 @@ group by l_suppkey
 RESET tpch.revenue
 RELOAD tpch.revenue
 ---- RESULTS
----- PARTITIONS
-/: 10000
+: 10000
 ====
 ---- QUERY : TPCH-Q15_QUERY_2
 insert overwrite table tpch.max_revenue
@@ -23,8 +22,7 @@ from tpch.revenue
 RESET tpch.max_revenue
 RELOAD tpch.max_revenue
 ---- RESULTS
----- PARTITIONS
-/: 1
+: 1
 ====
 ---- QUERY : TPCH-Q15_QUERY_3
 # Modifications - Added limit

@@ -25,8 +25,7 @@ group by
 RESET tpch.q22_customer_tmp1
 RELOAD tpch.q22_customer_tmp1
 ---- RESULTS
----- PARTITIONS
-/: 1
+: 1
 ====
 ---- QUERY : TPCH-Q22_QUERY_2
 # Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,

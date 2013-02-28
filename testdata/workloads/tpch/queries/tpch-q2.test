@@ -25,8 +25,7 @@ from partsupp ps
 RESET tpch.q2_minimum_cost_supplier_tmp1
 RELOAD tpch.q2_minimum_cost_supplier_tmp1
 ---- RESULTS
----- PARTITIONS
-/: 642
+: 642
 ====
 ---- QUERY : TPCH-Q2_QUERY_2
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
@@ -39,8 +38,7 @@ group by p_partkey
 RESET tpch.q2_minimum_cost_supplier_tmp2
 RELOAD tpch.q2_minimum_cost_supplier_tmp2
 ---- RESULTS
----- PARTITIONS
-/: 460
+: 460
 ====
 ---- QUERY : TPCH-Q2_QUERY_3
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause

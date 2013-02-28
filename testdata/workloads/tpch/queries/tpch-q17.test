@@ -9,8 +9,7 @@ group by l_partkey
 RESET tpch.lineitem_tmp
 RELOAD tpch.lineitem_tmp
 ---- RESULTS
----- PARTITIONS
-/: 200000
+: 200000
 ====
 ---- QUERY : TPCH-Q17_QUERY_2
 # Modifications: Converted selects from multiple tables to joins,

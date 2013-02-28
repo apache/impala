@@ -10,8 +10,7 @@ where year=2009 and month=04
 RESET alltypesnopart_insert
 RELOAD alltypesnopart_insert
 ---- RESULTS
----- PARTITIONS
-/: 25
+: 25
 ====
 ---- QUERY
 # search the overwritten table to verify the results
@@ -57,8 +56,7 @@ where year=2009 and month=04
 ---- SETUP
 RESET alltypesnopart_insert
 ---- RESULTS
----- PARTITIONS
-/: 25
+: 25
 ====
 ---- QUERY
 # search the table to verify it contains 25 rows
@@ -80,8 +78,7 @@ where year=2009 and month=4
 DROP PARTITIONS alltypesinsert
 RESET alltypesinsert
 ---- RESULTS
----- PARTITIONS
-/year=2009/month=4/: 25
+year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -129,8 +126,7 @@ where year=2009 and month=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
----- PARTITIONS
-/year=2009/month=4/: 25
+year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the partition to verify it contains all 25 rows
@@ -152,10 +148,9 @@ where year=2009 and month>1 and month<=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
----- PARTITIONS
-/year=2009/month=2/: 25
-/year=2009/month=3/: 25
-/year=2009/month=4/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -253,13 +248,9 @@ where year=2009 and month>=1 and month<4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
-year=2009/month=1/
-year=2009/month=2/
-year=2009/month=3/
----- PARTITIONS
-/year=2009/month=1/: 25
-/year=2009/month=2/: 25
-/year=2009/month=3/: 25
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
 ====
 ---- QUERY
 # search the partitions to verify they contain all 75 rows
@@ -280,11 +271,10 @@ from functional.alltypessmall
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
----- PARTITIONS
-/year=2009/month=1/: 25
-/year=2009/month=2/: 25
-/year=2009/month=3/: 25
-/year=2009/month=4/: 25
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -406,11 +396,10 @@ from functional.alltypessmall
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
----- PARTITIONS
-/year=2009/month=1/: 25
-/year=2009/month=2/: 25
-/year=2009/month=3/: 25
-/year=2009/month=4/: 25
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the partitions to verify they contain all 100 rows
@@ -426,7 +415,7 @@ bigint
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2="/\%.") SELECT "value" FROM alltypessmall LIMIT 1;
 ---- SETUP
 DROP PARTITIONS insert_string_partitioned
----- PARTITIONS
+---- RESULTS
 s2=%2F%5C%25./: 1
 ====
 ---- QUERY

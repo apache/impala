@@ -6,8 +6,7 @@ select NULL, "", "NULL", "\\N", NULL from alltypes limit 1
 ---- SETUP
 RESET nullinsert
 ---- RESULTS
----- PARTITIONS
-/: 1
+: 1
 ====
 ---- QUERY
 select * from nullinsert

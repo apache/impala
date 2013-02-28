@@ -14,8 +14,7 @@ group by ps_partkey
 RESET tpch.q11_sum_tmp
 RELOAD tpch.q11_sum_tmp
 ---- RESULTS
----- PARTITIONS
-/: 29818
+: 29818
 ====
 ---- QUERY : TPCH-Q11_QUERY_2
 insert overwrite table tpch.q11_sum_tmp
@@ -25,6 +24,5 @@ from tpch.q11_part_tmp
 RESET tpch.q11_part_tmp
 RELOAD tpch.q11_part_tmp
 ---- RESULTS
----- PARTITIONS
-/: 1
+: 1
 ====

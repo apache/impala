@@ -9,8 +9,7 @@ where p_name like 'forest%'
 RESET tpch.q20_tmp1
 RELOAD tpch.q20_tmp1
 ---- RESULTS
----- PARTITIONS
-/: 2127
+: 2127
 ====
 ---- QUERY : TPCH-Q20_QUERY_2
 insert overwrite table tpch.q20_tmp2
@@ -29,8 +28,7 @@ group by
 RESET tpch.q20_tmp2
 RELOAD tpch.q20_tmp2
 ---- RESULTS
----- PARTITIONS
-/: 543210
+: 543210
 ====
 ---- QUERY : TPCH-Q20_QUERY_3
 insert overwrite table tpch.q20_tmp3
@@ -47,8 +45,7 @@ from partsupp ps
 RESET tpch.q20_tmp3
 RELOAD tpch.q20_tmp3
 ---- RESULTS
----- PARTITIONS
-/: 5843
+: 5843
 ====
 ---- QUERY : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
@@ -61,8 +58,7 @@ group by ps_suppkey
 RESET tpch.q20_tmp4
 RELOAD tpch.q20_tmp4
 ---- RESULTS
----- PARTITIONS
-/: 4397
+: 4397
 ====
 ---- QUERY : TPCH-Q20_QUERY_5
 # Modifications: Added limit

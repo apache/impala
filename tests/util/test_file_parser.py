@@ -60,7 +60,7 @@ def parse_query_test_file(file_name):
   """
   # Update the valid section names as we support other test types
   # (ex. planner, data error)
-  VALID_SECTION_NAMES = ['QUERY', 'RESULTS', 'TYPES', 'PARTITIONS', 'SETUP']
+  VALID_SECTION_NAMES = ['QUERY', 'RESULTS', 'TYPES', 'SETUP']
   return parse_test_file(file_name, VALID_SECTION_NAMES)
 
 def parse_table_constraints(constraints_file):

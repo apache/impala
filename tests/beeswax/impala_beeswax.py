@@ -222,19 +222,17 @@ class ImpalaBeeswaxClient(object):
 
     self.__do_rpc(lambda: self.imp_service.close(handle))
     # The query executed successfully and all the data was fetched.
-    exec_result = QueryResult(success=True,
-                              data = result_rows,
-                              schema = schema)
+    exec_result = QueryResult(success=True, data=result_rows, schema=schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 
   def __fetch_insert_results(self, handle):
     """Executes an insert query"""
     result = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
-    # The insert was successfull
+    # The insert was successful
     num_rows = sum(map(int, result.rows_appended.values()))
-    exec_result = QueryResult(success=True,
-                              data = num_rows)
+    data = ["%s: %s" % row for row in result.rows_appended.iteritems()]
+    exec_result = QueryResult(success=True, data=data)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result
 

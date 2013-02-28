@@ -9,8 +9,7 @@ group by l_orderkey
 RESET q18_tmp
 RELOAD q18_tmp
 ---- RESULTS
----- PARTITIONS
-/: 1500000
+: 1500000
 ====
 ---- QUERY : TPCH-Q18_QUERY_2
 # Modifications: Cast o_totalprice column due to float/double values not
