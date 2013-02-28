@@ -117,7 +117,8 @@ class ImpalaTestSuite(BaseTestSuite):
         updated_sections.append(
             self.__update_results(test_file_name, test_section, result))
       else:
-        verify_raw_results(test_section, result)
+        verify_raw_results(test_section, result,
+                           vector.get_value('table_format').file_format)
 
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")

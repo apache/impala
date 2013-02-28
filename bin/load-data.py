@@ -19,6 +19,7 @@ parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
                   help="The exploration strategy for schema gen: 'core', "\
                   "'pairwise', or 'exhaustive'")
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
+                  default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
 parser.add_option("-w", "--workloads", dest="workloads",
                   help="Comma-separated list of workloads to load data for. If 'all' is "\
@@ -38,19 +39,21 @@ parser.add_option("--table_names", dest="table_names", default=None,
 parser.add_option("--table_formats", dest="table_formats", default=None,
                   help="Override the test vectors and load using the specified table "\
                   "formats. Ex. --table_formats=seq/snap/block,text/none")
-
+parser.add_option("--hdfs_namenode", dest="hdfs_namenode", default="localhost:20500",
+                  help="HDFS name node for Avro schema URLs, default localhost:20500")
 (options, args) = parser.parse_args()
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 DATASET_DIR = os.environ['IMPALA_DATASET_DIR']
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
+AVRO_SCHEMA_DIR = "avro_schemas"
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
                       "--workload=%s --scale_factor=%s --verbose"
 HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/hive')
 HIVE_ARGS = "-hiveconf hive.root.logger=WARN,console -v"
-
 IMPALA_SHELL_CMD = os.path.join(os.environ['IMPALA_HOME'], 'bin/impala-shell.sh')
+HADOOP_CMD = os.path.join(os.environ['HADOOP_HOME'], 'bin/hadoop')
 
 def available_workloads(workload_dir):
   return [subdir for subdir in os.listdir(workload_dir)
@@ -99,6 +102,8 @@ def generate_schema_statements(workload):
     generate_cmd += " --table_formats=%s" % options.table_formats
   if options.hive_warehouse_dir is not None:
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
+  if options.hdfs_namenode is not None:
+    generate_cmd += " --hdfs_namenode=%s" % options.hdfs_namenode
   print 'Executing Generate Schema Command: ' + generate_cmd
   ret_val = subprocess.call(os.path.join(TESTDATA_BIN_DIR, generate_cmd), shell = True)
   if ret_val != 0:
@@ -118,6 +123,15 @@ def get_dataset_for_workload(workload):
     else:
       print 'Dimension file does not contain dataset for workload \'%s\'' % (workload)
       sys.exit(1)
+
+def copy_avro_schemas_to_hdfs(schemas_dir):
+  """Recursively copies all of schemas_dir to the test warehouse."""
+  cmd = "%s fs -put -f %s /" % (HADOOP_CMD, schemas_dir)
+  print "Executing HDFS copy command: " + cmd
+  ret_val = subprocess.call(cmd, shell=True)
+  if ret_val != 0:
+    print "Error copying Avro schemas to HDFS, exiting"
+    sys.exit(ret_val)
 
 if __name__ == "__main__":
   all_workloads = available_workloads(WORKLOAD_DIR)
@@ -142,8 +156,18 @@ if __name__ == "__main__":
     dataset_dir = os.path.join(DATASET_DIR, dataset)
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
-    exec_hive_query_from_file(os.path.join(dataset_dir,
-       'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
+    # We load Avro tables separately due to bugs in the Avro SerDe.
+    # generate-schema-statements.py separates the avro statements into a
+    # separate file to get around this.
+    # See https://issues.apache.org/jira/browse/HIVE-4195.
+    generated_file = 'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_file):
+      exec_hive_query_from_file(os.path.join(dataset_dir, generated_file))
+    generated_avro_file = \
+        'load-%s-%s-avro-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_avro_file):
+      copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
+      exec_hive_query_from_file(os.path.join(dataset_dir, generated_avro_file))
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0

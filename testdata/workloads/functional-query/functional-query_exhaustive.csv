@@ -15,3 +15,5 @@ file_format: rc, dataset: functional, compression_codec: def, compression_type: 
 file_format: rc, dataset: functional, compression_codec: gzip, compression_type: block
 file_format: rc, dataset: functional, compression_codec: bzip, compression_type: block
 file_format: rc, dataset: functional, compression_codec: snap, compression_type: block
+file_format: avro, dataset: functional, compression_codec: none, compression_type: none
+file_format: avro, dataset: functional, compression_codec: snap, compression_type: block

@@ -19,6 +19,11 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/aggregation', vector)
 
   def test_exprs(self, vector):
+    # Don't attempt to evaluate timestamp expressions with Avro tables (which
+    # don't support a timestamp type)
+    # TODO: Enable some of these tests for Avro if possible
+    if vector.get_value('table_format').file_format == 'avro':
+      pytest.skip()
     self.run_test_case('QueryTest/exprs', vector)
 
   def test_hdfs_scan_node(self, vector):

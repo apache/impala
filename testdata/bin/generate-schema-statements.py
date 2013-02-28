@@ -25,6 +25,7 @@
 import collections
 import csv
 import math
+import json
 import os
 import random
 import subprocess
@@ -58,6 +59,8 @@ parser.add_option("--table_names", dest="table_names", default=None,
 parser.add_option("--table_formats", dest="table_formats", default=None,
                   help="Override the test vectors and load using the specified table "\
                   "formats. Ex. --table_formats=seq/snap/block,text/none")
+parser.add_option("--hdfs_namenode", dest="hdfs_namenode", default="localhost:20500",
+                  help="HDFS name node for Avro schema URLs, default localhost:20500")
 (options, args) = parser.parse_args()
 
 if options.workload is None:
@@ -67,10 +70,12 @@ if options.workload is None:
 
 WORKLOAD_DIR = os.environ['IMPALA_HOME'] + '/testdata/workloads'
 DATASET_DIR = os.environ['IMPALA_HOME'] + '/testdata/datasets'
+AVRO_SCHEMA_DIR = "avro_schemas"
 
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
 COMPRESSION_ENABLED = "SET hive.exec.compress.output=%s;"
 COMPRESSION_CODEC = "SET mapred.output.compression.codec=%s;"
+AVRO_COMPRESSION_CODEC = "SET avro.output.codec=%s;"
 SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
@@ -88,17 +93,42 @@ COMPRESSION_MAP = {'def': 'org.apache.hadoop.io.compress.DefaultCodec',
                    'none': ''
                   }
 
-FILE_FORMAT_MAP = {'text': 'TEXTFILE',
-                   'seq': 'SEQUENCEFILE',
-                   'rc': 'RCFILE',
-                   'parquet': '\n' +
-                     'INPUTFORMAT \'com.cloudera.impala.hive.serde.ParquetInputFormat\'\n' +
-                     'OUTPUTFORMAT \'com.cloudera.impala.hive.serde.ParquetOutputFormat\'',
-                   'text_lzo': '\n' +
-                     'INPUTFORMAT \'com.hadoop.mapred.DeprecatedLzoTextInputFormat\'\n' +
-                     'OUTPUTFORMAT ' +
-                     '\'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat\'\n'
-                  }
+AVRO_COMPRESSION_MAP = {
+  'def': 'deflate',
+  'snap': 'snappy',
+  'none': '',
+  }
+
+FILE_FORMAT_MAP = {
+  'text': 'TEXTFILE',
+  'seq': 'SEQUENCEFILE',
+  'rc': 'RCFILE',
+  'parquet':
+    "\nINPUTFORMAT 'com.cloudera.impala.hive.serde.ParquetInputFormat'" +
+    "\nOUTPUTFORMAT 'com.cloudera.impala.hive.serde.ParquetOutputFormat'",
+  'text_lzo':
+    "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
+    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
+  'avro':
+    "\nINPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'" +
+    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'"
+  }
+
+HIVE_TO_AVRO_TYPE_MAP = {
+  'STRING': 'string',
+  'INT': 'int',
+  'TINYINT': 'int',
+  'SMALLINT': 'int',
+  'BIGINT': 'long',
+  'BOOLEAN': 'boolean',
+  'FLOAT': 'float',
+  'DOUBLE': 'double',
+  # Avro has no timestamp type, so convert to string
+  # TODO: this allows us to create our Avro test tables, but any tests that use
+  # a timestamp column will fail. We probably want to convert back to timestamps
+  # in our tests.
+  'TIMESTAMP': 'string',
+  }
 
 PARQUET_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
      SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
@@ -117,12 +147,66 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
                                             hdfs_location=hdfs_location)
   return create_statement
 
-def build_compression_codec_statement(codec, compression_type):
-  compression_codec = COMPRESSION_MAP[codec]
-  if compression_codec:
-    return COMPRESSION_TYPE % compression_type.upper() + '\n' +\
-           COMPRESSION_CODEC % compression_codec
-  return ''
+def build_table_template(file_format, columns, partition_columns, row_format,
+                         avro_schema_dir):
+  partitioned_by = str()
+  if partition_columns:
+    partitioned_by = 'PARTITIONED BY (%s)' % \
+      ', '.join(partition_columns.split('\n'))
+
+  row_format_stmt = str()
+  if row_format:
+    row_format_stmt = 'ROW FORMAT ' + row_format
+
+  tblproperties = str()
+  if file_format == 'avro':
+    tblproperties = "TBLPROPERTIES ('avro.schema.url'=" \
+        "'hdfs://%s/%s/{table_name}.json')" \
+        % (options.hdfs_namenode, avro_schema_dir)
+    # Override specified row format
+    row_format_stmt = "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'"
+
+  # Note: columns are ignored but allowed if a custom serde is specified
+  # (e.g. Avro)
+  return """
+CREATE EXTERNAL TABLE {{db_name}}{{db_suffix}}.{{table_name}} (
+{columns})
+{partitioned_by}
+{row_format}
+STORED AS {{file_format}}
+LOCATION '{hive_warehouse_dir}/{{hdfs_location}}'
+{tblproperties};
+""".format(
+    row_format=row_format_stmt,
+    columns=',\n'.join(columns.split('\n')),
+    partitioned_by=partitioned_by,
+    hive_warehouse_dir=options.hive_warehouse_dir,
+    tblproperties=tblproperties
+    ).strip()
+
+def avro_schema(columns):
+  record = {
+    "name": "a", # doesn't matter
+    "type": "record",
+    "fields": list()
+    }
+  for column_spec in columns.strip().split('\n'):
+    # column_spec looks something like "col_name col_type COMMENT comment"
+    # (comment may be omitted, we don't use it)
+    name = column_spec.split()[0]
+    type = column_spec.split()[1]
+    assert type.upper() in HIVE_TO_AVRO_TYPE_MAP, "Cannot convert to Avro type: %s" % type
+    record["fields"].append(
+      {'name': name,
+       'type': [HIVE_TO_AVRO_TYPE_MAP[type.upper()], "null"]}) # all columns nullable
+  return json.dumps(record)
+
+def build_compression_codec_statement(codec, compression_type, file_format):
+  codec = AVRO_COMPRESSION_MAP[codec] if file_format == 'avro' else COMPRESSION_MAP[codec]
+  if not codec:
+    return str()
+  return (AVRO_COMPRESSION_CODEC % codec) if file_format == 'avro' else (
+    COMPRESSION_TYPE % compression_type.upper() + '\n' + COMPRESSION_CODEC % codec)
 
 def build_codec_enabled_statement(codec):
   compression_enabled = 'false' if codec == 'none' else 'true'
@@ -138,9 +222,10 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 
   statement = SET_PARTITION_MODE_NONSTRICT_STATEMENT + "\n"
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
-  # For some reason (hive bug?) we need to have the CombineHiveInputFormat set for cases
-  # where we are compressing in bzip on certain tables that have multiple files.
-  if 'bzip' in db_suffix and 'multi' in table_name:
+  # For some reason (hive bug?) we need to have the CombineHiveInputFormat set
+  # for cases where we are compressing in bzip or lzo on certain tables that
+  # have multiple files.
+  if 'multi' in table_name and ('bzip' in db_suffix or 'lzo' in db_suffix):
     statement += SET_HIVE_INPUT_FORMAT % "CombineHiveInputFormat"
   else:
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
@@ -149,7 +234,7 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 def build_insert(insert, db_name, db_suffix, file_format,
                  codec, compression_type, table_name):
   output = build_codec_enabled_statement(codec) + "\n"
-  output += build_compression_codec_statement(codec, compression_type) + "\n"
+  output += build_compression_codec_statement(codec, compression_type, file_format) + "\n"
   output += build_insert_into_statement(insert, db_name, db_suffix,
                                         table_name, file_format) + "\n"
   return output
@@ -180,15 +265,6 @@ def build_db_suffix(file_format, codec, compression_type):
   else:
     return '_%s_%s' % (file_format, codec)
 
-def write_parquet_to_file(file_name, array):
-  # Strip out all the hive SET statements
-  array.insert(0, 'refresh;\n')
-  write_array_to_file(file_name, 'w', array)
-
-def write_array_to_file(file_name, mode, array):
-  with open(file_name, mode) as f:
-    f.write('\n\n'.join(array))
-
 # Does a hdfs directory listing and returns array with all the subdir names.
 def get_hdfs_subdirs_with_data(path):
   tmp_file = tempfile.TemporaryFile("w+")
@@ -201,13 +277,34 @@ def get_hdfs_subdirs_with_data(path):
   # So to get subdirectory names just return everything after the last '/'
   return [line[line.rfind('/') + 1:].strip() for line in tmp_file.readlines()]
 
+class Statements(object):
+  """Simple container object for storing SQL statements to be output to a
+  file. Useful for ordering the statements correctly."""
+  def __init__(self):
+    self.create = list()
+    self.load = list()
+    self.load_base = list()
+
+  def write_to_file(self, filename):
+    # Only write to file if there's something to actually write
+    if self.create or self.load_base or self.load:
+      # Make sure we create the base tables first
+      output = self.create + self.load_base + self.load
+      with open(filename, 'w') as f:
+        f.write('\n\n'.join(output))
+
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
-  output_stats = [SET_HIVE_INPUT_FORMAT % "HiveInputFormat"]
-  output_create = []
-  output_load = []
-  output_load_base = []
-  output_parquet = []
+  # The Avro SerDe causes strange problems with other unrelated tables (e.g.,
+  # Avro files will be written to LZO-compressed text tables). We generate
+  # separate schema statement files for Avro tables so we can invoke Hive
+  # completely separately for them.
+  # See https://issues.apache.org/jira/browse/HIVE-4195.
+  avro_output = Statements()
+  # Parquet statements to be executed separately by Impala
+  parquet_output = Statements()
+  default_output = Statements()
+
   table_names = None
   if options.table_names:
     table_names = [name.lower() for name in options.table_names.split(',')]
@@ -216,6 +313,7 @@ def generate_statements(output_name, test_vectors, sections,
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
+    output = default_output if 'avro' not in table_format else avro_output
 
     for section in sections:
       alter = section.get('ALTER')
@@ -223,6 +321,9 @@ def generate_statements(output_name, test_vectors, sections,
       insert = section['DEPENDENT_LOAD']
       load_local = section['LOAD']
       base_table_name = section['BASE_TABLE_NAME']
+      columns = section['COLUMNS']
+      partition_columns = section['PARTITION_COLUMNS']
+      row_format = section['ROW_FORMAT']
       table_name = base_table_name
       db_suffix = build_db_suffix(file_format, codec, compression_type)
       db_name = '{0}{1}'.format(data_set, options.scale_factor)
@@ -253,14 +354,36 @@ def generate_statements(output_name, test_vectors, sections,
         print 'Skipping \'%s\' due to exclude constraint match' % table_name
         continue
 
-      output_create.append(build_create_statement(create, table_name, db_name, db_suffix,
-                                                  file_format, codec, hdfs_location))
+      # If a CREATE section is provided, use that. Otherwise a COLUMNS section
+      # must be provided (and optionally PARTITION_COLUMNS and ROW_FORMAT
+      # sections), which is used to generate the create table statement.
+      if create:
+        table_template = create
+        if file_format == 'avro':
+          # We don't know how to generalize CREATE sections to Avro.
+          print "CREATE section not supported with Avro, skipping: '%s'" % table_name
+          continue
+      else:
+        assert columns, "No CREATE or COLUMNS section defined for table " + table_name
+        avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
+        table_template = build_table_template(
+          file_format, columns, partition_columns, row_format, avro_schema_dir)
+        # Write Avro schema to local file
+        if not os.path.exists(avro_schema_dir):
+          os.makedirs(avro_schema_dir)
+        with open("%s/%s.json" % (avro_schema_dir, table_name),"w") as f:
+          f.write(avro_schema(columns))
+
+      output.create.append(
+        build_create_statement(table_template, table_name, db_name, db_suffix,
+                               file_format, codec, hdfs_location))
+
       # The ALTER statement in hive does not accept fully qualified table names.
       # We need the use statement.
       if alter:
         use_table = 'USE {db_name}{db_suffix};\n'.format(db_name=db_name,
                                                          db_suffix=db_suffix)
-        output_create.append(use_table + alter.format(table_name=table_name))
+        output.create.append(use_table + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
@@ -271,35 +394,35 @@ def generate_statements(output_name, test_vectors, sections,
         print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
         if not db_suffix:
           if load_local:
-            output_load_base.append(build_load_statement(load_local, db_name,
+            output.load_base.append(build_load_statement(load_local, db_name,
                                                          db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
         elif file_format == 'parquet':
           if insert:
-            # In most cases the same load logic can be used for the parquet and 
+            # In most cases the same load logic can be used for the parquet and
             # non-parquet case, but sometimes it needs to be special cased.
             insert = insert if 'LOAD_PARQUET' not in section else section['LOAD_PARQUET']
-            output_parquet.append(build_insert_into_statement(
+            parquet_output.load.append(build_insert_into_statement(
                 insert, db_name, db_suffix, table_name, 'parquet', for_impala=True))
           else:
             print \
                 'Empty parquet load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
-            output_load.append(build_insert(insert, db_name, db_suffix, file_format,
+            output.load.append(build_insert(insert, db_name, db_suffix, file_format,
                                             codec, compression_type, table_name))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
-  # Make sure we create the base tables first
-  output_load = output_create + output_load_base + output_load
-  write_array_to_file('load-' + output_name + '-generated.sql', 'w', output_load)
-  write_parquet_to_file('load-parquet-' + output_name + '-generated.sql', output_parquet);
+  avro_output.write_to_file('load-' + output_name + '-avro-generated.sql')
+  parquet_output.write_to_file('load-' + output_name + '-parquet-generated.sql')
+  default_output.write_to_file('load-' + output_name + '-generated.sql')
 
 def parse_schema_template_file(file_name):
-  VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'CREATE', 'DEPENDENT_LOAD',
-                         'LOAD', 'ALTER', 'LOAD_PARQUET']
+  VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
+                         'ROW_FORMAT', 'CREATE', 'DEPENDENT_LOAD', 'LOAD', 'ALTER',
+                         'LOAD_PARQUET']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":

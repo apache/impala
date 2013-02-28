@@ -3,23 +3,23 @@
 functional
 ---- BASE_TABLE_NAME
 alltypes
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int COMMENT 'Add a comment',
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int COMMENT 'Add a comment'
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
@@ -81,44 +81,42 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101201.txt' OVERW
 functional
 ---- BASE_TABLE_NAME
 alltypesnopart
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypessmall
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
@@ -138,23 +136,23 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090401.txt' 
 functional
 ---- BASE_TABLE_NAME
 alltypestiny
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
@@ -387,23 +385,24 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0903.txt' OV
 functional
 ---- BASE_TABLE_NAME
 alltypesagg
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
@@ -435,23 +434,24 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100110.txt' OV
 functional
 ---- BASE_TABLE_NAME
 alltypesaggnonulls
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
@@ -483,28 +483,23 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100110.
 functional
 ---- BASE_TABLE_NAME
 testtbl
----- CREATE
--- testtbl is empty
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id bigint,
-  name string,
-  zip int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+id bigint
+name string
+zip int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 dimtbl
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id bigint,
-  name string,
-  zip int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+id bigint
+name string
+zip int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -514,15 +509,13 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/DimTbl/data.csv' OVERWRITE INTO T
 functional
 ---- BASE_TABLE_NAME
 jointbl
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  test_id bigint,
-  test_name string,
-  test_zip int,
-  alltypes_id int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+test_id bigint
+test_name string
+test_zip int
+alltypes_id int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -532,16 +525,14 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/JoinTbl/data.csv' OVERWRITE INTO 
 functional
 ---- BASE_TABLE_NAME
 liketbl
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  str_col string,
-  match_like_col string,
-  no_match_like_col string,
-  match_regex_col string,
-  no_match_regex_col string)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+str_col string
+match_like_col string
+no_match_like_col string
+match_regex_col string
+no_match_regex_col string
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -679,15 +670,13 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 functional
 ---- BASE_TABLE_NAME
 escapenoquotes
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  col1 string,
-  col2 string,
-  col3 int,
-  col4 int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+col1 string
+col2 string
+col3 int
+col4 int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -697,17 +686,15 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/escape-no-quotes.txt' OVERWR
 functional
 ---- BASE_TABLE_NAME
 overflow
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -717,11 +704,8 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/overflow.txt' OVERWRITE INTO
 functional
 ---- BASE_TABLE_NAME
 greptiny
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  field string)
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+field string
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -731,14 +715,12 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/hive_benchmark/grepTiny/part-0000
 functional
 ---- BASE_TABLE_NAME
 rankingssmall
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  pageRank int,
-  pageURL string,
-  avgDuration int)
-row format delimited fields terminated by '|'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+pageRank int
+pageURL string
+avgDuration int
+---- ROW_FORMAT
+delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -748,20 +730,18 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/hive_benchmark/htmlTiny/Rankings.
 functional
 ---- BASE_TABLE_NAME
 uservisitssmall
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  sourceIP string,
-  destURL string,
-  visitDate string,
-  adRevenue float,
-  userAgent string,
-  cCode string,
-  lCode string,
-  sKeyword string,
-  avgTimeOnSite int)
-row format delimited fields terminated by '|'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+sourceIP string
+destURL string
+visitDate string
+adRevenue float
+userAgent string
+cCode string
+lCode string
+sKeyword string
+avgTimeOnSite int
+---- ROW_FORMAT
+delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -771,31 +751,31 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/hive_benchmark/htmlTiny/UserVisit
 functional
 ---- BASE_TABLE_NAME
 emptytable
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  field string)
-partitioned by (f2 int);
+---- PARTITION_COLUMNS
+f2 int
+---- COLUMNS
+field string
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypesaggmultifiles
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
 ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
@@ -824,22 +804,18 @@ insert into table {db_name}{db_suffix}.{table_name} partition (year, month, day)
 functional
 ---- BASE_TABLE_NAME
 alltypesaggmultifilesnopart
----- CREATE
-DROP TABLE if EXISTS {db_name}{db_suffix}.{table_name};
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM {db_name}.{table_name} where id % 4 = 0;
 insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM {db_name}.{table_name} where id % 4 = 1;
@@ -858,13 +834,10 @@ insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint
 functional
 ---- BASE_TABLE_NAME
 stringpartitionkey
----- CREATE
--- Regression for IMP-163, failure to load tables partitioned by string column
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int)
-PARTITIONED BY (string_col string)
-STORED AS {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+string_col string
+---- COLUMNS
+id int
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION (string_col = "partition1");
 ====
@@ -872,13 +845,11 @@ ALTER TABLE {table_name} ADD PARTITION (string_col = "partition1");
 functional
 ---- BASE_TABLE_NAME
 tinytable
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  a string,
-  b string)
-row format delimited fields terminated by ','
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+a string
+b string
+---- ROW_FORMAT
+delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -888,12 +859,10 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyTable/data.csv' OVERWRITE INT
 functional
 ---- BASE_TABLE_NAME
 tinyinttable
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  int_col int)
-row format delimited fields terminated by ','
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+int_col int
+---- ROW_FORMAT
+delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -903,15 +872,14 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyIntTable/data.csv' OVERWRITE 
 functional
 ---- BASE_TABLE_NAME
 nulltable
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  a string,
-  b string,
-  c string,
-  d int,
-  e double)
-row format delimited fields terminated by ','
-stored as {file_format};
+---- COLUMNS
+a string
+b string
+c string
+d int
+e double
+---- ROW_FORMAT
+delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
 ---- LOAD
@@ -921,15 +889,14 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, N
 functional
 ---- BASE_TABLE_NAME
 nullescapedtable
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  a string,
-  b string,
-  c string,
-  d int,
-  e double)
-row format delimited fields terminated by ',' escaped by '\\'
-stored as {file_format};
+---- COLUMNS
+a string
+b string
+c string
+d int
+e double
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
 ---- LOAD
@@ -939,13 +906,12 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, N
 functional
 ---- BASE_TABLE_NAME
 escapechartesttable
----- CREATE
--- Create a test data with the escape character as the same as the tuple delimiter
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (bool_col boolean)
-partitioned by (id int)
-row format delimited fields terminated by ',' escaped by '\n'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- PARTITION_COLUMNS
+id int
+---- COLUMNS
+bool_col boolean
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\n'
 ---- ALTER
 ALTER TABLE {table_name} ADD PARTITION(id=0);
 ALTER TABLE {table_name} ADD PARTITION(id=1);
@@ -971,13 +937,11 @@ select bool_col,id FROM {db_name}.alltypesagg where id < 10;
 functional
 ---- BASE_TABLE_NAME
 TblWithRaggedColumns
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  str_col string,
-  int_col int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+str_col string
+int_col int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -1011,16 +975,14 @@ LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 functional
 ---- BASE_TABLE_NAME
 zipcode_incomes
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id STRING,
-  zip STRING,
-  description1 STRING,
-  description2 STRING,
-  income int)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- COLUMNS
+id STRING
+zip STRING
+description1 STRING
+description2 STRING
+income int
+---- ROW_FORMAT
+DELIMITED FIELDS TERMINATED BY ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD

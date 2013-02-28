@@ -40,6 +40,10 @@ class TestAggregation(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
     cls.TestMatrix.add_constraint(lambda v: v.get_value('agg_func') in ['min', 'max'] if\
                                             v.get_value('data_type') == 'bool' else True)
+    # Avro doesn't have timestamp type
+    cls.TestMatrix.add_constraint(
+        lambda v: not (v.get_value('table_format').file_format == 'avro' and
+                       v.get_value('data_type') == 'timestamp'))
 
   def test_aggregation(self, vector):
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))

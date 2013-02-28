@@ -148,12 +148,7 @@ def verify_results(expected_results, actual_results, order_matters):
 
   assert expected_results == actual_results, failure_str
 
-def verify_column_types(actual_col_types, exec_result_schema):
-  actual_col_types = [c.strip().upper() for c in actual_col_types.split(',')]
-  expected_col_types = parse_column_types(exec_result_schema)
-  verify_results(actual_col_types, expected_col_types, order_matters=True)
-
-def verify_raw_results(test_section, exec_result):
+def verify_raw_results(test_section, exec_result, file_format):
   """
   Accepts a raw exec_result object and verifies it matches the expected results
 
@@ -169,9 +164,23 @@ def verify_raw_results(test_section, exec_result):
     return
 
   if 'TYPES' in test_section:
-    verify_column_types(test_section['TYPES'], exec_result.schema)
     expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
-    actual_types = parse_column_types(exec_result.schema)
+
+    # Avro does not support as many types as Hive, so the Avro test tables may
+    # have different column types than we expect (e.g., INT instead of
+    # TINYINT). We represent TIMESTAMP columns as strings in Avro, so we bail in
+    # this case since the results will be wrong. Otherwise we bypass the type
+    # checking by ignoring the actual types of the Avro table.
+    if file_format == 'avro':
+      if 'TIMESTAMP' in expected_types:
+        LOG.info("TIMESTAMP columns unsupported in Avro, skipping verification.")
+        return
+      LOG.info("Skipping type verification of Avro-format table.")
+      actual_types = expected_types
+    else:
+      actual_types = parse_column_types(exec_result.schema)
+
+    verify_results(expected_types, actual_types, order_matters=True)
   else:
     # This is an insert, so we are comparing the number of rows inserted
     expected_types = ['BIGINT']
