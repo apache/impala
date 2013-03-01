@@ -492,7 +492,19 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   TReportExecStatusResult res;
   Status rpc_status;
   try {
-    coord->ReportExecStatus(res, params);
+    try {
+      coord->ReportExecStatus(res, params);
+    } catch (TTransportException& e) {
+      VLOG_RPC << "Retrying ReportExecStatus: " << e.what();
+      rpc_status = client_cache_->ReopenClient(&coord);
+      if (!rpc_status.ok()) {
+        // we need to cancel the execution of this fragment
+        UpdateStatus(rpc_status);
+        executor_.Cancel();
+        return;
+      }
+      coord->ReportExecStatus(res, params);
+    }
     rpc_status = Status(res.status);
   } catch (TException& e) {
     stringstream msg;

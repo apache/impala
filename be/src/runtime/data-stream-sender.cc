@@ -169,7 +169,16 @@ void DataStreamSender::Channel::TransmitData() {
     params.__set_eos(false);
 
     TTransmitDataResult res;
-    client_->TransmitData(res, params);
+    try {
+      client_->TransmitData(res, params);
+    } catch (TTransportException& e) {
+      VLOG_RPC << "Retrying TransmitData: " << e.what();
+      rpc_status_ = client_cache_->ReopenClient(&client_);
+      if (!rpc_status_.ok()) {
+        return;
+      }
+      client_->TransmitData(res, params);
+    }
     if (res.status.status_code != TStatusCode::OK) {
       rpc_status_ = res.status;
     } else {
@@ -246,7 +255,16 @@ Status DataStreamSender::Channel::Close() {
     params.__set_eos(true);
     TTransmitDataResult res;
     VLOG_RPC << "calling TransmitData to close channel";
-    client_->TransmitData(res, params);
+    try {
+      client_->TransmitData(res, params);
+    } catch (TTransportException& e) {
+      VLOG_RPC << "Retrying TransmitData: " << e.what();
+      rpc_status_ = client_cache_->ReopenClient(&client_);
+      if (!rpc_status_.ok()) {
+        return rpc_status_;
+      }
+      client_->TransmitData(res, params);
+    }
     return Status(res.status);
   } catch (TException& e) {
     stringstream msg;

@@ -51,6 +51,7 @@ namespace impala {
 // TODO: More graceful handling of clients that have failed (maybe better
 // handled by a smart-wrapper of the interface object).
 // TODO: limits on total number of clients, and clients per-backend
+// TODO: requiring caller to release client is very prone to leaking.
 class ClientCacheHelper {
  public:
   // Callback method which produces a client object when one cannot be
@@ -61,10 +62,13 @@ class ClientCacheHelper {
   // Return client for specific host/port in 'client'. If a client
   // is not available, the client parameter is set to NULL.
   Status GetClient(const std::pair<std::string, int>& hostport,
-      ClientFactory factory_method, ThriftClientImpl** client);
+      ClientFactory factory_method, void** client_key);
 
-  // Reopens the underlying transport in case of error.
-  Status ReopenClient(void* client_key);
+  // Close and delete the underlying transport and remove the client from client_map_.
+  // Return a new client connecting to the same host/port.
+  // Return an error status and client_key would be set to NULL if a new client cannot
+  // created.
+  Status ReopenClient(ClientFactory factory_method, void** client_key);
 
   // Return a client to the cache, without closing it
   void ReleaseClient(void* client_key);
@@ -89,9 +93,9 @@ class ClientCacheHelper {
   // this isn't going to scale for a high request rate
   boost::mutex lock_;
 
-  // map from (host, port) to list of clients for that address
+  // map from (host, port) to list of client keys for that address
   typedef boost::unordered_map<
-      std::pair<std::string, int>, std::list<ThriftClientImpl*> > ClientCacheMap;
+      std::pair<std::string, int>, std::list<void*> > ClientCacheMap;
   ClientCacheMap client_cache_;
 
   // Map from client key back to its associated ThriftClientImpl transport
@@ -106,6 +110,10 @@ class ClientCacheHelper {
 
   // Total clients in the cache, including those in use
   Metrics::IntMetric* total_clients_metric_;
+
+  // Create a new client for specific host/port in 'client' and put it in client_map_
+  Status CreateClient(const std::pair<std::string, int>& hostport,
+      ClientFactory factory_method, void** client_key);
 };
 
 // Generic cache of Thrift clients for a given service type.
@@ -124,17 +132,17 @@ class ClientCache {
   // backed by a live transport which is already open. Returns
   // Status::OK unless there was an error opening the transport.
   Status GetClient(const std::pair<std::string, int>& hostport, T** iface) {
-    ThriftClientImpl* raw_client;
-    RETURN_IF_ERROR(
-        client_cache_helper_.GetClient(hostport, client_factory_, &raw_client));
-    *iface = reinterpret_cast<Client*>(raw_client)->iface();
-
-    return Status::OK;
+    return client_cache_helper_.GetClient(hostport, client_factory_,
+        reinterpret_cast<void**>(iface));
   }
 
-  // Closes and reopens the client's transport
-  Status ReopenClient(T* client) {
-    return client_cache_helper_.ReopenClient(reinterpret_cast<void*>(client));
+  // Close and delete the underlying transport. Return a new client connecting to the 
+  // same host/port.
+  // Return an error status if a new connection cannot be established and *client will be
+  // NULL in that case.
+  Status ReopenClient(T** client) {
+    return client_cache_helper_.ReopenClient(client_factory_,
+        reinterpret_cast<void**>(client));
   }
 
   // Return the client to the cache

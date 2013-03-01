@@ -36,36 +36,27 @@ using namespace apache::thrift::protocol;
 namespace impala {
 
 Status ClientCacheHelper::GetClient(const pair<string, int>& hostport,
-    ClientFactory factory_method, ThriftClientImpl** client) {
+    ClientFactory factory_method, void** client_key) {
   lock_guard<mutex> lock(lock_);
   VLOG_RPC << "GetClient("
            << hostport.first << ":" << hostport.second << ")";
   ClientCacheMap::iterator cache_entry = client_cache_.find(hostport);
   if (cache_entry == client_cache_.end()) {
     cache_entry =
-        client_cache_.insert(make_pair(hostport, list<ThriftClientImpl*>())).first;
+        client_cache_.insert(make_pair(hostport, list<void*>())).first;
     DCHECK(cache_entry != client_cache_.end());
   }
 
-  list<ThriftClientImpl*>& info_list = cache_entry->second;
+  list<void*>& info_list = cache_entry->second;
   if (!info_list.empty()) {
-    *client = info_list.front();
+    *client_key = info_list.front();
     VLOG_RPC << "GetClient(): cached client for "
-             << info_list.front()->ipaddress()
-             << ":" << info_list.front()->port();
+             << hostport.first
+             << ":" << hostport.second;
     info_list.pop_front();
   } else {
-    void* client_key;
-    auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, &client_key));
-    VLOG_CONNECTION << "GetClient(): adding new client for "
-                    << client_impl->ipaddress() << ":" << client_impl->port();
-    RETURN_IF_ERROR(client_impl->Open());
-    // Because the client starts life 'checked out', we don't add it to the cache map
-    client_map_[client_key] = client_impl.get();
-    *client = client_impl.release();
-    if (metrics_enabled_) {
-      total_clients_metric_->Increment(1);
-    }
+    RETURN_IF_ERROR(CreateClient(hostport, factory_method, client_key));
+
   }
 
   if (metrics_enabled_) {
@@ -75,13 +66,45 @@ Status ClientCacheHelper::GetClient(const pair<string, int>& hostport,
   return Status::OK;
 }
 
-Status ClientCacheHelper::ReopenClient(void* client_key) {
+Status ClientCacheHelper::ReopenClient(ClientFactory factory_method, void** client_key) {
   lock_guard<mutex> lock(lock_);
-  ClientMap::iterator i = client_map_.find(client_key);
+  ClientMap::iterator i = client_map_.find(*client_key);
   DCHECK(i != client_map_.end());
   ThriftClientImpl* info = i->second;
-  RETURN_IF_ERROR(info->Close());
-  RETURN_IF_ERROR(info->Open());
+  const string ipaddress = info->ipaddress();
+  int port = info->port();
+
+  // We don't expect Close() to fail. Even if it fails, we should continue on to delete
+  // the transport and remove it from the map.
+  Status status = info->Close();
+  DCHECK(status.ok());
+
+  // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does
+  // not clean up internal buffers it reopens. To work around this issue, create a new
+  // client instead.
+  client_map_.erase(*client_key);
+  delete info;
+  *client_key = NULL;
+  if (metrics_enabled_) {
+    total_clients_metric_->Increment(-1);
+  }
+  RETURN_IF_ERROR(CreateClient(make_pair(ipaddress, port), factory_method, client_key));
+  return Status::OK;
+}
+
+Status ClientCacheHelper::CreateClient(
+    const pair<string, int>& hostport, ClientFactory factory_method,
+    void** client_key) {
+  auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, client_key));
+  VLOG_CONNECTION << "CreateClient(): adding new client for "
+                  << client_impl->ipaddress() << ":" << client_impl->port();
+  RETURN_IF_ERROR(client_impl->Open());
+  // Because the client starts life 'checked out', we don't add it to the cache map
+  client_map_[*client_key] = client_impl.get();
+  client_impl.release();
+  if (metrics_enabled_) {
+    total_clients_metric_->Increment(1);
+  }
   return Status::OK;
 }
 
@@ -95,7 +118,7 @@ void ClientCacheHelper::ReleaseClient(void* client_key) {
   ClientCacheMap::iterator j =
       client_cache_.find(make_pair(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());
-  j->second.push_back(info);
+  j->second.push_back(client_key);
   if (metrics_enabled_) {
     clients_in_use_metric_->Increment(-1);
   }
@@ -107,8 +130,10 @@ void ClientCacheHelper::CloseConnections(const pair<string, int>& hostport) {
   if (cache_entry == client_cache_.end()) return;
   VLOG_RPC << "Invalidating all " << cache_entry->second.size() << " clients for: "
            << hostport.first << ":" << hostport.second;
-  BOOST_FOREACH(ThriftClientImpl* client, cache_entry->second) {
-    client->Close();
+  BOOST_FOREACH(void* client_key, cache_entry->second) {
+    ClientMap::iterator client_map_entry = client_map_.find(client_key);
+    DCHECK(client_map_entry != client_map_.end());
+    client_map_entry->second->Close();
   }
 }
 

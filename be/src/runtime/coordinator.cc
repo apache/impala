@@ -797,9 +797,9 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
       // the first failure and force a reopen of the transport.
       // TODO: Improve client-cache so that we don't need to do this.
       VLOG_RPC << "Retrying ExecPlanFragment: " << e.what();
-      Status status = exec_env_->client_cache()->ReopenClient(backend_client);
+      Status status = exec_env_->client_cache()->ReopenClient(&backend_client);
       if (!status.ok()) {
-        exec_env_->client_cache()->ReleaseClient(backend_client);
+        exec_state->status = status;
         return status;
       }
       backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
@@ -895,10 +895,9 @@ void Coordinator::CancelRemoteFragments() {
         backend_client->CancelPlanFragment(res, params);
       } catch (TTransportException& e) {
         VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
-        Status status = exec_env_->client_cache()->ReopenClient(backend_client);
+        Status status = exec_env_->client_cache()->ReopenClient(&backend_client);
         if (!status.ok()) {
           exec_state->status.AddError(status);
-          exec_env_->client_cache()->ReleaseClient(backend_client);
           continue;
         }
         backend_client->CancelPlanFragment(res, params);
