@@ -202,7 +202,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (col1 int) PARTITIONED BY (col2 i
 functional
 ---- BASE_TABLE_NAME
 insert_string_partitioned
-----
+---- CREATE
 CREATE TABLE {db_name}{db_suffix}.{table_name} (s1 string) PARTITIONED BY (s2 string);
 ====
 ---- DATASET
