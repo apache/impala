@@ -54,6 +54,9 @@ class LikePredicate: public Predicate {
   // Handling of like predicates that can be implemented using strncmp
   static void* ConstantEndsWithFn(Expr* e, TupleRow* row);
 
+  // Handling of like predicates that can be implemented using strcmp
+  static void* ConstantEqualsFn(Expr* e, TupleRow* row);
+
   static void* ConstantRegexFn(Expr* e, TupleRow* row);
   static void* LikeFn(Expr* e, TupleRow* row);
   static void* RegexFn(Expr* e, TupleRow* row);

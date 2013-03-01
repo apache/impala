@@ -71,6 +71,15 @@ void* LikePredicate::ConstantEndsWithFn(Expr* e, TupleRow* row) {
   return &p->result_.bool_val;
 }
 
+void* LikePredicate::ConstantEqualsFn(Expr* e, TupleRow* row) {
+  LikePredicate* p = static_cast<LikePredicate*>(e);
+  DCHECK_EQ(p->GetNumChildren(), 2);
+  StringValue* val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (val == NULL) return NULL;
+  p->result_.bool_val = p->search_string_sv_.Eq(*val);
+  return &p->result_.bool_val;
+}
+
 void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
@@ -124,10 +133,12 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     // - "%anything%": This maps to a fast substring search implementation. 
     // - anything%: This maps to a strncmp implementation
     // - %anything: This maps to a strncmp implementation
+    // - anything: This maps to a strncmp implementation
     // Regex marks the "anything" so it can be extracted for the pattern.
     regex substring_re("(%+)([^%_]*)(%+)", regex::extended);
     regex ends_with_re("(%+)([^%_]*)", regex::extended);
     regex starts_with_re("([^%_]*)(%+)", regex::extended);
+    regex equals_re("([^%_]*)", regex::extended);
     smatch match_res;
     if (opcode_ == TExprOpcode::LIKE) {
       if (regex_match(pattern_str, match_res, substring_re)) {
@@ -150,7 +161,13 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
             StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
         compute_fn_ = ConstantEndsWithFn;
         return Status::OK;
-      } 
+      } else if (regex_match(pattern_str, match_res, equals_re)) {
+        search_string_ = match_res.str(1);
+        search_string_sv_ =
+            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+        compute_fn_ = ConstantEqualsFn;
+        return Status::OK;
+      }
     } 
     string re_pattern;
     if (opcode_ == TExprOpcode::LIKE) {

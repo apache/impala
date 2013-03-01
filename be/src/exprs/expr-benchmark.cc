@@ -159,7 +159,7 @@ Benchmark* BenchmarkArithmetic() {
 //                         strstr               141.8             0.6857X
 //                       strncmp1               300.3              1.452X
 //                       strncmp2               300.4              1.453X
-//                       strncmp3               8.341            0.03925X
+//                       strncmp3               862.7              3.803X
 //                          regex               6.027            0.02915X
 Benchmark* BenchmarkLike() {
   Benchmark* suite = new Benchmark("Like");

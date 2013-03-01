@@ -1,0 +1,49 @@
+====
+---- QUERY: PERF_STRING-Q1
+SELECT count(*) FROM lineitem
+WHERE l_comment =     'egular courts above the'
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q2
+SELECT count(*) FROM lineitem
+WHERE l_comment LIKE 'egular courts above the'
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q3
+SELECT count(*) FROM lineitem
+WHERE l_comment LIKE 'egular courts above the%'
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q4
+SELECT count(*) FROM lineitem
+WHERE l_comment LIKE '%egular courts above the'
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q5
+SELECT count(*) FROM lineitem
+WHERE l_comment LIKE '%egular courts above the%'
+---- RESULTS
+28
+---- TYPES
+BIGINT
+====
+---- QUERY: PERF_STRING-Q5
+SELECT count(*) FROM lineitem
+WHERE l_comment LIKE 'egular courts above th%e'
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====

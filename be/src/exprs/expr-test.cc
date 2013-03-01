@@ -870,6 +870,7 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'ab' NOT LIKE '%a'", TYPE_BOOLEAN, true);
   // IMP-117
   TestValue("'ba' LIKE 'a%'", TYPE_BOOLEAN, false);
+  TestValue("'ab' LIKE 'a'", TYPE_BOOLEAN, false);
   TestValue("'a' LIKE '_'", TYPE_BOOLEAN, true);
   TestValue("'a' NOT LIKE '_'", TYPE_BOOLEAN, false);
   TestValue("'a' LIKE 'a'", TYPE_BOOLEAN, true);
