@@ -16,6 +16,7 @@
 #
 # Impala's shell
 import cmd
+import prettytable
 import time
 import sys
 import os
@@ -284,6 +285,24 @@ class ImpalaShell(cmd.Cmd):
 
     return 1.0
 
+  def __construct_table_header(self, handle):
+    """ Constructs the table header for a given query handle.
+
+    Should be called after the query has finished and before data is fetched. All data
+    is left aligned.
+    """
+    metadata = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle))
+    table = prettytable.PrettyTable()
+    for field_schema in metadata[0].schema.fieldSchemas:
+      table.add_column(field_schema.name, [])
+    table.align = "l"
+    return table
+
+  def __expect_result_metadata(self, query_str):
+    """ Given a query string, return True if impalad expects result metadata"""
+    excluded_query_types = ['use']
+    return not in set(map(query_str.startswith, excluded_query_types))
+
   def __query_with_results(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
     start, end = time.time(), 0
@@ -311,6 +330,10 @@ class ImpalaShell(cmd.Cmd):
         return self.__cancel_query(handle)
       time.sleep(self.__get_sleep_interval(loop_start))
 
+    # impalad does not support the fetching of metadata for certain types of queries.
+    if not self.__expect_result_metadata(query.query):
+      return True
+    table = self.__construct_table_header(handle)
     # Results are ready, fetch them till they're done.
     self.__print_if_verbose('Query finished, fetching results ...')
     result_rows = []
@@ -328,7 +351,18 @@ class ImpalaShell(cmd.Cmd):
       num_rows_fetched += len(results.data)
       result_rows.extend(results.data)
       if len(result_rows) >= self.fetch_batch_size or not results.has_more:
-        print '\n'.join(result_rows)
+        try:
+          map(table.add_row, [r.split('\t') for r in result_rows])
+          # Clear the rows that have been added. The goal is is to stream the table
+          # in batch_size quantums.
+          print table
+          table.clear_rows()
+        except Exception, e:
+          # beeswax returns each row as a tab separated string. If a string column
+          # value in a row has tabs, it will break the row split. Default to displaying
+          # raw results. This will change with a move to the hiverserver2 interface.
+          # Reference:  https://issues.cloudera.org/browse/IMPALA-116
+          print ('\n').join(result_rows)
         result_rows = []
         if not results.has_more:
           break
