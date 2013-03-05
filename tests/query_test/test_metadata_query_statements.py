@@ -28,7 +28,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db('hive_test_db')
 
-  @pytest.mark.xfail(run=False, reason='Investigate')
   def test_show_tables(self, vector):
     self.run_test_case('QueryTest/show', vector)
 

@@ -38,8 +38,6 @@ STRING
 ---- QUERY
 # Fully qualified names will not match
 show tables "functional.alltypes"
----- TYPES
-string
 ---- RESULTS
 
 ---- TYPES
@@ -57,7 +55,7 @@ USE FUNCTIONAL
 # changing often, and may be different depending on whether benchmark data is
 # loaded, for example.
 show tables '*'
----- RESULTS
+---- RESULTS: VERIFY_IS_SUBSET
 'alltypes'
 'alltypesagg'
 'alltypesaggmultifiles'
@@ -117,7 +115,7 @@ STRING
 ---- QUERY
 # Show tables in
 show tables in functional
----- RESULTS
+---- RESULTS: VERIFY_IS_SUBSET
 'alltypes'
 'alltypesagg'
 'alltypesaggmultifiles'

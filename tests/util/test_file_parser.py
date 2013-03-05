@@ -11,6 +11,10 @@ from tests.common.test_dimensions import TableFormatInfo
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_test_suite')
 
+# constants
+SECTION_DELIMITER = "===="
+SUBSECTION_DELIMITER = "----"
+
 # The QueryTestSectionReader provides utility functions that help to parse content
 # from a query test file
 class QueryTestSectionReader(object):
@@ -106,7 +110,7 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
 
 def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   sections = list()
-  section_start_regex = re.compile(r'(?m)^====')
+  section_start_regex = re.compile(r'(?m)^%s' % SECTION_DELIMITER)
   match = section_start_regex.search(text)
   if match is not None:
     # Assume anything before the first section (==== tag) is a header and ignore it
@@ -115,7 +119,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   # Split the test file up into sections. For each section, parse all subsections.
   for section in section_start_regex.split(text):
     parsed_sections = collections.defaultdict(str)
-    for sub_section in re.split(r'(?m)^----', section[1:]):
+    for sub_section in re.split(r'(?m)^%s' % SUBSECTION_DELIMITER, section[1:]):
       # Skip empty subsections
       if not sub_section:
         continue
@@ -139,6 +143,9 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       if subsection_name == 'QUERY' and subsection_comment:
         parsed_sections['QUERY_NAME'] = subsection_comment
 
+      if subsection_name == 'RESULTS' and subsection_comment:
+        parsed_sections['VERIFIER'] = subsection_comment
+
       parsed_sections[subsection_name] = '\n'.join([line for line in lines[1:-1]])
 
     if parsed_sections:
@@ -153,16 +160,23 @@ def write_test_file(test_file_name, test_file_sections):
   This is useful when updating the results of a test.
   """
   with open(test_file_name, 'w') as test_file:
+    test_file_text = list()
     for test_case in test_file_sections:
-      test_file.write("====\n")
+      test_file_text.append(SECTION_DELIMITER)
       for section_name, section_value in test_case.items():
-        # Have to special case query name because it is a section name annotation
-        if section_name == 'QUERY_NAME':
+        # Have to special case query name and verifier because they have annotations
+        # in the headers
+        if section_name in ['QUERY_NAME', 'VERIFIER']:
           continue
 
+        # TODO: We need a more generic way of persisting the old test file.
+        # Special casing will blow up.
         full_section_name = section_name
-        if section_name == 'QUERY' and 'QUERY_NAME' in test_case:
-          full_section_name = '%s : %s' % (section_name, test_case['QUERY_NAME'])
-        test_file.write('---- %s\n' % full_section_name)
-        test_file.write(test_case[section_name] + '\n')
-    test_file.write('====')
+        if section_name == 'QUERY' and test_case.get('QUERY_NAME'):
+          full_section_name = '%s: %s' % (section_name, test_case['QUERY_NAME'])
+        if section_name == 'RESULTS' and test_case.get('VERIFIER'):
+          full_section_name = '%s: %s' % (section_name, test_case['VERIFIER'])
+        test_file_text.append("%s %s" % (SUBSECTION_DELIMITER, full_section_name))
+        test_file_text.append(test_case[section_name])
+    test_file_text.append(SECTION_DELIMITER)
+    test_file.write(('\n').join(test_file_text))

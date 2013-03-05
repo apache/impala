@@ -8,6 +8,7 @@ import os
 import pytest
 import sys
 import re
+from functools import wraps
 from tests.util.test_file_parser import remove_comments
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
@@ -123,17 +124,31 @@ class ResultColumn(object):
   def __repr__(self):
     return 'Type: %s Value: %s' % (self.column_type, self.value)
 
-def verify_query_results(expected_results, actual_results):
-  """Verifies the actual versus expected results of a query"""
-  assert actual_results is not None
-  assert expected_results is not None
+def assert_args_not_none(*args):
+  for arg in args:
+    assert arg is not None
+
+def verify_query_result_is_subset(expected_results, actual_results):
+  assert_args_not_none(expected_results, actual_results)
+  expected_set= set(map(str, expected_results.rows))
+  actual_set = set(map(str, actual_results.rows))
+  assert expected_set <= actual_set
+
+def verify_query_result_is_equal(expected_results, actual_results):
+  assert_args_not_none(expected_results, actual_results)
   assert expected_results == actual_results
+
+# Global dictionary that maps the verification type to appropriate verifier.
+# The RESULTS section of a .test file is tagged with the verifier type. We may
+# add more verifiers in the future. If a tag is not found, it defaults to verifying
+# equality.
+VERIFIER_MAP = {'VERIFY_IS_SUBSET' : verify_query_result_is_subset,
+                'VERIFY_IS_EQUAL'  : verify_query_result_is_equal,
+                 None              : verify_query_result_is_equal}
 
 def verify_results(expected_results, actual_results, order_matters):
   """Verifies the actual versus expected result strings"""
-  assert actual_results is not None
-  assert expected_results is not None
-
+  assert_args_not_none(expected_results, actual_results)
   # The order of the result set might be different if running with multiple nodes. Unless
   # there is an order by clause, sort the expected and actual results before comparison.
   if not order_matters:
@@ -157,13 +172,14 @@ def verify_raw_results(test_section, exec_result, file_format):
   """
   expected_results = None
 
-  if 'RESULTS' in test_section:
+  if test_section.get('RESULTS'):
     expected_results = remove_comments(test_section['RESULTS'])
   else:
     LOG.info("No results found. Skipping verification");
     return
 
-  if 'TYPES' in test_section:
+  if test_section.get('TYPES'):
+    verify_column_types(test_section['TYPES'], exec_result.schema)
     expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
 
     # Avro does not support as many types as Hive, so the Avro test tables may
@@ -186,10 +202,15 @@ def verify_raw_results(test_section, exec_result, file_format):
     expected_types = ['BIGINT']
     actual_types = ['BIGINT']
 
+  # Get the verifier if specified. In the absence of an explicit
+  # verifier, defaults to verifying equality.
+  verifier = test_section.get('VERIFIER')
+
   order_matters = contains_order_by(exec_result.query)
   expected = QueryTestResult(expected_results.split('\n'), expected_types, order_matters)
   actual = QueryTestResult(parse_result_rows(exec_result), actual_types, order_matters)
-  verify_query_results(expected, actual)
+  assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + vefifier
+  VERIFIER_MAP[verifier](expected, actual)
 
 def contains_order_by(query):
   """Returns true of the query contains an 'order by' clause"""

@@ -64,6 +64,15 @@ def pytest_assertrepr_compare(op, left, right):
     LOG.error('\n'.join(result))
     return result
 
+  # pytest supports printing the diff for a set equality check, but does not do
+  # so well when we're doing a subset check. This handles that situation.
+  if isinstance(left, set) and isinstance(right, set) and op == '<=':
+    # If expected is not a subset of actual, print out the set difference.
+    result = ['Items in expected results not found in actual results:']
+    result.append(('').join(list(left - right)))
+    LOG.error('\n'.join(result))
+    return result
+
 def pytest_xdist_setupnodes(config, specs):
   """Hook that is called when setting up the xdist plugin"""
   # Force the xdist plugin to be quiet. In verbose mode it spews useless information.
