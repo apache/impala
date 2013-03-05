@@ -43,11 +43,10 @@ mkdir -p ${LOG_DIR}
 # Enable core dumps
 ulimit -c unlimited
 
-# Start an in-process Impala cluster and run some queries against it using run-workload.
-# This also helps to validate run-workload for each build.
+# Start an in-process Impala cluster and run queries against it using run-workload.
+# This helps verify mini-impala-cluster and run-workload have not been broken.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
     --in-process --wait_for_cluster --cluster_size=3
-
 ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
     --table_format=text/none
 

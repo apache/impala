@@ -64,12 +64,7 @@ def parse_query_test_file(file_name):
   return parse_test_file(file_name, VALID_SECTION_NAMES)
 
 def parse_table_constraints(constraints_file):
-  """
-  Reads a table contraints file, if one exists
-
-  TODO: once the python test frame changes are committed this can be moved to a common
-  utility function so the tests themselves can make use of this code.
-  """
+  """Reads a table contraints file, if one exists"""
   schema_include = defaultdict(list)
   schema_exclude = defaultdict(list)
   if not isfile(constraints_file):
@@ -80,13 +75,13 @@ def parse_table_constraints(constraints_file):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        # Format: table_name:<name>, contraint_type:<type>, file_format:<t1>,<t2>,...
-        table_name, constraint_type, file_types =\
+        # Format: table_name:<name>, constraint_type:<type>, table_format:<t1>,<t2>,...
+        table_name, constraint_type, table_formats =\
             [value.split(':')[1].strip() for value in line.split(',', 2)]
         if constraint_type == 'restrict_to':
-          schema_include[table_name.lower()] += file_types.split(',')
+          schema_include[table_name.lower()] += table_formats.split(',')
         elif constraint_type == 'exclude':
-          schema_exclude[table_name.lower()] += file_types.split(',')
+          schema_exclude[table_name.lower()] += table_formats.split(',')
         else:
           raise ValueError, 'Unknown constraint type: %s' % constraint_type
   return schema_include, schema_exclude

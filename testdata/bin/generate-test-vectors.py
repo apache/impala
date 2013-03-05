@@ -75,7 +75,9 @@ class VectorGenerator:
 def is_valid_combination(vector):
   if len(vector) == 4:
     return not (
-        (vector[FILE_FORMAT_IDX] == 'text' and vector[COMPRESSION_IDX] != 'none') or
+        (vector[FILE_FORMAT_IDX] == 'text' and\
+         vector[COMPRESSION_IDX] not in ['none', 'lzo']) or
+        (vector[FILE_FORMAT_IDX] != 'text' and vector[COMPRESSION_IDX] == 'lzo') or
         (vector[COMPRESSION_IDX] == 'none' and vector[COMPRESSION_TYPE_IDX] != 'none') or
         (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or
         (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or

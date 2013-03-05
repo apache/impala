@@ -70,8 +70,7 @@ DATASET_DIR = os.environ['IMPALA_HOME'] + '/testdata/datasets'
 
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
 COMPRESSION_ENABLED = "SET hive.exec.compress.output=%s;"
-COMPRESSION_CODEC =\
-    "SET mapred.output.compression.codec=%s;"
+COMPRESSION_CODEC = "SET mapred.output.compression.codec=%s;"
 SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
@@ -210,6 +209,7 @@ def generate_statements(output_name, test_vectors, sections,
   for row in test_vectors:
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
+    table_format = '%s/%s/%s' % (file_format, codec, compression_type)
 
     for section in sections:
       alter = section.get('ALTER')
@@ -238,12 +238,12 @@ def generate_statements(output_name, test_vectors, sections,
         continue
 
       if schema_include_constraints[table_name.lower()] and \
-         file_format not in schema_include_constraints[table_name.lower()]:
+         table_format not in schema_include_constraints[table_name.lower()]:
         print 'Skipping \'%s\' due to include constraint match' % table_name
         continue
 
       if schema_exclude_constraints[base_table_name.lower()] and\
-         file_format in schema_exclude_constraints[base_table_name.lower()]:
+         table_format in schema_exclude_constraints[base_table_name.lower()]:
         print 'Skipping \'%s\' due to exclude constraint match' % table_name
         continue
 

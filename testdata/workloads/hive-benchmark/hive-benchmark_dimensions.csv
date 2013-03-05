@@ -1,4 +1,4 @@
 file_format: text,seq,rc
 dataset: hive-benchmark
-compression_codec: none,def,gzip,bzip,snap
+compression_codec: none,def,gzip,bzip,snap,lzo
 compression_type: none,block,record

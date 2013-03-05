@@ -53,11 +53,6 @@ hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
 
-# Make compressed data for alltypesaggsmultifiles
-rm -rf /tmp/alltypesaggmultifiles
-hadoop fs -get /test-warehouse/alltypesaggmultifiles /tmp
-(cd /tmp/alltypesaggmultifiles; lzop */*/*/*)
-
 # Create a hidden file in AllTypesSmall
 hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/_hidden
 hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/.hidden
@@ -65,9 +60,6 @@ hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader
  /test-warehouse/alltypessmall/year=2009/month=1/_hidden
 hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
  /test-warehouse/alltypessmall/year=2009/month=1/.hidden
-
-# Create lzo compressed versions of the Alltypes data files.
-(cd ${IMPALA_HOME}/testdata/target/AllTypes; rm -f *.lzo; lzop *.txt)
 
 # TODO: For some reason DROP TABLE IF EXISTS sometimes fails on HBase if the table does
 # not exist. To work around this, disable exit on error before executing this command.
@@ -88,14 +80,18 @@ if [ $? != 0 ]; then
   exit 1
 fi
 
-# create the index files for AllTypes_lzo.
-${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse/alltypes_lzo
-${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse/alltypesaggmultifiles_lzo
-
-# Load the index files for lzo data.
-hadoop fs -rm -f /test-warehouse/bad_text_lzo//bad_text.lzo.index
+# Load the index files for corrupted lzo data.
+hadoop fs -rm -f /test-warehouse/bad_text_lzo/bad_text.lzo.index
 hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
-  /test-warehouse/bad_text_lzo/
+      /test-warehouse/bad_text_lzo/
+
+hadoop fs -rm -r -f /bad_text_lzo/
+hadoop fs -mv /test-warehouse/bad_text_lzo/ /
+
+# Index all lzo files in HDFS under /test-warehouse
+${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
+
+hadoop fs -mv /bad_text_lzo/ /test-warehouse/
 
 # Run compute stats against tpcds/text format only. Running this on all the functional
 # tables is blocked by Hive bugs: HIVE-4119 and HIVE-4122.
