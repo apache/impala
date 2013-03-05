@@ -849,6 +849,11 @@ void Coordinator::CancelRemoteFragments() {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     BackendExecState* exec_state = backend_exec_states_[i];
 
+    // If a fragment failed before we finished issuing all remote fragments,
+    // this function will have been called before we finished populating
+    // backend_exec_states_. Skip any such uninitialized exec states.
+    if (exec_state == NULL) continue;
+
     // lock each exec_state individually to synchronize correctly with
     // UpdateFragmentExecStatus() (which doesn't get the global lock_
     // to set its status)
