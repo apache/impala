@@ -13,6 +13,13 @@ from thrift.protocol import TBinaryProtocol
 COMPUTE_STATS_STATEMENT =\
     'ANALYZE TABLE %(db_name)s.%(table_name)s %(partitions)s COMPUTE STATISTICS'
 
+# Compute column stats using fully qualified table names doesn't work (HIVE-4118).
+# Column stats is also broken for empty tables and tables that contain data with errors,
+# so computing column stats across all functional tables will not work. For more
+# information see: HIVE-4119 and HIVE-4122.
+COMPUTE_COLUMN_STATS_STATEMENT =\
+    'USE %(db_name)s; ANALYZE TABLE %(table_name)s COMPUTE STATISTICS FOR COLUMNS %(col)s'
+
 def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None):
   """
   Queries the Hive Metastore and runs compute stats over all tables
@@ -20,8 +27,9 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
   Optionally, a list of table names can be passed and compute stats will only
   run matching table names
   """
-
-  # Create a Hive Metastore Client (used for executing some test SETUP steps
+  # Create a Hive Metastore Client
+  # TODO: Consider creating a utility module for this because it is also duplicated in
+  # impala_test_suite.py.
   hive_transport = TTransport.TBufferedTransport(
       TSocket.TSocket(hive_server_host, int(hive_server_port)))
   protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
@@ -29,7 +37,6 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
   hive_client = ThriftHive.Client(protocol)
   hive_transport.open()
 
-  statements = list()
   print "Enumerating databases and tables for compute stats."
 
   all_dbs = set(name.lower() for name in hive_metastore_client.get_all_databases())
@@ -39,34 +46,33 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
 
   for db in all_dbs.intersection(selected_dbs):
     for table in hive_metastore_client.get_all_tables(db):
-      # Hive doesn't seem to succeed running compute stats on bzip tables using
-      # a mini-dfs-cluster.
-      if 'bzip' in table:
-        print 'Compute stats not supported on table %s' % table
-        continue
-
       if table_names is not None and not\
-         any(name.lower() in table.lower() for name in table_names):
+          any(name.lower() in table.lower() for name in table_names):
         print 'Skipping table: %s' % table
         continue
 
       statement = __build_compute_stat_statement(hive_metastore_client, db, table)
       try:
         print 'Executing: %s' % statement
-        hive_client.execute(statement)
+        map(hive_client.execute, statement.split(';'))
       except HiveServerException as e:
         print 'Error executing statement:\n%s' % e
   hive_transport.close()
 
 def __build_compute_stat_statement(metastore_client, db_name, table_name):
-  """Builds an ANALYZE TABLE ... COMPUTE STATISTICS for the given db.table_name"""
+  """Builds the HQL statements to compute table and column stats for the given table"""
   partitions = metastore_client.get_partition_names(db_name, table_name, 1)
   partition_str = str()
   if len(partitions) > 0:
     partition_names = [p.split('=')[0] for p in partitions[0].split('/')]
     partition_str = 'PARTITION(%s)' % ', '.join(partition_names)
-  return COMPUTE_STATS_STATEMENT % {'db_name': db_name, 'table_name': table_name,
-                                    'partitions': partition_str}
+  stmt = COMPUTE_STATS_STATEMENT %\
+      {'db_name': db_name, 'table_name': table_name, 'partitions': partition_str}
+  stmt += ';\n'
+  col_names = [f.name for f in metastore_client.get_fields(db_name, table_name)]
+  stmt += COMPUTE_COLUMN_STATS_STATEMENT %\
+      {'db_name': db_name, 'table_name': table_name, 'col': ', '.join(col_names)}
+  return stmt
 
 if __name__ == "__main__":
   parser = OptionParser()
@@ -84,11 +90,11 @@ if __name__ == "__main__":
   options, args = parser.parse_args()
   table_names = None
   if options.table_names is not None:
-    table_names = [name.lower() for name in options.table_names.split(',')]
+    table_names = [name.lower().strip() for name in options.table_names.split(',')]
 
   db_names = None
   if options.db_names is not None:
-    db_names = [name.lower() for name in options.db_names.split(',')]
+    db_names = [name.lower().strip() for name in options.db_names.split(',')]
 
   compute_stats(*options.hive_server.split(':'),
       db_names=db_names, table_names=table_names)

@@ -97,5 +97,6 @@ hadoop fs -rm -f /test-warehouse/bad_text_lzo//bad_text.lzo.index
 hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
   /test-warehouse/bad_text_lzo/
 
-# Run compute stats against functional text format only.
-python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional
+# Run compute stats against tpcds/text format only. Running this on all the functional
+# tables is blocked by Hive bugs: HIVE-4119 and HIVE-4122.
+python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpcds
