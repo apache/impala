@@ -144,6 +144,8 @@ class ScanRangeContext {
   // This function must be called when the scanner is complete and no longer needs
   // any resources (e.g. tuple memory, io buffers, etc) returned from the scan range
   // context.  This should be called from the scanner thread.
+  // AcquirePool must be called on all MemPools that contain data for this context
+  // before calling flush.
   // This must be called even in the error path to clean up any pending resources.
   void Flush();
 

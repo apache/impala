@@ -53,6 +53,7 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
           "CreateLzoTextScanner", reinterpret_cast<void**>(&CreateLzoTextScanner)));
       RETURN_IF_ERROR(DynamicLookup(state, handle,
           "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges))); 
+      LOG(INFO) << "Loaded impala-lzo library: " << LIB_IMPALA_LZO;
     }
   }
   // We only try to load the library once.  Just return status to

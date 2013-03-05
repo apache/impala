@@ -82,8 +82,11 @@ void ScanRangeContext::AttachCompletedResources(bool done) {
     current_row_batch_->tuple_data_pool()->AcquireData(boundary_pool_.get(), false);
   }
 
-  // If there are any rows or any io buffers, pass this batch to the scan node.
-  if (current_row_batch_->num_io_buffers() > 0 || current_row_batch_->num_rows() > 0) {
+  // If there are any rows, any io buffers or the context is done, pass 
+  // the current batch to the scan node.
+  if (current_row_batch_->num_io_buffers() > 0 || 
+      current_row_batch_->num_rows() > 0 ||
+      done) {
     scan_node_->AddMaterializedRowBatch(current_row_batch_);
     current_row_batch_ = NULL;
     if (!done) NewRowBatch();
@@ -303,16 +306,9 @@ void ScanRangeContext::Flush() {
         completed_buffers_.end(), buffers_.begin(), buffers_.end());
     buffers_.clear();
     AttachCompletedResources(true);
-
-    // There was a row batch in progress, add it to the scan node now.  It might have
-    // resources attached to it that can't be cleaned up until all previous row
-    // batches have been consumed.
-    if (current_row_batch_ != NULL) {
-      scan_node_->AddMaterializedRowBatch(current_row_batch_);
-    }
+    DCHECK(current_row_batch_ == NULL);
 
     // Set variables to NULL to make sure this object is not being used after Complete()
-    current_row_batch_ = NULL;
     current_buffer_ = NULL;
     current_buffer_pos_ = NULL;
     read_eosr_ = false;

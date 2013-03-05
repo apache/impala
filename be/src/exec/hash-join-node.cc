@@ -323,11 +323,15 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
           RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
           probe_timer.Start();
           if (probe_batch_->num_rows() == 0) {
+            // We just asked for a final batch but there were no rows in it.  We
+            // still want to attach the resources from the probe batch to the output
+            // batch because there might still be mempools or io buffers with that
+            // batch.
+            probe_batch_->TransferResourceOwnership(out_batch);
             if (probe_eos_) {
               eos_ = true;
               break;
             }
-            probe_batch_->Reset();
             continue;
           } else {
             COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
