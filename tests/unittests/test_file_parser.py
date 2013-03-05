@@ -8,6 +8,8 @@ from tests.util.test_file_parser import *
 from tests.common.base_test_suite import BaseTestSuite
 
 test_text = """
+# Text before in the header (before the first ====) should be ignored
+# so put this here to test it out.
 ====
 ---- QUERY
 # comment

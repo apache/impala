@@ -111,8 +111,14 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
 
 def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   sections = list()
+  section_start_regex = re.compile(r'(?m)^====')
+  match = section_start_regex.search(text)
+  if match is not None:
+    # Assume anything before the first section (==== tag) is a header and ignore it
+    text = text[match.start():]
+
   # Split the test file up into sections. For each section, parse all subsections.
-  for section in re.split(r'(?m)^====', text):
+  for section in section_start_regex.split(text):
     parsed_sections = collections.defaultdict(str)
     for sub_section in re.split(r'(?m)^----', section[1:]):
       # Skip empty subsections
