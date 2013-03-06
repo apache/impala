@@ -53,6 +53,11 @@ def pytest_assertrepr_compare(op, left, right):
     if len(left.rows) != len(right.rows):
       result.append('Number of rows returned (expected vs actual): %d != %d' %\
           (len(left.rows), len(right.rows)))
+
+    # pytest has a bug/limitation where it will truncate long custom assertion messages
+    # (it has a hardcoded string length limit of 80*8 characters). To ensure this info
+    # isn't lost, always log the assertion message.
+    LOG.error('\n'.join(result))
     return result
 
 def pytest_generate_tests(metafunc):
