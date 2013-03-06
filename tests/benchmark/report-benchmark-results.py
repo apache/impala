@@ -25,6 +25,7 @@ import texttable
 from datetime import date, datetime
 from itertools import groupby
 from optparse import OptionParser
+from tests.util.calculation_util import calculate_geomean, calculate_tval
 
 parser = OptionParser()
 parser.add_option("--input_result_file", dest="result_file",
@@ -130,11 +131,11 @@ def calculate_speedup(reference, actual):
 def calculate_impala_hive_speedup(row):
   return calculate_speedup(row[HIVE_AVG_IDX], row[AVG_IDX])
 
-def calculate_geomean(times):
-  """ Calculates the geometric mean of the given collection of numerics """
-  if len(times) > 0:
-    return (reduce(lambda x, y: float(x) * float(y), times)) ** (1.0 / len(times))
-  return 'N/A'
+def calculate_geomean_wrapper(times):
+  """Wrapper around calculate_geomean that returns 'N/A' if the collection is empty"""
+  if len(times) == 0:
+    return 'N/A'
+  return calculate_geomean(times)
 
 def build_table_header(verbose):
   table_header =\
@@ -212,19 +213,6 @@ def check_perf_change_significance(row, ref_row):
     return abs(tval) > options.tval_threshold, tval > options.tval_threshold
   return False, False
 
-def calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters):
-  """
-  Calculates the t-test t value for the given result and refrence.
-
-  Uses the Welch's t-test formula. For more information see:
-  http://en.wikipedia.org/wiki/Student%27s_t-distribution#Table_of_selected_values
-  http://en.wikipedia.org/wiki/Student's_t-test
-  """
-  # SEM (standard error mean) = sqrt(var1/N1 + var2/N2)
-  # t = (X1 - X2) / SEM
-  sem = math.sqrt((math.pow(stddev, 2) / iters) + (math.pow(ref_stddev, 2) / ref_iters))
-  return (avg - ref_avg) / sem
-
 def geometric_mean_execution_time(results):
   """
   Returns the geometric mean of the average execution times
@@ -243,9 +231,9 @@ def geometric_mean_execution_time(results):
         impala_avgs_with_hive_match.append(float(impala_avg))
         hive_avgs.append(float(hive_avg))
 
-  return calculate_geomean(impala_avgs),\
-         calculate_geomean(impala_avgs_with_hive_match),\
-         calculate_geomean(hive_avgs)
+  return calculate_geomean_wrapper(impala_avgs),\
+         calculate_geomean_wrapper(impala_avgs_with_hive_match),\
+         calculate_geomean_wrapper(hive_avgs)
 
 # Returns the sum of the average execution times for the given result
 # collection
@@ -270,7 +258,7 @@ def geometric_mean_execution_time_by_key(results, key):
   results.sort(key = key)
   execution_results = dict()
   for key, group in groupby(results, key=key):
-    execution_results[key] = (geometric_mean_execution_time(group))
+    execution_results[key] = geometric_mean_execution_time(group)
   return execution_results
 
 # Returns dictionary of column_value to sum of the average times grouped by the specified

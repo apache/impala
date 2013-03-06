@@ -17,7 +17,6 @@
 #
 import logging
 import os
-import math
 import re
 import threading
 import shlex
@@ -26,6 +25,7 @@ from collections import defaultdict
 from random import randint
 from subprocess import Popen, PIPE
 from tests.beeswax.impala_beeswax import *
+from tests.util.calculation_util import calculate_avg, calculate_stddev
 
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
@@ -208,6 +208,12 @@ def construct_execution_result(iterations, results):
   exec_result.data = results[0].data
   exec_result.beeswax_result = results[0]
   exec_result.set_result_note(results[0].summary)
+
+  # If running more than 2 iterations, throw the first result out. Don't throw away
+  # the first result if iterations = 2 to preserve the stddev calculation.
+  if iterations > 2:
+    results = results[1:]
+
   runtimes = [r.time_taken for r in results]
   exec_result.success = True
   exec_result.avg_time = calculate_avg(runtimes)
@@ -325,10 +331,4 @@ def run_query_capture_results(cmd, query_result_parse_function, iterations,
 
 # Util functions
 # TODO : Move util functions to a common module.
-def calculate_avg(values):
-  return sum(values) / float(len(values))
 
-def calculate_stddev(values):
-  """Return the standard deviation of a numeric iterable."""
-  avg = calculate_avg(values)
-  return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
