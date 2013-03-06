@@ -1,0 +1,52 @@
+# These tests are run over all file formats and their permutations (e.g. compression).
+# Be careful about adding test cases here since they can blow up the time to run tests
+====
+---- QUERY
+# This query will do a full table scan, doing a simple aggregation on all cols with
+# a simple predicate
+select count(*),
+  sum(id), count(bool_col), sum(tinyint_col), sum(smallint_col),
+  sum(int_col), sum(bigint_col), max(float_col), max(double_col),
+  max(date_string_col), max(string_col), max(timestamp_col)
+from alltypesagg
+where id % 2 = 0
+---- RESULTS
+5000,24995000,5000,20000,245000,2495000,24950000,1097.800048828125,10079.8,'01/10/10','998',2010-01-10 18:00:55.300000000
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+# This query will do a join, projecting one string col from each table.
+# This is interesting because the join contains string cols which causes the scanners 
+# to do different memory handling.
+select sum(t1.id), sum(t1.int_col),max(t1.date_string_col), max(t2.string_col)
+from alltypesagg t1
+inner join alltypesagg t2 
+  on t1.id = t2.id
+---- RESULTS
+49995000,4995000,'01/10/10','999'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# This query does a top-n on non-string cols.  This is different because without
+# string cols, scanners will handle io buffers differently.  They don't need to
+# be passed up the execution tree.
+select id, bool_col, int_col
+from alltypesagg
+order by 1 desc, 2 desc, 3 desc
+limit 10
+---- RESULTS
+9999,false,999
+9998,true,998
+9997,false,997
+9996,true,996
+9995,false,995
+9994,true,994
+9993,false,993
+9992,true,992
+9991,false,991
+9990,true,990
+---- TYPES
+INT, BOOLEAN, INT
+====

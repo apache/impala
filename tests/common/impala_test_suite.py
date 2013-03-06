@@ -36,7 +36,8 @@ class ImpalaTestSuite(BaseTestSuite):
     add more dimensions or different dimensions they can override this function.
     """
     super(ImpalaTestSuite, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(cls.__create_table_info_dimension())
+    cls.TestMatrix.add_dimension(
+        cls.create_table_info_dimension(cls.exploration_strategy()))
     cls.TestMatrix.add_dimension(cls.__create_exec_option_dimension())
 
   @classmethod
@@ -241,7 +242,7 @@ class ImpalaTestSuite(BaseTestSuite):
     return test_section
 
   @classmethod
-  def __create_table_info_dimension(cls):
+  def create_table_info_dimension(cls, exploration_strategy):
     # If the user has specified a specific set of table formats to run against, then
     # use those. Otherwise, load from the workload test vectors.
     if pytest.config.option.table_formats:
@@ -251,7 +252,7 @@ class ImpalaTestSuite(BaseTestSuite):
         table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
       return TestDimension('table_format', *table_formats)
     else:
-      return load_table_info_dimension(cls.get_workload(), cls.exploration_strategy())
+      return load_table_info_dimension(cls.get_workload(), exploration_strategy)
 
   @classmethod
   def __create_exec_option_dimension(cls):
