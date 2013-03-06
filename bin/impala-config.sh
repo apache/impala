@@ -17,6 +17,12 @@
 # setup your environment. If $IMPALA_HOME is undefined
 # this script will set it to the current working directory.
 
+export JAVA_HOME=${JAVA_HOME-/usr/java/default}
+if [ ! -d $JAVA_HOME ] ; then
+    echo "Error! JAVA_HOME must be set to the location of your JDK!"
+    exit 1
+fi
+
 if [ -z $IMPALA_HOME ]; then
     this=${0/-/} # login-shells often have leading '-' chars
     shell_exec=`basename $SHELL`
@@ -112,8 +118,17 @@ export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib
 
 # So that the frontend tests and PlanService can pick up libbackend.so
+# and other required libraries
+LIB_JAVA=`find ${JAVA_HOME}   -name libjava.so | head -1`
+LIB_JSIG=`find ${JAVA_HOME}   -name libjsig.so | head -1`
+LIB_JVM=` find ${JAVA_HOME}   -name libjvm.so  | head -1`
+LIB_HDFS=`find ${HADOOP_HOME} -name libhdfs.so | head -1`
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib":$IMPALA_LZO/build
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$IMPALA_LZO/build"
+export LD_LIBRARY_PATH
 
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
@@ -135,3 +150,5 @@ echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"
 echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"
 echo "PYTHONPATH             = $PYTHONPATH"
+echo "JAVA_HOME              = $JAVA_HOME"
+echo $LD_LIBRARY_PATH
