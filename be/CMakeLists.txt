@@ -145,6 +145,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${CMAKE_CURRENT_SOURCE_DIR}/src"
   "-I${CMAKE_CURRENT_SOURCE_DIR}/generated-sources"
   "-I${THRIFT_INCLUDE_DIR}"
+  "-I${MONGOOSE_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib

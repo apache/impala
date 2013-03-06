@@ -174,8 +174,7 @@ class Metrics {
   M* RegisterMetric(M* metric) {
     boost::lock_guard<boost::mutex> l(lock_);
     DCHECK(!metric->key_.empty());
-    DCHECK(metric_map_.find(metric->key_) == metric_map_.end())
-      << "Multiple registrations of metric key: " << metric->key_;
+    DCHECK(metric_map_.find(metric->key_) == metric_map_.end());
 
     M* mt = obj_pool_->Add(metric);
     metric_map_[metric->key_] = mt;
