@@ -3,7 +3,6 @@
 # these libraries in the environment, or dynamic linking will be used instead.
 
 IF (DEFINED ENV{PIC_LIB_PATH})
-    set(CMAKE_SKIP_RPATH TRUE)
     set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_STATIC_RUNTIME ON)
     set(LIBBZ2 $ENV{PIC_LIB_PATH}/lib/libbz2.a)
