@@ -106,10 +106,8 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  build_timer_ =
-      ADD_COUNTER(runtime_profile(), "BuildTime", TCounterType::CPU_TICKS);
-  get_results_timer_ =
-      ADD_COUNTER(runtime_profile(), "GetResultsTime", TCounterType::CPU_TICKS);
+  build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
+  get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ = 
       ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
 

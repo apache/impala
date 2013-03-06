@@ -81,9 +81,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   build_timer_ = 
-      ADD_COUNTER(runtime_profile(), "BuildTime", TCounterType::CPU_TICKS);
+      ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ = 
-      ADD_COUNTER(runtime_profile(), "ProbeTime", TCounterType::CPU_TICKS);
+      ADD_TIMER(runtime_profile(), "ProbeTime");
   build_row_counter_ = 
       ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
   build_buckets_counter_ = 
@@ -257,7 +257,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
   // Explicitly manage the timer counter to avoid measuring time in the child
   // GetNext call.
-  ScopedTimer<StopWatch> probe_timer(probe_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
 
   while (!eos_) {
     // create output rows as long as:
@@ -390,7 +390,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     RowBatch* out_batch, bool* eos) {
   *eos = eos_;
 
-  ScopedTimer<StopWatch> probe_timer(probe_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
   while (!eos_) {
     // Compute max rows that should be added to out_batch
     int64_t max_added_rows = out_batch->capacity() - out_batch->num_rows();

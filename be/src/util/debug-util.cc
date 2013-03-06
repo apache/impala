@@ -155,6 +155,36 @@ static double GetUnit(int64_t value, string* unit) {
   }
 }
 
+// Print the value (time in ms) to ss
+static void PrintTimeMS(int64_t value, stringstream* ss) {
+  if (value == 0 ) {
+    *ss << "0";
+  } else {
+    bool hour = false;
+    bool minute = false;
+    bool second = false;
+    if (value >= HOUR) {
+      *ss << value / HOUR << "h";
+      value %= HOUR;
+      hour = true;
+    }
+    if (value >= MINUTE) {
+      *ss << value / MINUTE << "m";
+      value %= MINUTE;
+      minute = true;
+    }
+    if (!hour && value >= SECOND) {
+      *ss << value / SECOND << "s";
+      value %= SECOND;
+      second = true;
+    }
+    if (!hour && !minute) {
+      if (second) *ss << setw(3) << setfill('0');
+      *ss << value << "ms";
+    }
+  }
+}
+
 string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
   stringstream ss;
   ss.flags(ios::fixed);
@@ -181,43 +211,33 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       break;
     }
 
-    case TCounterType::CPU_TICKS:
+    case TCounterType::CPU_TICKS: {
       if (value < CpuInfo::cycles_per_ms()) {
         ss << (value / 1000) << "K clock cycles";
-        break;
       } else {
         value /= CpuInfo::cycles_per_ms();
-        // fall-through
-      }
-    case TCounterType::TIME_MS:
-      if (value == 0 ) {
-        ss << "0";
-        break;
-      } else {
-        bool hour = false;
-        bool minute = false;
-        bool second = false;
-        if (value >= HOUR) {
-          ss << value / HOUR << "h";
-          value %= HOUR;
-          hour = true;
-        }
-        if (value >= MINUTE) {
-          ss << value / MINUTE << "m";
-          value %= MINUTE;
-          minute = true;
-        }
-        if (!hour && value >= SECOND) {
-          ss << value / SECOND << "s";
-          value %= SECOND;
-          second = true;
-        }
-        if (!hour && !minute) {
-          if (second) ss << setw(3) << setfill('0');
-          ss << value << "ms";
-        }
+        PrintTimeMS(value, &ss);
       }
       break;
+    }
+
+    case TCounterType::TIME_NS: {
+      if (value >= BILLION) {
+        // If the time is over a second, print it up to ms.
+        value /= MILLION;
+        PrintTimeMS(value, &ss);
+      } else if (value >= MILLION) {
+        // if the time is over a ms, print it up to microsecond in the unit of ms.
+        value /= 1000;
+        ss << value / 1000 << "." << value % 1000 << "ms";
+      } else if (value > 1000) {
+        // if the time is over a microsecond, print it using unit microsecond
+        ss << value / 1000 << "." << value % 1000 << "us";
+      } else {
+        ss << value << "ns";
+      }
+      break;
+    }
 
     case TCounterType::BYTES: {
       string unit;

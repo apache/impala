@@ -37,8 +37,7 @@ ExchangeNode::ExchangeNode(
 Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   
-  convert_row_batch_timer_ = 
-      ADD_COUNTER(runtime_profile(), "ConvertRowBatchTime", TCounterType::CPU_TICKS);
+  convert_row_batch_timer_ = ADD_TIMER(runtime_profile(), "ConvertRowBatchTime");
 
   // TODO: figure out appropriate buffer size
   // row descriptor of this node and the incoming stream should be the same.

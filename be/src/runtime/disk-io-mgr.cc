@@ -414,7 +414,7 @@ DiskIoMgr::DiskIoMgr() :
     max_read_size_(FLAGS_read_size),
     shut_down_(false),
     total_bytes_read_counter_(TCounterType::BYTES),
-    read_timer_(TCounterType::CPU_TICKS),
+    read_timer_(TCounterType::TIME_NS),
     num_allocated_buffers_(0) {
   int num_disks = FLAGS_num_disks;
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
@@ -426,7 +426,7 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
     max_read_size_(max_read_size),
     shut_down_(false),
     total_bytes_read_counter_(TCounterType::BYTES),
-    read_timer_(TCounterType::CPU_TICKS),
+    read_timer_(TCounterType::TIME_NS),
     num_allocated_buffers_(0) {
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);

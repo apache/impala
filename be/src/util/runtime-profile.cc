@@ -33,10 +33,10 @@ static const int RATE_COUNTER_UPDATE_PERIOD = 500;
 
 // Thread counters name
 static const string THREAD_TOTAL_TIME = "TotalWallClockTime";
-static const string THREAD_USER_TIME = "UserCpuTime";
-static const string THREAD_SYS_TIME = "SysCpuTime";
-static const string THREAD_VOLUNTARY_CONTEXT_SWITCH = "VoluntaryContextSwitch";
-static const string THREAD_INVOLUNTARY_CONTEXT_SWITCH = "InvoluntaryContextSwitch";
+static const string THREAD_USER_TIME = "UserTime";
+static const string THREAD_SYS_TIME = "SysTime";
+static const string THREAD_VOLUNTARY_CONTEXT_SWITCHES = "VoluntaryContextSwitches";
+static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwitches";
 
 RuntimeProfile::RateCounterUpdateState RuntimeProfile::rate_counters_state_;
 
@@ -44,7 +44,7 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
   name_(name),
   metadata_(-1),
-  counter_total_time_(TCounterType::CPU_TICKS),
+  counter_total_time_(TCounterType::TIME_NS),
   local_time_percent_(0) {
   counter_map_["TotalTime"] = &counter_total_time_;
 }
@@ -302,13 +302,13 @@ RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
 RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
     const std::string& prefix) {
   ThreadCounters* counter = pool_->Add(new ThreadCounters());
-  counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TCounterType::TIME_MS);
-  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_MS);
-  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_MS);
-  counter->voluntary_context_switch_counter_ =
-      AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCH, TCounterType::UNIT);
-  counter->involuntary_context_switch_counter_ =
-      AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCH, TCounterType::UNIT);
+  counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TCounterType::TIME_NS);
+  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_NS);
+  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_NS);
+  counter->voluntary_context_switches_ =
+      AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCHES, TCounterType::UNIT);
+  counter->involuntary_context_switches_ =
+      AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCHES, TCounterType::UNIT);
   return counter;
 }
 
@@ -354,7 +354,8 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   stream << prefix << name_ << ":";
   if (total_time->second->value() != 0) {
     stream << "("
-           << PrettyPrinter::Print(total_time->second->value(), TCounterType::CPU_TICKS)
+           << PrettyPrinter::Print(total_time->second->value(),
+               total_time->second->type())
            << " " << setprecision(2) << local_time_percent_ 
            << "%)";
   }
@@ -443,10 +444,10 @@ int64_t RuntimeProfile::UnitsPerSecond(
     const RuntimeProfile::Counter* timer) {
   DCHECK(total_counter->type() == TCounterType::BYTES ||
          total_counter->type() == TCounterType::UNIT);
-  DCHECK_EQ(timer->type(), TCounterType::CPU_TICKS);
+  DCHECK(timer->type() == TCounterType::TIME_NS);
+
   if (timer->value() == 0) return 0;
-  double secs = static_cast<double>(timer->value())
-      / static_cast<double>(CpuInfo::cycles_per_ms()) / 1000.0;
+  double secs = static_cast<double>(timer->value()) / 1000.0 / 1000.0 / 1000.0;
   return total_counter->value() / secs;
 }
 

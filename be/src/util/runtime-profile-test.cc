@@ -220,9 +220,9 @@ TEST(CountersTest, DerivedCounters) {
   RuntimeProfile::Counter* bytes_counter =
       profile.AddCounter("bytes", TCounterType::BYTES);
   RuntimeProfile::Counter* ticks_counter =
-      profile.AddCounter("ticks", TCounterType::CPU_TICKS);
+      profile.AddCounter("ticks", TCounterType::TIME_NS);
   // set to 1 sec
-  ticks_counter->Set(CpuInfo::cycles_per_ms() * 1000);
+  ticks_counter->Set(1000 * 1000 * 1000);
 
   RuntimeProfile::DerivedCounter* throughput_counter =
       profile.AddDerivedCounter("throughput", TCounterType::BYTES,

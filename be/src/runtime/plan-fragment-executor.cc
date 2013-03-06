@@ -153,8 +153,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     RuntimeProfile* sink_profile = sink_->profile();
     if (sink_profile != NULL) {
       profile()->AddChild(sink_profile);
-      data_sink_timer_ = 
-          ADD_COUNTER(sink_profile, "DataSinkTime", TCounterType::CPU_TICKS);
+      data_sink_timer_ = ADD_TIMER(sink_profile, "DataSinkTime");
     }
   } else {
     sink_.reset(NULL);

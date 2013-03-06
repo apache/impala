@@ -178,7 +178,7 @@ bool PerfCounters::InitSysCounter(Counter counter) {
   data.fd = fd;
 
   if (counter == PERF_COUNTER_SW_CPU_CLOCK) {
-    data.type = TCounterType::TIME_MS;
+    data.type = TCounterType::TIME_NS;
   } else {
     data.type = TCounterType::UNIT;
   }
@@ -240,7 +240,7 @@ bool PerfCounters::GetSysCounters(vector<int64_t>& buffer) {
     if (counters_[i].source == SYS_PERF_COUNTER) {
       int num_bytes = read(counters_[i].fd, &buffer[i], COUNTER_SIZE);
       if (num_bytes != COUNTER_SIZE) return false;
-      if (counters_[i].type == TCounterType::TIME_MS) {
+      if (counters_[i].type == TCounterType::TIME_NS) {
         buffer[i] /= 1000000;
       }
     }

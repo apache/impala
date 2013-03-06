@@ -90,10 +90,10 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
 
   DCHECK(llvm_initialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
-  load_module_timer_ = ADD_COUNTER(&profile_, "LoadTime", TCounterType::CPU_TICKS);
+  load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
   module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TCounterType::BYTES);
-  compile_timer_ = ADD_COUNTER(&profile_, "CompileTime", TCounterType::CPU_TICKS);
-  codegen_timer_ = ADD_COUNTER(&profile_, "CodegenTime", TCounterType::CPU_TICKS);
+  compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
+  codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
 
   loaded_functions_.resize(IRFunction::FN_END);
 }

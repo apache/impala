@@ -97,8 +97,8 @@ HBaseTableScanner::HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htabl
     value_pool_(new MemPool()),
     buffer_pool_(new MemPool()),
     rows_cached_(DEFAULT_ROWS_CACHED),
-    scan_setup_timer_(ADD_COUNTER(scan_node_->runtime_profile(),
-      "HBaseTableScanner.ScanSetup", TCounterType::CPU_TICKS)) {
+    scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
+      "HBaseTableScanner.ScanSetup")) {
 }
 
 Status HBaseTableScanner::Init() {

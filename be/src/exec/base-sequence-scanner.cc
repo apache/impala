@@ -60,8 +60,7 @@ BaseSequenceScanner::~BaseSequenceScanner() {
 
 Status BaseSequenceScanner::Prepare() {
   RETURN_IF_ERROR(HdfsScanner::Prepare());
-  decompress_timer_ = ADD_COUNTER(
-      scan_node_->runtime_profile(), "DecompressionTime", TCounterType::CPU_TICKS);
+  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
   return Status::OK;

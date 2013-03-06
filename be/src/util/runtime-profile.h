@@ -42,8 +42,9 @@ namespace impala {
 
 #if ENABLE_COUNTERS
   #define ADD_COUNTER(profile, name, type) (profile)->AddCounter(name, type)
+  #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TCounterType::TIME_NS)
   #define SCOPED_TIMER(c) \
-      ScopedTimer<StopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
+      ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
   #define COUNTER_UPDATE(c, v) (c)->Update(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
   #define ADD_THREAD_COUNTERS(profile, prefix) (profile)->AddThreadCounters(prefix)
@@ -52,6 +53,7 @@ namespace impala {
       MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
 #else
   #define ADD_COUNTER(profile, name, type) NULL
+  #define ADD_TIMER(profile, name) NULL
   #define SCOPED_TIMER(c)
   #define COUNTER_UPDATE(c, v)
   #define COUNTER_SET(c, v)
@@ -118,7 +120,7 @@ class RuntimeProfile {
     DerivedCounterFunction counter_fn_;
   };
 
-  // A set of counters that measures thread info, such as total time, user time, sys time.
+  // A set of counters that measure thread info, such as total time, user time, sys time.
   class ThreadCounters {
    private:
     friend class ThreadCounterMeasurement;
@@ -130,11 +132,11 @@ class RuntimeProfile {
 
     // The number of times a context switch resulted due to a process voluntarily giving
     // up the processor before its time slice was completed.
-    Counter* voluntary_context_switch_counter_;
+    Counter* voluntary_context_switches_;
 
     // The number of times a context switch resulted due to a higher priority process
     // becoming runnable or because the current process exceeded its time slice.
-    Counter* involuntary_context_switch_counter_;
+    Counter* involuntary_context_switches_;
   };
 
   // Create a runtime profile object with 'name'.  Counters and merged profile are
@@ -351,8 +353,7 @@ class ScopedTimer {
   ScopedTimer(RuntimeProfile::Counter* counter) :
     counter_(counter) {
     if (counter == NULL) return;
-    DCHECK(counter->type() == TCounterType::CPU_TICKS || 
-           counter->type() == TCounterType::TIME_MS);
+    DCHECK(counter->type() == TCounterType::TIME_NS);
     sw_.Start();
   }
 
@@ -384,9 +385,9 @@ class ScopedTimer {
 // This is ~5x slower than ScopedTimer due to calling getrusage.
 class ThreadCounterMeasurement {
  public:
-  ThreadCounterMeasurement(RuntimeProfile::ThreadCounters* counter) :
-    stop_(false), counter_(counter) {
-    DCHECK(counter != NULL);
+  ThreadCounterMeasurement(RuntimeProfile::ThreadCounters* counters) :
+    stop_(false), counters_(counters) {
+    DCHECK(counters != NULL);
     sw_.Start();
     int ret = getrusage(RUSAGE_THREAD, &usage_base_);
     DCHECK_EQ(ret, 0);
@@ -400,18 +401,17 @@ class ThreadCounterMeasurement {
     rusage usage;
     int ret = getrusage(RUSAGE_THREAD, &usage);
     DCHECK_EQ(ret, 0);
-    int64_t utime_begin =
-        usage_base_.ru_utime.tv_sec * 1000L + usage_base_.ru_utime.tv_usec / 1000;
-    int64_t stime_begin =
-        usage_base_.ru_stime.tv_sec * 1000L + usage_base_.ru_stime.tv_usec / 1000;
-    int64_t utime_end = usage.ru_utime.tv_sec * 1000L + usage.ru_utime.tv_usec / 1000;
-    int64_t stime_end = usage.ru_stime.tv_sec * 1000L + usage.ru_stime.tv_usec / 1000;
-    counter_->total_time_->Update(sw_.ElapsedTime());
-    counter_->user_time_->Update(utime_end - utime_begin);
-    counter_->sys_time_->Update(stime_end - stime_begin);
-    counter_->voluntary_context_switch_counter_->Update(
-        usage.ru_nvcsw - usage_base_.ru_nvcsw);
-    counter_->involuntary_context_switch_counter_->Update(
+    int64_t utime_diff =
+        (usage.ru_utime.tv_sec - usage_base_.ru_utime.tv_sec) * 1000L * 1000L * 1000L + 
+        (usage.ru_utime.tv_usec - usage_base_.ru_utime.tv_usec) * 1000L;
+    int64_t stime_diff = 
+        (usage.ru_stime.tv_sec - usage_base_.ru_stime.tv_sec) * 1000L * 1000L * 1000L + 
+        (usage.ru_stime.tv_usec - usage_base_.ru_stime.tv_usec) * 1000L;
+    counters_->total_time_->Update(sw_.ElapsedTime());
+    counters_->user_time_->Update(utime_diff);
+    counters_->sys_time_->Update(stime_diff);
+    counters_->voluntary_context_switches_->Update(usage.ru_nvcsw - usage_base_.ru_nvcsw);
+    counters_->involuntary_context_switches_->Update(
         usage.ru_nivcsw - usage_base_.ru_nivcsw);
   }
 
@@ -427,8 +427,8 @@ class ThreadCounterMeasurement {
 
   bool stop_;
   rusage usage_base_;
-  WallClockStopWatch sw_;
-  RuntimeProfile::ThreadCounters* counter_;
+  MonotonicStopWatch sw_;
+  RuntimeProfile::ThreadCounters* counters_;
 };
 
 }

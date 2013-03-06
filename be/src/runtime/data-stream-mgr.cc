@@ -49,7 +49,7 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
   bytes_received_counter_ = 
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
   deserialize_row_batch_timer_ = 
-      ADD_COUNTER(profile, "DeserializeRowBatchTimer", TCounterType::CPU_TICKS);
+      ADD_TIMER(profile, "DeserializeRowBatchTimer");
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {

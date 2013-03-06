@@ -86,7 +86,7 @@ struct DebugOptions {
 class Coordinator::BackendExecState {
  public:
   TUniqueId fragment_instance_id;
-  WallClockStopWatch stopwatch;  // wall clock timer for this fragment
+  MonotonicStopWatch stopwatch;  // wall clock timer for this fragment
   const THostPort hostport;  // of ImpalaInternalService
   int64_t total_split_size;  // summed up across all splits; in bytes
 
@@ -1082,7 +1082,8 @@ void Coordinator::ReportQuerySummary() {
 
       int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
       data.completion_times(completion_time);
-      data.rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0));
+      data.rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0
+        / 1000.0 / 1000.0));
       data.averaged_profile->Merge(backend_exec_states_[i]->profile);
       data.root_profile->AddChild(backend_exec_states_[i]->profile);
     }
@@ -1098,13 +1099,13 @@ void Coordinator::ReportQuerySummary() {
       stringstream times_label;
       times_label
         << "min:" << PrettyPrinter::Print(
-            accumulators::min(completion_times), TCounterType::TIME_MS)
+            accumulators::min(completion_times), TCounterType::TIME_NS)
         << "  max:" << PrettyPrinter::Print(
-            accumulators::max(completion_times), TCounterType::TIME_MS)
+            accumulators::max(completion_times), TCounterType::TIME_NS)
         << "  mean: " << PrettyPrinter::Print(
-            accumulators::mean(completion_times), TCounterType::TIME_MS)
+            accumulators::mean(completion_times), TCounterType::TIME_NS)
         << "  stddev:" << PrettyPrinter::Print(
-            sqrt(accumulators::variance(completion_times)), TCounterType::TIME_MS);
+            sqrt(accumulators::variance(completion_times)), TCounterType::TIME_NS);
 
       stringstream rates_label;
       rates_label

@@ -85,7 +85,7 @@ double Send(ThriftClient<NetworkTestServiceClient>* client, int64_t bytes) {
   if (batch_size == 0) batch_size = bytes;
   int64_t total_sent = 0;
 
-  WallClockStopWatch timer;
+  MonotonicStopWatch timer;
   timer.Start();
   while (total_sent < bytes) {
     int64_t send_size = min(bytes - total_sent, batch_size);
@@ -103,7 +103,7 @@ double Send(ThriftClient<NetworkTestServiceClient>* client, int64_t bytes) {
   timer.Stop();
 
   double mb = bytes / (1024. * 1024.);
-  double sec = timer.ElapsedTime() / (1000.);
+  double sec = timer.ElapsedTime() / (1000.) / (1000.) / (1000.);
   return mb/sec;
 }
 
@@ -154,7 +154,7 @@ void HandleBroadcast(const vector<string>& tokens) {
     clients.push_back(client);
   }
 
-  WallClockStopWatch timer;
+  MonotonicStopWatch timer;
   timer.Start();
   thread_group threads;
   for (int i = 0; i < clients.size(); ++i) {
@@ -164,7 +164,7 @@ void HandleBroadcast(const vector<string>& tokens) {
   timer.Stop();
   
   double mb = bytes / (1024 * 1024.);
-  double sec = timer.ElapsedTime() / (1000.);
+  double sec = timer.ElapsedTime() / (1000.) / (1000.) / (1000.);
 
   cout << "Send rate per node: (MB/s) " << (mb/sec) << endl;
   cout << "Send rate cluster: (MB/s) " << (mb * clients.size() / sec) << endl;

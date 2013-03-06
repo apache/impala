@@ -265,7 +265,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
         num_rows_fetched_(0),
         impala_server_(server),
         start_time_(TimestampValue::local_time()) {
-      planner_timer_ = ADD_COUNTER(&profile_, "PlanningTime", TCounterType::CPU_TICKS);
+      planner_timer_ = ADD_TIMER(&profile_, "PlanningTime");
     }
 
     ~QueryExecState() {

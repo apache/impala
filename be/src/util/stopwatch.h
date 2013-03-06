@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_STOPWATCH_H
 
 #include <boost/cstdint.hpp>
+#include <time.h>
 
 namespace impala {
 
@@ -64,39 +65,45 @@ class StopWatch {
   bool running_;
 };
 
-// Stop watch for reporting elapsed time based on wall block.  This is heavyweight
-// but accurate.
-class WallClockStopWatch {
+// Stop watch for reporting elapsed time in nanosec based on CLOCK_MONOTONIC.
+// It is as fast as Rdtsc. 
+// It is also accurate because it not affected by cpu frequency changes and 
+// it is not affected by user setting the system clock.
+// CLOCK_MONOTONIC represents monotonic time since some unspecified starting point.
+// It is good for computing elapsed time.
+class MonotonicStopWatch {
  public:
-  WallClockStopWatch() {
+  MonotonicStopWatch() {
     total_time_ = 0;
     running_ = false;
   }
 
   void Start() {
     if (!running_) {
-      start_ = GetTime();
+      clock_gettime(CLOCK_MONOTONIC, &start_);
       running_ = true;
     }
   }
-  
+
   void Stop() {
     if (running_) {
-      total_time_ += GetTime() - start_;
+      total_time_ += ElapsedTime();
       running_ = false;
     }
   }
 
-  // Returns time in ms.
+  // Returns time in nanosecond.
   uint64_t ElapsedTime() {
-    return running_ ? GetTime() - start_ : total_time_;
+    if (!running_) return total_time_;
+    timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    return (end.tv_sec - start_.tv_sec) * 1000L * 1000L * 1000L +
+        (end.tv_nsec - start_.tv_nsec);
   }
 
  private:
-  // Returns time (since epoch) in ms.
-  static uint64_t GetTime();
-
-  uint64_t start_, total_time_;
+  timespec start_;
+  uint64_t total_time_; // in nanosec
   bool running_;
 };
 

@@ -307,10 +307,9 @@ Status DataStreamSender::Init(RuntimeState* state) {
   profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
-  serialize_batch_timer_ =
-      ADD_COUNTER(profile(), "SerializeBatchTime", TCounterType::CPU_TICKS);
-  thrift_transmit_timer_ =
-      ADD_COUNTER(profile(), "ThriftTransmitTime", TCounterType::CPU_TICKS);
+  serialize_batch_timer_ = 
+      ADD_TIMER(profile(), "SerializeBatchTime");
+  thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime");
 
   return Status::OK;
 }
