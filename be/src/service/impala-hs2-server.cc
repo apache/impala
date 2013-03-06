@@ -110,10 +110,11 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
   TRowSet* result_set_;
 };
 
-void ImpalaServer::ExecuteMetadataOp(const TMetadataOpRequest& request,
+void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
+    const TMetadataOpRequest& request,
     TOperationHandle* handle, apache::hive::service::cli::thrift::TStatus* status) {
   shared_ptr<QueryExecState> exec_state;
-  exec_state.reset(new QueryExecState(exec_env_, this));
+  exec_state.reset(new QueryExecState(session_key, exec_env_, this));
   // start execution of metadata first;
   Status exec_status = exec_state->Exec(request);
   if (!exec_status.ok()) {
@@ -127,7 +128,7 @@ void ImpalaServer::ExecuteMetadataOp(const TMetadataOpRequest& request,
   exec_state->UpdateQueryState(QueryState::FINISHED);
 
   // register exec state after execution is success
-  Status register_status = RegisterQuery(exec_state->query_id(), exec_state);
+  Status register_status = RegisterQuery(session_key, exec_state->query_id(), exec_state);
   if (!register_status.ok())
   {
     status->__set_statusCode(
@@ -190,16 +191,12 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
   client_request->stmt = execute_request.statement;
   VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
   {
-    lock_guard<mutex> l(session_state_map_lock_);
-    SessionStateMap::iterator it =
-        session_state_map_.find(execute_request.sessionHandle.sessionId.guid);
-    if (it == session_state_map_.end()) {
-      // In HiveServer2, session key is provider by the caller and it might be invalid.
-      return Status("Invalid session id");
-    }
-
-    it->second.ToThrift(&client_request->sessionState);
-    client_request->queryOptions = it->second.default_query_options;
+    shared_ptr<SessionState> session_state;
+    RETURN_IF_ERROR(GetSessionState(execute_request.sessionHandle.sessionId.guid,
+        &session_state));
+    lock_guard<mutex> l(session_state->lock, adopt_lock_t());
+    session_state->ToThrift(&client_request->sessionState);
+    client_request->queryOptions = session_state->default_query_options;
   }
 
   if (execute_request.__isset.confOverlay) {
@@ -231,29 +228,29 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // create a session state: initialize start time, session type, database and default
   // query options.
   // TODO: put secret in session state map and check it
-  SessionState state;
-  state.start_time = second_clock::local_time();
-  state.session_type = HIVESERVER2;
+  shared_ptr<SessionState> state(new SessionState());
+  state->start_time = TimestampValue::local_time();
+  state->session_type = HIVESERVER2;
 
   // TODO: request.configuration might specify database.
-  state.database = "default";
+  state->database = "default";
 
   // Convert request.configuration to session default query options.
-  state.default_query_options = default_query_options_;
+  state->default_query_options = default_query_options_;
   if (request.__isset.configuration) {
     map<string, string>::const_iterator conf_itr = request.configuration.begin();
     for (; conf_itr != request.configuration.end(); ++conf_itr) {
       Status status = SetQueryOptions(conf_itr->first, conf_itr->second,
-          &state.default_query_options);
+          &state->default_query_options);
       HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
     }
   }
-  TQueryOptionsToMap(state.default_query_options, &return_val.configuration);
+  TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
 
   // Put the session state in session_state_map_
   {
     lock_guard<mutex> l(session_state_map_lock_);
-    session_state_map_[return_val.sessionHandle.sessionId.guid] = state;
+    session_state_map_.insert(make_pair(return_val.sessionHandle.sessionId.guid, state));
   }
 
   return_val.__isset.configuration = true;
@@ -267,13 +264,8 @@ void ImpalaServer::CloseSession(
     const TCloseSessionReq& request) {
   VLOG_QUERY << "CloseSession(): request=" << ThriftDebugString(request);
 
-  // remove the session state from session_state_map_
-  lock_guard<mutex> l(session_state_map_lock_);
-  if (session_state_map_.erase(request.sessionHandle.sessionId.guid) == 0) {
-    // No session was found
-    HS2_RETURN_ERROR(return_val, "Invalid session id", SQLSTATE_GENERAL_ERROR);
-  }
-
+  HS2_RETURN_IF_ERROR(return_val,
+      CloseSessionInternal(request.sessionHandle.sessionId.guid), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
@@ -347,7 +339,7 @@ void ImpalaServer::GetTypeInfo(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TYPE_INFO);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -366,7 +358,7 @@ void ImpalaServer::GetCatalogs(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_CATALOGS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -385,7 +377,7 @@ void ImpalaServer::GetSchemas(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_SCHEMAS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -404,7 +396,7 @@ void ImpalaServer::GetTables(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TABLES);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -423,7 +415,7 @@ void ImpalaServer::GetTableTypes(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TABLE_TYPES);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -443,7 +435,7 @@ void ImpalaServer::GetColumns(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_COLUMNS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -462,7 +454,7 @@ void ImpalaServer::GetFunctions(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_FUNCTIONS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -537,6 +529,8 @@ void ImpalaServer::CloseOperation(
     // No handle was found
     HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
   }
+  return_val.status.__set_statusCode(
+    apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
 
 void ImpalaServer::GetResultSetMetadata(

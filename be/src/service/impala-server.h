@@ -257,8 +257,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // TODO: Consider renaming to RequestExecState for consistency.
   class QueryExecState {
    public:
-    QueryExecState(ExecEnv* exec_env, ImpalaServer* server)
-      : exec_env_(exec_env),
+    QueryExecState(const ThriftServer::SessionKey& session_id, ExecEnv* exec_env,
+        ImpalaServer* server)
+      : session_id_(session_id),
+        exec_env_(exec_env),
         coord_(NULL),
         profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
         summary_info_(&profile_pool_, "Summary"),
@@ -302,6 +304,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Sets state to EXCEPTION and cancels coordinator.
     // Caller needs to hold lock().
+    // Does nothing if the query has reached EOS.
     void Cancel();
 
     // This is called when the query is done (finished, cancelled, or failed).
@@ -312,6 +315,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     int num_rows_fetched() const { return num_rows_fetched_; }
     const TResultSetMetadata* result_metadata() { return &result_metadata_; }
     const TUniqueId& query_id() const { return query_id_; }
+    const ThriftServer::SessionKey& session_id() const { return session_id_; }
     const TExecRequest& exec_request() const { return exec_request_; }
     TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
     boost::mutex* lock() { return &lock_; }
@@ -325,6 +329,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     const TimestampValue& end_time() const { return end_time_; }
 
    private:
+    ThriftServer::SessionKey session_id_;
     TUniqueId query_id_;
     boost::mutex lock_;  // protects all following fields
     ExecEnv* exec_env_;
@@ -450,11 +455,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
                          boost::shared_ptr<QueryExecState>* exec_state);
 
   // Registers the query exec state with query_exec_state_map_ using the globally
-  // unique query_id.
-  Status RegisterQuery(const TUniqueId& query_id,
-      const boost::shared_ptr<QueryExecState>& exec_state);
+  // unique query_id and add the query id to session state's open query list.
+  Status RegisterQuery(const ThriftServer::SessionKey& session_key,
+      const TUniqueId& query_id, const boost::shared_ptr<QueryExecState>& exec_state);
 
-  // Removes exec_state from query_exec_state_map_ and cancels execution.
+  // Cancel the query execution if the query is still running. Removes exec_state from
+  // query_exec_state_map_, and removes the query id from session state's open query list
   // Returns true if it found a registered exec_state, otherwise false.
   bool UnregisterQuery(const TUniqueId& query_id);
 
@@ -462,7 +468,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status ResetCatalogInternal();
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
+  // Caller should not hold any locks when calling this function.
   Status CancelInternal(const TUniqueId& query_id);
+
+  // Close the session and release all resource used by this session.
+  // Caller should not hold any locks when calling this function.
+  Status CloseSessionInternal(const ThriftServer::SessionKey& session_key);
 
   // Gets the runtime profile string for a given query_id and writes it to the output
   // stream. First searches for the query id in the map of in-flight queries. If no
@@ -630,7 +641,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // query_exec_state_map_. Otherwise, nothing will be registered in query_exec_state_map_
   // and an error status will be returned.
   // Returns a TOperationHandle and TStatus.
-  void ExecuteMetadataOp(const TMetadataOpRequest& request,
+  void ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
+      const TMetadataOpRequest& request,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
 
@@ -737,14 +749,21 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   struct SessionState {
     SessionType session_type;
 
+    // Time the session was created
+    TimestampValue start_time;
+
+    // Protects all fields below
+    // If this lock has to be taken with query_exec_state_map_lock, take this lock first.
+    boost::mutex lock;
+
     // The default database (changed as a result of 'use' query execution)
     std::string database;
 
-    // Time the session was created
-    boost::posix_time::ptime start_time;
-
     // The default query options of this session
     TQueryOptions default_query_options;
+
+    // Inflight queries belonging to this session
+    boost::unordered_set<TUniqueId> inflight_queries;
 
     // Builds a Thrift representation of the default database for serialisation to
     // the frontend.
@@ -755,8 +774,27 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::mutex session_state_map_lock_;
 
   // A map from session identifier to a structure containing per-session information
-  typedef boost::unordered_map<ThriftServer::SessionKey, SessionState> SessionStateMap;
+  typedef boost::unordered_map<ThriftServer::SessionKey, boost::shared_ptr<SessionState> >
+    SessionStateMap;
   SessionStateMap session_state_map_;
+
+  // Return session state for given session_id. The returned session state's lock() will
+  // be acquired before the session_state_map_lock_ is released.
+  // If not found, session_state will be NULL and an error status will be returned.
+  inline Status GetSessionState(const ThriftServer::SessionKey& session_id,
+      boost::shared_ptr<SessionState>* session_state) {
+    boost::lock_guard<boost::mutex> l(session_state_map_lock_);
+    SessionStateMap::iterator i = session_state_map_.find(session_id);
+    if (i == session_state_map_.end()) {
+      *session_state = boost::shared_ptr<SessionState>();
+      return Status("Invalid session id");
+    } else {
+      i->second->lock.lock();
+      *session_state = i->second;
+      return Status::OK;
+    }
+  }
+
 
   // protects query_locations_. Must always be taken after
   // query_exec_state_map_lock_ if both are required.

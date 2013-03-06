@@ -423,21 +423,21 @@ void ImpalaServer::PingImpalaService() {
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionKey& session_key) {
-  lock_guard<mutex> l(session_state_map_lock_);
-
   // Currently Kerberos uses only one session id, so there can be dups.
   // TODO: Re-enable this check once IMP-391 is resolved
   // DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
+  shared_ptr<SessionState> state;
+  state.reset(new SessionState);
+  state->start_time = TimestampValue::local_time();
+  state->database = "default";
+  state->session_type = BEESWAX;
 
-  SessionState& state = session_state_map_[session_key];
-  state.start_time = second_clock::local_time();
-  state.database = "default";
-  state.session_type = BEESWAX;
+  lock_guard<mutex> l(session_state_map_lock_);
+  session_state_map_.insert(make_pair(session_key, state));
 }
 
 void ImpalaServer::SessionEnd(const ThriftServer::SessionKey& session_key) {
-  lock_guard<mutex> l(session_state_map_lock_);
-  session_state_map_.erase(session_key);
+  CloseSessionInternal(session_key);
 }
 
 Status ImpalaServer::QueryToTClientRequest(const Query& query,
@@ -447,12 +447,11 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   request->stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
-    lock_guard<mutex> l(session_state_map_lock_);
-    SessionStateMap::iterator it =
-        session_state_map_.find(*ThriftServer::GetThreadSessionKey());
-    DCHECK(it != session_state_map_.end());
-
-    it->second.ToThrift(&request->sessionState);
+    shared_ptr<SessionState> session_state;
+    RETURN_IF_ERROR(GetSessionState(*ThriftServer::GetThreadSessionKey(),
+        &session_state));
+    lock_guard<mutex> l(session_state->lock, adopt_lock_t());
+    session_state->ToThrift(&request->sessionState);
   }
 
   // Override default query options with Query.Configuration

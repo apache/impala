@@ -292,6 +292,8 @@ Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* r
 }
 
 void ImpalaServer::QueryExecState::Cancel() {
+  // If the query is completed, no need to cancel.
+  if (eos_) return;
   // we don't want multiple concurrent cancel calls to end up executing
   // Coordinator::Cancel() multiple times
   if (query_state_ == QueryState::EXCEPTION) return;
@@ -903,7 +905,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
     string session_type;
     string session_key;
-    if (session.second.session_type == BEESWAX) {
+    if (session.second->session_type == BEESWAX) {
       session_type = "Beeswax";
       session_key = session.first;
     } else {
@@ -919,8 +921,8 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
     (*output) << "<tr>"
               << "<td>" << session_type << "</td>"
               << "<td>" << session_key << "</td>"
-              << "<td>" << session.second.database << "</td>"
-              << "<td>" << to_simple_string(session.second.start_time) << "</td>"
+              << "<td>" << session.second->database << "</td>"
+              << "<td>" << session.second->start_time.DebugString() << "</td>"
               << "</tr>";
   }
   (*output) << "</table>";
@@ -1024,7 +1026,7 @@ Status ImpalaServer::Execute(const TClientRequest& request,
 Status ImpalaServer::ExecuteInternal(
     const TClientRequest& request, const ThriftServer::SessionKey& session_key,
     bool* registered_exec_state, shared_ptr<QueryExecState>* exec_state) {
-  exec_state->reset(new QueryExecState(exec_env_, this));
+  exec_state->reset(new QueryExecState(session_key, exec_env_, this));
   *registered_exec_state = false;
 
   TExecRequest result;
@@ -1036,13 +1038,10 @@ Status ImpalaServer::ExecuteInternal(
   if (result.stmt_type == TStmtType::DDL &&
       result.ddl_exec_request.ddl_type == TDdlType::USE) {
     {
-      lock_guard<mutex> l(session_state_map_lock_);
-      SessionStateMap::iterator it = session_state_map_.find(session_key);
-      if (it == session_state_map_.end()) {
-        // In HiveServer2, session key is provider by the caller and it might be invalid.
-        return Status("Invalid session key");
-      }
-      it->second.database = result.ddl_exec_request.use_db_params.db;
+      shared_ptr<SessionState> session_state;
+      RETURN_IF_ERROR(GetSessionState(session_key, &session_state));
+      lock_guard<mutex> l(session_state->lock, adopt_lock_t());
+      session_state->database = result.ddl_exec_request.use_db_params.db;
     }
     exec_state->reset();
     return Status::OK;
@@ -1054,7 +1053,7 @@ Status ImpalaServer::ExecuteInternal(
 
   // register exec state before starting execution in order to handle incoming
   // status reports
-  RETURN_IF_ERROR(RegisterQuery(result.request_id, *exec_state));
+  RETURN_IF_ERROR(RegisterQuery(session_key, result.request_id, *exec_state));
   *registered_exec_state = true;
 
   // start execution of query; also starts fragment status reports
@@ -1074,8 +1073,11 @@ Status ImpalaServer::ExecuteInternal(
   return Status::OK;
 }
 
-Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
-    const shared_ptr<QueryExecState>& exec_state) {
+Status ImpalaServer::RegisterQuery(const ThriftServer::SessionKey& session_key,
+    const TUniqueId& query_id, const shared_ptr<QueryExecState>& exec_state) {
+  shared_ptr<SessionState> session_state;
+  RETURN_IF_ERROR(GetSessionState(session_key, &session_state));
+  lock_guard<mutex> l2(session_state->lock, adopt_lock_t());
   lock_guard<mutex> l(query_exec_state_map_lock_);
 
   QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
@@ -1087,12 +1089,17 @@ Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
     return Status(TStatusCode::INTERNAL_ERROR, ss.str());
   }
 
+  session_state->inflight_queries.insert(query_id);
   query_exec_state_map_.insert(make_pair(query_id, exec_state));
   return Status::OK;
 }
 
 bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << query_id;
+
+  // Cancel the query if it's still running
+  CancelInternal(query_id);
+
   shared_ptr<QueryExecState> exec_state;
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
@@ -1107,6 +1114,17 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
   }
 
   exec_state->Done();
+  // If this function is called from CloseSessionInternal, the session has already
+  // been removed.
+  {
+    lock_guard<mutex> l(session_state_map_lock_);
+    SessionStateMap::iterator i = session_state_map_.find(exec_state->session_id());
+    if (i != session_state_map_.end()) {
+      lock_guard<mutex> l2(i->second->lock);
+      i->second->inflight_queries.erase(query_id);
+    }
+  }
+
   ArchiveQuery(*exec_state);
 
   if (exec_state->coord() != NULL) {
@@ -1373,6 +1391,28 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   exec_state->Cancel();
   return Status::OK;
 }
+
+Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionKey& session_key) {
+  // Find the session_state and remove it from the map.
+  shared_ptr<SessionState> session_state;
+  {
+    lock_guard<mutex> l(session_state_map_lock_);
+    SessionStateMap::iterator entry = session_state_map_.find(session_key);
+    if (entry == session_state_map_.end()) {
+      return Status("Invalid session key");
+    }
+    session_state = entry->second;
+    session_state_map_.erase(session_key);
+  }
+
+  // Unregister all open queries from this session.
+  BOOST_FOREACH(const TUniqueId& query_id, session_state->inflight_queries) {
+    UnregisterQuery(query_id);
+  }
+
+  return Status::OK;
+}
+
 
 Status ImpalaServer::ParseQueryOptions(const string& options,
     TQueryOptions* query_options) {
