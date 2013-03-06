@@ -56,8 +56,8 @@ class DataStreamSender::Channel {
   // combination. buffer_size is specified in bytes and a soft limit on
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
-  Channel(DataStreamSender* parent, const RowDescriptor& row_desc, 
-          const THostPort& destination, const TUniqueId& fragment_instance_id, 
+  Channel(DataStreamSender* parent, const RowDescriptor& row_desc,
+          const THostPort& destination, const TUniqueId& fragment_instance_id,
           PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
       client_(NULL),
@@ -108,7 +108,7 @@ class DataStreamSender::Channel {
   DataStreamSender* parent_;
 
   ImpalaInternalServiceClient* client_;
-  BackendClientCache* client_cache_;  // the one to which to return client_
+  ImpalaInternalServiceClientCache* client_cache_;  // the one to which to return client_
 
   const RowDescriptor& row_desc_;
   string ipaddress_;
@@ -261,7 +261,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
-  : pool_(pool), 
+  : pool_(pool),
     row_desc_(row_desc),
     current_thrift_batch_(&thrift_batch1_),
     profile_(NULL),
@@ -282,7 +282,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
 
   if (sink.output_partition.type == TPartitionType::HASH_PARTITIONED) {
     // TODO: move this to Init()? would need to save 'sink' somewhere
-    Status status = 
+    Status status =
         Expr::CreateExprTrees(pool, sink.output_partition.partitioning_exprs,
                               &partition_exprs_);
     DCHECK(status.ok());
@@ -303,13 +303,13 @@ Status DataStreamSender::Init(RuntimeState* state) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
   RETURN_IF_ERROR(Expr::Prepare(partition_exprs_, state, row_desc_));
-  
+
   profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
-  bytes_sent_counter_ = 
+  bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
-  serialize_batch_timer_ = 
+  serialize_batch_timer_ =
       ADD_COUNTER(profile(), "SerializeBatchTime", TCounterType::CPU_TICKS);
-  thrift_transmit_timer_ = 
+  thrift_transmit_timer_ =
       ADD_COUNTER(profile(), "ThriftTransmitTime", TCounterType::CPU_TICKS);
 
   return Status::OK;
@@ -325,7 +325,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       int num_bytes = batch->Serialize(current_thrift_batch_);
       COUNTER_UPDATE(bytes_sent_counter_, num_bytes);
     }
-    
+
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {

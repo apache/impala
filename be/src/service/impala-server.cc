@@ -389,7 +389,7 @@ class ImpalaServer::FragmentExecState {
   int backend_num_;
   TUniqueId fragment_instance_id_;
   PlanFragmentExecutor executor_;
-  BackendClientCache* client_cache_;
+  ImpalaInternalServiceClientCache* client_cache_;
   TExecPlanFragmentParams exec_params_;
 
   // initiating coordinator to which we occasionally need to report back
@@ -726,7 +726,7 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
   if (render_end_time) {
     (*output) << "<td>" << record.end_time.DebugString() << "</td>";
   }
-  
+
   // Output progress
   (*output) << "<td>";
   if (record.has_coord == false) {
@@ -742,14 +742,14 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
                 << "%)";
     }
   }
-  
+
   // Output state and rows fetched
   (*output) << "</td>"
             << "<td>" << _QueryState_VALUES_TO_NAMES.find(record.query_state)->second
             << "</td><td>" << record.num_rows_fetched << "</td>";
-  
+
   // Output profile
-  (*output) << "<td><a href='/query_profile?hi=" << record.id.hi << "&lo=" 
+  (*output) << "<td><a href='/query_profile?hi=" << record.id.hi << "&lo="
             << record.id.lo << "'>Profile</a></td>";
   (*output) << "</tr>" << endl;
 }

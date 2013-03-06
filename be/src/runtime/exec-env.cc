@@ -46,7 +46,7 @@ namespace impala {
 ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
     subscription_mgr_(new SubscriptionManager()),
-    client_cache_(new BackendClientCache(0, 0)),
+    client_cache_(new ImpalaInternalServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
     htable_cache_(new HBaseTableCache()),
     disk_io_mgr_(new DiskIoMgr()),
@@ -69,6 +69,8 @@ ExecEnv::ExecEnv()
   }
   Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
+
+  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
 }
 
 ExecEnv::~ExecEnv() {

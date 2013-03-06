@@ -91,7 +91,7 @@ class RuntimeState {
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
-  BackendClientCache* client_cache() { return exec_env_->client_cache(); }
+  ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -164,7 +164,7 @@ class RuntimeState {
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 
   // Temporary Hdfs files created, and where they should be moved to ultimately.
-  // Mapping a filename to a blank destination causes it to be deleted. 
+  // Mapping a filename to a blank destination causes it to be deleted.
   FileMoveMap hdfs_files_to_move_;
 
   // Records the total number of appended rows per created Hdfs partition
