@@ -151,4 +151,4 @@ echo "CLASSPATH              = $CLASSPATH"
 echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"
 echo "PYTHONPATH             = $PYTHONPATH"
 echo "JAVA_HOME              = $JAVA_HOME"
-echo $LD_LIBRARY_PATH
+echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
