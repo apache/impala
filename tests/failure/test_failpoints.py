@@ -73,6 +73,8 @@ class TestFailpoints(ImpalaTestSuite):
       pytest.xfail(reason='IMPALA-56 - Hangs on async query execution')
     elif node_type == 'HDFS_SCAN_NODE' and action == 'FAIL' and location == 'OPEN':
       pytest.xfail(reason='IMPALA-54 - Fails DCHECK')
+    elif node_type == 'SORT_NODE' and action == 'FAIL' and location == 'PREPARE':
+      pytest.xfail(reason='IMPALA-71 - impalad core dumps')
 
 
     for node_id in node_ids:
