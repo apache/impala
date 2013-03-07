@@ -113,6 +113,7 @@ string RuntimeState::ErrorLog() {
 }
 
 string RuntimeState::FileErrors() const {
+  lock_guard<mutex> l(file_errors_lock_);
   stringstream out;
   for (int i = 0; i < file_errors_.size(); ++i) {
     out << file_errors_[i].second << " errors in " << file_errors_[i].first << endl;
@@ -121,6 +122,7 @@ string RuntimeState::FileErrors() const {
 }
 
 void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors) {
+  lock_guard<mutex> l(file_errors_lock_);
   file_errors_.push_back(make_pair(file_name, num_errors));
 }
 

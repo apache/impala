@@ -151,6 +151,9 @@ class RuntimeState {
   // error_log_[unreported_error_idx_+] has been not reported to the coordinator.
   int unreported_error_idx_;
 
+  // Lock protecting file_errors_
+  mutable boost::mutex file_errors_lock_;
+
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
 
