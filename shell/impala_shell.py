@@ -301,7 +301,9 @@ class ImpalaShell(cmd.Cmd):
   def __expect_result_metadata(self, query_str):
     """ Given a query string, return True if impalad expects result metadata"""
     excluded_query_types = ['use']
-    return not in set(map(query_str.startswith, excluded_query_types))
+    if True in set(map(query_str.startswith, excluded_query_types)):
+      return False
+    return True
 
   def __query_with_results(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
