@@ -477,6 +477,7 @@ Status HdfsRCFileScanner::ProcessRange() {
       continue;
     }
 
+    int num_to_commit = 0;
     for (int i = 0; i < max_tuples; ++i) {
       RETURN_IF_ERROR(NextRow());
 
@@ -519,12 +520,13 @@ Status HdfsRCFileScanner::ProcessRange() {
       current_row->SetTuple(scan_node_->tuple_idx(), tuple);
       // Evaluate the conjuncts and add the row to the batch
       if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
-        context_->CommitRows(1);
-        if (scan_node_->ReachedLimit()) break;
+        ++num_to_commit;
         current_row = context_->next_row(current_row);
         tuple = context_->next_tuple(tuple);
       }
     }
+    context_->CommitRows(num_to_commit);
+    if (scan_node_->ReachedLimit()) break;
   }
   return Status::OK;
 }
