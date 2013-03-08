@@ -60,6 +60,11 @@ def pytest_assertrepr_compare(op, left, right):
     LOG.error('\n'.join(result))
     return result
 
+def pytest_xdist_setupnodes(config, specs):
+  """Hook that is called when setting up the xdist plugin"""
+  # Force the xdist plugin to be quiet. In verbose mode it spews useless information.
+  config.option.verbose = 0
+
 def pytest_generate_tests(metafunc):
   """
   This is a hook to parameterize the tests based on the input vector.
