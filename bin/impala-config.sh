@@ -119,10 +119,10 @@ export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSIO
 
 # So that the frontend tests and PlanService can pick up libbackend.so
 # and other required libraries
-LIB_JAVA=`find ${JAVA_HOME}   -name libjava.so | head -1`
-LIB_JSIG=`find ${JAVA_HOME}   -name libjsig.so | head -1`
-LIB_JVM=` find ${JAVA_HOME}   -name libjvm.so  | head -1`
-LIB_HDFS=`find ${HADOOP_HOME} -name libhdfs.so | head -1`
+LIB_JAVA=`find ${JAVA_HOME}/   -name libjava.so | head -1`
+LIB_JSIG=`find ${JAVA_HOME}/   -name libjsig.so | head -1`
+LIB_JVM=` find ${JAVA_HOME}/   -name libjvm.so  | head -1`
+LIB_HDFS=`find ${HADOOP_HOME}/ -name libhdfs.so | head -1`
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
