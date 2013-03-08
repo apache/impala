@@ -190,6 +190,8 @@ class HdfsScanNode : public ScanNode {
   const static int SKIP_COLUMN = -1;
 
  private:
+  friend class ScanRangeContext;
+
   // Cache of the plan node.  This is needed to be able to create a copy of
   // the conjuncts per scanner since our Exprs are not thread safe.
   boost::scoped_ptr<TPlanNode> thrift_plan_node_;
@@ -255,6 +257,12 @@ class HdfsScanNode : public ScanNode {
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
+
+  // This is the number of io buffers that are owned by the scan node and the scanners.
+  // This is used just to help debug leaked io buffers to detemine if the leak is
+  // happening in the scanners vs other parts of the execution.
+  // Updates to this variable should use interlocked operations.
+  int num_owned_io_buffers_;
 
   // Vector containing indices into materialized_slots_.  The vector is indexed by
   // the slot_desc's col_pos.  Non-materialized slots and partition key slots will 

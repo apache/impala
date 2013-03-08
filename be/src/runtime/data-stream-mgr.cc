@@ -131,6 +131,12 @@ void DataStreamMgr::StreamControlBlock::CancelStream() {
   // notice that the stream is cancelled and handle it.
   data_arrival_.notify_all();
   data_removal_.notify_all();
+
+  // Delete any batches queued in batch_queue_
+  for (RowBatchQueue::iterator it = batch_queue_.begin(); 
+      it != batch_queue_.end(); ++it) {
+    delete it->second;
+  }
 }
 
 inline uint32_t DataStreamMgr::GetHashValue(

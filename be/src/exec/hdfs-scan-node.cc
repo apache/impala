@@ -66,6 +66,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_unqueued_files_(0),
       scanner_pool_(new ObjectPool()),
       num_partition_keys_(0),
+      num_owned_io_buffers_(0),
       done_(false),
       partition_key_pool_(new MemPool()),
       next_range_to_issue_idx_(0),
@@ -109,14 +110,16 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     if (!materialized_row_batches_.empty()) {
       materialized_batch = materialized_row_batches_.front();
       materialized_row_batches_.pop_front();
-      row_batch_consumed_cv_.notify_one();
     }
   }
 
   if (materialized_batch != NULL) {
+    __sync_fetch_and_add(
+        &num_owned_io_buffers_, -1 * materialized_batch->num_io_buffers());
+    row_batch_consumed_cv_.notify_one();
     row_batch->Swap(materialized_batch);
     // Update the number of materialized rows instead of when they are materialized.
-    // This means that scanners might process and queue up more rows that are necessary
+    // This means that scanners might process and queue up more rows than are necessary
     // for the limit case but we want to avoid the synchronized writes to
     // num_rows_returned_
     num_rows_returned_ += row_batch->num_rows();
@@ -487,10 +490,12 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   // Clean those up now.
   for (list<RowBatch*>::iterator it = materialized_row_batches_.begin();
        it != materialized_row_batches_.end(); ++it) {
+    __sync_fetch_and_add(&num_owned_io_buffers_, -1 * (*it)->num_io_buffers());
     delete *it;
   }
   materialized_row_batches_.clear();
   
+  DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
   if (reader_context_ != NULL) {
     runtime_state_->io_mgr()->UnregisterReader(reader_context_);
   }
@@ -626,6 +631,7 @@ void HdfsScanNode::DiskThread() {
       }
 
       DCHECK(buffer_desc != NULL);
+      __sync_fetch_and_add(&num_owned_io_buffers_, 1);
 
       ContextMap::iterator context_it = contexts_.find(buffer_desc->scan_range());
       if (context_it == contexts_.end()) {
@@ -657,7 +663,6 @@ void HdfsScanNode::DiskThread() {
   }
 
   scanner_threads_.join_all();
-  contexts_.clear();
    
   // Wake up thread in GetNext	
   row_batch_added_cv_.notify_one();
@@ -672,6 +677,7 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
     }
 
     if (UNLIKELY(done_)) {
+      __sync_fetch_and_add(&num_owned_io_buffers_, -1 * row_batch->num_io_buffers());
       delete row_batch;
       return;
     }

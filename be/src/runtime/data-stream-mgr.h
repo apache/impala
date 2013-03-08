@@ -142,7 +142,8 @@ class DataStreamMgr {
     // signal removal of data by stream consumer
     boost::condition_variable data_removal_;
 
-    // queue of (batch length, batch) pairs
+    // queue of (batch length, batch) pairs.  The StreamControl block owns memory to
+    // these batches.  They are handed off to the caller via GetBatch.
     typedef std::list<std::pair<int, RowBatch*> > RowBatchQueue;
     RowBatchQueue batch_queue_;
 

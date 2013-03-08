@@ -131,6 +131,7 @@ class ScanRangeContext {
   // it is blocked.
   // This can be called from multiple threads but the buffers must be added in order 
   // (can't have the buffers be queued in non-sequential order).
+  // If this is called after Flush(), the buffer is returned right away.
   void AddBuffer(DiskIoMgr::BufferDescriptor*);
 
   // Flush() and Cancel() are used together to coordinate proper cleanup.
@@ -248,6 +249,9 @@ class ScanRangeContext {
 
   // If true, the scan range has been cancelled and the scanner thread should abort
   bool cancelled_;
+
+  // If true, flush has been called.
+  bool done_;
 
   // Set to true when a buffer returns the end of the scan range.
   bool read_eosr_;

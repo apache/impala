@@ -39,6 +39,7 @@ ScanRangeContext::ScanRangeContext(RuntimeState* state, HdfsScanNode* scan_node,
     boundary_pool_(new MemPool()),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())),
     cancelled_(false),
+    done_(false),
     read_eosr_(false),
     current_buffer_(NULL) {
 
@@ -57,6 +58,7 @@ ScanRangeContext::ScanRangeContext(RuntimeState* state, HdfsScanNode* scan_node,
 }
 
 ScanRangeContext::~ScanRangeContext() {
+  DCHECK(current_row_batch_ == NULL);
 }
 
 void ScanRangeContext::NewRowBatch() {
@@ -71,6 +73,7 @@ void ScanRangeContext::AttachCompletedResources(bool done) {
       it != completed_buffers_.end(); ++it) {
     if (compact_data_) {
       (*it)->Return();
+      __sync_fetch_and_add(&scan_node_->num_owned_io_buffers_, -1);
     } else {
       current_row_batch_->AddIoBuffer(*it);
     } 
@@ -210,6 +213,8 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
         if (buffer_desc != NULL) buffer_desc->Return();
         return status;
       }
+
+      __sync_fetch_and_add(&scan_node_->num_owned_io_buffers_, 1);
       
       DCHECK(!peek);
       current_buffer_ = buffer_desc;
@@ -268,6 +273,7 @@ void ScanRangeContext::CommitRows(int num_rows) {
 
   if (current_row_batch_->IsFull()) {
     scan_node_->AddMaterializedRowBatch(current_row_batch_);
+    current_row_batch_ = NULL;
     NewRowBatch();
   }
 }
@@ -275,6 +281,13 @@ void ScanRangeContext::CommitRows(int num_rows) {
 void ScanRangeContext::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   {
     unique_lock<mutex> l(lock_);
+    if (done_) {
+      // The context is done (e.g. limit reached) so this buffer can be just
+      // returned.
+      buffer->Return();
+      __sync_fetch_and_add(&scan_node_->num_owned_io_buffers_, -1);
+      return;
+    }
     buffers_.push_back(buffer);
 
     // These variables are read without a lock in GetBytes.  There is a race in 
@@ -312,6 +325,7 @@ void ScanRangeContext::Flush() {
     current_buffer_ = NULL;
     current_buffer_pos_ = NULL;
     read_eosr_ = false;
+    done_ = true;
   }
   
   DCHECK(completed_buffers_.empty());

@@ -495,15 +495,16 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
   CancelReader(reader);
   
   unique_lock<mutex> lock(reader->lock_);
-  DCHECK_EQ(reader->num_outstanding_buffers_, 0);
+  DCHECK_EQ(reader->num_outstanding_buffers_, 0) << endl << reader->DebugString();
   DCHECK(reader->Validate()) << endl << reader->DebugString();
-  DCHECK(reader->ready_buffers_.empty());
+  DCHECK(reader->ready_buffers_.empty()) << endl << reader->DebugString();
   while (reader->num_disks_with_ranges_ > 0) {
     reader->disks_complete_cond_var_.wait(lock);
   }
   if (!reader->sync_reader_) {
-    DCHECK_EQ(reader->num_empty_buffers_, 
-        reader->num_buffers_per_disk_ * disk_queues_.size());
+    DCHECK_EQ(
+        reader->num_empty_buffers_, reader->num_buffers_per_disk_ * disk_queues_.size()) 
+      << endl << reader->DebugString();
   } 
   for (int i = 0; i < reader->disk_states_.size(); ++i) {
     // Close any open scan ranges now.  If the reader is cancelled, then there
