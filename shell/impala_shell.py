@@ -383,6 +383,22 @@ class ImpalaShell(cmd.Cmd):
     if self.verbose:
       print message
 
+  def do_create(self, args):
+    query = BeeswaxService.Query()
+    query.query = "create %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+
+    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
+    return status == RpcStatus.OK
+
+  def do_drop(self, args):
+    query = BeeswaxService.Query()
+    query.query = "drop %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+
+    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
+    return status == RpcStatus.OK
+
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
     query = BeeswaxService.Query()

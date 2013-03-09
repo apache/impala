@@ -562,6 +562,14 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     exec_hs2_metadata_op_id_ =
         jni_env->GetMethodID(fe_class, "execHiveServer2MetadataOp", "([B)[B");
     EXIT_IF_EXC(jni_env);
+    create_table_id_ = jni_env->GetMethodID(fe_class, "createTable", "([B)V");
+    EXIT_IF_EXC(jni_env);
+    create_database_id_ = jni_env->GetMethodID(fe_class, "createDatabase", "([B)V");
+    EXIT_IF_EXC(jni_env);
+    drop_table_id_ = jni_env->GetMethodID(fe_class, "dropTable", "([B)V");
+    EXIT_IF_EXC(jni_env);
+    drop_database_id_ = jni_env->GetMethodID(fe_class, "dropDatabase", "([B)V");
+    EXIT_IF_EXC(jni_env);
 
     jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
@@ -960,7 +968,7 @@ Status ImpalaServer::ExecuteInternal(
         // In HiveServer2, session key is provider by the caller and it might be invalid.
         return Status("Invalid session key");
       }
-      it->second.database = result.ddl_exec_request.database;
+      it->second.database = result.ddl_exec_request.use_db_params.db;
     }
     exec_state->reset();
     return Status::OK;
@@ -1076,75 +1084,120 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   return Status::OK;
 }
 
+Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
+  if (FLAGS_use_planservice) {
+   return Status("CreateDatabase not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, create_database_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
+Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
+  if (FLAGS_use_planservice) {
+    return Status("CreateTable not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, create_table_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
+Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
+  if (FLAGS_use_planservice) {
+    return Status("DropDatabase not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, drop_database_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
+Status ImpalaServer::DropTable(const TDropTableParams& params) {
+  if (FLAGS_use_planservice) {
+    return Status("DropTable not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, drop_table_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
 Status ImpalaServer::DescribeTable(const string& db, const string& table,
     TDescribeTableResult* columns) {
- if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    TDescribeTableParams params;
-    params.__set_db(db);
-    params.__set_table_name(table);
-
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
-
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-
-    TDescribeTableResult result;
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, columns));
-    return Status::OK;
- } else {
+ if (FLAGS_use_planservice) {
    return Status("DescribeTable not supported with external planservice");
- }
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  TDescribeTableParams params;
+  params.__set_db(db);
+  params.__set_table_name(table);
+
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
+
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+  TDescribeTableResult result;
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, columns));
+  return Status::OK;
 }
 
 Status ImpalaServer::GetTableNames(const string* db, const string* pattern,
     TGetTablesResult* table_names) {
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    TGetTablesParams params;
-    if (db != NULL) {
-      params.__set_db(*db);
-    }
-    if (pattern != NULL) {
-      params.__set_pattern(*pattern);
-    }
-
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
-
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, table_names));
-    return Status::OK;
-  } else {
+  if (FLAGS_use_planservice) {
     return Status("GetTableNames not supported with external planservice");
   }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  TGetTablesParams params;
+  if (db != NULL) {
+    params.__set_db(*db);
+  }
+  if (pattern != NULL) {
+    params.__set_pattern(*pattern);
+  }
+
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
+
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, table_names));
+  return Status::OK;
 }
 
 Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) {
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    TGetDbsParams params;
-    if (pattern != NULL) {
-      params.__set_pattern(*pattern);
-    }
-
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
-
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, db_names));
-    return Status::OK;
-  } else {
+  if (FLAGS_use_planservice) {
     return Status("GetDbNames not supported with external planservice");
   }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  TGetDbsParams params;
+  if (pattern != NULL) {
+    params.__set_pattern(*pattern);
+  }
+
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
+
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, db_names));
+  return Status::OK;
 }
 
 Status ImpalaServer::GetExecRequest(

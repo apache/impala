@@ -24,10 +24,16 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
+import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +44,8 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.catalog.FileFormat;
+import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
@@ -63,8 +71,12 @@ import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryGlobals;
 import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.thrift.TShowDbsParams;
+import com.cloudera.impala.thrift.TShowTablesParams;
+import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TUniqueId;
+import com.cloudera.impala.thrift.TUseDbParams;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -115,30 +127,83 @@ public class Frontend {
     TResultSetMetadata metadata = new TResultSetMetadata();
     if (analysis.isUseStmt()) {
       ddl.ddl_type = TDdlType.USE;
-      ddl.setDatabase(analysis.getUseStmt().getDatabase());
+      ddl.setUse_db_params(analysis.getUseStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isShowTablesStmt()) {
       ddl.ddl_type = TDdlType.SHOW_TABLES;
-      ddl.setShow_pattern(analysis.getShowTablesStmt().getPattern());
-      ddl.setDatabase(analysis.getShowTablesStmt().getDb());
+      ddl.setShow_tables_params(analysis.getShowTablesStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isShowDbsStmt()) {
       ddl.ddl_type = TDdlType.SHOW_DBS;
-      ddl.setShow_pattern(analysis.getShowDbsStmt().getPattern());
+      ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {
       ddl.ddl_type = TDdlType.DESCRIBE;
-      ddl.setDescribe_table(analysis.getDescribeStmt().getTable().getTbl());
-      ddl.setDatabase(analysis.getDescribeStmt().getTable().getDb());
+      ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING),
           new TColumnDesc("type", TPrimitiveType.STRING)));
+    } else if (analysis.isCreateTableStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_TABLE;
+      ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateDbStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_DATABASE;
+      ddl.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isDropDbStmt()) {
+      ddl.ddl_type = TDdlType.DROP_DATABASE;
+      ddl.setDrop_db_params(analysis.getDropDbStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isDropTableStmt()) {
+      ddl.ddl_type = TDdlType.DROP_TABLE;
+      ddl.setDrop_table_params(analysis.getDropTableStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     }
 
     result.setResult_set_metadata(metadata);
     result.setDdl_exec_request(ddl);
+  }
+
+  /**
+   * Creates a new database in the metastore.
+   */
+  public void createDatabase(String dbName, String comment, String locationUri,
+      boolean ifNotExists) throws MetaException, org.apache.thrift.TException,
+      AlreadyExistsException, InvalidObjectException {
+    catalog.createDatabase(dbName, comment, locationUri, ifNotExists);
+  }
+
+  /**
+   * Creates a new table in the metastore.
+   */
+  public void createTable(String dbName, String tableName,
+      List<TColumnDesc> columns, boolean isExternal, String comment,
+      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
+      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
+      AlreadyExistsException, InvalidObjectException {
+    catalog.createTable(dbName, tableName, columns, isExternal, comment,
+        rowFormat, fileFormat, location, ifNotExists);
+  }
+
+  /**
+   * Drops the specified table.
+   */
+  public void dropTable(String dbName, String tableName, boolean ifExists)
+      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
+      AlreadyExistsException, InvalidObjectException, InvalidOperationException {
+    catalog.dropTable(dbName, tableName, ifExists);
+  }
+
+  /**
+   * Drops the specified database.
+   */
+  public void dropDatabase(String dbName, boolean ifExists)
+    throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
+    AlreadyExistsException, InvalidObjectException, InvalidOperationException {
+    catalog.dropDatabase(dbName, ifExists);
   }
 
   /**

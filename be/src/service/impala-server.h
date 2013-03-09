@@ -507,6 +507,26 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status DescribeTable(const std::string& db, const std::string& table,
       TDescribeTableResult* columns);
 
+  // Creates a new database in the metastore with the specified name. Returns OK if the
+  // database was successfully created, otherwise CANCELLED is returned with details on
+  // the specific error. Common errors include creating a database that already exists
+  // and metastore connectivity problems.
+  Status CreateDatabase(const TCreateDbParams& create_db_params);
+
+  // Creates a new table in the metastore with the specified name. Returns OK if the
+  // table was successfully created, otherwise CANCELLED is returned. Common errors
+  // include creating a table that already exists, creating a table in a database that
+  // does not exist, and metastore connectivity problems.
+  Status CreateTable(const TCreateTableParams& create_table_params);
+
+  // Drops the specified database from the metastore. Returns OK if the database
+  // drop was successful, otherwise CANCELLED is returned.
+  Status DropDatabase(const TDropDbParams& drop_db_params);
+
+  // Drops the specified table from the metastore. Returns OK if the table drop was
+  // successful, otherwise CANCELLED is returned.
+  Status DropTable(const TDropTableParams& drop_table_params);
+
   // Copies a query's state into the query log. Called immediately prior to a
   // QueryExecState's deletion.
   // Must be called with query_exec_state_map_lock_ held
@@ -643,8 +663,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
-  // JniFrontend.execHiveServer2MetadataOp
-  jmethodID exec_hs2_metadata_op_id_;
+  jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
+  jmethodID create_database_id_; // JniFrontend.createDatabase
+  jmethodID create_table_id_; // JniFrontend.createTable
+  jmethodID drop_database_id_; // JniFrontend.dropDatabase
+  jmethodID drop_table_id_; // JniFrontend.dropTable
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone

@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TUseDbParams;
 
 /**
  * Representation of a USE db statement. 
@@ -40,6 +41,14 @@ public class UseStmt extends ParseNodeBase {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    // USE is completely ignored for now
+    if (analyzer.getCatalog().getDb(getDatabase()) == null) {
+      throw new AnalysisException("Database does not exist: " + getDatabase());
+    }
+  }
+
+  public TUseDbParams toThrift() {
+    TUseDbParams params = new TUseDbParams();
+    params.setDb(getDatabase());
+    return params;
   }
 }

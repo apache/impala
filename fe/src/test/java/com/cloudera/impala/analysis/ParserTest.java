@@ -298,7 +298,7 @@ public class ParserTest {
     ParsesOk("select a from t where false AND true");
   }
 
-  @Test  
+  @Test
   public void TestIdentQuoting() {
     ParsesOk("select a from `t`");
     ParsesOk("select a from `default`.`t`");
@@ -322,7 +322,7 @@ public class ParserTest {
 
     // Lots of quoting
     ParsesOk(
-        "select `db`.`tbl`.`a` from `default`.`t` `alias` where `alias`.`col` = 'string'" 
+        "select `db`.`tbl`.`a` from `default`.`t` `alias` where `alias`.`col` = 'string'"
         + " group by `alias`.`col`");
 
     // Quoting keywords should fail
@@ -655,7 +655,7 @@ public class ParserTest {
     // Short form ok
     ParsesOk("SHOW TABLES");
     // Malformed pattern (no quotes)
-    ParserError("SHOW TABLES tablename");    
+    ParserError("SHOW TABLES tablename");
     // Well-formed pattern
     ParsesOk("SHOW TABLES 'tablename|othername'");
     // Empty pattern ok
@@ -677,6 +677,138 @@ public class ParserTest {
     ParsesOk("DESCRIBE databasename.tablename");
   }
 
+  @Test
+  public void TestCreateDatabase() {
+    // Both CREATE DATABASE and CREATE SCHEMA are valid (and equivalent)
+    String [] dbKeywords = {"DATABASE", "SCHEMA"};
+    for (String kw: dbKeywords) {
+      ParsesOk(String.format("CREATE %s Foo", kw));
+      ParsesOk(String.format("CREATE %s IF NOT EXISTS Foo", kw));
+
+      ParsesOk(String.format("CREATE %s Foo COMMENT 'Some comment'", kw));
+      ParsesOk(String.format("CREATE %s Foo LOCATION '/hdfs_location'", kw));
+      ParsesOk(String.format("CREATE %s Foo LOCATION '/hdfs_location'", kw));
+      ParsesOk(String.format(
+          "CREATE %s Foo COMMENT 'comment' LOCATION '/hdfs_location'", kw));
+
+      // Only string literals are supported
+      ParserError(String.format("CREATE %s Foo COMMENT mytable", kw));
+      ParserError(String.format("CREATE %s Foo LOCATION /hdfs_location", kw));
+
+      // COMMENT needs to be *before* LOCATION
+      ParserError(String.format(
+          "CREATE %s Foo LOCATION '/hdfs/location' COMMENT 'comment'", kw));
+
+      ParserError(String.format("CREATE %s Foo COMMENT LOCATION '/hdfs_location'", kw));
+      ParserError(String.format("CREATE %s Foo LOCATION", kw));
+      ParserError(String.format("CREATE %s Foo LOCATION 'dfsd' 'dafdsf'", kw));
+
+      ParserError(String.format("CREATE Foo", kw));
+      ParserError(String.format("CREATE %s 'Foo'", kw));
+      ParserError(String.format("CREATE %s", kw));
+      ParserError(String.format("CREATE %s IF EXISTS Foo", kw));
+
+      ParserError(String.format("CREATE %sS Foo", kw));
+    }
+  }
+
+  @Test
+  public void TestCreateTable() {
+    // Support unqualified and fully-qualified table names
+    ParsesOk("CREATE TABLE Foo (i int)");
+    ParsesOk("CREATE TABLE Foo.Bar (i int)");
+    ParsesOk("CREATE TABLE IF NOT EXISTS Foo.Bar (i int)");
+
+    ParsesOk("CREATE TABLE Foo (i int, s string)");
+    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string)");
+    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) LOCATION '/test-warehouse/'");
+    ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/'");
+
+    // Supported file formats
+    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS TEXTFILE");
+    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS RCFILE");
+    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS SEQUENCEFILE");
+    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS SEQUENCEFILE LOCATION '/b'");
+    ParsesOk(
+        "CREATE EXTERNAL TABLE Foo (f float) COMMENT 'c' STORED AS RCFILE LOCATION '/b'");
+
+    ParserError("CREATE TABLE Foo (i int, s string) STORED AS SEQFILE");
+    ParserError("CREATE TABLE Foo (i int, s string) STORED TEXTFILE");
+
+    // Row format syntax
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED");
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'");
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES TERMINATED BY '|'");
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\0'" +
+        " LINES TERMINATED BY '\1'");
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\0'" +
+        " LINES TERMINATED BY '\1' STORED AS TEXTFILE");
+    ParsesOk("CREATE TABLE T (i int) COMMENT 'hi' ROW FORMAT DELIMITED STORED AS RCFILE");
+    ParsesOk("CREATE TABLE T (i int) COMMENT 'hello' ROW FORMAT DELIMITED FIELDS " + 
+        "TERMINATED BY '\0' LINES TERMINATED BY '\1' STORED AS TEXTFILE LOCATION '/a'");
+
+    // Negative row format syntax
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED TERMINATED BY '\0'");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED '|'");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY |");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS BY '\0'");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES BY '\n'");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\n'");
+    ParserError("CREATE TABLE T (i int) FIELDS TERMINATED BY '\0'");
+    ParserError("CREATE TABLE T (i int) ROWS TERMINATED BY '\0'");
+
+    // Order should be: [comment] [row format] [stored as FILEFORMAT] [location]
+    ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE COMMENT 'c'");
+    ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE ROW FORMAT DELIMITED");
+    ParserError("CREATE TABLE Foo (d double) ROW FORMAT DELIMITED COMMENT 'c'");
+    ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c'");
+    ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c' STORED AS RCFILE");
+    ParserError("CREATE TABLE Foo (d double) LOCATION 'a' STORED AS RCFILE");
+
+    // Location and comment need to be string literals, file format is not
+    ParserError("CREATE TABLE Foo (d double) LOCATION a");
+    ParserError("CREATE TABLE Foo (d double) COMMENT c");
+    ParserError("CREATE TABLE Foo (d double) STORED AS 'TEXTFILE'");
+
+    // Invalid syntax
+    ParserError("CREATE TABLE IF EXISTS Foo.Bar (i int)");
+    ParserError("CREATE IF NOT EXISTS TABLE Foo.Bar (i int)");
+    ParserError("CREATE TABLE Foo (d double) STORED TEXTFILE");
+    ParserError("CREATE TABLE Foo (d double) AS TEXTFILE");
+    ParserError("CREATE TABLE Foo i int");
+    ParserError("CREATE TABLE Foo (i intt)");
+    ParserError("CREATE TABLE Foo (int i)");
+    ParserError("CREATE TABLE Foo ()");
+    ParserError("CREATE TABLE Foo.Bar");
+    ParserError("CREATE TABLE Foo");
+    ParserError("CREATE TABLE");
+    ParserError("CREATE EXTERNAL");
+    ParserError("CREATE EXTERNAL TABLE Foo");
+    ParserError("CREATE");
+  }
+
+  @Test
+  public void TestDrop() {
+    ParsesOk("DROP TABLE Foo");
+    ParsesOk("DROP TABLE Foo.Bar");
+    ParsesOk("DROP TABLE IF EXISTS Foo.Bar");
+    ParsesOk("DROP DATABASE Foo");
+    ParsesOk("DROP SCHEMA Foo");
+    ParsesOk("DROP DATABASE IF EXISTS Foo");
+    ParsesOk("DROP SCHEMA IF EXISTS Foo");
+
+    ParserError("DROP");
+    ParserError("DROP Foo");
+    ParserError("DROP DATABASE Foo.Bar");
+    ParserError("DROP SCHEMA Foo.Bar");
+    ParserError("DROP DATABASE Foo Bar");
+    ParserError("DROP SCHEMA Foo Bar");
+    ParserError("DROP TABLE IF Foo");
+    ParserError("DROP TABLE EXISTS Foo");
+    ParserError("DROP IF EXISTS TABLE Foo");
+    ParserError("DROP TBL Foo");
+  }
+
   @Test public void TestGetErrorMsg() {
 
     // missing select
@@ -685,7 +817,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: DESCRIBE, SELECT, SHOW, USE, INSERT\n");
+        "Expected: CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT\n");
 
     // missing select list
     ParserError("select from t",

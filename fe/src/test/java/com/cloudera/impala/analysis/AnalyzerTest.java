@@ -327,7 +327,7 @@ public class AnalyzerTest {
     AnalyzesOk("select a.* from" +
         " (select * from (select id+2 from functional.hbasealltypessmall) b) a");
     AnalysisError("select * from " +
-        "(select * from functional.alltypes a join " + 
+        "(select * from functional.alltypes a join " +
         "functional.alltypes b on (a.int_col = b.int_col)) x",
         "duplicated inline view column alias: 'year' in inline view 'x'");
 
@@ -341,11 +341,11 @@ public class AnalyzerTest {
         "            on (x.tinyint_col = c.id)");
 
     // aggregate test
-    AnalyzesOk("select count(*) from (select count(id) from " + 
+    AnalyzesOk("select count(*) from (select count(id) from " +
                "functional.AllTypes group by id) a");
-    AnalyzesOk("select count(a.x) from (select id+2 x "+ 
+    AnalyzesOk("select count(a.x) from (select id+2 x "+
                "from functional.hbasealltypessmall) a");
-    AnalyzesOk("select * from (select id, zip " + 
+    AnalyzesOk("select * from (select id, zip " +
         "       from (select * from functional.testtbl) x " +
         "       group by zip, id having count(*) > 0) x");
 
@@ -404,13 +404,13 @@ public class AnalyzerTest {
         "GROUP BY expression must not contain aggregate functions");
 
     // multiple grouping cols
-    AnalyzesOk("select int_col, string_col, bigint_col, " + 
+    AnalyzesOk("select int_col, string_col, bigint_col, " +
         "count(*) from functional.alltypes " +
         "group by string_col, int_col, bigint_col");
-    AnalyzesOk("select int_col, string_col, bigint_col, " + 
+    AnalyzesOk("select int_col, string_col, bigint_col, " +
         "count(*) from functional.alltypes " +
         "group by 2, 1, 3");
-    AnalysisError("select int_col, string_col, bigint_col, " + 
+    AnalysisError("select int_col, string_col, bigint_col, " +
         "count(*) from functional.alltypes " +
         "group by 2, 1, 4", "GROUP BY expression must not contain aggregate functions");
     // can't group by floating-point exprs
@@ -420,7 +420,7 @@ public class AnalyzerTest {
         "GROUP BY expression must have a discrete (non-floating point) type");
 
     // order by, top-n
-    AnalyzesOk("select * from (select zip, count(*) " + 
+    AnalyzesOk("select * from (select zip, count(*) " +
         "       from (select * from functional.testtbl) x " +
         "       group by 1 order by count(*) + min(zip) limit 5) x");
     AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
@@ -435,7 +435,7 @@ public class AnalyzerTest {
     // different db
     AnalyzesOk("select functional_seq.alltypes.* from functional_seq.alltypes");
     // two tables w/ identical names from different dbs
-    AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " + 
+    AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " +
                "from functional.alltypes, functional_seq.alltypes");
     AnalyzesOk("select * from functional.alltypes, functional_seq.alltypes");
   }
@@ -456,9 +456,9 @@ public class AnalyzerTest {
     AnalyzesOk("select * from functional.AllTypes where bool_col = false");
     AnalyzesOk("select * from functional.AllTypes where true or false");
     AnalyzesOk("select * from functional.AllTypes where true and false");
-    AnalyzesOk("select * from functional.AllTypes " + 
+    AnalyzesOk("select * from functional.AllTypes " +
                "where true or false and bool_col = false");
-    AnalyzesOk("select * from functional.AllTypes " + 
+    AnalyzesOk("select * from functional.AllTypes " +
                 "where true and false or bool_col = false");
     // Test predicates in select list.
     AnalyzesOk("select bool_col = true from functional.AllTypes");
@@ -482,7 +482,7 @@ public class AnalyzerTest {
     AnalysisError("select int_col from badtbl", "Unknown table");
 
     // Bad table metadata
-    AnalysisError("select * from functional.map_table", 
+    AnalysisError("select * from functional.map_table",
         "Failed to load metadata for table: map_table");
 
     // case-insensitive
@@ -500,16 +500,16 @@ public class AnalyzerTest {
     // This does not work
     AnalyzesOk("select int_col, zip from functional.alltypes, functional.testtbl");
     // duplicate alias
-    AnalysisError("select a.int_col, a.id " + 
+    AnalysisError("select a.int_col, a.id " +
         "          from functional.alltypes a, functional.testtbl a",
         "Duplicate table alias");
     // duplicate implicit alias
-    AnalysisError("select int_col from functional.alltypes, " + 
+    AnalysisError("select int_col from functional.alltypes, " +
                   "functional.alltypes", "Duplicate table alias");
 
     // resolves dbs correctly
     AnalyzesOk("select zip from functional.testtbl");
-    AnalysisError("select int_col from functional.testtbl", 
+    AnalysisError("select int_col from functional.testtbl",
         "couldn't resolve column reference");
   }
 
@@ -533,7 +533,7 @@ public class AnalyzerTest {
 
   @Test public void TestOnClause() throws AnalysisException {
     AnalyzesOk(
-        "select a.int_col from functional.alltypes a " + 
+        "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col = b.int_col)");
     AnalyzesOk(
         "select a.int_col " +
@@ -543,12 +543,12 @@ public class AnalyzerTest {
     AnalyzesOk("select a.int_col from functional.alltypes a join functional.alltypes b");
     // unknown column
     AnalysisError(
-        "select a.int_col from functional.alltypes a " + 
+        "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col = b.badcol)",
         "unknown column 'badcol'");
     // ambiguous col ref
     AnalysisError(
-        "select a.int_col from functional.alltypes a " + 
+        "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (int_col = int_col)",
         "Unqualified column reference 'int_col' is ambiguous");
     // unknown alias
@@ -558,7 +558,7 @@ public class AnalyzerTest {
         "unknown table alias: 'badalias'");
     // incompatible comparison
     AnalysisError(
-        "select a.int_col from functional.alltypes a join " + 
+        "select a.int_col from functional.alltypes a join " +
         "functional.alltypes b on (a.bool_col = b.string_col)",
         "operands are not comparable: a.bool_col = b.string_col");
     AnalyzesOk(
@@ -579,34 +579,34 @@ public class AnalyzerTest {
         "unknown table alias: 'c'");
 
     // outer joins require ON/USING clause
-    AnalyzesOk("select * from functional.alltypes a left outer join " + 
+    AnalyzesOk("select * from functional.alltypes a left outer join " +
         "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select * from functional.alltypes a left outer join " + 
+    AnalyzesOk("select * from functional.alltypes a left outer join " +
         "functional.alltypes b using (id)");
-    AnalysisError("select * from functional.alltypes a " + 
+    AnalysisError("select * from functional.alltypes a " +
         "left outer join functional.alltypes b",
         "LEFT OUTER JOIN requires an ON or USING clause");
-    AnalyzesOk("select * from functional.alltypes a right outer join " + 
+    AnalyzesOk("select * from functional.alltypes a right outer join " +
         "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select * from functional.alltypes a right outer join " + 
+    AnalyzesOk("select * from functional.alltypes a right outer join " +
         "functional.alltypes b using (id)");
-    AnalysisError("select * from functional.alltypes a " + 
+    AnalysisError("select * from functional.alltypes a " +
         "right outer join functional.alltypes b",
         "RIGHT OUTER JOIN requires an ON or USING clause");
-    AnalyzesOk("select * from functional.alltypes a full outer join " + 
+    AnalyzesOk("select * from functional.alltypes a full outer join " +
         "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select * from functional.alltypes a full outer join " + 
+    AnalyzesOk("select * from functional.alltypes a full outer join " +
         "functional.alltypes b using (id)");
-    AnalysisError("select * from functional.alltypes a full outer join " + 
+    AnalysisError("select * from functional.alltypes a full outer join " +
         "functional.alltypes b",
         "FULL OUTER JOIN requires an ON or USING clause");
 
     // semi join requires ON/USING clause
-    AnalyzesOk("select a.id from functional.alltypes a left semi join " + 
+    AnalyzesOk("select a.id from functional.alltypes a left semi join " +
         "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select a.id from functional.alltypes a left semi join " + 
+    AnalyzesOk("select a.id from functional.alltypes a left semi join " +
       "functional.alltypes b using (id)");
-    AnalysisError("select a.id from functional.alltypes a " + 
+    AnalysisError("select a.id from functional.alltypes a " +
       "left semi join functional.alltypes b",
         "LEFT SEMI JOIN requires an ON or USING clause");
     // TODO: enable when implemented
@@ -617,22 +617,22 @@ public class AnalyzerTest {
   }
 
   @Test public void TestUsingClause() throws AnalysisException {
-    AnalyzesOk("select a.int_col, b.int_col from functional.alltypes a join " + 
+    AnalyzesOk("select a.int_col, b.int_col from functional.alltypes a join " +
       "functional.alltypes b using (int_col)");
-    AnalyzesOk("select a.int_col, b.int_col from " + 
+    AnalyzesOk("select a.int_col, b.int_col from " +
       "functional.alltypes a join functional.alltypes b " +
       "using (int_col, string_col)");
     AnalyzesOk(
         "select a.int_col, b.int_col, c.int_col " +
-        "from functional.alltypes a " + 
+        "from functional.alltypes a " +
         "join functional.alltypes b using (int_col, string_col) " +
         "join functional.alltypes c using (int_col, string_col, bool_col)");
     // unknown column
-    AnalysisError("select a.int_col from functional.alltypes a " + 
+    AnalysisError("select a.int_col from functional.alltypes a " +
         "join functional.alltypes b using (badcol)",
         "unknown column badcol for alias a");
     AnalysisError(
-        "select a.int_col from functional.alltypes a " + 
+        "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b using (int_col, badcol)",
         "unknown column badcol for alias a ");
   }
@@ -647,14 +647,14 @@ public class AnalyzerTest {
         "aggregation function not allowed in WHERE clause");
     // NULL literal in binary predicate.
     for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
-      AnalyzesOk("select id from functional.testtbl where id " + 
+      AnalyzesOk("select id from functional.testtbl where id " +
           op.toString() + " NULL");
     }
     // bool literal in binary predicate.
     for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
-      AnalyzesOk("select id from functional.testtbl where id " +  
+      AnalyzesOk("select id from functional.testtbl where id " +
           op.toString() + " true");
-      AnalyzesOk("select id from functional.testtbl where id " +  
+      AnalyzesOk("select id from functional.testtbl where id " +
           op.toString() + " false");
     }
     // NULL literal predicate.
@@ -676,7 +676,7 @@ public class AnalyzerTest {
 
   @Test
   public void TestAggregates() throws AnalysisException {
-    AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " + 
+    AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " +
         "from functional.testtbl");
     AnalyzesOk("select count(id, zip) from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",
@@ -723,9 +723,9 @@ public class AnalyzerTest {
   @Test
   public void TestDistinct() throws AnalysisException {
     // DISTINCT
-    AnalyzesOk("select count(distinct id) as sum_id from " + 
+    AnalyzesOk("select count(distinct id) as sum_id from " +
         "functional.testtbl order by sum_id");
-    AnalyzesOk("select count(distinct id) as sum_id from " + 
+    AnalyzesOk("select count(distinct id) as sum_id from " +
         "functional.testtbl order by max(id)");
     AnalyzesOk("select distinct id, zip from functional.testtbl");
     AnalyzesOk("select distinct * from functional.testtbl");
@@ -733,11 +733,11 @@ public class AnalyzerTest {
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalysisError("select distinct id, zip from functional.testtbl group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
-    AnalysisError("select distinct id, zip, count(*) from " + 
+    AnalysisError("select distinct id, zip, count(*) from " +
         "functional.testtbl group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalyzesOk("select count(distinct id, zip) from functional.testtbl");
-    AnalysisError("select count(distinct id, zip), count(distinct zip) " + 
+    AnalysisError("select count(distinct id, zip), count(distinct zip) " +
         "from functional.testtbl",
         "all DISTINCT aggregate functions need to have the same set of parameters");
     AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
@@ -761,16 +761,16 @@ public class AnalyzerTest {
     AnalyzesOk("select distinct * from " +
         "(select distinct * from (Select * from functional.testtbl) x) y");
     AnalyzesOk("select distinct * from (select count(*) from functional.testtbl) x");
-    AnalyzesOk("select count(distinct id, zip) " + 
+    AnalyzesOk("select count(distinct id, zip) " +
         "from (select * from functional.testtbl) x");
     AnalyzesOk("select * from (select tinyint_col, count(distinct int_col, bigint_col) "
         + "from (select * from functional.alltypesagg) x group by 1) y");
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct int_col) from " + 
+        + "sum(distinct int_col) from " +
         "(select * from functional.alltypesagg) x group by 1");
 
     // Error case when distinct is inside an inline view
-    AnalysisError("select * from " + 
+    AnalysisError("select * from " +
         "(select distinct count(*) from functional.testtbl) x",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalysisError("select * from " +
@@ -780,7 +780,7 @@ public class AnalyzerTest {
         "(select distinct id, zip, count(*) from functional.testtbl group by 1, 2) x",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalysisError("select * from " +
-        "(select count(distinct id, zip), count(distinct zip) " + 
+        "(select count(distinct id, zip), count(distinct zip) " +
         "from functional.testtbl) x",
         "all DISTINCT aggregate functions need to have the same set of parameters");
     AnalysisError("select * from " + "(select tinyint_col, count(distinct int_col),"
@@ -790,13 +790,13 @@ public class AnalyzerTest {
     // Error case when inline view is in the from clause
     AnalysisError("select distinct count(*) from (select * from functional.testtbl) x",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
-    AnalysisError("select distinct id, zip from " + 
+    AnalysisError("select distinct id, zip from " +
         "(select * from functional.testtbl) x group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalysisError("select distinct id, zip, count(*) from " +
         "(select * from functional.testtbl) x group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
-    AnalyzesOk("select count(distinct id, zip) " + 
+    AnalyzesOk("select count(distinct id, zip) " +
         "from (select * from functional.testtbl) x");
     AnalysisError("select count(distinct id, zip), count(distinct zip) " +
         " from (select * from functional.testtbl) x",
@@ -804,10 +804,10 @@ public class AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
         + "from (select * from functional.alltypesagg) x group by 1");
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct int_col) from " + 
+        + "sum(distinct int_col) from " +
         "(select * from functional.alltypesagg) x group by 1");
     AnalysisError("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct bigint_col) from " + 
+        + "sum(distinct bigint_col) from " +
         "(select * from functional.alltypesagg) x group by 1",
         "all DISTINCT aggregate functions need to have the same set of parameters");
   }
@@ -824,13 +824,13 @@ public class AnalyzerTest {
         "select list expression not produced by aggregation output " +
         "(missing from GROUP BY clause?)");
 
-    AnalyzesOk("select id, zip from functional.testtbl " + 
+    AnalyzesOk("select id, zip from functional.testtbl " +
         "group by zip, id having count(*) > 0");
-    AnalysisError("select id, zip from functional.testtbl " + 
+    AnalysisError("select id, zip from functional.testtbl " +
         "group by id having count(*) > 0",
         "select list expression not produced by aggregation output " +
         "(missing from GROUP BY clause?)");
-    AnalysisError("select id from functional.testtbl " + 
+    AnalysisError("select id from functional.testtbl " +
         "group by id having zip + count(*) > 0",
         "HAVING clause not produced by aggregation output " +
         "(missing from GROUP BY clause?)");
@@ -842,7 +842,7 @@ public class AnalyzerTest {
     AnalysisError("select * from functional.alltypes group by 1",
         "cannot combine '*' in select list with GROUP BY");
     // picks up select item alias
-    AnalyzesOk("select zip z, id iD1, id ID2, count(*) " + 
+    AnalyzesOk("select zip z, id iD1, id ID2, count(*) " +
         "from functional.testtbl group by z, ID1, id2");
     // ambiguous alias
     AnalysisError("select zip a, id a, count(*) from functional.testtbl group by a",
@@ -856,19 +856,19 @@ public class AnalyzerTest {
     // can't group by aggregate
     AnalysisError("select zip, count(*) from functional.testtbl group by count(*)",
         "GROUP BY expression must not contain aggregate functions");
-    AnalysisError("select zip, count(*) " + 
+    AnalysisError("select zip, count(*) " +
         "from functional.testtbl group by count(*) + min(zip)",
         "GROUP BY expression must not contain aggregate functions");
     AnalysisError("select zip, count(*) from functional.testtbl group by 2",
         "GROUP BY expression must not contain aggregate functions");
 
     // multiple grouping cols
-    AnalyzesOk("select int_col, string_col, bigint_col, count(*) " + 
+    AnalyzesOk("select int_col, string_col, bigint_col, count(*) " +
         "from functional.alltypes group by string_col, int_col, bigint_col");
-    AnalyzesOk("select int_col, string_col, bigint_col, count(*) " + 
+    AnalyzesOk("select int_col, string_col, bigint_col, count(*) " +
         "from functional.alltypes group by 2, 1, 3");
-    AnalysisError("select int_col, string_col, bigint_col, count(*) " + 
-        "from functional.alltypes group by 2, 1, 4", 
+    AnalysisError("select int_col, string_col, bigint_col, count(*) " +
+        "from functional.alltypes group by 2, 1, 4",
         "GROUP BY expression must not contain aggregate functions");
     // can't group by floating-point exprs
     AnalysisError("select float_col, count(*) from functional.alltypes group by 1",
@@ -916,7 +916,7 @@ public class AnalyzerTest {
 
     // can introduce additional aggregates in order by clause
     AnalyzesOk("select zip, count(*) from functional.testtbl group by 1 order by count(*)");
-    AnalyzesOk("select zip, count(*) from functional.testtbl " + 
+    AnalyzesOk("select zip, count(*) from functional.testtbl " +
         "group by 1 order by count(*) + min(zip)");
     AnalysisError("select zip, count(*) from functional.testtbl group by 1 order by id",
         "ORDER BY expression not produced by aggregation output " +
@@ -933,14 +933,14 @@ public class AnalyzerTest {
     AnalyzesOk("select float_col, int_col + 0.5 from functional.alltypes order by 2, 1");
 
     // select-list item takes precedence
-    AnalyzesOk("select t1.int_col from functional.alltypes t1, " + 
+    AnalyzesOk("select t1.int_col from functional.alltypes t1, " +
         "functional.alltypes t2 where t1.id = t2.id order by int_col");
 
     // Ambiguous alias cause error
-    AnalysisError("select string_col a, int_col a from " + 
+    AnalysisError("select string_col a, int_col a from " +
         "functional.alltypessmall order by a limit 1",
         "Column a in order clause is ambiguous");
-    AnalysisError("select string_col a, int_col A from " + 
+    AnalysisError("select string_col a, int_col A from " +
         "functional.alltypessmall order by a limit 1",
         "Column a in order clause is ambiguous");
   }
@@ -976,12 +976,12 @@ public class AnalyzerTest {
     AnalysisError("select * from functional.alltypes where tinyint_col = '1'");
     AnalysisError("select * from functional.alltypes where bool_col = '0'");
 
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('0.5' as float)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "smallint_col = cast('0.5' as float)");
     AnalyzesOk("select * from functional.alltypes where int_col = cast('0.5' as float)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "bigint_col = cast('0.5' as float)");
     AnalyzesOk("select 1.0 = cast('" + Double.toString(Double.MIN_VALUE) +
         "' as double)");
@@ -992,13 +992,13 @@ public class AnalyzerTest {
     AnalyzesOk("select 1.0 = cast('-" + Double.toString(Double.MAX_VALUE) +
         "' as double)");
     // Test chains of minus. Note that "--" is the a comment symbol.
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('-1' as tinyint)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('- -1' as tinyint)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('- - -1' as tinyint)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('- - - -1' as tinyint)");
     // Test correct casting to compatible type on bitwise ops.
     AnalyzesOk("select 1 | cast('" + Byte.toString(Byte.MIN_VALUE) + "' as int)");
@@ -1025,7 +1025,7 @@ public class AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where tinyint_col = " +
         "cast('" + Double.toString(Double.MIN_VALUE) + "1' as tinyint)");
     // Cast never raise analysis exception
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('--1' as tinyint)");
   }
 
@@ -1048,9 +1048,9 @@ public class AnalyzerTest {
 
   @Test
   public void TestCompoundPredicates() throws AnalysisException {
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "string_col = '5' and int_col = 5");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "string_col = '5' or int_col = 5");
     AnalyzesOk("select * from functional.alltypes where (string_col = '5' " +
                "or int_col = 5) and string_col > '1'");
@@ -1098,27 +1098,27 @@ public class AnalyzerTest {
   public void TestInPredicates() throws AnalysisException {
     AnalyzesOk("select * from functional.alltypes where int_col in (1, 2, 3, 4)");
     AnalyzesOk("select * from functional.alltypes where int_col not in (1, 2, 3, 4)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "string_col in ('a', 'b', 'c', 'd')");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "string_col not in ('a', 'b', 'c', 'd')");
     // Test booleans.
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "true in (bool_col, true and false)");
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "true not in (bool_col, true and false)");
     // In list requires implicit casts.
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "double_col in (int_col, bigint_col)");
     // Comparison expr requires implicit cast.
-    AnalyzesOk("select * from functional.alltypes where " + 
+    AnalyzesOk("select * from functional.alltypes where " +
         "int_col in (double_col, bigint_col)");
     // Incompatible types.
-    AnalysisError("select * from functional.alltypes where " + 
+    AnalysisError("select * from functional.alltypes where " +
         "string_col in (bool_col, double_col)",
         "Incompatible return types 'STRING' and 'BOOLEAN' " +
         "of exprs 'string_col' and 'bool_col'.");
-    AnalysisError("select * from functional.alltypes where " + 
+    AnalysisError("select * from functional.alltypes where " +
         "timestamp_col in (int_col, double_col)",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
@@ -1265,17 +1265,17 @@ public class AnalyzerTest {
     // positive tests are included in TestComparisonTypeCasts
     AnalysisError("select int_col from functional.alltypes where date_col = 'ABCD'",
         "Unable to parse string 'ABCD' to date");
-    AnalysisError("select int_col from functional.alltypes " + 
+    AnalysisError("select int_col from functional.alltypes " +
         "where date_col = 'ABCD-EF-GH'",
         "Unable to parse string 'ABCD-EF-GH' to date");
     AnalysisError("select int_col from functional.alltypes where date_col = '2006'",
         "Unable to parse string '2006' to date");
     AnalysisError("select int_col from functional.alltypes where date_col = '0.5'",
         "Unable to parse string '0.5' to date");
-    AnalysisError("select int_col from functional.alltypes where " + 
+    AnalysisError("select int_col from functional.alltypes where " +
         "date_col = '2006-10-10 ABCD'",
         "Unable to parse string '2006-10-10 ABCD' to date");
-    AnalysisError("select int_col from functional.alltypes where " + 
+    AnalysisError("select int_col from functional.alltypes where " +
         "date_col = '2006-10-10 12:11:05.ABC'",
         "Unable to parse string '2006-10-10 12:11:05.ABC' to date");
   }
@@ -1292,7 +1292,7 @@ public class AnalyzerTest {
         "Invalid floating point argument to operation &");
     AnalysisError("select double_col | bigint_col from functional.alltypes",
         "Invalid floating point argument to operation |");
-    AnalysisError("select int_col from functional.alltypes where " + 
+    AnalysisError("select int_col from functional.alltypes where " +
         "float_col & bool_col > 5",
         "Arithmetic operation requires numeric operands");
   }
@@ -1349,12 +1349,12 @@ public class AnalyzerTest {
         "'INTERVAL 10 years + string_col' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP'");
     // First operand does not return a timestamp. Function-call like version.
-    AnalysisError("select date_add(float_col, interval 10 years) " + 
+    AnalysisError("select date_add(float_col, interval 10 years) " +
         "from functional.alltypes",
         "Operand 'float_col' of timestamp arithmetic expression " +
         "'date_add(float_col, INTERVAL 10 years)' returns type 'FLOAT'. " +
         "Expected type 'TIMESTAMP'.");
-    AnalysisError("select date_add(string_col, interval 10 years) " + 
+    AnalysisError("select date_add(string_col, interval 10 years) " +
         "from functional.alltypes",
         "Operand 'string_col' of timestamp arithmetic expression " +
         "'date_add(string_col, INTERVAL 10 years)' returns type 'STRING'. " +
@@ -1365,7 +1365,7 @@ public class AnalyzerTest {
         "Operand '5.2' of timestamp arithmetic expression " +
         "'timestamp_col + INTERVAL 5.2 years' returns type 'DOUBLE' " +
         "which is incompatible with expected type 'INT'.");
-    AnalysisError("select timestamp_col + interval bigint_col years " + 
+    AnalysisError("select timestamp_col + interval bigint_col years " +
         "from functional.alltypes",
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'timestamp_col + INTERVAL bigint_col years' returns type 'BIGINT' " +
@@ -1373,18 +1373,18 @@ public class AnalyzerTest {
 
     // No implicit cast from STRING to INT
     AnalysisError("select timestamp_col + interval '10' years from functional.alltypes");
-    AnalysisError("select date_add(timestamp_col, interval '10' years) " + 
+    AnalysisError("select date_add(timestamp_col, interval '10' years) " +
         "from functional.alltypes");
 
     // Cast from STRING to INT.
-    AnalyzesOk("select timestamp_col + interval cast('10' as int) years " + 
+    AnalyzesOk("select timestamp_col + interval cast('10' as int) years " +
         "from functional.alltypes");
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 5.2 years + timestamp_col from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
         "'INTERVAL 5.2 years + timestamp_col' returns type 'DOUBLE' " +
         "which is incompatible with expected type 'INT'.");
-    AnalysisError("select interval bigint_col years + timestamp_col " + 
+    AnalysisError("select interval bigint_col years + timestamp_col " +
         "from functional.alltypes",
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'INTERVAL bigint_col years + timestamp_col' returns type 'BIGINT' " +
@@ -1393,7 +1393,7 @@ public class AnalyzerTest {
     AnalyzesOk("select interval cast('10' as int) years + timestamp_col " +
         "from functional.alltypes");
     // Second operand is not compatible with type INT. Function-call like version.
-    AnalysisError("select date_add(timestamp_col, interval 5.2 years) " + 
+    AnalysisError("select date_add(timestamp_col, interval 5.2 years) " +
         "from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
         "'date_add(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE' " +
@@ -1419,11 +1419,11 @@ public class AnalyzerTest {
         "Invalid time unit 'error' in timestamp arithmetic expression " +
         "'INTERVAL 10 error + timestamp_col'.");
     // Invalid time unit. Function-call like version.
-    AnalysisError("select date_add(timestamp_col, interval 10 error) " + 
+    AnalysisError("select date_add(timestamp_col, interval 10 error) " +
         "from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
         "'date_add(timestamp_col, INTERVAL 10 error)'.");
-    AnalysisError("select date_sub(timestamp_col, interval 10 error) " + 
+    AnalysisError("select date_sub(timestamp_col, interval 10 error) " +
         "from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
         "'date_sub(timestamp_col, INTERVAL 10 error)'.");
@@ -1508,22 +1508,22 @@ public class AnalyzerTest {
     AnalyzesOk("select case when true then 1 end");
     AnalyzesOk("select case when true then 1.0 end");
     AnalyzesOk("select case when true then 'abc' end");
-    AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' " + 
+    AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' " +
         "as timestamp) end");
   }
 
   @Test
   public void TestUnion() {
     // Selects on different tables.
-    AnalyzesOk("select int_col from functional.alltypes union " + 
+    AnalyzesOk("select int_col from functional.alltypes union " +
         "select int_col from functional.alltypessmall");
     // Selects on same table without aliases.
-    AnalyzesOk("select int_col from functional.alltypes union " + 
+    AnalyzesOk("select int_col from functional.alltypes union " +
         "select int_col from functional.alltypes");
     // Longer union chain.
-    AnalyzesOk("select int_col from functional.alltypes union " + 
+    AnalyzesOk("select int_col from functional.alltypes union " +
         "select int_col from functional.alltypes " +
-        "union select int_col from functional.alltypes union " + 
+        "union select int_col from functional.alltypes union " +
         "select int_col from functional.alltypes");
     // All columns, perfectly compatible.
     AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
@@ -1547,7 +1547,7 @@ public class AnalyzerTest {
         "union select int_col from functional.alltypes " +
         "union select bigint_col from functional.alltypes");
     // Implicit casts on float types.
-    AnalyzesOk("select float_col from functional.alltypes union " + 
+    AnalyzesOk("select float_col from functional.alltypes union " +
         "select double_col from functional.alltypes");
     // Implicit casts on all numeric types with two columns from each select.
     AnalyzesOk("select tinyint_col, double_col from functional.alltypes " +
@@ -1606,12 +1606,12 @@ public class AnalyzerTest {
         "ORDER BY: ordinal exceeds number of items in select list: 2");
     // Ambiguous order by.
     AnalysisError("(select int_col a, string_col a from functional.alltypes) " +
-        "union (select int_col a, string_col a " + 
+        "union (select int_col a, string_col a " +
         "from functional.alltypessmall) order by a",
         "Column a in order clause is ambiguous");
     // Ambiguous alias in the second union operand should work.
     AnalyzesOk("(select int_col a, string_col b from functional.alltypes) " +
-        "union (select int_col a, string_col a " + 
+        "union (select int_col a, string_col a " +
         "from functional.alltypessmall) order by a");
 
     // Column labels are inherited from first select block.
@@ -1623,6 +1623,48 @@ public class AnalyzerTest {
     AnalysisError("select a.smallint_col from functional.alltypes a " +
         "union select a.int_col from functional.alltypessmall",
         "unknown table alias: 'a'");
+  }
+
+  @Test
+  public void TestDrop() throws AnalysisException {
+    AnalyzesOk("drop database functional");
+    AnalyzesOk("drop table functional.alltypes");
+
+    // If the database does not exist, and the user hasn't specified "IF EXISTS",
+    // an analysis error should be thrown.
+    AnalysisError("drop database db_does_not_exist",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("drop table db_does_not_exist.alltypes",
+        "Unknown database: db_does_not_exist");
+
+    // No error is thrown if the user specifies IF EXISTS
+    AnalyzesOk("drop database if exists db_does_not_exist");
+    AnalyzesOk("drop table if exists db_does_not_exist.alltypes");
+  }
+
+  @Test
+  public void TestCreateDb() throws AnalysisException {
+    AnalyzesOk("create database some_new_database");
+    AnalysisError("create database functional", "Database already exists: functional");
+    AnalyzesOk("create database if not exists functional");
+  }
+
+  @Test
+  public void TestCreateTable() throws AnalysisException {
+    AnalyzesOk("create table functional.new_table (i int)");
+    AnalyzesOk("create table if not exists functional.alltypes (i int)");
+    AnalysisError("create table functional.alltypes (i int)",
+        "Table already exists: functional.alltypes");
+    AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
+        "terminated by '|'");
+    AnalysisError("create table db_does_not_exist.new_table (i int)",
+        "Database does not exist: db_does_not_exist");
+  }
+
+  @Test
+  public void TestUseDb() throws AnalysisException {
+    AnalyzesOk("use functional");
+    AnalysisError("use db_does_not_exist", "Database does not exist: db_does_not_exist");
   }
 
   @Test
@@ -1648,7 +1690,7 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, " + 
+        "float_col, double_col, date_string_col, " +
         "string_col, timestamp_col, NULL, NULL from functional.alltypes");
     // Fully dynamic partitions. Order of corresponding select list items doesn't matter, as long as
     // they appear at the very end of the select list.
@@ -1661,7 +1703,7 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, month " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month " +
         "from functional.alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
@@ -1685,19 +1727,19 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "Partition (year=2009, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // Partially dynamic partitions with NULL literal in partition clause.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=NULL, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // No corresponding select list items of fully dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
         "The select list items corresponding to dynamic partition keys " +
@@ -1706,7 +1748,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'month'.\n" +
         "The select list items corresponding to dynamic partition keys " +
@@ -1715,7 +1757,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
         "The select list items corresponding to dynamic partition keys " +
@@ -1729,12 +1771,12 @@ public class AnalyzerTest {
         "Target table expects 11 columns but the select statement returns 13.");
     // Select '*' includes partitioning columns
     // but they don't appear at the end of the select list.
-    AnalysisError("insert " + qualifier + 
+    AnalysisError("insert " + qualifier +
         " table functional.alltypessmall partition (year, month)" +
         "select * from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
-        "Incompatible types 'INT' and 'STRING' in column " + 
+        "Incompatible types 'INT' and 'STRING' in column " +
         "'functional.alltypes.string_col'.");
   }
 
@@ -1743,8 +1785,8 @@ public class AnalyzerTest {
    */
   private void testInsertUnpartitioned(String qualifier) throws AnalysisException {
     // Non-insertable tables
-    AnalysisError("INSERT " + qualifier + 
-        " TABLE functional.hbasealltypesagg SELECT * FROM functional.alltypesagg", 
+    AnalysisError("INSERT " + qualifier +
+        " TABLE functional.hbasealltypesagg SELECT * FROM functional.alltypesagg",
         "INSERT into HBase tables is not supported");
 
     // Wrong number of columns.
@@ -1755,11 +1797,11 @@ public class AnalyzerTest {
     // Unpartitioned table without partition clause.
     AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col from " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col from " +
         "functional.alltypes");
 
     // Unpartitioned table with partition clause
-    AnalysisError("INSERT " + qualifier + 
+    AnalysisError("INSERT " + qualifier +
         " TABLE functional.alltypesnopart PARTITION(year=2009) " +
         "SELECT * FROM functional.alltypes", "PARTITION clause is only valid for INSERT" +
         " into partitioned table. 'alltypesnopart' is not partitioned");
@@ -1773,36 +1815,36 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // Static partition with NULL partition keys.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=NULL, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // Static partition with partial NULL partition keys.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // Static partition with partial NULL partition keys.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=NULL, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // Union compatibility requires cast of select list expr in column 5 (int_col -> bigint).
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
-        "float_col, float_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, float_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
     // No partition clause given for partitioned table.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No PARTITION clause given for INSERT into partitioned table 'alltypessmall'.");
     // Not union compatible, unequal number of columns.
@@ -1817,7 +1859,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, bool_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, bool_col, timestamp_col " +
         "from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
@@ -1826,28 +1868,28 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4, year=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "Superfluous columns in PARTITION clause: year.");
     // Too few partitioning columns.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "Missing partition column 'month' from PARTITION clause.");
     // Non-partitioning column in partition clause.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, bigint_col=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "Missing partition column 'month' from PARTITION clause.");
     // Loss of precision when casting in column 6 (double_col -> float).
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
     		"partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "double_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "double_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "Inserting into target table 'alltypessmall' may result in loss of precision.\n" +
         "Would need to cast 'double_col' to 'FLOAT'.");
@@ -1862,7 +1904,7 @@ public class AnalyzerTest {
 
   @Test
   public void testUseStatement() {
-    Assert.assertTrue(AnalyzesOk("USE database") instanceof UseStmt);
+    Assert.assertTrue(AnalyzesOk("USE functional") instanceof UseStmt);
   }
 
   /**

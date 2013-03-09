@@ -18,6 +18,7 @@ import java.io.StringReader;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Preconditions;
 
 /**
  * Wrapper class for parser and analyzer.
@@ -51,6 +52,22 @@ public class AnalysisContext {
       return stmt instanceof InsertStmt;
     }
 
+    public boolean isDropDbStmt() {
+      return stmt instanceof DropDbStmt;
+    }
+
+    public boolean isDropTableStmt() {
+      return stmt instanceof DropTableStmt;
+    }
+
+    public boolean isCreateTableStmt() {
+      return stmt instanceof CreateTableStmt;
+    }
+
+    public boolean isCreateDbStmt() {
+      return stmt instanceof CreateDbStmt;
+    }
+
     public boolean isUseStmt() {
       return stmt instanceof UseStmt;
     }
@@ -68,34 +85,61 @@ public class AnalysisContext {
     }
 
     public boolean isDdlStmt() {
-      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt();
+      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
+          isCreateTableStmt() || isCreateDbStmt() || isDropDbStmt() || isDropTableStmt();
     }
 
     public boolean isDmlStmt() {
       return isInsertStmt();
     }
 
+    public CreateTableStmt getCreateTableStmt() {
+      Preconditions.checkState(isCreateTableStmt());
+      return (CreateTableStmt) stmt;
+    }
+
+    public CreateDbStmt getCreateDbStmt() {
+      Preconditions.checkState(isCreateDbStmt());
+      return (CreateDbStmt) stmt;
+    }
+
+    public DropDbStmt getDropDbStmt() {
+      Preconditions.checkState(isDropDbStmt());
+      return (DropDbStmt) stmt;
+    }
+
+    public DropTableStmt getDropTableStmt() {
+      Preconditions.checkState(isDropTableStmt());
+      return (DropTableStmt) stmt;
+    }
+
     public QueryStmt getQueryStmt() {
+      Preconditions.checkState(isQueryStmt());
       return (QueryStmt) stmt;
     }
 
     public InsertStmt getInsertStmt() {
+      Preconditions.checkState(isInsertStmt());
       return (InsertStmt) stmt;
     }
 
     public UseStmt getUseStmt() {
+      Preconditions.checkState(isUseStmt());
       return (UseStmt) stmt;
     }
 
     public ShowTablesStmt getShowTablesStmt() {
+      Preconditions.checkState(isShowTablesStmt());
       return (ShowTablesStmt) stmt;
     }
 
     public ShowDbsStmt getShowDbsStmt() {
+      Preconditions.checkState(isShowDbsStmt());
       return (ShowDbsStmt) stmt;
     }
 
     public DescribeStmt getDescribeStmt() {
+      Preconditions.checkState(isDescribeStmt());
       return (DescribeStmt) stmt;
     }
 

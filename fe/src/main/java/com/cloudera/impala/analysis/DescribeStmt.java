@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TDescribeTableParams;
 
 /**
  * Representation of a DESCRIBE table statement. 
@@ -43,5 +44,12 @@ public class DescribeStmt extends ParseNodeBase {
     if (!table.isFullyQualified()) {
       table = new TableName(analyzer.getDefaultDb(), table.getTbl());
     }
+  }
+
+  public TDescribeTableParams toThrift() {
+    TDescribeTableParams params = new TDescribeTableParams();
+    params.setTable_name(getTable().getTbl());
+    params.setDb(getTable().getDb());
+    return params;
   }
 }

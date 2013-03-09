@@ -17,11 +17,10 @@ package com.cloudera.impala.catalog;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -29,10 +28,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
+import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.TableType;
+
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
@@ -44,10 +53,15 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 
+import com.cloudera.impala.thrift.TColumnDesc;
+
 /**
- * Interface to metadata stored in MetaStore instance.
- * Caches all db-, table- and column-related md during construction.
- *
+ * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
+ * This class caches db-, table- and column-related metadata.
+ * Although this class is thread safe, it does not guarantee consistency with the
+ * MetaStore. It is important to keep in mind that there may be external (potentially
+ * conflicting) concurrent metastore updates occurring at any time. This class does
+ * guarantee any MetaStore updates done via this class will be reflected consistently.
  */
 public class Catalog {
   public static final String DEFAULT_DB = "default";
@@ -56,6 +70,8 @@ public class Catalog {
   private final boolean lazy;
   private int nextTableId;
   private final MetaStoreClientPool metaStoreClientPool;
+  // Lock used to synchronize metastore CREATE/DROP TABLE/DATABASE requests.
+  private final Object metastoreCreateDropLock = new Object();
 
   // map from db name to DB
   private final LazyDbMap dbs;
@@ -68,7 +84,7 @@ public class Catalog {
 
   /**
    * Lazily loads database metadata on read (through 'get') and tracks the valid/known
-   * database names.
+   * database names. This class is thread safe.
    *
    * If a database has not yet been loaded successfully, get() will attempt to load it.
    * It is only possible to load metadata for databases that are in the known db name
@@ -103,11 +119,43 @@ public class Catalog {
      * Initializes the class with a list of valid database names and marks each
      * database's metadata as uninitialized.
      */
-     public LazyDbMap(List<String> dbNames) {
-       for (String dbName: dbNames) {
-         dbNameMap.put(dbName.toLowerCase(), MetadataLoadState.UNINITIALIZED);
-       }
-     }
+    public LazyDbMap(List<String> dbNames) {
+      for (String dbName: dbNames) {
+        dbNameMap.put(dbName.toLowerCase(), MetadataLoadState.UNINITIALIZED);
+      }
+    }
+
+    /**
+     * Invalidate the metadata for the given db name and marks the db metadata load
+     * state as uninitialized. Invalidating the metadata will cause the next access to
+     * the db to reload (synchronize) its metadata from the metastore. 
+     * If ifExists is true, this will only invalidate if the db name already exists in
+     * the dbNameMap. If ifExists is false, the db metadata will be invalidated and the
+     * metadata state will be set as UNINITIALIZED (potentially adding a new item to the
+     * db name map).
+     */
+    public void invalidate(String dbName, boolean ifExists) {
+      dbName = dbName.toLowerCase();
+      if (ifExists) {
+        if (dbNameMap.replace(dbName, MetadataLoadState.UNINITIALIZED) != null) {
+          // TODO: Should we always invalidate the metadata cache even if the db
+          // doesn't exist in the db name map?
+          dbMetadataCache.invalidate(dbName);
+        }
+      } else {
+        dbNameMap.put(dbName, MetadataLoadState.UNINITIALIZED);
+        dbMetadataCache.invalidate(dbName);
+      }
+    }
+
+    /**
+     * Removes the database from the metadata cache 
+     */
+    public void remove(String dbName) {
+      dbName = dbName.toLowerCase();
+      dbNameMap.remove(dbName);
+      dbMetadataCache.invalidate(dbName);
+    }
 
     /**
      * Returns all known database names.
@@ -165,7 +213,11 @@ public class Catalog {
         msClient.release();
       }
 
-      dbNameMap.put(dbName, MetadataLoadState.LOADED);
+      // Mark the metadata as loaded. If the database was removed while loading then
+      // throw a DatbaseNotFoundException.
+      if (dbNameMap.replace(dbName, MetadataLoadState.LOADED) == null) {
+        throw new DatabaseNotFoundException("Database not found: " + dbName);
+      }
       return db;
     }
   }
@@ -247,6 +299,166 @@ public class Catalog {
    */
   public void close() {
     metaStoreClientPool.close();
+  }
+
+  /**
+   * Creates a new database in the metastore and adds the db name to the internal
+   * metadata cache, marking its metadata to be lazily loaded on the next access.
+   * Re-throws any Hive Meta Store exceptions encountered during the create, these
+   * may vary depending on the Meta Store connection type (thrift vs direct db).
+   *
+   * @param dbName - The name of the new database.
+   * @param comment - Comment to attach to the database, or null for no comment.
+   * @param location - Hdfs path to use as the default location for new table data or
+   *                   null to use default location.
+   * @param ifNotExists - If true, no errors are thrown if the database already exists
+   */
+  public void createDatabase(String dbName, String comment, String location,
+      boolean ifNotExists) throws MetaException, AlreadyExistsException,
+      InvalidObjectException, org.apache.thrift.TException {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+        "Null or empty database name passed as argument to Catalog.createDatabase");
+    if (ifNotExists && getDb(dbName) != null) {
+      LOG.info("Skipping database creation because " + dbName + " already exists and " +
+          "ifNotExists is true.");
+      return;
+    }
+    org.apache.hadoop.hive.metastore.api.Database db =
+        new org.apache.hadoop.hive.metastore.api.Database();
+    db.setName(dbName);
+    if (comment != null) {
+      db.setDescription(comment);
+    }
+    if (location != null) {
+      db.setLocationUri(location);
+    }
+    LOG.info("Creating database " + dbName);
+    synchronized (metastoreCreateDropLock) {
+      try {
+        getMetaStoreClient().getHiveClient().createDatabase(db);
+      } catch (AlreadyExistsException e) {
+        if (!ifNotExists) {
+          throw e;
+        }
+        LOG.info(String.format("Ignoring '%s' when creating database %s because " +
+            "ifNotExists is true.", e, dbName));
+      }
+      dbs.invalidate(dbName, false);
+    }
+  }
+
+  /**
+   * Drops a database from the metastore and removes the database's metadata from the
+   * internal cache. The database must be empty (contain no tables) for the drop operation
+   * to succeed. Re-throws any Hive Meta Store exceptions encountered during the drop.
+   *
+   * @param dbName - The name of the database to drop
+   * @param ifExists - If true, no errors will be thrown if the database does not exist.
+   */
+  public void dropDatabase(String dbName, boolean ifExists)
+      throws MetaException, NoSuchObjectException, InvalidOperationException,
+      org.apache.thrift.TException {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+        "Null or empty database name passed as argument to Catalog.dropDatabase");
+    LOG.info("Dropping database " + dbName);
+    synchronized (metastoreCreateDropLock) {
+      getMetaStoreClient().getHiveClient().dropDatabase(dbName, false, ifExists);
+      dbs.remove(dbName);
+    }
+  }
+
+  /**
+   * Creates a new table in the metastore and adds the table name to the internal
+   * metadata cache, marking its metadata to be lazily loaded on the next access.
+   * Re-throws any Hive Meta Store exceptions encountered during the drop.
+   *
+   * @param dbName - The database that contains this table.
+   * @param tableName - The name of the table to drop.
+   * @param ifExists - If true, no errors will be thrown if the table does not exist.
+   */
+  public void dropTable(String dbName, String tableName, boolean ifExists)
+      throws MetaException, NoSuchObjectException, InvalidOperationException,
+      org.apache.thrift.TException {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+        "Null or empty database name passed as argument to Catalog.dropTable");
+    Preconditions.checkState(tableName != null && !tableName.isEmpty(),
+        "Null or empty table name passed as argument to Catalog.dropTable");
+    LOG.info(String.format("Dropping table %s.%s", dbName, tableName));
+    synchronized (metastoreCreateDropLock) {
+      getMetaStoreClient().getHiveClient().dropTable(dbName, tableName, true, ifExists);
+      dbs.get(dbName).removeTable(tableName);
+    }
+  }
+
+  /**
+   * Creates a new table in the metastore and adds an entry to the metadata cache to
+   * lazily load the new metadata on the next access. Re-throws any Hive Meta Store
+   * exceptions encountered during the create.
+   *
+   * @param dbName - Database to create the table within.
+   * @param tableName - Name of the new table.
+   * @param column - List of columns for the table.
+   * @param isExternal 
+   *    If true, table is created as external which means the data will be persisted
+   *    if dropped. External tables can also be created on top of existing data.
+   * @param comment - Optional comment to attach to the table (null for no comment).
+   * @param location - Hdfs path to use as the location for table data or null to use
+   *                   default location.
+   */
+  public void createTable(String dbName, String tableName,
+      List<TColumnDesc> columns, boolean isExternal, String comment,
+      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
+      throws MetaException, NoSuchObjectException, AlreadyExistsException,
+      InvalidObjectException, org.apache.thrift.TException {
+    Preconditions.checkState(tableName != null && !tableName.isEmpty(),
+        "Null or empty table name given as argument to Catalog.createTable");
+    Preconditions.checkState(columns != null && columns.size() > 0,
+        "Null or empty column list given as argument to Catalog.createTable");
+    if (ifNotExists && containsTable(dbName, tableName)) {
+      LOG.info(String.format("Skipping table creation because %s.%s already exists and " +
+          "ifNotExists is true.", dbName, tableName));
+      return;
+    }
+    org.apache.hadoop.hive.metastore.api.Table tbl =
+        new org.apache.hadoop.hive.metastore.api.Table();
+    tbl.setDbName(dbName);
+    tbl.setTableName(tableName);
+    tbl.setParameters(new HashMap<String, String>());
+
+    if (comment != null) {
+      tbl.getParameters().put("comment", comment);
+    }
+    if (isExternal) {
+      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
+      tbl.putToParameters("EXTERNAL", "TRUE");
+    }
+
+    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(fileFormat, rowFormat);
+    if (location != null) {
+      sd.setLocation(location);
+    }
+    List<FieldSchema> fsList = Lists.newArrayList();
+    // Add in all the columns
+    for (TColumnDesc c: columns) {
+      FieldSchema fs = new FieldSchema(c.getColumnName(),
+          c.getColumnType().toString().toLowerCase(), null);
+      fsList.add(fs);
+    }
+    sd.setCols(fsList);
+    tbl.setSd(sd);
+    LOG.info(String.format("Creating table %s.%s", dbName, tableName));
+    synchronized (metastoreCreateDropLock) {
+      try {
+        getMetaStoreClient().getHiveClient().createTable(tbl);
+      } catch (AlreadyExistsException e) {
+        if (!ifNotExists) {
+          throw e;
+        }
+        LOG.info(String.format("Ignoring '%s' when creating table %s.%s because " +
+            "ifNotExists is true.", e, dbName, tableName));
+      }
+      dbs.get(dbName).invalidateTable(tableName, false);
+    }
   }
 
   public TableId getNextTableId() {
@@ -347,5 +559,15 @@ public class Catalog {
     }
     Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);
     return filtered;
+  }
+
+  /**
+   * Returns true if the table and the database exist in the Impala Catalog. Returns
+   * false if the database does not exist or the table does not exist. This will
+   * not trigger a metadata load for the given table name.
+   */
+  public boolean containsTable(String dbName, String tableName) {
+    Db db = getDb(dbName);
+    return db != null && db.containsTable(tableName);
   }
 }

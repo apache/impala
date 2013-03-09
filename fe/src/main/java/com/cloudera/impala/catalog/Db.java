@@ -92,7 +92,7 @@ public class Db {
 
   /**
    * Lazily loads table metadata on read (through 'get') and tracks the valid/known
-   * table names.
+   * table names. This class is thread safe.
    *
    * If a table has not yet been loaded successfully, get() will attempt to load it.
    * It is only possible to load metadata for tables in the known table name map.
@@ -134,10 +134,42 @@ public class Db {
     }
 
     /**
+     * Invalidate the metadata for the given table name and marks the table metadata load
+     * state as uninitialized. If ifExists is true, this will only invalidate if the table
+     * name already exists in the tableNameMap. If ifExists is false, the table metadata
+     * will be invalidated and the metadata state will be set to UNINITIALIZED 
+     * (potentially adding a new item to the table name map).
+     */
+    public void invalidate(String tableName, boolean ifExists) {
+      tableName = tableName.toLowerCase();
+      if (ifExists) {
+        if(tableNameMap.replace(tableName, MetadataLoadState.UNINITIALIZED) != null) {
+          tableMetadataCache.invalidate(tableName);
+        }
+      } else {
+        tableNameMap.put(tableName, MetadataLoadState.UNINITIALIZED);
+        tableMetadataCache.invalidate(tableName);
+      }
+    }
+
+    /**
+     * Removes the table from the metadata cache 
+     */
+    public void remove(String tableName) {
+      tableName = tableName.toLowerCase();
+      tableNameMap.remove(tableName);
+      tableMetadataCache.invalidate(tableName);
+    }
+
+    /**
      * Returns all known table names.
      */
     public Set<String> getAllTableNames() {
       return tableNameMap.keySet();
+    }
+
+    public boolean containsTable(String tableName) {
+      return tableNameMap.containsKey(tableName.toLowerCase());
     }
 
     /**
@@ -195,7 +227,10 @@ public class Db {
       } finally {
         msClient.release();
       }
-      tableNameMap.put(tableName, MetadataLoadState.LOADED);
+
+      if (tableNameMap.replace(tableName, MetadataLoadState.LOADED) == null) {
+        throw new TableNotFoundException("Table not found: " + tableName);
+      }
       return table;
     }
   }
@@ -258,5 +293,27 @@ public class Db {
    */
   public Table getTable(String tbl) throws TableLoadingException {
       return tables.get(tbl);
+  }
+
+  public boolean containsTable(String tableName) {
+    return tables.containsTable(tableName);
+  }
+
+  /**
+   * Removes the table name and any cached metadata from the Table cache.
+   */
+  public void removeTable(String tableName) {
+    tables.remove(tableName);
+  }
+
+  /**
+   * Marks the table as invalid so the next access will trigger a metadata load. If
+   * the ifExists parameter is true, this will only invalidate if the table name already
+   * exists in collection of known tables. If ifExists is false, the table metadata will
+   * be invalidated and the metadata state will be set to UNINITIALIZED (potentially
+   * adding a new item to the known table names).
+   */
+  public void invalidateTable(String tableName, boolean ifExists) {
+    tables.invalidate(tableName, ifExists);
   }
 }

@@ -70,6 +70,85 @@ struct TDescribeTableResult {
   1: required list<TColumnDesc> columns
 }
 
+// Parameters of CREATE DATABASE commands
+struct TCreateDbParams {
+  // Name of the database to create
+  1: required string db
+
+  // Optional comment to attach to the database
+  2: optional string comment
+
+  // Optional HDFS path for the database. This will be the default location for all
+  // new tables created in the database.
+  3: optional string location
+
+  // Do not throw an error if a database of the same name already exists.
+  4: optional bool if_not_exists
+}
+
+// Valid table file formats
+enum TFileFormat {
+  RCFILE,
+  SEQUENCEFILE,
+  TEXTFILE,
+}
+
+// Parameters of CREATE TABLE commands
+struct TCreateTableParams {
+  // Name of the database the table should be created in
+  1: required string db
+
+  // Name of the table to create
+  2: required string table_name
+
+  // List of columns to create
+  3: required list<TColumnDesc> columns
+
+  // The file format for this table
+  4: required TFileFormat file_format
+
+  // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
+  // table data from the file system. If EXTERNAL is not specified, all table data will be
+  // removed when the table is dropped.
+  5: optional bool is_external
+
+  // Optional comment for the table
+  6: optional string comment
+
+  // Optional storage location for the table
+  7: optional string location
+
+  // Optional terminator string used to delimit fields (columns) in the table
+  8: optional string field_terminator
+
+  // Optional terminator string used to delimit lines (rows) in a table
+  9: optional string line_terminator
+
+  // Do not throw an error if a table of the same name already exists.
+  10: optional bool if_not_exists
+}
+
+// Parameters of DROP DATABASE commands
+struct TDropDbParams {
+  // Name of the database to drop
+  1: required string db
+
+  // If true, no error is raised if the target db does not exist
+  2: optional bool if_exists
+}
+
+// Parameters of DROP TABLE commands
+struct TDropTableParams {
+  // Name of the database the table resides in
+  1: required string db
+
+  // Name of the table to drop for DROP TABLE
+  2: required string table_name
+
+  // If true, no error is raised if the target table does not exist
+  3: optional bool if_exists
+}
+
 // Per-client session state
 struct TSessionState {
   // The default database, changed by USE <database> queries.
@@ -85,6 +164,27 @@ struct TClientRequest {
 
   // session state
   3: required TSessionState sessionState;
+}
+
+// Parameters for SHOW DATABASES commands
+struct TShowDbsParams {
+  // Optional pattern to match database names. If not set, all databases are returned.
+  1: optional string show_pattern
+}
+
+// Parameters for SHOW TABLES commands
+struct TShowTablesParams {
+  // Database to use for SHOW TABLE
+  1: optional string db
+
+  // Optional pattern to match tables names. If not set, all tables from the given
+  // database are returned.
+  2: optional string show_pattern
+}
+
+// Parameters for the USE db command
+struct TUseDbParams {
+  1: required string db
 }
 
 struct TResultSetMetadata {
@@ -153,20 +253,39 @@ enum TDdlType {
   SHOW_TABLES,
   SHOW_DBS,
   USE,
-  DESCRIBE
+  DESCRIBE,
+  CREATE_DATABASE,
+  CREATE_TABLE,
+  DROP_DATABASE,
+  DROP_TABLE,
 }
 
 struct TDdlExecRequest {
   1: required TDdlType ddl_type
 
-  // Used for USE and DESCRIBE
-  2: optional string database;
+  // Parameters for USE commands
+  2: optional TUseDbParams use_db_params;
 
-  // Table name (not fully-qualified) for DESCRIBE
-  3: optional string describe_table;
+  // Parameters for DESCRIBE table commands
+  3: optional TDescribeTableParams describe_table_params
 
-  // Patterns to match table names against for SHOW
-  4: optional string show_pattern;
+  // Parameters for SHOW DATABASES
+  4: optional TShowDbsParams show_dbs_params
+
+  // Parameters for SHOW TABLES
+  5: optional TShowTablesParams show_tables_params
+
+  // Parameters for CREATE DATABASE
+  6: optional TCreateDbParams create_db_params
+
+  // Parameters for CREATE TABLE
+  7: optional TCreateTableParams create_table_params
+
+  // Paramaters for DROP DATABAE
+  8: optional TDropDbParams drop_db_params
+
+  // Parameters for DROP TABLE
+  9: optional TDropTableParams drop_table_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)

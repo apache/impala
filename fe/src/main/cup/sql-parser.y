@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.FileFormat;
+import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
@@ -145,14 +147,16 @@ parser code {:
 :};
 
 terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
-  KW_CASE, KW_CAST, KW_COUNT, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DESC, KW_DESCRIBE, 
-  KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA,
-  KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
-  KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
-  KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
-  KW_RLIKE, KW_RIGHT, KW_SCHEMAS, KW_SELECT, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STRING, 
-  KW_SUM, KW_TABLES, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, 
-  KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, 
+  KW_CASE, KW_CAST, KW_CREATE, KW_COMMENT, KW_COUNT, KW_DATABASE, KW_DATABASES, KW_DATE,
+  KW_DATETIME, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
+  KW_DELIMITED, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_EXISTS, KW_EXTERNAL, KW_FALSE,
+  KW_FIELDS, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING, KW_IF, KW_IS,
+  KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOCATION,
+  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_RCFILE, KW_REGEXP,
+  KW_RLIKE, KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEQUENCEFILE, KW_SHOW,
+  KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
+  KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
+  KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
   KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -221,6 +225,25 @@ nonterminal PartitionKeyValue partition_key_value;
 nonterminal Expr expr_or_predicate;
 nonterminal Qualifier union_op;
 
+nonterminal DropDbStmt drop_db_stmt;
+nonterminal DropTableStmt drop_tbl_stmt;
+nonterminal CreateDbStmt create_db_stmt;
+nonterminal CreateTableStmt create_tbl_stmt;
+nonterminal CreateTableColumnDef create_table_column_def;
+nonterminal ArrayList<CreateTableColumnDef> create_table_column_defs;
+// Options for CREATE DATABASE/TABLE
+nonterminal String comment_val;
+nonterminal Boolean external_val;
+nonterminal FileFormat file_format_val;
+nonterminal Boolean if_exists_val;
+nonterminal Boolean if_not_exists_val;
+nonterminal String location_val;
+nonterminal RowFormat row_format_val;
+nonterminal String terminator_val;
+// Used to simplify commands that accept either KW_DATABASE(S) or KW_SCHEMA(S)
+nonterminal String db_or_schema_kw;
+nonterminal String dbs_or_schemas_kw;
+
 precedence left KW_OR;
 precedence left KW_AND;
 precedence left KW_NOT;
@@ -238,36 +261,170 @@ precedence left KW_INTERVAL;
 start with stmt;
 
 stmt ::= 
-    query_stmt:query
-    {: RESULT = query; :}
-    | insert_stmt:insert
-    {: RESULT = insert; :}
-    | use_stmt:use
-    {: RESULT = use; :}
-    | show_tables_stmt:show_tables
-    {: RESULT = show_tables; :}
-    | show_dbs_stmt:show_dbs
-    {: RESULT = show_dbs; :}
-    | describe_stmt:describe
-    {: RESULT = describe; :}
-    ;
+  query_stmt:query
+  {: RESULT = query; :}
+  | insert_stmt:insert
+  {: RESULT = insert; :}
+  | use_stmt:use
+  {: RESULT = use; :}
+  | show_tables_stmt:show_tables
+  {: RESULT = show_tables; :}
+  | show_dbs_stmt:show_dbs
+  {: RESULT = show_dbs; :}
+  | describe_stmt:describe
+  {: RESULT = describe; :}
+  | create_tbl_stmt:create_tbl
+  {: RESULT = create_tbl; :}
+  | create_db_stmt:create_db
+  {: RESULT = create_db; :}
+  | drop_db_stmt:drop_db
+  {: RESULT = drop_db; :}
+  | drop_tbl_stmt:drop_tbl
+  {: RESULT = drop_tbl; :}
+  ;
 
 insert_stmt ::=
-    KW_INSERT KW_OVERWRITE KW_TABLE table_name:table
-    partition_clause:list query_stmt:query
-    {: RESULT = new InsertStmt(table, true, list, query); :}
-    | KW_INSERT KW_INTO KW_TABLE table_name:table
-    partition_clause:list query_stmt:query
-    {: RESULT = new InsertStmt(table, false, list, query); :}
-    ;
-    
+  KW_INSERT KW_OVERWRITE KW_TABLE table_name:table
+  partition_clause:list query_stmt:query
+  {: RESULT = new InsertStmt(table, true, list, query); :}
+  | KW_INSERT KW_INTO KW_TABLE table_name:table
+  partition_clause:list query_stmt:query
+  {: RESULT = new InsertStmt(table, false, list, query); :}
+  ;
+
+create_db_stmt ::=
+  KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists IDENT:db_name
+  comment_val:comment location_val:location
+  {: RESULT = new CreateDbStmt(db_name, comment, location, if_not_exists); :}
+  ;
+
+create_tbl_stmt ::=
+  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table LPAREN create_table_column_defs:col_defs RPAREN
+  comment_val:comment row_format_val:row_format file_format_val:file_format
+  location_val:location
+  {:
+    RESULT = new CreateTableStmt(table, col_defs, external, comment, row_format,
+        file_format, location, if_not_exists);
+  :}
+  ;
+
+comment_val ::=
+  KW_COMMENT STRING_LITERAL:comment
+  {: RESULT = comment; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+location_val ::=
+  KW_LOCATION STRING_LITERAL:location
+  {: RESULT = location; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+external_val ::=
+  KW_EXTERNAL
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
+if_not_exists_val ::=
+  KW_IF KW_NOT KW_EXISTS
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
+row_format_val ::=
+  KW_ROW KW_FORMAT KW_DELIMITED KW_FIELDS terminator_val:field_terminator
+  {: RESULT = new RowFormat(field_terminator, null); :}
+  |
+  KW_ROW KW_FORMAT KW_DELIMITED KW_LINES terminator_val:line_terminator
+  {: RESULT = new RowFormat(null, line_terminator); :}
+  |
+  KW_ROW KW_FORMAT KW_DELIMITED KW_FIELDS terminator_val:field_terminator
+  KW_LINES terminator_val:line_terminator
+  {: RESULT = new RowFormat(field_terminator, line_terminator); :}
+  |
+  KW_ROW KW_FORMAT KW_DELIMITED
+  {: RESULT = RowFormat.DEFAULT_ROW_FORMAT; :}
+  |/* empty */
+  {: RESULT = RowFormat.DEFAULT_ROW_FORMAT; :}
+  ;
+
+terminator_val ::=
+  KW_TERMINATED KW_BY STRING_LITERAL:terminator
+  {: RESULT = terminator; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+file_format_val ::=
+  KW_STORED KW_AS KW_TEXTFILE
+  {: RESULT = FileFormat.TEXTFILE; :}
+  | KW_STORED KW_AS KW_SEQUENCEFILE
+  {: RESULT = FileFormat.SEQUENCEFILE; :}
+  | KW_STORED KW_AS KW_RCFILE
+  {: RESULT = FileFormat.RCFILE; :}
+  | /* empty - default to TEXTFILE */
+  {: RESULT = FileFormat.TEXTFILE; :}
+  ;
+
+create_table_column_defs ::=
+  create_table_column_def:col_def
+  {:
+    ArrayList<CreateTableColumnDef> list = new ArrayList<CreateTableColumnDef>();
+    list.add(col_def);
+    RESULT = list;
+  :}
+  | create_table_column_defs:list COMMA create_table_column_def:col_def
+  {:
+    list.add(col_def);
+    RESULT = list;
+  :}
+  ;
+
+create_table_column_def ::=
+  IDENT:col_name primitive_type:targetType
+  {: RESULT = new CreateTableColumnDef(col_name, targetType); :}
+  ;
+
+drop_db_stmt ::=
+  KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name
+  {: RESULT = new DropDbStmt(db_name, if_exists); :}
+  ;
+
+drop_tbl_stmt ::=
+  | KW_DROP KW_TABLE if_exists_val:if_exists table_name:table
+  {: RESULT = new DropTableStmt(table, if_exists); :}
+  ;
+
+db_or_schema_kw ::= 
+  KW_DATABASE
+  | KW_SCHEMA
+  ;
+
+dbs_or_schemas_kw ::= 
+  KW_DATABASES
+  | KW_SCHEMAS
+  ;
+
+if_exists_val ::=
+  KW_IF KW_EXISTS
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
 partition_clause ::=
-    KW_PARTITION LPAREN partition_key_value_list:list RPAREN
-    {: RESULT = list; :}
-    | 
-    {: RESULT = null; :}
-    ;
-    
+  KW_PARTITION LPAREN partition_key_value_list:list RPAREN
+  {: RESULT = list; :}
+  | 
+  {: RESULT = null; :}
+  ;
+
 partition_key_value_list ::=
   partition_key_value:item
   {:
@@ -283,16 +440,16 @@ partition_key_value_list ::=
   ;
 
 partition_key_value ::=
-    // Dynamic partition key values.
-    IDENT:column
-    {: RESULT = new PartitionKeyValue(column, null); :}
-    // Static partition key values.
-    | IDENT:column EQUAL literal:value
-    {: RESULT = new PartitionKeyValue(column, (LiteralExpr)value); :}
-    // Static partition key value with NULL.
-    | IDENT:column EQUAL KW_NULL
-    {: RESULT = new PartitionKeyValue(column, new NullLiteral()); :}
-    ;
+  // Dynamic partition key values.
+  IDENT:column
+  {: RESULT = new PartitionKeyValue(column, null); :}
+  // Static partition key values.
+  | IDENT:column EQUAL literal:value
+  {: RESULT = new PartitionKeyValue(column, (LiteralExpr)value); :}
+  // Static partition key value with NULL.
+  | IDENT:column EQUAL KW_NULL
+  {: RESULT = new PartitionKeyValue(column, new NullLiteral()); :}
+  ;
 
 
 // Our parsing of UNION is slightly different from MySQL's:
@@ -407,16 +564,10 @@ show_tables_stmt ::=
   {: RESULT = new ShowTablesStmt(db, showPattern); :}
   ;
 
-// TODO: No obvious way in CUP to create a rule that returns nothing (needed to
-// make choice between DATABASES and SCHEMAS less ugly below).
 show_dbs_stmt ::=
-  KW_SHOW KW_DATABASES
+  KW_SHOW dbs_or_schemas_kw
   {: RESULT = new ShowDbsStmt(); :}
-  | KW_SHOW KW_DATABASES show_pattern:showPattern
-  {: RESULT = new ShowDbsStmt(showPattern); :}
-  | KW_SHOW KW_SCHEMAS
-  {: RESULT = new ShowDbsStmt(); :}
-  | KW_SHOW KW_SCHEMAS show_pattern:showPattern
+  | KW_SHOW dbs_or_schemas_kw show_pattern:showPattern
   {: RESULT = new ShowDbsStmt(showPattern); :}
   ;
 

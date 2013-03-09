@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TShowTablesParams;
 
 import com.google.common.base.Preconditions;
 
@@ -107,5 +108,12 @@ public class ShowTablesStmt extends ParseNodeBase {
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     postAnalysisDb = (parsedDb == null ? analyzer.getDefaultDb() : parsedDb);
+  }
+
+  public TShowTablesParams toThrift() {
+    TShowTablesParams params = new TShowTablesParams();
+    params.setShow_pattern(getPattern());
+    params.setDb(getDb());
+    return params;
   }
 }

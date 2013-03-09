@@ -29,65 +29,73 @@ DdlExecutor::DdlExecutor(ImpalaServer* impala_server)
 }
 
 Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
-  if (exec_request->ddl_type == TDdlType::SHOW_TABLES) {
-    // A NULL pattern means match all tables. However, Thrift string types can't
-    // be NULL in C++, so we have to test if it's set rather than just blindly
-    // using the value.
-    string* table_name = 
-        exec_request->__isset.show_pattern ? &(exec_request->show_pattern) : NULL;
-    // NULL DB means search all dbs; required until we support USE, and not set
-    // in the Thrift request
-    // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
-    TGetTablesResult table_names;
-    RETURN_IF_ERROR(impala_server_->GetTableNames(&exec_request->database, table_name, 
-        &table_names));
+  switch (exec_request->ddl_type) {
+    case TDdlType::SHOW_TABLES: {
+      TShowTablesParams* params = &exec_request->show_tables_params;
+      // A NULL pattern means match all tables. However, Thrift string types can't
+      // be NULL in C++, so we have to test if it's set rather than just blindly
+      // using the value.
+      string* table_name = params->__isset.show_pattern ? &(params->show_pattern) : NULL;
+      // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
+      TGetTablesResult table_names;
+      RETURN_IF_ERROR(impala_server_->GetTableNames(&params->db, table_name,
+          &table_names));
 
-    // Set the result set
-    result_set_.resize(table_names.tables.size());
-    for (int i = 0; i < table_names.tables.size(); ++i) {
-      result_set_[i].__isset.colVals = true;
-      result_set_[i].colVals.resize(1);
-      result_set_[i].colVals[0].__set_stringVal(table_names.tables[i]);
+      // Set the result set
+      result_set_.resize(table_names.tables.size());
+      for (int i = 0; i < table_names.tables.size(); ++i) {
+        result_set_[i].__isset.colVals = true;
+        result_set_[i].colVals.resize(1);
+        result_set_[i].colVals[0].__set_stringVal(table_names.tables[i]);
+      }
+      return Status::OK;
     }
-    return Status::OK;
-  }
+    case TDdlType::SHOW_DBS: {
+      TShowDbsParams* params = &exec_request->show_dbs_params;
+      TGetDbsResult db_names;
+      string* db_pattern = params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &db_names));
 
-  if (exec_request->ddl_type == TDdlType::SHOW_DBS) {
-    string* db_pattern = 
-      exec_request->__isset.show_pattern ? (&exec_request->show_pattern) : NULL;
-    TGetDbsResult db_names;
-    RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &db_names));
-
-    // Set the result set
-    result_set_.resize(db_names.dbs.size());
-    for (int i = 0; i < db_names.dbs.size(); ++i) {
-      result_set_[i].__isset.colVals = true;
-      result_set_[i].colVals.resize(1);
-      result_set_[i].colVals[0].__set_stringVal(db_names.dbs[i]);
+      // Set the result set
+      result_set_.resize(db_names.dbs.size());
+      for (int i = 0; i < db_names.dbs.size(); ++i) {
+        result_set_[i].__isset.colVals = true;
+        result_set_[i].colVals.resize(1);
+        result_set_[i].colVals[0].__set_stringVal(db_names.dbs[i]);
+      }
+      return Status::OK;
     }
-    return Status::OK;
-  }
+    case TDdlType::DESCRIBE: {
+      TDescribeTableResult table_columns;
+      TDescribeTableParams* params = &exec_request->describe_table_params;
+      RETURN_IF_ERROR(impala_server_->DescribeTable(params->db,
+          params->table_name, &table_columns));
 
-  if (exec_request->ddl_type == TDdlType::DESCRIBE) {
-    TDescribeTableResult table_columns;
-    RETURN_IF_ERROR(impala_server_->DescribeTable(exec_request->database, 
-        exec_request->describe_table, &table_columns));
-
-    // Set the result set
-    result_set_.resize(table_columns.columns.size());
-    for (int i = 0; i < table_columns.columns.size(); ++i) {
-      result_set_[i].__isset.colVals = true;
-      result_set_[i].colVals.resize(2);
-      result_set_[i].colVals[0].__set_stringVal(table_columns.columns[i].columnName);
-      result_set_[i].colVals[1].__set_stringVal(
-          TypeToOdbcString(ThriftToType(table_columns.columns[i].columnType)));
+      // Set the result set
+      result_set_.resize(table_columns.columns.size());
+      for (int i = 0; i < table_columns.columns.size(); ++i) {
+        result_set_[i].__isset.colVals = true;
+        result_set_[i].colVals.resize(2);
+        result_set_[i].colVals[0].__set_stringVal(table_columns.columns[i].columnName);
+        result_set_[i].colVals[1].__set_stringVal(
+            TypeToOdbcString(ThriftToType(table_columns.columns[i].columnType)));
+      }
+      return Status::OK;
     }
-    return Status::OK;
+    case TDdlType::CREATE_DATABASE:
+      return impala_server_->CreateDatabase(exec_request->create_db_params);
+    case TDdlType::CREATE_TABLE:
+      return impala_server_->CreateTable(exec_request->create_table_params);
+    case TDdlType::DROP_DATABASE:
+      return impala_server_->DropDatabase(exec_request->drop_db_params);
+    case TDdlType::DROP_TABLE:
+      return impala_server_->DropTable(exec_request->drop_table_params);
+    default: {
+      stringstream ss;
+      ss << "Unknown DDL exec request type: " << exec_request->ddl_type;
+      return Status(ss.str());
+    }
   }
-
-  stringstream ss;
-  ss << "Unknown DDL exec request type: " << exec_request->ddl_type;
-  return Status(ss.str());
 }
 
 // TODO: This is likely a superset of GetTableNames/GetDbNames. Coalesce these different
@@ -101,4 +109,3 @@ Status DdlExecutor::Exec(const TMetadataOpRequest& exec_request) {
   result_set_ = metdata_op_result_.results;
   return Status::OK;
 }
-

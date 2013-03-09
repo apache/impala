@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TShowDbsParams;
 
 /**
  * Representation of a SHOW DATABASES [pattern] statement. 
@@ -65,5 +66,11 @@ public class ShowDbsStmt extends ParseNodeBase {
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     // Nothing to do here
+  }
+
+  public TShowDbsParams toThrift() {
+    TShowDbsParams params = new TShowDbsParams();
+    params.setShow_pattern(getPattern());
+    return params;
   }
 }
