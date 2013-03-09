@@ -155,55 +155,54 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
 
 Status SimpleScheduler::GetHosts(
     const vector<TNetworkAddress>& data_locations, HostList* hostports) {
+  hostports->clear();
+  for (int i = 0; i < data_locations.size(); ++i) {
+    TNetworkAddress backend;
+    GetHost(data_locations[i], &backend);
+    hostports->push_back(backend);
+  }
+  DCHECK_EQ(data_locations.size(), hostports->size());
+  return Status::OK;
+}
+
+Status SimpleScheduler::GetHost(const TNetworkAddress& data_location,
+    TNetworkAddress* hostport) {
   lock_guard<mutex> lock(host_map_lock_);
   if (host_map_.size() == 0) {
     return Status("No backends configured");
   }
-  hostports->clear();
   int num_local_assignments = 0;
-  for (int i = 0; i < data_locations.size(); ++i) {
-    HostLocalityMap::iterator entry = host_map_.find(data_locations[i].hostname);
-    if (entry == host_map_.end()) {
-      // round robin the ipaddress
-      entry = next_nonlocal_host_entry_;
-      ++next_nonlocal_host_entry_;
-      if (next_nonlocal_host_entry_ == host_map_.end()) {
-        next_nonlocal_host_entry_ = host_map_.begin();
-      }
-    } else {
-      ++num_local_assignments;
+  HostLocalityMap::iterator entry = host_map_.find(data_location.hostname);
+  if (entry == host_map_.end()) {
+    // round robin the hostname
+    entry = next_nonlocal_host_entry_;
+    ++next_nonlocal_host_entry_;
+    if (next_nonlocal_host_entry_ == host_map_.end()) {
+      next_nonlocal_host_entry_ = host_map_.begin();
     }
-    DCHECK(!entry->second.empty());
-    // Round-robin between impalads on the same ipaddress.
-    // Pick the first one, then move it to the back of the queue
-    TNetworkAddress hostport = entry->second.front();
-    hostports->push_back(hostport);
-    entry->second.pop_front();
-    entry->second.push_back(hostport);
+  } else {
+    ++num_local_assignments;
   }
+  DCHECK(!entry->second.empty());
+  // Round-robin between impalads on the same ipaddress.
+  // Pick the first one, then move it to the back of the queue
+  TNetworkAddress chosen_hostport = entry->second.front();
+  hostport->__set_hostname(chosen_hostport.hostname);
+  hostport->__set_port(chosen_hostport.port);
+  entry->second.pop_front();
+  entry->second.push_back(chosen_hostport);
 
   if (metrics_ != NULL) {
-    total_assignments_->Increment(data_locations.size());
+    total_assignments_->Increment(1);
     total_local_assignments_->Increment(num_local_assignments);
   }
 
-  if (VLOG_QUERY_IS_ON) {
-    vector<string> hostport_strings;
-    for (int i = 0; i < hostports->size(); ++i) {
-      stringstream s;
-      s << "(" << data_locations[i] << " -> " << (*hostports)[i] << ")";
-      hostport_strings.push_back(s.str());
-    }
-    VLOG_QUERY << "SimpleScheduler assignment (data->backend):  "
-               << algorithm::join(hostport_strings, ", ");
-    if (data_locations.size() > 0) {
-      VLOG_QUERY << "SimpleScheduler locality percentage " << setprecision(4)
-                 << 100.0f * (num_local_assignments / (float)data_locations.size())
-                 << "% (" << num_local_assignments << " out of " << data_locations.size()
-                 << ")";
-    }
+  if (VLOG_FILE_IS_ON) {
+    stringstream s;
+    s << "(" << data_location.hostname << ":" << data_location.port;
+    s << " -> " << (hostport->hostname) << ":" << (hostport->port) << ")";
+    VLOG_FILE << "SimpleScheduler assignment (data->backend):  " << s.str();
   }
-  DCHECK_EQ(data_locations.size(), hostports->size());
   return Status::OK;
 }
 

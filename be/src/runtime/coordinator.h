@@ -199,11 +199,6 @@ class Coordinator {
   // hosts.size() == instance_ids.size()
   struct FragmentExecParams {
     SimpleScheduler::HostList hosts; // execution backends
-
-    // map from scan range server (from TScanRangeLocations) to host in 'hosts'
-    typedef boost::unordered_map<TNetworkAddress, TNetworkAddress> DataServerMap;
-    DataServerMap data_server_map;
-
     std::vector<TUniqueId> instance_ids;
     std::vector<TPlanFragmentDestination> destinations;
     std::map<PlanNodeId, int> per_exch_num_senders;
@@ -351,7 +346,7 @@ class Coordinator {
 
   // For each fragment in exec_request, computes hosts on which to run the instances
   // and stores result in fragment_exec_params_.hosts.
-  Status ComputeFragmentHosts(const TQueryExecRequest& exec_request);
+  void ComputeFragmentHosts(const TQueryExecRequest& exec_request);
 
   // Returns the id of the leftmost node of any of the gives types in 'plan_root',
   // or INVALID_PLAN_NODE_ID if no such node present.
@@ -364,13 +359,14 @@ class Coordinator {
   int FindLeftmostInputFragment(
       int fragment_idx, const TQueryExecRequest& exec_request);
 
-  // Populates scan_range_assignment_.
-  void ComputeScanRangeAssignment(const TQueryExecRequest& exec_request);
+  // Populates scan_range_assignment_. Unpartitioned fragments are assigned to the coord
+  Status ComputeScanRangeAssignment(const TQueryExecRequest& exec_request);
 
   // Does a scan range assignment (returned in 'assignment') based on a list of scan
   // range locations for a particular node.
-  void ComputeScanRangeAssignment(PlanNodeId node_id,
-      const std::vector<TScanRangeLocations>& locations,
+  // If exec_at_coord is true, all scan ranges will be assigned to the coord node.
+  Status ComputeScanRangeAssignment(PlanNodeId node_id,
+      const std::vector<TScanRangeLocations>& locations, bool exec_at_coord,
       const FragmentExecParams& params, FragmentScanRangeAssignment* assignment);
 
   // Fill in rpc_params based on parameters.

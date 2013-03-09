@@ -43,6 +43,14 @@ class Scheduler {
   virtual impala::Status GetHosts(
       const HostList& data_locations, HostList* hostports) = 0;
 
+  // Return a host/port pair of known ImpalaInternalServices that is running on or
+  // nearby the given data location
+  virtual impala::Status GetHost(const TNetworkAddress& data_location,
+      TNetworkAddress* hostport) = 0;
+
+  // Return true if there is a host located on the given data_location
+  virtual bool HasLocalHost(const TNetworkAddress& data_location) = 0;
+
   // Return a list of all hosts known to the scheduler
   virtual void GetAllKnownHosts(HostList* hostports) = 0;
 

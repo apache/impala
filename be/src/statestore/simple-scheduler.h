@@ -58,7 +58,17 @@ class SimpleScheduler : public Scheduler {
   // If the set of available hosts is updated between calls, round-robin state is reset.
   virtual impala::Status GetHosts(const HostList& data_locations, HostList* hostports);
 
+  // Return a backend such that the impalad at hostport should be used to read data
+  // from the given data_loation
+  virtual impala::Status GetHost(const TNetworkAddress& data_location,
+      TNetworkAddress* hostport);
+
   virtual void GetAllKnownHosts(HostList* hostports);
+
+  virtual bool HasLocalHost(const TNetworkAddress& data_location) {
+    HostLocalityMap::iterator entry = host_map_.find(data_location.hostname);
+    return (entry != host_map_.end());
+  }
 
   // Registers with the subscription manager if required
   virtual impala::Status Init();

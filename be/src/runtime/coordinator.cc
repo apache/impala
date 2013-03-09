@@ -290,8 +290,8 @@ Status Coordinator::Exec(
   query_profile_.reset(new RuntimeProfile(obj_pool(), "Query " + PrintId(query_id_)));
   SCOPED_TIMER(query_profile_->total_time_counter());
 
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(*request));
   ComputeFragmentExecParams(*request);
-  ComputeScanRangeAssignment(*request);
 
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
@@ -1196,7 +1196,7 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
   }
 }
 
-Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) {
+void Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) {
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
   DCHECK_EQ(fragment_exec_params_.size(), exec_request.fragments.size());
   vector<TPlanNodeType::type> scan_node_types;
@@ -1238,36 +1238,14 @@ Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) 
       params.hosts.push_back(coord);
       continue;
     }
-    const vector<TScanRangeLocations>& scan_range_locations = entry->second;
 
-    // collect unique set of data hosts
-    unordered_set<const TNetworkAddress*, HashTNetworkAddressPtr,
-        TNetworkAddressPtrEquals> data_hosts;
-    BOOST_FOREACH(const TScanRangeLocations& locations, scan_range_locations) {
-      BOOST_FOREACH(const TScanRangeLocation& location, locations.locations) {
-        data_hosts.insert(&(location.server));
-      }
+    // Get the list of impalad host from scan_range_assignment_
+    BOOST_FOREACH(const FragmentScanRangeAssignment::value_type scan_range_assignment,
+        scan_range_assignment_[i]) {
+      params.hosts.push_back(scan_range_assignment.first);
     }
-    vector<TNetworkAddress> data_locations;
-    BOOST_FOREACH(const TNetworkAddress* datanode_address, data_hosts) {
-      data_locations.push_back(*datanode_address);
-    }
-
-    // find execution hosts for data hosts
-    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(data_locations, &params.hosts));
-    DCHECK_EQ(data_locations.size(), params.hosts.size());
-    for (int j = 0; j < data_locations.size(); ++j) {
-      params.data_server_map[data_locations[j]] = params.hosts[j];
-    }
-
-    // de-dup
-    sort(params.hosts.begin(), params.hosts.end());
-    vector<TNetworkAddress >::iterator start_duplicates =
-        unique(params.hosts.begin(), params.hosts.end());
-    params.hosts.erase(start_duplicates, params.hosts.end());
     unique_hosts_.insert(params.hosts.begin(), params.hosts.end());
   }
-  return Status::OK;
 }
 
 PlanNodeId Coordinator::FindLeftmostNode(
@@ -1312,7 +1290,7 @@ int Coordinator::FindLeftmostInputFragment(
   return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
-void Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request) {
+Status Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request) {
   // map from node id to fragment index in exec_request.fragments
   vector<PlanNodeId> per_node_fragment_idx;
   for (int i = 0; i < exec_request.fragments.size(); ++i) {
@@ -1329,11 +1307,16 @@ void Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_reque
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
     int fragment_idx = per_node_fragment_idx[entry->first];
+    const TPlanFragment& fragment = exec_request.fragments[fragment_idx];
+    bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
+
     FragmentScanRangeAssignment* assignment = &scan_range_assignment_[fragment_idx];
-    ComputeScanRangeAssignment(
-        entry->first, entry->second, fragment_exec_params_[fragment_idx], assignment);
+    RETURN_IF_ERROR(ComputeScanRangeAssignment(
+        entry->first, entry->second, exec_at_coord, fragment_exec_params_[fragment_idx],
+        assignment));
     num_scan_ranges_ += entry->second.size();
   }
+  return Status::OK;
 }
 
 int64_t GetScanRangeLength(const TScanRange& scan_range) {
@@ -1344,42 +1327,57 @@ int64_t GetScanRangeLength(const TScanRange& scan_range) {
   }
 }
 
-void Coordinator::ComputeScanRangeAssignment(
-    PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
+Status Coordinator::ComputeScanRangeAssignment(
+    PlanNodeId node_id, const vector<TScanRangeLocations>& locations, bool exec_at_coord,
     const FragmentExecParams& params, FragmentScanRangeAssignment* assignment) {
-  unordered_map<TNetworkAddress, int64_t> assigned_bytes_per_host;  // total assigned
+  // map from datanode host to total assigned bytes;
+  // If the data node does not have a collocated impalad, the actual assigned bytes is
+  // "total assigned - numeric_limits<int64_t>::max()".
+  unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;
+  unordered_set<TNetworkAddress> remote_hosts;
+  int64_t remote_bytes = 0L;
+  int64_t local_bytes = 0L;
   BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
     // assign this scan range to the host w/ the fewest assigned bytes
-    int64_t min_assigned_bytes = numeric_limits<int64_t>::max();
+    uint64_t min_assigned_bytes = numeric_limits<uint64_t>::max();
     const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
     int volume_id = -1;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
-      int64_t* assigned_bytes =
-          FindOrInsert(&assigned_bytes_per_host, location.server, 0L);
+      // Deprioritize non-collocated datanodes by assigning a very high initial bytes
+      uint64_t initial_bytes = (!exec_env_->scheduler()->HasLocalHost(location.server)) ?
+          numeric_limits<int64_t>::max() : 0L;
+      uint64_t* assigned_bytes =
+          FindOrInsert(&assigned_bytes_per_host, location.server, initial_bytes);
       if (*assigned_bytes < min_assigned_bytes) {
         min_assigned_bytes = *assigned_bytes;
         data_host = &location.server;
         volume_id = location.volume_id;
       }
     }
-    assigned_bytes_per_host[*data_host] +=
-        GetScanRangeLength(scan_range_locations.scan_range);
+
+    int64_t scan_range_length = GetScanRangeLength(scan_range_locations.scan_range);
+    bool remote_read = min_assigned_bytes >= numeric_limits<int64_t>::max();
+    if (remote_read) {
+      remote_bytes += scan_range_length;
+      remote_hosts.insert(*data_host);
+    } else {
+      local_bytes += scan_range_length;
+    }
+    assigned_bytes_per_host[*data_host] += scan_range_length;
 
     // translate data host to backend host
     DCHECK(data_host != NULL);
-    TNetworkAddress exec_address;
-    DCHECK_GT(params.hosts.size(), 0);
-    if (params.hosts.size() == 1) {
-      // this is only running on the coordinator anyway
-      exec_address = params.hosts[0];
+
+    TNetworkAddress exec_hostport;
+    if (!exec_at_coord) {
+      DCHECK(remote_read || exec_env_->scheduler()->HasLocalHost(*data_host));
+      RETURN_IF_ERROR(exec_env_->scheduler()->GetHost(*data_host, &exec_hostport));
     } else {
-      FragmentExecParams::DataServerMap::const_iterator it =
-          params.data_server_map.find(*data_host);
-      DCHECK(it != params.data_server_map.end());
-      exec_address = it->second;
+      exec_hostport = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
     }
+
     PerNodeScanRanges* scan_ranges =
-        FindOrInsert(assignment, exec_address, PerNodeScanRanges());
+        FindOrInsert(assignment, exec_hostport, PerNodeScanRanges());
     vector<TScanRangeParams>* scan_range_params_list =
         FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
     // add scan range
@@ -1391,6 +1389,18 @@ void Coordinator::ComputeScanRangeAssignment(
   }
 
   if (VLOG_FILE_IS_ON) {
+    VLOG_FILE << "Total remote scan volume = " <<
+        PrettyPrinter::Print(remote_bytes, TCounterType::BYTES);
+    VLOG_FILE << "Total local scan volume = " <<
+        PrettyPrinter::Print(local_bytes, TCounterType::BYTES);
+    if (remote_hosts.size() > 0) {
+      stringstream remote_node_log;
+      remote_node_log << "Remote data node list: ";
+      BOOST_FOREACH(const TNetworkAddress& remote_host, remote_hosts) {
+        remote_node_log << remote_host << " ";
+      }
+    }
+
     BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
       VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
       BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
@@ -1402,6 +1412,8 @@ void Coordinator::ComputeScanRangeAssignment(
       }
     }
   }
+
+  return Status::OK;
 }
 
 void Coordinator::SetExecPlanFragmentParams(
