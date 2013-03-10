@@ -743,6 +743,11 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY ()");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY");
 
+    // Column comments
+    ParsesOk("CREATE TABLE Foo (i int COMMENT 'hello', s string)");
+    ParsesOk("CREATE TABLE Foo (i int COMMENT 'hello', s string COMMENT 'hi')");
+    ParsesOk("CREATE TABLE T (i int COMMENT 'hi') PARTITIONED BY (j int COMMENT 'bye')");
+
     // Supported file formats
     for (FileFormat format: FileFormat.values()) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
@@ -791,6 +796,8 @@ public class ParserTest {
     // Location and comment need to be string literals, file format is not
     ParserError("CREATE TABLE Foo (d double) LOCATION a");
     ParserError("CREATE TABLE Foo (d double) COMMENT c");
+    ParserError("CREATE TABLE Foo (d double COMMENT c)");
+    ParserError("CREATE TABLE Foo (d double COMMENT 'c') PARTITIONED BY (j COMMENT hi)");
     ParserError("CREATE TABLE Foo (d double) STORED AS 'TEXTFILE'");
 
     // Invalid syntax

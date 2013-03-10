@@ -35,7 +35,7 @@ show tables in ddl_test_db
 ---- RESULTS
 ====
 ---- QUERY
-create table ddl_test_db.testtbl(i int, s string) STORED AS TEXTFILE
+create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
 ---- RESULTS
 ====
 ---- QUERY
@@ -52,7 +52,16 @@ show tables in ddl_test_db
 string
 ====
 ---- QUERY
-insert overwrite table ddl_test_db.testtbl SELECT 1, 'Hi' from functional.alltypes limit 10
+describe ddl_test_db.testtbl
+---- RESULTS
+'i','int',''
+'s','string','String col'
+---- TYPES
+string,string,string
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl SELECT 1, 'Hi'
+from functional.alltypes limit 10
 ---- RESULTS
 : 10
 ====
@@ -73,18 +82,18 @@ select * from ddl_test_db.testtbl
 int,string
 ====
 ---- QUERY
-create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int)
+create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
 ---- RESULTS
 ====
 ---- QUERY
 # Partition columns are displayed as part of DESCRIBE <table>
 describe ddl_test_db.testtbl_part
 ---- RESULTS
-'i','int'
-'s','string'
-'id','int'
+'i','int',''
+'s','string',''
+'id','int','C'
 ---- TYPES
-string,string
+string,string,string
 ====
 ---- QUERY
 insert overwrite table ddl_test_db.testtbl_part partition(id=1)

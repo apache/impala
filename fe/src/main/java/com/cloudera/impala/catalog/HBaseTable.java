@@ -141,7 +141,8 @@ public class HBaseTable extends Table {
       List<String> hbaseColumnQualifiers = new ArrayList<String>();
       parseColumnMapping(hbaseColumnsMapping, hbaseColumnFamilies,
           hbaseColumnQualifiers);
-      Preconditions.checkState(hbaseColumnFamilies.size() == hbaseColumnQualifiers.size());
+      Preconditions.checkState(
+          hbaseColumnFamilies.size() == hbaseColumnQualifiers.size());
 
       // Populate tmp cols in the order they appear in the Hive metastore.
       // We will reorder the cols below.
@@ -151,7 +152,8 @@ public class HBaseTable extends Table {
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
-            hbaseColumnQualifiers.get(i), getPrimitiveType(s.getType()), -1);
+            hbaseColumnQualifiers.get(i), getPrimitiveType(s.getType()),
+            s.getComment(), -1);
         tmpCols.add(col);
       }
        

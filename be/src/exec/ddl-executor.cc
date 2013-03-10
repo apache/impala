@@ -74,11 +74,13 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
       // Set the result set
       result_set_.resize(table_columns.columns.size());
       for (int i = 0; i < table_columns.columns.size(); ++i) {
+        TColumnDesc* columnDesc = &table_columns.columns[i].columnDesc;
         result_set_[i].__isset.colVals = true;
-        result_set_[i].colVals.resize(2);
-        result_set_[i].colVals[0].__set_stringVal(table_columns.columns[i].columnName);
+        result_set_[i].colVals.resize(3);
+        result_set_[i].colVals[0].__set_stringVal(columnDesc->columnName);
         result_set_[i].colVals[1].__set_stringVal(
-            TypeToOdbcString(ThriftToType(table_columns.columns[i].columnType)));
+            TypeToOdbcString(ThriftToType(columnDesc->columnType)));
+        result_set_[i].colVals[2].__set_stringVal(table_columns.columns[i].comment);
       }
       return Status::OK;
     }

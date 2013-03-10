@@ -456,7 +456,8 @@ public class HdfsTable extends Table {
             getName() + " due to unsupported column type " + s.getType() + " in column " +
             s.getName());
       }
-      Column col = new Column(s.getName(), getPrimitiveType(s.getType()), pos);
+      Column col =
+          new Column(s.getName(), getPrimitiveType(s.getType()), s.getComment(), pos);
       colsByPos.add(col);
       colsByName.put(s.getName(), col);
       ++pos;

@@ -19,12 +19,12 @@ package com.cloudera.impala.catalog;
 // This class adds the HBase columnFamily and columnQualifier,
 // so we can read the column from HBase directly.
 public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
-  protected String columnFamily;
-  protected String columnQualifier;
+  private final String columnFamily;
+  private final String columnQualifier;
 
-  public HBaseColumn(String name, String columnFamily, String columnQualifier, PrimitiveType type,
-      int position) {
-    super(name, type, position);
+  public HBaseColumn(String name, String columnFamily, String columnQualifier,
+      PrimitiveType type, String comment, int position) {
+    super(name, type, comment, position);
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
   }

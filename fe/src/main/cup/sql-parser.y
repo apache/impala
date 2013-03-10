@@ -229,9 +229,9 @@ nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropTableStmt drop_tbl_stmt;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
-nonterminal CreateTableColumnDef create_table_column_def;
-nonterminal ArrayList<CreateTableColumnDef> create_table_column_defs;
-nonterminal ArrayList<CreateTableColumnDef> partition_column_defs;
+nonterminal ColumnDef column_def;
+nonterminal ArrayList<ColumnDef> column_def_list;
+nonterminal ArrayList<ColumnDef> partition_column_defs;
 // Options for CREATE DATABASE/TABLE
 nonterminal String comment_val;
 nonterminal Boolean external_val;
@@ -301,7 +301,7 @@ create_db_stmt ::=
 
 create_tbl_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
-  table_name:table LPAREN create_table_column_defs:col_defs RPAREN
+  table_name:table LPAREN column_def_list:col_defs RPAREN
   partition_column_defs:partition_col_defs comment_val:comment
   row_format_val:row_format file_format_val:file_format location_val:location
   {:
@@ -376,29 +376,29 @@ file_format_val ::=
   ;
 
 partition_column_defs ::=
-  KW_PARTITIONED KW_BY LPAREN create_table_column_defs:col_defs RPAREN
+  KW_PARTITIONED KW_BY LPAREN column_def_list:col_defs RPAREN
   {: RESULT = col_defs; :}
   | /* Empty - not a partitioned table */ 
-  {: RESULT = new ArrayList<CreateTableColumnDef>(); :}
+  {: RESULT = new ArrayList<ColumnDef>(); :}
   ;
 
-create_table_column_defs ::=
-  create_table_column_def:col_def
+column_def_list ::=
+  column_def:col_def
   {:
-    ArrayList<CreateTableColumnDef> list = new ArrayList<CreateTableColumnDef>();
+    ArrayList<ColumnDef> list = new ArrayList<ColumnDef>();
     list.add(col_def);
     RESULT = list;
   :}
-  | create_table_column_defs:list COMMA create_table_column_def:col_def
+  | column_def_list:list COMMA column_def:col_def
   {:
     list.add(col_def);
     RESULT = list;
   :}
   ;
 
-create_table_column_def ::=
-  IDENT:col_name primitive_type:targetType
-  {: RESULT = new CreateTableColumnDef(col_name, targetType); :}
+column_def ::=
+  IDENT:col_name primitive_type:targetType comment_val:comment
+  {: RESULT = new ColumnDef(col_name, targetType, comment); :}
   ;
 
 drop_db_stmt ::=

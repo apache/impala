@@ -21,7 +21,6 @@ import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TFileFormat;
 
@@ -34,13 +33,13 @@ import com.google.common.collect.Lists;
  * TODO: Add support for creating partitioned tables (IMPALA-102)
  */
 public class CreateTableStmt extends ParseNodeBase {
-  private final ArrayList<CreateTableColumnDef> columnDefs;
+  private final ArrayList<ColumnDef> columnDefs;
   private final String comment;
   private final boolean isExternal;
   private final boolean ifNotExists;
   private final FileFormat fileFormat;
   private final String location;
-  private final ArrayList<CreateTableColumnDef> partitionColumnDefs;
+  private final ArrayList<ColumnDef> partitionColumnDefs;
   private final RowFormat rowFormat;
   private final TableName tableName;
 
@@ -50,7 +49,8 @@ public class CreateTableStmt extends ParseNodeBase {
   /**
    * Builds a CREATE TABLE statement
    * @param tableName - Name of the new table
-   * @param columnDefs - List of columns for the table
+   * @param columnDefs - List of column definitions for the table
+   * @param partitionColumnDefs - List of partition column definitions for the table
    * @param isExternal - If true, the table's data will be preserved if dropped.
    * @param comment - Comment to attach to the table
    * @param rowFormat - Custom row format of the table. Use RowFormat.DEFAULT_ROW_FORMAT
@@ -58,8 +58,8 @@ public class CreateTableStmt extends ParseNodeBase {
    * @param fileFormat - File format of the table
    * @param location - The HDFS location of where the table data will stored.
    */
-  public CreateTableStmt(TableName tableName, List<CreateTableColumnDef> columnDefs,
-      List<CreateTableColumnDef> partitionColumnDefs, boolean isExternal, String comment,
+  public CreateTableStmt(TableName tableName, List<ColumnDef> columnDefs,
+      List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
       RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDefs);
@@ -91,11 +91,11 @@ public class CreateTableStmt extends ParseNodeBase {
     return dbName;
   }
 
-  public List<CreateTableColumnDef> getColumnDefs() {
+  public List<ColumnDef> getColumnDefs() {
     return columnDefs;
   }
 
-  public List<CreateTableColumnDef> getPartitionColumnDefs() {
+  public List<ColumnDef> getPartitionColumnDefs() {
     return partitionColumnDefs;
   }
 
@@ -173,12 +173,11 @@ public class CreateTableStmt extends ParseNodeBase {
     TCreateTableParams params = new TCreateTableParams();
     params.setTable_name(getTbl());
     params.setDb(getDb());
-    for (CreateTableColumnDef col: getColumnDefs()) {
-      params.addToColumns(new TColumnDesc(col.getColName(), col.getColType().toThrift()));
+    for (ColumnDef col: getColumnDefs()) {
+      params.addToColumns(col.toThrift());
     }
-    for (CreateTableColumnDef col: getPartitionColumnDefs()) {
-      params.addToPartition_columns(
-          new TColumnDesc(col.getColName(), col.getColType().toThrift()));
+    for (ColumnDef col: getPartitionColumnDefs()) {
+      params.addToPartition_columns(col.toThrift());
     }
     params.setIs_external(isExternal());
     params.setComment(comment);

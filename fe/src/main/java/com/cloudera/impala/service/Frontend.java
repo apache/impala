@@ -59,6 +59,7 @@ import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TExecRequest;
@@ -144,7 +145,8 @@ public class Frontend {
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING),
-          new TColumnDesc("type", TPrimitiveType.STRING)));
+          new TColumnDesc("type", TPrimitiveType.STRING),
+          new TColumnDesc("comment", TPrimitiveType.STRING)));
     } else if (analysis.isCreateTableStmt()) {
       ddl.ddl_type = TDdlType.CREATE_TABLE;
       ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
@@ -179,10 +181,9 @@ public class Frontend {
   /**
    * Creates a new table in the metastore.
    */
-  public void createTable(String dbName, String tableName,
-      List<TColumnDesc> columns, List<TColumnDesc> partitionColumns, boolean isExternal,
-      String comment, RowFormat rowFormat, FileFormat fileFormat, String location,
-      boolean ifNotExists)
+  public void createTable(String dbName, String tableName, List<TColumnDef> columns,
+      List<TColumnDef> partitionColumns, boolean isExternal, String comment,
+      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
       AlreadyExistsException, InvalidObjectException {
     catalog.createTable(dbName, tableName, columns, partitionColumns, isExternal, comment,
@@ -242,7 +243,7 @@ public class Frontend {
    * specified table. Throws an AnalysisException if the table or db is not
    * found.
    */
-  public List<TColumnDesc> describeTable(String dbName, String tableName)
+  public List<TColumnDef> describeTable(String dbName, String tableName)
       throws ImpalaException {
     Db db = catalog.getDb(dbName);
     if (db == null) {
@@ -260,12 +261,13 @@ public class Frontend {
       throw new AnalysisException("Unknown table: " + db.getName() + "." + tableName);
     }
 
-    List<TColumnDesc> columns = Lists.newArrayList();
+    List<TColumnDef> columns = Lists.newArrayList();
     for (Column column: table.getColumnsInHiveOrder()) {
-      TColumnDesc columnDesc = new TColumnDesc();
-      columnDesc.setColumnName(column.getName());
-      columnDesc.setColumnType(column.getType().toThrift());
-      columns.add(columnDesc);
+      TColumnDef colDef = new TColumnDef(
+          new TColumnDesc(column.getName(), column.getType().toThrift()));
+      LOG.info("describe comment:  " + column.getComment());
+      colDef.setComment(column.getComment());
+      columns.add(colDef);
     }
 
     return columns;

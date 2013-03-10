@@ -36,7 +36,6 @@ import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
-import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TDropDbParams;

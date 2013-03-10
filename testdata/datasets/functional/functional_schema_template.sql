@@ -5,7 +5,7 @@ functional
 alltypes
 ---- CREATE
 CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int,
+  id int COMMENT 'Add a comment',
   bool_col boolean,
   tinyint_col tinyint,
   smallint_col smallint,

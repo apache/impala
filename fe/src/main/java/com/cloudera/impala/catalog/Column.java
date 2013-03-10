@@ -20,14 +20,24 @@ package com.cloudera.impala.catalog;
  * Owned by Catalog instance.
  */
 public class Column {
-  protected final String name;
-  protected final PrimitiveType type;
-  protected int position;  // in table
+  private final String name;
+  private final PrimitiveType type;
+  private final String comment;
+  private int position;  // in table
 
   public Column(String name, PrimitiveType type, int position) {
+    this(name, type, null, position);
+  }
+
+  public Column(String name, PrimitiveType type, String comment, int position) {
     this.name = name;
     this.type = type;
+    this.comment = comment;
     this.position = position;
+  }
+
+  public String getComment() {
+    return comment;
   }
 
   public String getName() {

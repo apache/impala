@@ -53,6 +53,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 
+import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 
 /**
@@ -397,7 +398,8 @@ public class Catalog {
    *
    * @param dbName - Database to create the table within.
    * @param tableName - Name of the new table.
-   * @param column - List of columns for the table.
+   * @param column - List of column definitions for the new table.
+   * @param partitionColumn - List of partition column definitions for the new table.
    * @param isExternal 
    *    If true, table is created as external which means the data will be persisted
    *    if dropped. External tables can also be created on top of existing data.
@@ -405,10 +407,9 @@ public class Catalog {
    * @param location - Hdfs path to use as the location for table data or null to use
    *                   default location.
    */
-  public void createTable(String dbName, String tableName,
-      List<TColumnDesc> columns, List<TColumnDesc> partitionColumns, boolean isExternal,
-      String comment, RowFormat rowFormat, FileFormat fileFormat, String location,
-      boolean ifNotExists)
+  public void createTable(String dbName, String tableName, List<TColumnDef> columns,
+      List<TColumnDef> partitionColumns, boolean isExternal, String comment,
+      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
       InvalidObjectException, org.apache.thrift.TException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty(),
@@ -462,12 +463,13 @@ public class Catalog {
     }
   }
 
-  private static List<FieldSchema> buildFieldSchemaList(List<TColumnDesc> columnDefs) {
+  private static List<FieldSchema> buildFieldSchemaList(List<TColumnDef> columnDefs) {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
-    for (TColumnDesc c: columnDefs) {
-      FieldSchema fs = new FieldSchema(c.getColumnName(),
-          c.getColumnType().toString().toLowerCase(), null);
+    for (TColumnDef c: columnDefs) {
+      TColumnDesc colDesc = c.getColumnDesc();
+      FieldSchema fs = new FieldSchema(colDesc.getColumnName(),
+          colDesc.getColumnType().toString().toLowerCase(), c.getComment());
       fsList.add(fs);
     }
     return fsList;

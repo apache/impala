@@ -17,19 +17,22 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import com.google.common.collect.Lists;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumnDef;
 
 /**
- * Represents a column definition in a CREATE TABLE statement (column name + data type).
- * Used by CreateTableStmt.
- * TODO: Add support for column definition comments.
+ * Represents a column definition in a CREATE/ALTER TABLE statement (column name +
+ * data type) and optional comment.
  */
-public class CreateTableColumnDef {
+public class ColumnDef {
   private final String colName;
+  private final String comment;
   private final PrimitiveType colType;
 
-  public CreateTableColumnDef(String colName, PrimitiveType colType) {
+  public ColumnDef(String colName, PrimitiveType colType, String comment) {
     this.colName = colName;
     this.colType = colType;
+    this.comment = comment;
   }
 
   public PrimitiveType getColType() {
@@ -40,7 +43,22 @@ public class CreateTableColumnDef {
     return colName;
   }
 
+  public String getComment() {
+    return comment;
+  }
+
   public String toString() {
-    return colName + " " + colType.toString();
+    StringBuilder sb = new StringBuilder(colName + " " + colType.toString());
+    if (comment != null) {
+      sb.append(String.format(" COMMENT '%s'", comment));
+    }
+    return sb.toString();
+  }
+
+  public TColumnDef toThrift() {
+    TColumnDef colDef = new TColumnDef(
+        new TColumnDesc(getColName(), getColType().toThrift()));
+    colDef.setComment(getComment());
+    return colDef;
   }
 }

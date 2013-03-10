@@ -58,6 +58,14 @@ struct TColumnDesc {
   2: required Types.TPrimitiveType columnType
 }
 
+// A column definition; used by CREATE TABLE and DESCRIBE <table> statements. A column
+// definition has a different meaning (and additional fields) from a column descriptor,
+// so this is a separate struct from TColumnDesc.
+struct TColumnDef {
+  1: required TColumnDesc columnDesc
+  2: optional string comment
+}
+
 // Arguments to DescribeTable, which returns a list of column descriptors for a 
 // given table
 struct TDescribeTableParams {
@@ -67,7 +75,7 @@ struct TDescribeTableParams {
 
 // Results of a call to describeTable()
 struct TDescribeTableResult {
-  1: required list<TColumnDesc> columns
+  1: required list<TColumnDef> columns
 }
 
 // Parameters of CREATE DATABASE commands
@@ -103,10 +111,10 @@ struct TCreateTableParams {
   2: required string table_name
 
   // List of columns to create
-  3: required list<TColumnDesc> columns
+  3: required list<TColumnDef> columns
 
   // List of partition columns
-  4: optional list<TColumnDesc> partition_columns
+  4: optional list<TColumnDef> partition_columns
 
   // The file format for this table
   5: required TFileFormat file_format
