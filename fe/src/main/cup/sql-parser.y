@@ -904,6 +904,9 @@ expr ::=
   {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
   | IDENT:functionName LPAREN func_arg_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr(functionName, exprs); :}
+  /* Since "IF" is a keyword, need to special case this function */
+  | KW_IF LPAREN func_arg_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr("if", exprs); :}
   | cast_expr:c
   {: RESULT = c; :}
   | case_expr:c

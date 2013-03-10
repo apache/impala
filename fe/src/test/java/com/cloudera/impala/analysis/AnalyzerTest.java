@@ -1513,6 +1513,24 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestConditionalExprs() {
+    AnalyzesOk("select if(true, false, false)");
+    AnalyzesOk("select if(1 != 2, false, false)");
+    AnalyzesOk("select if(bool_col, false, true) from functional.alltypes");
+    AnalyzesOk("select if(bool_col, int_col, double_col) from functional.alltypes");
+
+    // if() only accepts three arguments
+    // TODO: Fix the Analysis error message, it does not include a left paren/space
+    AnalysisError("select if(true, false, true, true)", 
+        "No matching function with those arguments: ifBOOLEAN, BOOLEAN, BOOLEAN, " +
+        "BOOLEAN)");
+    AnalysisError("select if(true, false)", 
+        "No matching function with those arguments: ifBOOLEAN, BOOLEAN)");
+    AnalysisError("select if(false)",
+        "No matching function with those arguments: ifBOOLEAN)");
+  }
+
+  @Test
   public void TestUnion() {
     // Selects on different tables.
     AnalyzesOk("select int_col from functional.alltypes union " +

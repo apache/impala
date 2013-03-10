@@ -458,6 +458,15 @@ public class ParserTest {
     ParserError("select cast(a + 5.0, string) from t");
   }
 
+  @Test
+  public void TestConditionalExprs() {
+    ParsesOk("select if(TRUE, TRUE, FALSE) from t");
+    ParsesOk("select c1, c2, if(TRUE, TRUE, FALSE) from t");
+    ParsesOk("select if(1 = 2, c1, c2) from t");
+    ParsesOk("select if(1 = 2, c1, c2)");
+    ParserError("select if()");
+  }
+
   @Test public void TestAggregateExprs() {
     ParsesOk("select count(*), count(a), count(distinct a, b) from t");
     ParserError("select count() from t");
@@ -826,7 +835,8 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
+        "DISTINCTPCSA, FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, " + 
+        "IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -852,7 +862,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
+        "FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -861,7 +871,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
+        "FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
