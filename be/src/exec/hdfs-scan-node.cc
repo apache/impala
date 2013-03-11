@@ -76,7 +76,10 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       counters_reported_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
-    max_materialized_row_batches_ = 50 * DiskInfo::num_disks();
+    // TODO: This parameter has an U-shaped effect on performance: increasing the value
+    // would first improves performance, but further increasing would degrade performance.
+    // Investigate and tune this.
+    max_materialized_row_batches_ = 10 * DiskInfo::num_disks();
   }
 }
 
