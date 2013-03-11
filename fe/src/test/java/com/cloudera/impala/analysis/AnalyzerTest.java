@@ -1525,14 +1525,13 @@ public class AnalyzerTest {
     AnalyzesOk("select if(bool_col, int_col, double_col) from functional.alltypes");
 
     // if() only accepts three arguments
-    // TODO: Fix the Analysis error message, it does not include a left paren/space
     AnalysisError("select if(true, false, true, true)",
-        "No matching function with those arguments: ifBOOLEAN, BOOLEAN, BOOLEAN, " +
+        "No matching function with those arguments: if (BOOLEAN, BOOLEAN, BOOLEAN, " +
         "BOOLEAN)");
     AnalysisError("select if(true, false)",
-        "No matching function with those arguments: ifBOOLEAN, BOOLEAN)");
+        "No matching function with those arguments: if (BOOLEAN, BOOLEAN)");
     AnalysisError("select if(false)",
-        "No matching function with those arguments: ifBOOLEAN)");
+        "No matching function with those arguments: if (BOOLEAN)");
   }
 
   @Test
