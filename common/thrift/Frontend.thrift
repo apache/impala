@@ -88,6 +88,7 @@ struct TCreateDbParams {
 
 // Valid table file formats
 enum TFileFormat {
+  PARQUETFILE,
   RCFILE,
   SEQUENCEFILE,
   TEXTFILE,

@@ -11,6 +11,7 @@ import java.io.StringReader;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import com.cloudera.impala.catalog.FileFormat;
 
 public class ParserTest {
   /**
@@ -734,13 +735,15 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/'");
 
     // Supported file formats
-    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS TEXTFILE");
-    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS RCFILE");
-    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS SEQUENCEFILE");
-    ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS SEQUENCEFILE LOCATION '/b'");
-    ParsesOk(
-        "CREATE EXTERNAL TABLE Foo (f float) COMMENT 'c' STORED AS RCFILE LOCATION '/b'");
-
+    for (FileFormat format: FileFormat.values()) {
+      ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
+      ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS " + format);
+      ParsesOk(String.format(
+          "CREATE TABLE Foo (i int, s string) STORED AS %s LOCATION '/b'", format));
+      ParsesOk(String.format(
+          "CREATE EXTERNAL TABLE Foo (f float) COMMENT 'c' STORED AS %s LOCATION '/b'",
+          format));
+    }
     ParserError("CREATE TABLE Foo (i int, s string) STORED AS SEQFILE");
     ParserError("CREATE TABLE Foo (i int, s string) STORED TEXTFILE");
 

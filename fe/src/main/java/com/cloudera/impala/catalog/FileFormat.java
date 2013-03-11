@@ -17,6 +17,7 @@ package com.cloudera.impala.catalog;
 import com.cloudera.impala.thrift.TFileFormat;
 
 public enum FileFormat {
+  PARQUETFILE("PARQUETFILE", TFileFormat.PARQUETFILE),
   TEXTFILE("TEXTFILE", TFileFormat.TEXTFILE),
   SEQUENCEFILE("SEQUENCEFILE", TFileFormat.SEQUENCEFILE),
   RCFILE("RCFILE", TFileFormat.RCFILE);
@@ -39,6 +40,7 @@ public enum FileFormat {
 
   public static FileFormat fromThrift(TFileFormat fileFormat) {
     switch (fileFormat) {
+      case PARQUETFILE: return FileFormat.PARQUETFILE;
       case SEQUENCEFILE: return FileFormat.SEQUENCEFILE;
       case RCFILE: return FileFormat.RCFILE;
       case TEXTFILE: return FileFormat.TEXTFILE;

@@ -111,6 +111,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("order", new Integer(SqlParserSymbols.KW_ORDER));
     keywordMap.put("outer", new Integer(SqlParserSymbols.KW_OUTER));
     keywordMap.put("overwrite", new Integer(SqlParserSymbols.KW_OVERWRITE));
+    keywordMap.put("parquetfile", new Integer(SqlParserSymbols.KW_PARQUETFILE));
     keywordMap.put("rcfile", new Integer(SqlParserSymbols.KW_RCFILE));
     keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
     keywordMap.put("rlike", new Integer(SqlParserSymbols.KW_RLIKE));

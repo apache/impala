@@ -22,8 +22,9 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 class HiveStorageDescriptorFactory {
   /**
    * Creates and returns a Hive StoreDescriptor for the given FileFormat and RowFormat.
-   * Currently supports creating StorageDescriptors for Text, Sequence, and RC file.
-   * TODO: Add support for Avro, Parquet file, and HBase
+   * Currently supports creating StorageDescriptors for Parquet, Text, Sequence, and
+   * RC file.
+   * TODO: Add support for Avro and HBase
    */
   static StorageDescriptor createSd(FileFormat fileFormat, RowFormat rowFormat) {
     Preconditions.checkNotNull(fileFormat);
@@ -31,6 +32,7 @@ class HiveStorageDescriptorFactory {
 
     StorageDescriptor sd = null;
     switch(fileFormat) {
+      case PARQUETFILE: sd = createParquetFileSd(); break;
       case RCFILE: sd = createRcFileSd(); break;
       case SEQUENCEFILE: sd = createSequenceFileSd(); break;
       case TEXTFILE: sd = createTextSd(); break;
@@ -47,6 +49,17 @@ class HiveStorageDescriptorFactory {
     if (rowFormat.getLineDelimiter() != null) {
       sd.getSerdeInfo().putToParameters("line.delim", rowFormat.getLineDelimiter());
     }
+    return sd;
+  }
+
+  private static StorageDescriptor createParquetFileSd() {
+    StorageDescriptor sd = createGenericSd();
+    // TODO: Change the Parquet input/output formats to use class.getName()
+    sd.setInputFormat("org.apache.hadoop.hive.ql.io.ParquetInputFormat");
+    sd.setOutputFormat("org.apache.hadoop.hive.ql.io.ParquetOutputFormat");
+    sd.getSerdeInfo().setSerializationLib(
+        org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
+    sd.setCompressed(false);
     return sd;
   }
 
