@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include "util/decompress.h"
 #include "util/compress.h"
+#include "gen-cpp/Descriptors_types.h"
 
 using namespace std;
 using namespace boost;
@@ -39,15 +40,15 @@ class DecompressorTest : public ::testing::Test{
     }
   }
 
-  void RunTest(const char* codec) {
+  void RunTest(THdfsCompression::type format) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
     MemPool* mem_pool = new MemPool;
 
     EXPECT_TRUE(
-        Codec::CreateCompressor(NULL, mem_pool, true, codec, &compressor).ok());
-    EXPECT_TRUE(Codec::CreateDecompressor(NULL,
-        mem_pool, true, codec, &decompressor).ok());
+        Codec::CreateCompressor(NULL, mem_pool, true, format, &compressor).ok());
+    EXPECT_TRUE(
+        Codec::CreateDecompressor(NULL, mem_pool, true, format, &decompressor).ok());
 
     uint8_t* compressed;
     int compressed_length = 0;
@@ -74,19 +75,27 @@ class DecompressorTest : public ::testing::Test{
 };
 
 TEST_F(DecompressorTest, Default) {
-  RunTest(Codec::DEFAULT_COMPRESSION);
+  RunTest(THdfsCompression::DEFAULT);
 }
 
 TEST_F(DecompressorTest, Gzip) {
-  RunTest(Codec::GZIP_COMPRESSION);
+  RunTest(THdfsCompression::GZIP);
+}
+
+TEST_F(DecompressorTest, Deflate) {
+  RunTest(THdfsCompression::DEFLATE);
 }
 
 TEST_F(DecompressorTest, Bzip) {
-  RunTest(Codec::BZIP2_COMPRESSION);
+  RunTest(THdfsCompression::BZIP2);
 }
 
 TEST_F(DecompressorTest, Snappy) {
-  RunTest(Codec::SNAPPY_COMPRESSION);
+  RunTest(THdfsCompression::SNAPPY);
+}
+
+TEST_F(DecompressorTest, SnappyBlocked) {
+  RunTest(THdfsCompression::SNAPPY_BLOCKED);
 }
 
 }

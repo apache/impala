@@ -48,6 +48,7 @@ enum THdfsCompression {
   NONE,
   DEFAULT,
   GZIP,
+  DEFLATE,
   BZIP2,
   SNAPPY,
   SNAPPY_BLOCKED // Used by sequence and rc files but not stored in the metadata.

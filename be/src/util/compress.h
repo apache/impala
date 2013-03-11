@@ -29,8 +29,15 @@ namespace impala {
 
 class GzipCompressor : public Codec {
  public:
+  // Compression formats supported by the zlib library
+  enum Format {
+    ZLIB,
+    DEFLATE,
+    GZIP,
+  };
+
   // If gzip is set then we create gzip otherwise lzip.
-  GzipCompressor(MemPool* mem_pool, bool reuse_buffer, bool is_gzip);
+  GzipCompressor(MemPool* mem_pool, bool reuse_buffer, Format format);
   virtual ~GzipCompressor();
 
   // Process a block of data.
@@ -42,8 +49,7 @@ class GzipCompressor : public Codec {
   virtual Status Init();
 
  private:
-  // If set we use the gzip algorithm otherwise the lzip.
-  bool is_gzip_;
+  Format format_;
 
   // Structure used to communicate with the library.
   z_stream stream_;

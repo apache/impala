@@ -27,7 +27,7 @@ namespace impala {
 
 class GzipDecompressor : public Codec {
  public:
-  GzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
+  GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate);
   virtual ~GzipDecompressor();
 
   // Process a block of data.
@@ -39,6 +39,9 @@ class GzipDecompressor : public Codec {
   virtual Status Init();
 
  private:
+  // If set assume deflate format, otherwise zlib or gzip
+  bool is_deflate_;
+
   z_stream stream_;
 
   // These are magic numbers from zlib.h.  Not clear why they are not defined there.

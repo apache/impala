@@ -56,8 +56,8 @@ string Codec::GetCodecName(THdfsCompression::type type) {
 }
 
 Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                     bool reuse, const string& codec,
-                                     scoped_ptr<Codec>* compressor) {
+                               bool reuse, const string& codec,
+                               scoped_ptr<Codec>* compressor) {
   map<const string, const THdfsCompression::type>::const_iterator
       type = CODEC_MAP.find(codec);
 
@@ -74,17 +74,30 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 }
 
 Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                     bool reuse, THdfsCompression::type format,
-                                     Codec** compressor) {
+                               bool reuse, THdfsCompression::type format,
+                               scoped_ptr<Codec>* compressor) {
+  Codec* comp;
+  RETURN_IF_ERROR(
+      CreateCompressor(runtime_state, mem_pool, reuse, format, &comp));
+  compressor->reset(comp);
+  return Status::OK;
+}
+
+Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
+                               bool reuse, THdfsCompression::type format,
+                               Codec** compressor) {
   switch (format) {
     case THdfsCompression::NONE:
       *compressor = NULL;
       return Status::OK;
     case THdfsCompression::GZIP:
-      *compressor = new GzipCompressor(mem_pool, reuse, true);
+      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::GZIP);
       break;
     case THdfsCompression::DEFAULT:
-      *compressor = new GzipCompressor(mem_pool, reuse, false);
+      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::ZLIB);
+      break;
+    case THdfsCompression::DEFLATE:
+      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::DEFLATE);
       break;
     case THdfsCompression::BZIP2:
       *compressor = new BzipCompressor(mem_pool, reuse);
@@ -101,8 +114,8 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 }
 
 Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                       bool reuse, const string& codec,
-                                       scoped_ptr<Codec>* decompressor) {
+                                 bool reuse, const string& codec,
+                                 scoped_ptr<Codec>* decompressor) {
   map<const string, const THdfsCompression::type>::const_iterator
       type = CODEC_MAP.find(codec);
 
@@ -129,15 +142,18 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 }
 
 Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                       bool reuse, THdfsCompression::type format,
-                                       Codec** decompressor) {
+                                 bool reuse, THdfsCompression::type format,
+                                 Codec** decompressor) {
   switch (format) {
     case THdfsCompression::NONE:
       *decompressor = NULL;
       return Status::OK;
     case THdfsCompression::DEFAULT:
     case THdfsCompression::GZIP:
-      *decompressor = new GzipDecompressor(mem_pool, reuse);
+      *decompressor = new GzipDecompressor(mem_pool, reuse, false);
+      break;
+    case THdfsCompression::DEFLATE:
+      *decompressor = new GzipDecompressor(mem_pool, reuse, true);
       break;
     case THdfsCompression::BZIP2:
       *decompressor = new BzipDecompressor(mem_pool, reuse);

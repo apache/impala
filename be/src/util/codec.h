@@ -80,6 +80,11 @@ class Codec {
                                  bool reuse, THdfsCompression::type format,
                                  Codec** decompressor);
 
+  // Alternate creator: returns a scoped pointer.
+  static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
+                                 bool reuse, THdfsCompression::type format,
+                                 boost::scoped_ptr<Codec>* compressor);
+
   // Alternate creator: takes a codec string and returns a scoped pointer.
   // Input, as above except:
   //  codec: the string representing the codec of the current file.

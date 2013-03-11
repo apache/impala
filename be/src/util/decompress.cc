@@ -27,8 +27,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer) {
+GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate)
+  : Codec(mem_pool, reuse_buffer),
+    is_deflate_(is_deflate) {
   bzero(&stream_, sizeof(stream_));
 }
 
@@ -38,8 +39,9 @@ GzipDecompressor::~GzipDecompressor() {
 
 Status GzipDecompressor::Init() {
   int ret;
-  // Initialize to run either zlib or gzib inflate.
-  if ((ret = inflateInit2(&stream_, WINDOW_BITS | DETECT_CODEC)) != Z_OK) {
+  // Initialize to run either deflate or zlib/gzip format
+  int window_bits = is_deflate_ ? -WINDOW_BITS : WINDOW_BITS | DETECT_CODEC;
+  if ((ret = inflateInit2(&stream_, window_bits)) != Z_OK) {
     return Status("zlib inflateInit failed: " +  string(stream_.msg));
   }
 

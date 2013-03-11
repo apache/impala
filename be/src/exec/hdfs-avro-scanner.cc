@@ -120,11 +120,13 @@ Status HdfsAvroScanner::ParseMetadata() {
         string avro_codec(reinterpret_cast<char*>(value), value_len);
         if (avro_codec != AVRO_NULL_CODEC) {
           header_->is_compressed = true;
+          // This scanner doesn't use header_->codec (Avro doesn't use the
+          // Hadoop codec strings), but fill it in for logging
+          header_->codec = avro_codec;
           if (avro_codec == AVRO_SNAPPY_CODEC) {
-            header_->codec = Codec::SNAPPY_COMPRESSION;
             header_->compression_type = THdfsCompression::SNAPPY;
           } else if (avro_codec == AVRO_DEFLATE_CODEC) {
-            return Status("Deflate codec currently unsupported");
+            header_->compression_type = THdfsCompression::DEFLATE;
           } else {
             return Status("Unknown Avro compression codec: " + avro_codec);
           }
@@ -184,7 +186,7 @@ Status HdfsAvroScanner::ProcessRange() {
         context_, compressed_size, &compressed_data, &parse_status_));
 
     if (header_->is_compressed) {
-      if (header_->codec == Codec::SNAPPY_COMPRESSION) {
+      if (header_->compression_type == THdfsCompression::SNAPPY) {
         // Snappy-compressed data block includes trailing 4-byte checksum,
         // decompressor_ doesn't expect this
         compressed_size -= 4;
