@@ -37,7 +37,7 @@ public class CastExpr extends Expr {
     if (isImplicit) {
       type = targetType;
       OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
-          FunctionOperator.CAST, getChild(0).getType(), type);
+          FunctionOperator.CAST, true, getChild(0).getType(), type);
       Preconditions.checkState(match != null);
       Preconditions.checkState(match.returnType == type);
       this.opcode = match.opcode;
@@ -76,10 +76,11 @@ public class CastExpr extends Expr {
     // this cast may result in loss of precision, but the user requested it
     this.type = targetType;
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CAST, getChild(0).getType(), type);
-    if (match == null)
+        FunctionOperator.CAST, false, getChild(0).getType(), type);
+    if (match == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType);
+    }
     Preconditions.checkState(match.returnType == targetType);
     this.opcode = match.opcode;
   }

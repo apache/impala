@@ -181,7 +181,7 @@ public class CaseExpr extends Expr {
 
     // Set opcode based on whenType.
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CASE, whenType);
+        FunctionOperator.CASE, true, whenType);
     if (match == null) {
       throw new AnalysisException("Could not find match in function registry " +
           "for CASE and arg type: " + whenType);

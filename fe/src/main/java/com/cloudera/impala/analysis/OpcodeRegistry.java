@@ -198,12 +198,14 @@ public class OpcodeRegistry {
   }
 
   /**
-   * Query for a function in the registry, specifying the operation, 'op', and the arguments.
+   * Query for a function in the registry, specifying the operation, 'op', the arguments.
    * If there is no matching signature, null will be returned.
-   * If there is a match, the matching signature will be returned.  The matching signature does
-   * not have to match the input identically, implicit type promotion is allowed.
+   * If there is a match, the matching signature will be returned.
+   * If 'allowImplicitCasts' is true the matching signature does not have to match the
+   * input identically, implicit type promotion is allowed.
    */
-  public Signature getFunctionInfo(FunctionOperator op, PrimitiveType ... argTypes) {
+  public Signature getFunctionInfo(FunctionOperator op, boolean allowImplicitCasts,
+      PrimitiveType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
     // Take the last argument's type as the vararg type.
     Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
@@ -225,7 +227,8 @@ public class OpcodeRegistry {
     for (Signature signature : signatures) {
       if (search.equals(signature)) {
         return signature;
-      } else if (compatibleMatch == null && signature.isCompatible(search)) {
+      } else if (allowImplicitCasts && compatibleMatch == null
+          && signature.isCompatible(search)) {
         compatibleMatch = signature;
       }
     }

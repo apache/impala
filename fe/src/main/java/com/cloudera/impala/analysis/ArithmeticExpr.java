@@ -118,7 +118,7 @@ public class ArithmeticExpr extends Expr {
     if (op == Operator.BITNOT) {
       type = getChild(0).getType();
       OpcodeRegistry.Signature match =
-        OpcodeRegistry.instance().getFunctionInfo(op.functionOp, type);
+        OpcodeRegistry.instance().getFunctionInfo(op.functionOp, true, type);
       if (match == null) {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point types: "
             + toSql());
@@ -168,7 +168,7 @@ public class ArithmeticExpr extends Expr {
 
     type = castBinaryOp(type);
     OpcodeRegistry.Signature match =
-      OpcodeRegistry.instance().getFunctionInfo(op.toFunctionOp(), type, type);
+      OpcodeRegistry.instance().getFunctionInfo(op.toFunctionOp(), true, type, type);
     this.opcode = match.opcode;
   }
 }

@@ -64,7 +64,7 @@ public class FunctionCallExpr extends Expr {
       argTypes[i] = this.children.get(i).getType();
     }
     OpcodeRegistry.Signature match =
-      OpcodeRegistry.instance().getFunctionInfo(op, argTypes);
+      OpcodeRegistry.instance().getFunctionInfo(op, true, argTypes);
     if (match == null) {
       String error = "No matching function with those arguments: " + functionName
         + Joiner.on(", ").join(argTypes) + ")";

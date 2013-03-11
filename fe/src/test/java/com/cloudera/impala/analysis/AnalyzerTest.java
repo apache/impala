@@ -973,8 +973,13 @@ public class AnalyzerTest {
   @Test
   public void TestStringCasts() throws AnalysisException {
     // No implicit cast from STRING to numeric and boolean
-    AnalysisError("select * from functional.alltypes where tinyint_col = '1'");
-    AnalysisError("select * from functional.alltypes where bool_col = '0'");
+    AnalysisError("select * from functional.alltypes where tinyint_col = '1'",
+        "operands are not comparable: tinyint_col = '1'");
+    AnalysisError("select * from functional.alltypes where bool_col = '0'",
+        "operands are not comparable: bool_col = '0'");
+    // No explicit cast from STRING to boolean.
+    AnalysisError("select cast('false' as boolean) from functional.alltypes",
+        "Invalid type cast of 'false' from STRING to BOOLEAN");
 
     AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('0.5' as float)");
@@ -1521,10 +1526,10 @@ public class AnalyzerTest {
 
     // if() only accepts three arguments
     // TODO: Fix the Analysis error message, it does not include a left paren/space
-    AnalysisError("select if(true, false, true, true)", 
+    AnalysisError("select if(true, false, true, true)",
         "No matching function with those arguments: ifBOOLEAN, BOOLEAN, BOOLEAN, " +
         "BOOLEAN)");
-    AnalysisError("select if(true, false)", 
+    AnalysisError("select if(true, false)",
         "No matching function with those arguments: ifBOOLEAN, BOOLEAN)");
     AnalysisError("select if(false)",
         "No matching function with those arguments: ifBOOLEAN)");

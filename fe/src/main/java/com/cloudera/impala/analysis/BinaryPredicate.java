@@ -103,7 +103,7 @@ public class BinaryPredicate extends Predicate {
     castBinaryOp(compatibleType);
 
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
-        op.toFunctionOp(), compatibleType, compatibleType);
+        op.toFunctionOp(), true, compatibleType, compatibleType);
     Preconditions.checkState(match != null);
     Preconditions.checkState(match.returnType == PrimitiveType.BOOLEAN);
     this.opcode = match.opcode;
