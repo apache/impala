@@ -28,7 +28,7 @@ def calculate_stddev(values):
   avg = calculate_avg(values)
   return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
 
-def calculate_mean(self, values):
+def calculate_mean(values):
   """Return the mean of a numeric iterable."""
   sorted_values = sorted(values)
   length = len(sorted_values)
