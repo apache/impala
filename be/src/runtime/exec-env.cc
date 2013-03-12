@@ -23,7 +23,7 @@
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/disk-io-mgr.h"
-#include "runtime/hbase-table-cache.h"
+#include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-limit.h"
 #include "statestore/simple-scheduler.h"
@@ -50,7 +50,7 @@ ExecEnv::ExecEnv()
     subscription_mgr_(new SubscriptionManager()),
     client_cache_(new ImpalaInternalServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
-    htable_cache_(new HBaseTableCache()),
+    htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     metrics_(new Metrics()),

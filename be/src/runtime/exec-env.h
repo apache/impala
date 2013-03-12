@@ -28,7 +28,7 @@ namespace impala {
 
 class DataStreamMgr;
 class DiskIoMgr;
-class HBaseTableCache;
+class HBaseTableFactory;
 class HdfsFsCache;
 class Scheduler;
 class SubscriptionManager;
@@ -53,7 +53,7 @@ class ExecEnv {
   DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
   ImpalaInternalServiceClientCache* client_cache() { return client_cache_.get(); }
   HdfsFsCache* fs_cache() { return fs_cache_.get(); }
-  HBaseTableCache* htable_cache() { return htable_cache_.get(); }
+  HBaseTableFactory* htable_factory() { return htable_factory_.get(); }
   DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   Metrics* metrics() { return metrics_.get(); }
@@ -73,7 +73,7 @@ class ExecEnv {
   boost::scoped_ptr<SubscriptionManager> subscription_mgr_;
   boost::scoped_ptr<ImpalaInternalServiceClientCache> client_cache_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
-  boost::scoped_ptr<HBaseTableCache> htable_cache_;
+  boost::scoped_ptr<HBaseTableFactory> htable_factory_;
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<Metrics> metrics_;

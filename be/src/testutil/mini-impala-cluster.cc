@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
 
   EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTableCache::Init());
+  EXIT_IF_ERROR(HBaseTableFactory::Init());
   InitFeSupport();
 
   // Create an in-process Impala server and in-process backends for test environment.

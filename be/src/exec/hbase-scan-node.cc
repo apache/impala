@@ -55,7 +55,7 @@ bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
-  hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_cache(), state));
+  hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
   tuple_pool_->set_limits(*state->mem_limits());
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);

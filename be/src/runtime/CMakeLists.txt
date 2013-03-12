@@ -28,7 +28,7 @@ add_library(Runtime STATIC
   disk-io-mgr.cc
   disk-io-mgr-stress.cc
   exec-env.cc
-  hbase-table-cache.cc
+  hbase-table-factory.cc
   hdfs-fs-cache.cc
   mem-pool.cc
   parallel-executor.cc

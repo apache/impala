@@ -22,7 +22,7 @@
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/scan-node.h"
-#include "runtime/hbase-table-cache.h"
+#include "runtime/hbase-table-factory.h"
 
 namespace impala {
 
@@ -46,7 +46,7 @@ class HBaseTableScanner {
   // Initialize all members to NULL, except ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
-  HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htable_cache,
+  HBaseTableScanner(ScanNode* scan_node, HBaseTableFactory* htable_factory,
                     RuntimeState* state);
 
   // JNI setup. Create global references to classes,
@@ -157,8 +157,8 @@ class HBaseTableScanner {
   static jobject must_pass_all_op_;
   static jobjectArray compare_ops_;
 
-  // HBase Table cache from runtime state.
-  HBaseTableCache* htable_cache_;
+  // HBase Table factory from runtime state.
+  HBaseTableFactory* htable_factory_;
 
   // Vector of ScanRange
   const ScanRangeVector* scan_range_vector_;
