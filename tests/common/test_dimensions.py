@@ -83,12 +83,10 @@ class TableFormatInfo(object):
 #11: partition_agg (bool)
 
 # Common sets of values for the exec option vectors
-ALL_BATCH_SIZES = [0, 16, 1]
-SMALL_BATCH_SIZES = [16, 1]
-
-ALL_CLUSTER_SIZES = [1, 2]
+ALL_BATCH_SIZES = [0, 1, 16]
+ALL_CLUSTER_SIZES = [0, 1]
 SINGLE_NODE_ONLY = [1]
-ALL_NODES_ONLY = [2]
+ALL_NODES_ONLY = [0]
 
 ALL_DISABLE_CODEGEN_OPTIONS = [True, False]
 

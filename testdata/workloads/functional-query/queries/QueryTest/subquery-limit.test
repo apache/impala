@@ -1,6 +1,6 @@
 # limit in subquery
 ---- QUERY
-select count(*) from (select * from functional.alltypessmall limit 10) a
+select count(*) from (select * from alltypessmall limit 10) a
 ---- TYPES
 BIGINT
 ---- RESULTS
@@ -10,7 +10,7 @@ BIGINT
 # predicate is not applied in subquery
 ---- QUERY
 select *
-from (select * from functional.alltypessmall order by id limit 10) a
+from (select * from alltypessmall order by id limit 10) a
 where bool_col = true
 ---- TYPES
 INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
@@ -26,7 +26,7 @@ INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, S
 ---- QUERY
 select *
 from (
-    select a.* from functional.alltypessmall a join functional.alltypessmall using (id)
+    select a.* from alltypessmall a join alltypessmall using (id)
     order by a.id limit 10
   ) a
 where bool_col = true
@@ -41,9 +41,9 @@ INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, S
 ====
 ---- QUERY
 # join against subquery with limit creates a merge fragment that applies the limit
-select functional.alltypes.id, a.id
-from functional.alltypes
-join (select id from functional.alltypessmall order by id limit 10) a using (id)
+select alltypes.id, a.id
+from alltypes
+join (select id from alltypessmall order by id limit 10) a using (id)
 ---- TYPES
 INT, INT
 ---- RESULTS
@@ -61,11 +61,11 @@ INT, INT
 ---- QUERY
 # join against subquery with limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
-select functional.alltypes.id, a.id
-from functional.alltypes
+select alltypes.id, a.id
+from alltypes
   join (
     select a.id, a.bool_col
-    from functional.alltypessmall a join functional.alltypessmall using (id)
+    from alltypessmall a join alltypessmall using (id)
     order by a.id limit 10
   ) a using (id)
 where a.bool_col = true order by a.id limit 5

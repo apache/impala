@@ -38,6 +38,10 @@ def pytest_addoption(parser):
   parser.addoption("--use_kerberos", action="store_true", default=False,
                    help="Use kerberos transport for running tests")
 
+  parser.addoption("--sanity", action="store_true", default=False,
+                   help="Runs a single test vector from each test to provide a quick "\
+                   "sanity check at the cost of lower test coverage.")
+
 def pytest_assertrepr_compare(op, left, right):
   """
   Provides a hook for outputting type-specific assertion messages
@@ -80,9 +84,10 @@ def pytest_generate_tests(metafunc):
       LOG.warning('No test vectors generated. Check constraints and input vectors')
 
     vector_names = map(str, vectors)
-    # In the case this is a test result update, just select a single test vector to run
-    # the results are expected to be the same in all cases
-    if metafunc.config.option.update_results:
+    # In the case this is a test result update or sanity run, select a single test vector
+    # to run. This is okay for update_results because results are expected to be the same
+    # for all test vectors.
+    if metafunc.config.option.update_results or metafunc.config.option.sanity:
       vectors = vectors[0:1]
       vector_names = vector_names[0:1]
     metafunc.parametrize('vector', vectors, ids=vector_names)

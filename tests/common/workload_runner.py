@@ -186,7 +186,8 @@ class WorkloadRunner(object):
     if len(results) == 1:
       return final_result
     final_result.avg_time = calculate_median([result.avg_time for result in results])
-    final_result.std_dev = calculate_median([result.std_dev for result in results])
+    if self.iterations > 1:
+      final_result.std_dev = calculate_median([result.std_dev for result in results])
     return final_result
 
   @staticmethod

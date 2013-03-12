@@ -39,7 +39,7 @@ WHERE l_comment LIKE '%egular courts above the%'
 ---- TYPES
 BIGINT
 ====
----- QUERY: PERF_STRING-Q5
+---- QUERY: PERF_STRING-Q6
 SELECT count(*) FROM lineitem
 WHERE l_comment LIKE 'egular courts above th%e'
 ---- RESULTS
