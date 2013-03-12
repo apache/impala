@@ -141,7 +141,10 @@ class DataStreamSender::Channel {
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
-  return client_cache_->GetClient(MakeNetworkAddress(ipaddress_, port_), &client_);
+  Status status = client_cache_->GetClient(
+      MakeNetworkAddress(ipaddress_, port_), &client_);
+  if (!status.ok()) client_ = NULL;
+  return status;
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
@@ -157,6 +160,7 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
 
 void DataStreamSender::Channel::TransmitData() {
   DCHECK(in_flight_batch_ != NULL);
+  DCHECK(client_ != NULL);
   try {
     VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
              << " dest_node=" << dest_node_id_
@@ -242,6 +246,12 @@ Status DataStreamSender::Channel::Close() {
   VLOG_RPC << "Channel::Close() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
+  if (client_ == NULL) {
+    DCHECK_EQ(batch_->num_rows(), 0);
+    DCHECK(rpc_status_.ok());
+    return Status::OK;
+  }
+
   if (batch_->num_rows() > 0) {
     // flush
     RETURN_IF_ERROR(SendCurrentBatch());
