@@ -151,7 +151,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
         &len, &unparsed_data_buffer_));
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
-    int size = SerDeUtils::GetVLong(*record_ptr, record_len);
+    int size = ReadWriteUtil::GetVLong(*record_ptr, record_len);
     if (size == -1) {
         stringstream ss;
         ss << "Invalid record size";
@@ -257,7 +257,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   int field_location_offset = 0;
   for (int i = 0; i < num_to_commit; ++i) {
     DCHECK_LT(i, record_locations_.size());
-    int bytes_read = SerDeUtils::GetVLong(
+    int bytes_read = ReadWriteUtil::GetVLong(
         next_record_in_compressed_block_, &record_locations_[i].len);
     if (UNLIKELY(bytes_read == -1)) {
       stringstream ss;
@@ -409,7 +409,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   if (memcmp(header, SEQFILE_VERSION_HEADER, sizeof(SEQFILE_VERSION_HEADER))) {
     stringstream ss;
     ss << "Invalid SEQFILE_VERSION_HEADER: '"
-       << SerDeUtils::HexDump(header, sizeof(SEQFILE_VERSION_HEADER)) << "'";
+       << ReadWriteUtil::HexDump(header, sizeof(SEQFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
 

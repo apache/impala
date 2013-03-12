@@ -56,7 +56,6 @@ add_library(Exec STATIC
   scan-node.cc
   scanner-context.cc
   select-node.cc
-  serde-utils.cc
   text-converter.cc
   topn-node.cc
 )

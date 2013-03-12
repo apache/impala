@@ -17,6 +17,7 @@
 #include <iostream>
 #include <limits.h>
 #include <gtest/gtest.h>
+#include "common/status.h"
 #include "exec/read-write-util.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
@@ -29,25 +30,38 @@ void TestZInt(int32_t value) {
   uint8_t buf[ReadWriteUtil::MAX_ZINT_LEN];
   int plen = ReadWriteUtil::PutZInt(value, static_cast<uint8_t*>(buf));
   EXPECT_TRUE(plen <= ReadWriteUtil::MAX_ZINT_LEN);
-  int32_t output;
-  int glen = ReadWriteUtil::GetZInt(static_cast<uint8_t*>(buf), &output);
-  EXPECT_EQ(plen, glen);
-  EXPECT_EQ(value, output);
+
+  uint8_t* buf_ptr = static_cast<uint8_t*>(buf);
+  int buf_len = sizeof(buf);
+  int32_t val;
+  Status status;
+  bool success = ReadWriteUtil::ReadZInt(&buf_ptr, &buf_len, &val, &status);
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(status.ok());
+  EXPECT_GE(buf_len, 0);
+  EXPECT_LT(buf_len, sizeof(buf));
+  EXPECT_EQ(value, val);
 }
 
 void TestZLong(int64_t value) {
   uint8_t buf[ReadWriteUtil::MAX_ZLONG_LEN];
   int plen = ReadWriteUtil::PutZLong(value, static_cast<uint8_t*>(buf));
   EXPECT_TRUE(plen <= ReadWriteUtil::MAX_ZLONG_LEN);
-  int64_t output;
-  int glen = ReadWriteUtil::GetZLong(static_cast<uint8_t*>(buf), &output);
-  EXPECT_EQ(plen, glen);
-  EXPECT_EQ(value, output);
+
+  uint8_t* buf_ptr = static_cast<uint8_t*>(buf);
+  int buf_len = sizeof(buf);
+  int64_t val;
+  Status status;
+  bool success = ReadWriteUtil::ReadZLong(&buf_ptr, &buf_len, &val, &status);
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(status.ok());
+  EXPECT_GE(buf_len, 0);
+  EXPECT_LT(buf_len, sizeof(buf));
+  EXPECT_EQ(value, val);
 }
 
-
 // Test put and get of zigzag integers and longs.
-TEST(ZigzagTest, Basic) { 
+TEST(ZigzagTest, Basic) {
   // Test min/max of all sizes.
   TestZInt(0);
   TestZInt(INT_MAX);
@@ -71,7 +85,23 @@ TEST(ZigzagTest, Basic) {
     TestZLong(value);
     TestZLong((static_cast<int64_t>(value) << 32) | value);
   }
+}
 
+TEST(ZigzagTest, Failure) {
+  uint8_t* buf;
+  int buf_len = 0;
+  int32_t val32;
+  Status status;
+  bool success = ReadWriteUtil::ReadZInt(&buf, &buf_len, &val32, &status);
+  EXPECT_FALSE(success);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(buf_len, 0);
+
+  int64_t val64;
+  success = ReadWriteUtil::ReadZLong(&buf, &buf_len, &val64, &status);
+  EXPECT_FALSE(success);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(buf_len, 0);
 }
 }
 
@@ -80,4 +110,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

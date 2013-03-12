@@ -5,8 +5,7 @@
 #include <boost/algorithm/string.hpp>
 #include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/serde-utils.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "util/debug-util.h"

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "util/compress.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 #include "runtime/runtime-state.h"
 
 // Codec libraries
@@ -166,7 +166,7 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
 
   uint8_t* outp = out_buffer_;
   uint8_t* sizep;
-  SerDeUtils::PutInt(outp, input_length);
+  ReadWriteUtil::PutInt(outp, input_length);
   outp += sizeof (int32_t);
   do {
     // Point at the spot to store the compressed size.
@@ -176,7 +176,7 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
     snappy::RawCompress(reinterpret_cast<const char*>(input),
         static_cast<size_t>(block_size), reinterpret_cast<char*>(outp), &size);
 
-    SerDeUtils::PutInt(sizep, size);
+    ReadWriteUtil::PutInt(sizep, size);
     input += block_size;
     input_length -= block_size;
     outp += size;

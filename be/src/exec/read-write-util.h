@@ -17,64 +17,23 @@
 #define IMPALA_EXEC_READ_WRITE_UTIL_H
 
 #include <boost/cstdint.hpp>
+#include <sstream>
 #include "common/logging.h"
+#include "common/status.h"
 
 namespace impala {
+
+#define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
 // Class for reading and writing various data types supported by Trevni and Avro.
 class ReadWriteUtil {
  public:
+  // Maximum length for Writeable VInt
+  static const int MAX_VINT_LEN = 9;
+
   // Maximum lengths for Zigzag encodings.
   const static int MAX_ZINT_LEN = 5;
   const static int MAX_ZLONG_LEN = 10;
-
-  // Return an integer from a buffer, stored little endian.
-  static int32_t GetInt(uint8_t* buf) {
-    return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
-  }
-
-  // Return a long from a buffer, stored little endian.
-  static int64_t GetLong(uint8_t* buf) {
-    return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24) |
-        (static_cast<int64_t>(buf[4]) << 32) |
-        (static_cast<int64_t>(buf[5]) << 40) |
-        (static_cast<int64_t>(buf[6]) << 48) |
-        (static_cast<int64_t>(buf[7]) << 56);
-  }
-
-  // Get a zigzag encoded long integer from a buffer and return its length.
-  // This is the integer encoding defined by google.com protocol-buffers:
-  // https://developers.google.com/protocol-buffers/docs/encoding
-  static int GetZLong(uint8_t* buf, int64_t* value) {
-    uint64_t zlong = 0;
-    int shift = 0;
-    uint8_t* bp = buf;
-
-    do {
-      DCHECK_LE(shift, 64);
-      zlong |= static_cast<uint64_t>(*bp & 0x7f) << shift;
-      shift += 7;
-    } while ((*(bp++) & 0x80) != 0);
-
-    *value = (zlong >> 1) ^ -(zlong & 1);
-    return bp - buf;
-  }
-
-  // Get a zigzag encoded integer from a buffer and return its length.
-  static int GetZInt(uint8_t* buf, int32_t* integer) {
-    uint32_t zint = 0;
-    int shift = 0;
-    uint8_t* bp = buf;
-
-    do {
-      DCHECK_LE(shift, 32);
-      zint |= static_cast<uint32_t>(*bp & 0x7f) << shift;
-      shift += 7;
-    } while (*(bp++) & 0x80);
-
-    *integer = (zint >> 1) ^ -(zint & 1);
-    return bp - buf;
-  }
 
   // Put a zigzag encoded integer into a buffer and return its length.
   static int PutZInt(int32_t integer, uint8_t* buf);
@@ -82,26 +41,183 @@ class ReadWriteUtil {
   // Put a zigzag encoded long integer into a buffer and return its length.
   static int PutZLong(int64_t longint, uint8_t* buf);
 
-  // Put an integer into a buffer in little endian order.
-  static void PutInt(int32_t integer, uint8_t* buf) {
-    buf[0] = integer;
-    buf[1] = integer >> 8;
-    buf[2] = integer >> 16;
-    buf[3] = integer >> 24;
+  // Get a big endian integer from a buffer.  The buffer does not have to be word aligned.
+  static int32_t GetInt(const uint8_t* buffer);
+  static int16_t GetSmallInt(const uint8_t* buffer);
+  static int64_t GetLongInt(const uint8_t* buffer);
+
+  // Get a variable-length Long or int value from a byte buffer.
+  // Returns the length of the long/int
+  // If the size byte is corrupted then return -1;
+  static int GetVLong(uint8_t* buf, int64_t* vlong);
+  static int GetVInt(uint8_t* buf, int32_t* vint);
+
+  // Read a variable-length Long value from a byte buffer starting at the specified
+  // byte offset.
+  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
+
+  // Put an Integer into a buffer in big endian order .  The buffer must be at least
+  // 4 bytes long.
+  static void PutInt(uint8_t* buf, int32_t integer);
+
+  // Dump the first length bytes of buf to a Hex string.
+  static std::string HexDump(const uint8_t* buf, int64_t length);
+  static std::string HexDump(const char* buf, int64_t length);
+
+  // Determines the sign of a VInt/VLong from the first byte.
+  static bool IsNegativeVInt(int8_t byte);
+
+  // Determines the total length in bytes of a Writable VInt/VLong from the first byte.
+  static int DecodeVIntSize(int8_t byte);
+
+  // The following methods read data from a buffer without assuming the buffer is long
+  // enough. If the buffer isn't long enough or another error occurs, they return false
+  // and update the status with the error. Otherwise they return true. buffer is advanced
+  // past the data read and buf_len is decremented appropriately.
+
+  // Read a zig-zag encoded long. This is the integer encoding defined by google.com
+  // protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
+  static bool ReadZLong(uint8_t** buf, int* buf_len, int64_t* val, Status* status);
+
+  // Read a zig-zag encoded int.
+  static bool ReadZInt(uint8_t** buf, int* buf_len, int32_t* val, Status* status);
+
+  // Read a native type T (e.g. bool, float) directly into output (i.e. input is cast
+  // directly to T and incremented by sizeof(T)).
+  template <class T>
+  static bool Read(uint8_t** buf, int* buf_len, T* val, Status* status);
+
+  // Skip the next num_bytes bytes.
+  static bool SkipBytes(uint8_t** buf, int* buf_len, int num_bytes, Status* status);
+};
+
+inline int16_t ReadWriteUtil::GetSmallInt(const uint8_t* buf) {
+  return (buf[0] << 8) | buf[1];
+}
+
+inline int32_t ReadWriteUtil::GetInt(const uint8_t* buf) {
+  return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+}
+
+inline int64_t ReadWriteUtil::GetLongInt(const uint8_t* buf) {
+  return (static_cast<int64_t>(buf[0]) << 56) |
+      (static_cast<int64_t>(buf[1]) << 48) |
+      (static_cast<int64_t>(buf[2]) << 40) |
+      (static_cast<int64_t>(buf[3]) << 32) |
+      (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
+}
+
+inline void ReadWriteUtil::PutInt(uint8_t* buf, int32_t integer) {
+  buf[0] = integer >> 24;
+  buf[1] = integer >> 16;
+  buf[2] = integer >> 8;
+  buf[3] = integer;
+}
+
+inline int ReadWriteUtil::GetVInt(uint8_t* buf, int32_t* vint) {
+  int64_t vlong = 0;
+  int len = GetVLong(buf, &vlong);
+  *vint = static_cast<int32_t>(vlong);
+  return len;
+}
+
+inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t* vlong) {
+  return GetVLong(buf, 0, vlong);
+}
+
+inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong) {
+  int8_t firstbyte = (int8_t) buf[0 + offset];
+
+  int len = DecodeVIntSize(firstbyte);
+  if (len > MAX_VINT_LEN) return -1;
+  if (len == 1) {
+    *vlong = static_cast<int64_t>(firstbyte);
+    return len;
   }
 
-  // Put a long integer into a buffer in little endian order.
-  static void PutLong(int64_t longint, uint8_t* buf) {
-    buf[0] = longint;
-    buf[1] = longint >> 8;
-    buf[2] = longint >> 16;
-    buf[3] = longint >> 24;
-    buf[4] = longint >> 32;
-    buf[5] = longint >> 40;
-    buf[6] = longint >> 48;
-    buf[7] = longint >> 56;
+  *vlong &= ~*vlong;
+
+  for (int i = 1; i < len; i++) {
+    *vlong = (*vlong << 8) | buf[i+offset];
   }
-};
+
+  if (IsNegativeVInt(firstbyte)) {
+    *vlong = *vlong ^ ((int64_t) - 1);
+  }
+
+  return len;
+}
+
+inline bool ReadWriteUtil::ReadZInt(uint8_t** buf, int* buf_len, int32_t* val,
+                                    Status* status) {
+  int64_t zlong;
+  RETURN_IF_FALSE(ReadZLong(buf, buf_len, &zlong, status));
+  *val = static_cast<int32_t>(zlong);
+  return true;
+}
+
+inline bool ReadWriteUtil::ReadZLong(uint8_t** buf, int* buf_len, int64_t* val,
+                                     Status* status) {
+  uint64_t zlong = 0;
+  int shift = 0;
+  bool more;
+  do {
+    DCHECK_LE(shift, 64);
+    if (UNLIKELY(*buf_len < 1)) {
+      *status = Status("Insufficient buffer length");
+      return false;
+    }
+    zlong |= static_cast<uint64_t>(**buf & 0x7f) << shift;
+    shift += 7;
+    more = (**buf & 0x80) != 0;
+    ++(*buf);
+    --(*buf_len);
+  } while (more);
+  *val = (zlong >> 1) ^ -(zlong & 1);
+  return true;
+}
+
+template <class T>
+inline bool ReadWriteUtil::Read(uint8_t** buf, int* buf_len, T* val, Status* status) {
+  int val_len = sizeof(T);
+  if (UNLIKELY(val_len > *buf_len)) {
+    std::stringstream ss;
+    ss << "Cannot read " << val_len << " bytes, buffer length is " << *buf_len;
+    *status = Status(ss.str());
+    return false;
+  }
+  *val = *reinterpret_cast<T*>(*buf);
+  *buf += val_len;
+  *buf_len -= val_len;
+  return true;
+}
+
+inline bool ReadWriteUtil::SkipBytes(uint8_t** buf, int* buf_len, int num_bytes,
+                                     Status* status) {
+  DCHECK_GE(*buf_len, 0);
+  if (UNLIKELY(num_bytes > *buf_len)) {
+    std::stringstream ss;
+    ss << "Cannot skip " << num_bytes << " bytes, buffer length is " << *buf_len;
+    *status = Status(ss.str());
+    return false;
+  }
+  *buf += num_bytes;
+  *buf_len -= num_bytes;
+  return true;
+}
+
+inline bool ReadWriteUtil::IsNegativeVInt(int8_t byte) {
+  return byte < -120 || (byte >= -112 && byte < 0);
+}
+
+inline int ReadWriteUtil::DecodeVIntSize(int8_t byte) {
+  if (byte >= -112) {
+    return 1;
+  } else if (byte < -120) {
+    return -119 - byte;
+  }
+  return -111 - byte;
+}
 
 }
 #endif

@@ -14,7 +14,7 @@
 
 #include <boost/assign/list_of.hpp>
 #include "util/decompress.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/Descriptors_types.h"
 
@@ -232,7 +232,7 @@ static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_onl
   
   int uncompressed_total_len = 0;
   while (input_len > 0) {
-    size_t uncompressed_block_len = SerDeUtils::GetInt(input);
+    size_t uncompressed_block_len = ReadWriteUtil::GetInt(input);
     input += sizeof(int32_t);
     input_len -= sizeof(int32_t);
 
@@ -254,7 +254,7 @@ static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_onl
 
     while (uncompressed_block_len > 0) {
       // Read the length of the next snappy compressed block.
-      size_t compressed_len = SerDeUtils::GetInt(input);
+      size_t compressed_len = ReadWriteUtil::GetInt(input);
       input += sizeof(int32_t);
       input_len -= sizeof(int32_t);
 

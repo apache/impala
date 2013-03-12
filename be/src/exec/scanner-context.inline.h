@@ -17,7 +17,7 @@
 #define IMPALA_EXEC_SCANNER_CONTEXT_INLINE_H
 
 #include "exec/scanner-context.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 
 using namespace impala;
 
@@ -75,7 +75,7 @@ inline bool ScannerContext::Stream::ReadBoolean(bool* b, Status* status) {
 inline bool ScannerContext::Stream::ReadInt(int32_t* val, Status* status) {
   uint8_t* bytes;
   RETURN_IF_FALSE(ReadBytes(sizeof(int32_t), &bytes, status));
-  *val = SerDeUtils::GetInt(bytes);
+  *val = ReadWriteUtil::GetInt(bytes);
   return true;
 }
 
@@ -92,8 +92,8 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
 
   RETURN_IF_FALSE(ReadBytes(1, reinterpret_cast<uint8_t**>(&firstbyte), status));
 
-  int len = SerDeUtils::DecodeVIntSize(*firstbyte);
-  if (len > SerDeUtils::MAX_VINT_LEN) {
+  int len = ReadWriteUtil::DecodeVIntSize(*firstbyte);
+  if (len > ReadWriteUtil::MAX_VINT_LEN) {
     *status = Status("ReadVLong: size is too big");
     return false;
   }
@@ -112,7 +112,7 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
     *value = (*value << 8) | (bytes[i] & 0xFF);
   }
 
-  if (SerDeUtils::IsNegativeVInt(*firstbyte)) {
+  if (ReadWriteUtil::IsNegativeVInt(*firstbyte)) {
     *value = *value ^ (static_cast<int64_t>(-1));
   }
   return true;

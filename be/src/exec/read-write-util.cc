@@ -51,3 +51,15 @@ int ReadWriteUtil::PutZLong(int64_t longint, uint8_t* buf) {
   return len;
 }
 
+string ReadWriteUtil::HexDump(const uint8_t* buf, int64_t length) {
+  stringstream ss;
+  ss << std::hex;
+  for (int i = 0; i < length; ++i) {
+    ss << static_cast<int>(buf[i]) << " ";
+  }
+  return ss.str();
+}
+
+string ReadWriteUtil::HexDump(const char* buf, int64_t length) {
+  return HexDump(reinterpret_cast<const uint8_t*>(buf), length);
+}

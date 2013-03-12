@@ -17,7 +17,7 @@
 #include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scanner-context.inline.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"

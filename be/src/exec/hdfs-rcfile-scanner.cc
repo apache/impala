@@ -107,7 +107,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   } else {
     stringstream ss;
     ss << "Invalid RCFILE_VERSION_HEADER: '"
-       << SerDeUtils::HexDump(header, sizeof(RCFILE_VERSION_HEADER)) << "'";
+       << ReadWriteUtil::HexDump(header, sizeof(RCFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
   
@@ -324,7 +324,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
 
   row_group_length_ = 0;
   uint8_t* key_buf_ptr = key_buffer;
-  int bytes_read = SerDeUtils::GetVInt(key_buf_ptr, &num_rows_);
+  int bytes_read = ReadWriteUtil::GetVInt(key_buf_ptr, &num_rows_);
   key_buf_ptr += bytes_read;
 
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
@@ -340,14 +340,14 @@ void HdfsRCFileScanner::GetCurrentKeyBuffer(int col_idx, bool skip_col_data,
                                             uint8_t** key_buf_ptr) {
   ColumnInfo& col_info = columns_[col_idx];
 
-  int bytes_read = SerDeUtils::GetVInt(*key_buf_ptr, &col_info.buffer_len);
+  int bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.buffer_len);
   *key_buf_ptr += bytes_read;
 
-  bytes_read = SerDeUtils::GetVInt(*key_buf_ptr, &col_info.uncompressed_buffer_len);
+  bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.uncompressed_buffer_len);
   *key_buf_ptr += bytes_read;
 
   int col_key_buf_len;
-  bytes_read = SerDeUtils::GetVInt(*key_buf_ptr , &col_key_buf_len);
+  bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr , &col_key_buf_len);
   *key_buf_ptr += bytes_read;
 
   if (!skip_col_data) {
@@ -371,7 +371,7 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
     // Get the next column length or repeat count
     int64_t length = 0;
     uint8_t* col_key_buf = col_info.key_buffer;
-    int bytes_read = SerDeUtils::GetVLong(col_key_buf, col_info.key_buffer_pos, &length);
+    int bytes_read = ReadWriteUtil::GetVLong(col_key_buf, col_info.key_buffer_pos, &length);
     if (bytes_read == -1) {
         int64_t position = stream_->file_offset();
         stringstream ss;

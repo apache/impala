@@ -38,30 +38,24 @@
 //     - serialized objects
 //     - sync marker
 //
-
-// This implementation reads one data block at a time, using the Avro decoder
-// provided in the Avro C++ library to decode the serialized objects (the
-// decoder doesn't read from the scan range context directly -- the serialized
-// blob is read from the context and passed into the decoder via Avro's
-// MemoryInputStream).
+//
+// This implementation reads one data block at a time, using the schema from the
+// file header to decode the serialized objects. If possible, non-materialized
+// columns are skipped without being read. The Avro C++ library is used to parse
+// the JSON schema into a ValidSchema object, which is then transformed into our
+// own schema representation.
 //
 // TODO:
+// - implement SkipComplex()
 // - codegen
-// - super high performance Avro decoder
 
 #include "exec/base-sequence-scanner.h"
 
-// TODO: figure out how to forward declare this
-#include <ValidSchema.hh>
-#include "exec/scanner-context.h"
-#include "exec/serde-utils.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 
 namespace avro {
-  class Decoder;
-  class GenericDatum;
-  class GenericRecord;
+  class Node;
 }
 
 namespace impala {
@@ -76,20 +70,51 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   virtual ~HdfsAvroScanner();
 
  protected:
-  // Implementation of sequence container super class methods
+  // Implementation of BaseSeqeunceScanner super class methods
+  virtual Status Prepare();
   virtual FileHeader* AllocateFileHeader();
   // TODO: check that file schema matches metadata schema
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
-  
-  virtual THdfsFileFormat::type file_format() const { 
-    return THdfsFileFormat::AVRO; 
+
+  virtual THdfsFileFormat::type file_format() const {
+    return THdfsFileFormat::AVRO;
   }
 
  private:
+  struct SchemaElement {
+    enum Type {
+      NULL_TYPE,
+      BOOLEAN,
+      INT,
+      LONG,
+      FLOAT,
+      DOUBLE,
+      BYTES,
+      STRING,
+      COMPLEX_TYPE, // marker dividing primitive from complex (nested) types
+      RECORD,
+      ENUM,
+      ARRAY,
+      MAP,
+      UNION,
+      FIXED,
+    } type;
+
+    // Complex types, e.g. records, may have nested child types
+    std::vector<SchemaElement> children;
+
+    // Avro supports nullable types via unions of the form [<type>, "null"]. We
+    // special case nullable primitives by storing which position "null"
+    // occupies in the union and setting type to the primitive, rather than
+    // UNION. null_union_position is set to 0 or 1 accordingly if this type is a
+    // union between a primitive type and "null", and -1 otherwise.
+    int null_union_position;
+  };
+
   struct AvroFileHeader : public BaseSequenceScanner::FileHeader {
-    avro::ValidSchema schema;
+    std::vector<SchemaElement> schema;
   };
 
   AvroFileHeader* avro_header_;
@@ -103,30 +128,51 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const std::string AVRO_SNAPPY_CODEC;
   static const std::string AVRO_DEFLATE_CODEC;
 
+  // Vector of slot descriptors indexed by table column number, not including partition
+  // columns. Non-materialized columns have NULL descriptors.
+  std::vector<const SlotDescriptor*> slot_descs_;
+
   // Utility function for decoding and parsing file header metadata
   Status ParseMetadata();
 
+  // Utility function that maps the Avro library's type representation to our
+  // own. Used to convert a ValidSchema to a vector of SchemaElements.
+  SchemaElement ConvertSchemaNode(const avro::Node& node);
+
   // Decodes records, copies the data into tuples, and commits the tuple rows.
-  // - decoder: an avro decoder that is initialized to a stream and ready to
-  //       decode records
-  // - datum: datum to read records into (passed in so we only have to
-  //       initialize once). Note that although a GenericDatum can be of any
-  //       type, we're expecting only records.
+  // - max_tuples: the maximum number of tuples to write and commit
+  // - num_records: the number of records remaining in this data block. This is
+  //       decremented by the number of records decoded.
+  // - data: serialized record data. Is advanced as records are read.
+  // - data_len: the length of data. Is decremented as records are read.
   // - pool: memory pool to allocate string data from
   // - tuple: tuple pointer to copy objects to
   // - tuple_row: tuple row of written tuples
-  // - max_tuples: the maximum number of tuples to write and commit
-  // - records_remaining: the maximum number of records that decoder can decode
-  //       before its input stream runs out. This is decremented by the number
-  //       of records decoded.
-  Status DecodeAvroData(avro::Decoder* decoder, avro::GenericDatum* datum,
-                        MemPool* pool, Tuple* tuple, TupleRow* tuple_row,
-                        int max_tuples, int64_t* records_remaining);
+  Status DecodeAvroData(int max_tuples, int64_t* num_records, MemPool* pool,
+                        uint8_t** data, int* data_len, Tuple* tuple, TupleRow* tuple_row);
 
-  // Reads an Avro record and copies the data to tuple, allocating any string
-  // data from pool.
-  inline Status ReadRecord(const avro::GenericRecord& record,
-                           MemPool* pool, Tuple* tuple);
+  // Read the primitive type 'element' from 'data' and write it to the slot in 'tuple'
+  // specified by 'slot_desc'. String data is allocated from pool if necessary. 'data' is
+  // advanced past the element read and 'data_len' is decremented appropriately if there
+  // is no error. Returns true if no error.
+  bool ReadPrimitive(const SchemaElement& element, const SlotDescriptor& slot_desc,
+                     MemPool* pool, uint8_t** data, int* data_len, Tuple* tuple);
+
+  // Advance 'data' past the primitive type 'element' and decrement 'data_len'
+  // appropriately. Avoids reading 'data' when possible. Returns true if no error.
+  bool SkipPrimitive(const SchemaElement& element, uint8_t** data, int* data_len);
+
+  // Advance 'data' past the complex type 'element' and decrement 'data_len'
+  // appropriately. Avoids reading 'data' when possible. Returns true if no error. By
+  // skipping complex types, we can execute queries over tables with nested data types if
+  // none of those columns are materialized.
+  // TODO: implement this function
+  bool SkipComplex(const SchemaElement& element, uint8_t** data, int* data_len);
+
+  // Utility function that uses element.null_union_position to set 'type' to the next
+  // primitive type we should read from 'data'.
+  bool ReadUnionType(const SchemaElement& element, uint8_t** data, int* data_len,
+                     SchemaElement::Type* type);
 };
 } // namespace impala
 

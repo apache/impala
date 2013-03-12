@@ -197,10 +197,10 @@ Status BaseSequenceScanner::ReadSync() {
       ss  << "Bad sync hash at file offset "
           << (stream_->file_offset() - SYNC_HASH_SIZE) << "." << endl
           << "Expected: '"
-          << SerDeUtils::HexDump(header_->sync, SYNC_HASH_SIZE)
+          << ReadWriteUtil::HexDump(header_->sync, SYNC_HASH_SIZE)
           << "'" << endl
           << "Actual:   '"
-          << SerDeUtils::HexDump(hash, SYNC_HASH_SIZE)
+          << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE)
           << "'" << endl;
       state_->LogError(ss.str());
     }

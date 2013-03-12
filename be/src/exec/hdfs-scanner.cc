@@ -22,7 +22,7 @@
 #include "common/object-pool.h"
 #include "exec/text-converter.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
