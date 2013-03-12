@@ -27,6 +27,7 @@ import com.cloudera.impala.thrift.TFileFormat;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Represents a CREATE TABLE statement.
@@ -39,6 +40,7 @@ public class CreateTableStmt extends ParseNodeBase {
   private final boolean ifNotExists;
   private final FileFormat fileFormat;
   private final String location;
+  private final ArrayList<CreateTableColumnDef> partitionColumnDefs;
   private final RowFormat rowFormat;
   private final TableName tableName;
 
@@ -57,19 +59,21 @@ public class CreateTableStmt extends ParseNodeBase {
    * @param location - The HDFS location of where the table data will stored.
    */
   public CreateTableStmt(TableName tableName, List<CreateTableColumnDef> columnDefs,
-      boolean isExternal, String comment, RowFormat rowFormat, FileFormat fileFormat,
-      String location, boolean ifNotExists) {
+      List<CreateTableColumnDef> partitionColumnDefs, boolean isExternal, String comment,
+      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists) {
     Preconditions.checkNotNull(columnDefs);
+    Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
     Preconditions.checkNotNull(tableName);
 
-    this.columnDefs = new ArrayList<CreateTableColumnDef>(columnDefs);
+    this.columnDefs = Lists.newArrayList(columnDefs);
     this.comment = comment;
     this.isExternal = isExternal;
     this.ifNotExists = ifNotExists;
     this.fileFormat = fileFormat;
     this.location = location;
+    this.partitionColumnDefs = Lists.newArrayList(partitionColumnDefs);
     this.rowFormat = rowFormat;
     this.tableName = tableName;
   }
@@ -89,6 +93,10 @@ public class CreateTableStmt extends ParseNodeBase {
 
   public List<CreateTableColumnDef> getColumnDefs() {
     return columnDefs;
+  }
+
+  public List<CreateTableColumnDef> getPartitionColumnDefs() {
+    return partitionColumnDefs;
   }
 
   public String getComment() {
@@ -138,6 +146,11 @@ public class CreateTableStmt extends ParseNodeBase {
       sb.append(" COMMENT = '" + comment + "'");
     }
 
+    if (partitionColumnDefs.size() > 0) {
+      sb.append(String.format(" PARTITIONED BY (%s)",
+          Joiner.on(", ").join(partitionColumnDefs)));
+    }
+
     if (rowFormat != RowFormat.DEFAULT_ROW_FORMAT) {
       sb.append(" ROW FORMAT DELIMITED");
       if (rowFormat.getFieldDelimiter() != null) {
@@ -162,6 +175,10 @@ public class CreateTableStmt extends ParseNodeBase {
     params.setDb(getDb());
     for (CreateTableColumnDef col: getColumnDefs()) {
       params.addToColumns(new TColumnDesc(col.getColName(), col.getColType().toThrift()));
+    }
+    for (CreateTableColumnDef col: getPartitionColumnDefs()) {
+      params.addToPartition_columns(
+          new TColumnDesc(col.getColName(), col.getColType().toThrift()));
     }
     params.setIs_external(isExternal());
     params.setComment(comment);

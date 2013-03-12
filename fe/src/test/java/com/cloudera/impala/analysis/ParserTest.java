@@ -734,6 +734,15 @@ public class ParserTest {
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) LOCATION '/test-warehouse/'");
     ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/'");
 
+    // Partitioned tables
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (j string)");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (s string, d double)");
+    ParsesOk("CREATE TABLE Foo (i int, s string) PARTITIONED BY (s string, d double)" + 
+        " COMMENT 'hello' LOCATION '/a/b/'");
+    ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (int)");
+    ParserError("CREATE TABLE Foo (i int) PARTITIONED BY ()");
+    ParserError("CREATE TABLE Foo (i int) PARTITIONED BY");
+
     // Supported file formats
     for (FileFormat format: FileFormat.values()) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
@@ -769,7 +778,9 @@ public class ParserTest {
     ParserError("CREATE TABLE T (i int) FIELDS TERMINATED BY '\0'");
     ParserError("CREATE TABLE T (i int) ROWS TERMINATED BY '\0'");
 
-    // Order should be: [comment] [row format] [stored as FILEFORMAT] [location]
+    // Order should be: [comment] [partition by cols] [row format] [stored as FILEFORMAT]
+    // [location]
+    ParserError("CREATE TABLE Foo (d double) COMMENT 'c' PARTITIONED BY (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE ROW FORMAT DELIMITED");
     ParserError("CREATE TABLE Foo (d double) ROW FORMAT DELIMITED COMMENT 'c'");

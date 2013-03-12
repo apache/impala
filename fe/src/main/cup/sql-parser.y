@@ -152,12 +152,12 @@ terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEA
   KW_DELIMITED, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_EXISTS, KW_EXTERNAL, KW_FALSE,
   KW_FIELDS, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING, KW_IF, KW_IS,
   KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOCATION,
-  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_PARQUETFILE, 
-  KW_RCFILE, KW_REGEXP, KW_RLIKE, KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT,
-  KW_SEQUENCEFILE, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES,
-  KW_TERMINATED, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE,
-  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE,
-  KW_PARTITION, KW_INTERVAL;
+  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_PARQUETFILE,
+  KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RLIKE, KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS,
+  KW_SELECT, KW_SEQUENCEFILE, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
+  KW_TABLES, KW_TERMINATED, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN,
+  KW_WHERE, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE,
+  KW_TABLE, KW_PARTITION, KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -231,6 +231,7 @@ nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateTableColumnDef create_table_column_def;
 nonterminal ArrayList<CreateTableColumnDef> create_table_column_defs;
+nonterminal ArrayList<CreateTableColumnDef> partition_column_defs;
 // Options for CREATE DATABASE/TABLE
 nonterminal String comment_val;
 nonterminal Boolean external_val;
@@ -301,11 +302,11 @@ create_db_stmt ::=
 create_tbl_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
   table_name:table LPAREN create_table_column_defs:col_defs RPAREN
-  comment_val:comment row_format_val:row_format file_format_val:file_format
-  location_val:location
+  partition_column_defs:partition_col_defs comment_val:comment
+  row_format_val:row_format file_format_val:file_format location_val:location
   {:
-    RESULT = new CreateTableStmt(table, col_defs, external, comment, row_format,
-        file_format, location, if_not_exists);
+    RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
+        row_format, file_format, location, if_not_exists);
   :}
   ;
 
@@ -372,6 +373,13 @@ file_format_val ::=
   {: RESULT = FileFormat.RCFILE; :}
   | /* empty - default to TEXTFILE */
   {: RESULT = FileFormat.TEXTFILE; :}
+  ;
+
+partition_column_defs ::=
+  KW_PARTITIONED KW_BY LPAREN create_table_column_defs:col_defs RPAREN
+  {: RESULT = col_defs; :}
+  | /* Empty - not a partitioned table */ 
+  {: RESULT = new ArrayList<CreateTableColumnDef>(); :}
   ;
 
 create_table_column_defs ::=

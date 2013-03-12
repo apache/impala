@@ -406,8 +406,9 @@ public class Catalog {
    *                   default location.
    */
   public void createTable(String dbName, String tableName,
-      List<TColumnDesc> columns, boolean isExternal, String comment,
-      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
+      List<TColumnDesc> columns, List<TColumnDesc> partitionColumns, boolean isExternal,
+      String comment, RowFormat rowFormat, FileFormat fileFormat, String location,
+      boolean ifNotExists)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
       InvalidObjectException, org.apache.thrift.TException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty(),
@@ -439,13 +440,13 @@ public class Catalog {
     }
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
-    for (TColumnDesc c: columns) {
-      FieldSchema fs = new FieldSchema(c.getColumnName(),
-          c.getColumnType().toString().toLowerCase(), null);
-      fsList.add(fs);
-    }
-    sd.setCols(fsList);
+    sd.setCols(buildFieldSchemaList(columns));
     tbl.setSd(sd);
+    if (partitionColumns != null) {
+      // Add in any partition keys that were specified
+      tbl.setPartitionKeys(buildFieldSchemaList(partitionColumns));
+    }
+
     LOG.info(String.format("Creating table %s.%s", dbName, tableName));
     synchronized (metastoreCreateDropLock) {
       try {
@@ -459,6 +460,17 @@ public class Catalog {
       }
       dbs.get(dbName).invalidateTable(tableName, false);
     }
+  }
+
+  private static List<FieldSchema> buildFieldSchemaList(List<TColumnDesc> columnDefs) {
+    List<FieldSchema> fsList = Lists.newArrayList();
+    // Add in all the columns
+    for (TColumnDesc c: columnDefs) {
+      FieldSchema fs = new FieldSchema(c.getColumnName(),
+          c.getColumnType().toString().toLowerCase(), null);
+      fsList.add(fs);
+    }
+    return fsList;
   }
 
   public TableId getNextTableId() {

@@ -132,7 +132,7 @@ public class JniFrontend {
     TCreateTableParams params = new TCreateTableParams();
     deserializeThrift(params, thriftCreateTableParams);
     frontend.createTable(params.getDb(), params.getTable_name(), params.getColumns(),
-        params.isIs_external(), params.getComment(),
+        params.getPartition_columns(), params.isIs_external(), params.getComment(),
         new RowFormat(params.getField_terminator(), params.getLine_terminator()),
         FileFormat.fromThrift(params.getFile_format()), params.getLocation(),
         params.isIf_not_exists());

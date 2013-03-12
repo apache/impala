@@ -73,12 +73,55 @@ select * from ddl_test_db.testtbl
 int,string
 ====
 ---- QUERY
+create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int)
+---- RESULTS
+====
+---- QUERY
+# Partition columns are displayed as part of DESCRIBE <table>
+describe ddl_test_db.testtbl_part
+---- RESULTS
+'i','int'
+'s','string'
+'id','int'
+---- TYPES
+string,string
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl_part partition(id=1)
+select 10, 'Ten' from functional.alltypes limit 1
+---- RESULTS
+id=1/: 1
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl_part partition(id=2)
+select 20, 'Twenty' from functional.alltypes limit 2
+---- RESULTS
+id=2/: 2
+====
+---- QUERY
+select * from ddl_test_db.testtbl_part
+---- RESULTS
+1,10,'Ten'
+2,20,'Twenty'
+2,20,'Twenty'
+---- TYPES
+int, int, string
+====
+---- QUERY
+select * from ddl_test_db.testtbl_part where id = 1
+---- RESULTS
+1,10,'Ten'
+---- TYPES
+int, int, string
+====
+---- QUERY
 use ddl_test_db
 ====
 ---- QUERY
 show tables
 ---- RESULTS
 'testtbl'
+'testtbl_part'
 ---- TYPES
 string
 ====
@@ -92,6 +135,7 @@ show tables
 ---- RESULTS
 'testtbl'
 'testtbl2'
+'testtbl_part'
 ---- TYPES
 string
 ====
@@ -103,11 +147,16 @@ drop table testtbl2
 show tables
 ---- RESULTS
 'testtbl'
+'testtbl_part'
 ---- TYPES
 string
 ====
 ---- QUERY
 drop table testtbl
+---- RESULTS
+====
+---- QUERY
+drop table testtbl_part
 ---- RESULTS
 ====
 ---- QUERY

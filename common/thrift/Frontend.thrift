@@ -105,28 +105,31 @@ struct TCreateTableParams {
   // List of columns to create
   3: required list<TColumnDesc> columns
 
+  // List of partition columns
+  4: optional list<TColumnDesc> partition_columns
+
   // The file format for this table
-  4: required TFileFormat file_format
+  5: required TFileFormat file_format
 
   // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
   // table data from the file system. If EXTERNAL is not specified, all table data will be
   // removed when the table is dropped.
-  5: optional bool is_external
+  6: optional bool is_external
 
   // Optional comment for the table
-  6: optional string comment
+  7: optional string comment
 
   // Optional storage location for the table
-  7: optional string location
+  8: optional string location
 
   // Optional terminator string used to delimit fields (columns) in the table
-  8: optional string field_terminator
+  9: optional string field_terminator
 
   // Optional terminator string used to delimit lines (rows) in a table
-  9: optional string line_terminator
+  10: optional string line_terminator
 
   // Do not throw an error if a table of the same name already exists.
-  10: optional bool if_not_exists
+  11: optional bool if_not_exists
 }
 
 // Parameters of DROP DATABASE commands
