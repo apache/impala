@@ -18,6 +18,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
+#include "common/daemon.h"
 #include "exec/hbase-table-scanner.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
@@ -47,17 +48,12 @@ ThriftServer* be_server_;
 }
 
 int main(int argc, char** argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  InitGoogleLoggingSafe(argv[0]);
-
+  InitDaemon(argc, argv);
   if (FLAGS_num_backends <= 0) {
     LOG(ERROR) << "-num_backends arg must be > 0";
     exit(1);
   }
 
-  InitThriftLogging();
-  CpuInfo::Init();
-  DiskInfo::Init();
   LlvmCodeGen::InitializeLlvm();
   // Enable Kerberos security, if requested.
   if (!FLAGS_principal.empty()) {
@@ -75,7 +71,6 @@ int main(int argc, char** argv) {
   test_env_ = new TestExecEnv(FLAGS_num_backends, FLAGS_be_port + 1);
   LOG(INFO) << "Starting backends";
   test_env_->StartBackends();
-
   EXIT_IF_ERROR(CreateImpalaServer(test_env_, FLAGS_beeswax_port, FLAGS_hs2_port,
       FLAGS_be_port, &beeswax_server_, &hs2_server_, &be_server_, NULL));
   be_server_->Start();

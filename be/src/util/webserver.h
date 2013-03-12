@@ -31,9 +31,9 @@ namespace impala {
 class Webserver {
  public:
   typedef std::map<std::string, std::string> ArgumentMap;
-  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)> 
+  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
       PathHandlerCallback;
-  
+
   // If interface is set to the empty string the socket will bind to all available
   // interfaces.
   Webserver(const std::string& interface, const int port);
@@ -64,7 +64,7 @@ class Webserver {
   // Container class for a list of path handler callbacks for a single URL.
   class PathHandler {
    public:
-    PathHandler(bool is_styled) 
+    PathHandler(bool is_styled)
         : is_styled_(is_styled) {};
 
     void AddCallback(const PathHandlerCallback& callback) {
@@ -82,7 +82,7 @@ class Webserver {
     std::vector<PathHandlerCallback> callbacks_;
   };
 
-  // Renders a common Bootstrap-styled header 
+  // Renders a common Bootstrap-styled header
   void BootstrapPageHeader(std::stringstream* output);
 
   // Renders a common Bootstrap-styled footer. Must be used in conjunction with
@@ -90,7 +90,7 @@ class Webserver {
   void BootstrapPageFooter(std::stringstream* output);
 
   // Static so that it can act as a function pointer, and then call the next method
-  static void* MongooseCallbackStatic(enum mg_event event, 
+  static void* MongooseCallbackStatic(enum mg_event event,
       struct mg_connection* connection);
 
   // Dispatch point for all incoming requests.
@@ -116,7 +116,7 @@ class Webserver {
 
   const int port_;
   // If empty, webserver will bind to all interfaces.
-  const std::string& interface_;
+  const std::string interface_;
 
   // Handle to Mongoose context; owned and freed by Mongoose internally
   struct mg_context* context_;

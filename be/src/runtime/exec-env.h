@@ -61,10 +61,7 @@ class ExecEnv {
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
-  Scheduler* scheduler() {
-    DCHECK(scheduler_.get() != NULL);
-    return scheduler_.get();
-  }
+  Scheduler* scheduler() { return scheduler_.get(); }
 
   // Starts any dependent services in their correct order
   virtual Status StartServices();

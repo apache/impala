@@ -49,7 +49,7 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
-  if (ReachedLimit() || child_row_idx_ == child_row_batch_->num_rows() && child_eos_) {
+  if (ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_)) {
     // we're already done or we exhausted the last child batch and there won't be any
     // new ones
     *eos = true;
@@ -68,7 +68,7 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
 
     if (CopyRows(row_batch)) {
       *eos = ReachedLimit()
-          || child_row_idx_ == child_row_batch_->num_rows() && child_eos_;
+          || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
       return Status::OK;
     }
     if (child_eos_) {

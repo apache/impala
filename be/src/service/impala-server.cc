@@ -911,6 +911,12 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   Scheduler::HostList backends;
+
+  // TODO: Remove when TestExecEnv is less convoluted
+  if (exec_env_->scheduler() == NULL) {
+    (*output) << "No scheduler";
+    return;
+  }
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
 
   (*output) << "<h2>Known Backends "

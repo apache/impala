@@ -26,6 +26,9 @@
 #include "statestore/simple-scheduler.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/metrics.h"
+#include "util/network-util.h"
+#include "util/webserver.h"
+#include "util/default-path-handlers.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
@@ -33,13 +36,17 @@ using namespace boost;
 using namespace std;
 using namespace apache::thrift::server;
 
+DECLARE_bool(enable_webserver);
+DECLARE_int32(webserver_port);
+
 namespace impala {
 
-// ExecEnv for slave backends run as part of a test environment, with webserver disabled,
-// no scheduler (since coordinator takes care of that) and a state store subscriber.
+// ExecEnv for slave backends run as part of a test environment with no
+// scheduler (since coordinator takes care of that) and a state store
+// subscriber.
 class BackendTestExecEnv : public ExecEnv {
  public:
-  BackendTestExecEnv(int subscriber_port, int state_store_port);
+  BackendTestExecEnv(int subscriber_port, int state_store_port, int webserver_port);
 
   virtual Status StartServices();
 };
@@ -49,23 +56,29 @@ struct TestExecEnv::BackendInfo {
   ThriftServer* server;
   BackendTestExecEnv exec_env;
 
-  BackendInfo(int subscriber_port, int state_store_port)
+  BackendInfo(int subscriber_port, int state_store_port, int webserver_port)
       : server(NULL),
-        exec_env(subscriber_port, state_store_port) {
+        exec_env(subscriber_port, state_store_port, webserver_port) {
   }
 };
 
 
-BackendTestExecEnv::BackendTestExecEnv(int subscriber_port, int state_store_port)
+BackendTestExecEnv::BackendTestExecEnv(int subscriber_port, int state_store_port,
+    int webserver_port)
   : ExecEnv() {
   subscription_mgr_.reset(new SubscriptionManager("localhost", subscriber_port,
       "localhost", state_store_port));
   scheduler_.reset(NULL);
+  webserver_.reset(new Webserver("0.0.0.0", webserver_port));
 }
 
 Status BackendTestExecEnv::StartServices() {
-  // Don't start the scheduler, or the webserver
+  // Don't start the scheduler
   RETURN_IF_ERROR(subscription_mgr_->Start());
+  AddDefaultPathHandlers(webserver_.get());
+  if (FLAGS_enable_webserver) {
+    RETURN_IF_ERROR(webserver_->Start());
+  }
   return Status::OK;
 }
 
@@ -87,13 +100,15 @@ TestExecEnv::~TestExecEnv() {
 Status TestExecEnv::StartBackends() {
   LOG(INFO) << "Starting " << num_backends_ << " backends";
   int next_free_port = start_port_;
+  int webserver_port = FLAGS_webserver_port;
   state_store_port_ = next_free_port++;
   LOG(INFO) << "Starting in-process state-store";
   state_store_->Start(state_store_port_);
   RETURN_IF_ERROR(WaitForServer("localhost", state_store_port_, 10, 100));
 
   for (int i = 0; i < num_backends_; ++i) {
-    BackendInfo* info = new BackendInfo(next_free_port++, state_store_port_);
+    BackendInfo* info =
+        new BackendInfo(next_free_port++, state_store_port_, webserver_port++);
     int backend_port = next_free_port++;
     EXIT_IF_ERROR(
         CreateImpalaServer(&info->exec_env, 0, 0, backend_port, NULL, NULL, &info->server,
@@ -102,12 +117,10 @@ Status TestExecEnv::StartBackends() {
     backend_info_.push_back(info);
     info->exec_env.StartServices();
     info->server->Start();
-    TNetworkAddress address;
-    address.hostname = "127.0.0.1";
-    address.port = backend_port;
+
     RETURN_IF_ERROR(
         info->exec_env.subscription_mgr()->RegisterService(
-          IMPALA_SERVICE_ID, address));
+          IMPALA_SERVICE_ID, MakeNetworkAddress("127.0.0.1", backend_port)));
   }
 
   // Coordinator exec env gets both a subscription manager and a scheduler.
