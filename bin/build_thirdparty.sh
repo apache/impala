@@ -103,7 +103,6 @@ make -j4
 # Build Snappy
 cd $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
-autoreconf -i
 make install
 
 if [ -z "$USE_PIC_LIB_PATH" ]; then
