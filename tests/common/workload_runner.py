@@ -19,7 +19,7 @@ from os.path import isfile, isdir
 from tests.common.query_executor import *
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
-from tests.util.calculation_util import calculate_mean
+from tests.util.calculation_util import calculate_median
 from tests.util.test_file_parser import *
 from time import sleep
 from random import choice
@@ -171,17 +171,22 @@ class WorkloadRunner(object):
 
       results.append((thread.get_results()))
       LOG.debug(thread.name + " completed")
-    return self.__get_mean_execution_result(results)
+    return self.__get_median_execution_result(results)
 
-  def __get_mean_execution_result(self, results):
-    """Returns an ExecutionResult object who's avg/stddev is the mean of all results"""
+  def __get_median_execution_result(self, results):
+    """
+    Returns an ExecutionResult object whose avg/stddev is the median of all results.
+
+    This is used when running with multiple clients to select a good representative value
+    for the overall execution time.
+    """
     # Choose a result to update with the mean avg/stddev values. It doesn't matter which
     # one, so just pick the first one.
     final_result = results[0]
     if len(results) == 1:
       return final_result
-    final_result.avg_time = calculate_mean([result.avg_time for result in results])
-    final_result.std_dev = calculate_mean([result.std_dev for result in results])
+    final_result.avg_time = calculate_median([result.avg_time for result in results])
+    final_result.std_dev = calculate_median([result.std_dev for result in results])
     return final_result
 
   @staticmethod

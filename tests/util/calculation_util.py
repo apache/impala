@@ -28,8 +28,8 @@ def calculate_stddev(values):
   avg = calculate_avg(values)
   return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
 
-def calculate_mean(values):
-  """Return the mean of a numeric iterable."""
+def calculate_median(values):
+  """Return the median of a numeric iterable."""
   sorted_values = sorted(values)
   length = len(sorted_values)
   if length % 2 == 0:
