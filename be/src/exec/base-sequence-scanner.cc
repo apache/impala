@@ -243,6 +243,13 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   int buffer_len;
   bool eosr;
   Status status;
+  
+  // A sync marker can span multiple buffers.  In that case, we use this staging
+  // buffer to combine bytes from the buffers.  
+  // The -1 marker (if present) and the sync can start anywhere in the last 19 bytes 
+  // of the buffer, so we save the 19-byte tail of the buffer.
+  int tail_size = sync_size + sizeof(int32_t) - 1;
+  uint8_t split_buffer[2 * tail_size];
 
   // Read buffers until we find a sync or reach end of scan range
   RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
@@ -252,26 +259,24 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
     DCHECK_LE(offset, buffer_len);
     if (offset != -1) break;
 
-    // We need to check for a sync that spans buffers.  The -1 marker (if
-    // present) and the sync can start anywhere in the last 19 bytes of the
-    // buffer, so we save the 19-byte tail of the buffer.
-    int tail_size = sync_size + sizeof(int32_t) - 1;
-    uint8_t* bp = buffer + buffer_len - tail_size;
-    uint8_t save[2 * tail_size];
-    memcpy(save, bp, tail_size);
+    // It wasn't in the full buffer, copy the bytes at the end
+    int bytes_first_buffer = ::min(tail_size, buffer_len);
+    uint8_t* bp = buffer + buffer_len - bytes_first_buffer;
+    memcpy(split_buffer, bp, bytes_first_buffer);
 
     // Read the next buffer
     if (!SerDeUtils::SkipBytes(context_, buffer_len, &status)) return status;
     RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
-    if (buffer_len < tail_size) continue;
 
-    // Check if sync spans buffers
-    memcpy(save + tail_size, buffer, tail_size);
-    offset = FindSyncBlock(save, 2 * tail_size, sync, sync_size);
+    // Copy the first few bytes of the next buffer and check again.
+    int bytes_second_buffer = ::min(tail_size, buffer_len);
+    memcpy(split_buffer + bytes_first_buffer, buffer, bytes_second_buffer);
+    offset = FindSyncBlock(split_buffer, 
+        bytes_first_buffer + bytes_second_buffer, sync, sync_size);
     if (offset != -1) {
-      DCHECK_GE(offset, tail_size);
+      DCHECK_GE(offset, bytes_first_buffer);
       // Adjust the offset to be relative to the start of the new buffer
-      offset -= tail_size;
+      offset -= bytes_first_buffer;
       break;
     }
 

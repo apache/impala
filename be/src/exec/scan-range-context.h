@@ -108,6 +108,8 @@ class ScanRangeContext {
 
   // Gets the bytes from the first available buffer without advancing the scan
   // range location (e.g. repeated calls to this function will return the same thing).
+  // If the buffer is the last one in the scan range, *eos will be set to true.
+  // If we are past the end of the scan range, *out_len will be 0 and *eos will be true.
   Status GetRawBytes(uint8_t** buffer, int* out_len, bool* eos);
 
   // Gets memory for outputting tuples.   

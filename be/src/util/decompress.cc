@@ -238,7 +238,11 @@ static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_onl
 
     if (uncompressed_block_len > Codec::MAX_BLOCK_SIZE || uncompressed_block_len == 0) {
       if (uncompressed_total_len == 0) {
-        return Status("Decompressor: block size is too big.  Data is likely corrupt.");
+        // TODO: is this check really robust?
+        stringstream ss;
+        ss << "Decompressor: block size is too big.  Data is likely corrupt. "
+           << "Size: " << uncompressed_block_len;
+        return Status(ss.str());
       }
       break;
     }
@@ -317,7 +321,10 @@ Status SnappyBlockDecompressor::ProcessBlock(int input_len, uint8_t* input,
   
   if (*output_len > MAX_BLOCK_SIZE) {
     // TODO: is this check really robust?
-    return Status("Decompressor: block size is too big.  Data is likely corrupt.");
+    stringstream ss;
+    ss << "Decompressor: block size is too big.  Data is likely corrupt. "
+       << "Size: " << *output_len;
+    return Status(ss.str());
   }
     
   char* out_ptr = reinterpret_cast<char*>(*output);
