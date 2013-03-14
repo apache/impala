@@ -31,5 +31,6 @@ add_library(Statestore STATIC
 add_executable(statestored statestored-main.cc)
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
-ADD_BE_TEST(state-store-test)
+# Disabled pending state-store rewrite
+# ADD_BE_TEST(state-store-test)
 ADD_BE_TEST(simple-scheduler-test)
