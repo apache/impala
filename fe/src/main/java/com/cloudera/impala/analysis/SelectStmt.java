@@ -315,11 +315,6 @@ public class SelectStmt extends QueryStmt {
               "GROUP BY expression must not contain aggregate functions: "
                   + groupingExprs.get(i).toSql());
         }
-        if (groupingExprsCopy.get(i).getType().isFloatingPointType()) {
-          throw new AnalysisException(
-              "GROUP BY expression must have a discrete (non-floating point) type: "
-                  + groupingExprs.get(i).toSql());
-        }
       }
     }
 

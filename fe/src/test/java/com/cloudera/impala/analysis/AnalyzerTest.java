@@ -403,22 +403,6 @@ public class AnalyzerTest {
         "(select zip, count(*) from functional.testtbl group by 2) x",
         "GROUP BY expression must not contain aggregate functions");
 
-    // multiple grouping cols
-    AnalyzesOk("select int_col, string_col, bigint_col, " +
-        "count(*) from functional.alltypes " +
-        "group by string_col, int_col, bigint_col");
-    AnalyzesOk("select int_col, string_col, bigint_col, " +
-        "count(*) from functional.alltypes " +
-        "group by 2, 1, 3");
-    AnalysisError("select int_col, string_col, bigint_col, " +
-        "count(*) from functional.alltypes " +
-        "group by 2, 1, 4", "GROUP BY expression must not contain aggregate functions");
-    // can't group by floating-point exprs
-    AnalysisError("select float_col, count(*) from functional.alltypes group by 1",
-        "GROUP BY expression must have a discrete (non-floating point) type");
-    AnalysisError("select int_col + 0.5, count(*) from functional.alltypes group by 1",
-        "GROUP BY expression must have a discrete (non-floating point) type");
-
     // order by, top-n
     AnalyzesOk("select * from (select zip, count(*) " +
         "       from (select * from functional.testtbl) x " +
@@ -870,11 +854,14 @@ public class AnalyzerTest {
     AnalysisError("select int_col, string_col, bigint_col, count(*) " +
         "from functional.alltypes group by 2, 1, 4",
         "GROUP BY expression must not contain aggregate functions");
-    // can't group by floating-point exprs
-    AnalysisError("select float_col, count(*) from functional.alltypes group by 1",
-        "GROUP BY expression must have a discrete (non-floating point) type");
-    AnalysisError("select int_col + 0.5, count(*) from functional.alltypes group by 1",
-        "GROUP BY expression must have a discrete (non-floating point) type");
+
+    // group by floating-point column
+    AnalyzesOk("select float_col, double_col, count(*) " +
+        "from functional.alltypes group by 1, 2");
+    // group by floating-point exprs
+    AnalyzesOk("select int_col + 0.5, count(*) from functional.alltypes group by 1");
+    AnalyzesOk("select cast(int_col as double), count(*)" +
+        "from functional.alltypes group by 1");
   }
 
   @Test public void TestAvgSubstitution() throws AnalysisException {
@@ -1075,7 +1062,7 @@ public class AnalyzerTest {
   @Test
   public void TestBetweenPredicates() throws AnalysisException {
     AnalyzesOk("select * from functional.alltypes " +
-    		"where tinyint_col between smallint_col and int_col");
+        "where tinyint_col between smallint_col and int_col");
     AnalyzesOk("select * from functional.alltypes " +
         "where tinyint_col not between smallint_col and int_col");
     AnalyzesOk("select * from functional.alltypes " +
@@ -1084,17 +1071,17 @@ public class AnalyzerTest {
         "where 'abc' not between string_col and date_string_col");
     // Lower and upper bounds require implicit casts.
     AnalyzesOk("select * from functional.alltypes " +
-    		"where double_col between smallint_col and int_col");
+        "where double_col between smallint_col and int_col");
     // Comparison expr requires implicit cast.
     AnalyzesOk("select * from functional.alltypes " +
         "where smallint_col between float_col and double_col");
     // Incompatible types.
     AnalysisError("select * from functional.alltypes " +
-    		"where string_col between bool_col and double_col",
+        "where string_col between bool_col and double_col",
         "Incompatible return types 'STRING' and 'BOOLEAN' " +
         "of exprs 'string_col' and 'bool_col'.");
     AnalysisError("select * from functional.alltypes " +
-    		"where timestamp_col between int_col and double_col",
+        "where timestamp_col between int_col and double_col",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
   }
@@ -1404,7 +1391,7 @@ public class AnalyzerTest {
         "'date_add(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE' " +
         "which is incompatible with expected type 'INT'.");
     AnalysisError("select date_add(timestamp_col, interval bigint_col years) " +
-    		"from functional.alltypes",
+        "from functional.alltypes",
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'date_add(timestamp_col, INTERVAL bigint_col years)' returns type 'BIGINT' " +
         "which is incompatible with expected type 'INT'.");
@@ -1472,7 +1459,7 @@ public class AnalyzerTest {
     AnalyzesOk("select case when 20 > 10 then 20 when 1 > 2 then 1.0 else 15 end");
     // Requires casting then exprs.
     AnalyzesOk("select case when 20 > 10 then 20 when 1 > 2 then 1.0 " +
-    		"when 4 < 5 then 2 else 15 end");
+        "when 4 < 5 then 2 else 15 end");
     // First when expr doesn't return boolean.
     AnalysisError("select case when 20 then 20 when 1 > 2 then timestamp_col " +
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
@@ -1485,7 +1472,7 @@ public class AnalyzerTest {
 
     // With case expr.
     AnalyzesOk("select case int_col when 20 then 30 else 15 end " +
-    		"from functional.alltypes");
+        "from functional.alltypes");
     // No else.
     AnalyzesOk("select case int_col when 20 then 30 end " +
         "from functional.alltypes");
@@ -1497,7 +1484,7 @@ public class AnalyzerTest {
         "from functional.alltypes");
     // Requires multiple casts.
     AnalyzesOk("select case bigint_col when int_col then 30 " +
-    		"when double_col then 1.0 else 15 end from functional.alltypes");
+        "when double_col then 1.0 else 15 end from functional.alltypes");
     // Type of case expr is incompatible with first when expr.
     AnalysisError("select case bigint_col when timestamp_col then 30 " +
         "when double_col then 1.0 else 15 end from functional.alltypes",
@@ -1786,7 +1773,7 @@ public class AnalyzerTest {
         "must be at the end of the select list.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
-    		"partition (year=2009, month=4)" +
+        "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
@@ -1909,7 +1896,7 @@ public class AnalyzerTest {
         "Missing partition column 'month' from PARTITION clause.");
     // Loss of precision when casting in column 6 (double_col -> float).
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
-    		"partition (year=2009, month=4)" +
+        "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "double_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
@@ -1917,7 +1904,7 @@ public class AnalyzerTest {
         "Would need to cast 'double_col' to 'FLOAT'.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
-    		"partition (year=2009, month=4)" +
+        "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +

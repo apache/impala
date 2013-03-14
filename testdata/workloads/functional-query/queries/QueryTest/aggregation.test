@@ -332,6 +332,84 @@ bigint
 990
 ====
 ---- QUERY
+select float_col, float_col * 2, count(*) from alltypes group by 1, 2
+---- TYPES
+float, double, bigint 
+---- RESULTS
+0,0,730
+3.299999952316284,6.599999904632568,730
+8.800000190734863,17.60000038146973,730
+6.599999904632568,13.19999980926514,730
+7.699999809265137,15.39999961853027,730
+2.200000047683716,4.400000095367432,730
+5.5,11,730
+1.100000023841858,2.200000047683716,730
+9.899999618530273,19.79999923706055,730
+4.400000095367432,8.800000190734863,730
+====
+---- QUERY
+select count(*) from alltypes group by float_col
+---- TYPES
+bigint
+---- RESULTS
+730
+730
+730
+730
+730
+730
+730
+730
+730
+730
+====
+---- QUERY
+select float_col, count(*) from alltypesagg where float_col is null group by 1
+---- TYPES
+float, bigint 
+---- RESULTS
+NULL,10
+====
+---- QUERY
+select double_col, double_col * 2, count(*) from alltypes group by 1, 2
+---- TYPES
+double, double, bigint 
+---- RESULTS
+0,0,730
+90.90000000000001,181.8,730
+40.4,80.8,730
+20.2,40.4,730
+80.8,161.6,730
+10.1,20.2,730
+70.7,141.4,730
+50.5,101,730
+30.3,60.6,730
+60.6,121.2,730
+====
+---- QUERY
+select count(*) from alltypes group by double_col
+---- TYPES
+bigint
+---- RESULTS
+730
+730
+730
+730
+730
+730
+730
+730
+730
+730
+====
+---- QUERY
+select double_col, count(*) from alltypesagg where double_col is null group by 1
+---- TYPES
+double, bigint
+---- RESULTS
+NULL,10
+====
+---- QUERY
 select date_string_col, count(*) from alltypesagg group by 1
 ---- TYPES
 string, bigint
