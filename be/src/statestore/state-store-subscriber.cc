@@ -54,6 +54,7 @@ StateStoreSubscriber::StateStoreSubscriber(const string& hostname,
         seconds(FLAGS_statestore_subscriber_timeout_seconds),
         seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))) {
   client_.reset();
+
   host_port_.port = port;
   host_port_.hostname = hostname;
   state_store_host_port_.hostname = state_store_host;
@@ -217,7 +218,8 @@ Status StateStoreSubscriber::Start() {
   shared_ptr<TProcessor> processor(
       new StateStoreSubscriberServiceProcessor(shared_from_this()));
 
-  server_.reset(new ThriftServer("StateStoreSubscriber", processor, host_port_.port, 1));
+  server_.reset(new ThriftServer("state-store-subscriber", processor, host_port_.port,
+      NULL, 1));
 
   DCHECK(!server_running_);
   server_running_ = true;

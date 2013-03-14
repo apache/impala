@@ -24,6 +24,7 @@
 #include <thrift/TProcessor.h>
 
 #include "common/status.h"
+#include "util/metrics.h"
 
 namespace boost { class thread; }
 
@@ -47,7 +48,7 @@ class ThriftServer {
 
     // Called when a session is terminated (when a client closes the connection).
     // After this callback returns, the memory session_key references is no longer valid
-    // and clients must not refer to it again. 
+    // and clients must not refer to it again.
     virtual void SessionEnd(const SessionKey& session_key) = 0;
   };
 
@@ -64,9 +65,15 @@ class ThriftServer {
 
   // Creates, but does not start, a new server on the specified port
   // that exports the supplied interface.
+  //  - name: human-readable name of this server. Should not contain spaces
+  //  - processor: Thrift processor to handle RPCs
+  //  - port: The port the server will listen for connections on
+  //  - metrics: if not NULL, the server will register metrics on this object
+  //  - num_worker_threads: the number of worker threads to use in any thread pool
+  //  - server_type: the type of IO strategy this server should employ
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
-      int num_worker_threads = DEFAULT_WORKER_THREADS,
+      Metrics* metrics = NULL, int num_worker_threads = DEFAULT_WORKER_THREADS,
       ServerType server_type = Threaded);
 
   int port() const { return port_; }
@@ -92,7 +99,7 @@ class ThriftServer {
   // identified with the lifetime of a socket connection to this server.
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
-  // It is also only safe to reference the returned value during an RPC method. 
+  // It is also only safe to reference the returned value during an RPC method.
   static SessionKey* GetThreadSessionKey();
 
  private:
@@ -101,7 +108,7 @@ class ThriftServer {
 
   // The port on which the server interface is exposed
   int port_;
-  
+
   // How many worker threads to use to serve incoming requests
   // (requests are queued if no thread is immediately available)
   int num_worker_threads_;
@@ -115,7 +122,7 @@ class ThriftServer {
   // Thread that runs the TNonblockingServer::serve loop
   boost::scoped_ptr<boost::thread> server_thread_;
 
-  // Thrift housekeeping 
+  // Thrift housekeeping
   boost::scoped_ptr<apache::thrift::server::TServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
 
@@ -132,6 +139,15 @@ class ThriftServer {
 
   // True if using a secure transport
   bool kerberos_enabled_;
+
+  // True if metrics are enabled
+  bool metrics_enabled_;
+
+  // Number of currently active connections
+  Metrics::IntMetric* num_current_connections_metric_;
+
+  // Total connections made over the lifetime of this server
+  Metrics::IntMetric* total_connections_metric_;
 
   // Helper class which monitors starting servers. Needs access to internal members, and
   // is not used outside of this class.

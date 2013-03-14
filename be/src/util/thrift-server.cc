@@ -225,6 +225,11 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
     thrift_server_->session_handler_->SessionStart(*__session_key__);
   }
 
+  if (thrift_server_->metrics_enabled_) {
+    thrift_server_->num_current_connections_metric_->Increment(1L);
+    thrift_server_->total_connections_metric_->Increment(1L);
+  }
+
   // Store the __session_key__ in the per-client context to avoid recomputing
   // it. If only this were accessible from RPC method calls, we wouldn't have to
   // mess around with thread locals.
@@ -249,11 +254,14 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
     lock_guard<mutex> l_(thrift_server_->session_keys_lock_);
     thrift_server_->session_keys_.erase(__session_key__);
   }
+
+  if (thrift_server_->metrics_enabled_) {
+    thrift_server_->num_current_connections_metric_->Increment(-1L);
+  }
 }
 
-
 ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& processor,
-    int port, int num_worker_threads, ServerType server_type)
+    int port, Metrics* metrics, int num_worker_threads, ServerType server_type)
     : started_(false),
       port_(port),
       num_worker_threads_(num_worker_threads),
@@ -263,7 +271,20 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
       server_(NULL),
       processor_(processor),
       session_handler_(NULL),
-      kerberos_enabled_(false){
+      kerberos_enabled_(false) {
+  if (metrics != NULL) {
+    metrics_enabled_ = true;
+    stringstream count_ss;
+    count_ss << "impala.thrift-server." << name << ".connections-in-use";
+    num_current_connections_metric_ =
+        metrics->CreateAndRegisterPrimitiveMetric(count_ss.str(), 0L);
+    stringstream max_ss;
+    max_ss << "impala.thrift-server." << name << ".total-connections";
+    total_connections_metric_ =
+        metrics->CreateAndRegisterPrimitiveMetric(max_ss.str(), 0L);
+  } else {
+    metrics_enabled_ = false;
+  }
 }
 
 Status ThriftServer::Start() {

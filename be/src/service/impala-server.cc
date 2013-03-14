@@ -1776,8 +1776,9 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support
     // TThreadPoolServer.
     shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
-    *beeswax_server = new ThriftServer("ImpalaServer Beeswax Frontend", beeswax_processor,
-        beeswax_port, FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+    *beeswax_server = new ThriftServer("beeswax-frontend", beeswax_processor,
+        beeswax_port, exec_env->metrics(), FLAGS_fe_service_threads,
+        ThriftServer::ThreadPool);
 
     (*beeswax_server)->SetSessionHandler(handler.get());
 
@@ -1788,8 +1789,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // HiveServer2 JDBC driver does not support non-blocking server.
     shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
-    *hs2_server = new ThriftServer("ImpalaServer HiveServer2 Frontend",
-        hs2_fe_processor, hs2_port, FLAGS_fe_service_threads,
+    *hs2_server = new ThriftServer("hiveServer2-frontend",
+        hs2_fe_processor, hs2_port, exec_env->metrics(), FLAGS_fe_service_threads,
         ThriftServer::ThreadPool);
 
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
@@ -1797,7 +1798,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
 
   if (be_port != 0 && be_server != NULL) {
     shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(handler));
-    *be_server = new ThriftServer("ImpalaServer Backend", be_processor, be_port,
+    *be_server = new ThriftServer("backend", be_processor, be_port, exec_env->metrics(),
         FLAGS_be_service_threads);
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;

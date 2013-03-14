@@ -313,7 +313,7 @@ void StateStore::Start(int port) {
   shared_ptr<StateStore> state_store = shared_from_this();
   shared_ptr<TProcessor> processor(new StateStoreServiceProcessor(state_store));
 
-  server_.reset(new ThriftServer("StateStoreService", processor, port,
+  server_.reset(new ThriftServer("state-store", processor, port, metrics_,
       FLAGS_statestore_num_server_worker_threads));
   server_->Start();
 

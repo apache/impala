@@ -39,7 +39,7 @@ DEFINE_int64(send_batch_size, 0, "Batch size (in bytes).  Data is split up into 
 // the client 'shell' where benchmarks can be run.
 // The supported benchmarks are:
 //   'send <size in mb> <target ip>'
-//   'broadcast <size in mb> <list of space separated target ips> 
+//   'broadcast <size in mb> <list of space separated target ips>
 // The command can also be passed in via command line in the same format.  If
 // run in this mode, the server does not start up.
 // For broadcast, the data is sent in parallel to all nodes.
@@ -117,7 +117,7 @@ void HandleSend(const vector<string>& tokens) {
   int64_t bytes = mbs * (1024L * 1024L);
   cout << "Sending " << mbs << " megabytes..." << endl;
   const string& ip = tokens[2];
-  
+
   ThriftClient<NetworkTestServiceClient> client(ip, FLAGS_port);
   Status status = client.Open();
   if (!status.ok()) {
@@ -162,7 +162,7 @@ void HandleBroadcast(const vector<string>& tokens) {
   }
   threads.join_all();
   timer.Stop();
-  
+
   double mb = bytes / (1024 * 1024.);
   double sec = timer.ElapsedTime() / (1000.) / (1000.) / (1000.);
 
@@ -189,7 +189,7 @@ bool ProcessCommand(const vector<string>& tokens) {
   } else {
     cerr << "Invalid command" << endl;
     return false;
-  } 
+  }
   return false;
 }
 
@@ -207,26 +207,26 @@ int main(int argc, char** argv) {
     ProcessCommand(tokens);
     return 0;
   }
-  
+
   // Start up server and client shell
   shared_ptr<TestServer> handler(new TestServer);
   shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
   shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
   ThriftServer* server = new ThriftServer("Network Test Server", processor,
-      FLAGS_port, 100, ThriftServer::ThreadPool);
+      FLAGS_port, NULL, 100, ThriftServer::ThreadPool);
   thread* server_thread = new thread(&TestServer::Server, handler.get(), server);
-  
+
   string input;
   while (1) {
     vector<string> tokens;
     cout << "> ";
     cout.flush();
-    
+
     getline(cin, input);
     if (cin.eof()) break;
 
     split(tokens, input, is_any_of(" "), token_compress_on);
-    
+
     ConvertToLowerCase(&tokens);
     if (ProcessCommand(tokens)) break;
   }
