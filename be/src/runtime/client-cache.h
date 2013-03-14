@@ -125,7 +125,8 @@ class ClientCache {
 
   ClientCache() : client_cache_helper_() {
     client_factory_ =
-        boost::bind<ThriftClientImpl*>(mem_fn(&ClientCache::MakeClient), this, _1, _2);
+        boost::bind<ThriftClientImpl*>(
+            boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);
   }
 
   // Obtains a pointer to a Thrift interface object (of type T),
