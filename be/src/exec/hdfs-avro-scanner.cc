@@ -75,7 +75,6 @@ Status HdfsAvroScanner::ReadFileHeader() {
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
   header_->header_size = context_->total_bytes_returned();
-  header_->file_type = THdfsFileFormat::AVRO;
   return Status::OK;
 }
 

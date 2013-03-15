@@ -122,7 +122,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
       stringstream ss;
       ss << "Invalid RCFILE_KEY_CLASS_NAME: '"
          << string(reinterpret_cast<char*>(class_name_key), len)
-         << "'";
+         << "' len=" << len;
       return Status(ss.str());
     }
 
@@ -130,11 +130,11 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     RETURN_IF_FALSE(
         SerDeUtils::ReadText(context_, &class_name_val, &len, &parse_status_));
     if (len != strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME) ||
-        memcmp(class_name_key, HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME, len)) {
+        memcmp(class_name_val, HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME, len)) {
       stringstream ss;
       ss << "Invalid RCFILE_VALUE_CLASS_NAME: '"
          << string(reinterpret_cast<char*>(class_name_val), len)
-         << "'";
+         << "' len=" << len;
       return Status(ss.str());
     }
   }
@@ -180,7 +180,6 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
   
   header_->header_size = context_->total_bytes_returned();
-  header_->file_type = THdfsFileFormat::RC_FILE;
   return Status::OK;
 }
 

@@ -51,9 +51,6 @@ class BaseSequenceScanner : public HdfsScanner {
   // Data that is shared between scan ranges of the same file.  The subclass is 
   // responsible for filling in all these fields in ReadFileHeader
   struct FileHeader {
-    // Type of file: e.g. rcfile, seqfile
-    THdfsFileFormat::type file_type;
-  
     // The sync hash for this file.
     uint8_t sync[SYNC_HASH_SIZE];
 
@@ -98,6 +95,9 @@ class BaseSequenceScanner : public HdfsScanner {
   // tuples to the context.  When this function is called, it is guaranteed to be
   // at the start of a data block (i.e. right after the sync marker).
   virtual Status ProcessRange() = 0;
+
+  // Returns type of scanner: e.g. rcfile, seqfile
+  virtual THdfsFileFormat::type file_format() const = 0;
   
   // - marker_precedes_sync: if true, sync markers are preceded by 4 bytes of
   //   0xFFFFFFFF.
@@ -164,6 +164,10 @@ class BaseSequenceScanner : public HdfsScanner {
   // buffer of the _end_ of sync if it is found, otherwise, returns -1.
   int FindSyncBlock(const uint8_t* buffer, int buffer_len, const uint8_t* sync,
                     int sync_len);
+
+  // Close skipped ranges for 'file'.  This is only called when processing
+  // the header range and the header had an issue.
+  void CloseFileRanges(const char* file);
 
   // Number of bytes skipped when advancing to next sync on error.
   RuntimeProfile::Counter* bytes_skipped_counter_;

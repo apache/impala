@@ -82,6 +82,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
+  
+  virtual THdfsFileFormat::type file_format() const { 
+    return THdfsFileFormat::AVRO; 
+  }
 
  private:
   struct AvroFileHeader : public BaseSequenceScanner::FileHeader {

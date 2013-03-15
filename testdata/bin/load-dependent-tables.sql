@@ -38,7 +38,6 @@ ALTER TABLE alltypesmixedformat SET FILEFORMAT RCFILE;
 LOAD DATA INPATH '/tmp/alltypes_rc/year=2009/month=3/'
 OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=3);
 
-
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)
   SET SERDEPROPERTIES('field.delim'=',', 'escape.delim'='\\');
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)
@@ -85,3 +84,13 @@ DROP TABLE IF EXISTS map_table;
 CREATE TABLE map_table(map_col map<int, string>);
 DROP TABLE IF EXISTS array_table;
 CREATE TABLE array_table(array_col array<int>);
+
+----
+-- Create a table to test older rc files (pre hive9).  The header for those files are
+-- different.
+CREATE DATABASE IF NOT EXISTS functional_rc;
+USE functional_rc;
+DROP TABLE IF EXISTS old_rcfile_table;
+CREATE TABLE old_rcfile_table(key int, value string)
+STORED AS RCFILE;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/oldrcfile.rc' into table old_rcfile_table;

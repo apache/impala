@@ -71,7 +71,7 @@ Status BaseSequenceScanner::Close() {
   context_->AcquirePool(data_buffer_pool_.get());
   context_->Flush();
   if (!only_parsing_header_) {
-    scan_node_->RangeComplete(header_->file_type, header_->compression_type);
+    scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
   // Collect the maximum amount of memory we used to process this file.
   COUNTER_UPDATE(scan_node_->memory_used_counter(),
@@ -88,7 +88,13 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
     // This is the initial scan range just to parse the header
     only_parsing_header_ = true;
     header_ = state_->obj_pool()->Add(AllocateFileHeader());
-    RETURN_IF_ERROR(ReadFileHeader());
+    Status status = ReadFileHeader();
+    if (!status.ok()) {
+      if (state_->abort_on_error()) return status;
+      // We need to complete the ranges for this file.
+      CloseFileRanges(context_->filename());
+      return Status::OK;
+    }
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
     scan_node_->SetFileMetadata(context_->filename(), header_);
@@ -293,4 +299,14 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   VLOG_FILE << "Found sync for: " << context_->filename()
             << " at " << context_->file_offset() - sync_size;
   return Status::OK;
+}
+
+void BaseSequenceScanner::CloseFileRanges(const char* filename) {
+  DCHECK(only_parsing_header_);
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(filename);
+  const vector<DiskIoMgr::ScanRange*>& ranges = desc->ranges;
+  for (int i = 0; i < ranges.size(); ++i) {
+    COUNTER_UPDATE(bytes_skipped_counter_, ranges[i]->len());
+    scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);
+  }
 }

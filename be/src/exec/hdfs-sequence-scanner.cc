@@ -477,7 +477,6 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   }
 
   header_->header_size = context_->total_bytes_returned();
-  header_->file_type = THdfsFileFormat::SEQUENCE_FILE;
   return Status::OK;
 }
 

@@ -694,3 +694,15 @@ bigint
 ---- RESULTS
 10000
 ====
+# Select from old (pre-hive 9) rc file table
+---- QUERY
+SELECT * FROM functional_rc.old_rcfile_table
+---- TYPES
+int, string
+---- RESULTS
+1,'val_1'
+3,'val_3'
+4,'val_4'
+5,'val_5'
+10,'val_10'
+====

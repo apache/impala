@@ -260,6 +260,10 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   virtual Status InitNewRange();
   virtual Status ProcessRange();
 
+  virtual THdfsFileFormat::type file_format() const { 
+    return THdfsFileFormat::RC_FILE; 
+  }
+
   // read the RCFile Header Metadata section in the current file verifying the
   // number of columns is correct.  Other pieces of the metadata are ignored.
   Status VerifyNumColumnsMetadata();

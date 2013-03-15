@@ -176,6 +176,10 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
+  
+  virtual THdfsFileFormat::type file_format() const { 
+    return THdfsFileFormat::SEQUENCE_FILE; 
+  }
 
  private:
   // Maximum size of a compressed block.  This is used to check for corrupted
