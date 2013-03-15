@@ -68,6 +68,10 @@ public class SlotRef extends Expr {
     super.analyze(analyzer);
     desc = analyzer.registerColumnRef(tblName, col);
     type = desc.getType();
+    if (!type.isSupported()) {
+      throw new AnalysisException("Unsupported type '"
+          + type.toString() + "' in '" + toSql() + "'.");
+    }
   }
 
   @Override

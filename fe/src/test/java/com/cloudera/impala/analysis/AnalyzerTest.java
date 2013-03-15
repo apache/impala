@@ -465,10 +465,6 @@ public class AnalyzerTest {
     AnalyzesOk("select int_col from functional.alltypes");
     AnalysisError("select int_col from badtbl", "Unknown table");
 
-    // Bad table metadata
-    AnalysisError("select * from functional.map_table",
-        "Failed to load metadata for table: map_table");
-
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM FUNCTIONAL.ALLTYPES");
     AnalyzesOk("SELECT INT_COL FROM functional.alltypes");
@@ -1914,6 +1910,35 @@ public class AnalyzerTest {
   @Test
   public void testUseStatement() {
     Assert.assertTrue(AnalyzesOk("USE functional") instanceof UseStmt);
+  }
+
+  /**
+   * We distinguish between two classes of unsupported types:
+   * 1. Complex types, e.g., map
+   *    For tables with such types we prevent loading the table metadata.
+   * 2. Primitive types
+   *    For tables with unsupported primitive types (e.g., decimal)
+   *    we can run queries as long as the unsupported columns are not referenced.
+   *    We fail analysis if a query references an unsupported primitive column.
+   */
+  @Test
+  public void TestUnsupportedTypes() {
+    // The table metadata should not have been loaded.
+    AnalysisError("select * from functional.map_table",
+        "Failed to load metadata for table: map_table");
+
+    // Select supported types from a table with mixed supported/unsupported types.
+    AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
+    // Unsupported type decimal.
+    AnalysisError("select dec_col from functional.unsupported_types",
+        "Unsupported type 'DECIMAL' in 'dec_col'.");
+    // Unsupported type binary.
+    AnalysisError("select bin_col from functional.unsupported_types",
+        "Unsupported type 'BINARY' in 'bin_col'.");
+    // Mixed supported/unsupported types.
+    AnalysisError("select int_col, dec_col, str_col, bin_col " +
+    		"from functional.unsupported_types",
+        "Unsupported type 'DECIMAL' in 'dec_col'.");
   }
 
   /**

@@ -36,7 +36,10 @@ public enum PrimitiveType {
   TIMESTAMP("TIMESTAMP", 16, TPrimitiveType.TIMESTAMP),
   // 8-byte pointer and 4-byte length indicator (12 bytes total).
   // Aligning to 8 bytes so 16 total.
-  STRING("STRING", 16, TPrimitiveType.STRING);
+  STRING("STRING", 16, TPrimitiveType.STRING),
+  // Unsupported scalar types.
+  BINARY("BINARY", -1, TPrimitiveType.BINARY),
+  DECIMAL("DECIMAL", -1, TPrimitiveType.DECIMAL);
 
   private final String description;
   private final int slotSize;  // size of tuple slot for this type
@@ -98,6 +101,16 @@ public enum PrimitiveType {
 
   public boolean isStringType() {
     return (this == STRING);
+  }
+
+  public boolean isSupported() {
+    switch (this) {
+      case BINARY:
+      case DECIMAL:
+        return false;
+      default:
+        return true;
+    }
   }
 
   private static ArrayList<PrimitiveType> numericTypes;
@@ -366,6 +379,8 @@ public enum PrimitiveType {
       case DOUBLE: return java.sql.Types.DOUBLE;
       case TIMESTAMP: return java.sql.Types.TIMESTAMP;
       case STRING: return java.sql.Types.VARCHAR;
+      case BINARY: return java.sql.Types.BINARY;
+      case DECIMAL: return java.sql.Types.DECIMAL;
       default:
         Preconditions.checkArgument(false, "Invalid type " + name());
         return 0;

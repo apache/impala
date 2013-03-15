@@ -33,6 +33,8 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
     case TPrimitiveType::DATETIME: return TYPE_DATETIME;
     case TPrimitiveType::TIMESTAMP: return TYPE_TIMESTAMP;
     case TPrimitiveType::STRING: return TYPE_STRING;
+    case TPrimitiveType::BINARY: return TYPE_BINARY;
+    case TPrimitiveType::DECIMAL: return TYPE_DECIMAL;
     default: return INVALID_TYPE;
   }
 }
@@ -51,6 +53,8 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype) {
     case TYPE_DATETIME: return TPrimitiveType::DATETIME;
     case TYPE_TIMESTAMP: return TPrimitiveType::TIMESTAMP;
     case TYPE_STRING: return TPrimitiveType::STRING;
+    case TYPE_BINARY: return TPrimitiveType::BINARY;
+    case TYPE_DECIMAL: return TPrimitiveType::DECIMAL;
     default: return TPrimitiveType::INVALID_TYPE;
   }
 }
@@ -69,6 +73,8 @@ string TypeToString(PrimitiveType t) {
     case TYPE_DATETIME: return "DATETIME";
     case TYPE_TIMESTAMP: return "TIMESTAMP";
     case TYPE_STRING: return "STRING";
+    case TYPE_BINARY: return "BINARY";
+    case TYPE_DECIMAL: return "DECIMAL";
   };
   return "";
 }
@@ -88,6 +94,8 @@ string TypeToOdbcString(PrimitiveType t) {
     case TYPE_DATETIME: return "datetime";
     case TYPE_TIMESTAMP: return "timestamp";
     case TYPE_STRING: return "string";
+    case TYPE_BINARY: return "binary";
+    case TYPE_DECIMAL: return "decimal";
   };
   return "unknown";
 }
@@ -103,7 +111,9 @@ TTypeId::type TypeToHiveServer2Type(PrimitiveType t) {
     case TYPE_DOUBLE: return TTypeId::DOUBLE_TYPE;
     case TYPE_TIMESTAMP: return TTypeId::TIMESTAMP_TYPE;
     case TYPE_STRING: return TTypeId::STRING_TYPE;
+    case TYPE_BINARY: return TTypeId::BINARY_TYPE;
     default:
+      // Hive only supports DECIMAL from 0.11 so we are not including it here.
       // HiveServer2 does not have a type for invalid, date and datetime.
       DCHECK(false) << "bad TypeToTValueType() type: " << TypeToString(t);
       return TTypeId::STRING_TYPE;

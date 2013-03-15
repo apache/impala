@@ -19,9 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
@@ -90,7 +88,7 @@ public abstract class Table {
    * Calls load() on the appropriate instance of Table subclass.
    * @return new instance of HdfsTable or HBaseTable
    *         null if the table does not exist
-   * @throws TableLoadingException if there was an error loading the table. 
+   * @throws TableLoadingException if there was an error loading the table.
    * @throws TableNotFoundException if the table was not found
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
@@ -143,6 +141,10 @@ public abstract class Table {
       return PrimitiveType.TIMESTAMP;
     } else if (typeName.toLowerCase().equals("string")) {
       return PrimitiveType.STRING;
+    } else if (typeName.toLowerCase().equals("binary")) {
+      return PrimitiveType.BINARY;
+    } else if (typeName.toLowerCase().equals("decimal")) {
+      return PrimitiveType.DECIMAL;
     } else {
       return PrimitiveType.INVALID_TYPE;
     }

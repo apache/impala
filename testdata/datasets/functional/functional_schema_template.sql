@@ -988,3 +988,25 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+unsupported_types
+---- CREATE
+-- Create a table that mixes supported and unsupported scalar types.
+-- We should be able to read the column values of supported types and
+-- fail queries that reference  columns of unsupported types.
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+  int_col INT,
+  dec_col DECIMAL,
+  str_col STRING,
+  bin_col BINARY,
+  bigint_col BIGINT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/UnsupportedTypes/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====

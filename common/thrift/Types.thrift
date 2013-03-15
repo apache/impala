@@ -33,7 +33,10 @@ enum TPrimitiveType {
   DATE,
   DATETIME,
   TIMESTAMP,
-  STRING
+  STRING,
+  // Unsupported types
+  BINARY,
+  DECIMAL
 }
 
 enum TStmtType {

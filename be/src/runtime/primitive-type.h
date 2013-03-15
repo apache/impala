@@ -37,6 +37,8 @@ enum PrimitiveType {
   TYPE_STRING,
   TYPE_DATE,        // Not implemented
   TYPE_DATETIME,    // Not implemented
+  TYPE_BINARY,      // Not implemented
+  TYPE_DECIMAL      // Not implemented
 };
 
 // Returns the byte size of 'type'  Returns 0 for variable length types.
