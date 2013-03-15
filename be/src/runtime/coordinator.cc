@@ -1370,7 +1370,6 @@ Status Coordinator::ComputeScanRangeAssignment(
 
     TNetworkAddress exec_hostport;
     if (!exec_at_coord) {
-      DCHECK(remote_read || exec_env_->scheduler()->HasLocalHost(*data_host));
       RETURN_IF_ERROR(exec_env_->scheduler()->GetHost(*data_host, &exec_hostport));
     } else {
       exec_hostport = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
