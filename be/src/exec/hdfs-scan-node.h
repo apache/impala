@@ -214,6 +214,22 @@ class HdfsScanNode : public ScanNode {
   
   const static int SKIP_COLUMN = -1;
 
+  // map from volume id to <number of split, per volume split lengths>
+  typedef boost::unordered_map<int32_t, std::pair<int, int64_t> > PerVolumnStats;
+
+  // Update the per volume stats with the given scan range params list
+  static void UpdateHdfsSplitStats(
+      const std::vector<TScanRangeParams>& scan_range_params_list,
+      PerVolumnStats* per_volume_stats);
+
+  // Output the per_volume_stats to stringsteam. The output format is a list of:
+  // <volume id>:<# splits>/<per volume split lengths>
+  static void PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
+      std::stringstream* ss);
+
+  // Description string for the per volume stats output.
+  static const std::string HDFS_SPLIT_STATS_DESC;
+
  private:
   friend class ScannerContext;
 
@@ -384,6 +400,9 @@ class HdfsScanNode : public ScanNode {
 
   // Issue all queued ranges to the io mgr.
   Status IssueQueuedRanges();
+
+  // Disk accessed bitmap
+  RuntimeProfile::Counter disks_accessed_bitmap_;
   
   // Create a new scanner for this partition type and initialize it.
   // If the scanner cannot be created return NULL.

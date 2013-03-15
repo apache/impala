@@ -26,11 +26,53 @@ namespace impala {
 class TScanRange;
 
 // Abstract base class of all scan nodes; introduces SetScanRange().
-// Includes ScanNode common counters
+//
+// Includes ScanNode common counters:
+//   BytesRead - total bytes read by this scan node
+//
+//   TotalRawHdfsReadTime - it measures the total time spent in the disk-io-mgr's reading
+//     threads for this node. For example, if we have 3 reading threads and each spent
+//     1 sec, this counter will report 3 sec.
+//
+//   TotalReadThroughput - BytesRead divided by the total time spent in this node
+//     (from Open to Close). For IO bounded queries, this should be very close to the
+//     total throughput of all the disks.
+//
+//   PerDiskRawHdfsThroughput - the read throughput for each disk. If all the data reside
+//     on disk, this should be the read throughput the disk, regardless of whether the
+//     query is IO bounded or not.
+//
+//   NumDisksAccessed - number of disks accessed.
+//
+//   AverageScannerThreadConcurrency - the average number of active scanner threads. A
+//     scanner thread is considered active if it is not blocked by IO. This number would
+//     be low (less than 1) for IO bounded queries. For cpu bounded queries, this number
+//     would be close to the max scanner threads allowed.
+//
+//   AverageHdfsReadThreadConcurrency - the average number of active hdfs reading threads
+//     reading for this scan node. For IO bound queries, this should be close to the
+//     number of disk.
+//
+//     HdfsReadThreadConcurrencyCount=<i> - the number of samples taken when the hdfs read
+//       thread concurrency is <i>.
+//
+//   ScanRangesComplete - number of scan ranges completed
+//
+//   MaterializeTupleTime - time spent in creating in-memory tuple format
+//
+//   ScannerThreadsTotalWallClockTime - total time spent in all scanner threads.
+//
+//   ScannerThreadsUserTime, ScannerThreadsSysTime,
+//   ScannerThreadsVoluntaryContextSwitches, ScannerThreadsInvoluntaryContextSwitches -
+//     these are aggregated counters across all scanner threads of this scan node. They
+//     are taken from getrusage. See RuntimeProfile::ThreadCounters for details.
+//
 class ScanNode : public ExecNode {
  public:
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs) {}
+    : ExecNode(pool, tnode, descs),
+      active_scanner_thread_counter_(TCounterType::UNIT, 0),
+      active_hdfs_read_thread_counter_(TCounterType::UNIT, 0) {}
 
   // Set up counters
   virtual Status Prepare(RuntimeState* state);
@@ -46,8 +88,8 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* total_throughput_counter() const { 
     return total_throughput_counter_; 
   }
-  RuntimeProfile::Counter* per_thread_throughput_counter() const {
-    return per_thread_throughput_counter_;
+  RuntimeProfile::Counter* per_read_thread_throughput_counter() const {
+    return per_read_thread_throughput_counter_;
   }
   RuntimeProfile::Counter* materialize_tuple_timer() const { 
     return materialize_tuple_timer_; 
@@ -58,27 +100,57 @@ class ScanNode : public ExecNode {
   RuntimeProfile::ThreadCounters* scanner_thread_counters() const {
     return scanner_thread_counters_;
   }
+  RuntimeProfile::Counter& active_scanner_thread_counter() {
+    return active_scanner_thread_counter_;
+  }
+  RuntimeProfile::Counter* average_scanner_thread_concurrency() const {
+    return average_scanner_thread_concurrency_;
+  }
 
   // names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
-  static const std::string READ_TIMER;
+  static const std::string TOTAL_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
-  static const std::string PER_THREAD_THROUGHPUT_COUNTER;
+  static const std::string PER_READ_THREAD_THROUGHPUT_COUNTER;
+  static const std::string NUM_DISKS_ACCESSED_COUNTER;
   static const std::string MATERIALIZE_TUPLE_TIMER;
   static const std::string SCAN_RANGES_COMPLETE_COUNTER;
   static const std::string SCANNER_THREAD_COUNTERS_PREFIX;
+  static const std::string SCANNER_THREAD_TOTAL_WALLCLOCK_TIME;
+  static const std::string AVERAGE_SCANNER_THREAD_CONCURRENCY;;
+  static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
+  static const std::string HDFS_READ_THREAD_CONCURRENCY_BUCKET;
 
- private:
+ protected:
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
   RuntimeProfile::Counter* read_timer_; // total read time 
   // Wall based aggregate read throughput [bytes/sec]
   RuntimeProfile::Counter* total_throughput_counter_;
   // Per thread read throughput [bytes/sec]
-  RuntimeProfile::Counter* per_thread_throughput_counter_;
+  RuntimeProfile::Counter* per_read_thread_throughput_counter_;
+  RuntimeProfile::Counter* num_disks_accessed_counter_;
   RuntimeProfile::Counter* materialize_tuple_timer_;  // time writing tuple slots
   RuntimeProfile::Counter* scan_ranges_complete_counter_;
   // Aggregated scanner thread counters
   RuntimeProfile::ThreadCounters* scanner_thread_counters_;
+  
+  // The number of active scanner threads that are not blocked by IO.
+  RuntimeProfile::Counter active_scanner_thread_counter_;
+  
+  // Average number of active scanner threads
+  // This should be created in Open and stopped when all the scanner threads are done.
+  RuntimeProfile::Counter* average_scanner_thread_concurrency_;
+  
+  // The number of active hdfs reading threads reading for this node.
+  RuntimeProfile::Counter active_hdfs_read_thread_counter_;
+
+  // Average number of active hdfs reading threads
+  // This should be created in Open and stopped when all the scanner threads are done.
+  RuntimeProfile::Counter* average_hdfs_read_thread_concurrency_;
+
+  // HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
+  // taken where there are i concurrent hdfs read thread running
+  std::vector<RuntimeProfile::Counter*> hdfs_read_thread_concurrency_bucket_;
 };
 
 }

@@ -19,19 +19,23 @@
 #include "util/debug-util.h"
 #include "util/thrift-util.h"
 #include "util/url-coding.h"
+#include "util/container-util.h"
 
 #include <iomanip>
 #include <iostream>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/foreach.hpp>
+
 
 using namespace boost;
 using namespace std;
 
 namespace impala {
-
-// Period to update rate counters in ms.
-static const int RATE_COUNTER_UPDATE_PERIOD = 500;
+  
+// Period to update rate counters and sampling counters in ms.
+DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate counters and"
+    " sampling counters in ms");
 
 // Thread counters name
 static const string THREAD_TOTAL_TIME = "TotalWallClockTime";
@@ -40,7 +44,10 @@ static const string THREAD_SYS_TIME = "SysTime";
 static const string THREAD_VOLUNTARY_CONTEXT_SWITCHES = "VoluntaryContextSwitches";
 static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwitches";
 
-RuntimeProfile::RateCounterUpdateState RuntimeProfile::rate_counters_state_;
+// The root counter name for all top level counters.
+static const string ROOT_COUNTER = "";
+
+RuntimeProfile::PeriodicCounterUpdateState RuntimeProfile::periodic_counter_update_state_;
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
@@ -56,6 +63,15 @@ RuntimeProfile::~RuntimeProfile() {
   map<string, Counter*>::const_iterator iter;
   for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
     StopRateCounterUpdates(iter->second);
+    StopSamplingCounterUpdates(iter->second);
+  }
+
+  set<vector<Counter*>* >::const_iterator buckets_iter;
+  for (buckets_iter = bucketing_counters_.begin();
+      buckets_iter != bucketing_counters_.end(); ++buckets_iter) {
+    // This is just a clean up. No need to perform conversion. Also, the underlying
+    // counters might be gone already.
+    StopBucketingCountersUpdates(*buckets_iter, false);
   }
   if (own_pool_) delete pool_;
 }
@@ -79,7 +95,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
     profile->counter_map_[counter.name] =
       pool->Add(new Counter(counter.type, counter.value));
   }
-
+  profile->child_counter_map_ = node.child_counters_map;
   profile->info_strings_ = node.info_strings;
 
   ++*idx;
@@ -94,8 +110,8 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
 
   // Merge this level
   {
-    map<string, Counter*>::iterator dst_iter;
-    map<string, Counter*>::const_iterator src_iter;
+    CounterMap::iterator dst_iter;
+    CounterMap::const_iterator src_iter;
     lock_guard<mutex> l(counter_map_lock_);
     lock_guard<mutex> m(other->counter_map_lock_);
     for (src_iter = other->counter_map_.begin();
@@ -106,8 +122,24 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
           pool_->Add(new Counter(src_iter->second->type(), src_iter->second->value()));
       } else {
         DCHECK(dst_iter->second->type() == src_iter->second->type());
-        dst_iter->second->Update(src_iter->second->value());
+        if (dst_iter->second->type() == TCounterType::DOUBLE_VALUE) {
+          double new_val = dst_iter->second->double_value() +
+              src_iter->second->double_value();
+          dst_iter->second->Set(new_val);
+        } else {
+          dst_iter->second->Update(src_iter->second->value());
+        }
       }
+    }
+
+    ChildCounterMap::const_iterator child_counter_src_itr;
+    for (child_counter_src_itr = other->child_counter_map_.begin();
+         child_counter_src_itr != other->child_counter_map_.end();
+         ++child_counter_src_itr) {
+      set<string>* child_counters = FindOrInsert(&child_counter_map_,
+          child_counter_src_itr->first, set<string>());
+      child_counters->insert(child_counter_src_itr->second.begin(),
+          child_counter_src_itr->second.end());
     }
   }
 
@@ -162,6 +194,16 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
         }
       }
     }
+
+    ChildCounterMap::const_iterator child_counter_src_itr;
+    for (child_counter_src_itr = node.child_counters_map.begin();
+         child_counter_src_itr != node.child_counters_map.end();
+         ++child_counter_src_itr) {
+      set<string>* child_counters = FindOrInsert(&child_counter_map_,
+          child_counter_src_itr->first, set<string>());
+      child_counters->insert(child_counter_src_itr->second.begin(),
+          child_counter_src_itr->second.end());
+    }
   }
 
   {
@@ -200,7 +242,11 @@ void RuntimeProfile::Divide(int n) {
   {
     lock_guard<mutex> l(counter_map_lock_);
     for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
-      iter->second->value_ /= n;
+      if (iter->second->type() == TCounterType::DOUBLE_VALUE) {
+        iter->second->Set(iter->second->double_value() / n);
+      } else {
+        iter->second->value_ /= n;
+      }
     }
   }
   {
@@ -283,33 +329,43 @@ const string* RuntimeProfile::GetInfoString(const string& key) {
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddCounter(
-    const string& name, TCounterType::type type) {
+    const string& name, TCounterType::type type, const string& parent_counter_name) {
   lock_guard<mutex> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) {
     // TODO: should we make sure that we don't return existing derived counters?
     return counter_map_[name];
   }
+  DCHECK(parent_counter_name == ROOT_COUNTER ||
+      counter_map_.find(parent_counter_name) != counter_map_.end());
   Counter* counter = pool_->Add(new Counter(type));
   counter_map_[name] = counter;
+  set<string>* child_counters =
+      FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());
+  child_counters->insert(name);
   return counter;
 }
 
 RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
-    const std::string& name, TCounterType::type type,
-    const DerivedCounterFunction& counter_fn) {
+    const string& name, TCounterType::type type,
+    const DerivedCounterFunction& counter_fn, const string& parent_counter_name) {
   lock_guard<mutex> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
   DerivedCounter* counter = pool_->Add(new DerivedCounter(type, counter_fn));
   counter_map_[name] = counter;
+  set<string>* child_counters =
+      FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());
+  child_counters->insert(name);
   return counter;
 }
 
 RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
-    const std::string& prefix) {
+    const string& prefix) {
   ThreadCounters* counter = pool_->Add(new ThreadCounters());
   counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TCounterType::TIME_NS);
-  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_NS);
-  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_NS);
+  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_NS,
+      prefix + THREAD_TOTAL_TIME);
+  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_NS,
+      prefix + THREAD_TOTAL_TIME);
   counter->voluntary_context_switches_ =
       AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCHES, TCounterType::UNIT);
   counter->involuntary_context_switches_ =
@@ -325,8 +381,7 @@ RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
   return NULL;
 }
 
-void RuntimeProfile::GetCounters(
-    const std::string& name, std::vector<Counter*>* counters) {
+void RuntimeProfile::GetCounters(const string& name, vector<Counter*>* counters) {
   Counter* c = GetCounter(name);
   if (c != NULL) counters->push_back(c);
 
@@ -344,12 +399,14 @@ void RuntimeProfile::GetCounters(
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   ostream& stream = *s;
 
-  // create copy of counter_map_ so we don't need to hold lock while we call
-  // value() on the counters (some of those might be DerivedCounters)
+  // create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
+  // while we call value() on the counters (some of those might be DerivedCounters)
   CounterMap counter_map;
+  ChildCounterMap child_counter_map;
   {
     lock_guard<mutex> l(counter_map_lock_);
     counter_map = counter_map_;
+    child_counter_map = child_counter_map_;
   }
 
   map<string, Counter*>::const_iterator total_time = counter_map.find("TotalTime");
@@ -374,13 +431,8 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     }
   }
 
-  for (map<string, Counter*>::const_iterator iter = counter_map.begin();
-       iter != counter_map.end(); ++iter) {
-    if (iter == total_time) continue;
-    stream << prefix << "   - " << iter->first << ": "
-           << PrettyPrinter::Print(iter->second->value(), iter->second->type())
-           << endl;
-  }
+  RuntimeProfile::PrintChildCounters(
+      prefix, ROOT_COUNTER, counter_map, child_counter_map, s);
 
   // create copy of children_ so we don't need to hold lock while we call
   // PrettyPrint() on the children
@@ -432,6 +484,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
   {
     lock_guard<mutex> l(counter_map_lock_);
     counter_map = counter_map_;
+    node.child_counters_map = child_counter_map_;
   }
   for (map<string, Counter*>::const_iterator iter = counter_map.begin();
        iter != counter_map.end(); ++iter) {
@@ -472,7 +525,7 @@ int64_t RuntimeProfile::UnitsPerSecond(
   return total_counter->value() / secs;
 }
 
-int64_t RuntimeProfile::CounterSum(const std::vector<Counter*>* counters) {
+int64_t RuntimeProfile::CounterSum(const vector<Counter*>* counters) {
   int64_t value = 0;
   for (int i = 0; i < counters->size(); ++i) {
     value += (*counters)[i]->value();
@@ -495,57 +548,171 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
       return NULL;
   }
   Counter* dst_counter = AddCounter(name, dst_type);
-  RegisterRateCounter(src_counter, dst_counter);
+  RegisterPeriodicCounter(src_counter, dst_counter, RATE_COUNTER);
   return dst_counter;
 }
 
-void RuntimeProfile::RegisterRateCounter(Counter* src_counter, Counter* dst_counter) {
-  RateCounterInfo counter;
-  counter.src_counter = src_counter;
-  counter.elapsed_ms = 0;
+RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
+    const string& name, Counter* src_counter) {
+  DCHECK(src_counter->type() == TCounterType::UNIT);
+  Counter* dst_counter = AddCounter(name, TCounterType::DOUBLE_VALUE);
+  RegisterPeriodicCounter(src_counter, dst_counter, SAMPLING_COUNTER);
+  return dst_counter;
+}
 
-  lock_guard<mutex> l(rate_counters_state_.lock);
-  if (rate_counters_state_.update_thread.get() == NULL) {
-    rate_counters_state_.update_thread.reset(
-        new thread(&RuntimeProfile::RateCounterUpdateLoop));
+void RuntimeProfile::AddBucketingCounters(const string& name,
+    const string& parent_counter_name, Counter* src_counter,
+    int num_buckets, vector<Counter*>* buckets) {
+  {
+    lock_guard<mutex> l(counter_map_lock_);
+    bucketing_counters_.insert(buckets);
   }
-  rate_counters_state_.counters[dst_counter] = counter;
+  for (int i = 0; i < num_buckets; ++i) {
+    stringstream counter_name;
+    counter_name << name << "=" << i;
+    buckets->push_back(AddCounter(counter_name.str(), TCounterType::DOUBLE_VALUE,
+        parent_counter_name));
+  }
+
+  lock_guard<mutex> l(periodic_counter_update_state_.lock);
+  if (periodic_counter_update_state_.update_thread.get() == NULL) {
+    periodic_counter_update_state_.update_thread.reset(
+        new thread(&RuntimeProfile::PeriodicCounterUpdateLoop));
+  }
+  BucketCountersInfo info;
+  info.src_counter = src_counter;
+  info.num_sampled = 0;
+  periodic_counter_update_state_.bucketing_counters[buckets] = info;
+}
+  
+void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, Counter* dst_counter,
+    PeriodicCounterType type) {
+
+  lock_guard<mutex> l(periodic_counter_update_state_.lock);
+  if (periodic_counter_update_state_.update_thread.get() == NULL) {
+    periodic_counter_update_state_.update_thread.reset(
+        new thread(&RuntimeProfile::PeriodicCounterUpdateLoop));
+  }
+  switch (type) {
+    case RATE_COUNTER: {
+      RateCounterInfo counter;
+      counter.src_counter = src_counter;
+      counter.elapsed_ms = 0;
+      periodic_counter_update_state_.rate_counters[dst_counter] = counter;
+      break;
+    }
+    case SAMPLING_COUNTER: {
+      SamplingCounterInfo counter;
+      counter.src_counter = src_counter;
+      counter.num_sampled = 0;
+      counter.total_sampled_value = 0;
+      periodic_counter_update_state_.sampling_counters[dst_counter] = counter;
+      break;
+    }
+    default:
+      DCHECK(false) << "Unsupported PeriodicCounterType:" << type;
+  }
 }
 
 void RuntimeProfile::StopRateCounterUpdates(Counter* rate_counter) {
-  lock_guard<mutex> l(rate_counters_state_.lock);
-  rate_counters_state_.counters.erase(rate_counter);
+  lock_guard<mutex> l(periodic_counter_update_state_.lock);
+  periodic_counter_update_state_.rate_counters.erase(rate_counter);
 }
 
-RuntimeProfile::RateCounterUpdateState::RateCounterUpdateState() : done_(false) {
+void RuntimeProfile::StopSamplingCounterUpdates(Counter* sampling_counter) {
+  lock_guard<mutex> l(periodic_counter_update_state_.lock);
+  periodic_counter_update_state_.sampling_counters.erase(sampling_counter);
 }
 
-RuntimeProfile::RateCounterUpdateState::~RateCounterUpdateState() {
-  if (rate_counters_state_.update_thread.get() != NULL) {
-    {
-      // Lock to ensure the update thread will see the update to done_
-      lock_guard<mutex> l(rate_counters_state_.lock);
-      done_ = true;
+void RuntimeProfile::StopBucketingCountersUpdates(vector<Counter*>* buckets,
+    bool convert) {
+  int64_t num_sampled = 0;
+  {
+    lock_guard<mutex> l(periodic_counter_update_state_.lock);
+    PeriodicCounterUpdateState::BucketCountersMap::const_iterator itr =
+        periodic_counter_update_state_.bucketing_counters.find(buckets);
+    if (itr != periodic_counter_update_state_.bucketing_counters.end()) {
+      num_sampled = itr->second.num_sampled;
+      periodic_counter_update_state_.bucketing_counters.erase(buckets);
     }
-    rate_counters_state_.update_thread->join();
+  }
+
+  if (convert && num_sampled > 0) {
+    BOOST_FOREACH(Counter* counter, *buckets) {
+      double perc = 100 * counter->value() / (double)num_sampled;
+      counter->Set(perc);
+    }
   }
 }
 
-void RuntimeProfile::RateCounterUpdateLoop() {
-  while (!rate_counters_state_.done_) {
+RuntimeProfile::PeriodicCounterUpdateState::PeriodicCounterUpdateState() : done_(false) {
+}
+
+RuntimeProfile::PeriodicCounterUpdateState::~PeriodicCounterUpdateState() {
+  if (periodic_counter_update_state_.update_thread.get() != NULL) {
+    {
+      // Lock to ensure the update thread will see the update to done_
+      lock_guard<mutex> l(periodic_counter_update_state_.lock);
+      done_ = true;
+    }
+    periodic_counter_update_state_.update_thread->join();
+  }
+}
+
+void RuntimeProfile::PeriodicCounterUpdateLoop() {
+  while (!periodic_counter_update_state_.done_) {
     system_time before_time = get_system_time();
-    usleep(RATE_COUNTER_UPDATE_PERIOD * 1000);
+    usleep(FLAGS_periodic_counter_update_period_ms * 1000);
     posix_time::time_duration elapsed = get_system_time() - before_time;
     int elapsed_ms = elapsed.total_milliseconds();
 
-    lock_guard<mutex> l(rate_counters_state_.lock);
-    for (RateCounterUpdateState::RateCounterMap::iterator it =
-        rate_counters_state_.counters.begin();
-        it != rate_counters_state_.counters.end(); ++it) {
+    lock_guard<mutex> l(periodic_counter_update_state_.lock);
+    for (PeriodicCounterUpdateState::RateCounterMap::iterator it = 
+        periodic_counter_update_state_.rate_counters.begin();
+        it != periodic_counter_update_state_.rate_counters.end(); ++it) {
       it->second.elapsed_ms += elapsed_ms;
       int64_t value = it->second.src_counter->value();
       int64_t rate = value * 1000 / (it->second.elapsed_ms);
       it->first->Set(rate);
+    }
+
+    for (PeriodicCounterUpdateState::SamplingCounterMap::iterator it =
+        periodic_counter_update_state_.sampling_counters.begin();
+        it != periodic_counter_update_state_.sampling_counters.end(); ++it) {
+      ++it->second.num_sampled;
+      it->second.total_sampled_value += it->second.src_counter->value_;
+      double average = static_cast<double>(it->second.total_sampled_value) /
+          it->second.num_sampled;
+      it->first->Set(average);
+    }
+
+    for (PeriodicCounterUpdateState::BucketCountersMap::iterator it =
+        periodic_counter_update_state_.bucketing_counters.begin();
+        it != periodic_counter_update_state_.bucketing_counters.end(); ++it) {
+      int64_t val = it->second.src_counter->value();
+      if (val >= it->first->size()) val = it->first->size() - 1;
+      it->first->at(val)->Update(1);
+      ++it->second.num_sampled;
+    }
+
+  }
+}
+
+void RuntimeProfile::PrintChildCounters(const string& prefix,
+    const string& counter_name, const CounterMap& counter_map,
+    const ChildCounterMap& child_counter_map, ostream* s) {
+  ostream& stream = *s;
+  ChildCounterMap::const_iterator itr = child_counter_map.find(counter_name);
+  if (itr != child_counter_map.end()) {
+    const set<string>& child_counters = itr->second;
+    BOOST_FOREACH(const string& child_counter, child_counters) {
+      CounterMap::const_iterator iter = counter_map.find(child_counter);
+      DCHECK(iter != counter_map.end());
+      stream << prefix << "   - " << iter->first << ": "
+             << PrettyPrinter::Print(iter->second->value(), iter->second->type())
+             << endl;
+      RuntimeProfile::PrintChildCounters(prefix + "  ", child_counter, counter_map,
+          child_counter_map, s);
     }
   }
 }

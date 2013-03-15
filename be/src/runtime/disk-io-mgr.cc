@@ -106,6 +106,13 @@ struct DiskIoMgr::ReaderContext {
   // Total time spent in hdfs reading
   RuntimeProfile::Counter* read_timer_;
 
+  // Number of active read threads
+  RuntimeProfile::Counter* active_read_thread_counter_;
+
+  // Disk access bitmap. Bit[i] is set if disk id i has been accessed. Map to
+  // HdfsScanNode::disks_accessed_bitmap_
+  RuntimeProfile::Counter* disks_accessed_bitmap_;
+
   // hdfsFS connection handle.  This is set once and never changed for the duration 
   // of the reader.  NULL if this is a local reader.
   hdfsFS hdfs_connection_;
@@ -263,6 +270,8 @@ struct DiskIoMgr::ReaderContext {
     : parent_(parent),
       bytes_read_counter_(NULL),
       read_timer_(NULL),
+      active_read_thread_counter_(NULL),
+      disks_accessed_bitmap_(NULL),
       state_(Inactive),
       disk_states_(num_disks) {
   }
@@ -282,6 +291,8 @@ struct DiskIoMgr::ReaderContext {
 
     bytes_read_counter_ = NULL;
     read_timer_ = NULL;
+    active_read_thread_counter_ = NULL;
+    disks_accessed_bitmap_ = NULL;
 
     state_ = Active;
     sync_reader_ = false;
@@ -691,6 +702,16 @@ void DiskIoMgr::set_read_timer(ReaderContext* r, RuntimeProfile::Counter* c) {
 
 void DiskIoMgr::set_bytes_read_counter(ReaderContext* r, RuntimeProfile::Counter* c) {
   r->bytes_read_counter_ = c;
+}
+
+void DiskIoMgr::set_active_read_thread_counter(ReaderContext* r,
+    RuntimeProfile::Counter* c) {
+  r->active_read_thread_counter_ = c;
+}
+
+void DiskIoMgr::set_disks_access_bitmap(ReaderContext* r,
+    RuntimeProfile::Counter* c) {
+  r->disks_accessed_bitmap_ = c;
 }
 
 int64_t DiskIoMgr::GetReadThroughput() {
@@ -1533,6 +1554,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
 //      results of the io.
 // Cancellation checking needs to happen in both steps 1 and 3.
 void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
+  int64_t disk_bit = 1 << disk_queue->disk_id;
   while (true) {
     char* buffer = NULL;
     ReaderContext* reader = NULL;;
@@ -1555,6 +1577,12 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
     buffer_desc->status_ = OpenScanRange(reader->hdfs_connection_, range);
     if (buffer_desc->status_.ok()) {
       // Update counters.
+      if (reader->active_read_thread_counter_) {
+        reader->active_read_thread_counter_->Update(1L);
+      }
+      if (reader->disks_accessed_bitmap_) {
+        reader->disks_accessed_bitmap_->BitOr(disk_bit);
+      }
       SCOPED_TIMER(&read_timer_);
       SCOPED_TIMER(reader->read_timer_);
       
@@ -1567,6 +1595,9 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
         COUNTER_UPDATE(reader->bytes_read_counter_, buffer_desc->len_);
       }
       COUNTER_UPDATE(&total_bytes_read_counter_, buffer_desc->len_);
+      if (reader->active_read_thread_counter_) {
+        reader->active_read_thread_counter_->Update(-1L);
+      }
     }
 
     // Finished read, update reader/disk based on the results

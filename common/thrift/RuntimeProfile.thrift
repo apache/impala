@@ -22,7 +22,8 @@ enum TCounterType {
   CPU_TICKS,
   BYTES
   BYTES_PER_SECOND,
-  TIME_NS
+  TIME_NS,
+  DOUBLE_VALUE
 }
 
 // Counter data
@@ -48,6 +49,9 @@ struct TRuntimeProfileNode {
   // map of key,value info strings that capture any kind of additional information 
   // about the profiled object
   6: required map<string, string> info_strings
+  
+  // map from parent counter name to child counter name
+  7: required map<string, set<string>> child_counters_map
 }
 
 // A flattened tree of runtime profiles, obtained by an

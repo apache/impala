@@ -52,7 +52,7 @@ TEST(CountersTest, Basic) {
   counter_a->Update(10);
   counter_a->Update(-5);
   EXPECT_EQ(counter_a->value(), 5);
-  counter_a->Set(1);
+  counter_a->Set(1L);
   EXPECT_EQ(counter_a->value(), 1);
   
   counter_b = profile_a2.AddCounter("B", TCounterType::BYTES);
@@ -222,15 +222,15 @@ TEST(CountersTest, DerivedCounters) {
   RuntimeProfile::Counter* ticks_counter =
       profile.AddCounter("ticks", TCounterType::TIME_NS);
   // set to 1 sec
-  ticks_counter->Set(1000 * 1000 * 1000);
+  ticks_counter->Set(1000L * 1000L * 1000L);
 
   RuntimeProfile::DerivedCounter* throughput_counter =
       profile.AddDerivedCounter("throughput", TCounterType::BYTES,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
-  bytes_counter->Set(10);
+  bytes_counter->Set(10L);
   EXPECT_EQ(throughput_counter->value(), 10);
-  bytes_counter->Set(20);
+  bytes_counter->Set(20L);
   EXPECT_EQ(throughput_counter->value(), 20);
   ticks_counter->Set(ticks_counter->value() / 2);
   EXPECT_EQ(throughput_counter->value(), 40);
@@ -290,7 +290,7 @@ TEST(CountersTest, RateCounters) {
 
   EXPECT_EQ(rate_counter->value(), 0);
   // set to 100MB.  Use bigger units to avoid truncating to 0 after divides.
-  bytes_counter->Set(100 * 1024 * 1024);  
+  bytes_counter->Set(100L * 1024L * 1024L);
 
   // Wait one second.  
   sleep(1);
@@ -314,6 +314,40 @@ TEST(CountersTest, RateCounters) {
   EXPECT_LE(rate, 200 * 1024 * 1024);
 }
 
+TEST(CountersTest, BucketCounters) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+
+  RuntimeProfile::Counter* unit_counter =
+      profile.AddCounter("unit", TCounterType::UNIT);
+
+  // Set the unit to 1 before sampling
+  unit_counter->Set(1L);
+
+  // Create the bucket counters and start sampling
+  vector<RuntimeProfile::Counter*> buckets;
+  profile.AddBucketingCounters("BucketCounters", "", unit_counter, 2, &buckets);
+
+  // Wait two seconds.
+  sleep(2);
+
+  // Stop sampling
+  profile.StopBucketingCountersUpdates(&buckets, true);
+
+  // TODO: change the value to double
+  // The value of buckets[0] should be zero and buckets[1] should be 1.
+  double val0 = buckets[0]->double_value();
+  double val1 = buckets[1]->double_value();
+
+  EXPECT_EQ(val0, 0);
+  EXPECT_EQ(val1, 100);
+
+  // Wait another second.  The counter has been removed. So the value should not be
+  // changed (much).
+  sleep(2);
+  EXPECT_EQ(val0, buckets[0]->double_value());
+  EXPECT_EQ(val1, buckets[1]->double_value());
+}
 }
 
 int main(int argc, char **argv) {

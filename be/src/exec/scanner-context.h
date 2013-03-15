@@ -382,7 +382,7 @@ class ScannerContext {
   // Attach all resources to the current row batch and send the batch to the scan node.
   void AddFinalBatch();
 };
-  
+
 }
 
 #endif

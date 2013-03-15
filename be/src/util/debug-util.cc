@@ -269,6 +269,12 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       break;
     }
 
+    case TCounterType::DOUBLE_VALUE: {
+      double output = *reinterpret_cast<double*>(&value);
+      ss << setprecision(PRECISION) << output << " ";
+      break;
+    }
+
     default:
       DCHECK(false);
       break;

@@ -328,7 +328,8 @@ Function* HdfsTextScanner::Codegen(HdfsScanNode* node) {
 Status HdfsTextScanner::Prepare() {
   RETURN_IF_ERROR(HdfsScanner::Prepare());
   
-  parse_delimiter_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DelimiterParseTime");
+  parse_delimiter_timer_ = ADD_CHILD_TIMER(scan_node_->runtime_profile(),
+      "DelimiterParseTime", ScanNode::SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
 
   // Allocate the scratch space for two pass parsing.  The most fields we can go
   // through in one parse pass is the batch size (tuples) * the number of fields per tuple

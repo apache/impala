@@ -315,6 +315,8 @@ class DiskIoMgr {
 
   void set_bytes_read_counter(ReaderContext*, RuntimeProfile::Counter*);
   void set_read_timer(ReaderContext*, RuntimeProfile::Counter*);
+  void set_active_read_thread_counter(ReaderContext*, RuntimeProfile::Counter*);
+  void set_disks_access_bitmap(ReaderContext*, RuntimeProfile::Counter*);
 
   // Returns the read throughput across all readers.    
   // TODO: should this be a sliding window?  This should report metrics for the

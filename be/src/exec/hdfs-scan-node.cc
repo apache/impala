@@ -23,7 +23,9 @@
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
+#include <boost/foreach.hpp>
 #include <dlfcn.h>
+
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
@@ -35,6 +37,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
@@ -52,6 +55,9 @@ using namespace boost;
 using namespace impala;
 using namespace llvm;
 using namespace std;
+
+const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
+    "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
 
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
@@ -74,7 +80,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       max_queued_io_buffers_(2 * DiskIoMgr::default_parallel_scan_ranges()),
       num_blocked_scanners_(0),
       partition_key_pool_(new MemPool()),
-      counters_reported_(false) {
+      counters_reported_(false),
+      disks_accessed_bitmap_(TCounterType::UNIT, 0) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
     // TODO: This parameter has an U-shaped effect on performance: increasing the value
@@ -203,6 +210,13 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
   // incomplete metadata.
   ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params.size());
   ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
+
+  // Add per volume stats to the runtime profile
+  PerVolumnStats per_volume_stats;
+  stringstream str;
+  UpdateHdfsSplitStats(scan_range_params, &per_volume_stats);
+  PrintHdfsSplitStats(per_volume_stats, &str);
+  runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
 
   return Status::OK;
 }
@@ -395,6 +409,18 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       &reader_context_));
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
+  runtime_state_->io_mgr()->set_active_read_thread_counter(reader_context_,
+      &active_hdfs_read_thread_counter_);
+  runtime_state_->io_mgr()->set_disks_access_bitmap(reader_context_,
+      &disks_accessed_bitmap_);
+
+  average_scanner_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
+      AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
+  average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
+      AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
+  runtime_profile()->AddBucketingCounters(HDFS_READ_THREAD_CONCURRENCY_BUCKET,
+      AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_,
+      state->io_mgr()->num_disks() + 1, &hdfs_read_thread_concurrency_bucket_);
 
   int total_splits = 0;
   // Walk all the files on this node and coalesce all the files with the same
@@ -509,6 +535,10 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   if (reader_context_ != NULL) {
     runtime_state_->io_mgr()->UnregisterReader(reader_context_);
   }
+
+  // There should be no active scanner threads and hdfs read threads.
+  DCHECK_EQ(active_scanner_thread_counter_.value(), 0);
+  DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
   scanner_pool_.reset(NULL);
 
@@ -670,7 +700,7 @@ void HdfsScanNode::DiskThread() {
   }
 
   scanner_threads_.join_all();
-   
+
   // Wake up thread in GetNext	
   row_batch_added_cv_.notify_one();
 }
@@ -696,6 +726,7 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) 
   Status status;
   {
     SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
+    ScopedCounter scoped_counter(&active_scanner_thread_counter_, -1);
     status = scanner->ProcessSplit(context);
     scanner->Close();
   }
@@ -799,7 +830,16 @@ void HdfsScanNode::UpdateCounters() {
   counters_reported_ = true;
 
   runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
-  
+  runtime_profile()->StopSamplingCounterUpdates(average_scanner_thread_concurrency_);
+  runtime_profile()->StopSamplingCounterUpdates(average_hdfs_read_thread_concurrency_);
+  runtime_profile()->StopBucketingCountersUpdates(&hdfs_read_thread_concurrency_bucket_,
+      true);
+
+  // Convert disk access bitmap to num of disk accessed
+  uint64_t num_disk_bitmap = disks_accessed_bitmap_.value();
+  int64_t num_disk_accessed = __builtin_popcountl(num_disk_bitmap);
+  num_disks_accessed_counter_->Set(num_disk_accessed);
+
   // output completed file types and counts to info string
   if (!file_type_counts_.empty()) {
     unique_lock<mutex> l2(file_type_counts_lock_);
@@ -810,6 +850,30 @@ void HdfsScanNode::UpdateCounters() {
         << ":" << it->second << " ";
     }
     runtime_profile_->AddInfoString("File Formats", ss.str());
+  }
+}
+
+void HdfsScanNode::UpdateHdfsSplitStats(
+    const vector<TScanRangeParams>& scan_range_params_list,
+    PerVolumnStats* per_volume_stats) {
+  pair<int, int64_t> init_value(0, 0);
+  BOOST_FOREACH(const TScanRangeParams& scan_range_params, scan_range_params_list) {
+    const TScanRange& scan_range = scan_range_params.scan_range;
+    if (!scan_range.__isset.hdfs_file_split) continue;
+    const THdfsFileSplit& split = scan_range.hdfs_file_split;
+    pair<int, int64_t>* stats =
+        FindOrInsert(per_volume_stats, scan_range_params.volume_id, init_value);
+    ++(stats->first);
+    stats->second += split.length;
+  }
+}
+
+void HdfsScanNode::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
+    stringstream* ss) {
+  for (PerVolumnStats::const_iterator i = per_volume_stats.begin();
+       i != per_volume_stats.end(); ++i) {
+     (*ss) << i->first << ":" << i->second.first << "/"
+         << PrettyPrinter::Print(i->second.second, TCounterType::BYTES) << " ";
   }
 }
 

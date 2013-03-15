@@ -30,7 +30,7 @@ void DataProvider::Reset(int num_rows, int batch_size, const vector<DataProvider
     row_size_ += cols[i].bytes;
   }
   data_.reset(new char[row_size_ * batch_size_]);
-  COUNTER_SET(bytes_generated_, 0);
+  COUNTER_SET(bytes_generated_, 0L);
 }
 
 void DataProvider::SetSeed(int seed) {

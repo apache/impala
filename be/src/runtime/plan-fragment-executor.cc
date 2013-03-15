@@ -26,6 +26,7 @@
 #include "exec/exec-node.h"
 #include "exec/exchange-node.h"
 #include "exec/scan-node.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -193,30 +194,15 @@ void PlanFragmentExecutor::PrintVolumeIds(
     const PerNodeScanRanges& per_node_scan_ranges) {
   if (per_node_scan_ranges.empty()) return;
 
-  // map from volume id to (# of splits, total # bytes) on that volume
-  unordered_map<int32_t, pair<int, int64_t> > per_volume_stats;
-  pair<int, int64_t> init_value(0, 0);
+  HdfsScanNode::PerVolumnStats per_volume_stats;
   BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
-    BOOST_FOREACH(const TScanRangeParams& scan_range_params, entry.second) {
-      const TScanRange& scan_range = scan_range_params.scan_range;
-      if (!scan_range.__isset.hdfs_file_split) continue;
-      const THdfsFileSplit& split = scan_range.hdfs_file_split;
-      pair<int, int64_t>* stats =
-          FindOrInsert(&per_volume_stats, scan_range_params.volume_id, init_value);
-      ++(stats->first);
-      stats->second += split.length;
-    }
+    HdfsScanNode::UpdateHdfsSplitStats(entry.second, &per_volume_stats);
   }
 
   stringstream str;
-  for (unordered_map<int32_t, pair<int, int64_t> >::iterator i = per_volume_stats.begin();
-       i != per_volume_stats.end(); ++i) {
-     str << i->first << ":" << i->second.first << "/"
-         << PrettyPrinter::Print(i->second.second, TCounterType::UNIT) << " ";
-  }
-  profile()->AddInfoString("Hdfs split stats (<volume id>:<# splits>/<split lengths>)",
-     str.str());
 
+  HdfsScanNode::PrintHdfsSplitStats(per_volume_stats, &str);
+  profile()->AddInfoString(HdfsScanNode::HDFS_SPLIT_STATS_DESC, str.str());
   VLOG_FILE << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
             << query_id_ << ":\n"
             << str.str();
