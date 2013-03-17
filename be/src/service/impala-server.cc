@@ -704,29 +704,39 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
   TUniqueId unique_id;
   unique_id.hi = hi;
   unique_id.lo = lo;
+  (*output) << "<pre>";
+  Status status = GetRuntimeProfileStr(unique_id, output);
+  if (!status.ok()) {
+    (*output) << status.GetErrorMsg();
+  }
+  (*output) << "</pre>";
+}
+
+Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
+    stringstream* output) {
+  DCHECK(output != NULL);
+  // Search for the query id in the active query map
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
-    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(unique_id);
-
+    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
     if (exec_state != query_exec_state_map_.end()) {
-      (*output) << "<pre>";
       exec_state->second->profile().PrettyPrint(output);
-      (*output) << "</pre>";
-      return;
+      return Status::OK;
     }
   }
 
-  // Check the query log
+  // The query was not found the active query map, search the query log.
   {
     lock_guard<mutex> l(query_log_lock_);
-    QueryLogIndex::const_iterator query_record = query_log_index_.find(unique_id);
+    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
     if (query_record == query_log_index_.end()) {
-      (*output) << "Query '" << unique_id.hi << ":" << unique_id.lo << "' not found";
-      return;
+      stringstream ss;
+      ss << "Query id " << PrintId(query_id) << " not found.";
+      return Status(ss.str());
     }
-
-    (*output) << "<pre>" << query_record->second->profile_str << "</pre>";
+    (*output) << query_record->second->profile_str;
   }
+  return Status::OK;
 }
 
 void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,

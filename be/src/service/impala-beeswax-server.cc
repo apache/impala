@@ -400,6 +400,25 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
   }
 }
 
+// Gets the runtime profile string for the given query handle and stores the result in
+// the profile_output parameter. Raises a BeeswaxException if there are any errors
+// getting the profile, such as no matching queries found.
+void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& handle) {
+  if (handle.id == NO_QUERY_HANDLE) {
+    return;
+  }
+  TUniqueId query_id;
+  QueryHandleToTUniqueId(handle, &query_id);
+  VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
+  stringstream ss;
+  Status status = GetRuntimeProfileStr(query_id, &ss);
+  if (!status.ok()) {
+    ss << "GetRuntimeProfile error: " << status.GetErrorMsg();
+    RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
+  }
+  profile_output = ss.str();
+}
+
 void ImpalaServer::PingImpalaService() {
 }
 

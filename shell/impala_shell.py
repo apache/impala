@@ -88,6 +88,9 @@ class ImpalaShell(cmd.Cmd):
     self.refresh_after_connect = options.refresh_after_connect
     self.default_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
+    self.show_profiles = options.show_profiles
+    # Tracks the last query executed. Stored as a tuple of: (query_handle, query_string)
+    self.last_query = None
     try:
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
@@ -229,6 +232,7 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('refresh')
       if self.default_db:
         self.cmdqueue.append('use %s' % self.default_db)
+    self.last_query = None
     return True
 
   def __connect(self):
@@ -368,16 +372,28 @@ class ImpalaShell(cmd.Cmd):
         result_rows = []
         if not results.has_more:
           break
+    # Don't include the time to get the runtime profile in the query execution time
     end = time.time()
-
+    self.__print_runtime_profile_if_enabled(handle)
     self.__print_if_verbose(
       "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end - start))
+    self.last_query = (handle, query.query)
     return self.__close_query_handle(handle)
 
   def __close_query_handle(self, handle):
     """Close the query handle"""
     self.__do_rpc(lambda: self.imp_service.close(handle))
     return True
+
+  def __print_runtime_profile_if_enabled(self, handle):
+    if self.show_profiles:
+      self.__print_runtime_profile(handle)
+
+  def __print_runtime_profile(self, handle):
+    profile = self.__get_runtime_profile(handle)
+    if profile is not None:
+      print "Query Runtime Profile:"
+      print profile
 
   def __print_if_verbose(self, message):
     if self.verbose:
@@ -398,6 +414,18 @@ class ImpalaShell(cmd.Cmd):
 
     (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
     return status == RpcStatus.OK
+
+  def do_profile(self, args):
+    """Prints the runtime profile of the last INSERT or SELECT query executed."""
+    if len(args) > 0:
+      print "'profile' does not accept any arguments"
+      return False
+    elif self.last_query is None or len(self.last_query) != 2:
+      print 'No previous query available to profile'
+      return False
+    print 'Query: %s' % self.last_query[1]
+    self.__print_runtime_profile(self.last_query[0])
+    return True
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
@@ -465,8 +493,10 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK or self.is_interrupted.isSet():
       return False
 
+    self.__print_runtime_profile_if_enabled(handle)
     num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
     self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
+    self.last_query = (handle, query.query)
     return True
 
   def __cancel_query(self, handle):
@@ -485,6 +515,11 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK:
       return self.query_state["EXCEPTION"]
     return state
+
+  def __get_runtime_profile(self, handle):
+    profile, status = self.__do_rpc(lambda: self.imp_service.GetRuntimeProfile(handle))
+    if status == RpcStatus.OK and profile:
+      return profile
 
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking. Returns
@@ -669,6 +704,9 @@ if __name__ == "__main__":
                     help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=True, action="store_true",
                     help="Enable verbose output")
+  parser.add_option("-p", "--show_profiles", dest="show_profiles", default=False,
+                    action="store_true",
+                    help="Always display query profiles after execution")
   parser.add_option("--quiet", dest="verbose", default=True, action="store_false",
                     help="Disable verbose output")
   parser.add_option("-v", "--version", dest="version", default=False, action="store_true",
@@ -680,7 +718,6 @@ if __name__ == "__main__":
                     help="Refresh Impala catalog after connecting")
   parser.add_option("-d", "--database", dest="default_db", default=None,
                     help="Issue a use database command on startup.")
-
   options, args = parser.parse_args()
 
   if options.version:

@@ -122,6 +122,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void CloseInsert(impala::TInsertResult& insert_result,
       const beeswax::QueryHandle& query_handle);
   virtual void PingImpalaService();
+  // TODO: Need to implement HiveServer2 version of GetRuntimeProfile
+  virtual void GetRuntimeProfile(std::string& profile_output,
+      const beeswax::QueryHandle& query_id);
 
   // ImpalaHiveServer2Service rpcs: HiveServer2 API (implemented in impala-hs2-server.cc)
   virtual void OpenSession(
@@ -454,6 +457,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
   Status CancelInternal(const TUniqueId& query_id);
+
+  // Gets the runtime profile string for a given query_id and writes it to the output
+  // stream. First searches for the query id in the map of in-flight queries. If no
+  // match is found there, the query log is searched. Returns OK if the profile was
+  // found, otherwise a Status object with an error message will be returned. The
+  // output stream will not be modified on error.
+  Status GetRuntimeProfileStr(const TUniqueId& query_id, std::stringstream* output);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);

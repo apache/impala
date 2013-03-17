@@ -129,6 +129,10 @@ service ImpalaService extends beeswax.BeeswaxService {
         
   // Invalidates all catalog metadata, forcing a reload
   Status.TStatus ResetCatalog();
+
+  // Returns the runtime profile string for the given query handle.
+  string GetRuntimeProfile(1:beeswax.QueryHandle query_id)
+      throws(1:beeswax.BeeswaxException error);
   
   // Closes the query handle and return the result summary of the insert.
   TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
