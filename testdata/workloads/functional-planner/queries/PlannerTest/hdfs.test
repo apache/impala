@@ -254,53 +254,6 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
   LOCATIONS:
 ====
-select * from functional.alltypes where 2009.0 = year
----- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
-    TUPLE IDS: 0 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (1)
-    TUPLE IDS: 0 
-
-Plan Fragment 1
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
-    TUPLE IDS: 0 
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-  LOCATIONS:
-====
 # predicate on second partition key
 select * from functional.alltypes where month=1
 ---- PLAN
@@ -424,6 +377,124 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
   LOCATIONS:
 ====
+select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7)
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+====
+# adding a predicate that always evaluates to true shouldn't change anything
+select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is not null
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+====
+# adding a predicate that always evaluates to false should remove all partitions
+select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is null
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+====
+select * from functional.alltypes where year=2009 and (month in (1, 3, 5) or month = 7)
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypes #partitions=4 size=80.74KB (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+====
 # single-sided ranges on both keys
 select * from functional.alltypes where year<=2009 and month < 6
 ---- PLAN
@@ -495,8 +566,7 @@ select * from functional.alltypes where year < 2010 and year < 2009 and month > 
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
-    PREDICATES: year < 2009
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -510,31 +580,17 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
-    PREDICATES: year < 2009
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-  LOCATIONS:
 ====
-# multiple predicates on second key; 2nd one applied as predicate
-select * from functional.alltypes where year < 2010 and month > 6 and month > 8
+# multiple predicates on second key
+select * from functional.alltypes where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
-    PREDICATES: month > 8
+  SCAN HDFS table=functional.alltypes #partitions=9 size=180.49KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -548,16 +604,21 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
-    PREDICATES: month > 8
+  SCAN HDFS table=functional.alltypes #partitions=9 size=180.49KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
   LOCATIONS:
@@ -626,13 +687,12 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
   LOCATIONS:
 ====
-# slot binding can't be determined
+# slot binding still determined
 select * from functional.alltypes where year - 1 = 2009
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
-    PREDICATES: year - 1 = 2009
+  SCAN HDFS table=functional.alltypes #partitions=12 size=239.77KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -646,35 +706,10 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
-    PREDICATES: year - 1 = 2009
+  SCAN HDFS table=functional.alltypes #partitions=12 size=239.77KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
@@ -700,7 +735,7 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
   LOCATIONS:
 ====
-# multi files non-partitioned table test
+# multi-file non-partitioned table
 select * from functional.alltypesaggmultifilesNoPart
 ---- PLAN
 Plan Fragment 0
@@ -732,8 +767,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
   LOCATIONS:
 ====
-# multi files partitioned table test
-select * from functional.alltypesaggmultifiles where day<=2
+# multi-file partitioned table
+select * from functional.alltypesaggmultifiles where day <= 2
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED

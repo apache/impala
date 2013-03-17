@@ -63,6 +63,12 @@ import com.google.common.collect.Maps;
 public class HBaseScanNode extends ScanNode {
   private final TupleDescriptor desc;
 
+  // One range per clustering column. The range bounds are expected to be constants.
+  // A null entry means there's no range restriction for that particular key.
+  // If keyRanges is non-null it always contains as many entries as there are clustering
+  // cols.
+  private List<ValueRange> keyRanges;
+
   // derived from keyRanges; empty means unbounded;
   // initialize start/stopKey to be unbounded.
   private byte[] startKey = HConstants.EMPTY_START_ROW;
@@ -77,6 +83,11 @@ public class HBaseScanNode extends ScanNode {
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc);
     this.desc = desc;
+  }
+
+  public void setKeyRanges(List<ValueRange> keyRanges) {
+    Preconditions.checkNotNull(keyRanges);
+    this.keyRanges = keyRanges;
   }
 
   @Override

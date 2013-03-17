@@ -312,8 +312,8 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
   if (sink.output_partition.type == TPartitionType::HASH_PARTITIONED) {
     // TODO: move this to Init()? would need to save 'sink' somewhere
     Status status =
-        Expr::CreateExprTrees(pool, sink.output_partition.partitioning_exprs,
-                              &partition_exprs_);
+        Expr::CreateExprTrees(
+          pool, sink.output_partition.partition_exprs, &partition_exprs_);
     DCHECK(status.ok());
   }
 }

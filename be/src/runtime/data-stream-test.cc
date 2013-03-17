@@ -108,8 +108,8 @@ class DataStreamTest : public testing::Test {
     expr_node.__set_slot_ref(slot_ref);
     TExpr expr;
     expr.nodes.push_back(expr_node);
-    hash_sink_.output_partition.__isset.partitioning_exprs = true;
-    hash_sink_.output_partition.partitioning_exprs.push_back(expr);
+    hash_sink_.output_partition.__isset.partition_exprs = true;
+    hash_sink_.output_partition.partition_exprs.push_back(expr);
 
     // Ensure that individual sender info addresses don't change
     sender_info_.reserve(MAX_SENDERS);

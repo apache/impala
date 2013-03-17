@@ -30,7 +30,6 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
-import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
@@ -53,6 +52,8 @@ public class HdfsScanNode extends ScanNode {
   // Partitions that are filtered in for scanning by the key ranges
   private final ArrayList<HdfsPartition> partitions = Lists.newArrayList();
 
+  private List<SingleColumnFilter> keyFilters;
+
   // Total number of bytes from partitions
   private long totalBytes = 0;
 
@@ -62,6 +63,11 @@ public class HdfsScanNode extends ScanNode {
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, HdfsTable tbl) {
     super(id, desc);
     this.tbl = tbl;
+  }
+
+  public void setKeyFilters(List<SingleColumnFilter> filters) {
+    Preconditions.checkNotNull(filters);
+    this.keyFilters = filters;
   }
 
   @Override
@@ -78,7 +84,7 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
-    Preconditions.checkNotNull(keyRanges);
+    Preconditions.checkNotNull(keyFilters);
 
     LOG.info("collecting partitions for table " + tbl.getName());
     for (HdfsPartition p: tbl.getPartitions()) {
@@ -87,21 +93,21 @@ public class HdfsScanNode extends ScanNode {
         continue;
       }
 
-      Preconditions.checkState(p.getPartitionValues().size() ==
-        tbl.getNumClusteringCols());
+      Preconditions.checkState(
+          p.getPartitionValues().size() == tbl.getNumClusteringCols());
       // check partition key values against key ranges, if set
-      Preconditions.checkState(keyRanges.size() == p.getPartitionValues().size());
+      Preconditions.checkState(keyFilters.size() == p.getPartitionValues().size());
       boolean matchingPartition = true;
-      for (int i = 0; i < keyRanges.size(); ++i) {
-        ValueRange keyRange = keyRanges.get(i);
-        if (keyRange != null &&
-            !keyRange.isInRange(analyzer, p.getPartitionValues().get(i))) {
+      for (int i = 0; i < keyFilters.size(); ++i) {
+        SingleColumnFilter keyFilter = keyFilters.get(i);
+        if (keyFilter != null
+            && !keyFilter.isTrue(analyzer, p.getPartitionValues().get(i))) {
           matchingPartition = false;
           break;
         }
       }
       if (!matchingPartition) {
-        // skip this partition, it's outside the key ranges
+        // skip this partition, it's outside the key filters
         continue;
       }
       // HdfsPartition is immutable, so it's ok to copy by reference

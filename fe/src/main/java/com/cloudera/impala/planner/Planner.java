@@ -654,6 +654,28 @@ public class Planner {
   }
 
   /**
+   * Packages all conjuncts that are fully bound by 'd' into a SingleColumnFilter and
+   * removes them from 'conjuncts'.
+   * Returns constructed SingleColumnFilter or null if no suitable conjuncts were found.
+   */
+  private SingleColumnFilter createKeyFilter(
+      SlotDescriptor d, List<Predicate> conjuncts) {
+    SingleColumnFilter filter = null;
+    ListIterator<Predicate> i = conjuncts.listIterator();
+    while (i.hasNext()) {
+      Predicate p = i.next();
+      if (p.isBound(d.getId())){
+        if (filter == null) {
+          filter = new SingleColumnFilter(d);
+        }
+        filter.addConjunct(p);
+        i.remove();
+      }
+    }
+    return filter;
+  }
+
+  /**
    * Transform '=', '<[=]' and '>[=]' comparisons for given slot into
    * ValueRange. Also removes those predicates which were used for the construction
    * of ValueRange from 'conjuncts'. Only looks at comparisons w/ constants
@@ -745,10 +767,11 @@ public class Planner {
     }
 
     List<Predicate> conjuncts = getUnassignedConjuncts(scanNode, analyzer);
-    // mark conjuncts assigned here; they will either end up as ValueRanges
-    // or will be evaluated directly by the node
+    // mark conjuncts assigned here; they will either end up inside a
+    // SingleColumnFilter/ValueRange or will be evaluated directly by the node
     analyzer.markConjunctsAssigned(conjuncts);
-    ArrayList<ValueRange> keyRanges = Lists.newArrayList();
+    List<SingleColumnFilter> keyFilters = Lists.newArrayList();
+    List<ValueRange> keyRanges = Lists.newArrayList();
     // determine scan predicates for clustering cols
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
       SlotDescriptor slotDesc =
@@ -761,15 +784,24 @@ public class Planner {
         // or: the hbase row key is mapped to a non-string type
         // (since it's stored in ascii it will be lexicographically ordered,
         // and non-string comparisons won't work)
+        keyFilters.add(null);
         keyRanges.add(null);
       } else {
-        // create ValueRange from conjuncts for slot; also removes conjuncts
-        // that were used as input for ValueRange
-        keyRanges.add(createScanRange(slotDesc, conjuncts));
+        // create SingleColumnFilter/ValueRange from conjuncts for slot; also removes
+        // conjuncts that were used as input for filter
+        if (scanNode instanceof HdfsScanNode) {
+          keyFilters.add(createKeyFilter(slotDesc, conjuncts));
+        } else {
+          keyRanges.add(createScanRange(slotDesc, conjuncts));
+        }
       }
     }
 
-    scanNode.setKeyRanges(keyRanges);
+    if (scanNode instanceof HdfsScanNode) {
+      ((HdfsScanNode)scanNode).setKeyFilters(keyFilters);
+    } else {
+      ((HBaseScanNode)scanNode).setKeyRanges(keyRanges);
+    }
     scanNode.addConjuncts(conjuncts);
 
     return scanNode;

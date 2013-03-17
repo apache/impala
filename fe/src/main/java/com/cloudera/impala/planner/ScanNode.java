@@ -28,22 +28,9 @@ import com.google.common.base.Preconditions;
 abstract public class ScanNode extends PlanNode {
   protected final TupleDescriptor desc;
 
-  /**
-   * One range per clustering column. The range bounds are expected to be constants.
-   * A null entry means there's no range restriction for that particular key.
-   * If keyRanges is non-null it always contains as many entries as there are clustering
-   * cols.
-   */
-  protected List<ValueRange> keyRanges;
-
   public ScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc.getId().asList());
     this.desc = desc;
-  }
-
-  public void setKeyRanges(List<ValueRange> keyRanges) {
-    Preconditions.checkNotNull(keyRanges);
-    this.keyRanges = keyRanges;
   }
 
   /**

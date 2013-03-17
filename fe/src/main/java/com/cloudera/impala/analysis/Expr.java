@@ -225,7 +225,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Map of expression substitutions (lhs[i] gets substituted with rhs[i]).
    *
    */
-  static class SubstitutionMap {
+  static public class SubstitutionMap {
     public ArrayList<Expr> lhs;  // left-hand side
     public ArrayList<Expr> rhs;  // right-hand side
 
@@ -423,6 +423,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return true;
   }
 
+  /**
+   * Returns true if expr is fully bound by slotId, otherwise false.
+   */
+  public boolean isBound(SlotId slotId) {
+    for (Expr child: children) {
+      if (!child.isBound(slotId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   public static boolean isBound(List<? extends Expr> exprs, List<TupleId> tids) {
     for (Expr expr: exprs) {
       if (!expr.isBound(tids)) {
@@ -440,7 +452,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static <C extends Expr> void getIds(List<? extends Expr> exprs,
       List<TupleId> tupleIds, List<SlotId> slotIds) {
-    if (exprs == null) return;
+    if (exprs == null) {
+      return;
+    }
     for (Expr e: exprs) {
       e.getIds(tupleIds, slotIds);
     }

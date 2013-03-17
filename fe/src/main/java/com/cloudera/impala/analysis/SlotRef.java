@@ -141,6 +141,11 @@ public class SlotRef extends Expr {
     return false;
   }
 
+  public boolean isBound(SlotId slotId) {
+    Preconditions.checkState(isAnalyzed);
+    return desc.getId().equals(slotId);
+  }
+
   @Override
   public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
     Preconditions.checkState(type != PrimitiveType.INVALID_TYPE);
