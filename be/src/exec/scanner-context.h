@@ -47,6 +47,15 @@ class TupleRow;
 //     Resources (io buffers and mempools) get attached to the last row batch
 //     that still needs them.  Row batches are consumed by the rest of the query 
 //     in order and cleaned up in order.  
+//     As soon as a buffer is done, it is attached to the current row batch.  This
+//     gurantees that the buffers (and therefore the cleanup of them) *trails* the
+//     rows they are for.
+//     RowBatches are passed up when they are full, independent of how many io buffers
+//     are attached to them.  In the case where a denser representation is preferred
+//     (e.g. very selective predicates or very wide rows), the scanner context will
+//     compact the tuples, copying the (sparse) memory from the io buffers into a 
+//     compact pool and returning the io buffers.
+//     TODO: implement the compaction
 //   - Abstracts over getting buffers from the disk io mgr.  Buffers are pushed to
 //     this object from another thread and queued in this object.  The scanners 
 //     call a GetBytes() API which handles blocking if bytes are not yet ready
@@ -248,7 +257,9 @@ class ScannerContext {
     // Removes the first buffer from the queue, adding it to the row batch if necessary.
     void RemoveFirstBuffer();
   
-    // Attach all completed io buffers to the current row batch.  
+    // Attach all completed io buffers and any boundary mem pools to the current batch.
+    // If done, this is the final call and any pending resources in the stream should
+    // be passed to the row batch.
     void AttachCompletedResources(bool done);
 
     // Returns all buffers queued on this stream to the io mgr.
@@ -260,6 +271,8 @@ class ScannerContext {
     DCHECK_LT(idx, streams_.size());
     return streams_[idx]; 
   }
+  
+  RowBatch* current_row_batch() { return  current_row_batch_; }
 
   // Gets memory for outputting tuples.   
   //  *pool is the mem pool that should be used for memory allocated for those tuples.
@@ -305,6 +318,7 @@ class ScannerContext {
   // Release all memory in 'pool' to the current row batch.  
   void AcquirePool(MemPool* pool) {
     DCHECK(current_row_batch_ != NULL);
+    DCHECK(pool != NULL);
     current_row_batch_->tuple_data_pool()->AcquireData(pool, false);
   }
 
@@ -359,54 +373,16 @@ class ScannerContext {
   // If true, flush has been called.
   bool done_;
 
-  // If true, this context is for a columnar file.  This causes AddBuffer() to queue
-  // the buffer to the appropriate stream.
-  bool is_columnar_;
-
   // If true, the scan range has been cancelled and the scanner thread should abort
   bool cancelled_;
 
   // Create a new row batch and tuple buffer.
   void NewRowBatch();
 
-  // Attach all completed io buffers to the current row batch.
-  void AttachCompletedResources(bool done);
+  // Attach all resources to the current row batch and send the batch to the scan node.
+  void AddFinalBatch();
 };
   
-// Handle the fast common path where all the bytes are in the first buffer.  This
-// is the path used by sequence/rc/trevni file formats to read a very small number
-// (i.e. single int) of bytes.
-inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
-    int* out_len, bool* eos, Status* status) {
-
-  if (UNLIKELY(requested_len == 0)) {
-    *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
-    return status->ok();
-  }
-
-  // Note: the fast path does not grab any locks even though another thread might be 
-  // updating current_buffer_bytes_left_, current_buffer_ and current_buffer_pos_.
-  // See the implementation of AddBuffer() on why this is okay.
-  if (LIKELY(requested_len < current_buffer_bytes_left_)) {
-    *eos = false;
-    // Memory barrier to guarantee current_buffer_pos_ is not read before the 
-    // above if statement.
-    __sync_synchronize();
-    DCHECK(current_buffer_ != NULL);
-    *buffer = current_buffer_pos_;
-    *out_len = requested_len;
-    current_buffer_bytes_left_ -= requested_len;
-    current_buffer_pos_ += requested_len;
-    total_bytes_returned_ += *out_len;
-    if (UNLIKELY(current_buffer_bytes_left_ == 0)) {
-      *eos = current_buffer_->eosr();
-    }
-    return true;
-  }
-  *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
-  return status->ok();
-}
-
 }
 
 #endif

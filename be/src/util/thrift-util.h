@@ -63,7 +63,7 @@ class ThriftSerializer {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());
-    } catch (apache::thrift::TApplicationException& e) {
+    } catch (std::exception& e) {
       std::stringstream msg;
       msg << "Couldn't serialize thrift object:\n" << e.what();
       return Status(msg.str());
@@ -121,7 +121,7 @@ Status DeserializeThriftMsg(uint8_t* buf, uint32_t* len, bool compact,
       CreateDeserializeProtocol(tmem_transport, compact);
   try {
     deserialized_msg->read(tproto.get());
-  } catch (apache::thrift::protocol::TProtocolException& e) {
+  } catch (std::exception& e) {
     std::stringstream msg;
     msg << "couldn't deserialize thrift msg:\n" << e.what();
     return Status(msg.str());

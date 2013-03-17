@@ -83,6 +83,7 @@ namespace impala {
 class DiskIoMgr {
  public:
   struct ReaderContext;
+  struct ScanRangeGroup;
 
   // ScanRange description.  The public fields should be populated by the caller
   // before calling AddScanRanges().  The private fields are used internally by
@@ -110,7 +111,7 @@ class DiskIoMgr {
     friend class DiskIoMgr;
     
     // Initialize internal fields
-    void InitInternal(ReaderContext* reader);
+    void InitInternal(ReaderContext* reader, ScanRangeGroup* group);
     
     // Path to file
     const char* file_;
@@ -131,6 +132,9 @@ class DiskIoMgr {
     // Reader/owner of the scan range
     ReaderContext* reader_;
 
+    // The group this scan range is part of, if any.
+    ScanRangeGroup* group_;
+
     // File handle either to hdfs or local fs (FILE*)
     union {
       FILE* local_file_;
@@ -139,6 +143,17 @@ class DiskIoMgr {
 
     // Number of bytes read so far for this scan range
     int bytes_read_;
+
+    // Number of io buffers that are being used for this scan range. This
+    // includes buffers currently with the reader (i.e. returned by GetNext),
+    // buffers queued in the ready queue and buffers currently being read into.
+    // It is only safe to update this after the lock for this range's reader is
+    // taken.
+    int num_io_buffers_;
+  };
+  
+  struct ScanRangeGroup {
+    std::vector<ScanRange*> ranges;
   };
   
   // Buffer struct that is used by the reader and io mgr to pass read buffers.
@@ -237,8 +252,6 @@ class DiskIoMgr {
   // are aborted and tracking structures cleaned up.  This does not need to be
   // called if the reader finishes normally.
   // This will also fail any outstanding GetNext()/Read requests.
-  // TODO: this might not be most useful way with query cancellation.  We probably
-  // want readers to be associated with a fragment id and also be able to cancel on that.
   void CancelReader(ReaderContext* reader);
 
   // Sets the maximum io buffers for this reader.  This can be higher or lower than
@@ -256,13 +269,14 @@ class DiskIoMgr {
 
   // Adds the scan ranges to the queues. This call is non-blocking.  The caller must
   // not deallocate the scan range pointers before UnregisterReader.
-  // If is_grouped, then the ranges in the vector are part of the same group and
-  // the IO mgr will guarantee that if any of the grouped ranges have ready buffers,
-  // all ranges in that group will also have ready buffers. 
-  // If a reader has multiple groups, this can be called repeatedly, once for each
-  // group.
-  Status AddScanRanges(ReaderContext* reader, const std::vector<ScanRange*>& ranges,
-      bool is_grouped = false);
+  Status AddScanRanges(ReaderContext* reader, const std::vector<ScanRange*>& ranges);
+  
+  // Similar to AddScanRanges except adds groups of scan ranges.  For each group,
+  // the IO mgr will guarantee that if any of the ranges in the group have ready buffers,
+  // all ranges in that group will also have ready buffers without needing to return
+  // any of the buffers in the group.
+  Status AddScanRangeGroups(ReaderContext* reader, 
+      const std::vector<ScanRangeGroup*>& groups);
 
   // Get the next buffer for this query. Results are returned in buffer. 
   // GetNext can be called from multiple threads for a single reader and has a few
@@ -290,10 +304,10 @@ class DiskIoMgr {
   // this function will return right away.
   // Note: this can still be blocking if there are buffers ready but not yet
   // read by a disk thread.
-  // Currently, this is only uesd for testing.
+  // Currently, this is only used for testing.
   Status TryGetNext(ReaderContext* reader, BufferDescriptor** buffer, bool* eos);
 
-  // Reads the range and returns the result in bufer.  
+  // Reads the range and returns the result in buffer.  
   // This behaves like the typical synchronous read() api, blocking until the data 
   // is read.This can be called while there are outstanding ScanRanges and is 
   // thread safe.  Multiple threads can be calling Read() per reader at a time.
@@ -315,6 +329,9 @@ class DiskIoMgr {
 
   // Returns the number of allocated buffers.
   int num_allocated_buffers() const { return num_allocated_buffers_; }
+
+  // Returns the number of buffers currently owned by all readers.
+  int num_buffers_in_readers() const { return num_buffers_in_readers_; }
 
   // Dumps the disk io mgr queues (for readers and disks)
   std::string DebugString();
@@ -371,9 +388,16 @@ class DiskIoMgr {
   // Total number of allocated buffers, used for debugging.
   int num_allocated_buffers_;
 
+  // Total number of buffers in readers
+  int num_buffers_in_readers_;
+
   // Per disk queues.  This is static and created once at Init() time.
   // One queue is allocated for each disk on the system and indexed by disk id
   std::vector<DiskQueue*> disk_queues_;
+
+  // Schedules the ranges onto the disks
+  Status AddScanRangesInternal(ReaderContext* reader, 
+      const std::vector<ScanRange*>& ranges);
 
   // Gets a buffer description object, initialized for this reader, allocating
   // one as necessary

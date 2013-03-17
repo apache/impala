@@ -211,7 +211,7 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       if (unit.empty()) {
         ss << value;
       } else {
-        ss << setprecision(PRECISION) << output << unit;
+        ss << setprecision(PRECISION) << output << unit << " (" << value << ")";
       }
       break;
     }

@@ -32,8 +32,6 @@ class TestCancellation(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(TestDimension('query', *QUERIES))
     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format != 'parquet')
     if cls.exploration_strategy() != 'core':
       NUM_CANCELATION_ITERATIONS = 3
 

@@ -54,6 +54,9 @@ class HdfsParquetScanner : public HdfsScanner {
   // need to issue another read.
   static const int FOOTER_SIZE = 100 * 1024;
 
+  // Max page header size in bytes.
+  static const int MAX_PAGE_HEADER_SIZE = 100;
+
   // Per column reader.
   class ColumnReader;
   friend class ColumnReader;
@@ -63,6 +66,15 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // File metadata thrift object
   parquet::FileMetaData file_metadata_;
+  
+  // The scan range group for this scanner.
+  DiskIoMgr::ScanRangeGroup scan_range_group_;
+
+  // Returned in ProcessSplit
+  Status parse_status_;
+
+  // Timer for materializing rows.  This ignores time getting the next buffer.
+  ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
   // Reads data from all the columns (in parallel) and assembles rows into the context
   // object.

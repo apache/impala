@@ -115,7 +115,6 @@ TEST_F(DiskIoMgrTest, SingleReader) {
 
         ValidateRead(&io_mgr, reader, data);
 
-        ASSERT_LE(io_mgr.num_allocated_buffers(), num_buffers * num_disks);
         io_mgr.UnregisterReader(reader);
       }
     }
@@ -165,7 +164,6 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         EXPECT_TRUE(status.IsCancelled());
         EXPECT_TRUE(buffer == NULL);
 
-        ASSERT_LE(io_mgr.num_allocated_buffers(), num_buffers * num_disks);
         io_mgr.UnregisterReader(reader);
         // The io_mgr destructor asserts that everything is cleaned up.
       }
@@ -243,7 +241,6 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
 
         EXPECT_TRUE(strncmp(data, result, strlen(data)) == 0);
 
-        ASSERT_LE(io_mgr.num_allocated_buffers(), num_buffers * num_disks);
         io_mgr.UnregisterReader(reader);
       }
     }
@@ -330,7 +327,6 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         EXPECT_TRUE(strncmp(data, result, strlen(data)) == 0);
 
         // One additional buffer could have been allocated for the sync read
-        ASSERT_LE(io_mgr.num_allocated_buffers(), num_buffers * num_disks + 1);
         io_mgr.UnregisterReader(reader);
       }
     }
@@ -478,28 +474,30 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
 
 // This tests exercises the grouped scan range functionality.
 TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
-  return; // TODO
   int64_t return_buffer_idx = 0;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-  const char* data = "abcd";
+  const char* data = "abcdefghijklmnopqrstuvwxyz";
   CreateTempFile(tmp_file, data);
 
   int data_len = strlen(data);
   char result[data_len];
 
+  int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-      for (int group_size = 1; group_size < 2; ++group_size) {
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int group_size = 1; group_size < 5; ++group_size) {
         // There are two interesting num_buffer settings.  
         // 1) The number of buffers is less than the group.  The IO mgr needs to increase 
         // the number to at least the group size.
         // 2) The number is more, in which case the IO mgr can buffer some ranges in a 
         // group more.
-        for (int num_buffers = data_len; num_buffers < data_len + group_size; 
-            num_buffers += group_size) {
+        for (int num_buffers = 1; num_buffers < 2; num_buffers += group_size) {
           LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
-                    << " num_disk=" << num_disks << "num_buffers=" << num_buffers
-                    << " group-size=" << group_size;
+                    << " num_disk=" << num_disks << " num_buffers=" << num_buffers
+                    << " group_size=" << group_size;
+          if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
+
+          memset(result, 0, strlen(data));
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
           Status status = io_mgr.Init();
           ASSERT_TRUE(status.ok());
@@ -507,13 +505,12 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
           DiskIoMgr::ReaderContext* reader;
           status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
           ASSERT_TRUE(status.ok());
-            
-          memset(result, 0, strlen(data));
-
-          vector<DiskIoMgr::ScanRange*> ranges;
+        
+          // Make one range that is the entire file for each group
+          DiskIoMgr::ScanRangeGroup group;
           for (int i = 0; i < group_size; ++i) {
-            int disk_id = ranges.size() % num_disks;
-            ranges.push_back(
+            int disk_id = i % num_disks;
+            group.ranges.push_back(
                 InitRange(tmp_file, 0, data_len, disk_id, reinterpret_cast<void*>(i)));
           }
 
@@ -521,8 +518,9 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
           vector<list<DiskIoMgr::BufferDescriptor*> > buffers;
           buffers.resize(group_size);
         
-          // All ranges in group are added.  
-          status = io_mgr.AddScanRanges(reader, ranges, true);
+          vector<DiskIoMgr::ScanRangeGroup*> groups;
+          groups.push_back(&group);
+          status = io_mgr.AddScanRangeGroups(reader, groups);
           ASSERT_TRUE(status.ok());
 
           // Until all the ranges are read, call TryGetNext until all the buffers are
@@ -530,15 +528,17 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
           // fails to return a buffer, we verify that at least one buffer has been
           // returned for each scan range.  This guarantees the grouping functionality
           // is correct.
+          bool try_can_fail = false;
           while (true) {
             bool eos;
             DiskIoMgr::BufferDescriptor* buffer;
             status = io_mgr.TryGetNext(reader, &buffer, &eos);
             ASSERT_TRUE(status.ok());
+
             if (buffer != NULL) {
+              try_can_fail = true;
               EXPECT_EQ(buffer->len(), 1);
               result[buffer->scan_range_offset()] = buffer->buffer()[0];
-              
               long group_idx = reinterpret_cast<long>(buffer->scan_range()->meta_data());
               ASSERT_GE(group_idx, 0);
               ASSERT_LT(group_idx, group_size);
@@ -559,8 +559,9 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
                 break;
               }
             } else {
-              EXPECT_TRUE(strncmp(data, result, data_len) == 0);
-              // Validate all ranges have at least one buffer.
+              EXPECT_TRUE(try_can_fail);
+              // All buffers are exhausted - verify that there is at least one buffer
+              // per group queued.
               for (int i = 0; i < buffers.size(); ++i) {
                 EXPECT_GT(buffers[i].size(), 0);
               }
@@ -583,6 +584,7 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
                 // Return the buffer which should trigger the IO mgr to read the 
                 // next thing.
                 return_buffer->Return();
+                try_can_fail = false;
               }
             }
           }

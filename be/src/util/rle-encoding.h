@@ -331,13 +331,17 @@ inline void RleEncoder::FlushBufferedValues(bool done) {
 inline int RleEncoder::Flush() {
   DCHECK_EQ(bit_width_, 1);
 
-  // Flush the current literal or repeated run.
-  if (literal_count_ == 0 && repeat_count_ != 0) {
-    FlushRepeatedRun();
-  } else if (literal_count_ > 0) {
-    literal_count_ += num_buffered_values_;
-    FlushLiteralRun(true);
-    repeat_count_ = 0;
+  if (literal_count_ > 0 || repeat_count_ > 0 || num_buffered_values_ > 0) {
+    bool all_repeat = literal_count_ == 0 && 
+        (repeat_count_ == num_buffered_values_ || num_buffered_values_ == 0);
+    // There is something pending, figure out if it's a repeated or literal run
+    if (repeat_count_ > 0 && all_repeat) {
+      FlushRepeatedRun();
+    } else  {
+      literal_count_ += num_buffered_values_;
+      FlushLiteralRun(true);
+      repeat_count_ = 0;
+    }
   }
   DCHECK_EQ(num_buffered_values_, 0);
   DCHECK_EQ(literal_count_, 0);

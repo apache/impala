@@ -35,7 +35,7 @@ class TupleRow {
   }
 
   // Create a deep copy of this TupleRow.  DeepCopy will allocate from  the pool.
-  TupleRow* DeepCopy(const std::vector<TupleDescriptor*> descs, MemPool* pool) {
+  TupleRow* DeepCopy(const std::vector<TupleDescriptor*>& descs, MemPool* pool) {
     int size = descs.size() * sizeof(Tuple*);
     TupleRow* result = reinterpret_cast<TupleRow*>(pool->Allocate(size));
     DeepCopy(result, descs, pool, false);
@@ -48,7 +48,7 @@ class TupleRow {
   // If reuse_tuple_mem is true, it is assumed the dst TupleRow has already allocated
   // tuple memory and that memory will be reused.  Otherwise, new tuples will be allocated
   // and stored in 'dst'.
-  void DeepCopy(TupleRow* dst, const std::vector<TupleDescriptor*> descs, MemPool* pool,
+  void DeepCopy(TupleRow* dst, const std::vector<TupleDescriptor*>& descs, MemPool* pool,
       bool reuse_tuple_mem) {
     for (int i = 0; i < descs.size(); ++i) {
       if (this->GetTuple(i) != NULL) {

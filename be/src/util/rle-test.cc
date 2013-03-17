@@ -154,7 +154,7 @@ TEST(BitArray, TestMixed) {
 // if expected_len is not -1, it will validate the encoded size is correct.
 void ValidateRle(const vector<int>& values, 
     uint8_t* expected_encoding, int expected_len) {
-  const int len = 1024;
+  const int len = 64 * 1024;
   uint8_t buffer[len];
   EXPECT_LE(expected_len, len);
 
@@ -237,6 +237,43 @@ TEST(BitRle, AllSame) {
     }
 
     ValidateRle(values, NULL, 3);
+  }
+}
+
+// Test that writes out a repeated group and then a literal
+// group but flush before finishing.
+TEST(BitRle, Flush) {
+  vector<int> values;
+  for (int i = 0; i < 16; ++i) values.push_back(1);
+  values.push_back(0);
+  ValidateRle(values, NULL, -1);
+  values.push_back(1);
+  ValidateRle(values, NULL, -1);
+  values.push_back(1);
+  ValidateRle(values, NULL, -1);
+  values.push_back(1);
+  ValidateRle(values, NULL, -1);
+}
+
+// Test some random sequences.
+TEST(BitRle, Random) {
+  int iters = 0;
+  while (iters < 1000) {
+    srand(iters++);
+    if (iters % 10000 == 0) LOG(ERROR) << "Seed: " << iters;
+    vector<int> values;
+    bool parity = 0;
+    for (int i = 0; i < 1000; ++i) {
+      int group_size = rand() % 20 + 1;
+      if (group_size > 16) {
+        group_size = 1;
+      }
+      for (int i = 0; i < group_size; ++i) {
+        values.push_back(parity);
+      }
+      parity = !parity;
+    }
+    ValidateRle(values, NULL, -1);
   }
 }
 

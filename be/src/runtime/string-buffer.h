@@ -61,7 +61,7 @@ class StringBuffer {
     Append(str, len);
   }
 
-  // Clear the underlying StringValue
+  // Clear the underlying StringValue.  The allocated buffer can be reused.
   void Clear() {
     string_value_.len = 0;
   }

@@ -36,9 +36,6 @@ class TestLimit(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('limit_value') < 100 or v.get_value('exec_option')['batch_size'] == 0)
     
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format != 'parquet')
-
   def test_limit(self, vector):
     # We can't validate the rows that are returned since that is non-deterministic.
     # This is why this is a python test rather than a .test.

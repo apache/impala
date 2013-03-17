@@ -24,6 +24,40 @@ using namespace impala;
 // Macro to return false if condition is false. Only defined for this file.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
+// Handle the fast common path where all the bytes are in the first buffer.  This
+// is the path used by sequence/rc/trevni file formats to read a very small number
+// (i.e. single int) of bytes.
+inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
+    int* out_len, bool* eos, Status* status) {
+
+  if (UNLIKELY(requested_len == 0)) {
+    *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
+    return status->ok();
+  }
+
+  // Note: the fast path does not grab any locks even though another thread might be 
+  // updating current_buffer_bytes_left_, current_buffer_ and current_buffer_pos_.
+  // See the implementation of AddBuffer() on why this is okay.
+  if (LIKELY(requested_len < current_buffer_bytes_left_)) {
+    *eos = false;
+    // Memory barrier to guarantee current_buffer_pos_ is not read before the 
+    // above if statement.
+    __sync_synchronize();
+    DCHECK(current_buffer_ != NULL);
+    *buffer = current_buffer_pos_;
+    *out_len = requested_len;
+    current_buffer_bytes_left_ -= requested_len;
+    current_buffer_pos_ += requested_len;
+    total_bytes_returned_ += *out_len;
+    if (UNLIKELY(current_buffer_bytes_left_ == 0)) {
+      *eos = current_buffer_->eosr();
+    }
+    return true;
+  }
+  *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
+  return status->ok();
+}
+
 inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status* status) {
   if (UNLIKELY(length < 0)) {
     *status = Status("Negative length");

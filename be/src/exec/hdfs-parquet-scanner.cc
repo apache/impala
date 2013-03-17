@@ -67,7 +67,9 @@ void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 }
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state) 
-    : HdfsScanner(scan_node, state) {
+    : HdfsScanner(scan_node, state),
+      assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
+  assemble_rows_timer_.Stop();
 }
 
 HdfsParquetScanner::~HdfsParquetScanner() {
@@ -77,7 +79,7 @@ HdfsParquetScanner::~HdfsParquetScanner() {
 // ScannerContext::Stream and is responsible for decoding the data.
 class HdfsParquetScanner::ColumnReader {
  public:
-  ColumnReader(HdfsParquetScanner* parent, SlotDescriptor* desc) 
+  ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc) 
     : parent_(parent),
       desc_(desc),
       num_buffered_values_(0) {
@@ -85,23 +87,23 @@ class HdfsParquetScanner::ColumnReader {
 
   void set_metadata(const parquet::ColumnMetaData* metadata) { metadata_ = metadata; }
   int64_t total_len() const { return metadata_->total_compressed_size; }
-  SlotDescriptor* slot_desc() const { return desc_; }
+  const SlotDescriptor* slot_desc() const { return desc_; }
 
-  // Read the next value into 'tuple' for this column.  Returns false if there
-  // are no more values in the file.
+  // Read the next value into tuple for this column.  Returns 
+  // false if there are no more values in the file.
   // TODO: this is the function that needs to be codegen'd (e.g. CodegenReadValue())
   // The codegened functions from all the materialized cols will then be combined
   // into one function.
   // TODO: another option is to materialize col by col for the entire row batch in
   // one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
   // are currently dense so we'll need to figure out something there.
-  bool ReadValue(Tuple* tuple);
+  bool ReadValue(MemPool* pool, Tuple* tuple);
  
  private:
   friend class HdfsParquetScanner;
 
   HdfsParquetScanner* parent_;
-  SlotDescriptor* desc_;
+  const SlotDescriptor* desc_;
 
   const parquet::ColumnMetaData* metadata_;
   ScannerContext::Stream* stream_;
@@ -135,6 +137,7 @@ Status HdfsParquetScanner::Prepare() {
     column_readers_[i] = scan_node_->runtime_state()->obj_pool()->Add(
         new ColumnReader(this, scan_node_->materialized_slots()[i]));
   }
+
   return Status::OK;
 }
 
@@ -154,6 +157,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
   bool eos;
 
   while (true) {
+    DCHECK_EQ(num_buffered_values_, 0);
     RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &num_bytes, &eos));
     if (num_bytes == 0) {
       DCHECK(eos);
@@ -161,11 +165,30 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     }
 
     // We don't know the actual header size until the thrift object is deserialized.
-    // TODO: not right, if the header is split across IO buffers we need to deal
-    // with that.
     uint32_t header_size = num_bytes;
-    RETURN_IF_ERROR(
-        DeserializeThriftMsg(buffer, &header_size, true, &current_page_header_));
+    status = DeserializeThriftMsg(buffer, &header_size, true, &current_page_header_);
+    if (!status.ok()) {
+      if (header_size >= MAX_PAGE_HEADER_SIZE) return status;
+      // Stitch the header bytes that are split across buffers.
+      uint8_t header_buffer[MAX_PAGE_HEADER_SIZE];
+      int header_first_part = header_size;
+      memcpy(header_buffer, buffer, header_first_part);
+     
+      if (!stream_->SkipBytes(header_first_part, &status)) return status;
+      RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &num_bytes, &eos));
+      if (num_bytes == 0) return status;
+
+      uint32_t header_second_part = 
+          ::min(num_bytes, MAX_PAGE_HEADER_SIZE - header_first_part);
+      memcpy(header_buffer + header_first_part, buffer, header_second_part);
+      header_size = MAX_PAGE_HEADER_SIZE;
+      status = 
+          DeserializeThriftMsg(header_buffer, &header_size, true, &current_page_header_);
+
+      RETURN_IF_ERROR(status);
+      DCHECK_GT(header_size, header_first_part);
+      header_size = header_size - header_first_part;
+    }
     if (!stream_->SkipBytes(header_size, &status)) return status;
 
     int data_size = current_page_header_.compressed_page_size;
@@ -176,7 +199,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     }
 
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
-  
+
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
     
     // Initialize the definition level data
@@ -185,7 +208,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       case parquet::Encoding::RLE:
         num_definition_bytes = *reinterpret_cast<int32_t*>(data_);
         data_ += sizeof(int32_t);
-        rle_def_levels_ = RleDecoder(data_ + sizeof(int32_t), num_definition_bytes);
+        rle_def_levels_ = RleDecoder(data_, num_definition_bytes);
         break;
       case parquet::Encoding::BIT_PACKED:
         num_definition_bytes = BitUtil::Ceil(num_buffered_values_, 8);
@@ -200,10 +223,10 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     }
     DCHECK_GT(num_definition_bytes, 0);
     data_ += num_definition_bytes;
-
     break;
   }
-  return Status::OK;
+    
+  return status;
 }
   
 // TODO More codegen here as well.
@@ -227,10 +250,12 @@ inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
   return definition_level;
 }
   
-inline bool HdfsParquetScanner::ColumnReader::ReadValue(Tuple* tuple) {
+inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
   if (num_buffered_values_ == 0) {
-    ReadDataPage();
+    parent_->assemble_rows_timer_.Stop();
+    parent_->parse_status_ = ReadDataPage();
     if (num_buffered_values_ == 0) return false;
+    parent_->assemble_rows_timer_.Start();
   }
   
   --num_buffered_values_;
@@ -275,7 +300,12 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(Tuple* tuple) {
       StringValue* sv = reinterpret_cast<StringValue*>(slot);
       sv->len = *reinterpret_cast<int32_t*>(data_);
       data_ += sizeof(int32_t);
-      sv->ptr = reinterpret_cast<char*>(data_);
+      if (stream_->compact_data() && sv->len > 0) {
+        sv->ptr = reinterpret_cast<char*>(pool->Allocate(sv->len));
+        memcpy(sv->ptr, data_, sv->len);
+      } else {
+        sv->ptr = reinterpret_cast<char*>(data_);
+      }
       data_ += sv->len;
       break;
     }
@@ -307,33 +337,43 @@ Status HdfsParquetScanner::ProcessSplit(ScannerContext* context) {
 // TODO: this needs to be codegen'd.  The ReadValue function needs to be codegen'd,
 // specific to type and encoding and then inlined into AssembleRows().
 Status HdfsParquetScanner::AssembleRows() {
-  while (true) {
+  assemble_rows_timer_.Start();
+  while (!scan_node_->ReachedLimit() && !context_->cancelled()) {
     MemPool* pool;
     Tuple* tuple;
-    TupleRow* current_row;
-    int max_tuples = context_->GetMemory(&pool, &tuple, &current_row);
-
+    TupleRow* row;
+    int num_rows = context_->GetMemory(&pool, &tuple, &row);
     int num_to_commit = 0;
-    for (int i = 0; i < max_tuples; ++i) {
+
+    for (int i = 0; i < num_rows; ++i) {
       InitTuple(template_tuple_, tuple);
       for (int c = 0; c < column_readers_.size(); ++c) {
-        if (!column_readers_[c]->ReadValue(tuple)) {
-          DCHECK_EQ(c, 0);
+        if (!column_readers_[c]->ReadValue(pool, tuple)) {
+          assemble_rows_timer_.Stop();
+          // This column is complete and has no more data.  This indicates
+          // we are done with this row group.
+          // For correctly formed files, this should be the first column we
+          // are reading.
+          DCHECK(c == 0 || !parse_status_.ok()) << "c=" << c << " " 
+              << parse_status_.GetErrorMsg();;
           context_->CommitRows(num_to_commit);
-          return Status::OK;
+          return parse_status_;
         }
       }
-      
-      current_row->SetTuple(scan_node_->tuple_idx(), tuple);
-      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
-        current_row = context_->next_row(current_row);
+    
+      row->SetTuple(scan_node_->tuple_idx(), tuple);
+      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) {
+        row = context_->next_row(row);
         tuple = context_->next_tuple(tuple);
         ++num_to_commit;
-      }
+      } 
     }
     context_->CommitRows(num_to_commit);
   }
-  return Status::OK;
+
+  assemble_rows_timer_.Stop();
+  if (context_->cancelled()) return Status::CANCELLED;
+  return parse_status_;
 }
 
 Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
@@ -433,7 +473,6 @@ Status HdfsParquetScanner::InitColumns() {
   parquet::RowGroup& row_group = file_metadata_.row_groups[0];
 
   int64_t total_bytes = 0;
-  vector<DiskIoMgr::ScanRange*> col_ranges;
 
   // Tell the context the number of streams (aka cols) there will be and initialize
   // column_readers_ to the correct stream objects
@@ -479,9 +518,9 @@ Status HdfsParquetScanner::InitColumns() {
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range->file(), col_len, col_start, i, metadata_range->disk_id(),
         stream);
-    col_ranges.push_back(col_range);
+    scan_range_group_.ranges.push_back(col_range);
   }
-  DCHECK_EQ(scan_node_->materialized_slots().size(), col_ranges.size());
+  DCHECK_EQ(scan_node_->materialized_slots().size(), scan_range_group_.ranges.size());
   DCHECK_EQ(scan_node_->materialized_slots().size(), column_readers_.size());
 
   // The super class stream is not longer valid/used.  It was used
@@ -489,8 +528,10 @@ Status HdfsParquetScanner::InitColumns() {
   stream_ = NULL;  
 
   // Issue all the column chunks to the io mgr.
-  RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRanges(
-      scan_node_->reader_context(), col_ranges));
+  vector<DiskIoMgr::ScanRangeGroup*> groups;
+  groups.push_back(&scan_range_group_);
+  RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRangeGroups(
+      scan_node_->reader_context(), groups));
 
   return Status::OK;
 }

@@ -106,12 +106,9 @@ class RowBatch {
     num_rows_ = num_rows;
   }
 
-  // Returns true if row_batch has reached capacity or there are io buffers attached to
-  // this batch, false otherwise
-  // IO buffers are a scarce resource and must be recycled as quickly as possible to get
-  // the best cpu/disk interleaving.
+  // Returns true if row_batch has reached capacity.
   bool IsFull() {
-    return num_rows_ == capacity_ || !io_buffers_.empty();
+    return num_rows_ == capacity_;
   }
 
   int row_byte_size() {
@@ -123,6 +120,7 @@ class RowBatch {
   int TotalByteSize();
 
   TupleRow* GetRow(int row_idx) {
+    DCHECK(tuple_ptrs_ != NULL);
     DCHECK_GE(row_idx, 0);
     DCHECK_LT(row_idx, num_rows_ + (has_in_flight_row_ ? 1 : 0));
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);

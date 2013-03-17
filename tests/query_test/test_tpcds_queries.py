@@ -18,7 +18,6 @@ class TestTpcdsQuery(ImpalaTestSuite):
     # Cut down on the execution time for these tests
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != 'rc' and\
-        v.get_value('table_format').file_format != 'parquet' and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
     cls.TestMatrix.add_constraint(lambda v:\

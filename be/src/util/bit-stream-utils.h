@@ -110,6 +110,9 @@ class BitReader {
   // beginning of a byte. Return false if there were not enough bytes in the buffer.
   bool GetVlqInt(int32_t* v);
 
+  // Returns the number of bytes left in the stream, including the current byte.
+  int bytes_left() { return num_bytes_ - byte_offset_; }
+
   // Maximum byte length of a vlq encoded int
   static const int MAX_VLQ_BYTE_LEN = 5;
  

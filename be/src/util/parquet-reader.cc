@@ -245,7 +245,7 @@ int main(int argc, char** argv) {
         total_page_header_size += header_size;
         column_sizes[c] += header.compressed_page_size;
         total_column_data_size += header.compressed_page_size;
-          
+
         // Skip non-data or non-plain encoding
         if (header.type != PageType::DATA_PAGE || 
             header.data_page_header.encoding != Encoding::PLAIN) {
