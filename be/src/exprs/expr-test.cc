@@ -894,24 +894,24 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abxcy1234a' LIKE 'a_x_y%a'", TYPE_BOOLEAN, true);
   TestValue("'axcy1234a' LIKE 'a_x_y%a'", TYPE_BOOLEAN, false);
   TestValue("'abxcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, true);
-  TestValue("'a.x.y.*a' REGEXP 'a\\.x\\.y\\.\\*a'", TYPE_BOOLEAN, true);
-  TestValue("'abxcy1234a' REGEXP 'a\\.x\\.y\\.\\*a'", TYPE_BOOLEAN, false);
+  TestValue("'a.x.y.*a' REGEXP 'a\\\\.x\\\\.y\\\\.\\\\*a'", TYPE_BOOLEAN, true);
+  TestValue("'abxcy1234a' REGEXP '\\a\\.x\\\\.y\\\\.\\\\*a'", TYPE_BOOLEAN, false);
   TestValue("'abxcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, true);
   TestValue("'axcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, false);
   TestValue("'axcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, false);
   // regex escape chars; insert special character in the middle to prevent
   // it from being matched as a substring
-  TestValue("'.[]{}()x\\*+?|^$' LIKE '.[]{}()_\\\\*+?|^$'", TYPE_BOOLEAN, true);
+  TestValue("'.[]{}()x\\\\*+?|^$' LIKE '.[]{}()_\\\\\\\\*+?|^$'", TYPE_BOOLEAN, true);
   // escaped _ matches single _
-  TestValue("'\\_' LIKE '\\_'", TYPE_BOOLEAN, false);
-  TestValue("'_' LIKE '\\_'", TYPE_BOOLEAN, true);
-  TestValue("'a' LIKE '\\_'", TYPE_BOOLEAN, false);
+  TestValue("'\\\\_' LIKE '\\\\_'", TYPE_BOOLEAN, false);
+  TestValue("'_' LIKE '\\\\_'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE '\\\\_'", TYPE_BOOLEAN, false);
   // escaped escape char
-  TestValue("'\\a' LIKE '\\\\_'", TYPE_BOOLEAN, true);
-  TestValue("'_' LIKE '\\\\_'", TYPE_BOOLEAN, false);
+  TestValue("'\\\\a' LIKE '\\\\\\_'", TYPE_BOOLEAN, true);
+  TestValue("'_' LIKE '\\\\\\_'", TYPE_BOOLEAN, false);
   // make sure the 3rd \ counts toward the _
-  TestValue("'\\_' LIKE '\\\\\\_'", TYPE_BOOLEAN, true);
-  TestValue("'\\\\a' LIKE '\\\\\\_'", TYPE_BOOLEAN, false);
+  TestValue("'\\\\_' LIKE '\\\\\\\\\\_'", TYPE_BOOLEAN, true);
+  TestValue("'\\\\\\\\a' LIKE '\\\\\\\\\\_'", TYPE_BOOLEAN, false);
   // Test invalid patterns, unmatched parenthesis.
   TestNonOkStatus("'a' RLIKE '(./'");
   TestNonOkStatus("'a' REGEXP '(./'");
@@ -1163,9 +1163,10 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_extract('abxcy1234a', 'a.x', 0)", "abx");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.*a', 0)", "abxcy1234a");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 0)", "abxcy1234a");
-  TestStringValue("regexp_extract('a.x.y.*a', 'a\\.x\\.y\\.\\*a', 0)", "a.x.y.*a");
+  TestStringValue("regexp_extract('a.x.y.*a',"
+      "'a\\\\.x\\\\.y\\\\.\\\\*a', 0)", "a.x.y.*a");
   TestStringValue("regexp_extract('abxcy1234a', 'abczy', 0)", "");
-  TestStringValue("regexp_extract('abxcy1234a', 'a\\.x\\.y\\.\\*a', 0)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a\\\\.x\\\\.y\\\\.\\\\*a', 0)", "");
   TestStringValue("regexp_extract('axcy1234a', 'a.x.y.*a', 0)","");
   // Accessing non-existant group should return empty string.
   TestStringValue("regexp_extract('abxcy1234a', 'a.x', 2)", "");

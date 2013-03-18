@@ -244,7 +244,13 @@ class ImpalaBeeswaxClient(object):
     return exec_result
 
   def __get_query_type(self, query_string):
-    return shlex.split(query_string.lstrip())[0].lower()
+    lexer = shlex.shlex(query_string.lstrip())
+    # ignore string quotes when splitting for queries with 
+    # single quoted string literals with an escaped single quote inside, e.g.:
+    # select '\''
+    # otherwise shlex will fail because of an unterminated quoted string
+    lexer.quotes = ''
+    return list(lexer)[0].lower()
 
   def __build_error_message(self, exception):
     """Construct a meaningful exception string"""

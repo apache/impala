@@ -203,8 +203,8 @@ IdentifierOrKwContents = [:jletter:][:jletterdigit:]* | "&&" | "||"
 
 IdentifierOrKw = \`{IdentifierOrKwContents}\` | {IdentifierOrKwContents}
 IntegerLiteral = [:digit:][:digit:]*
-SingleQuoteStringLiteral = (\'([^\n\r\']|\\\\|\\\')*\')
-DoubleQuoteStringLiteral = \"([^\n\r\"]|\\\\|\\\")*\"
+SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
+DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
 
 FLit1 = [0-9]+ \. [0-9]*
 FLit2 = \. [0-9]+

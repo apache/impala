@@ -19,6 +19,8 @@ import java.io.StringReader;
 
 import java_cup.runtime.Symbol;
 
+import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -50,7 +52,10 @@ public class StringLiteral extends LiteralExpr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.STRING_LITERAL;
-    msg.string_literal = new TStringLiteral(value);
+    // Unescape string exactly like Hive does. Hive's method assumes
+    // quotes so we add them here to reuse Hive's code.
+    msg.string_literal = new TStringLiteral(
+        BaseSemanticAnalyzer.unescapeSQLString("'" + value + "'"));
   }
 
   public String getValue() {

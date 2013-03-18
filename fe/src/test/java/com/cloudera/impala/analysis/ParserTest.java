@@ -54,6 +54,24 @@ public class ParserTest {
   }
 
   /**
+   * Asserts if stmt scans fine.
+   * @param stmt
+   */
+  public void ScannerError(String stmt) {
+    SqlScanner input = new SqlScanner(new StringReader(stmt));
+    SqlParser parser = new SqlParser(input);
+    try {
+      parser.parse();
+    } catch (java.lang.Exception e) {
+      fail("Stmt didn't result in scanning error but a parsing error instead: " + stmt);
+    } catch (java.lang.Error e) {
+      // Exception message is always 'failure occurred on input'.
+      return;
+    }
+    fail("Stmt didn't result in scanning or parsing error: " + stmt);
+  }
+
+  /**
    * Asserts if stmt parses fine.
    * @param stmt
    */
@@ -359,6 +377,31 @@ public class ParserTest {
     ParserError("select `5 from t");
     ParserError("select \"\"five\"\" from t\n");
     ParserError("select 5.0.5 from t");
+
+    // we implement MySQL-style escape sequences just like Hive:
+    // http://dev.mysql.com/doc/refman/5.0/en/string-literals.html
+    // test escape sequences with single and double quoted strings
+    testStringLiteral("\\0");
+    testStringLiteral("\\\\");
+    testStringLiteral("\\b");
+    testStringLiteral("\\n");
+    testStringLiteral("\\r");
+    testStringLiteral("\\t");
+    testStringLiteral("\\Z");
+    // MySQL deals with escapes and "%" and "_" specially for pattern matching
+    testStringLiteral("\\%");
+    testStringLiteral("\\\\%");
+    testStringLiteral("\\_");
+    testStringLiteral("\\\\_");
+    // all escape sequences back-to-back
+    testStringLiteral("\\0\\\\\\b\\n\\r\\t\\Z\\%\\\\%\\_\\\\_");
+    // mixed regular chars and escape sequences
+    testStringLiteral("a\\0b\\\\c\\bd\\ne\\rf\\tg\\Zh\\%i\\\\%j\\_k\\\\_l");
+    // escaping non-escape chars should scan ok and result in the character itself
+    testStringLiteral("\\a\\b\\c\\d\\1\\2\\3\\$\\&\\*");
+    // Single backslash is a scanner error.
+    ScannerError("select \"\\\" from t");
+
     // NULL literal in arithmetic expr
     for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
       ParserError("select a from t where a " +  op.toString() + " NULL");
@@ -368,6 +411,14 @@ public class ParserTest {
       ParserError("select a from t where a " +  op.toString() + " true");
       ParserError("select a from t where a " +  op.toString() + " false");
     }
+  }
+
+  // test string literal s with single and double quotes
+  private void testStringLiteral(String s) {
+    String singleQuoteQuery = "select " + "'" + s + "'" + " from t";
+    String doubleQuoteQuery = "select " + "\"" + s + "\"" + " from t";
+    ParsesOk(singleQuoteQuery);
+    ParsesOk(doubleQuoteQuery);
   }
 
   @Test public void TestFunctionCallExprs() {
@@ -737,7 +788,7 @@ public class ParserTest {
     // Partitioned tables
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (j string)");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (s string, d double)");
-    ParsesOk("CREATE TABLE Foo (i int, s string) PARTITIONED BY (s string, d double)" + 
+    ParsesOk("CREATE TABLE Foo (i int, s string) PARTITIONED BY (s string, d double)" +
         " COMMENT 'hello' LOCATION '/a/b/'");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (int)");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY ()");
@@ -770,7 +821,7 @@ public class ParserTest {
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\0'" +
         " LINES TERMINATED BY '\1' STORED AS TEXTFILE");
     ParsesOk("CREATE TABLE T (i int) COMMENT 'hi' ROW FORMAT DELIMITED STORED AS RCFILE");
-    ParsesOk("CREATE TABLE T (i int) COMMENT 'hello' ROW FORMAT DELIMITED FIELDS " + 
+    ParsesOk("CREATE TABLE T (i int) COMMENT 'hello' ROW FORMAT DELIMITED FIELDS " +
         "TERMINATED BY '\0' LINES TERMINATED BY '\1' STORED AS TEXTFILE LOCATION '/a'");
 
     // Negative row format syntax
@@ -779,7 +830,6 @@ public class ParserTest {
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY |");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS BY '\0'");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES BY '\n'");
-    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\n'");
     ParserError("CREATE TABLE T (i int) FIELDS TERMINATED BY '\0'");
     ParserError("CREATE TABLE T (i int) ROWS TERMINATED BY '\0'");
 
@@ -856,7 +906,7 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, " + 
+        "DISTINCTPCSA, FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, " +
         "IDENTIFIER\n");
 
     // missing from

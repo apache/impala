@@ -122,3 +122,36 @@ int, boolean
 8,true
 9,false
 ====
+---- QUERY
+# Test string-literal escape sequences
+SELECT ASCII("\0"), ASCII("\\"), ASCII("\b"), ASCII("\n"), ASCII("\r"), ASCII("\t"), ASCII("\Z")
+---- TYPES
+int, int, int, int, int, int, int
+---- RESULTS
+0,92,8,10,13,9,26
+====
+---- QUERY
+# Test escaping non-escape chars. We expect the escape to be simply removed.
+SELECT ASCII("\a"), ASCII("\X"), ASCII("\z"), ASCII("\?"), ASCII("\*")
+---- TYPES
+int, int, int, int, int
+---- RESULTS
+97,88,122,63,42
+====
+---- QUERY
+# Test escaping '%' and '_' which handled specially.
+# We expect '\\%' and '\%' to result in '\%' (similarly for '_')
+SELECT "\%", "\\%", "\_", "\\_"
+---- TYPES
+string, string, string, string
+---- RESULTS
+'\%','\%','\_','\_'
+====
+---- QUERY
+# Test query filed in IMPALA-65
+SELECT "quote \"", 'quote \''
+---- TYPES
+string, string
+---- RESULTS
+'quote "','quote ''
+====
