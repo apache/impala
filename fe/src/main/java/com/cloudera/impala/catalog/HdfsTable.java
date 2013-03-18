@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
@@ -32,6 +33,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -255,6 +257,31 @@ public class HdfsTable extends Table {
                         DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
   }
 
+  /**
+   *  Returns a disk id (0-based) index from the Hdfs VolumeId object.
+   *  There is currently no public API to get at the volume id.  We'll have to get it
+   *  by accessing the internals.
+   */
+  private static int getDiskId(VolumeId hdfsVolumeId) {
+    // Initialize the diskId as -1 to indicate it is unknown
+    int diskId = -1;
+
+    if (hdfsVolumeId.isValid()) {
+      // TODO: this is a hack and we'll have to address this by getting the
+      // public API.  Also, we need to be very mindful of this when we change
+      // the version of HDFS.
+      String volumeIdString = hdfsVolumeId.toString();
+      // This is the hacky part.  The toString is currently the underlying id
+      // encoded in base64.
+      byte[] volumeIdBytes = Base64.decodeBase64(volumeIdString);
+      if (volumeIdBytes.length == 4) {
+        diskId = Bytes.toInt(volumeIdBytes);
+      }
+    }
+    return diskId;
+  }
+
+
   // cache for our block metadata;
   // TODO: eviction policy, which should maximize the # of saved
   // getFileStatus()/getFileBlockLocations() calls per byte;
@@ -381,30 +408,9 @@ public class HdfsTable extends Table {
             found_null = true;
             break;
           }
-
-          Map<VolumeId, Integer> hostDisks;
-          if (!hostDiskIds.containsKey(hosts[j])) {
-            hostDisks = Maps.newHashMap();
-            hostDiskIds.put(hosts[j], hostDisks);
-          } else {
-            hostDisks = hostDiskIds.get(hosts[j]);
-          }
-
-          if (!volumeIds[j].isValid()) {
-            // The data node with this block did not respond to the block location
-            // rpc.  Mark it as -1 for the BE which will assign it a random disk.
-            diskIds[j] = -1;
-          } else if (hostDisks.containsKey(volumeIds[j])) {
-            // This is a VolumeId we've seen on this host, assign it the id we already
-            // assigned to this VolumeId
-            diskIds[j] = hostDisks.get(volumeIds[j]);
-          } else {
-            // This is a VolumeId we haven't seen.  Give it the next index.
-            int index = hostDisks.size();
-            hostDisks.put(volumeIds[j], index);
-            diskIds[j] = index;
-          }
+          diskIds[j] = getDiskId(volumeIds[j]);
         }
+
         if (found_null) {
           break;
         }
