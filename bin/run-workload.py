@@ -131,7 +131,8 @@ def append_row_to_csv_file(csv_writer, query, query_name, result):
     compression_str = 'none'
   csv_writer.writerow([result.executor, result.workload, result.scale_factor,
                        query, query_name, result.file_format, compression_str,
-                       avg_time, std_dev, options.num_clients, options.iterations])
+                       avg_time, std_dev, options.num_clients, options.iterations,
+                       result.execution_result.runtime_profile])
 
 def enumerate_query_files(base_directory):
   """

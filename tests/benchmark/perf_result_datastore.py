@@ -46,11 +46,11 @@ class PerfResultDataStore(object):
 
   def insert_execution_result(self, query_id, workload_id, file_type_id, num_clients,
         cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
-        run_info_id, num_iterations, is_official=False):
+        run_info_id, num_iterations, runtime_profile, is_official=False):
     """ Inserts a perf execution result record """
     return self.__insert_execution_result(query_id, workload_id, file_type_id,
         num_clients, cluster_name, executor_name, avg_time, stddev, run_date, version,
-        notes, run_info_id, num_iterations, is_official)
+        notes, run_info_id, num_iterations, runtime_profile, is_official)
 
   def print_execution_results(self, run_info_id):
     """ Prints results that were inserted for the given run_info_id """
@@ -106,14 +106,14 @@ class PerfResultDataStore(object):
   @cursor_wrapper
   def __insert_execution_result(self, query_id, workload_id, file_type_id, num_clients,
       cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
-      run_info_id, num_iterations, is_official, cursor):
+      run_info_id, num_iterations, runtime_profile, is_official, cursor):
     result = cursor.execute("insert into ExecutionResults (run_info_id, query_id, "\
         "workload_id, file_type_id, num_clients, cluster_name, executor_name,  avg_time,"\
-        " stddev, run_date, version, notes, num_iterations, is_official) values "\
-        "(%d, %d, %d, %d, %d, '%s', '%s', %s, %s, '%s', '%s', '%s', %d, %s)" %\
+        " stddev, run_date, version, notes, num_iterations, profile, is_official) values"\
+        "(%d, %d, %d, %d, %d, '%s', '%s', %s, %s, '%s', '%s', '%s', %d, '%s', %s)" %\
         (run_info_id, query_id, workload_id, file_type_id, num_clients, cluster_name,
          executor_name, avg_time, stddev, run_date, version, notes, num_iterations,
-         is_official))
+         runtime_profile, is_official))
 
   @cursor_wrapper
   def __insert_query_info(self, name, query, cursor):

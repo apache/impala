@@ -87,8 +87,14 @@ AVG_IDX = 7
 STDDEV_IDX = 8
 NUM_CLIENTS_IDX = 9
 NUM_ITERS_IDX = 10
-HIVE_AVG_IDX = 11
-HIVE_STDDEV_IDX = 12
+RUNTIME_PROFILE_IDX = 11
+HIVE_AVG_IDX = 12
+HIVE_STDDEV_IDX = 13
+SPEEDUP_IDX = 14
+
+# These are the column indexes that will be displayed as part of the perf result table.
+TABLE_COL_IDXS = range(FILE_FORMAT_IDX, NUM_ITERS_IDX + 1) +\
+    [HIVE_AVG_IDX, HIVE_STDDEV_IDX, SPEEDUP_IDX]
 
 # Formats a string so that is is wrapped across multiple lines with no single line
 # being longer than the given width
@@ -155,10 +161,10 @@ def build_table(results, verbose, reference_results = None):
   for query_group, group in groupby(results, key = sort_key):
     output += 'Query: ' + wrap_text(query_group, TOTAL_WIDTH) + '\n'
     table = texttable.Texttable(max_width=TOTAL_WIDTH)
-    table.set_deco(table.HEADER | table.VLINES | table.BORDER)
     table.header(build_table_header(verbose))
+    table.set_deco(table.HEADER | table.VLINES | table.BORDER)
 
-    # Add reach result to the output table
+    # Add each result to the output table
     for row in group:
       full_row = list(row)
       # Don't show the hive execution times in verbose mode.
@@ -186,7 +192,9 @@ def build_table(results, verbose, reference_results = None):
               format_if_float(calculate_speedup(ref_row[AVG_IDX], full_row[AVG_IDX]))
           full_row[AVG_IDX] = format_if_float(full_row[AVG_IDX])
           full_row[AVG_IDX] = full_row[AVG_IDX] + ' (%sX)' % speedup
-      table.add_row(full_row[FILE_FORMAT_IDX:])
+
+      test_row = [col for i, col in enumerate(full_row) if i in TABLE_COL_IDXS]
+      table.add_row(test_row)
 
     output += table.draw() + '\n'
   return output, perf_changes
@@ -309,25 +317,11 @@ def read_csv_result_file(file_name):
   results = []
   for row in csv.reader(open(file_name, 'rb'), delimiter='|'):
     # Backwards compatibility:
-    # Older results sets may not have num_clients, so default to 1. Older results also
-    # may not contain num_iterations, so fill that in if needed.
-    # TODO: This can be removed once all results are in the new format.
-    if len(row) == STDDEV_IDX + 1:
-      row.append('1')
-      row.append(get_num_iterations())
-    elif len(row) == NUM_CLIENTS_IDX + 1:
-      row.append(get_num_iterations())
+    # Older results may not have runtime profile, so fill this in if detected.
+    if len(row) == NUM_ITERS_IDX + 1:
+      row.append("No profile available")
     results.append(row)
   return results
-
-def get_num_iterations():
-  # This is for backwards compatibility only - older results may not contain the
-  # num_iterations record. In this case try to get it from the report description. If it
-  # is not available there, default to 2 iterations which is the minimum for all current
-  # runs.
-  description = options.report_description if options.report_description else str()
-  match = re.search(r'Iterations: (\d+)', description)
-  return 2 if match is None else match.group(1)
 
 def filter_sort_results(results, workload, scale_factor, key):
   filtered_res = [result for result in results if (
@@ -382,7 +376,8 @@ def write_results_to_datastore(results):
         executor_name=executor, avg_time=avg_time, stddev=stddev,
         run_date=current_date, version=options.build_version,
         notes=options.report_description, run_info_id=run_info_id,
-        num_iterations=int(row[NUM_ITERS_IDX]), is_official=options.is_official)
+        num_iterations=int(row[NUM_ITERS_IDX]), runtime_profile=row[RUNTIME_PROFILE_IDX],
+        is_official=options.is_official)
 
 def build_summary_header():
   summary = "Execution Summary (%s)\n" % date.today()

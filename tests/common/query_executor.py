@@ -37,12 +37,14 @@ hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 
 # Contains details about the execution result of a query
 class QueryExecutionResult(object):
-  def __init__(self, avg_time=None, std_dev=None, data=None, note=None):
+  def __init__(self, avg_time=None, std_dev=None, data=None, note=None,
+      runtime_profile=str()):
     self.avg_time = avg_time
     self.std_dev = std_dev
     self.__note = note
     self.success = False
     self.data = data
+    self.runtime_profile = runtime_profile
 
   def set_result_note(self, note):
     self.__note = note
@@ -191,7 +193,7 @@ def execute_using_impala_beeswax(query, query_options):
       return exec_result
     results.append(result)
   # We only need to print the results for a successfull run, not all.
-  LOG.debug('Data:\n%s\n' % results[0].get_data())
+  LOG.debug('Result:\n%s\n' % results[0])
   client.close_connection()
   # get rid of the client object
   del client
@@ -199,7 +201,8 @@ def execute_using_impala_beeswax(query, query_options):
   return construct_execution_result(query_options.iterations, results)
 
 def construct_execution_result(iterations, results):
-  """Calculate average running time and standard deviation.
+  """
+  Calculate average running time and standard deviation.
 
   The summary of the first result is used as the summary for the entire execution.
   """
@@ -208,7 +211,7 @@ def construct_execution_result(iterations, results):
   exec_result.data = results[0].data
   exec_result.beeswax_result = results[0]
   exec_result.set_result_note(results[0].summary)
-
+  exec_result.runtime_profile = results[0].runtime_profile
   # If running more than 2 iterations, throw the first result out. Don't throw away
   # the first result if iterations = 2 to preserve the stddev calculation.
   if iterations > 2:

@@ -15,6 +15,7 @@ CREATE TABLE ExecutionResults (
      workload_id BIGINT NOT NULL,
      file_type_id BIGINT NOT NULL,
      num_clients INT NOT NULL DEFAULT 1,
+     num_iterations INT NOT NULL DEFAULT 1,
      cluster_name char(255),
      executor_name char(255),
      avg_time double NULL,
@@ -22,7 +23,8 @@ CREATE TABLE ExecutionResults (
      run_date DATETIME,
      version char(255),
      notes TEXT,
-     is_official BOOLEAN DEFAULT FALSE, -- Is this an official result
+     profile TEXT, -- The query runtime profile
+     is_official BOOLEAN DEFAULT FALSE, -- True if this an official result
      PRIMARY KEY (result_id)
 );
 

@@ -43,7 +43,7 @@ class ImpalaBeeswaxException(Exception):
 # Encapsulates a typical query result.
 class QueryResult(object):
   def __init__(self, query=None, success=False, data=None, schema=None,
-               time_taken=0, summary=''):
+               time_taken=0, summary='', runtime_profile=str()):
     self.query = query
     self.success = success
     # Insert returns an int, convert into list to have a uniform data type.
@@ -55,6 +55,7 @@ class QueryResult(object):
     self.time_taken = time_taken
     self.summary = summary
     self.schema = schema
+    self.runtime_profile = runtime_profile
 
   def get_data(self):
     return self.__format_data()
@@ -65,12 +66,13 @@ class QueryResult(object):
     return ''
 
   def __str__(self):
-    message = ('Success: %s'
-               'Took: %s s\n'
-               'Summary: %s\n'
-               'Data:\n%s'
-               % (self.success,self.time_taken,
-                  self.summary, self.__format_data())
+    message = ('Summary: %s\n'
+               'Success: %s\n'
+               'Took: %s(s)\n'
+               'Data:\n%s\n'
+               'Runtime Profile:\n%s\n'
+               % (self.summary, self.success, self.time_taken,
+                  self.__format_data(), self.runtime_profile)
               )
     return message
 
@@ -151,7 +153,12 @@ class ImpalaBeeswaxClient(object):
     handle = self.__execute_query(query_string.strip())
     result = self.fetch_results(query_string,  handle)
     result.time_taken = time.time() - start
+    # Don't include the time it takes to get the runtime profile in the execution time
+    result.runtime_profile = self.get_runtime_profile(handle)
     return result
+
+  def get_runtime_profile(self, handle):
+    return self.__do_rpc(lambda: self.imp_service.GetRuntimeProfile(handle))
 
   def execute_query_async(self, query_string):
     """
