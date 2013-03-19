@@ -299,7 +299,7 @@ def generate_statements(output_name, test_vectors, sections,
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'CREATE', 'DEPENDENT_LOAD',
-                         'LOAD', 'LOAD_PARQUET']
+                         'LOAD', 'ALTER', 'LOAD_PARQUET']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
