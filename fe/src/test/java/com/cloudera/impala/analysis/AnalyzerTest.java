@@ -662,7 +662,6 @@ public class AnalyzerTest {
   public void TestAggregates() throws AnalysisException {
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " +
         "from functional.testtbl");
-    AnalyzesOk("select count(id, zip) from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",
         "aggregation function not allowed in WHERE clause");
 
@@ -677,7 +676,8 @@ public class AnalyzerTest {
         "'*' can only be used in conjunction with COUNT");
 
     // multiple args
-    AnalyzesOk("select count(id, zip) from functional.testtbl");
+    AnalysisError("select count(id, zip) from functional.testtbl",
+        "COUNT must have DISTINCT for multiple arguments: COUNT(id, zip)");
     AnalysisError("select min(id, zip) from functional.testtbl",
         "MIN requires exactly one parameter");
     AnalysisError("select max(id, zip) from functional.testtbl",

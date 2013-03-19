@@ -154,6 +154,11 @@ public class AggregateExpr extends Expr {
     }
 
     if (op == Operator.COUNT) {
+      // for multipe exprs count must be qualified with distinct
+      if (children.size() > 1 && !isDistinct) {
+        throw new AnalysisException(
+            "COUNT must have DISTINCT for multiple arguments: " + this.toSql());
+      }
       type = PrimitiveType.BIGINT;
       return;
     }
