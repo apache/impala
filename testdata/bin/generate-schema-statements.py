@@ -291,12 +291,12 @@ class Statements(object):
     self.load_base = list()
 
   def write_to_file(self, filename):
-    # Only write to file if there's something to actually write
-    if self.create or self.load_base or self.load:
-      # Make sure we create the base tables first
-      output = self.create + self.load_base + self.load
-      with open(filename, 'w') as f:
-        f.write('\n\n'.join(output))
+    # Make sure we create the base tables first. It is important that we always write
+    # to the output file, even if there are no statements to generate. This makes sure
+    # the output file is empty and the user doesn't unexpectedly load some stale data.
+    output = self.create + self.load_base + self.load
+    with open(filename, 'w') as f:
+      f.write('\n\n'.join(output))
 
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
@@ -346,21 +346,21 @@ def generate_statements(output_name, test_vectors, sections,
       # hive does not allow hyphenated table names.
       if data_set == 'hive-benchmark':
         db_name = '{0}{1}'.format('hivebenchmark', options.scale_factor)
-
+      db = '{0}{1}'.format(db_name, db_suffix)
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       if table_names and (table_name.lower() not in table_names):
-        print 'Skipping table: %s' % table_name
+        print 'Skipping table: %s.%s' % (db, table_name)
         continue
 
       if schema_include_constraints[table_name.lower()] and \
          table_format not in schema_include_constraints[table_name.lower()]:
-        print 'Skipping \'%s\' due to include constraint match' % table_name
+        print 'Skipping \'%s.%s\' due to include constraint match' % (db, table_name)
         continue
 
       if schema_exclude_constraints[base_table_name.lower()] and\
          table_format in schema_exclude_constraints[base_table_name.lower()]:
-        print 'Skipping \'%s\' due to exclude constraint match' % table_name
+        print 'Skipping \'%s.%s\' due to exclude constraint match' % (db, table_name)
         continue
 
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
@@ -390,8 +390,7 @@ def generate_statements(output_name, test_vectors, sections,
       # The ALTER statement in hive does not accept fully qualified table names.
       # We need the use statement.
       if alter:
-        use_table = 'USE {db_name}{db_suffix};\n'.format(db_name=db_name,
-                                                         db_suffix=db_suffix)
+        use_table = 'USE {db_name};\n'.format(db_name=db)
         output.create.append(use_table + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist

@@ -1020,3 +1020,58 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/UnsupportedTypes/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+old_rcfile_table
+---- COLUMNS
+key INT
+value STRING
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/data/oldrcfile.rc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_text_lzo
+---- COLUMNS
+field STRING
+---- DEPENDENT_LOAD
+-- Error recovery test data for LZO compression.
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_text_lzo/bad_text.lzo' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_seq_snap
+---- COLUMNS
+field STRING
+---- DEPENDENT_LOAD
+-- This data file contains format errors and is accessed by the unit test: sequence-file-recover-test.
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_seq_snap/bad_file' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+map_table
+---- CREATE
+-- For structured-type testing
+DROP TABLE IF EXISTS map_table;
+CREATE TABLE {db_name}{db_suffix}.{table_name} (map_col map<int, string>);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+array_table
+---- CREATE
+-- For structured-type testing
+CREATE TABLE {db_name}{db_suffix}.{table_name} (array_col array<int>);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+array_table
+---- CREATE
+-- For structured-type testing
+CREATE TABLE {db_name}{db_suffix}.{table_name} (array_col array<int>);
+====

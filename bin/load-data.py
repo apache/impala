@@ -137,6 +137,10 @@ def get_dataset_for_workload(workload):
 
 def copy_avro_schemas_to_hdfs(schemas_dir):
   """Recursively copies all of schemas_dir to the test warehouse."""
+  if not os.path.exists(schemas_dir):
+    print 'Avro schema dir (%s) does not exist. Skipping copy to HDFS.' % schemas_dir
+    return
+
   # Create warehouse directory if it doesn't already exist
   if exec_hadoop_fs_cmd("-test -d " + options.hive_warehouse_dir, expect_success=False):
     exec_hadoop_fs_cmd("-mkdir -p " + options.hive_warehouse_dir)

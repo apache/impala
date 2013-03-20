@@ -83,12 +83,19 @@ def parse_table_constraints(constraints_file):
         table_name, constraint_type, table_formats =\
             [value.split(':')[1].strip() for value in line.split(',', 2)]
         if constraint_type == 'restrict_to':
-          schema_include[table_name.lower()] += table_formats.split(',')
+          schema_include[table_name.lower()] +=\
+              map(parse_table_format_constraint, table_formats.split(','))
         elif constraint_type == 'exclude':
-          schema_exclude[table_name.lower()] += table_formats.split(',')
+          schema_exclude[table_name.lower()] +=\
+              map(parse_table_format_constraint, table_formats.split(','))
         else:
           raise ValueError, 'Unknown constraint type: %s' % constraint_type
   return schema_include, schema_exclude
+
+def parse_table_format_constraint(table_format_constraint):
+  # TODO: Expand how we parse table format constraints to support syntax such as
+  # a table format string with a wildcard character. Right now we don't do anything.
+  return table_format_constraint
 
 def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=True):
   """

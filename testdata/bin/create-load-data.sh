@@ -81,17 +81,19 @@ if [ $? != 0 ]; then
 fi
 
 # Load the index files for corrupted lzo data.
-hadoop fs -rm -f /test-warehouse/bad_text_lzo/bad_text.lzo.index
+hadoop fs -rm -f /test-warehouse/bad_text_lzo_text_lzo/bad_text.lzo.index
 hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
-      /test-warehouse/bad_text_lzo/
+    /test-warehouse/bad_text_lzo_text_lzo/
 
-hadoop fs -rm -r -f /bad_text_lzo/
-hadoop fs -mv /test-warehouse/bad_text_lzo/ /
+hadoop fs -rm -r -f /bad_text_lzo_text_lzo/
+hadoop fs -mv /test-warehouse/bad_text_lzo_text_lzo/ /
+# Cleanup the old bad_text_lzo files, if they exist.
+hadoop fs -rm -r -f /test-warehouse/bad_text_lzo/
 
 # Index all lzo files in HDFS under /test-warehouse
 ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
 
-hadoop fs -mv /bad_text_lzo/ /test-warehouse/
+hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 
 # Run compute stats over as many of the tables used in the Planner tests as possible.
 # Due to Hive bugs HIVE-4119 and HIVE-4122, these tables need to be chosen carefully or

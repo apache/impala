@@ -49,26 +49,6 @@ ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=2)
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=3)
   SET FILEFORMAT RCFILE;
 
--- Not really dependent: this table contains format errors and
--- is accessed by the unit test: sequence-file-recover-test.
-CREATE DATABASE IF NOT EXISTS functional_seq_snap;
-USE functional_seq_snap;
-DROP TABLE IF EXISTS bad_seq_snap;
-CREATE EXTERNAL TABLE bad_seq_snap (field string) stored as SEQUENCEFILE
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/bad_seq_snap';
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/bad_seq_snap/bad_file' OVERWRITE INTO TABLE bad_seq_snap;
-
---- Error recovery test data for LZO compression.
-CREATE DATABASE IF NOT EXISTS functional_text_lzo;
-USE functional_text_lzo;
-DROP TABLE IF EXISTS bad_text;
-CREATE EXTERNAL TABLE bad_text (field string) stored as
-INPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'
-OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/bad_text_lzo';
-
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo' OVERWRITE INTO TABLE bad_text;
-
 ----
 -- Used by CatalogTest to confirm that non-external HBase tables are identified
 -- correctly (IMP-581) 
@@ -78,23 +58,6 @@ USE functional;
 CREATE TABLE internal_hbase_table(key int, value string)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,cf1:val");
-----
--- For structured-type testing
-DROP TABLE IF EXISTS map_table;
-CREATE TABLE map_table(map_col map<int, string>);
-DROP TABLE IF EXISTS array_table;
-CREATE TABLE array_table(array_col array<int>);
-
-----
--- Create a table to test older rc files (pre hive9).  The header for those files are
--- different.
-CREATE DATABASE IF NOT EXISTS functional_rc;
-USE functional_rc;
-DROP TABLE IF EXISTS old_rcfile_table;
-CREATE EXTERNAL TABLE old_rcfile_table(key int, value string)
-STORED AS RCFILE
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/old_rcfile';
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/oldrcfile.rc' OVERWRITE into table old_rcfile_table;
 
 ---- Unsupported Impala table types
 USE functional;

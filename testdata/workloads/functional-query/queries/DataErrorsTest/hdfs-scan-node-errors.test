@@ -174,7 +174,7 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,3,29,false,9,9,NULL,90,9,90.90000000000001,'03/01/09','9',2012-03-22 00:00:00
 ====
 ---- QUERY
-select count(*) from functional_text_lzo.bad_text
+select count(*) from functional_text_lzo.bad_text_lzo
 ---- ERRORS
 Blocksize: 536870911 is greater than MAX_BLOCK_SIZE: 67108864
 ---- TYPES

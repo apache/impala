@@ -10,7 +10,7 @@ Format error in record or block header at offset: 1784325
 Format error in record or block header at offset: 1790563
 Format error in record or block header at offset: 1791244
 Format error in record or block header at end of file.
-First error while processing: hdfs: test-warehouse/bad_seq_snap/bad_file at offset: 899514
+First error while processing: hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset: 899514
 ---- TYPES
 bigint
 ---- RESULTS
