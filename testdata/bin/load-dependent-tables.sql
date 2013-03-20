@@ -91,6 +91,7 @@ CREATE TABLE array_table(array_col array<int>);
 CREATE DATABASE IF NOT EXISTS functional_rc;
 USE functional_rc;
 DROP TABLE IF EXISTS old_rcfile_table;
-CREATE TABLE old_rcfile_table(key int, value string)
-STORED AS RCFILE;
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/oldrcfile.rc' into table old_rcfile_table;
+CREATE EXTERNAL TABLE old_rcfile_table(key int, value string)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/old_rcfile';
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/oldrcfile.rc' OVERWRITE into table old_rcfile_table;
