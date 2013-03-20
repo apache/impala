@@ -80,9 +80,28 @@ parser code {:
   }
   
   // override to keep it from calling report_fatal_error()
+  @Override
   public void unrecovered_syntax_error(Symbol cur_token)
-    throws Exception {
+      throws Exception {
     throw new Exception(getErrorTypeMessage(cur_token.sym));
+  }
+  
+  /**
+   * Manually throw a parse error on a given symbol for special circumstances.
+   *
+   * @symbolName
+   *   name of symbol on which to fail parsing
+   * @symbolId
+   *   id of symbol from SqlParserSymbols on which to fail parsing
+   */
+  public void parseError(String symbolName, int symbolId) throws Exception {
+    Symbol errorToken = getSymbolFactory().newSymbol(symbolName, symbolId,
+        ((Symbol) stack.peek()), ((Symbol) stack.peek()), null);
+    // Call syntax error to gather information about expected tokens, etc.
+    // syntax_error does not throw an exception
+    syntax_error(errorToken);
+    // Unrecovered_syntax_error throws an exception and will terminate parsing
+    unrecovered_syntax_error(errorToken);
   }
   
   // Returns error string, consisting of the original
@@ -174,8 +193,10 @@ nonterminal ParseNodeBase stmt;
 nonterminal SelectStmt select_stmt;
 // Select or union statement.
 nonterminal QueryStmt query_stmt;
+// Single select_stmt or parenthesized query_stmt.
+nonterminal QueryStmt union_operand;
 // List of select or union blocks connected by UNION operators or a single select block.
-nonterminal List<UnionOperand> union_operands;
+nonterminal List<UnionOperand> union_operand_list;
 // USE stmt
 nonterminal UseStmt use_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
@@ -481,7 +502,7 @@ partition_key_value ::=
 // even if the union has order by and limit.
 // ORDER BY and LIMIT bind to the preceding select statement by default.
 query_stmt ::=  
-  union_operands:operands
+  union_operand_list:operands
   {:
     QueryStmt queryStmt = null;
     if (operands.size() == 1) {
@@ -496,55 +517,67 @@ query_stmt ::=
   ;
 
 // We must have a non-empty order by or limit for them to bind to the union.
-// We cannot reuse the existing order_by_clause or 
+// We cannot reuse the existing order_by_clause or
 // limit_clause because they would introduce conflicts with EOF,
 // which, unfortunately, cannot be accessed in the parser as a nonterminal
 // making this issue unresolvable.
 // We rely on the left precedence of KW_ORDER, KW_BY, and KW_LIMIT,
 // to resolve the ambiguity with select_stmt in favor of select_stmt
 // (i.e., ORDER BY and LIMIT bind to the select_stmt by default, and not the union).
+// There must be at least two union operands for ORDER BY or LIMIT to bind to a union,
+// and we manually throw a parse error if we reach this production
+// with only a single operand.
 union_with_order_by_or_limit ::=
-    union_operands:operands
+    union_operand_list:operands
     KW_ORDER KW_BY order_by_elements:orderByClause
   {:
+    if (operands.size() == 1) {
+      parser.parseError("order", SqlParserSymbols.KW_ORDER);
+    }
     RESULT = new UnionStmt(operands, orderByClause, -1);
   :}
-  | 
-    union_operands:operands
+  |
+    union_operand_list:operands
     KW_LIMIT INTEGER_LITERAL:limitClause
   {:
+    if (operands.size() == 1) {
+      parser.parseError("limit", SqlParserSymbols.KW_LIMIT);
+    }
     RESULT = new UnionStmt(operands, null, limitClause.longValue());
   :}
   |
-    union_operands:operands
+    union_operand_list:operands
     KW_ORDER KW_BY order_by_elements:orderByClause
     KW_LIMIT INTEGER_LITERAL:limitClause
   {:
+    if (operands.size() == 1) {
+      parser.parseError("order", SqlParserSymbols.KW_ORDER);
+    }
     RESULT = new UnionStmt(operands, orderByClause, limitClause.longValue());
   :}
   ;
 
-union_operands ::=
+union_operand ::=
   select_stmt:select
   {:
-    List<UnionOperand> operands = new ArrayList<UnionOperand>();
-    operands.add(new UnionOperand(select, null));
-    RESULT = operands;
+    RESULT = select;
   :}
   | LPAREN query_stmt:query RPAREN
   {:
+    RESULT = query;
+  :}
+  ;
+
+union_operand_list ::=
+  union_operand:operand
+  {:
     List<UnionOperand> operands = new ArrayList<UnionOperand>();
-    operands.add(new UnionOperand(query, null));
+    operands.add(new UnionOperand(operand, null));
     RESULT = operands;
-  :}
-  | union_operands:operands union_op:op select_stmt:select
+  :}  
+  | union_operand_list:operands union_op:op union_operand:operand
   {:
-    operands.add(new UnionOperand(select, op));
-    RESULT = operands;
-  :}
-  | union_operands:operands union_op:op LPAREN query_stmt:query RPAREN
-  {:
-    operands.add(new UnionOperand(query, op));
+    operands.add(new UnionOperand(operand, op));
     RESULT = operands;
   :}
   ;
@@ -997,15 +1030,7 @@ timestamp_arithmetic_expr ::=
   {:
     if (l.size() > 1) {
       // Report parsing failure on keyword interval.
-      Symbol errorToken = parser.getSymbolFactory().newSymbol("interval",
-        SqlParserSymbols.KW_INTERVAL,
-        ((Symbol) CUP$SqlParser$stack.peek()),
-        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
-      // Call syntax error to gather information about expected tokens, etc.
-      // syntax_error does not throw an exception
-      parser.syntax_error(errorToken);
-      // Unrecovered_syntax_error throws an exception and will terminate parsing
-      parser.unrecovered_syntax_error(errorToken);    
+      parser.parseError("interval", SqlParserSymbols.KW_INTERVAL);
     }
     RESULT = new TimestampArithmeticExpr(functionName, l.get(0), v, u);
   :}
@@ -1028,32 +1053,14 @@ literal ::=
     // and generate an unmatched string literal symbol 
     // to be passed as the last seen token in the
     // error handling routine (otherwise some other token could be reported)
-    Symbol errorToken = parser.getSymbolFactory().newSymbol("literal",
-        SqlParserSymbols.UNMATCHED_STRING_LITERAL,
-        ((Symbol) CUP$SqlParser$stack.peek()),
-        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
-    // call syntax error to gather information about expected tokens, etc.
-    // syntax_error does not throw an exception
-    parser.syntax_error(errorToken);
-    // unrecovered_syntax_error throws an exception and will terminate parsing
-    parser.unrecovered_syntax_error(errorToken);
-    RESULT = null;
+    parser.parseError("literal", SqlParserSymbols.UNMATCHED_STRING_LITERAL);
   :}
   | NUMERIC_OVERFLOW:l
   {: 
     // similar to the unmatched string literal case
     // we must terminate parsing at this point
     // and generate a corresponding symbol to be reported
-    Symbol errorToken = parser.getSymbolFactory().newSymbol("literal",
-        SqlParserSymbols.NUMERIC_OVERFLOW,
-        ((Symbol) CUP$SqlParser$stack.peek()),
-        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
-    // call syntax error to gather information about expected tokens, etc.
-    // syntax_error does not throw an exception
-    parser.syntax_error(errorToken);
-    // unrecovered_syntax_error throws an exception and will terminate parsing
-    parser.unrecovered_syntax_error(errorToken);    
-    RESULT = null; 
+    parser.parseError("literal", SqlParserSymbols.NUMERIC_OVERFLOW);
   :}
   ;
 

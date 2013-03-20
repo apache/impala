@@ -83,6 +83,10 @@ public class ParserTest {
     ParsesOk("select 1 + 1, 'two', f(3), a + b");
     ParserError("select 1 + 1 'two' f(3) a + b");
     ParserError("select a, 2 where a > 2");
+    ParserError("select a, 2 group by");
+    ParserError("select a, 2 order by 1");
+    ParserError("select a, 2 limit 1");
+    ParserError("select a, 2 order by 1 limit 1");
   }
 
   @Test public void TestSelect() {
