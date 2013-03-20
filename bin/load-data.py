@@ -137,12 +137,19 @@ def get_dataset_for_workload(workload):
 
 def copy_avro_schemas_to_hdfs(schemas_dir):
   """Recursively copies all of schemas_dir to the test warehouse."""
-  cmd = "%s fs -put -f %s /" % (HADOOP_CMD, schemas_dir)
-  print "Executing HDFS copy command: " + cmd
+  # Create warehouse directory if it doesn't already exist
+  if exec_hadoop_fs_cmd("-test -d " + options.hive_warehouse_dir, expect_success=False):
+    exec_hadoop_fs_cmd("-mkdir -p " + options.hive_warehouse_dir)
+  exec_hadoop_fs_cmd("-put -f %s %s/" % (schemas_dir, options.hive_warehouse_dir))
+
+def exec_hadoop_fs_cmd(args, expect_success=True):
+  cmd = "%s fs %s" % (HADOOP_CMD, args)
+  print "Executing Hadoop command: " + cmd
   ret_val = subprocess.call(cmd, shell=True)
-  if ret_val != 0:
-    print "Error copying Avro schemas to HDFS, exiting"
+  if expect_success and ret_val != 0:
+    print "Error executing Hadoop command, exiting"
     sys.exit(ret_val)
+  return ret_val
 
 if __name__ == "__main__":
   all_workloads = available_workloads(WORKLOAD_DIR)

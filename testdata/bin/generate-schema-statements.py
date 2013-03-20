@@ -158,8 +158,8 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   tblproperties = str()
   if file_format == 'avro':
     tblproperties = "TBLPROPERTIES ('avro.schema.url'=" \
-        "'hdfs://%s/%s/{table_name}.json')" \
-        % (options.hdfs_namenode, avro_schema_dir)
+        "'hdfs://%s/%s/%s/{table_name}.json')" \
+        % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
     # Override specified row format
     row_format_stmt = "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'"
   elif file_format == 'parquet':
