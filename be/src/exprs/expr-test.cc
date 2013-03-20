@@ -493,11 +493,15 @@ class ExprTest : public testing::Test {
         TYPE_SMALLINT, static_cast<int16_t>(val));
     TestValue("cast(" + stmt + " as int)",
         TYPE_INT, static_cast<int32_t>(val));
+    TestValue("cast(" + stmt + " as integer)",
+        TYPE_INT, static_cast<int32_t>(val));
     TestValue("cast(" + stmt + " as bigint)",
         TYPE_BIGINT, static_cast<int64_t>(val));
     TestValue("cast(" + stmt + " as float)",
         TYPE_FLOAT, static_cast<float>(val));
     TestValue("cast(" + stmt + " as double)",
+        TYPE_DOUBLE, static_cast<double>(val));
+    TestValue("cast(" + stmt + " as real)",
         TYPE_DOUBLE, static_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)",
         lexical_cast<string>(val));
@@ -595,9 +599,13 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, "f");
   TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "123");
   TestSingleLiteralConstruction(TYPE_INT, &i_val, "234");
+  TestSingleLiteralConstruction(TYPE_INT, &i_val, "+234");
   TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "1234");
+  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "+1234");
   TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "3.14");
+  TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "+3.14");
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "+1.23");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
 
   // Min/Max Boundary value test for tiny/small/int/long
@@ -1677,6 +1685,20 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("round(-3.14159265, 3)", TYPE_DOUBLE, -3.142);
   TestValue("round(-3.14159265, 4)", TYPE_DOUBLE, -3.1416);
   TestValue("round(-3.14159265, 5)", TYPE_DOUBLE, -3.14159);
+}
+
+TEST_F(ExprTest, UnaryOperators) {
+  TestValue("+1", TYPE_TINYINT, 1);
+  TestValue("-1", TYPE_TINYINT, -1);
+  TestValue("- -1", TYPE_TINYINT, 1);
+  TestValue("+-1", TYPE_TINYINT, -1);
+  TestValue("++1", TYPE_TINYINT, 1);
+
+  TestValue("+1.f", TYPE_FLOAT, 1.0f);
+  TestValue("+1.0", TYPE_FLOAT, 1.0f);
+  TestValue("-1.0", TYPE_FLOAT, -1.0f);
+
+  TestValue("1 - - - 1", TYPE_BIGINT, 0);
 }
 
 // TODO: I think a lot of these casts are not necessary and we should fix this

@@ -287,6 +287,22 @@ bigint
 9980
 ====
 ---- QUERY
+# Type synonym check: DOUBLE = REAL
+select count(*) from alltypesagg where double_col >= 20.2 and cast(double_col as double) = cast(double_col as real) 
+---- TYPES
+bigint
+---- RESULTS
+9980
+====
+---- QUERY
+# Type synonym check: INT = INTEGER
+select count(*) from alltypesagg where double_col >= 20.2 and cast(double_col as int) = cast(double_col as integer)
+---- TYPES
+bigint
+---- RESULTS
+9980
+====
+---- QUERY
 # TODO: figure out why the last col has a diff
 # result: 111428999.9997675
 # +

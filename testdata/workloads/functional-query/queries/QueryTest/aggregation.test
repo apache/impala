@@ -298,6 +298,24 @@ bigint
 990
 ====
 ---- QUERY
+# Check that ALL inside aggregates is correct
+select count(ALL *) from alltypesagg group by int_col % 10
+---- TYPES
+bigint
+---- RESULTS
+10
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+990
+====
+---- QUERY
 select bigint_col % 100, count(*) from alltypesagg group by 1
 ---- TYPES
 bigint, bigint

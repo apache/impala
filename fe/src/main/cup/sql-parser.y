@@ -25,67 +25,67 @@ import java_cup.runtime.Symbol;
 
 parser code {:
   private Symbol errorToken;
-  
-  // list of expected tokens ids from current parsing state 
+
+  // list of expected tokens ids from current parsing state
   // for generating syntax error message
   private final List<Integer> expectedTokenIds = new ArrayList<Integer>();
 
   // to avoid reporting trivial tokens as expected tokens in error messages
   private boolean reportExpectedToken(Integer tokenId) {
-    if (SqlScanner.isKeyword(tokenId) || 
+    if (SqlScanner.isKeyword(tokenId) ||
         tokenId.intValue() == SqlParserSymbols.COMMA ||
         tokenId.intValue() == SqlParserSymbols.IDENT) {
       return true;
     } else {
       return false;
     }
-  }  
-  
+  }
+
   private String getErrorTypeMessage(int lastTokenId) {
     String msg = null;
     switch(lastTokenId) {
-      case SqlParserSymbols.UNMATCHED_STRING_LITERAL: 
+      case SqlParserSymbols.UNMATCHED_STRING_LITERAL:
         msg = "Unmatched string literal";
-        break;    
+        break;
       case SqlParserSymbols.NUMERIC_OVERFLOW:
         msg = "Numeric overflow";
-        break;      
+        break;
       default:
         msg = "Syntax error";
         break;
-    }    
+    }
     return msg;
-  }  
-  
+  }
+
   // override to save error token
   public void syntax_error(java_cup.runtime.Symbol token) {
     errorToken = token;
-    
+
     // derive expected tokens from current parsing state
-    expectedTokenIds.clear();    
-    int state = ((Symbol)stack.peek()).parse_state;    
-    // get row of actions table corresponding to current parsing state    
-    // the row consists of pairs of <tokenId, actionId> 
+    expectedTokenIds.clear();
+    int state = ((Symbol)stack.peek()).parse_state;
+    // get row of actions table corresponding to current parsing state
+    // the row consists of pairs of <tokenId, actionId>
     // a pair is stored as row[i] (tokenId) and row[i+1] (actionId)
     // the last pair is a special error action
     short[] row = action_tab[state];
     short tokenId;
-    // the expected tokens are all the symbols with a 
-    // corresponding action from the current parsing state 
+    // the expected tokens are all the symbols with a
+    // corresponding action from the current parsing state
     for (int i = 0; i < row.length-2; ++i) {
       // get tokenId and skip actionId
       tokenId = row[i++];
       expectedTokenIds.add(Integer.valueOf(tokenId));
-    }  
+    }
   }
-  
+
   // override to keep it from calling report_fatal_error()
   @Override
   public void unrecovered_syntax_error(Symbol cur_token)
       throws Exception {
     throw new Exception(getErrorTypeMessage(cur_token.sym));
   }
-  
+
   /**
    * Manually throw a parse error on a given symbol for special circumstances.
    *
@@ -103,10 +103,10 @@ parser code {:
     // Unrecovered_syntax_error throws an exception and will terminate parsing
     unrecovered_syntax_error(errorToken);
   }
-  
+
   // Returns error string, consisting of the original
   // stmt with a '^' under the offending token. Assumes
-  // that parse() has been called and threw an exception  
+  // that parse() has been called and threw an exception
   public String getErrorMsg(String stmt) {
     if (errorToken == null || stmt == null) return null;
     String[] lines = stmt.split("\n");
@@ -128,23 +128,23 @@ parser code {:
       result.append(lines[i]);
       result.append('\n');
     }
-    
+
     // only report encountered and expected tokens for syntax errors
     if (errorToken.sym == SqlParserSymbols.UNMATCHED_STRING_LITERAL ||
         errorToken.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
-      return result.toString();                    
+      return result.toString();
     }
-    
+
     // append last encountered token
     result.append("Encountered: ");
-    String lastToken = 
+    String lastToken =
       SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken.sym));
     if (lastToken != null) {
       result.append(lastToken);
     } else {
       result.append("Unknown last token with id: " + errorToken.sym);
     }
-    
+
     // append expected tokens
     result.append('\n');
     result.append("Expected: ");
@@ -153,14 +153,14 @@ parser code {:
     for (int i = 0; i < expectedTokenIds.size(); ++i) {
       tokenId = expectedTokenIds.get(i);
       if (reportExpectedToken(tokenId)) {
-       expectedToken = SqlScanner.tokenIdMap.get(tokenId);        
-         result.append(expectedToken + ", ");        
+       expectedToken = SqlScanner.tokenIdMap.get(tokenId);
+         result.append(expectedToken + ", ");
       }
     }
     // remove trailing ", "
-    result.delete(result.length()-2, result.length());    
+    result.delete(result.length()-2, result.length());
     result.append('\n');
-    
+
     return result.toString();
   }
 :};
@@ -216,7 +216,7 @@ nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal TableName table_name;
 nonterminal Predicate where_clause;
-nonterminal Predicate predicate, between_predicate, comparison_predicate, 
+nonterminal Predicate predicate, between_predicate, comparison_predicate,
   compound_predicate, in_predicate, like_predicate;
 nonterminal LiteralPredicate literal_predicate;
 nonterminal ArrayList<Expr> group_by_clause;
@@ -237,7 +237,7 @@ nonterminal InlineViewRef inline_view_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
-nonterminal Expr subtract_chain_expr;
+nonterminal Expr sign_chain_expr;
 nonterminal BinaryPredicate.Operator binary_comparison_operator;
 nonterminal InsertStmt insert_stmt;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
@@ -282,7 +282,7 @@ precedence left KW_INTERVAL;
 
 start with stmt;
 
-stmt ::= 
+stmt ::=
   query_stmt:query
   {: RESULT = query; :}
   | insert_stmt:insert
@@ -399,7 +399,7 @@ file_format_val ::=
 partition_column_defs ::=
   KW_PARTITIONED KW_BY LPAREN column_def_list:col_defs RPAREN
   {: RESULT = col_defs; :}
-  | /* Empty - not a partitioned table */ 
+  | /* Empty - not a partitioned table */
   {: RESULT = new ArrayList<ColumnDef>(); :}
   ;
 
@@ -432,12 +432,12 @@ drop_tbl_stmt ::=
   {: RESULT = new DropTableStmt(table, if_exists); :}
   ;
 
-db_or_schema_kw ::= 
+db_or_schema_kw ::=
   KW_DATABASE
   | KW_SCHEMA
   ;
 
-dbs_or_schemas_kw ::= 
+dbs_or_schemas_kw ::=
   KW_DATABASES
   | KW_SCHEMAS
   ;
@@ -452,7 +452,7 @@ if_exists_val ::=
 partition_clause ::=
   KW_PARTITION LPAREN partition_key_value_list:list RPAREN
   {: RESULT = list; :}
-  | 
+  |
   {: RESULT = null; :}
   ;
 
@@ -498,15 +498,15 @@ partition_key_value ::=
 // with and without parenthesis, but also disallows others.
 //
 // Our parsing:
-// Select blocks may or may not be in parenthesis, 
+// Select blocks may or may not be in parenthesis,
 // even if the union has order by and limit.
 // ORDER BY and LIMIT bind to the preceding select statement by default.
-query_stmt ::=  
+query_stmt ::=
   union_operand_list:operands
   {:
     QueryStmt queryStmt = null;
     if (operands.size() == 1) {
-      queryStmt = operands.get(0).getQueryStmt();        
+      queryStmt = operands.get(0).getQueryStmt();
     } else {
       queryStmt = new UnionStmt(operands, null, -1);
     }
@@ -574,7 +574,7 @@ union_operand_list ::=
     List<UnionOperand> operands = new ArrayList<UnionOperand>();
     operands.add(new UnionOperand(operand, null));
     RESULT = operands;
-  :}  
+  :}
   | union_operand_list:operands union_op:op union_operand:operand
   {:
     operands.add(new UnionOperand(operand, op));
@@ -646,12 +646,14 @@ select_stmt ::=
 
 select_clause ::=
   KW_SELECT select_list:l
-  {: RESULT = l; :}  
+  {: RESULT = l; :}
+  | KW_SELECT KW_ALL select_list:l
+  {: RESULT = l; :}
   | KW_SELECT KW_DISTINCT select_list:l
   {:
     l.setIsDistinct(true);
     RESULT = l;
-  :}  
+  :}
   ;
 
 select_list ::=
@@ -665,7 +667,7 @@ select_list ::=
   {:
     list.getItems().add(item);
     RESULT = list;
-  :}    
+  :}
   ;
 
 select_list_item ::=
@@ -679,9 +681,9 @@ select_list_item ::=
   | predicate:p
   {: RESULT = new SelectListItem(p, null); :}
   | star_expr:expr
-  {: RESULT = expr; :}  
+  {: RESULT = expr; :}
   ;
-  
+
 alias_clause ::=
   KW_AS IDENT:ident
   {: RESULT = ident; :}
@@ -691,7 +693,7 @@ alias_clause ::=
 
 star_expr ::=
   STAR
-  // table_name DOT STAR doesn't work because of a reduce-reduce conflict 
+  // table_name DOT STAR doesn't work because of a reduce-reduce conflict
   // on IDENT [DOT]
   {:
     RESULT = SelectListItem.createStarItem(null);
@@ -756,14 +758,14 @@ table_ref ::=
   | inline_view_ref:s
   {: RESULT = s; :}
   ;
-  
+
 inline_view_ref ::=
-  LPAREN query_stmt:query RPAREN IDENT:alias
+  LPAREN query_stmt:query RPAREN alias_clause:alias
   {: RESULT = new InlineViewRef(alias, query); :}
   ;
-  
+
 base_table_ref ::=
-  table_name:name IDENT:alias
+  table_name:name alias_clause:alias
   {: RESULT = new BaseTableRef(name, alias); :}
   | table_name:name
   {: RESULT = new BaseTableRef(name, null); :}
@@ -903,14 +905,14 @@ case_when_clause_list ::=
     list.add(new CaseWhenClause(whenExpr, thenExpr));
     RESULT = list;
   :}
-  | case_when_clause_list:list KW_WHEN expr_or_predicate:whenExpr 
+  | case_when_clause_list:list KW_WHEN expr_or_predicate:whenExpr
     KW_THEN expr_or_predicate:thenExpr
   {:
     list.add(new CaseWhenClause(whenExpr, thenExpr));
     RESULT = list;
   :}
   ;
-  
+
 case_else_clause ::=
   KW_ELSE expr_or_predicate:e
   {: RESULT = e; :}
@@ -925,10 +927,10 @@ expr_or_predicate ::=
   {: RESULT = p; :}
   ;
 
-subtract_chain_expr ::=    
+sign_chain_expr ::=
   SUBTRACT expr:e
-  {:      
-    // integrate signs into literals 
+  {:
+    // integrate signs into literals
     if (e.isLiteral() && e.getType().isNumericType()) {
       ((LiteralExpr)e).swapSign();
       RESULT = e;
@@ -936,13 +938,15 @@ subtract_chain_expr ::=
       RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, new IntLiteral((long)-1), e);
     }
   :}
+  | ADD expr:e
+  {: RESULT = e; :}
   ;
 
 expr ::=
-  subtract_chain_expr:e
-  {: RESULT = e; :}  
+  sign_chain_expr:e
+  {: RESULT = e; :}
   | literal:l
-  {: RESULT = l; :} 
+  {: RESULT = l; :}
   | IDENT:functionName LPAREN RPAREN
   {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
   | IDENT:functionName LPAREN func_arg_list:exprs RPAREN
@@ -959,11 +963,11 @@ expr ::=
   | column_ref:c
   {: RESULT = c; :}
   | timestamp_arithmetic_expr:e
-  {: RESULT = e; :}  
-  | arithmetic_expr:e  
+  {: RESULT = e; :}
+  | arithmetic_expr:e
   {: RESULT = e; :}
   | LPAREN expr:e RPAREN
-  {: RESULT = e; :}  
+  {: RESULT = e; :}
   ;
 
 func_arg_list ::=
@@ -993,7 +997,7 @@ arithmetic_expr ::=
   | expr:e1 ADD expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.ADD, e1, e2); :}
   | expr:e1 SUBTRACT expr:e2
-  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, e1, e2); :}     
+  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, e1, e2); :}
   | expr:e1 BITAND expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITAND, e1, e2); :}
   | expr:e1 BITOR expr:e2
@@ -1011,14 +1015,14 @@ timestamp_arithmetic_expr ::=
   KW_INTERVAL expr:v IDENT:u ADD expr:t
   {: RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, true); :}
   | expr:t ADD KW_INTERVAL expr:v IDENT:u
-  {: 
+  {:
     RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, false);
   :}
   // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
   %prec KW_INTERVAL
   | expr:t SUBTRACT KW_INTERVAL expr:v IDENT:u
   {:
-    RESULT = 
+    RESULT =
         new TimestampArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, t, v, u, false);
   :}
   // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
@@ -1046,17 +1050,17 @@ literal ::=
   | BOOL_LITERAL:l
   {: RESULT = new BoolLiteral(l); :}
   | UNMATCHED_STRING_LITERAL:l expr:e
-  {: 
+  {:
     // we have an unmatched string literal.
     // to correctly report the root cause of this syntax error
     // we must force parsing to fail at this point,
-    // and generate an unmatched string literal symbol 
+    // and generate an unmatched string literal symbol
     // to be passed as the last seen token in the
     // error handling routine (otherwise some other token could be reported)
     parser.parseError("literal", SqlParserSymbols.UNMATCHED_STRING_LITERAL);
   :}
   | NUMERIC_OVERFLOW:l
-  {: 
+  {:
     // similar to the unmatched string literal case
     // we must terminate parsing at this point
     // and generate a corresponding symbol to be reported
@@ -1092,7 +1096,11 @@ aggregate_operator ::=
 aggregate_param_list ::=
   STAR
   {: RESULT = AggregateParamsList.createStarParam(); :}
+  | KW_ALL STAR
+  {: RESULT = AggregateParamsList.createStarParam(); :}
   | expr_list:exprs
+  {: RESULT = new AggregateParamsList(false, exprs); :}
+  | KW_ALL expr_list:exprs
   {: RESULT = new AggregateParamsList(false, exprs); :}
   | KW_DISTINCT:distinct expr_list:exprs
   {: RESULT = new AggregateParamsList(true, exprs); :}
@@ -1106,8 +1114,8 @@ predicate ::=
   | between_predicate:p
   {: RESULT = p; :}
   | comparison_predicate:p
-  {: RESULT = p; :}  
-  | compound_predicate:p  
+  {: RESULT = p; :}
+  | compound_predicate:p
   {: RESULT = p; :}
   | in_predicate:p
   {: RESULT = p; :}
@@ -1138,28 +1146,28 @@ binary_comparison_operator ::=
 
 comparison_predicate ::=
   expr:e1 binary_comparison_operator:op expr:e2
-  {: RESULT = new BinaryPredicate(op, e1, e2); :}  
+  {: RESULT = new BinaryPredicate(op, e1, e2); :}
   // A bool/null literal should be both an expr (to act as a BoolLiteral)
   // and a predicate (to act as a LiteralPredicate).
   // Implementing this directly will lead to shift-reduce conflicts.
-  // We decided that a bool literal shall be literal predicate. 
+  // We decided that a bool literal shall be literal predicate.
   // This means we must list all combinations with bool literals in the ops below,
   // transforming the literal predicate to a literal expr.
   // We could have chosen the other way (bool literal as a literal expr), but
-  // this would have required more and uglier code, 
+  // this would have required more and uglier code,
   // e.g., a special-case rule for dealing with "where true/false".
   | expr:e1 binary_comparison_operator:op literal_predicate:l
-  {: 
+  {:
     Expr e2 = (l.isNull()) ? new NullLiteral() : new BoolLiteral(l.getValue());
-    RESULT = new BinaryPredicate(op, e1, e2);  
+    RESULT = new BinaryPredicate(op, e1, e2);
   :}
   | literal_predicate:l binary_comparison_operator:op expr:e2
-  {: 
+  {:
     Expr e1 = (l.isNull()) ? new NullLiteral() : new BoolLiteral(l.getValue());
     RESULT = new BinaryPredicate(op, e1, e2);
   :}
   | literal_predicate:l1 binary_comparison_operator:op literal_predicate:l2
-  {:     
+  {:
     Expr e1 = (l1.isNull()) ? new NullLiteral() : new BoolLiteral(l1.getValue());
     Expr e2 = (l2.isNull()) ? new NullLiteral() : new BoolLiteral(l2.getValue());
     RESULT = new BinaryPredicate(op, e1, e2);
@@ -1183,7 +1191,7 @@ like_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2), null); :}
   ;
-  
+
 between_predicate ::=
   expr:e1 KW_BETWEEN expr:e2 KW_AND expr:e3
   {: RESULT = new BetweenPredicate(e1, e2, e3, false); :}
@@ -1203,7 +1211,7 @@ compound_predicate ::=
   ;
 
 // Using expr_or_predicate here results in an unresolvable shift/reduce conflict.
-// Instead, we must list expr and predicate explicitly. 
+// Instead, we must list expr and predicate explicitly.
 in_predicate ::=
   expr:e KW_IN LPAREN func_arg_list:l RPAREN
   {: RESULT = new InPredicate(e, l, false); :}
@@ -1212,7 +1220,7 @@ in_predicate ::=
   | expr:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
   {: RESULT = new InPredicate(e, l, true); :}
   | predicate:p KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
-  {: RESULT = new InPredicate(p, l, true); :} 
+  {: RESULT = new InPredicate(p, l, true); :}
   ;
 
 literal_predicate ::=

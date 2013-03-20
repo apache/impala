@@ -92,8 +92,10 @@ public class ParserTest {
   @Test public void TestSelect() {
     ParsesOk("select a from tbl");
     ParsesOk("select a, b, c, d from tbl");
+    ParsesOk("select all a, b, c from tbl");
     ParserError("a from tbl");
     ParserError("select a b c from tbl");
+    ParserError("select all from tbl");
   }
 
   @Test public void TestAlias() {
@@ -102,6 +104,12 @@ public class ParserTest {
     ParsesOk("select a as a, b as b, c as c, d as d from tbl");
     ParserError("a from tbl");
     ParserError("select a as a, b c d from tbl");
+
+    ParsesOk("select a from tbl b");
+    ParsesOk("select a from tbl as b");
+    ParsesOk("select a from (select * from tbl) b");
+    ParsesOk("select a from (select * from tbl) as b");
+    ParsesOk("select a from (select * from tbl b) as b");
   }
 
   @Test public void TestStar() {
@@ -359,6 +367,36 @@ public class ParserTest {
     ParsesOk("select - 1 from t");
     ParsesOk("select a - - 1 from t");
     ParsesOk("select a - - - 1 from t");
+
+    // positive integer literal
+    ParsesOk("select +1 from t");
+    ParsesOk("select + 1 from t");
+    ParsesOk("select a + + 1 from t");
+    ParsesOk("select a + + + 1 from t");
+
+    // Float literals
+    ParsesOk("select +1.0 from t");
+    ParsesOk("select +-1.0 from t");
+    ParsesOk("select +1.-0 from t");
+
+    // mixed signs
+    ParsesOk("select -+-1 from t");
+    ParsesOk("select - +- 1 from t");
+    ParsesOk("select 1 + -+ 1 from t");
+
+    // -- is parsed as a comment starter
+    ParserError("select --1");
+
+    // Postfix operators must be binary
+    ParserError("select 1- from t");
+    ParserError("select 1 + from t");
+
+    // Only - and + can be unary operators
+    ParserError("select /1 from t");
+    ParserError("select *1 from t");
+    ParserError("select &1 from t");
+    ParserError("select =1 from t");
+
     // NULL literal in binary predicate.
     for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
       ParsesOk("select a from t where a " +  op.toString() + " NULL");
@@ -436,8 +474,8 @@ public class ParserTest {
     ParsesOk("select (i + 5) * (i - -5) / (a % 10) from t");
     ParsesOk("select a & b, a | b, a ^ b, ~a from t");
     ParsesOk("select 15.7 * f from t");
+    ParsesOk("select +a from t");
     ParserError("select (i + 5)(1 - i) from t");
-    ParserError("select +a from t");
     ParserError("select %a from t");
     ParserError("select *a from t");
     ParserError("select /a from t");
@@ -526,6 +564,8 @@ public class ParserTest {
   @Test public void TestAggregateExprs() {
     ParsesOk("select count(*), count(a), count(distinct a, b) from t");
     ParserError("select count() from t");
+    ParsesOk("select count(all *) from t");
+    ParsesOk("select count(all 1) from t");
     ParsesOk("select min(a), min(distinct a) from t");
     ParserError("select min() from t");
     ParsesOk("select max(a), max(distinct a) from t");
@@ -893,6 +933,14 @@ public class ParserTest {
     ParserError("DROP TBL Foo");
   }
 
+  @Test
+  public void TestTypeSynonyms() {
+    ParsesOk("CREATE TABLE bar (i INTEGER)");
+    ParsesOk("CREATE TABLE bar (r REAL)");
+    ParsesOk("SELECT CAST(a as INTEGER) from tbl");
+    ParsesOk("SELECT CAST(a as REAL) from tbl");
+  }
+
   @Test public void TestGetErrorMsg() {
 
     // missing select
@@ -909,7 +957,7 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
+        "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
         "DISTINCTPCSA, FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, " +
         "IDENTIFIER\n");
 
