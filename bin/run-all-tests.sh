@@ -45,14 +45,16 @@ ulimit -c unlimited
 
 # Start an in-process Impala cluster and run queries against it using run-workload.
 # This helps verify mini-impala-cluster and run-workload have not been broken.
-${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
-    --in-process --wait_for_cluster --cluster_size=3
-${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
-    --table_format=text/none
+# TODO: Disable running in-process cluster until IMPALA-155 is resolved.
+#${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
+#    --in-process --wait_for_cluster --cluster_size=3
 
 # Run the remaining tests against an external Impala test cluster.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
     --wait_for_cluster --cluster_size=3
+
+${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
+    --table_format=text/none
 
 # Run end-to-end tests.
 ${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=$EXPLORATION_STRATEGY -x
