@@ -9,10 +9,13 @@
 
 import logging
 import pytest
+from copy import copy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
+  BATCH_SIZES = [0, 1, 16]
+
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -23,6 +26,10 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     # Exhaustively generate all table format vectors. This can still be overridden
     # using the --table_formats flag.
     cls.TestMatrix.add_dimension(cls.create_table_info_dimension('exhaustive'))
+    cls.TestMatrix.add_dimension(
+        TestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
 
   def test_scanners(self, vector):
-    self.run_test_case('QueryTest/scanners', vector)
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    self.run_test_case('QueryTest/scanners', new_vector)

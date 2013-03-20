@@ -81,8 +81,8 @@ class TestMatrix(object):
     self.dimensions = dict((arg.name, arg) for arg in args)
     self.constraint_list = list()
 
-  def add_dimension(self, vector_value_list):
-    self.dimensions[vector_value_list.name] = vector_value_list
+  def add_dimension(self, dimension):
+    self.dimensions[dimension.name] = dimension
 
   def clear(self):
     self.dimensions.clear()

@@ -38,12 +38,21 @@ class TestAggregation(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(TestDimension('agg_func', *agg_functions))
     cls.TestMatrix.add_dimension(TestDimension('data_type', *data_types))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('agg_func') in ['min', 'max'] if\
-                                            v.get_value('data_type') == 'bool' else True)
+    cls.TestMatrix.add_constraint(lambda v: cls.is_valid_vector(v))
+
+  @classmethod
+  def is_valid_vector(cls, vector):
+    data_type, agg_func = vector.get_value('data_type'), vector.get_value('agg_func')
+    file_format = vector.get_value('table_format').file_format
+
     # Avro doesn't have timestamp type
-    cls.TestMatrix.add_constraint(
-        lambda v: not (v.get_value('table_format').file_format == 'avro' and
-                       v.get_value('data_type') == 'timestamp'))
+    if file_format == 'avro' and data_type == 'timestamp':
+      return False
+    elif agg_func not in ['min', 'max', 'count'] and data_type == 'bool':
+      return False
+    elif agg_func == 'sum' and data_type == 'timestamp':
+      return False
+    return True
 
   def test_aggregation(self, vector):
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))

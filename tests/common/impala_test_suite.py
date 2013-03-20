@@ -262,8 +262,6 @@ class ImpalaTestSuite(BaseTestSuite):
     batch_sizes = ALL_BATCH_SIZES
     if cls.exploration_strategy() == 'core':
       disable_codegen_options = [False]
-      # TODO: Consider only running with batch size 0 for core exploration strategy.
-      batch_sizes = [0, 1]
       cluster_sizes = ALL_NODES_ONLY
     return create_exec_option_dimension(cluster_sizes, disable_codegen_options,
                                         batch_sizes)

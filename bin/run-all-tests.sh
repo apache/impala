@@ -56,8 +56,11 @@ ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
 ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
     --table_format=text/none
 
-# Run end-to-end tests.
-${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=$EXPLORATION_STRATEGY -x
+# Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
+# functional-query workload because the larger datasets (ex. tpch) are not generated
+# in all table formats.
+${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=core \
+    --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
 # Run JUnit frontend tests
 # Requires a running impalad cluster because some tests (such as DataErrorTest and

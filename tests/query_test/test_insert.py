@@ -29,9 +29,8 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector)
 
-  # Disabled until IMP-577 is fixed (NULL conversion to boolean)
   @pytest.mark.execute_serially
-  @pytest.mark.xfail(run=False, reason="IMP-613")
+  @pytest.mark.xfail(run=False, reason="IMPALA-82")
   def test_insert_null(self, vector):
     self.run_test_case('QueryTest/insert_null', vector)
 
