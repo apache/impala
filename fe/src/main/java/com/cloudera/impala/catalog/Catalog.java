@@ -104,8 +104,10 @@ public class Catalog {
   private class LazyDbMap {
     // Cache of Db metadata with a key of lower-case database name
     private final LoadingCache<String, Db> dbMetadataCache =
-        CacheBuilder.newBuilder().build(
-            new CacheLoader<String, Db>() {
+        CacheBuilder.newBuilder()
+            // TODO: Increase concurrency level once HIVE-3521 is resolved.
+            .concurrencyLevel(1)
+            .build(new CacheLoader<String, Db>() {
               public Db load(String dbName) throws DatabaseNotFoundException {
                 return loadDb(dbName);
               }

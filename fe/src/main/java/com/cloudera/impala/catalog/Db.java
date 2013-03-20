@@ -55,7 +55,7 @@ import com.google.common.collect.MapMaker;
  */
 public class Db {
   private static final Logger LOG = Logger.getLogger(Db.class);
-
+  private static final Object tableMapCreationLock = new Object();
   private final String name;
 
   private final Catalog parentCatalog;
@@ -110,8 +110,10 @@ public class Db {
   private class LazyTableMap {
     // Cache of table metadata with key of lower-case table name
     private final LoadingCache<String, Table> tableMetadataCache =
-        CacheBuilder.newBuilder().build(
-            new CacheLoader<String, Table>() {
+        CacheBuilder.newBuilder()
+            // TODO: Increase concurrency level once HIVE-3521 is resolved.
+            .concurrencyLevel(1)
+            .build(new CacheLoader<String, Table>() {
               public Table load(String tableName) throws TableNotFoundException,
                   TableLoadingException {
                 return loadTable(tableName);
@@ -239,7 +241,10 @@ public class Db {
       throws MetaException {
     this.name = name;
     this.parentCatalog = catalog;
-    this.tables = new LazyTableMap(hiveClient.getAllTables(name));
+    // Need to serialize calls to getAllTables() due to HIVE-3521
+    synchronized (tableMapCreationLock) {
+      this.tables = new LazyTableMap(hiveClient.getAllTables(name));
+    }
   }
 
   /**
