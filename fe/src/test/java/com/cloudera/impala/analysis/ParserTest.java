@@ -1022,8 +1022,9 @@ public class ParserTest {
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED");
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'");
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES TERMINATED BY '|'");
+    ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED ESCAPED BY '\'");
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\0'" +
-        " LINES TERMINATED BY '\1'");
+        " ESCAPED BY '\3' LINES TERMINATED BY '\1'");
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\0'" +
         " LINES TERMINATED BY '\1' STORED AS TEXTFILE");
     ParsesOk("CREATE TABLE T (i int) COMMENT 'hi' ROW FORMAT DELIMITED STORED AS RCFILE");
@@ -1032,12 +1033,16 @@ public class ParserTest {
 
     // Negative row format syntax
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED TERMINATED BY '\0'");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES TERMINATED BY");
+    ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED ESCAPED BY");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED '|'");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS TERMINATED BY |");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED FIELDS BY '\0'");
     ParserError("CREATE TABLE T (i int) ROW FORMAT DELIMITED LINES BY '\n'");
     ParserError("CREATE TABLE T (i int) FIELDS TERMINATED BY '\0'");
     ParserError("CREATE TABLE T (i int) ROWS TERMINATED BY '\0'");
+    ParserError("CREATE TABLE T (i int) ESCAPED BY '\0'");
 
     // Order should be: [comment] [partition by cols] [row format] [stored as FILEFORMAT]
     // [location]

@@ -136,7 +136,7 @@ public class CreateTableStmt extends ParseNodeBase {
       sb.append("EXTERNAL ");
     }
     sb.append("TABLE ");
-    if (ifNotExists) { 
+    if (ifNotExists) {
       sb.append("IF NOT EXISTS ");
     }
     if (tableName.getDb() != null) {
@@ -158,6 +158,9 @@ public class CreateTableStmt extends ParseNodeBase {
       sb.append(" ROW FORMAT DELIMITED");
       if (rowFormat.getFieldDelimiter() != null) {
         sb.append(" FIELDS TERMINATED BY '" + rowFormat.getFieldDelimiter() + "'");
+      }
+      if (rowFormat.getEscapeChar() != null) {
+        sb.append(" ESCAPED BY '" + rowFormat.getEscapeChar() + "'");
       }
       if (rowFormat.getLineDelimiter() != null) {
         sb.append(" LINES TERMINATED BY '" + rowFormat.getLineDelimiter() + "'");
@@ -184,8 +187,7 @@ public class CreateTableStmt extends ParseNodeBase {
     params.setIs_external(isExternal());
     params.setComment(comment);
     params.setLocation(location);
-    params.setField_terminator(rowFormat.getFieldDelimiter());
-    params.setLine_terminator(rowFormat.getLineDelimiter());
+    params.setRow_format(rowFormat.toThrift());
     params.setFile_format(fileFormat.toThrift());
     params.setIf_not_exists(getIfNotExists());
     return params;
@@ -208,6 +210,10 @@ public class CreateTableStmt extends ParseNodeBase {
       throw new AnalysisException("A table requires at least 1 column");
     }
 
+    analyzeRowFormatValue(rowFormat.getFieldDelimiter());
+    analyzeRowFormatValue(rowFormat.getLineDelimiter());
+    analyzeRowFormatValue(rowFormat.getEscapeChar());
+
     // Check that all the column names are unique.
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef colDef: columnDefs) {
@@ -219,6 +225,14 @@ public class CreateTableStmt extends ParseNodeBase {
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
+    }
+  }
+
+  private void analyzeRowFormatValue(String value) throws AnalysisException {
+    if (value == null) return;
+    if (value.length() != 1) {
+      throw new AnalysisException(
+          "ESCAPED BY values and LINE/FIELD terminators must have length of 1: " + value);
     }
   }
 }

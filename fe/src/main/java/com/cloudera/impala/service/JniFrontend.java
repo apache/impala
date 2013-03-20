@@ -211,8 +211,8 @@ public class JniFrontend {
     deserializeThrift(params, thriftCreateTableParams);
     frontend.createTable(TableName.fromThrift(params.getTable_name()),
         params.getColumns(), params.getPartition_columns(), params.isIs_external(),
-        params.getComment(), new RowFormat(params.getField_terminator(),
-        params.getLine_terminator()), FileFormat.fromThrift(params.getFile_format()),
+        params.getComment(), RowFormat.fromThrift(params.getRow_format()),
+        FileFormat.fromThrift(params.getFile_format()),
         params.getLocation(), params.isIf_not_exists());
   }
 
@@ -222,10 +222,9 @@ public class JniFrontend {
       TableLoadingException {
     TCreateTableLikeParams params = new TCreateTableLikeParams();
     deserializeThrift(params, thriftCreateTableLikeParams);
-    frontend.createTableLike(TableName.fromThrift(params.getTable_name()), 
+    frontend.createTableLike(TableName.fromThrift(params.getTable_name()),
         TableName.fromThrift(params.getSrc_table_name()),
-        params.isIs_external(), params.getLocation(),
-        params.isIf_not_exists());
+        params.isIs_external(), params.getLocation(), params.isIf_not_exists());
   }
 
   public void dropDatabase(byte[] thriftDropDbParams)

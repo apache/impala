@@ -41,7 +41,12 @@ create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
-create table if not exists ddl_test_db.testtbl(i int, s string) STORED AS TEXTFILE
+create table if not exists ddl_test_db.testtbl(i int, s string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+ESCAPED BY '\\'
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
 ---- RESULTS
 ====
 ---- QUERY

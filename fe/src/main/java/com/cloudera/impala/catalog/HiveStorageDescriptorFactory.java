@@ -48,7 +48,9 @@ class HiveStorageDescriptorFactory {
           "serialization.format", rowFormat.getFieldDelimiter());
       sd.getSerdeInfo().putToParameters("field.delim", rowFormat.getFieldDelimiter());
     }
-
+    if (rowFormat.getEscapeChar() != null) {
+      sd.getSerdeInfo().putToParameters("escape.delim", rowFormat.getEscapeChar());
+    }
     if (rowFormat.getLineDelimiter() != null) {
       sd.getSerdeInfo().putToParameters("line.delim", rowFormat.getLineDelimiter());
     }

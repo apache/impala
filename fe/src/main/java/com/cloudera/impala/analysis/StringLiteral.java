@@ -52,14 +52,18 @@ public class StringLiteral extends LiteralExpr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.STRING_LITERAL;
-    // Unescape string exactly like Hive does. Hive's method assumes
-    // quotes so we add them here to reuse Hive's code.
-    msg.string_literal = new TStringLiteral(
-        BaseSemanticAnalyzer.unescapeSQLString("'" + value + "'"));
+   
+    msg.string_literal = new TStringLiteral(getUnescapedValue());
   }
 
   public String getValue() {
     return value;
+  }
+
+  public String getUnescapedValue() {
+    // Unescape string exactly like Hive does. Hive's method assumes
+    // quotes so we add them here to reuse Hive's code.
+    return BaseSemanticAnalyzer.unescapeSQLString("'" + value + "'");
   }
 
   @Override

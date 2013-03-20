@@ -1882,6 +1882,17 @@ public class AnalyzerTest {
         "Table already exists: functional.alltypes");
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
         "terminated by '|'");
+
+    // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
+    // For example, if this were a real query the value '\' would be stored in the
+    // metastore for the ESCAPED BY field.
+    AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
+        "terminated by '\\t' escaped by '\\\\' lines terminated by '\\n'");
+
+    AnalysisError("create table functional.new_table (i int) row format delimited " +
+        "fields terminated by '||' escaped by '\\\\' lines terminated by '\\n'",
+        "ESCAPED BY values and LINE/FIELD terminators must have length of 1: ||");
+
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
     AnalysisError("create table new_table (i int, I string)",

@@ -111,6 +111,19 @@ struct TTableName {
   2: required string table_name
 }
 
+// The row format specifies how to interpret the fields (columns) and lines (rows) in a
+// data file when creating a new table.
+struct TTableRowFormat {
+  // Optional terminator string used to delimit fields (columns) in the table
+  1: optional string field_terminator
+
+  // Optional terminator string used to delimit lines (rows) in a table
+  2: optional string line_terminator
+
+  // Optional string used to specify a special escape character sequence
+  3: optional string escaped_by
+}
+
 // Types of ALTER TABLE commands supported.
 enum TAlterTableType {
   ADD_REPLACE_COLUMNS,
@@ -268,25 +281,22 @@ struct TCreateTableParams {
   // The file format for this table
   4: required TFileFormat file_format
 
+  // Specifies how rows and columns are interpreted when reading data from the table
+  5: optional TTableRowFormat row_format
+
   // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
   // table data from the file system. If EXTERNAL is not specified, all table data will be
   // removed when the table is dropped.
-  5: required bool is_external
+  6: required bool is_external
 
   // Do not throw an error if a table of the same name already exists.
-  6: required bool if_not_exists
+  7: required bool if_not_exists
 
   // Optional comment for the table
-  7: optional string comment
+  8: optional string comment
 
   // Optional storage location for the table
-  8: optional string location
-
-  // Optional terminator string used to delimit fields (columns) in the table
-  9: optional string field_terminator
-
-  // Optional terminator string used to delimit lines (rows) in a table
-  10: optional string line_terminator
+  9: optional string location
 }
 
 // Parameters of DROP DATABASE commands

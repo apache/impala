@@ -82,6 +82,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("drop", new Integer(SqlParserSymbols.KW_DROP));
     keywordMap.put("else", new Integer(SqlParserSymbols.KW_ELSE));
     keywordMap.put("end", new Integer(SqlParserSymbols.KW_END));
+    keywordMap.put("escaped", new Integer(SqlParserSymbols.KW_ESCAPED));
     keywordMap.put("exists", new Integer(SqlParserSymbols.KW_EXISTS));
     keywordMap.put("external", new Integer(SqlParserSymbols.KW_EXTERNAL));
     keywordMap.put("false", new Integer(SqlParserSymbols.KW_FALSE));    

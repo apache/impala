@@ -169,15 +169,17 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_CREATE, KW_COLUMN, KW_COLUMNS,
   KW_COMMENT, KW_COUNT, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DESC,
   KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV, KW_DELIMITED,
-  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_EXISTS, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
-  KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING, KW_IF, KW_IS,
-  KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOCATION,
-  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_PARQUETFILE,
-  KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RLIKE, KW_RIGHT, KW_ROW,
-  KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SET, KW_SEQUENCEFILE, KW_SHOW, KW_SEMI,
-  KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED, KW_TINYINT, KW_TO,
-  KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE, KW_THEN,
-  KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
+  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXTERNAL, KW_FALSE,
+  KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING,
+  KW_IF, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
+  KW_LOCATION, KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER,
+  KW_PARQUETFILE, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RLIKE,
+  KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SET, KW_SEQUENCEFILE, KW_SHOW,
+  KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
+  KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
+  KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
+  KW_INTERVAL;
+
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -269,6 +271,9 @@ nonterminal Boolean if_not_exists_val;
 nonterminal Boolean replace_existing_cols_val;
 nonterminal String location_val;
 nonterminal RowFormat row_format_val;
+nonterminal String field_terminator_val;
+nonterminal String line_terminator_val;
+nonterminal String escaped_by_val;
 nonterminal String terminator_val;
 // Used to simplify commands that accept either KW_DATABASE(S) or KW_SCHEMA(S)
 nonterminal String db_or_schema_kw;
@@ -429,27 +434,37 @@ if_not_exists_val ::=
   ;
 
 row_format_val ::=
-  KW_ROW KW_FORMAT KW_DELIMITED KW_FIELDS terminator_val:field_terminator
-  {: RESULT = new RowFormat(field_terminator, null); :}
-  |
-  KW_ROW KW_FORMAT KW_DELIMITED KW_LINES terminator_val:line_terminator
-  {: RESULT = new RowFormat(null, line_terminator); :}
-  |
-  KW_ROW KW_FORMAT KW_DELIMITED KW_FIELDS terminator_val:field_terminator
-  KW_LINES terminator_val:line_terminator
-  {: RESULT = new RowFormat(field_terminator, line_terminator); :}
-  |
-  KW_ROW KW_FORMAT KW_DELIMITED
-  {: RESULT = RowFormat.DEFAULT_ROW_FORMAT; :}
+  KW_ROW KW_FORMAT KW_DELIMITED field_terminator_val:field_terminator
+  escaped_by_val:escaped_by line_terminator_val:line_terminator
+  {: RESULT = new RowFormat(field_terminator, line_terminator, escaped_by); :}
   |/* empty */
   {: RESULT = RowFormat.DEFAULT_ROW_FORMAT; :}
+  ;
+
+escaped_by_val ::=
+  KW_ESCAPED KW_BY STRING_LITERAL:escaped_by
+  {: RESULT = escaped_by; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+line_terminator_val ::=
+  KW_LINES terminator_val:line_terminator
+  {: RESULT = line_terminator; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+field_terminator_val ::=
+  KW_FIELDS terminator_val:field_terminator
+  {: RESULT = field_terminator; :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 terminator_val ::=
   KW_TERMINATED KW_BY STRING_LITERAL:terminator
   {: RESULT = terminator; :}
-  | /* empty */
-  {: RESULT = null; :}
   ;
 
 file_format_create_table_val ::=
