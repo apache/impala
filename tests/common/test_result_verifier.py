@@ -179,7 +179,6 @@ def verify_raw_results(test_section, exec_result, file_format):
     return
 
   if test_section.get('TYPES'):
-    verify_column_types(test_section['TYPES'], exec_result.schema)
     expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
 
     # Avro does not support as many types as Hive, so the Avro test tables may
