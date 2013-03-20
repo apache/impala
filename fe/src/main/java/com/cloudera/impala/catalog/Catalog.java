@@ -389,7 +389,8 @@ public class Catalog {
     LOG.info(String.format("Dropping table %s.%s", dbName, tableName));
     synchronized (metastoreCreateDropLock) {
       getMetaStoreClient().getHiveClient().dropTable(dbName, tableName, true, ifExists);
-      dbs.get(dbName).removeTable(tableName);
+      Db db = dbs.get(dbName);
+      if (db != null) db.removeTable(tableName);
     }
   }
 

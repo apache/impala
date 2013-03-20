@@ -103,9 +103,7 @@ FILE_FORMAT_MAP = {
   'text': 'TEXTFILE',
   'seq': 'SEQUENCEFILE',
   'rc': 'RCFILE',
-  'parquet':
-    "\nINPUTFORMAT 'com.cloudera.impala.hive.serde.ParquetInputFormat'" +
-    "\nOUTPUTFORMAT 'com.cloudera.impala.hive.serde.ParquetOutputFormat'",
+  'parquet': 'PARQUETFILE',
   'text_lzo':
     "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
@@ -151,8 +149,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
                          avro_schema_dir):
   partitioned_by = str()
   if partition_columns:
-    partitioned_by = 'PARTITIONED BY (%s)' % \
-      ', '.join(partition_columns.split('\n'))
+    partitioned_by = 'PARTITIONED BY (%s)' % ', '.join(partition_columns.split('\n'))
 
   row_format_stmt = str()
   if row_format:
@@ -165,17 +162,19 @@ def build_table_template(file_format, columns, partition_columns, row_format,
         % (options.hdfs_namenode, avro_schema_dir)
     # Override specified row format
     row_format_stmt = "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'"
+  elif file_format == 'parquet':
+    row_format_stmt = str()
 
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)
-  return """
+  stmt = """
 CREATE EXTERNAL TABLE {{db_name}}{{db_suffix}}.{{table_name}} (
 {columns})
 {partitioned_by}
 {row_format}
 STORED AS {{file_format}}
 LOCATION '{hive_warehouse_dir}/{{hdfs_location}}'
-{tblproperties};
+{tblproperties}
 """.format(
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
@@ -183,6 +182,12 @@ LOCATION '{hive_warehouse_dir}/{{hdfs_location}}'
     hive_warehouse_dir=options.hive_warehouse_dir,
     tblproperties=tblproperties
     ).strip()
+
+  # Remove empty lines from the stmt string.  There is an empty line for
+  # each of the sections that didn't have anything (e.g. partitioned_by)
+  stmt = os.linesep.join([s for s in stmt.splitlines() if s])
+  stmt += ';'
+  return stmt
 
 def avro_schema(columns):
   record = {
@@ -313,7 +318,11 @@ def generate_statements(output_name, test_vectors, sections,
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
-    output = default_output if 'avro' not in table_format else avro_output
+    output = default_output
+    if file_format == 'avro':
+      output = avro_output
+    elif file_format == 'parquet':
+      output = parquet_output
 
     for section in sections:
       alter = section.get('ALTER')

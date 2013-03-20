@@ -175,6 +175,10 @@ show tables
 string
 ====
 ---- QUERY
+drop table if exists non_existent_db.tbl
+---- RESULTS
+====
+---- QUERY
 # Need to switch databases before dropping
 use default
 ---- RESULTS

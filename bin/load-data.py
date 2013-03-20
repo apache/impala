@@ -75,12 +75,23 @@ def exec_hive_query_from_file(file_name):
     sys.exit(ret_val)
 
 def exec_impala_query_from_file(file_name):
+  impala_refresh_cmd = "%s --impalad=%s -q 'refresh'" %\
+      (IMPALA_SHELL_CMD, options.impala_shell_args)
   impala_cmd = "%s --impalad=%s -f %s" %\
       (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
+  # Refresh catalog before and after
+  ret_val = subprocess.call(impala_refresh_cmd, shell = True)
+  if ret_val != 0:
+    print 'Error executing refresh from Impala.'
+    sys.exit(ret_val)
   print 'Executing Impala Command: ' + impala_cmd
   ret_val = subprocess.call(impala_cmd, shell = True)
   if ret_val != 0:
     print 'Error executing file from Impala: ' + file_name
+    sys.exit(ret_val)
+  ret_val = subprocess.call(impala_refresh_cmd, shell = True)
+  if ret_val != 0:
+    print 'Error executing refresh from Impala.'
     sys.exit(ret_val)
 
 def exec_bash_script(file_name):
@@ -156,18 +167,31 @@ if __name__ == "__main__":
     dataset_dir = os.path.join(DATASET_DIR, dataset)
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
-    # We load Avro tables separately due to bugs in the Avro SerDe.
-    # generate-schema-statements.py separates the avro statements into a
-    # separate file to get around this.
-    # See https://issues.apache.org/jira/browse/HIVE-4195.
+
     generated_file = 'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)
     if os.path.exists(generated_file):
       exec_hive_query_from_file(os.path.join(dataset_dir, generated_file))
+
     generated_avro_file = \
         'load-%s-%s-avro-generated.sql' % (workload, options.exploration_strategy)
     if os.path.exists(generated_avro_file):
+      # We load Avro tables separately due to bugs in the Avro SerDe.
+      # generate-schema-statements.py separates the avro statements into a
+      # separate file to get around this.
+      # See https://issues.apache.org/jira/browse/HIVE-4195.
       copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
       exec_hive_query_from_file(os.path.join(dataset_dir, generated_avro_file))
+
+    generated_parquet_file = \
+        'load-%s-%s-parquet-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_parquet_file):
+      if workload == 'functional-query':
+        # TODO This needs IMPALA-156
+        print "Functional query is not yet working with parquet.  Skipping"
+        continue
+      # For parquet, the data loading is run through impala instead of hive
+      exec_impala_query_from_file(os.path.join(dataset_dir, generated_parquet_file))
+
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0
