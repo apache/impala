@@ -93,6 +93,11 @@ ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
 
 hadoop fs -mv /bad_text_lzo/ /test-warehouse/
 
-# Run compute stats against tpcds/text format only. Running this on all the functional
-# tables is blocked by Hive bugs: HIVE-4119 and HIVE-4122.
-python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpcds
+# Run compute stats over as many of the tables used in the Planner tests as possible.
+# Due to Hive bugs HIVE-4119 and HIVE-4122, these tables need to be chosen carefully or
+# Hive will either crash or fail with an error when executing the COMPUTE STATS query.
+python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional\
+    --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
+    alltypessmall,alltypestiny,hbasealltypessmall,hbasestringids,jointbl,dimtbl"
+python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpch \
+    --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier

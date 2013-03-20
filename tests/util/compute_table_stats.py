@@ -45,12 +45,13 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
     print 'Skipping compute stats on databases:\n%s' % '\n'.join(all_dbs - selected_dbs)
 
   for db in all_dbs.intersection(selected_dbs):
-    for table in hive_metastore_client.get_all_tables(db):
-      if table_names is not None and not\
-          any(name.lower() in table.lower() for name in table_names):
-        print 'Skipping table: %s' % table
-        continue
+    all_tables = set(name.lower() for name in hive_metastore_client.get_all_tables(db))
+    selected_tables = all_tables if table_names is None else set(table_names)
+    if table_names:
+      print 'Skipping compute stats on tables:\n%s' %\
+          '\n'.join(['%s.%s' % (db, tbl)  for tbl in all_tables - selected_tables])
 
+    for table in all_tables.intersection(selected_tables):
       statement = __build_compute_stat_statement(hive_metastore_client, db, table)
       try:
         print 'Executing: %s' % statement
