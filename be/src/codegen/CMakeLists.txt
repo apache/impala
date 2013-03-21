@@ -25,18 +25,20 @@ add_library(CodeGen
 )
 
 # output cross compile to ir metadata
-set(IR_DESC_GEN_OUTPUT
-  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-names.h
-  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-functions.h
-)
-add_custom_command(
-  OUTPUT ${IR_DESC_GEN_OUTPUT}
-  COMMAND ./gen_ir_descriptions.py
-  DEPENDS ./gen_ir_descriptions.py
-  COMMENT "Generating ir cross compile metadata."
-  VERBATIM
-)
-add_custom_target(gen_ir_functions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
+# TODO: this doesn't track dependences right.  We need to specify that
+# the files in impala-ir must exist before building.
+#set(IR_DESC_GEN_OUTPUT
+#  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-names.h
+#  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-functions.h
+#)
+#add_custom_command(
+#  OUTPUT ${IR_DESC_GEN_OUTPUT}
+#  COMMAND ./gen_ir_descriptions.py
+#  DEPENDS ./gen_ir_descriptions.py
+#  COMMENT "Generating ir cross compile metadata."
+#  VERBATIM
+#)
+#add_custom_target(gen_ir_functions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 
 
 # impala-ir.cc is the central place for all cross-compiled code.  All of

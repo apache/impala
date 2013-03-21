@@ -56,6 +56,7 @@ then
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
+  python src/codegen/gen_ir_descriptions.py
   make -j4
   cd $IMPALA_HOME
 
@@ -96,6 +97,7 @@ then
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
+  python src/codegen/gen_ir_descriptions.py
   make -j4
   cd $IMPALA_HOME
 
@@ -113,5 +115,6 @@ else
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
+  python src/codegen/gen_ir_descriptions.py
   make -j4
 fi

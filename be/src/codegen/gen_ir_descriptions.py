@@ -123,11 +123,12 @@ names_epilogue = '\
 \n\
 #endif\n'
 
-BE_PATH = "../../generated-sources/impala-ir/"
+BE_PATH = os.environ['IMPALA_HOME'] + "/be/generated-sources/impala-ir/"
 if not os.path.exists(BE_PATH):
   os.makedirs(BE_PATH)
 
 if __name__ == "__main__":
+  print "Generating IR description files"
   enums_file = open(BE_PATH + 'impala-ir-functions.h', 'w')
   enums_file.write(enums_preamble)
 
