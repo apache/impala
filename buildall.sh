@@ -165,6 +165,7 @@ make
 cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
+python src/codegen/gen_ir_descriptions.py
 make -j4
 
 if [ -e $IMPALA_LZO ]
