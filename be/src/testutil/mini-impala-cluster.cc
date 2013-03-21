@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "common/daemon.h"
 #include "exec/hbase-table-scanner.h"
+#include "exec/hbase-table-writer.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "util/authorization.h"
@@ -59,6 +60,7 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTableFactory::Init());
+  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 
   int base_be_port = FLAGS_be_port;

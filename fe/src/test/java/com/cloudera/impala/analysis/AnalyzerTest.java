@@ -1805,21 +1805,31 @@ public class AnalyzerTest {
    * Tests for inserting into unpartitioned tables
    */
   private void testInsertUnpartitioned(String qualifier) throws AnalysisException {
-    // Non-insertable tables
-    AnalysisError("INSERT " + qualifier +
-        " TABLE functional.hbasealltypesagg SELECT * FROM functional.alltypesagg",
-        "INSERT into HBase tables is not supported");
-
     // Wrong number of columns.
     AnalysisError("insert " + qualifier + " table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col from functional.alltypes");
-
+    // Wrong number of columns.
+    AnalysisError("INSERT " + qualifier +
+        " TABLE functional.hbasealltypesagg SELECT * FROM functional.alltypesagg");
     // Unpartitioned table without partition clause.
     AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from " +
         "functional.alltypes");
+
+    String hbaseQuery =  "INSERT " + qualifier + " TABLE " +
+        "functional.hbaseinsertalltypesagg select id, bigint_col, bool_col, " +
+        "date_string_col, double_col, float_col, int_col, smallint_col, " +
+        "string_col, timestamp_col, tinyint_col from functional.alltypesagg";
+
+    // HBase doesn't support OVERWRITE so error out if the query is
+    // trying to do that.
+    if (!qualifier.contains("OVERWRITE")) {
+      AnalyzesOk(hbaseQuery);
+    } else {
+      AnalysisError(hbaseQuery);
+    }
 
     // Unpartitioned table with partition clause
     AnalysisError("INSERT " + qualifier +

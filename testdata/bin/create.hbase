@@ -14,5 +14,9 @@ disable 'hbasealltypesagg'
 drop 'hbasealltypesagg'
 create 'hbasealltypesagg', 'bools', 'ints', 'floats', 'strings'
 enable 'hbasealltypesagg'
+disable 'hbaseinsertalltypesagg'
+drop 'hbaseinsertalltypesagg'
+create 'hbaseinsertalltypesagg', 'd'
+enable 'hbaseinsertalltypesagg'
 exit
 

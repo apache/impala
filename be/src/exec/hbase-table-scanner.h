@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef IMPALA_EXEC_HBASE_TABLE_SCANNER_H
 #define IMPALA_EXEC_HBASE_TABLE_SCANNER_H
 
+#include <boost/scoped_ptr.hpp>
 #include <jni.h>
 #include <string>
 #include <sstream>
-#include <boost/scoped_ptr.hpp>
+#include <vector>
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/scan-node.h"
 #include "runtime/hbase-table-factory.h"
+#include "runtime/hbase-table.h"
 
 namespace impala {
 
@@ -42,7 +43,6 @@ class Status;
 // TODO: Enable time travel.
 class HBaseTableScanner {
  public:
-
   // Initialize all members to NULL, except ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
@@ -111,7 +111,6 @@ class HBaseTableScanner {
   ScanNode* scan_node_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
-  static jclass htable_cl_;
   static jclass scan_cl_;
   static jclass resultscanner_cl_;
   static jclass result_cl_;
@@ -123,9 +122,6 @@ class HBaseTableScanner {
   static jclass single_column_value_filter_cl_;
   static jclass compare_op_cl_;
 
-  static jmethodID htable_ctor_;
-  static jmethodID htable_get_scanner_id_;
-  static jmethodID htable_close_id_;
   static jmethodID scan_ctor_;
   static jmethodID scan_set_max_versions_id_;
   static jmethodID scan_set_caching_id_;
@@ -162,23 +158,25 @@ class HBaseTableScanner {
 
   // Vector of ScanRange
   const ScanRangeVector* scan_range_vector_;
-  int current_scan_range_idx_; // the index of the current scan range
+  int current_scan_range_idx_;  // the index of the current scan range
+
+  // C++ wrapper for HTable
+  boost::scoped_ptr<HBaseTable> htable_;
 
   // Instances related to scanning a table. Set in StartScan(). They are global references
   // because they cannot be automatically garbage collected by the JVM.
-  jobject htable_;        // Java type HTable
-  jobject scan_;          // Java type Scan
-  jobject resultscanner_; // Java type ResultScanner
+  jobject scan_;           // Java type Scan
+  jobject resultscanner_;  // Java type ResultScanner
 
   // Helper members for retrieving results from a scan. Updated in Next(), and
   // NextValue() methods.
   jobject result_;  // Java type Result
   jobjectArray keyvalues_;  // Java type KeyValue[]. Result of result_.raw();
-  jobject keyvalue_; // Java type KeyValue
+  jobject keyvalue_;  // Java type KeyValue
   // Byte array backing the KeyValues[] created in one call to Next().
   jbyteArray byte_array_;
   void* buffer_;  // C version of byte_array_.
-  int buffer_length_; // size of buffer
+  int buffer_length_;  // size of buffer
 
   // The offset of the ImmutableByteWritable (returned by result_.getBytes()).
   int result_bytes_offset_;
@@ -223,7 +221,7 @@ class HBaseTableScanner {
   // and 0 if they are equal.
   int CompareStrings(const std::string& s, int offset, int length);
 
-  // Turn string s into java byte array.
+  // Turn strings into Java byte array.
   Status CreateByteArray(JNIEnv* env, const std::string& s, jbyteArray* bytes);
 
   // First time scanning the table, do some setup
@@ -234,6 +232,6 @@ class HBaseTableScanner {
   Status InitScanRange(JNIEnv* env, const ScanRange& scan_range);
 };
 
-}
+}  // namespace impala
 
 #endif

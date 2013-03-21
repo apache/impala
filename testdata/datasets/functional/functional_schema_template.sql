@@ -655,6 +655,30 @@ FROM functional.alltypesagg;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+hbaseinsertalltypesagg
+---- CREATE
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbaseinsertalltypesagg");
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 hbasestringids
 ---- CREATE
 CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (

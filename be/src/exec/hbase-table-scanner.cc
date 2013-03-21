@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "hbase-table-scanner.h"
+#include "exec/hbase-table-scanner.h"
+
 #include <cstring>
+#include <algorithm>
+
 #include "util/jni-util.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
@@ -22,7 +25,6 @@
 using namespace std;
 using namespace impala;
 
-jclass HBaseTableScanner::htable_cl_ = NULL;
 jclass HBaseTableScanner::scan_cl_ = NULL;
 jclass HBaseTableScanner::resultscanner_cl_ = NULL;
 jclass HBaseTableScanner::result_cl_ = NULL;
@@ -33,9 +35,6 @@ jclass HBaseTableScanner::filter_list_cl_ = NULL;
 jclass HBaseTableScanner::filter_list_op_cl_ = NULL;
 jclass HBaseTableScanner::single_column_value_filter_cl_ = NULL;
 jclass HBaseTableScanner::compare_op_cl_ = NULL;
-jmethodID HBaseTableScanner::htable_ctor_ = NULL;
-jmethodID HBaseTableScanner::htable_get_scanner_id_ = NULL;
-jmethodID HBaseTableScanner::htable_close_id_ = NULL;
 jmethodID HBaseTableScanner::scan_ctor_ = NULL;
 jmethodID HBaseTableScanner::scan_set_max_versions_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_caching_id_ = NULL;
@@ -114,9 +113,6 @@ Status HBaseTableScanner::Init() {
   // Global class references:
   // HTable, Scan, ResultScanner, Result, ImmutableBytesWritable, KeyValue, HConstants.
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/HTable",
-          &htable_cl_));
-  RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/Scan", &scan_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/ResultScanner",
@@ -148,15 +144,6 @@ Status HBaseTableScanner::Init() {
           &compare_op_cl_));
 
   // HTable method ids.
-  htable_ctor_ = env->GetMethodID(htable_cl_, "<init>",
-      "(Lorg/apache/hadoop/conf/Configuration;Ljava/lang/String;)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  htable_get_scanner_id_ = env->GetMethodID(htable_cl_, "getScanner",
-      "(Lorg/apache/hadoop/hbase/client/Scan;)"
-      "Lorg/apache/hadoop/hbase/client/ResultScanner;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  htable_close_id_ = env->GetMethodID(htable_cl_, "close", "()V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // Scan method ids.
   scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "()V");
@@ -276,7 +263,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
   // Use global cache of HTables.
-  RETURN_IF_ERROR(htable_factory_->GetHBaseTable(hbase_table->table_name(), &htable_));
+  RETURN_IF_ERROR(htable_factory_->GetTable(hbase_table->table_name(),
+      &htable_));
 
   // Setup an Scan object without the range
   // scan_ = new Scan();
@@ -388,13 +376,12 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
 
   // resultscanner_ = htable_.getScanner(scan_);
   if (resultscanner_ != NULL) env->DeleteGlobalRef(resultscanner_);
-  resultscanner_ = env->CallObjectMethod(htable_, htable_get_scanner_id_, scan_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_IF_ERROR(htable_->GetResultScanner(scan_, &resultscanner_));
+
   resultscanner_ = env->NewGlobalRef(resultscanner_);
 
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   return Status::OK;
-
 }
 
 Status HBaseTableScanner::StartScan(JNIEnv* env, const TupleDescriptor* tuple_desc,
@@ -428,8 +415,8 @@ Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const std::string& s,
 Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   {
     SCOPED_TIMER(scan_node_->read_timer());
-    while(true) {
-      //result_ = resultscanner_.next();
+    while (true) {
+      // result_ = resultscanner_.next();
       result_ = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
 
       // jump to the next region when finished with the current region.
@@ -575,7 +562,7 @@ void HBaseTableScanner::Close(JNIEnv* env) {
   }
 
   // Close the HTable so that the connections are not kept around.
-  if (htable_ != NULL && htable_factory_ != NULL) {
-    htable_factory_->CloseHTable(htable_);
+  if (htable_.get() != NULL) {
+    htable_->Close();
   }
 }

@@ -13,13 +13,17 @@
 // limitations under the License.
 
 #include "exec/data-sink.h"
+
+#include <string>
+#include <map>
+
 #include "exec/hdfs-table-sink.h"
+#include "exec/hbase-table-sink.h"
 #include "exec/exec-node.h"
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/data-stream-sender.h"
-
-#include <string>
+#include "util/logging.h"
 
 using namespace std;
 using namespace boost;
@@ -33,7 +37,10 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
   DataSink* tmp_sink = NULL;
   switch (thrift_sink.type) {
     case TDataSinkType::DATA_STREAM_SINK:
-      if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
+      if (!thrift_sink.__isset.stream_sink) {
+        return Status("Missing data stream sink.");
+      }
+
       // TODO: figure out good buffer size based on size of output row
       tmp_sink = new DataStreamSender(pool,
           row_desc, thrift_sink.stream_sink, params.destinations, 16 * 1024);
@@ -42,13 +49,31 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
 
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
-      tmp_sink = new HdfsTableSink(
-          row_desc, params.fragment_instance_id, output_exprs, thrift_sink);
-      sink->reset(tmp_sink);
-      break;
+      switch (thrift_sink.table_sink.type) {
+        case TTableSinkType::HDFS:
+          tmp_sink = new HdfsTableSink(
+              row_desc, params.fragment_instance_id, output_exprs, thrift_sink);
+          sink->reset(tmp_sink);
+          break;
+        case TTableSinkType::HBASE:
+          tmp_sink = new HBaseTableSink(row_desc, output_exprs, thrift_sink);
+          sink->reset(tmp_sink);
+          break;
+        default:
+          stringstream error_msg;
+          const char* str = "Unknown table sink";
+          map<int, const char*>::const_iterator i =
+              _TTableSinkType_VALUES_TO_NAMES.find(thrift_sink.table_sink.type);
+          if (i != _TTableSinkType_VALUES_TO_NAMES.end()) {
+            str = i->second;
+          }
+          error_msg << str << " not implemented.";
+          return Status(error_msg.str());
+      }
 
+      break;
     default:
-      std::stringstream error_msg;
+      stringstream error_msg;
       map<int, const char*>::const_iterator i =
           _TDataSinkType_VALUES_TO_NAMES.find(thrift_sink.type);
       const char* str = "Unknown data sink type ";
@@ -61,4 +86,4 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
   return Status::OK;
 }
 
-}
+}  // namespace impala

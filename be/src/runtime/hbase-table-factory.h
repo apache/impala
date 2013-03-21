@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef IMPALA_RUNTIME_HBASE_TABLE_FACTORY_H
 #define IMPALA_RUNTIME_HBASE_TABLE_FACTORY_H
 
+#include <boost/scoped_ptr.hpp>
 #include <jni.h>
 #include <string>
 
 #include "common/status.h"
+#include "runtime/hbase-table.h"
 
 namespace impala {
 
@@ -30,8 +31,6 @@ namespace impala {
 // having to mark objects as global refs)
 // TODO: Implement a cache to avoid creating more HTables than necessary
 // TODO: Add metrics to track the number of tables outstanding
-// TODO: Consider merging JNI handles with HBaseTableScanner where possible to
-// avoid duplicating JNI work (maybe by writing a C++-side HTable class)
 class HBaseTableFactory {
  public:
   ~HBaseTableFactory();
@@ -42,22 +41,13 @@ class HBaseTableFactory {
 
   // create an HTable java object for the given table name.
   // The new htable is returned in global_htable
-  // It is the caller's responsibility to close the HTable by calling
-  // CloseHTable when the HTable is no longer needed.
-  Status GetHBaseTable(const std::string& table_name, jobject* global_htable);
-
-  // Close the java HTable.  This should allow java to spin
-  // down unneeded resources.
-  Status CloseHTable(const jobject& htable);
+  // It is the caller's responsibility to close the HBaseTable using
+  // HBaseTable#Close().
+  Status GetTable(const std::string& table_name,
+                  boost::scoped_ptr<HBaseTable>* hbase_table);
 
  private:
-  static jclass htable_cl_;
-  static jmethodID htable_ctor_;
-  static jmethodID htable_close_id_;
-
-  static jclass bytes_cl_;
-  static jmethodID bytes_to_bytes_id_;
-
+  // ExecutorService class and methods.
   static jclass executor_cl_;
   static jmethodID executor_shutdown_id_;
 

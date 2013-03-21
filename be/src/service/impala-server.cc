@@ -319,10 +319,12 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
 Status ImpalaServer::QueryExecState::UpdateMetastore() {
   if (stmt_type() != TStmtType::DML) return Status::OK;
 
+
   DCHECK(exec_request().__isset.query_exec_request);
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
-  DCHECK(query_exec_request.__isset.finalize_params);
+  if (!query_exec_request.__isset.finalize_params) return Status::OK;
 
+  TFinalizeParams& finalize_params = query_exec_request.finalize_params;
   // TODO: Doesn't handle INSERT with no FROM
   if (coord() == NULL) {
     stringstream ss;
@@ -344,8 +346,8 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
                << " altered partitions ("
                << join (catalog_update.created_partitions, ", ") << ")";
 
-    catalog_update.target_table = query_exec_request.finalize_params.table_name;
-    catalog_update.db_name = query_exec_request.finalize_params.table_db;
+    catalog_update.target_table = finalize_params.table_name;
+    catalog_update.db_name = finalize_params.table_db;
     RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
   }
 
@@ -487,10 +489,12 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   DCHECK(runtime_state != NULL);
   // Only send updates to insert status if fragment is finished, the coordinator
   // waits until query execution is done to use them anyhow.
-  if (done && runtime_state->hdfs_files_to_move()->size() > 0) {
+  if (done) {
     TInsertExecStatus insert_status;
-    insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
 
+    if (runtime_state->hdfs_files_to_move()->size() > 0) {
+      insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
+    }
     if (executor_.runtime_state()->num_appended_rows()->size() > 0) {
       insert_status.__set_num_appended_rows(
           *executor_.runtime_state()->num_appended_rows());

@@ -16,10 +16,10 @@
 #ifndef IMPALA_EXEC_DATA_SINK_H
 #define IMPALA_EXEC_DATA_SINK_H
 
-#include <vector>
-#include "common/status.h"
-
 #include <boost/scoped_ptr.hpp>
+#include <vector>
+
+#include "common/status.h"
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/Exprs_types.h"
 
@@ -60,5 +60,5 @@ class DataSink {
   virtual RuntimeProfile* profile() = 0;
 };
 
-}
+}  // namespace impala
 #endif

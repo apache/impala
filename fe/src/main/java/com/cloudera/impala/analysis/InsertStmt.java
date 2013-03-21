@@ -76,7 +76,7 @@ public class InsertStmt extends ParseNodeBase {
     try {
       table = catalog.getDb(targetTableName.getDb()).getTable(targetTableName.getTbl());
     } catch (TableLoadingException e) {
-      throw new AnalysisException("Failed to load metadata for table: " 
+      throw new AnalysisException("Failed to load metadata for table: "
           + targetTableName.getTbl(), e);
     }
     if (table == null) {
@@ -84,20 +84,26 @@ public class InsertStmt extends ParseNodeBase {
           "' in db: '" + targetTableName.getDb() + "'.");
     }
 
-    if (table instanceof HBaseTable) {
-      throw new AnalysisException("INSERT into HBase tables is not supported");
-    }
-
     // Add target table to descriptor table.
     analyzer.getDescTbl().addReferencedTable(table);
 
-    int numClusteringCols = table.getNumClusteringCols();
+    boolean isHBaseTable = (table instanceof HBaseTable);
+    int numClusteringCols = isHBaseTable ? 0 : table.getNumClusteringCols();
     int numDynamicPartKeys = 0;
 
-    // TODO: When we do add HBase table sink support, the logic below will need
-    // to change. Each HBase table has a single clustering column (see
-    // HBaseTable), but INSERTs into that table should not have a PARTITION
-    // clause.
+    if (isHBaseTable && overwrite) {
+      throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
+    }
+
+    // Make sure there is a set of partitionKeys when the table below
+    // indicates they are needed.
+    //
+    //  Table Type | numClusteringCols  | Expecting PartionKeys
+    //  -----------+--------------------+------------------------
+    //  HDFS       | 1+                 | Yes
+    //  HDFS       | 0                  | No
+    //  HBase      | 1+                 | No
+
     if (partitionKeyValues == null) {
       if (numClusteringCols != 0) {
         // Partitioned table but no partition clause.
@@ -258,7 +264,12 @@ public class InsertStmt extends ParseNodeBase {
       int numDynamicPartKeys)
       throws AnalysisException {
     List<Column> columns = table.getColumns();
-    int numClusteringCols = table.getNumClusteringCols();
+
+    // For writes to hbase every query node can write to any part of
+    // the row key space. So use 0 as the numClusteringCols.
+    int numClusteringCols =
+        (table instanceof HBaseTable) ? 0 : table.getNumClusteringCols();
+
     int numNonClusteringCols = columns.size() - numClusteringCols;
     if (numNonClusteringCols != selectListExprs.size() - numDynamicPartKeys) {
       throw new AnalysisException("Target table '" + targetTableName.getTbl()
@@ -267,6 +278,7 @@ public class InsertStmt extends ParseNodeBase {
           + numNonClusteringCols + " columns but the select statement returns "
           + (selectListExprs.size() - numDynamicPartKeys) + ".");
     }
+
     for (int i = numClusteringCols; i < columns.size(); ++i) {
       int selectListIndex = i - numClusteringCols;
       // Check for compatible type, and add casts to the selectListExprs if necessary.

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.cloudera.impala.thrift.TTableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -394,14 +395,16 @@ public class Frontend {
       result.stmt_type = TStmtType.DML;
       // create finalization params of insert stmt
       InsertStmt insertStmt = analysisResult.getInsertStmt();
-      TFinalizeParams finalizeParams = new TFinalizeParams();
-      finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
-      finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
-      String db = insertStmt.getTargetTableName().getDb();
-      finalizeParams.setTable_db(db == null ? request.sessionState.database : db);
-      finalizeParams.setHdfs_base_dir(
-        ((HdfsTable)insertStmt.getTargetTable()).getHdfsBaseDir());
-      queryExecRequest.setFinalize_params(finalizeParams);
+      if (insertStmt.getTargetTable() instanceof HdfsTable) {
+        TFinalizeParams finalizeParams = new TFinalizeParams();
+        finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
+        finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+        String db = insertStmt.getTargetTableName().getDb();
+        finalizeParams.setTable_db(db == null ? request.sessionState.database : db);
+        HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();
+        finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
+        queryExecRequest.setFinalize_params(finalizeParams);
+      }
     }
 
     return result;

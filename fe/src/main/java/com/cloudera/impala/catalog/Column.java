@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import com.google.common.base.Objects;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 
 /**
@@ -64,5 +65,13 @@ public class Column {
 
   public void updateStats(ColumnStatisticsData statsData) {
     stats.update(type, statsData);
+  }
+
+  @Override
+  public String toString() {
+    return Objects.toStringHelper(this.getClass())
+                  .add("name", name)
+                  .add("type", type)
+                  .add("position", position).toString();
   }
 }

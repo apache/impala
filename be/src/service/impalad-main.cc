@@ -26,6 +26,7 @@
 // TODO: fix this: we currently need to include uid-util.h before impala-server.h
 #include "util/uid-util.h"
 #include "exec/hbase-table-scanner.h"
+#include "exec/hbase-table-writer.h"
 #include "runtime/hbase-table-factory.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
@@ -74,6 +75,7 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTableFactory::Init());
+  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 
   // start backend service for the coordinator on be_port

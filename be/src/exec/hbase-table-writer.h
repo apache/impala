@@ -1,0 +1,113 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef IMPALA_EXEC_HBASE_TABLE_WRITER_H
+#define IMPALA_EXEC_HBASE_TABLE_WRITER_H
+
+#include <jni.h>
+#include <boost/thread.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <vector>
+#include <string>
+#include <utility>
+
+#include "common/status.h"
+#include "runtime/runtime-state.h"
+#include "runtime/descriptors.h"
+#include "runtime/row-batch.h"
+#include "runtime/hbase-table.h"
+
+namespace impala {
+
+// Class to write RowBatches to an HBase table using the java HTable client.
+// This class should only be called from a single sink and should not be
+// shared.
+// Sample usage (Must happen in order):
+//    HBaseTableWriter::InitJni();
+//    writer = new HBaseTableWriter(state, table_desc_, output_exprs_);
+//    writer.Init(state);
+//    writer.AppendRowBatch(batch);
+class HBaseTableWriter {
+ public:
+  HBaseTableWriter(RuntimeState* state,
+                   HBaseTableDescriptor* table_desc,
+                   const std::vector<Expr*>& output_exprs);
+  Status AppendRowBatch(RowBatch* batch);
+
+  // Calls to Close release the HBaseTable.
+  Status Close(RuntimeState* state);
+
+  // Create all needed java side objects.
+  // This call may cause connections to HBase and Zookeeper to be created.
+  Status Init(RuntimeState* state);
+
+  // Grab all of the Java classes needed to get data into and out of HBase.
+  static Status InitJNI();
+
+ private:
+  // Methods used to create JNI objects.
+  // Create a Put using the supplied row key
+  Status CreatePut(JNIEnv* env, const std::string& rk, jobject* put);
+
+  // Create a byte array containing the string's chars.
+  Status CreateByteArray(JNIEnv* env, const std::string& s,
+                         jbyteArray* j_array);
+
+  // Create an ArrayList<Put> to be passed to put.put(list);
+  // Should be used like:
+  //    CreatePutList(env, limit);
+  Status CreatePutList(JNIEnv* env, int num_puts);
+
+  // Clean up the jni global ref in put_list_, allowing the jni to garbage
+  // collect all of the puts that are created by a writer.
+  Status CleanJNI();
+
+  // Not owned by this
+  RuntimeState* state_;
+
+  // Owned by RuntimeState not by this object
+  HBaseTableDescriptor* table_desc_;
+
+  // The wrapper around a Java HTable.
+  // This instance is owned by this object and must be cleaned
+  // up using close before the table can be discarded.
+  boost::scoped_ptr<HBaseTable> table_;
+
+  // The expressions that are run to create tuples to be written to hbase.
+  const std::vector<Expr*> output_exprs_;
+
+  // jni ArrayList<Put>
+  jobject put_list_;
+
+  // org.apache.hadoop.hbase.client.Put
+  static jclass put_cl_;
+
+  // new Put(byte[])
+  static jmethodID put_ctor_;
+
+  // Put#add(byte[], byte[], byte[])
+  static jmethodID put_add_id_;
+
+  // java.util.ArrayList
+  static jclass list_cl_;
+
+  // new ArrayList<V>(starting_capacity)
+  static jmethodID list_ctor_;
+
+  // ArrayList#add(V);
+  static jmethodID list_add_id_;
+};
+
+}  // namespace impala
+#endif

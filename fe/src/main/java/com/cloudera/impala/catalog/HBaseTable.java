@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.cloudera.impala.planner.HBaseTableSink;
 import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -79,7 +80,7 @@ public class HBaseTable extends Table {
           "Error: hbase.columns.mapping missing for this HBase table.");
     }
 
-    if (columnsMappingSpec.equals("") || 
+    if (columnsMappingSpec.equals("") ||
         columnsMappingSpec.equals(HBaseSerDe.HBASE_KEY_COL)) {
       throw new SerDeException("Error: hbase.columns.mapping specifies only "
           + "the HBase table row key. A valid Hive-HBase table must specify at "
@@ -158,7 +159,7 @@ public class HBaseTable extends Table {
             s.getComment(), -1);
         tmpCols.add(col);
       }
-       
+
       // HBase columns are ordered by columnFamily,columnQualifier,
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.
@@ -176,7 +177,7 @@ public class HBaseTable extends Table {
 
       return this;
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for HBase table: " + name, 
+      throw new TableLoadingException("Failed to load metadata for HBase table: " + name,
           e);
     }
   }
@@ -213,11 +214,11 @@ public class HBaseTable extends Table {
         tHbaseTable.addToQualifiers("");
       }
     }
-    TTableDescriptor TTableDescriptor =
+    TTableDescriptor tableDescriptor =
         new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(),
             numClusteringCols, hbaseTableName, db.getName());
-    TTableDescriptor.setHbaseTable(tHbaseTable);
-    return TTableDescriptor;
+    tableDescriptor.setHbaseTable(tHbaseTable);
+    return tableDescriptor;
   }
 
   public String getHBaseTableName() {
@@ -232,8 +233,10 @@ public class HBaseTable extends Table {
   public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
     // Partition clause doesn't make sense for an HBase table.
     Preconditions.checkState(partitionKeyExprs.isEmpty());
-    // Overwrite doesn't make sense for an HBase table.
+
+    // HBase doesn't have a way to perform INSERT OVERWRITE
     Preconditions.checkState(overwrite == false);
-    throw new UnsupportedOperationException("HBase Output Sink not implemented.");
+    // Create the HBaseTableSink and return it.
+    return new HBaseTableSink(this);
   }
 }

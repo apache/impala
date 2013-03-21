@@ -29,6 +29,7 @@ import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -593,5 +594,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       castChild(compatibleType, 1);
     }
     return compatibleType;
+  }
+
+  @Override
+  public String toString() {
+    return Objects.toStringHelper(this.getClass())
+        .add("id", id)
+        .add("type", type).toString();
   }
 }

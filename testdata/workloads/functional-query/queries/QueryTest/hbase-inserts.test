@@ -1,0 +1,40 @@
+====
+---- QUERY
+insert into table hbaseinsertalltypesagg
+select id, bigint_col, bool_col, date_string_col, double_col, float_col, 
+int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+---- RESULTS
+: 10000
+---- SETUP
+RELOAD hbaseinsertalltypesagg
+====
+---- QUERY
+select id, bool_col from hbaseinsertalltypesagg 
+WHERE id > 300 
+ORDER BY id 
+LIMIT 2
+---- TYPES
+int, boolean
+---- RESULTS
+301,false
+302,true
+====
+---- QUERY
+insert into table hbaseinsertalltypesagg
+select 9999999, bigint_col, false, date_string_col, double_col, float_col, 
+int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+---- RESULTS
+: 10000
+---- SETUP
+RELOAD hbaseinsertalltypesagg
+====
+---- QUERY
+select id, bool_col from hbaseinsertalltypesagg 
+WHERE id = 9999999 
+ORDER BY id 
+LIMIT 2
+---- TYPES
+int, boolean
+---- RESULTS
+9999999,false
+====
