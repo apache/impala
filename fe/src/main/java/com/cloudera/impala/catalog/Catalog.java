@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.common.ImpalaException;
@@ -375,22 +376,19 @@ public class Catalog {
    * metadata cache, marking its metadata to be lazily loaded on the next access.
    * Re-throws any Hive Meta Store exceptions encountered during the drop.
    *
-   * @param dbName - The database that contains this table.
-   * @param tableName - The name of the table to drop.
+   * @param tableName - The fully qualified name of the table to drop.
    * @param ifExists - If true, no errors will be thrown if the table does not exist.
    */
-  public void dropTable(String dbName, String tableName, boolean ifExists)
+  public void dropTable(TableName tableName, boolean ifExists)
       throws MetaException, NoSuchObjectException, InvalidOperationException,
       org.apache.thrift.TException {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
-        "Null or empty database name passed as argument to Catalog.dropTable");
-    Preconditions.checkState(tableName != null && !tableName.isEmpty(),
-        "Null or empty table name passed as argument to Catalog.dropTable");
-    LOG.info(String.format("Dropping table %s.%s", dbName, tableName));
+    checkTableNameFullyQualified(tableName);
+    LOG.info(String.format("Dropping table %s", tableName));
     synchronized (metastoreCreateDropLock) {
-      getMetaStoreClient().getHiveClient().dropTable(dbName, tableName, true, ifExists);
-      Db db = dbs.get(dbName);
-      if (db != null) db.removeTable(tableName);
+      getMetaStoreClient().getHiveClient().dropTable(
+          tableName.getDb(), tableName.getTbl(), true, ifExists);
+      Db db = dbs.get(tableName.getDb());
+      if (db != null) db.removeTable(tableName.getTbl());
     }
   }
 
@@ -399,35 +397,34 @@ public class Catalog {
    * lazily load the new metadata on the next access. Re-throws any Hive Meta Store
    * exceptions encountered during the create.
    *
-   * @param dbName - Database to create the table within.
-   * @param tableName - Name of the new table.
+   * @param tableName - Fully qualified name of the new table.
    * @param column - List of column definitions for the new table.
    * @param partitionColumn - List of partition column definitions for the new table.
    * @param isExternal 
-   *    If true, table is created as external which means the data will be persisted
+   *    If true, table is created as external which means the data will not be deleted
    *    if dropped. External tables can also be created on top of existing data.
    * @param comment - Optional comment to attach to the table (null for no comment).
    * @param location - Hdfs path to use as the location for table data or null to use
    *                   default location.
+   * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
-  public void createTable(String dbName, String tableName, List<TColumnDef> columns,
+  public void createTable(TableName tableName, List<TColumnDef> columns,
       List<TColumnDef> partitionColumns, boolean isExternal, String comment,
       RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
       InvalidObjectException, org.apache.thrift.TException {
-    Preconditions.checkState(tableName != null && !tableName.isEmpty(),
-        "Null or empty table name given as argument to Catalog.createTable");
+    checkTableNameFullyQualified(tableName);
     Preconditions.checkState(columns != null && columns.size() > 0,
         "Null or empty column list given as argument to Catalog.createTable");
-    if (ifNotExists && containsTable(dbName, tableName)) {
-      LOG.info(String.format("Skipping table creation because %s.%s already exists and " +
-          "ifNotExists is true.", dbName, tableName));
+    if (ifNotExists && containsTable(tableName.getDb(), tableName.getTbl())) {
+      LOG.info(String.format("Skipping table creation because %s already exists and " +
+          "ifNotExists is true.", tableName));
       return;
     }
     org.apache.hadoop.hive.metastore.api.Table tbl =
         new org.apache.hadoop.hive.metastore.api.Table();
-    tbl.setDbName(dbName);
-    tbl.setTableName(tableName);
+    tbl.setDbName(tableName.getDb());
+    tbl.setTableName(tableName.getTbl());
     tbl.setParameters(new HashMap<String, String>());
 
     if (comment != null) {
@@ -451,19 +448,88 @@ public class Catalog {
       tbl.setPartitionKeys(buildFieldSchemaList(partitionColumns));
     }
 
-    LOG.info(String.format("Creating table %s.%s", dbName, tableName));
+    LOG.info(String.format("Creating table %s", tableName));
+    createTable(tbl, ifNotExists); 
+  }
+
+  /**
+   * Creates a new table in the metastore based on the definition of an existing table.
+   * No data is copied as part of this process, it is a metadata only operation. If the
+   * creation succeeds, an entry is added to the metadata cache to lazily load the new
+   * table's metadata on the next access. 
+   *
+   * @param tableName - Fully qualified name of the new table.
+   * @param srcTableName - Fully qualified name of the old table.
+   * @param isExternal 
+   *    If true, table is created as external which means the data will not be deleted
+   *    if dropped. External tables can also be created on top of existing data.
+   * @param comment - Optional comment to attach to the table (null for no comment).
+   * @param location - Hdfs path to use as the location for table data or null to use
+   *                   default location.
+   * @param ifNotExists - If true, no errors are thrown if the table already exists
+   */
+  public void createTableLike(TableName tableName, TableName srcTableName,
+      boolean isExternal, String location, boolean ifNotExists) throws MetaException,
+      NoSuchObjectException, AlreadyExistsException, InvalidObjectException,
+      org.apache.thrift.TException {
+    checkTableNameFullyQualified(tableName);
+    checkTableNameFullyQualified(srcTableName);
+    if (ifNotExists && containsTable(tableName.getDb(), tableName.getTbl())) {
+      LOG.info(String.format("Skipping table creation because %s already exists and " +
+          "ifNotExists is true.", tableName));
+      return;
+    }
+    // getTable() returns a deep copy of the Hive Table object
+    org.apache.hadoop.hive.metastore.api.Table tbl =
+        getMetaStoreClient().getHiveClient().getTable(srcTableName.getDb(),
+                                                      srcTableName.getTbl());
+    tbl.setDbName(tableName.getDb());
+    tbl.setTableName(tableName.getTbl());
+    if (tbl.getParameters() == null) {
+      tbl.setParameters(new HashMap<String, String>());
+    }
+    // The EXTERNAL table property should not be copied from the old table.
+    if (isExternal) {
+      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
+      tbl.putToParameters("EXTERNAL", "TRUE");
+    } else { 
+      tbl.setTableType(TableType.MANAGED_TABLE.toString());
+      if (tbl.getParameters().containsKey("EXTERNAL")) {
+        tbl.getParameters().remove("EXTERNAL");  
+      }
+    }
+    // The LOCATION property should not be copied from the old table. If the location
+    // is null (the caller didn't specify a custom location) this will clear the value
+    // and the table will use the default table location from the parent database. 
+    tbl.getSd().setLocation(location);
+    LOG.info(String.format("Creating table %s LIKE %s", tableName, srcTableName));
+    createTable(tbl, ifNotExists); 
+  }
+
+  private void createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+      boolean ifNotExists) throws MetaException, NoSuchObjectException,
+      AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException {
+    MetaStoreClient msClient = getMetaStoreClient();
     synchronized (metastoreCreateDropLock) {
       try {
-        getMetaStoreClient().getHiveClient().createTable(tbl);
+        msClient.getHiveClient().createTable(newTable);
       } catch (AlreadyExistsException e) {
         if (!ifNotExists) {
           throw e;
         }
         LOG.info(String.format("Ignoring '%s' when creating table %s.%s because " +
-            "ifNotExists is true.", e, dbName, tableName));
+            "ifNotExists is true.", e, newTable.getDbName(), newTable.getTableName()));
+      } finally {
+        msClient.release();
       }
-      dbs.get(dbName).invalidateTable(tableName, false);
+      dbs.get(newTable.getDbName()).invalidateTable(newTable.getTableName(), false);
     }
+  }
+
+  private static void checkTableNameFullyQualified(TableName tableName) {
+    Preconditions.checkNotNull(tableName);
+    Preconditions.checkState(tableName.isFullyQualified(),
+        "Table name must be fully qualified: " + tableName);
   }
 
   private static List<FieldSchema> buildFieldSchemaList(List<TColumnDef> columnDefs) {

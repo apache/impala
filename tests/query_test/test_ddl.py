@@ -36,4 +36,4 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_create_tables(self, vector):
-    self.run_test_case('QueryTest/ddl', vector)
+    self.run_test_case('QueryTest/create', vector)

@@ -823,6 +823,10 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo (i int)");
     ParsesOk("CREATE TABLE Foo.Bar (i int)");
     ParsesOk("CREATE TABLE IF NOT EXISTS Foo.Bar (i int)");
+    ParsesOk("CREATE TABLE Foo.Bar2 LIKE Foo.Bar1");
+    ParsesOk("CREATE TABLE IF NOT EXISTS Bar2 LIKE Bar1");
+    ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1");
+    ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1 LOCATION '/a/b'");
 
     ParsesOk("CREATE TABLE Foo (i int, s string)");
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string)");
@@ -896,6 +900,8 @@ public class ParserTest {
 
     // Invalid syntax
     ParserError("CREATE TABLE IF EXISTS Foo.Bar (i int)");
+    ParserError("CREATE TABLE Bar LIKE Bar2 (i int)");
+    ParserError("CREATE TABLE Bar LIKE Bar2 STORED AS TEXTFILE");
     ParserError("CREATE IF NOT EXISTS TABLE Foo.Bar (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED TEXTFILE");
     ParserError("CREATE TABLE Foo (d double) AS TEXTFILE");

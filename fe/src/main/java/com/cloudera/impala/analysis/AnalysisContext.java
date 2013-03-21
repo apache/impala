@@ -40,7 +40,6 @@ public class AnalysisContext {
   }
 
   static public class AnalysisResult {
-    // SelectStmt, InsertStmt or UnionStmt.
     private ParseNode stmt;
     private Analyzer analyzer;
 
@@ -58,6 +57,10 @@ public class AnalysisContext {
 
     public boolean isDropTableStmt() {
       return stmt instanceof DropTableStmt;
+    }
+
+    public boolean isCreateTableLikeStmt() {
+      return stmt instanceof CreateTableLikeStmt;
     }
 
     public boolean isCreateTableStmt() {
@@ -86,11 +89,17 @@ public class AnalysisContext {
 
     public boolean isDdlStmt() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
-          isCreateTableStmt() || isCreateDbStmt() || isDropDbStmt() || isDropTableStmt();
+          isCreateTableLikeStmt() || isCreateTableStmt() || isCreateDbStmt() ||
+          isDropDbStmt() || isDropTableStmt();
     }
 
     public boolean isDmlStmt() {
       return isInsertStmt();
+    }
+
+    public CreateTableLikeStmt getCreateTableLikeStmt() {
+      Preconditions.checkState(isCreateTableLikeStmt());
+      return (CreateTableLikeStmt) stmt;
     }
 
     public CreateTableStmt getCreateTableStmt() {

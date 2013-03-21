@@ -161,11 +161,90 @@ show tables
 string
 ====
 ---- QUERY
+# CREATE TABLE LIKE on partitioned table
+create table alltypes_test like functional.alltypes
+---- RESULTS
+====
+---- QUERY
+# Make sure no data exists for this table
+select count(*) from alltypes_test
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY 
+insert overwrite table alltypes_test
+partition (year=2009, month=4)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes where year=2009 and month=4
+---- RESULTS
+year=2009/month=4/: 300
+====
+---- QUERY
+# Make sure we can read the new data.
+select count(*) from alltypes_test
+---- RESULTS
+300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# CREATE TABLE LIKE on unpartitioned table.
+create table testtbl_like like testtbl
+---- RESULTS
+====
+---- QUERY
+# Make sure the new table can be queried and no data exists for this table.
+select count(*) from testtbl_like
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# No error is thrown when IF NOT EXISTS is specified and the table already exists.
+create table if not exists testtbl_like like testtbl
+---- RESULTS
+====
+---- QUERY
+# IF NOT EXISTS also applies when the src table is the same as the new table.
+create table if not exists testtbl_like like testtbl_like
+---- RESULTS
+====
+---- QUERY 
+insert overwrite table testtbl_like
+select * from testtbl limit 5
+---- RESULTS
+: 5
+====
+---- QUERY
+# Make sure we can read the data.
+select * from testtbl_like 
+---- RESULTS
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 drop table testtbl
 ---- RESULTS
 ====
 ---- QUERY
 drop table testtbl_part
+---- RESULTS
+====
+---- QUERY
+drop table alltypes_test
+---- RESULTS
+====
+---- QUERY
+drop table testtbl_like
 ---- RESULTS
 ====
 ---- QUERY

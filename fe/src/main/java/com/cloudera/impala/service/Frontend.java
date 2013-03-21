@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
@@ -151,6 +152,10 @@ public class Frontend {
       ddl.ddl_type = TDdlType.CREATE_TABLE;
       ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateTableLikeStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_TABLE_LIKE;
+      ddl.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateDbStmt()) {
       ddl.ddl_type = TDdlType.CREATE_DATABASE;
       ddl.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
@@ -181,22 +186,33 @@ public class Frontend {
   /**
    * Creates a new table in the metastore.
    */
-  public void createTable(String dbName, String tableName, List<TColumnDef> columns,
+  public void createTable(TableName tableName, List<TColumnDef> columns,
       List<TColumnDef> partitionColumns, boolean isExternal, String comment,
       RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
       AlreadyExistsException, InvalidObjectException {
-    catalog.createTable(dbName, tableName, columns, partitionColumns, isExternal, comment,
+    catalog.createTable(tableName, columns, partitionColumns, isExternal, comment,
         rowFormat, fileFormat, location, ifNotExists);
+  }
+
+  /**
+   * Creates a new table in the metastore.
+   */
+  public void createTableLike(TableName tableName, TableName oldTableName,
+      boolean isExternal,String location, boolean ifNotExists)
+      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
+      AlreadyExistsException, InvalidObjectException {
+    catalog.createTableLike(tableName, oldTableName, isExternal,
+        location, ifNotExists);
   }
 
   /**
    * Drops the specified table.
    */
-  public void dropTable(String dbName, String tableName, boolean ifExists)
+  public void dropTable(TableName tableName, boolean ifExists)
       throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
       AlreadyExistsException, InvalidObjectException, InvalidOperationException {
-    catalog.dropTable(dbName, tableName, ifExists);
+    catalog.dropTable(tableName, ifExists);
   }
 
   /**

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 public class TableName {
@@ -41,10 +42,11 @@ public class TableName {
   }
 
   /**
-   * Returns true if this name has a non-empty database field
+   * Returns true if this name has a non-empty database field and a non-empty
+   * table name.
    */
   public boolean isFullyQualified() {
-    return db != null && !db.isEmpty();
+    return db != null && !db.isEmpty() && !tbl.isEmpty();
   }
 
   @Override
@@ -54,5 +56,9 @@ public class TableName {
     } else {
       return db + "." + tbl;
     }
+  }
+
+  public static TableName fromThrift(TTableName tableName) {
+    return new TableName(tableName.getDb_name(), tableName.getTable_name());
   }
 }

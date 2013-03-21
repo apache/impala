@@ -23,6 +23,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.TTableName;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -57,6 +58,7 @@ public class CreateTableStmt extends ParseNodeBase {
    *          to specify default row format.
    * @param fileFormat - File format of the table
    * @param location - The HDFS location of where the table data will stored.
+   * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableStmt(TableName tableName, List<ColumnDef> columnDefs,
       List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
@@ -171,8 +173,7 @@ public class CreateTableStmt extends ParseNodeBase {
 
   public TCreateTableParams toThrift() {
     TCreateTableParams params = new TCreateTableParams();
-    params.setTable_name(getTbl());
-    params.setDb(getDb());
+    params.setTable_name(new TTableName(getDb(), getTbl()));
     for (ColumnDef col: getColumnDefs()) {
       params.addToColumns(col.toThrift());
     }
@@ -191,11 +192,8 @@ public class CreateTableStmt extends ParseNodeBase {
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = tableName.getDb();
-    if (dbName == null) {
-      dbName = analyzer.getDefaultDb();
-    }
-
+    dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
+    
     if (analyzer.getCatalog().getDb(dbName) == null) {
       throw new AnalysisException("Database does not exist: " + dbName);
     }

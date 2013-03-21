@@ -1658,6 +1658,14 @@ public class AnalyzerTest {
   public void TestCreateTable() throws AnalysisException {
     AnalyzesOk("create table functional.new_table (i int)");
     AnalyzesOk("create table if not exists functional.alltypes (i int)");
+    AnalyzesOk("create table if not exists functional.new_tbl like functional.alltypes");
+    AnalyzesOk("create table if not exists functional.alltypes like functional.alltypes");
+    AnalysisError("create table functional.alltypes like functional.alltypes",
+        "Table already exists: functional.alltypes");
+    AnalysisError("create table functional.new_table like functional.tbl_does_not_exist",
+        "Source table does not exist: functional.tbl_does_not_exist");
+    AnalysisError("create table functional.new_table like db_does_not_exist.alltypes",
+        "Database does not exist: db_does_not_exist");
     AnalysisError("create table functional.alltypes (i int)",
         "Table already exists: functional.alltypes");
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
@@ -1697,8 +1705,8 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, " +
         "string_col, timestamp_col, NULL, NULL from functional.alltypes");
-    // Fully dynamic partitions. Order of corresponding select list items doesn't matter, as long as
-    // they appear at the very end of the select list.
+    // Fully dynamic partitions. Order of corresponding select list items doesn't matter,
+    // as long as they appear at the very end of the select list.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +

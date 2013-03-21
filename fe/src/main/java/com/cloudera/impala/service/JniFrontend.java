@@ -28,6 +28,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.ImpalaException;
@@ -36,6 +37,7 @@ import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TDropDbParams;
@@ -130,10 +132,22 @@ public class JniFrontend {
       InvalidObjectException {
     TCreateTableParams params = new TCreateTableParams();
     deserializeThrift(params, thriftCreateTableParams);
-    frontend.createTable(params.getDb(), params.getTable_name(), params.getColumns(),
-        params.getPartition_columns(), params.isIs_external(), params.getComment(),
-        new RowFormat(params.getField_terminator(), params.getLine_terminator()),
-        FileFormat.fromThrift(params.getFile_format()), params.getLocation(),
+    frontend.createTable(TableName.fromThrift(params.getTable_name()),
+        params.getColumns(), params.getPartition_columns(), params.isIs_external(),
+        params.getComment(), new RowFormat(params.getField_terminator(),
+        params.getLine_terminator()), FileFormat.fromThrift(params.getFile_format()),
+        params.getLocation(), params.isIf_not_exists());
+  }
+
+  public void createTableLike(byte[] thriftCreateTableLikeParams)
+      throws ImpalaException, MetaException, NoSuchObjectException,
+      org.apache.thrift.TException, AlreadyExistsException,
+      InvalidObjectException {
+    TCreateTableLikeParams params = new TCreateTableLikeParams();
+    deserializeThrift(params, thriftCreateTableLikeParams);
+    frontend.createTableLike(TableName.fromThrift(params.getTable_name()), 
+        TableName.fromThrift(params.getSrc_table_name()),
+        params.isIs_external(), params.getLocation(),
         params.isIf_not_exists());
   }
 
@@ -152,7 +166,8 @@ public class JniFrontend {
       InvalidObjectException {
     TDropTableParams params = new TDropTableParams();
     deserializeThrift(params, thriftDropTableParams);
-    frontend.dropTable(params.getDb(), params.getTable_name(), params.isIf_exists());
+    frontend.dropTable(TableName.fromThrift(params.getTable_name()),
+        params.isIf_exists());
   }
 
   /**

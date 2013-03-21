@@ -574,6 +574,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     EXIT_IF_EXC(jni_env);
     create_table_id_ = jni_env->GetMethodID(fe_class, "createTable", "([B)V");
     EXIT_IF_EXC(jni_env);
+    create_table_like_id_ = jni_env->GetMethodID(fe_class, "createTableLike", "([B)V");
+    EXIT_IF_EXC(jni_env);
     create_database_id_ = jni_env->GetMethodID(fe_class, "createDatabase", "([B)V");
     EXIT_IF_EXC(jni_env);
     drop_table_id_ = jni_env->GetMethodID(fe_class, "dropTable", "([B)V");
@@ -1119,6 +1121,18 @@ Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_database_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
+Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
+  if (FLAGS_use_planservice) {
+    return Status("CreateTable not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, create_table_like_id_, request_bytes);
   RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
   return Status::OK;
 }

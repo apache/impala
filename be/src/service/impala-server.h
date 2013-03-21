@@ -529,6 +529,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // does not exist, and metastore connectivity problems.
   Status CreateTable(const TCreateTableParams& create_table_params);
 
+  // Creates a new table in the metastore that is a based on the table definition of a
+  // given source table. This is a metadata only operation - no data is copied.
+  Status CreateTableLike(const TCreateTableLikeParams& create_table_like_params);
+
   // Drops the specified database from the metastore. Returns OK if the database
   // drop was successful, otherwise CANCELLED is returned.
   Status DropDatabase(const TDropDbParams& drop_db_params);
@@ -676,6 +680,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID create_database_id_; // JniFrontend.createDatabase
   jmethodID create_table_id_; // JniFrontend.createTable
+  jmethodID create_table_like_id_; // JniFrontend.createTableLike
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
   ExecEnv* exec_env_;  // not owned

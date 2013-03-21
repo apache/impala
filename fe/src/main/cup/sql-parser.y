@@ -249,6 +249,7 @@ nonterminal Qualifier union_op;
 nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropTableStmt drop_tbl_stmt;
 nonterminal CreateDbStmt create_db_stmt;
+nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal ColumnDef column_def;
 nonterminal ArrayList<ColumnDef> column_def_list;
@@ -295,6 +296,8 @@ stmt ::=
   {: RESULT = show_dbs; :}
   | describe_stmt:describe
   {: RESULT = describe; :}
+  | create_tbl_like_stmt:create_tbl_like
+  {: RESULT = create_tbl_like; :}
   | create_tbl_stmt:create_tbl
   {: RESULT = create_tbl; :}
   | create_db_stmt:create_db
@@ -318,6 +321,15 @@ create_db_stmt ::=
   KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists IDENT:db_name
   comment_val:comment location_val:location
   {: RESULT = new CreateDbStmt(db_name, comment, location, if_not_exists); :}
+  ;
+
+create_tbl_like_stmt ::=
+  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table KW_LIKE table_name:other_table location_val:location
+  {:
+    RESULT = new CreateTableLikeStmt(table, other_table, external, location,
+        if_not_exists);
+  :} 
   ;
 
 create_tbl_stmt ::=

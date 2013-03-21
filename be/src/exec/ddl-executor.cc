@@ -86,6 +86,8 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
     }
     case TDdlType::CREATE_DATABASE:
       return impala_server_->CreateDatabase(exec_request->create_db_params);
+    case TDdlType::CREATE_TABLE_LIKE:
+      return impala_server_->CreateTableLike(exec_request->create_table_like_params);
     case TDdlType::CREATE_TABLE:
       return impala_server_->CreateTable(exec_request->create_table_params);
     case TDdlType::DROP_DATABASE:

@@ -102,42 +102,68 @@ enum TFileFormat {
   TEXTFILE,
 }
 
-// Parameters of CREATE TABLE commands
-struct TCreateTableParams {
-  // Name of the database the table should be created in
-  1: required string db
+// Represents a fully qualified table name.
+struct TTableName {
+  // Name of the table's parent database. Null to specify an unqualified table name.
+  1: required string db_name
 
-  // Name of the table to create
+  // Name of the table
   2: required string table_name
+}
 
-  // List of columns to create
-  3: required list<TColumnDef> columns
+// Parameters of CREATE TABLE LIKE commands
+struct TCreateTableLikeParams {
+  // Fully qualified name of the table to create
+  1: required TTableName table_name
 
-  // List of partition columns
-  4: optional list<TColumnDef> partition_columns
-
-  // The file format for this table
-  5: required TFileFormat file_format
+  // Fully qualified name of the source table
+  2: required TTableName src_table_name
 
   // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
   // table data from the file system. If EXTERNAL is not specified, all table data will be
   // removed when the table is dropped.
-  6: optional bool is_external
-
-  // Optional comment for the table
-  7: optional string comment
+  3: optional bool is_external
 
   // Optional storage location for the table
-  8: optional string location
-
-  // Optional terminator string used to delimit fields (columns) in the table
-  9: optional string field_terminator
-
-  // Optional terminator string used to delimit lines (rows) in a table
-  10: optional string line_terminator
+  4: optional string location
 
   // Do not throw an error if a table of the same name already exists.
-  11: optional bool if_not_exists
+  5: optional bool if_not_exists
+}
+
+// Parameters of CREATE TABLE commands
+struct TCreateTableParams {
+  // Fully qualified name of the table to create
+  1: required TTableName table_name
+
+  // List of columns to create
+  2: required list<TColumnDef> columns
+
+  // List of partition columns
+  3: optional list<TColumnDef> partition_columns
+
+  // The file format for this table
+  4: required TFileFormat file_format
+
+  // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
+  // table data from the file system. If EXTERNAL is not specified, all table data will be
+  // removed when the table is dropped.
+  5: optional bool is_external
+
+  // Optional comment for the table
+  6: optional string comment
+
+  // Optional storage location for the table
+  7: optional string location
+
+  // Optional terminator string used to delimit fields (columns) in the table
+  8: optional string field_terminator
+
+  // Optional terminator string used to delimit lines (rows) in a table
+  9: optional string line_terminator
+
+  // Do not throw an error if a table of the same name already exists.
+  10: optional bool if_not_exists
 }
 
 // Parameters of DROP DATABASE commands
@@ -151,14 +177,11 @@ struct TDropDbParams {
 
 // Parameters of DROP TABLE commands
 struct TDropTableParams {
-  // Name of the database the table resides in
-  1: required string db
-
-  // Name of the table to drop for DROP TABLE
-  2: required string table_name
+  // Fully qualified name of the table to drop
+  1: required TTableName table_name
 
   // If true, no error is raised if the target table does not exist
-  3: optional bool if_exists
+  2: optional bool if_exists
 }
 
 // Per-client session state
@@ -268,6 +291,7 @@ enum TDdlType {
   DESCRIBE,
   CREATE_DATABASE,
   CREATE_TABLE,
+  CREATE_TABLE_LIKE,
   DROP_DATABASE,
   DROP_TABLE,
 }
@@ -293,11 +317,14 @@ struct TDdlExecRequest {
   // Parameters for CREATE TABLE
   7: optional TCreateTableParams create_table_params
 
+  // Parameters for CREATE TABLE LIKE
+  8: optional TCreateTableLikeParams create_table_like_params
+
   // Paramaters for DROP DATABAE
-  8: optional TDropDbParams drop_db_params
+  9: optional TDropDbParams drop_db_params
 
   // Parameters for DROP TABLE
-  9: optional TDropTableParams drop_table_params
+  10: optional TDropTableParams drop_table_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TDropTableParams;
+import com.cloudera.impala.thrift.TTableName;
 
 import com.google.common.base.Preconditions;
 
@@ -74,19 +75,15 @@ public class DropTableStmt extends ParseNodeBase {
 
   public TDropTableParams toThrift() {
     TDropTableParams params = new TDropTableParams();
-    params.setDb(getDb());
-    params.setTable_name(getTbl());
+    params.setTable_name(new TTableName(getDb(), getTbl()));
     params.setIf_exists(getIfExists());
     return params;
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = tableName.getDb();
-    if (dbName == null) {
-      dbName = analyzer.getDefaultDb();
-    }
-
+    dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
+    
     // Only run this analysis if the user did not specify the IF EXISTS clause
     if (!ifExists && analyzer.getCatalog().getDb(dbName) == null) {
       throw new AnalysisException("Unknown database: " + dbName);
