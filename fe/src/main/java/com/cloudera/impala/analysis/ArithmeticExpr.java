@@ -108,7 +108,7 @@ public class ArithmeticExpr extends Expr {
     super.analyze(analyzer);
     for (Expr child: children) {
       Expr operand = (Expr) child;
-      if (!operand.type.isNumericType()) {
+      if (!operand.type.isNumericType() && !operand.type.isNull()) {
         throw new AnalysisException("Arithmetic operation requires " +
             "numeric operands: " + toSql());
       }
@@ -120,10 +120,10 @@ public class ArithmeticExpr extends Expr {
       OpcodeRegistry.Signature match =
         OpcodeRegistry.instance().getFunctionInfo(op.functionOp, true, type);
       if (match == null) {
-        throw new AnalysisException("Bitwise operations only allowed on fixed-point types: "
-            + toSql());
+        throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
+            "types: " + toSql());
       }
-      Preconditions.checkState(type == match.returnType);
+      Preconditions.checkState(type == match.returnType || type.isNull());
       opcode = match.opcode;
       return;
     }
@@ -136,7 +136,7 @@ public class ArithmeticExpr extends Expr {
       case ADD:
       case SUBTRACT:
         // numeric ops must be promoted to highest-resolution type
-        // (otherwise we can't guarantee that a <op> b won't result in an overflow/underflow)
+        // (otherwise we can't guarantee that a <op> b won't overflow/underflow)
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2).getMaxResolutionType();
         Preconditions.checkState(type.isValid());
         break;
@@ -156,8 +156,8 @@ public class ArithmeticExpr extends Expr {
               op.toString() + ": " + this.toSql());
         }
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
-        // the result is always an integer
-        Preconditions.checkState(type.isFixedPointType());
+        // the result is always an integer or null
+        Preconditions.checkState(type.isFixedPointType() || type.isNull());
         break;
       default:
         // the programmer forgot to deal with a case

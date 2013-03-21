@@ -829,3 +829,25 @@ timestamp, bigint
 2010-01-01 01:03:19.530000000,1
 2010-01-01 01:04:20.160000000,1
 ====
+---- QUERY
+# Test NULLs in aggregate functions
+select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL) from alltypesagg
+---- TYPES
+bigint, NULL, NULL, NULL, double
+---- RESULTS
+0,NULL,NULL,NULL,NULL
+====
+---- QUERY
+# Test ignored distinct in MIN and MAX with NULLs
+---- TYPES
+NULL, NULL
+---- RESULTS
+NULL,NULL
+---- QUERY
+# TODO: Fix count(distinct null) to return 0 instead of 1
+select count(distinct NULL) from alltypesagg
+---- TYPES
+bigint
+---- RESULTS
+1
+====

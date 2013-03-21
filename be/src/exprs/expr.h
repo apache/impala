@@ -116,6 +116,8 @@ struct ExprValue {
   // Sets the value for type to '0' and returns a pointer to the data
   void* SetToZero(PrimitiveType type) {
     switch (type) {
+      case TYPE_NULL:
+        return NULL;
       case TYPE_BOOLEAN:
         bool_val = false;
         return &bool_val;
@@ -146,6 +148,8 @@ struct ExprValue {
   // Sets the value for type to min and returns a pointer to the data
   void* SetToMin(PrimitiveType type) {
     switch (type) {
+      case TYPE_NULL:
+        return NULL;
       case TYPE_BOOLEAN:
         bool_val = false;
         return &bool_val;
@@ -176,6 +180,8 @@ struct ExprValue {
   // Sets the value for type to max and returns a pointer to the data
   void* SetToMax(PrimitiveType type) {
     switch (type) {
+      case TYPE_NULL:
+        return NULL;
       case TYPE_BOOLEAN:
         bool_val = true;
         return &bool_val;

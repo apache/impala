@@ -23,6 +23,9 @@ import com.google.common.collect.Lists;
 
 public enum PrimitiveType {
   INVALID_TYPE("INVALID_TYPE", -1, TPrimitiveType.INVALID_TYPE),
+  // NULL_TYPE - used only in LiteralPredicate and NullLiteral to make NULLs compatible
+  // with all other types.
+  NULL_TYPE("NULL_TYPE", 1, TPrimitiveType.NULL_TYPE),
   BOOLEAN("BOOLEAN", 1, TPrimitiveType.BOOLEAN),
   TINYINT("TINYINT", 1, TPrimitiveType.TINYINT),
   SMALLINT("SMALLINT", 2, TPrimitiveType.SMALLINT),
@@ -82,6 +85,8 @@ public enum PrimitiveType {
     // Timestamps get summed as DOUBLE for AVG.
     } else if (isFloatingPointType() || this == TIMESTAMP) {
       return DOUBLE;
+    } else if (isNull()) {
+      return NULL_TYPE;
     } else {
       return INVALID_TYPE;
     }
@@ -95,6 +100,10 @@ public enum PrimitiveType {
     return this != INVALID_TYPE;
   }
 
+  public boolean isNull() {
+    return this == NULL_TYPE;
+  }
+
   public boolean isDateType() {
     return (this == DATE || this == DATETIME || this == TIMESTAMP);
   }
@@ -105,6 +114,8 @@ public enum PrimitiveType {
 
   public boolean isSupported() {
     switch (this) {
+      case DATE:
+      case DATETIME:
       case BINARY:
       case DECIMAL:
         return false;
@@ -163,6 +174,20 @@ public enum PrimitiveType {
   private static PrimitiveType[][] compatibilityMatrix;
   static {
     compatibilityMatrix = new PrimitiveType[STRING.ordinal() + 1][STRING.ordinal() + 1];
+
+    // NULL_TYPE is compatible with any type and results in the non-null type.
+    compatibilityMatrix[NULL_TYPE.ordinal()][NULL_TYPE.ordinal()] = NULL_TYPE;
+    compatibilityMatrix[NULL_TYPE.ordinal()][BOOLEAN.ordinal()] = BOOLEAN;
+    compatibilityMatrix[NULL_TYPE.ordinal()][TINYINT.ordinal()] = TINYINT;
+    compatibilityMatrix[NULL_TYPE.ordinal()][SMALLINT.ordinal()] = SMALLINT;
+    compatibilityMatrix[NULL_TYPE.ordinal()][INT.ordinal()] = INT;
+    compatibilityMatrix[NULL_TYPE.ordinal()][BIGINT.ordinal()] = BIGINT;
+    compatibilityMatrix[NULL_TYPE.ordinal()][FLOAT.ordinal()] = FLOAT;
+    compatibilityMatrix[NULL_TYPE.ordinal()][DOUBLE.ordinal()] = DOUBLE;
+    compatibilityMatrix[NULL_TYPE.ordinal()][DATE.ordinal()] = DATE;
+    compatibilityMatrix[NULL_TYPE.ordinal()][DATETIME.ordinal()] = DATETIME;
+    compatibilityMatrix[NULL_TYPE.ordinal()][TIMESTAMP.ordinal()] = TIMESTAMP;
+    compatibilityMatrix[NULL_TYPE.ordinal()][STRING.ordinal()] = STRING;
 
     compatibilityMatrix[BOOLEAN.ordinal()][BOOLEAN.ordinal()] = BOOLEAN;
     compatibilityMatrix[BOOLEAN.ordinal()][TINYINT.ordinal()] = TINYINT;
@@ -247,14 +272,16 @@ public enum PrimitiveType {
    * without loss of precision. Returns INVALID_TYPE if there is no such type
    * or if any of t1 and t2 is INVALID_TYPE.
    */
-  public static PrimitiveType getAssignmentCompatibleType(PrimitiveType t1, PrimitiveType t2) {
+  public static PrimitiveType getAssignmentCompatibleType(PrimitiveType t1,
+      PrimitiveType t2) {
     if (!t1.isValid() || !t2.isValid()) {
       return INVALID_TYPE;
     }
 
     PrimitiveType smallerType = (t1.ordinal() < t2.ordinal() ? t1 : t2);
     PrimitiveType largerType = (t1.ordinal() > t2.ordinal() ? t1 : t2);
-    PrimitiveType result =  compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
+    PrimitiveType result =
+        compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
     Preconditions.checkNotNull(result);
     return result;
   }
@@ -264,7 +291,7 @@ public enum PrimitiveType {
    * t1 to t2 results in no loss of precision.
    */
   public static boolean isImplicitlyCastable(PrimitiveType t1, PrimitiveType t2) {
-      return getAssignmentCompatibleType(t1, t2) == t2;
+    return getAssignmentCompatibleType(t1, t2) == t2;
   }
 
   // Returns the highest resolution type
@@ -376,6 +403,7 @@ public enum PrimitiveType {
    */
   public int getJavaSQLType() {
     switch (this) {
+      case NULL_TYPE: return java.sql.Types.NULL;
       case BOOLEAN: return java.sql.Types.BOOLEAN;
       case TINYINT: return java.sql.Types.TINYINT;
       case SMALLINT: return java.sql.Types.SMALLINT;

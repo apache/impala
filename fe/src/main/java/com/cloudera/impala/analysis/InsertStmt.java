@@ -322,7 +322,7 @@ public class InsertStmt extends ParseNodeBase {
           + exprType.toString() + "' in column '" + expr.toSql() + "'.");
     }
     // Loss of precision when inserting into the table.
-    if (compatibleType != colType) {
+    if (compatibleType != colType && !compatibleType.isNull()) {
       throw new AnalysisException("Inserting into target table '"
           + targetTableName.getTbl() + "' may result in loss of precision.\n"
           + "Would need to cast '"

@@ -319,6 +319,36 @@ class ExprTest : public testing::Test {
     TestValue<bool>("'' = ''", TYPE_BOOLEAN, true);
   }
 
+  // Test comparison operators with a left or right NULL operand against op.
+  void TestNullComparison(const string& op) {
+    // NULL as right operand.
+    TestIsNull(op + " = NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " != NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " <> NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " < NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " > NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " <= NULL", TYPE_BOOLEAN);
+    TestIsNull(op + " >= NULL", TYPE_BOOLEAN);
+    // NULL as left operand.
+    TestIsNull("NULL = " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL != " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL <> " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL < " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL > " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL <= " + op, TYPE_BOOLEAN);
+    TestIsNull("NULL >= " + op, TYPE_BOOLEAN);
+  }
+
+  // Test comparison operators with a left or right NULL operand on all types.
+  void TestNullComparisons() {
+    unordered_map<int, string>::iterator def_iter;
+    for(def_iter = default_type_strs_.begin(); def_iter != default_type_strs_.end();
+        ++def_iter) {
+      TestNullComparison(def_iter->second);
+    }
+    TestNullComparison("NULL");
+  }
+
   // Generate all possible tests for combinations of <smaller> <op> <larger>.
   // Also test conversions from strings.
   void TestComparison(const string& smaller, const string& larger, bool compare_strings) {
@@ -481,6 +511,60 @@ class ExprTest : public testing::Test {
     TestValue(a_str + " % " + b_str, expected_type, cast_a % cast_b);
   }
 
+  // Test ops that that always promote to a fixed type with NULL operands:
+  // ADD, SUBTRACT, MULTIPLY, DIVIDE.
+  // We need CastType to make lexical_cast work properly for low-resolution types.
+  template <typename NonNullOp, typename CastType>
+  void TestNullOperandFixedResultTypeOps(NonNullOp op, PrimitiveType expected_type) {
+    CastType cast_op = static_cast<CastType>(op);
+    string op_str = lexical_cast<string>(cast_op);
+    // NULL as right operand.
+    TestIsNull(op_str + " + NULL", expected_type);
+    TestIsNull(op_str + " - NULL", expected_type);
+    TestIsNull(op_str + " * NULL", expected_type);
+    TestIsNull(op_str + " / NULL", TYPE_DOUBLE);
+    // NULL as left operand.
+    TestIsNull("NULL + " + op_str, expected_type);
+    TestIsNull("NULL - " + op_str, expected_type);
+    TestIsNull("NULL * " + op_str, expected_type);
+    TestIsNull("NULL / " + op_str, TYPE_DOUBLE);
+  }
+
+  // Test binary int ops with NULL as left or right operand:
+  // BITAND, BITOR, BITXOR, INT_DIVIDE, MOD.
+  template <typename NonNullOp>
+  void TestNullOperandVariableResultTypeIntOps(NonNullOp op,
+      PrimitiveType expected_type) {
+    string op_str = lexical_cast<string>(static_cast<int64_t>(op));
+    // NULL as right operand.
+    TestIsNull(op_str + " & NULL", expected_type);
+    TestIsNull(op_str + " | NULL", expected_type);
+    TestIsNull(op_str + " ^ NULL", expected_type);
+    TestIsNull(op_str + " DIV NULL", expected_type);
+    TestIsNull(op_str + " % NULL", expected_type);
+    // NULL as left operand.
+    TestIsNull("NULL & " + op_str, expected_type);
+    TestIsNull("NULL | " + op_str, expected_type);
+    TestIsNull("NULL ^ " + op_str, expected_type);
+    TestIsNull("NULL DIV " + op_str, expected_type);
+    TestIsNull("NULL % " + op_str, expected_type);
+  }
+
+  // Test all binary ops with both operands being NULL.
+  // We expect such exprs to return TYPE_NULL, except for '/' which is always double.
+  void TestNullOperandsArithmeticOps() {
+    TestIsNull("NULL + NULL", TYPE_NULL);
+    TestIsNull("NULL - NULL", TYPE_NULL);
+    TestIsNull("NULL * NULL", TYPE_NULL);
+    TestIsNull("NULL / NULL", TYPE_DOUBLE);
+    TestIsNull("NULL & NULL", TYPE_NULL);
+    TestIsNull("NULL | NULL", TYPE_NULL);
+    TestIsNull("NULL ^ NULL", TYPE_NULL);
+    TestIsNull("NULL DIV NULL", TYPE_NULL);
+    TestIsNull("NULL % NULL", TYPE_NULL);
+    TestIsNull("~NULL", TYPE_NULL);
+  }
+
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
   void TestCast(const string& stmt, T val) {
@@ -604,6 +688,7 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "+1.23");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
+  TestSingleLiteralConstruction(TYPE_NULL, NULL, "NULL");
 
   // Min/Max Boundary value test for tiny/small/int/long
   c_val = 127;
@@ -643,7 +728,7 @@ TEST_F(ExprTest, LiteralExprs) {
   TestValue("true", TYPE_BOOLEAN, true);
   TestValue("false", TYPE_BOOLEAN, false);
   TestStringValue("'test'", "test");
-  TestIsNull("null", TYPE_BOOLEAN);
+  TestIsNull("null", TYPE_NULL);
 }
 
 TEST_F(ExprTest, ArithmeticExprs) {
@@ -712,6 +797,20 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(numeric_limits<int64_t>::max(),
       numeric_limits<int64_t>::min()+1, TYPE_BIGINT);
 
+  // Test behavior with NULLs.
+  TestNullOperandFixedResultTypeOps<float, double>(min_float_values_[TYPE_FLOAT],
+      TYPE_DOUBLE);
+  TestNullOperandFixedResultTypeOps<double, double>(min_float_values_[TYPE_DOUBLE],
+      TYPE_DOUBLE);
+  TestNullOperandFixedResultTypeOps<int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
+      TYPE_BIGINT);
+  TestNullOperandFixedResultTypeOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
+      TYPE_BIGINT);
+  TestNullOperandFixedResultTypeOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
+      TYPE_BIGINT);
+  TestNullOperandFixedResultTypeOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
+      TYPE_BIGINT);
+
   // Test int ops that promote to assignment compatible type.
   TestVariableResultTypeIntOps<int8_t, int8_t>(min_int_values_[TYPE_TINYINT],
       min_int_values_[TYPE_TINYINT], TYPE_TINYINT);
@@ -734,6 +833,16 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestVariableResultTypeIntOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
 
+  // Test behavior with NULLs.
+  TestNullOperandVariableResultTypeIntOps<int8_t>(min_int_values_[TYPE_TINYINT],
+      TYPE_TINYINT);
+  TestNullOperandVariableResultTypeIntOps<int16_t>(min_int_values_[TYPE_SMALLINT],
+      TYPE_SMALLINT);
+  TestNullOperandVariableResultTypeIntOps<int32_t>(min_int_values_[TYPE_INT],
+      TYPE_INT);
+  TestNullOperandVariableResultTypeIntOps<int64_t>(min_int_values_[TYPE_BIGINT],
+      TYPE_BIGINT);
+
   // Tests for dealing with '-'.
   TestValue("-1", TYPE_TINYINT, -1);
   TestValue("1 - 1", TYPE_BIGINT, 0);
@@ -744,6 +853,9 @@ TEST_F(ExprTest, ArithmeticExprs) {
   // The "--" indicates a comment to be ignored.
   // Therefore, the result should be -1.
   TestValue("- 1 --1", TYPE_TINYINT, -1);
+
+  // Test all arithmetic exprs with only NULL operands.
+  TestNullOperandsArithmeticOps();
 }
 
 // There are two tests of ranges, the second of which requires a cast
@@ -759,6 +871,7 @@ TEST_F(ExprTest, BinaryPredicates) {
   TestFloatingPointComparisons<float>(true);
   TestFloatingPointComparisons<double>(false);
   TestStringComparisons();
+  TestNullComparisons();
 }
 
 // Test casting from all types to all other types
@@ -861,6 +974,8 @@ TEST_F(ExprTest, CompoundPredicates) {
 TEST_F(ExprTest, IsNullPredicate) {
   TestValue("5 IS NULL", TYPE_BOOLEAN, false);
   TestValue("5 IS NOT NULL", TYPE_BOOLEAN, true);
+  TestValue("NULL IS NULL", TYPE_BOOLEAN, true);
+  TestValue("NULL IS NOT NULL", TYPE_BOOLEAN, false);
 }
 
 TEST_F(ExprTest, LikePredicate) {
@@ -922,6 +1037,16 @@ TEST_F(ExprTest, LikePredicate) {
   TestNonOkStatus("'a' REGEXP '(./'");
   // Pattern is converted for LIKE, and should not throw.
   TestValue("'a' LIKE '(./'", TYPE_BOOLEAN, false);
+  // Test NULLs.
+  TestIsNull("NULL LIKE 'a'", TYPE_BOOLEAN);
+  TestIsNull("'a' LIKE NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL LIKE NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL RLIKE 'a'", TYPE_BOOLEAN);
+  TestIsNull("'a' RLIKE NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL RLIKE NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL REGEXP 'a'", TYPE_BOOLEAN);
+  TestIsNull("'a' REGEXP NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL REGEXP NULL", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, BetweenPredicate) {
@@ -954,6 +1079,11 @@ TEST_F(ExprTest, BetweenPredicate) {
   TestValue("'abc' between 'aaa' and 'aab'", TYPE_BOOLEAN, false);
   TestValue("'abc' not between 'a' and 'z'", TYPE_BOOLEAN, false);
   TestValue("'abc' not between 'aaa' and 'aab'", TYPE_BOOLEAN, true);
+  // Test NULLs.
+  TestIsNull("NULL between 0 and 10", TYPE_BOOLEAN);
+  TestIsNull("1 between NULL and 10", TYPE_BOOLEAN);
+  TestIsNull("1 between 0 and NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL between NULL and NULL", TYPE_BOOLEAN);
 }
 
 // Tests with NULLs are in the FE QueryTest.
@@ -1022,32 +1152,52 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', -5)", "Hello");
   TestStringValue("substring('Hello', -6)", "");
   TestStringValue("substring('Hello', 100)", "");
+  TestIsNull("substring(NULL, 100)", TYPE_STRING);
+  TestIsNull("substring('Hello', NULL)", TYPE_STRING);
+  TestIsNull("substring(NULL, NULL)", TYPE_STRING);
+
   TestStringValue("substring('Hello', 1, 1)", "H");
   TestStringValue("substring('Hello', 2, 100)", "ello");
   TestStringValue("substring('Hello', -3, 2)", "ll");
+  TestIsNull("substring(NULL, 1, 100)", TYPE_STRING);
+  TestIsNull("substring('Hello', NULL, 100)", TYPE_STRING);
+  TestIsNull("substring('Hello', 1, NULL)", TYPE_STRING);
+  TestIsNull("substring(NULL, NULL, NULL)", TYPE_STRING);
 
   TestStringValue("lower('')", "");
   TestStringValue("lower('HELLO')", "hello");
   TestStringValue("lower('Hello')", "hello");
   TestStringValue("lower('hello!')", "hello!");
   TestStringValue("lcase('HELLO')", "hello");
+  TestIsNull("lower(NULL)", TYPE_STRING);
+  TestIsNull("lcase(NULL)", TYPE_STRING);
 
   TestStringValue("upper('')", "");
   TestStringValue("upper('HELLO')", "HELLO");
   TestStringValue("upper('Hello')", "HELLO");
   TestStringValue("upper('hello!')", "HELLO!");
   TestStringValue("ucase('hello')", "HELLO");
+  TestIsNull("upper(NULL)", TYPE_STRING);
+  TestIsNull("ucase(NULL)", TYPE_STRING);
 
   TestValue("length('')", TYPE_INT, 0);
   TestValue("length('a')", TYPE_INT, 1);
   TestValue("length('abcdefg')", TYPE_INT, 7);
+  TestIsNull("length(NULL)", TYPE_INT);
 
   TestStringValue("reverse('abcdefg')", "gfedcba");
   TestStringValue("reverse('')", "");
+  TestIsNull("reverse(NULL)", TYPE_STRING);
   TestStringValue("strleft('abcdefg', 3)", "abc");
   TestStringValue("strleft('abcdefg', 10)", "abcdefg");
+  TestIsNull("strleft(NULL, 3)", TYPE_STRING);
+  TestIsNull("strleft('abcdefg', NULL)", TYPE_STRING);
+  TestIsNull("strleft(NULL, NULL)", TYPE_STRING);
   TestStringValue("strright('abcdefg', 3)", "efg");
   TestStringValue("strright('abcdefg', 10)", "abcdefg");
+  TestIsNull("strright(NULL, 3)", TYPE_STRING);
+  TestIsNull("strright('abcdefg', NULL)", TYPE_STRING);
+  TestIsNull("strright(NULL, NULL)", TYPE_STRING);
 
   TestStringValue("trim('')", "");
   TestStringValue("trim('      ')", "");
@@ -1055,23 +1205,27 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("trim('abcdefg   ')", "abcdefg");
   TestStringValue("trim('   abcdefg')", "abcdefg");
   TestStringValue("trim('abc  defg')", "abc  defg");
+  TestIsNull("trim(NULL)", TYPE_STRING);
   TestStringValue("ltrim('')", "");
   TestStringValue("ltrim('      ')", "");
   TestStringValue("ltrim('   abcdefg   ')", "abcdefg   ");
   TestStringValue("ltrim('abcdefg   ')", "abcdefg   ");
   TestStringValue("ltrim('   abcdefg')", "abcdefg");
   TestStringValue("ltrim('abc  defg')", "abc  defg");
+  TestIsNull("ltrim(NULL)", TYPE_STRING);
   TestStringValue("rtrim('')", "");
   TestStringValue("rtrim('      ')", "");
   TestStringValue("rtrim('   abcdefg   ')", "   abcdefg");
   TestStringValue("rtrim('abcdefg   ')", "abcdefg");
   TestStringValue("rtrim('   abcdefg')", "   abcdefg");
   TestStringValue("rtrim('abc  defg')", "abc  defg");
+  TestIsNull("rtrim(NULL)", TYPE_STRING);
 
   TestStringValue("space(0)", "");
   TestStringValue("space(-1)", "");
   TestStringValue("space(1)", " ");
   TestStringValue("space(6)", "      ");
+  TestIsNull("space(NULL)", TYPE_STRING);
 
   TestStringValue("repeat('', 0)", "");
   TestStringValue("repeat('', 6)", "");
@@ -1079,12 +1233,16 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("repeat('ab', -1)", "");
   TestStringValue("repeat('ab', 1)", "ab");
   TestStringValue("repeat('ab', 6)", "abababababab");
+  TestIsNull("repeat(NULL, 6)", TYPE_STRING);
+  TestIsNull("repeat('ab', NULL)", TYPE_STRING);
+  TestIsNull("repeat(NULL, NULL)", TYPE_STRING);
 
   TestValue("ascii('')", TYPE_INT, 0);
   TestValue("ascii('abcde')", TYPE_INT, 'a');
   TestValue("ascii('Abcde')", TYPE_INT, 'A');
   TestValue("ascii('dddd')", TYPE_INT, 'd');
   TestValue("ascii(' ')", TYPE_INT, ' ');
+  TestIsNull("ascii(NULL)", TYPE_INT);
 
   TestStringValue("lpad('', 0, '')", "");
   TestStringValue("lpad('abc', 0, '')", "");
@@ -1093,6 +1251,10 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lpad('abc', 6, 'xyz')", "xyzabc");
   TestStringValue("lpad('abc', 5, 'xyz')", "xyabc");
   TestStringValue("lpad('abc', 10, 'xyz')", "xyzxyzxabc");
+  TestIsNull("lpad(NULL, 10, 'xyz')", TYPE_STRING);
+  TestIsNull("lpad('abc', NULL, 'xyz')", TYPE_STRING);
+  TestIsNull("lpad('abc', 10, NULL)", TYPE_STRING);
+  TestIsNull("lpad(NULL, NULL, NULL)", TYPE_STRING);
   TestStringValue("rpad('', 0, '')", "");
   TestStringValue("rpad('abc', 0, '')", "");
   TestStringValue("rpad('abc', 3, '')", "abc");
@@ -1100,6 +1262,10 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("rpad('abc', 6, 'xyz')", "abcxyz");
   TestStringValue("rpad('abc', 5, 'xyz')", "abcxy");
   TestStringValue("rpad('abc', 10, 'xyz')", "abcxyzxyzx");
+  TestIsNull("rpad(NULL, 10, 'xyz')", TYPE_STRING);
+  TestIsNull("rpad('abc', NULL, 'xyz')", TYPE_STRING);
+  TestIsNull("rpad('abc', 10, NULL)", TYPE_STRING);
+  TestIsNull("rpad(NULL, NULL, NULL)", TYPE_STRING);
 
   // Note that Hive returns positions starting from 1.
   // Hive returns 0 if substr was not found in str (or on other error coditions).
@@ -1109,12 +1275,19 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("instr('abc', 'abc')", TYPE_INT, 1);
   TestValue("instr('xyzabc', 'abc')", TYPE_INT, 4);
   TestValue("instr('xyzabcxyz', 'bcx')", TYPE_INT, 5);
+  TestIsNull("instr(NULL, 'bcx')", TYPE_INT);
+  TestIsNull("instr('xyzabcxyz', NULL)", TYPE_INT);
+  TestIsNull("instr(NULL, NULL)", TYPE_INT);
   TestValue("locate('', '')", TYPE_INT, 0);
   TestValue("locate('abc', '')", TYPE_INT, 0);
   TestValue("locate('', 'abc')", TYPE_INT, 0);
   TestValue("locate('abc', 'abc')", TYPE_INT, 1);
   TestValue("locate('abc', 'xyzabc')", TYPE_INT, 4);
   TestValue("locate('bcx', 'xyzabcxyz')", TYPE_INT, 5);
+  TestIsNull("locate(NULL, 'xyzabcxyz')", TYPE_INT);
+  TestIsNull("locate('bcx', NULL)", TYPE_INT);
+  TestIsNull("locate(NULL, NULL)", TYPE_INT);
+
   // Test locate with starting pos param.
   // Note that Hive expects positions starting from 1 as input.
   TestValue("locate('', '', 0)", TYPE_INT, 0);
@@ -1130,12 +1303,19 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("locate('abc', 'xyzabcdef', 3)", TYPE_INT, 4);
   TestValue("locate('abc', 'xyzabcdef', 4)", TYPE_INT, 4);
   TestValue("locate('abc', 'abcabcabc', 5)", TYPE_INT, 7);
+  TestIsNull("locate(NULL, 'abcabcabc', 5)", TYPE_INT);
+  TestIsNull("locate('abc', NULL, 5)", TYPE_INT);
+  TestIsNull("locate('abc', 'abcabcabc', NULL)", TYPE_INT);
+  TestIsNull("locate(NULL, NULL, NULL)", TYPE_INT);
 
   TestStringValue("concat('a')", "a");
   TestStringValue("concat('a', 'b')", "ab");
   TestStringValue("concat('a', 'b', 'cde')", "abcde");
   TestStringValue("concat('a', 'b', 'cde', 'fg')", "abcdefg");
   TestStringValue("concat('a', 'b', 'cde', '', 'fg', '')", "abcdefg");
+  TestIsNull("concat(NULL)", TYPE_STRING);
+  TestIsNull("concat('a', NULL, 'b')", TYPE_STRING);
+  TestIsNull("concat('a', 'b', NULL)", TYPE_STRING);
 
   TestStringValue("concat_ws(',', 'a')", "a");
   TestStringValue("concat_ws(',', 'a', 'b')", "a,b");
@@ -1144,6 +1324,9 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("concat_ws('%%', 'a', 'b', 'cde', 'fg')", "a%%b%%cde%%fg");
   TestStringValue("concat_ws('|','a', 'b', 'cde', '', 'fg', '')", "a|b|cde||fg|");
   TestStringValue("concat_ws('', '', '', '')", "");
+  TestIsNull("concat_ws(NULL, NULL)", TYPE_STRING);
+  TestIsNull("concat_ws(',', NULL, 'b')", TYPE_STRING);
+  TestIsNull("concat_ws(',', 'b', NULL)", TYPE_STRING);
 
   TestValue("find_in_set('ab', 'ab,ab,ab,ade,cde')", TYPE_INT, 1);
   TestValue("find_in_set('ab', 'abc,xyz,abc,ade,ab')", TYPE_INT, 5);
@@ -1155,12 +1338,11 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("find_in_set('', 'abc,ad,,ade,cde,')", TYPE_INT,3);
   // First param contains comma.
   TestValue("find_in_set('abc,def', 'abc,ad,,ade,cde,')", TYPE_INT, 0);
+  TestIsNull("find_in_set(NULL, 'abc,ad,,ade,cde')", TYPE_INT);
+  TestIsNull("find_in_set('abc,def', NULL)", TYPE_INT);
+  TestIsNull("find_in_set(NULL, NULL)", TYPE_INT);
 
   TestStringValue("version()", GetVersionString());
-
-  // TODO: tests with NULL arguments, currently we can't parse them
-  // inside function calls.
-  // e.g.   TestValue("length(NULL)", TYPE_INT, NULL);
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {
@@ -1189,6 +1371,11 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_extract('', 'abx', 0)", "");
   // Invalid regex patter, unmatched parenthesis.
   TestIsNull("regexp_extract('abxcy1234a', '(/.', 0)", TYPE_STRING);
+  // NULL arguments.
+  TestIsNull("regexp_extract(NULL, 'a.x', 2)", TYPE_STRING);
+  TestIsNull("regexp_extract('abxcy1234a', NULL, 2)", TYPE_STRING);
+  TestIsNull("regexp_extract('abxcy1234a', 'a.x', NULL)", TYPE_STRING);
+  TestIsNull("regexp_extract(NULL, NULL, NULL)", TYPE_STRING);
 
   TestStringValue("regexp_replace('axcaycazc', 'a.c', 'a')", "aaa");
   TestStringValue("regexp_replace('axcaycazc', 'a.c', '')", "");
@@ -1205,6 +1392,11 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_replace('axcaycazc', '', 'r')", "rarxrcraryrcrarzrcr");
   // Invalid regex patter, unmatched parenthesis.
   TestIsNull("regexp_replace('abxcy1234a', '(/.', 'x')", TYPE_STRING);
+  // NULL arguments.
+  TestIsNull("regexp_replace(NULL, 'a.*', 'abcde')", TYPE_STRING);
+  TestIsNull("regexp_replace('axcaycazc', NULL, 'abcde')", TYPE_STRING);
+  TestIsNull("regexp_replace('axcaycazc', 'a.*', NULL)", TYPE_STRING);
+  TestIsNull("regexp_replace(NULL, NULL, NULL)", TYPE_STRING);
 }
 
 TEST_F(ExprTest, StringParseUrlFunction) {
@@ -1415,6 +1607,12 @@ TEST_F(ExprTest, StringParseUrlFunction) {
   TestIsNull("parse_url('http://example.com', 'Userinfo')", TYPE_STRING);
   TestIsNull("parse_url('http://example.com', 'USERINFOXYZ')", TYPE_STRING);
 
+  // NULL arguments.
+  TestIsNull("parse_url(NULL, 'AUTHORITY')", TYPE_STRING);
+  TestIsNull("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+          "index.html?name=networking#DOWNLOADING', NULL)", TYPE_STRING);
+  TestIsNull("parse_url(NULL, NULL)", TYPE_STRING);
+
   // Key's value is terminated by '#'.
   TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'QUERY', 'name')", "networking");
@@ -1488,7 +1686,16 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestValue("degrees(0)", TYPE_DOUBLE, 0.0);
   TestValue("degrees(pi())", TYPE_DOUBLE, 180.0);
 
-  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
+  // NULL artuments.
+  TestIsNull("sin(NULL)", TYPE_DOUBLE);
+  TestIsNull("asin(NULL)", TYPE_DOUBLE);
+  TestIsNull("cos(NULL)", TYPE_DOUBLE);
+  TestIsNull("acos(NULL)", TYPE_DOUBLE);
+  TestIsNull("tan(NULL)", TYPE_DOUBLE);
+  TestIsNull("atan(NULL)", TYPE_DOUBLE);
+  TestIsNull("radians(NULL)", TYPE_DOUBLE);
+  TestIsNull("degrees(NULL)", TYPE_DOUBLE);
+
 }
 
 TEST_F(ExprTest, MathConversionFunctions) {
@@ -1576,7 +1783,14 @@ TEST_F(ExprTest, MathConversionFunctions) {
   TestStringValue("conv('$123', 12, 2)", "0");
   TestStringValue("conv('*12g', 32, 5)", "0");
 
-  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
+  // NULL arguments.
+  TestIsNull("bin(NULL)", TYPE_STRING);
+  TestIsNull("hex(NULL)", TYPE_STRING);
+  TestIsNull("unhex(NULL)", TYPE_STRING);
+  TestIsNull("conv(NULL, 10, 10)", TYPE_STRING);
+  TestIsNull("conv(10, NULL, 10)", TYPE_STRING);
+  TestIsNull("conv(10, 10, NULL)", TYPE_STRING);
+  TestIsNull("conv(NULL, NULL, NULL)", TYPE_STRING);
 }
 
 TEST_F(ExprTest, MathFunctions) {
@@ -1652,7 +1866,30 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("negative(3.14159265)", TYPE_DOUBLE, -3.14159265);
   TestValue("negative(-3.14159265)", TYPE_DOUBLE, 3.14159265);
 
-  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
+  // NULL arguments.
+  TestIsNull("abs(NULL)", TYPE_DOUBLE);
+  TestIsNull("sign(NULL)", TYPE_FLOAT);
+  TestIsNull("exp(NULL)", TYPE_DOUBLE);
+  TestIsNull("ln(NULL)", TYPE_DOUBLE);
+  TestIsNull("log10(NULL)", TYPE_DOUBLE);
+  TestIsNull("log2(NULL)", TYPE_DOUBLE);
+  TestIsNull("log(NULL, 64.0)", TYPE_DOUBLE);
+  TestIsNull("log(2.0, NULL)", TYPE_DOUBLE);
+  TestIsNull("log(NULL, NULL)", TYPE_DOUBLE);
+  TestIsNull("pow(NULL, 10.0)", TYPE_DOUBLE);
+  TestIsNull("pow(2.0, NULL)", TYPE_DOUBLE);
+  TestIsNull("pow(NULL, NULL)", TYPE_DOUBLE);
+  TestIsNull("power(NULL, 10.0)", TYPE_DOUBLE);
+  TestIsNull("power(2.0, NULL)", TYPE_DOUBLE);
+  TestIsNull("power(NULL, NULL)", TYPE_DOUBLE);
+  TestIsNull("sqrt(NULL)", TYPE_DOUBLE);
+  TestIsNull("rand(NULL)", TYPE_DOUBLE);
+  TestIsNull("pmod(NULL, 3)", TYPE_BIGINT);
+  TestIsNull("pmod(10, NULL)", TYPE_BIGINT);
+  TestIsNull("pmod(NULL, NULL)", TYPE_BIGINT);
+  TestIsNull("positive(NULL)", TYPE_BIGINT);
+  TestIsNull("negative(NULL)", TYPE_BIGINT);
+
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {
@@ -1682,6 +1919,15 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("round(-3.14159265, 3)", TYPE_DOUBLE, -3.142);
   TestValue("round(-3.14159265, 4)", TYPE_DOUBLE, -3.1416);
   TestValue("round(-3.14159265, 5)", TYPE_DOUBLE, -3.14159);
+
+  // NULL arguments.
+  TestIsNull("ceil(NULL)", TYPE_BIGINT);
+  TestIsNull("ceiling(NULL)", TYPE_BIGINT);
+  TestIsNull("floor(NULL)", TYPE_BIGINT);
+  TestIsNull("round(NULL)", TYPE_BIGINT);
+  TestIsNull("round(NULL, 1)", TYPE_DOUBLE);
+  TestIsNull("round(3.14159265, NULL)", TYPE_DOUBLE);
+  TestIsNull("round(NULL, NULL)", TYPE_DOUBLE);
 }
 
 TEST_F(ExprTest, UnaryOperators) {
@@ -1804,6 +2050,16 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as timestamp), interval 1033 nanoseconds) as string)",
       "2012-01-01 00:00:00.000000001");
 
+  // NULL arguments.
+  TestIsNull("date_add(NULL, interval 10 years)", TYPE_TIMESTAMP);
+  TestIsNull("date_add(cast('2012-01-01 09:10:11.123456789' as timestamp),"
+      "interval NULL years)", TYPE_TIMESTAMP);
+  TestIsNull("date_add(NULL, interval NULL years)", TYPE_TIMESTAMP);
+  TestIsNull("date_sub(NULL, interval 10 years)", TYPE_TIMESTAMP);
+  TestIsNull("date_sub(cast('2012-01-01 09:10:11.123456789' as timestamp),"
+      "interval NULL years)", TYPE_TIMESTAMP);
+  TestIsNull("date_sub(NULL, interval NULL years)", TYPE_TIMESTAMP);
+
   // Test add/sub behavior with very large time values.
   string max_int = lexical_cast<string>(numeric_limits<int32_t>::max());
   TestStringValue(
@@ -1823,10 +2079,18 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("unix_timestamp('1970-01-01 10:10:10', 'yyyy-MM-dd')", TYPE_INT, 0);
   TestValue("unix_timestamp('1970-01-01 00:00:00 extra text', 'yyyy-MM-dd HH:mm:ss')",
             TYPE_INT, 0);
+  TestIsNull("unix_timestamp(NULL)", TYPE_INT);
+  TestIsNull("unix_timestamp(NULL, 'yyyy-MM-dd')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01 10:10:10', NULL)", TYPE_INT);
+  TestIsNull("unix_timestamp(NULL, NULL)", TYPE_INT);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0)", "1970-01-01 00:00:00");
+  TestIsNull("from_unixtime(NULL)", TYPE_STRING);
   TestStringValue("from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')", "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0, 'yyyy-MM-dd')", "1970-01-01");
+  TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(0, NULL)", TYPE_STRING);
+  TestIsNull("from_unixtime(NULL, NULL)", TYPE_STRING);
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd')", "1999-01-01");
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
@@ -1867,6 +2131,15 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
       "cast('2012-12-22' as timestamp))", TYPE_INT);
 
+  TestIsNull("year(NULL)", TYPE_INT);
+  TestIsNull("month(NULL)", TYPE_INT);
+  TestIsNull("dayofmonth(NULL)", TYPE_INT);
+  TestIsNull("day(NULL)", TYPE_INT);
+  TestIsNull("weekofyear(NULL)", TYPE_INT);
+  TestIsNull("datediff(NULL, '2011-12-22 09:10:11.12345678')", TYPE_INT);
+  TestIsNull("datediff('2012-12-22', NULL)", TYPE_INT);
+  TestIsNull("datediff(NULL, NULL)", TYPE_INT);
+
   // Tests from Hive
   // The hive documentation states that timestamps are timezoneless, but the tests
   // show that they treat them as being in the current timezone so these tests
@@ -1894,6 +2167,11 @@ TEST_F(ExprTest, TimestampFunctions) {
   // We get some decimal-binary skew here
   TestStringValue("cast(from_utc_timestamp(cast(1.3041352164485E9 as timestamp), 'PST') "
       "as string)", "2011-04-29 20:46:56.448499917");
+  // NULL arguments.
+  TestIsNull("from_utc_timestamp(NULL, 'PST')", TYPE_TIMESTAMP);
+  TestIsNull("from_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), NULL)",
+      TYPE_TIMESTAMP);
+  TestIsNull("from_utc_timestamp(NULL, NULL)", TYPE_TIMESTAMP);
 
   // Hive silently ignores bad timezones.  We log a problem.
   TestStringValue(
@@ -1926,12 +2204,6 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("from_unixtime(0, 'HH:mm:dd')", TYPE_STRING);
 }
 
-// TODO: Since we currently can't analyze NULL literals as function parameters,
-// we instead use a function which we know will return NULL as a workaround.
-// This only works sometimes though, because the NULL-returning function
-// must also have the correct return type that we are looking for.
-// The commented (#if 0) tests should be enabled once we can analyze NULL literals
-// as function arguments.
 TEST_F(ExprTest, ConditionalFunctions) {
   // If first param evaluates to true, should return second parameter,
   // false or NULL should return the third.
@@ -1950,52 +2222,33 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", else_val);
 
-  // Workaround: if(true, NULL, NULL) returns NULL of type BOOLEAN.
-  // coalesce(NULL)
-  TestIsNull("coalesce(if(true, NULL, NULL))", TYPE_BOOLEAN);
-  // coalesce(NULL, NULL)
-  TestIsNull("coalesce(if(true, NULL, NULL), if(true, NULL, NULL))", TYPE_BOOLEAN);
+  TestIsNull("coalesce(NULL)", TYPE_DOUBLE);
+  TestIsNull("coalesce(NULL, NULL)", TYPE_DOUBLE);
   TestValue("coalesce(TRUE)", TYPE_BOOLEAN, true);
-  // coalesce(NULL, TRUE, NULL)
-  TestValue("coalesce(if(true, NULL, NULL), TRUE, if(true, NULL, NULL))",
-      TYPE_BOOLEAN, true);
-  // coalesce(FALSE, NULL, TRUE, NULL)
-  TestValue("coalesce(FALSE, if(true, NULL, NULL), TRUE, if(true, NULL, NULL))",
-      TYPE_BOOLEAN, false);
-  // coalesce(NULL, NULL, NULL TRUE, NULL, NULL)
-  TestValue("coalesce(if(true, NULL, NULL), if(true, NULL, NULL), if(true, NULL, NULL),"
-      "TRUE, if(true, NULL, NULL), if(true, NULL, NULL))", TYPE_BOOLEAN, true);
+  TestValue("coalesce(NULL, TRUE, NULL)", TYPE_BOOLEAN, true);
+  TestValue("coalesce(FALSE, NULL, TRUE, NULL)", TYPE_BOOLEAN, false);
+  TestValue("coalesce(NULL, NULL, NULL, TRUE, NULL, NULL)", TYPE_BOOLEAN, true);
   TestValue("coalesce(10)", TYPE_BIGINT, 10);
-#if 0
   TestValue("coalesce(NULL, 10, NULL)", TYPE_BIGINT, 10);
-  TestValue("coalesce(20, NULL, 10, NULL)", TYPE_BIGINT);
-  TestValue("coalesce(NULL, NULL, NULL, 10, NULL, NULL)", TYPE_BIGINT);
-#endif
+  TestValue("coalesce(20, NULL, 10, NULL)", TYPE_BIGINT, 20);
+  TestValue("coalesce(NULL, NULL, NULL, 10, NULL, NULL)", TYPE_BIGINT, 10);
   TestValue("coalesce(5.5)", TYPE_DOUBLE, 5.5);
-#if 0
   TestValue("coalesce(NULL, 5.5, NULL)", TYPE_DOUBLE, 5.5);
-  TestValue("coalesce(8.8, NULL, 5.5, NULL)", TYPE_DOUBLE);
-  TestValue("coalesce(NULL, NULL, NULL, 5.5, NULL, NULL)", TYPE_DOUBLE);
-#endif
+  TestValue("coalesce(8.8, NULL, 5.5, NULL)", TYPE_DOUBLE, 8.8);
+  TestValue("coalesce(NULL, NULL, NULL, 5.5, NULL, NULL)", TYPE_DOUBLE, 5.5);
   TestStringValue("coalesce('abc')", "abc");
-#if 0
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
   TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
-#endif
   TimestampValue ats(1293872461);
-#if 0
   TimestampValue bts(929387245);
-#endif
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
-#if 0
   TestTimestampValue("coalesce(NULL, cast('2011-01-01 09:01:01' as timestamp),"
       "NULL)", ats);
   TestTimestampValue("coalesce(cast('1999-06-14 19:07:25' as timestamp), NULL,"
       "cast('2011-01-01 09:01:01' as timestamp), NULL)", bts);
   TestTimestampValue("coalesce(NULL, NULL, NULL,"
       "cast('2011-01-01 09:01:01' as timestamp), NULL, NULL)", ats);
-#endif
 
   // Test logic of case expr using int types.
   // The different types and casting are tested below.
@@ -2014,27 +2267,29 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("case 21 when 20 then 1 when 21 then 2 end", TYPE_TINYINT, 2);
   TestValue("case 21 when 20 then 1 when 19 then 2 when 21 then 3 end", TYPE_TINYINT, 3);
   // Should skip when-exprs that are NULL
-#if 0
   TestIsNull("case when NULL then 1 end", TYPE_TINYINT);
-  TestIsNull("case when NULL then 1 end else NULL end", TYPE_TINYINT);
+  TestIsNull("case when NULL then 1 else NULL end", TYPE_TINYINT);
   TestValue("case when NULL then 1 else 2 end", TYPE_TINYINT, 2);
   TestValue("case when NULL then 1 when true then 2 else 3 end", TYPE_TINYINT, 2);
-#endif
   // Should return else expr, if case-expr is NULL.
-#if 0
   TestIsNull("case NULL when 1 then 1 end", TYPE_TINYINT);
   TestIsNull("case NULL when 1 then 1 else NULL end", TYPE_TINYINT);
   TestValue("case NULL when 1 then 1 else 2 end", TYPE_TINYINT, 2);
   TestValue("case 10 when NULL then 1 else 2 end", TYPE_TINYINT, 2);
   TestValue("case 10 when NULL then 1 when 10 then 2 else 3 end", TYPE_TINYINT, 2);
-#endif
+  // Not statically known that it will return NULL.
+  TestIsNull("case NULL when NULL then true end", TYPE_BOOLEAN);
+  TestIsNull("case NULL when NULL then true else NULL end", TYPE_BOOLEAN);
+  // Statically known that it will return NULL.
+  TestIsNull("case NULL when NULL then NULL end", TYPE_NULL);
+  TestIsNull("case NULL when NULL then NULL else NULL end", TYPE_NULL);
 
   // Test all types in case/when exprs, without casts.
   unordered_map<int, string>::iterator def_iter;
   for(def_iter = default_type_strs_.begin(); def_iter != default_type_strs_.end();
       ++def_iter) {
     TestValue("case " + def_iter->second + " when " + def_iter->second +
-        " then true end", TYPE_BOOLEAN, true);
+        " then true else true end", TYPE_BOOLEAN, true);
   }
 
   // Test all int types in then and else exprs.

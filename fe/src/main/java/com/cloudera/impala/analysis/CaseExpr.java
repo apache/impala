@@ -122,8 +122,7 @@ public class CaseExpr extends Expr {
       Expr whenExpr = children.get(i);
       if (hasCaseExpr) {
         // Determine maximum compatible type of the case expr,
-        // and all when expr seen so far.
-        // We will add casts to them at the very end.
+        // and all when exprs seen so far. We will add casts to them at the very end.
         whenType = analyzer.getCompatibleType(whenType,
             lastCompatibleWhenExpr, whenExpr);
         lastCompatibleWhenExpr = whenExpr;

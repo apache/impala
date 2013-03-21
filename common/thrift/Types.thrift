@@ -23,6 +23,7 @@ typedef i32 TTableId
 
 enum TPrimitiveType {
   INVALID_TYPE,
+  NULL_TYPE,
   BOOLEAN,
   TINYINT,
   SMALLINT,

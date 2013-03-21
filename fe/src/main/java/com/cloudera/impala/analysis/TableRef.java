@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.catalog.Table;

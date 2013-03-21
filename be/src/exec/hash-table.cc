@@ -121,6 +121,10 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
         dst = builder->CreateBitCast(dst, codegen->ptr_type());
         null_value = codegen->GetIntConstant(TYPE_TINYINT, fvn_seed);
         break;
+      case TYPE_NULL:
+        dst = builder->CreateBitCast(dst, codegen->ptr_type());
+        null_value = codegen->GetIntConstant(type, fvn_seed);
+        break;
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT: 

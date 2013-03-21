@@ -710,6 +710,11 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val) {
   bool not_null = (value != NULL);
   switch (type) {
+    case TPrimitiveType::NULL_TYPE:
+      // Set NULLs in the boolVal.
+      hs2_col_val->__isset.boolVal = true;
+      hs2_col_val->boolVal.__isset.value = false;
+      break;
     case TPrimitiveType::BOOLEAN:
       hs2_col_val->__isset.boolVal = true;
       if (not_null) hs2_col_val->boolVal.value = *reinterpret_cast<const bool*>(value);

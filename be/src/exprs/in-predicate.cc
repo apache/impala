@@ -55,7 +55,8 @@ void* InPredicate::ComputeFn(Expr* e, TupleRow* row) {
   int32_t num_children = e->GetNumChildren();
   bool found_null = false;
   for (int32_t i = 1; i < num_children; ++i) {
-    DCHECK_EQ(type, e->children()[i]->type());
+    DCHECK(type == e->children()[i]->type() || type == TYPE_NULL
+        || e->children()[i]->type() == TYPE_NULL);
     void* in_list_val = e->children()[i]->GetValue(row);
     if (in_list_val == NULL) {
       found_null = true;

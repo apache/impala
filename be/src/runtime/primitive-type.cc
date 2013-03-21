@@ -22,6 +22,7 @@ namespace impala {
 PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
   switch (ttype) {
     case TPrimitiveType::INVALID_TYPE: return INVALID_TYPE;
+    case TPrimitiveType::NULL_TYPE: return TYPE_NULL;
     case TPrimitiveType::BOOLEAN: return TYPE_BOOLEAN;
     case TPrimitiveType::TINYINT: return TYPE_TINYINT;
     case TPrimitiveType::SMALLINT: return TYPE_SMALLINT;
@@ -42,6 +43,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
 TPrimitiveType::type ToThrift(PrimitiveType ptype) {
   switch (ptype) {
     case INVALID_TYPE: return TPrimitiveType::INVALID_TYPE;
+    case TYPE_NULL: return TPrimitiveType::NULL_TYPE;
     case TYPE_BOOLEAN: return TPrimitiveType::BOOLEAN;
     case TYPE_TINYINT: return TPrimitiveType::TINYINT;
     case TYPE_SMALLINT: return TPrimitiveType::SMALLINT;
@@ -62,6 +64,7 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype) {
 string TypeToString(PrimitiveType t) {
   switch (t) {
     case INVALID_TYPE: return "INVALID";
+    case TYPE_NULL: return "NULL";
     case TYPE_BOOLEAN: return "BOOL";
     case TYPE_TINYINT: return "TINYINT";
     case TYPE_SMALLINT: return "SMALLINT";
@@ -83,6 +86,7 @@ string TypeToOdbcString(PrimitiveType t) {
   // ODBC driver requires types in lower case
   switch (t) {
     case INVALID_TYPE: return "invalid";
+    case TYPE_NULL: return "null";
     case TYPE_BOOLEAN: return "boolean";
     case TYPE_TINYINT: return "tinyint";
     case TYPE_SMALLINT: return "smallint";
@@ -102,6 +106,7 @@ string TypeToOdbcString(PrimitiveType t) {
 
 TTypeId::type TypeToHiveServer2Type(PrimitiveType t) {
   switch (t) {
+    case TYPE_NULL: return TTypeId::USER_DEFINED_TYPE;
     case TYPE_BOOLEAN: return TTypeId::BOOLEAN_TYPE;
     case TYPE_TINYINT: return TTypeId::TINYINT_TYPE;
     case TYPE_SMALLINT: return TTypeId::SMALLINT_TYPE;

@@ -76,7 +76,7 @@ public class CastExpr extends Expr {
     // this cast may result in loss of precision, but the user requested it
     this.type = targetType;
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CAST, false, getChild(0).getType(), type);
+        FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type);
     if (match == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType);

@@ -113,6 +113,8 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
 // http://docs.oracle.com/javase/1.4.2/docs/api/java/text/SimpleDateFormat.html
 // Convert them to boost format strings.
 StringValue* TimestampFunctions::CheckFormat(StringValue* format) {
+  if(format == NULL) return NULL;
+
   // For now the format  must be of the form: yyyy-MM-dd HH:mm:ss
   // where the time part is optional.
   switch(format->len) {

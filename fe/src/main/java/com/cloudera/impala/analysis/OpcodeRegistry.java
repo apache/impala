@@ -65,6 +65,8 @@ public class OpcodeRegistry {
    * varArgType must be a maximum-resolution type.
    * We use a separate map to be able to support multiple vararg signatures for the same
    * FunctionOperator.
+   * Contains a special entry mapping from Operator,NULL_TYPE to signatures for each
+   * Operator to correctly match varag functions when all args are NULL.
    * Limitations: Since we do not consider the number of arguments, each FunctionOperator
    * is limited to having one vararg signature per maximum-resolution PrimitiveType.
    * For example, one can have two signatures func(float, int ...) and func(string ...),
@@ -210,8 +212,8 @@ public class OpcodeRegistry {
     // Take the last argument's type as the vararg type.
     Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
     if (argTypes.length > 0) {
-      varArgsLookup =
-          Pair.create(op, argTypes[argTypes.length - 1].getMaxResolutionType());
+      PrimitiveType varArgMatchType = getRightMostNonNullTypeOrNull(argTypes);
+      varArgsLookup = Pair.create(op, varArgMatchType.getMaxResolutionType());
     }
     List<Signature> signatures = null;
     if (operations.containsKey(lookup)) {
@@ -236,6 +238,18 @@ public class OpcodeRegistry {
   }
 
   /**
+   * Returns right-most argType that is not NULL_TYPE, otherwise NULL_TYPE.
+   */
+  private PrimitiveType getRightMostNonNullTypeOrNull(PrimitiveType[] argTypes) {
+    for (int i = argTypes.length - 1; i >= 0; --i) {
+      if (!argTypes[i].isNull()) {
+        return argTypes[i];
+      }
+    }
+    return PrimitiveType.NULL_TYPE;
+  }
+
+  /**
    * Add a function with the specified opcode/signature to the registry.
    */
   public boolean add(FunctionOperator op, TExprOpcode opcode, boolean varArgs,
@@ -244,9 +258,12 @@ public class OpcodeRegistry {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
     // Take the last argument's type as the vararg type.
     Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
+    // Special signature for vararg functions to handle matching when all args are NULL.
+    Pair<FunctionOperator, PrimitiveType> varArgsNullLookup = null;
     Preconditions.checkArgument((varArgs) ? args.length > 0 : true);
     if (varArgs && args.length > 0) {
       varArgsLookup = Pair.create(op, args[args.length - 1].getMaxResolutionType());
+      varArgsNullLookup = Pair.create(op, PrimitiveType.NULL_TYPE);
     }
     if (operations.containsKey(lookup)) {
       signatures = operations.get(lookup);
@@ -256,6 +273,7 @@ public class OpcodeRegistry {
       signatures = new ArrayList<Signature>();
       if (varArgs) {
         varArgOperations.put(varArgsLookup, signatures);
+        varArgOperations.put(varArgsNullLookup, signatures);
       } else {
         operations.put(lookup, signatures);
       }

@@ -694,6 +694,63 @@ boolean
 true
 ====
 ---- QUERY
+# IN predicate with NULLs and other types
+select NULL in ('a', NULL, 'b')
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select NULL not in ('a', NULL, 'b')
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select NULL not in (1.0, NULL, 2.0)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select NULL in (1.0, NULL, 2.0)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select NULL in (true, NULL, false)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select NULL not in (true, NULL, false)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select true in (NULL, false)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select true not in (NULL, false)
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
 select count(*) from alltypesagg
 where true in (bool_col, tinyint_col)
 ---- TYPES

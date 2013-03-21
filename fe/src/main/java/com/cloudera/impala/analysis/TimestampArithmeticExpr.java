@@ -123,8 +123,9 @@ public class TimestampArithmeticExpr extends Expr {
           "' in timestamp arithmetic expression '" + toSql() + "'.");
     }
 
-    // The first child must return a timestamp.
-    if (getChild(0).getType() != PrimitiveType.TIMESTAMP) {
+    // The first child must return a timestamp or null.
+    if (getChild(0).getType() != PrimitiveType.TIMESTAMP
+        && !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
           getChild(0).getType() + "'. Expected type 'TIMESTAMP'.");

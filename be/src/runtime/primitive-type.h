@@ -26,6 +26,7 @@ namespace impala {
 
 enum PrimitiveType {
   INVALID_TYPE = 0,
+  TYPE_NULL,
   TYPE_BOOLEAN,
   TYPE_TINYINT,
   TYPE_SMALLINT,
@@ -38,7 +39,7 @@ enum PrimitiveType {
   TYPE_DATE,        // Not implemented
   TYPE_DATETIME,    // Not implemented
   TYPE_BINARY,      // Not implemented
-  TYPE_DECIMAL      // Not implemented
+  TYPE_DECIMAL     // Not implemented
 };
 
 // Returns the byte size of 'type'  Returns 0 for variable length types.
@@ -46,6 +47,7 @@ inline int GetByteSize(PrimitiveType type) {
   switch (type) {
     case TYPE_STRING:
       return 0;
+    case TYPE_NULL:
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
       return 1;

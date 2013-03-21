@@ -30,7 +30,6 @@ class TestInsertQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert_overwrite', vector)
 
   @pytest.mark.execute_serially
-  @pytest.mark.xfail(run=False, reason="IMPALA-82")
   def test_insert_null(self, vector):
     self.run_test_case('QueryTest/insert_null', vector)
 

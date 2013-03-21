@@ -53,15 +53,15 @@ public class CompoundPredicate extends Predicate {
   }
   private final Operator op;
 
-  public CompoundPredicate(Operator op, Predicate p1, Predicate p2) {
+  public CompoundPredicate(Operator op, Expr e1, Expr e2) {
     super();
     this.op = op;
-    Preconditions.checkNotNull(p1);
-    children.add(p1);
-    Preconditions.checkArgument(op == Operator.NOT && p2 == null
-        || op != Operator.NOT && p2 != null);
-    if (p2 != null) {
-      children.add(p2);
+    Preconditions.checkNotNull(e1);
+    children.add(e1);
+    Preconditions.checkArgument(op == Operator.NOT && e2 == null
+        || op != Operator.NOT && e2 != null);
+    if (e2 != null) {
+      children.add(e2);
     }
   }
 
@@ -96,6 +96,15 @@ public class CompoundPredicate extends Predicate {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+
+    // Check that children are predicates.
+    for (Expr e : children) {
+      if (!(e instanceof Predicate)) {
+        throw new AnalysisException(String.format("Operand '%s' part of predicate " +
+            "'%s' should return type 'BOOLEAN' but returns type '%s'.",
+            e.toSql(), toSql(), e.getType()));
+      }
+    }
 
     if (getChild(0).selectivity == -1
         || children.size() == 2 && getChild(1).selectivity == -1) {

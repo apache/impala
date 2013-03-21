@@ -151,6 +151,8 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   int32_t i1, i2;
   int64_t b1, b2;
   switch (type) {
+    case TYPE_NULL:
+      return 0;
     case TYPE_BOOLEAN:
       return *reinterpret_cast<const bool*>(v1) - *reinterpret_cast<const bool*>(v2);
     case TYPE_TINYINT:

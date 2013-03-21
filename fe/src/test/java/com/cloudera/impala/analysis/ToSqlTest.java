@@ -49,11 +49,11 @@ public class ToSqlTest {
   public void selectListTest() {
     testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
         "from functional.alltypes",
-        "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " + 
+        "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
         "FROM functional.alltypes");
-    testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " + 
+    testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
         "from functional.alltypes",
-        "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " + 
+        "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
         "FROM functional.alltypes");
     testToSql("select int_col + int_col, " +
         "tinyint_col + int_col, " +
@@ -75,24 +75,24 @@ public class ToSqlTest {
   // Test the toSql() output of the where clause.
   @Test
   public void whereTest() {
-    testToSql("select id from functional.alltypes " + 
+    testToSql("select id from functional.alltypes " +
         "where tinyint_col < 40 OR int_col = 4 AND float_col > 1.4",
-        "SELECT id FROM functional.alltypes " + 
+        "SELECT id FROM functional.alltypes " +
         "WHERE tinyint_col < 40 OR int_col = 4 AND float_col > 1.4");
     testToSql("select id from functional.alltypes where string_col = \"abc\"",
         "SELECT id FROM functional.alltypes WHERE string_col = 'abc'");
     testToSql("select id from functional.alltypes where string_col = 'abc'",
         "SELECT id FROM functional.alltypes WHERE string_col = 'abc'");
-    testToSql("select id from functional.alltypes " + 
+    testToSql("select id from functional.alltypes " +
         "where 5 between smallint_col and int_col",
         "SELECT id FROM functional.alltypes WHERE 5 BETWEEN smallint_col AND int_col");
-    testToSql("select id from functional.alltypes " + 
+    testToSql("select id from functional.alltypes " +
         "where 5 not between smallint_col and int_col",
-        "SELECT id FROM functional.alltypes " + 
+        "SELECT id FROM functional.alltypes " +
         "WHERE 5 NOT BETWEEN smallint_col AND int_col");
     testToSql("select id from functional.alltypes where 5 in (smallint_col, int_col)",
         "SELECT id FROM functional.alltypes WHERE 5 IN (smallint_col, int_col)");
-    testToSql("select id from functional.alltypes " + 
+    testToSql("select id from functional.alltypes " +
         "where 5 not in (smallint_col, int_col)",
         "SELECT id FROM functional.alltypes WHERE 5 NOT IN (smallint_col, int_col)");
   }
@@ -100,21 +100,21 @@ public class ToSqlTest {
   // Test the toSql() output of aggregate and group by expressions.
   @Test
   public void aggregationTest() {
-    testToSql("select COUNT(*), count(id), COUNT(id), SUM(id), AVG(id) " + 
+    testToSql("select COUNT(*), count(id), COUNT(id), SUM(id), AVG(id) " +
         "from functional.alltypes group by tinyint_col",
-        "SELECT COUNT(*), COUNT(id), COUNT(id), SUM(id), AVG(id) " + 
+        "SELECT COUNT(*), COUNT(id), COUNT(id), SUM(id), AVG(id) " +
         "FROM functional.alltypes GROUP BY tinyint_col");
     testToSql("select avg(float_col / id) from functional.alltypes group by tinyint_col",
         "SELECT AVG(float_col / id) " +
         "FROM functional.alltypes GROUP BY tinyint_col");
-    testToSql("select avg(double_col) from functional.alltypes " + 
+    testToSql("select avg(double_col) from functional.alltypes " +
         "group by int_col, tinyint_col, bigint_col",
-        "SELECT AVG(double_col) FROM functional.alltypes " + 
+        "SELECT AVG(double_col) FROM functional.alltypes " +
         "GROUP BY int_col, tinyint_col, bigint_col");
     // Group by with having clause
-    testToSql("select avg(id) from functional.alltypes " + 
+    testToSql("select avg(id) from functional.alltypes " +
         "group by tinyint_col having count(tinyint_col) > 10",
-        "SELECT AVG(id) FROM functional.alltypes " + 
+        "SELECT AVG(id) FROM functional.alltypes " +
         "GROUP BY tinyint_col HAVING COUNT(tinyint_col) > 10");
     testToSql("select sum(id) from functional.alltypes group by tinyint_col " +
         "having avg(tinyint_col) > 10 AND count(tinyint_col) > 5",
@@ -138,13 +138,13 @@ public class ToSqlTest {
   // Test the toSql() output of queries with all clauses.
   @Test
   public void allTest() {
-    testToSql("select bigint_col, avg(double_col), sum(tinyint_col) " + 
+    testToSql("select bigint_col, avg(double_col), sum(tinyint_col) " +
         "from functional.alltypes " +
         "where double_col > 2.5 AND string_col != \"abc\"" +
         "group by bigint_col, int_col " +
         "having count(int_col) > 10 OR sum(bigint_col) > 20 " +
         "order by 2 DESC, 3 ASC",
-        "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) " + 
+        "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) " +
         "FROM functional.alltypes " +
         "WHERE double_col > 2.5 AND string_col != 'abc' " +
         "GROUP BY bigint_col, int_col " +
@@ -169,12 +169,12 @@ public class ToSqlTest {
     // With 'order by' and 'limit' on union, and also on last select.
     testToSql("(select bool_col, int_col from functional.alltypes) " +
         "union all (select bool_col, int_col from functional.alltypessmall) " +
-        "union all (select bool_col, bigint_col " + 
+        "union all (select bool_col, bigint_col " +
         "from functional.alltypes order by 1 limit 1) " +
         "order by int_col, bool_col limit 10",
         "SELECT bool_col, int_col FROM functional.alltypes " +
         "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
-        "UNION ALL SELECT bool_col, bigint_col " + 
+        "UNION ALL SELECT bool_col, bigint_col " +
         "FROM functional.alltypes ORDER BY 1 ASC LIMIT 1 " +
         "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
     // With 'order by' and 'limit' on union but not on last select.
@@ -203,18 +203,18 @@ public class ToSqlTest {
     // Insert into unpartitioned table without partition clause.
     testToSql("insert into table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "INSERT INTO TABLE functional.alltypesnopart " + 
+        "INSERT INTO TABLE functional.alltypesnopart " +
         "SELECT id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
         "string_col, timestamp_col FROM functional.alltypes");
     // Insert into overwrite unpartitioned table without partition clause.
     testToSql("insert overwrite table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "INSERT OVERWRITE TABLE functional.alltypesnopart " + 
+        "INSERT OVERWRITE TABLE functional.alltypesnopart " +
         "SELECT id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
         "string_col, timestamp_col FROM functional.alltypes");
@@ -222,34 +222,34 @@ public class ToSqlTest {
     testToSql("insert into table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "INSERT INTO TABLE functional.alltypessmall " + 
+        "INSERT INTO TABLE functional.alltypessmall " +
         "PARTITION (year=2009, month=4) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
-        "double_col, date_string_col, string_col, timestamp_col " + 
+        "double_col, date_string_col, string_col, timestamp_col " +
         "FROM functional.alltypes");
     // Fully dynamic partitions.
     testToSql("insert into table functional.alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, year, " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year, " +
         "month from functional.alltypes",
-        "INSERT INTO TABLE functional.alltypessmall " + 
+        "INSERT INTO TABLE functional.alltypessmall " +
         "PARTITION (year, month) SELECT id, bool_col, " +
         "tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, " +
-        "date_string_col, string_col, timestamp_col, year, month " + 
+        "date_string_col, string_col, timestamp_col, year, month " +
         "FROM functional.alltypes");
     // Partially dynamic partitions.
     testToSql("insert into table functional.alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, month " + 
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month " +
         "from functional.alltypes",
-        "INSERT INTO TABLE functional.alltypessmall " + 
+        "INSERT INTO TABLE functional.alltypessmall " +
         "PARTITION (year=2009, month) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
-        "double_col, date_string_col, string_col, timestamp_col, month " + 
+        "double_col, date_string_col, string_col, timestamp_col, month " +
         "FROM functional.alltypes");
   }
 }

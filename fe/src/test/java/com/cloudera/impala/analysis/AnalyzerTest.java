@@ -142,8 +142,8 @@ public class AnalyzerTest {
     } catch (InternalException e) {
       fail("Internal exception:\n" + e.toString());
     }
-    if(node instanceof SelectStmt) {
-      CheckSelectToThrift((SelectStmt)node);
+    if (node instanceof SelectStmt) {
+      CheckSelectToThrift((SelectStmt) node);
     } else if (node instanceof InsertStmt) {
       InsertStmt insertStmt = (InsertStmt) node;
       if (insertStmt.getQueryStmt() instanceof SelectStmt) {
@@ -207,9 +207,11 @@ public class AnalyzerTest {
   private void checkBinaryExprs(Expr expr) {
     if (expr instanceof BinaryPredicate
         || (expr instanceof ArithmeticExpr
-            && ((ArithmeticExpr) expr).getOp() != ArithmeticExpr.Operator.BITNOT)) {
+        && ((ArithmeticExpr) expr).getOp() != ArithmeticExpr.Operator.BITNOT)) {
       Assert.assertEquals(expr.getChildren().size(), 2);
-      Assert.assertEquals(expr.getChild(0).getType(), expr.getChild(1).getType());
+      // The types must be equal or one of them is NULL_TYPE.
+      Assert.assertTrue(expr.getChild(0).getType() == expr.getChild(1).getType()
+          || expr.getChild(0).getType().isNull() || expr.getChild(1).getType().isNull());
     }
     for (Expr child: expr.getChildren()) {
       checkBinaryExprs(child);
@@ -226,7 +228,7 @@ public class AnalyzerTest {
   private void TestSelectStar() throws AnalysisException {
     AnalyzesOk("select * from functional.AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
-    for (SlotDescriptor slotD: descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
+    for (SlotDescriptor slotD : descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
@@ -246,9 +248,9 @@ public class AnalyzerTest {
   }
 
   private void TestNonNullable() throws AnalysisException {
-    // both slots are non-nullable bigints.  The layout should look like:
+    // both slots are non-nullable bigints. The layout should look like:
     // (byte range : data)
-    // 0 - 7:  count(int_col)
+    // 0 - 7: count(int_col)
     // 8 - 15: count(*)
     AnalyzesOk("select count(int_col), count(*) from functional.AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
@@ -264,7 +266,7 @@ public class AnalyzerTest {
   }
 
   private void TestMixedNullable() throws AnalysisException {
-    // one slot is nullable, one is not.  The layout should look like:
+    // one slot is nullable, one is not. The layout should look like:
     // (byte range : data)
     // 0 : 1 nullable-byte (only 1 bit used)
     // 1 - 7: padded bytes
@@ -284,7 +286,7 @@ public class AnalyzerTest {
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
-                                 int nullIndicatorByte, int nullIndicatorBit) {
+      int nullIndicatorByte, int nullIndicatorBit) {
     Assert.assertEquals(byteSize, d.getByteSize());
     Assert.assertEquals(byteOffset, d.getByteOffset());
     Assert.assertEquals(nullIndicatorByte, d.getNullIndicatorByte());
@@ -292,7 +294,7 @@ public class AnalyzerTest {
   }
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
-                                 int nullIndicatorByte, int nullIndicatorBit) {
+      int nullIndicatorByte, int nullIndicatorBit) {
     SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
@@ -316,7 +318,7 @@ public class AnalyzerTest {
     AnalysisError("select a.id from (select id y from functional.hbasealltypessmall) a",
         "unknown column 'id' (table alias 'a')");
     AnalyzesOk("select * from (select * from functional.AllTypes) a where year = 2009");
-    AnalyzesOk("select * from (select * from functional.alltypesagg) a right outer join"+
+    AnalyzesOk("select * from (select * from functional.alltypesagg) a right outer join" +
         "             (select * from functional.alltypessmall) b using (id, int_col) " +
         "       where a.day >= 6 and b.month > 2 and a.tinyint_col = 15 and " +
         "             b.string_col = '15' and a.tinyint_col + b.tinyint_col < 15");
@@ -332,7 +334,7 @@ public class AnalyzerTest {
         "duplicated inline view column alias: 'year' in inline view 'x'");
 
     // subquery on the rhs of the join
-    AnalyzesOk("select x.float_col "+
+    AnalyzesOk("select x.float_col " +
         "       from functional.alltypessmall c join " +
         "          (select a.smallint_col smallint_col, a.tinyint_col tinyint_col, " +
         "                   a.int_col int_col, b.float_col float_col" +
@@ -343,7 +345,7 @@ public class AnalyzerTest {
     // aggregate test
     AnalyzesOk("select count(*) from (select count(id) from " +
                "functional.AllTypes group by id) a");
-    AnalyzesOk("select count(a.x) from (select id+2 x "+
+    AnalyzesOk("select count(a.x) from (select id+2 x " +
                "from functional.hbasealltypessmall) a");
     AnalyzesOk("select * from (select id, zip " +
         "       from (select * from functional.testtbl) x " +
@@ -382,11 +384,11 @@ public class AnalyzerTest {
     AnalysisError("select * from " +
         "(select id, zip from functional.testtbl group by id having count(*) > 0) x",
         "select list expression not produced by aggregation output " +
-        "(missing from GROUP BY clause?)");
+            "(missing from GROUP BY clause?)");
     AnalysisError("select * from " +
         "(select id from functional.testtbl group by id having zip + count(*) > 0) x",
         "HAVING clause not produced by aggregation output " +
-        "(missing from GROUP BY clause?)");
+            "(missing from GROUP BY clause?)");
     AnalysisError("select * from " +
         "(select zip, count(*) from functional.testtbl group by 3) x",
         "GROUP BY: ordinal exceeds number of items in select list");
@@ -410,6 +412,9 @@ public class AnalyzerTest {
     AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
         "                     from (select * from functional.testtbl) x group by 1) x " +
         "        order by 2, 1 limit 5");
+
+    // test NULLs
+    AnalyzesOk("select * from (select NULL) a");
   }
 
   @Test
@@ -420,15 +425,15 @@ public class AnalyzerTest {
     AnalyzesOk("select functional_seq.alltypes.* from functional_seq.alltypes");
     // two tables w/ identical names from different dbs
     AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " +
-               "from functional.alltypes, functional_seq.alltypes");
+        "from functional.alltypes, functional_seq.alltypes");
     AnalyzesOk("select * from functional.alltypes, functional_seq.alltypes");
   }
 
   @Test
   public void TestTimestampValueExprs() throws AnalysisException {
-   AnalyzesOk("select cast (0 as timestamp)");
-   AnalyzesOk("select cast (0.1 as timestamp)");
-   AnalyzesOk("select cast ('1970-10-10 10:00:00.123' as timestamp)");
+    AnalyzesOk("select cast (0 as timestamp)");
+    AnalyzesOk("select cast (0.1 as timestamp)");
+    AnalyzesOk("select cast ('1970-10-10 10:00:00.123' as timestamp)");
   }
 
   @Test
@@ -436,19 +441,25 @@ public class AnalyzerTest {
     // Test predicates in where clause.
     AnalyzesOk("select * from functional.AllTypes where true");
     AnalyzesOk("select * from functional.AllTypes where false");
+    AnalyzesOk("select * from functional.AllTypes where NULL");
     AnalyzesOk("select * from functional.AllTypes where bool_col = true");
     AnalyzesOk("select * from functional.AllTypes where bool_col = false");
+    AnalyzesOk("select * from functional.AllTypes where bool_col = NULL");
+    AnalyzesOk("select * from functional.AllTypes where NULL = NULL");
+    AnalyzesOk("select * from functional.AllTypes where NULL and NULL or NULL");
     AnalyzesOk("select * from functional.AllTypes where true or false");
     AnalyzesOk("select * from functional.AllTypes where true and false");
     AnalyzesOk("select * from functional.AllTypes " +
-               "where true or false and bool_col = false");
+        "where true or false and bool_col = false");
     AnalyzesOk("select * from functional.AllTypes " +
-                "where true and false or bool_col = false");
+        "where true and false or bool_col = false");
     // Test predicates in select list.
     AnalyzesOk("select bool_col = true from functional.AllTypes");
     AnalyzesOk("select bool_col = false from functional.AllTypes");
+    AnalyzesOk("select bool_col = NULL from functional.AllTypes");
     AnalyzesOk("select true or false and bool_col = false from functional.AllTypes");
     AnalyzesOk("select true and false or bool_col = false from functional.AllTypes");
+    AnalyzesOk("select NULL or NULL and NULL from functional.AllTypes");
   }
 
   @Test
@@ -485,7 +496,7 @@ public class AnalyzerTest {
         "Duplicate table alias");
     // duplicate implicit alias
     AnalysisError("select int_col from functional.alltypes, " +
-                  "functional.alltypes", "Duplicate table alias");
+        "functional.alltypes", "Duplicate table alias");
 
     // resolves dbs correctly
     AnalyzesOk("select zip from functional.testtbl");
@@ -509,9 +520,13 @@ public class AnalyzerTest {
     AnalyzesOk("select null");
     AnalyzesOk("select null and null");
     AnalyzesOk("select null or null");
+    AnalyzesOk("select null is null");
+    AnalyzesOk("select null is not null");
+    AnalyzesOk("select int_col is not null from functional.alltypes");
   }
 
-  @Test public void TestOnClause() throws AnalysisException {
+  @Test
+  public void TestOnClause() throws AnalysisException {
     AnalyzesOk(
         "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col = b.int_col)");
@@ -519,6 +534,9 @@ public class AnalyzerTest {
         "select a.int_col " +
         "from functional.alltypes a join functional.alltypes b on " +
         "(a.int_col = b.int_col and a.string_col = b.string_col)");
+    AnalyzesOk(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (NULL)");
     // ON or USING clause not required for inner join
     AnalyzesOk("select a.int_col from functional.alltypes a join functional.alltypes b");
     // unknown column
@@ -542,7 +560,7 @@ public class AnalyzerTest {
         "functional.alltypes b on (a.bool_col = b.string_col)",
         "operands are not comparable: a.bool_col = b.string_col");
     AnalyzesOk(
-        "select a.int_col, b.int_col, c.int_col " +
+    "select a.int_col, b.int_col, c.int_col " +
         "from functional.alltypes a join functional.alltypes b on " +
         "(a.int_col = b.int_col and a.string_col = b.string_col)" +
         "join functional.alltypes c on " +
@@ -585,23 +603,24 @@ public class AnalyzerTest {
     AnalyzesOk("select a.id from functional.alltypes a left semi join " +
         "functional.alltypes b on (a.id = b.id)");
     AnalyzesOk("select a.id from functional.alltypes a left semi join " +
-      "functional.alltypes b using (id)");
+        "functional.alltypes b using (id)");
     AnalysisError("select a.id from functional.alltypes a " +
-      "left semi join functional.alltypes b",
+        "left semi join functional.alltypes b",
         "LEFT SEMI JOIN requires an ON or USING clause");
     // TODO: enable when implemented
     // must not reference semi-joined alias outside of join clause
-    //AnalysisError(
-        //"select a.id, b.id from alltypes a left semi join alltypes b on (a.id = b.id)",
-        //"x");
+    // AnalysisError(
+    // "select a.id, b.id from alltypes a left semi join alltypes b on (a.id = b.id)",
+    // "x");
   }
 
-  @Test public void TestUsingClause() throws AnalysisException {
+  @Test
+  public void TestUsingClause() throws AnalysisException {
     AnalyzesOk("select a.int_col, b.int_col from functional.alltypes a join " +
-      "functional.alltypes b using (int_col)");
+        "functional.alltypes b using (int_col)");
     AnalyzesOk("select a.int_col, b.int_col from " +
-      "functional.alltypes a join functional.alltypes b " +
-      "using (int_col, string_col)");
+        "functional.alltypes a join functional.alltypes b " +
+        "using (int_col, string_col)");
     AnalyzesOk(
         "select a.int_col, b.int_col, c.int_col " +
         "from functional.alltypes a " +
@@ -613,7 +632,7 @@ public class AnalyzerTest {
         "unknown column badcol for alias a");
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
-        "join functional.alltypes b using (int_col, badcol)",
+         "join functional.alltypes b using (int_col, badcol)",
         "unknown column badcol for alias a ");
   }
 
@@ -641,6 +660,7 @@ public class AnalyzerTest {
     AnalyzesOk("select id from functional.testtbl where NULL OR NULL");
     AnalyzesOk("select id from functional.testtbl where NULL AND NULL");
     AnalyzesOk("select id from functional.testtbl where NOT NULL");
+    AnalyzesOk("select id from functional.testtbl where NULL");
     // bool literal predicate
     AnalyzesOk("select id from functional.testtbl where true");
     AnalyzesOk("select id from functional.testtbl where false");
@@ -657,6 +677,8 @@ public class AnalyzerTest {
   @Test
   public void TestAggregates() throws AnalysisException {
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " +
+        "from functional.testtbl");
+    AnalyzesOk("select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL) " +
         "from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",
         "aggregation function not allowed in WHERE clause");
@@ -796,6 +818,14 @@ public class AnalyzerTest {
   public void TestGroupBy() throws AnalysisException {
     AnalyzesOk("select zip, count(*) from functional.testtbl group by zip");
     AnalyzesOk("select zip + count(*) from functional.testtbl group by zip");
+    // grouping on constants is ok and doesn't require them to be in select list
+    AnalyzesOk("select count(*) from functional.testtbl group by 2*3+4");
+    AnalyzesOk("select count(*) from functional.testtbl " +
+        "group by true, false, NULL");
+    // ok for constants in select list not to be in group by list
+    AnalyzesOk("select true, NULL, 1*2+5 as a, zip, count(*) from functional.testtbl " +
+        "group by zip");
+
     // doesn't group by all non-agg select list items
     AnalysisError("select zip, count(*) from functional.testtbl",
         "select list expression not produced by aggregation output " +
@@ -830,7 +860,7 @@ public class AnalyzerTest {
     AnalysisError("select zip id, id, count(*) from functional.testtbl group by id",
         "Column id in group by clause is ambiguous");
     AnalysisError("select zip id, zip ID, count(*) from functional.testtbl group by id",
-    "Column id in group by clause is ambiguous");
+        "Column id in group by clause is ambiguous");
 
 
     // can't group by aggregate
@@ -860,7 +890,8 @@ public class AnalyzerTest {
         "from functional.alltypes group by 1");
   }
 
-  @Test public void TestAvgSubstitution() throws AnalysisException {
+  @Test
+  public void TestAvgSubstitution() throws AnalysisException {
     SelectStmt select = (SelectStmt) AnalyzesOk(
         "select avg(id) from functional.testtbl having count(id) > 0 order by avg(zip)");
     ArrayList<Expr> selectListExprs = select.getResultExprs();
@@ -878,10 +909,13 @@ public class AnalyzerTest {
     assertEquals("<slot 4> / <slot 5>", orderingExpr.toSql());
   }
 
-  @Test public void TestOrderBy() throws AnalysisException {
+  @Test
+  public void TestOrderBy() throws AnalysisException {
     AnalyzesOk("select zip, id from functional.testtbl order by zip");
     AnalyzesOk("select zip, id from functional.testtbl order by zip asc");
     AnalyzesOk("select zip, id from functional.testtbl order by zip desc");
+    AnalyzesOk("select zip, id from functional.testtbl " +
+        "order by true asc, false desc, NULL asc");
 
     // resolves ordinals
     AnalyzesOk("select zip, id from functional.testtbl order by 1");
@@ -930,7 +964,7 @@ public class AnalyzerTest {
 
   @Test
   public void TestBinaryPredicates() throws AnalysisException {
-    // AnalyzesOk("select * from functional.alltypes where bool_col != true");
+    AnalyzesOk("select * from functional.alltypes where bool_col != true");
     AnalyzesOk("select * from functional.alltypes where tinyint_col <> 1");
     AnalyzesOk("select * from functional.alltypes where smallint_col <= 23");
     AnalyzesOk("select * from functional.alltypes where int_col > 15");
@@ -944,13 +978,23 @@ public class AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where bool_col = 0");
     AnalyzesOk("select * from functional.alltypes where int_col = cast('0' as int)");
     AnalyzesOk("select * from functional.alltypes where cast(string_col as int) = 15");
+    // tests with NULL
+    AnalyzesOk("select * from functional.alltypes where bool_col != NULL");
+    AnalyzesOk("select * from functional.alltypes where tinyint_col <> NULL");
+    AnalyzesOk("select * from functional.alltypes where smallint_col <= NULL");
+    AnalyzesOk("select * from functional.alltypes where int_col > NULL");
+    AnalyzesOk("select * from functional.alltypes where bigint_col >= NULL");
+    AnalyzesOk("select * from functional.alltypes where float_col < NULL");
+    AnalyzesOk("select * from functional.alltypes where double_col > NULL");
+    AnalyzesOk("select * from functional.alltypes where string_col = NULL");
+    AnalyzesOk("select * from functional.alltypes where timestamp_col = NULL");
     // invalid casts
     AnalysisError("select * from functional.alltypes where bool_col = '15'",
         "operands are not comparable: bool_col = '15'");
-    //AnalysisError("select * from functional.alltypes where date_col = 15",
-        //"operands are not comparable: date_col = 15");
-    //AnalysisError("select * from functional.alltypes where datetime_col = 1.0",
-        //"operands are not comparable: datetime_col = 1.0");
+    // AnalysisError("select * from functional.alltypes where date_col = 15",
+    // "operands are not comparable: date_col = 15");
+    // AnalysisError("select * from functional.alltypes where datetime_col = 1.0",
+    // "operands are not comparable: datetime_col = 1.0");
   }
 
   @Test
@@ -998,11 +1042,11 @@ public class AnalyzerTest {
     // We need to add 1 to MIN_VALUE because there are no negative integer literals.
     // The reason is that whether a minus belongs to an
     // arithmetic expr or a literal must be decided by the parser, not the lexer.
-    AnalyzesOk("select 1 | cast('" + Long.toString(Long.MIN_VALUE+1)  + "' as bigint)");
+    AnalyzesOk("select 1 | cast('" + Long.toString(Long.MIN_VALUE + 1) + "' as bigint)");
     AnalyzesOk("select 1 | cast('" + Long.toString(Long.MAX_VALUE) + "' as bigint)");
     // Cast to numeric never overflow
     AnalyzesOk("select * from functional.alltypes where tinyint_col = " +
-                "cast('" + Long.toString(Long.MIN_VALUE) + "1' as tinyint)");
+        "cast('" + Long.toString(Long.MIN_VALUE) + "1' as tinyint)");
     AnalyzesOk("select * from functional.alltypes where tinyint_col = " +
         "cast('" + Long.toString(Long.MAX_VALUE) + "1' as tinyint)");
     AnalyzesOk("select * from functional.alltypes where tinyint_col = " +
@@ -1015,6 +1059,27 @@ public class AnalyzerTest {
     // Cast never raise analysis exception
     AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('--1' as tinyint)");
+  }
+
+  /**
+   * Tests that cast(null to type) returns type for all types.
+   */
+  @Test
+  public void TestNullCasts() throws AnalysisException {
+   for (PrimitiveType type: PrimitiveType.values()) {
+     // Cannot cast to INVALID_TYPE, NULL_TYPE or unsupported types.
+     if (!type.isValid() || type.isNull() || !type.isSupported()) {
+       continue;
+     }
+     checkExprType("select cast(null as " + type + ")", type);
+   }
+  }
+
+  // Analyzes query and asserts that the first result expr returns the given type.
+  // Requires query to parse to a SelectStmt.
+  private void checkExprType(String query, PrimitiveType type) {
+    SelectStmt select = (SelectStmt) AnalyzesOk(query);
+    assertEquals(select.getResultExprs().get(0).getType(), type);
   }
 
   @Test
@@ -1032,6 +1097,16 @@ public class AnalyzerTest {
         "left operand of LIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where string_col regexp 'test]['",
         "invalid regular expression in 'string_col REGEXP 'test][''");
+    // Test NULLs.
+    String[] likePreds = new String[] {"LIKE", "RLIKE", "REGEXP"};
+    for (String likePred: likePreds) {
+      AnalyzesOk(String.format("select * from functional.alltypes " +
+          "where string_col %s NULL", likePred));
+      AnalyzesOk(String.format("select * from functional.alltypes " +
+          "where NULL %s string_col", likePred));
+      AnalyzesOk(String.format("select * from functional.alltypes " +
+          "where NULL %s NULL", likePred));
+    }
   }
 
   @Test
@@ -1041,18 +1116,30 @@ public class AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where " +
         "string_col = '5' or int_col = 5");
     AnalyzesOk("select * from functional.alltypes where (string_col = '5' " +
-               "or int_col = 5) and string_col > '1'");
+        "or int_col = 5) and string_col > '1'");
     AnalyzesOk("select * from functional.alltypes where not string_col = '5'");
     AnalyzesOk("select * from functional.alltypes where int_col = cast('5' as int)");
+    // test NULLs
+    AnalyzesOk("select * from functional.alltypes where NULL and NULL");
+    AnalyzesOk("select * from functional.alltypes where NULL or NULL");
+    AnalyzesOk("select * from functional.alltypes where not NULL");
+    // arithmetic exprs as operands to compound predicates should fail to analyze
+    AnalysisError("select * from functional.alltypes where 1 + 2 and false",
+        "Operand '1 + 2' part of predicate '1 + 2 AND FALSE' should return " +
+            "type 'BOOLEAN' but returns type 'BIGINT'.");
+    AnalysisError("select * from functional.alltypes where 1 + 2 or true",
+        "Operand '1 + 2' part of predicate '1 + 2 OR TRUE' should return " +
+            "type 'BOOLEAN' but returns type 'BIGINT'.");
+    AnalysisError("select * from functional.alltypes where not 1 + 2",
+        "Operand '1 + 2' part of predicate 'NOT 1 + 2' should return " +
+            "type 'BOOLEAN' but returns type 'BIGINT'.");
   }
 
   @Test
   public void TestIsNullPredicates() throws AnalysisException {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
-    // TODO: add null literals (i think this would require a null type, which is
-    // compatible with anything else)
-    // AnalyzesOk("select * from functional.alltypes where null is not null");
+    AnalyzesOk("select * from functional.alltypes where null is not null");
   }
 
   @Test
@@ -1071,6 +1158,15 @@ public class AnalyzerTest {
     // Comparison expr requires implicit cast.
     AnalyzesOk("select * from functional.alltypes " +
         "where smallint_col between float_col and double_col");
+    // Test NULLs.
+    AnalyzesOk("select * from functional.alltypes " +
+        "where NULL between float_col and double_col");
+    AnalyzesOk("select * from functional.alltypes " +
+        "where smallint_col between NULL and double_col");
+    AnalyzesOk("select * from functional.alltypes " +
+        "where smallint_col between float_col and NULL");
+    AnalyzesOk("select * from functional.alltypes " +
+        "where NULL between NULL and NULL");
     // Incompatible types.
     AnalysisError("select * from functional.alltypes " +
         "where string_col between bool_col and double_col",
@@ -1101,6 +1197,12 @@ public class AnalyzerTest {
     // Comparison expr requires implicit cast.
     AnalyzesOk("select * from functional.alltypes where " +
         "int_col in (double_col, bigint_col)");
+    // Test predicates.
+    AnalyzesOk("select * from functional.alltypes where " +
+        "!true in (false or true, true and false)");
+    // Test NULLs.
+    AnalyzesOk("select * from functional.alltypes where " +
+        "NULL in (NULL, NULL)");
     // Incompatible types.
     AnalysisError("select * from functional.alltypes where " +
         "string_col in (bool_col, double_col)",
@@ -1108,6 +1210,10 @@ public class AnalyzerTest {
         "of exprs 'string_col' and 'bool_col'.");
     AnalysisError("select * from functional.alltypes where " +
         "timestamp_col in (int_col, double_col)",
+        "Incompatible return types 'TIMESTAMP' and 'INT' " +
+        "of exprs 'timestamp_col' and 'int_col'.");
+    AnalysisError("select * from functional.alltypes where " +
+        "timestamp_col in (NULL, int_col)",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
   }
@@ -1118,34 +1224,40 @@ public class AnalyzerTest {
    */
   @Test
   public void TestArithmeticTypeCasts() throws AnalysisException {
-    for (PrimitiveType type1 : PrimitiveType.getNumericTypes()) {
-      for (PrimitiveType type2 : PrimitiveType.getNumericTypes()) {
+    // test all numeric types and the null type
+    List<PrimitiveType> numericTypes =
+        new ArrayList<PrimitiveType>(PrimitiveType.getNumericTypes());
+    numericTypes.add(PrimitiveType.NULL_TYPE);
+
+    for (PrimitiveType type1 : numericTypes) {
+      for (PrimitiveType type2 : numericTypes) {
         PrimitiveType compatibleType =
             PrimitiveType.getAssignmentCompatibleType(type1, type2);
         PrimitiveType promotedType = compatibleType.getMaxResolutionType();
 
         // +, -, *
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.ADD, null,
-                      promotedType);
+            promotedType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.ADD, null,
-                      promotedType);
+            promotedType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.SUBTRACT, null,
-                      promotedType);
+            promotedType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.SUBTRACT, null,
-                      promotedType);
+            promotedType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MULTIPLY, null,
-                      promotedType);
+            promotedType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MULTIPLY, null,
-                      promotedType);
+            promotedType);
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
-                      PrimitiveType.DOUBLE);
+            PrimitiveType.DOUBLE);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
-                      PrimitiveType.DOUBLE);
+            PrimitiveType.DOUBLE);
 
         // % div, &, |, ^ only for fixed-point types
-        if (!type1.isFixedPointType() || !type2.isFixedPointType()) {
+        if ((!type1.isFixedPointType() && !type1.isNull())
+            || (!type2.isFixedPointType() && !type2.isNull())) {
           continue;
         }
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
@@ -1153,40 +1265,48 @@ public class AnalyzerTest {
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
             compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.INT_DIVIDE, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.INT_DIVIDE, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITAND, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITAND, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITOR, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITOR, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITXOR, null,
-                      compatibleType);
+            compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITXOR, null,
-                      compatibleType);
+            compatibleType);
       }
     }
 
-    for (PrimitiveType type : PrimitiveType.getFixedPointTypes()) {
+    List<PrimitiveType> fixedPointTypes = new ArrayList<PrimitiveType>(
+        PrimitiveType.getFixedPointTypes());
+    fixedPointTypes.add(PrimitiveType.NULL_TYPE);
+    for (PrimitiveType type: fixedPointTypes) {
       typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null, type);
     }
   }
 
   /**
    * Test of all type casts in comparisons following mysql's casting policy.
+   *
    * @throws AnalysisException
    */
   @Test
   public void TestComparisonTypeCasts() throws AnalysisException {
+    // test all numeric types and the null type
+    List<PrimitiveType> types =
+        new ArrayList<PrimitiveType>(PrimitiveType.getNumericTypes());
+    types.add(PrimitiveType.NULL_TYPE);
+
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
-      // test all numeric
-      for (PrimitiveType type1 : PrimitiveType.getNumericTypes()) {
-        for (PrimitiveType type2 : PrimitiveType.getNumericTypes()) {
+      for (PrimitiveType type1 : types) {
+        for (PrimitiveType type2 : types) {
           PrimitiveType compatibleType =
               PrimitiveType.getAssignmentCompatibleType(type1, type2);
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
@@ -1219,10 +1339,10 @@ public class AnalyzerTest {
     String queryStr = null;
     if (arithmeticMode) {
       queryStr = "select " + op1 + " " + arithmeticOp.toString() + " " + op2 +
-            " AS a from functional.alltypes";
+          " AS a from functional.alltypes";
     } else {
       queryStr = "select int_col from functional.alltypes " +
-            "where " + op1 + " " + cmpOp.toString() + " " + op2;
+          "where " + op1 + " " + cmpOp.toString() + " " + op2;
     }
     System.err.println(queryStr);
     SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
@@ -1237,13 +1357,18 @@ public class AnalyzerTest {
     } else {
       // check the where clause
       expr = select.getWhereClause();
-      assertEquals(PrimitiveType.BOOLEAN, expr.getType());
+      if (!expr.getType().isNull()) {
+        assertEquals(PrimitiveType.BOOLEAN, expr.getType());
+      }
     }
 
     checkCasts(expr);
-    assertEquals(opType, expr.getChild(0).getType());
+    // The children's types must be NULL or equal to the requested opType.
+    Assert.assertTrue(opType == expr.getChild(0).getType()
+        || opType.isNull() || expr.getChild(0).getType().isNull());
     if (type1 != null) {
-      assertEquals(opType, expr.getChild(1).getType());
+      Assert.assertTrue(opType == expr.getChild(1).getType()
+          || opType.isNull() || expr.getChild(1).getType().isNull());
     }
   }
 
@@ -1296,7 +1421,7 @@ public class AnalyzerTest {
   @Test
   public void TestTimestampArithmeticExpressions() {
     String[] valueTypeCols =
-      new String[] { "tinyint_col", "smallint_col", "int_col" };
+        new String[] {"tinyint_col", "smallint_col", "int_col", "NULL"};
 
     // Tests all time units.
     for (TimeUnit timeUnit : TimeUnit.values()) {
@@ -1307,6 +1432,8 @@ public class AnalyzerTest {
             " from functional.alltypes");
         AnalyzesOk("select timestamp_col - interval " + col + " " + timeUnit.toString() +
             " from functional.alltypes");
+        AnalyzesOk("select NULL - interval " + col + " " + timeUnit.toString() +
+            " from functional.alltypes");
         // Reversed interval and timestamp using addition.
         AnalyzesOk("select interval " + col + " " + timeUnit.toString() +
             " + timestamp_col from functional.alltypes");
@@ -1314,6 +1441,10 @@ public class AnalyzerTest {
         AnalyzesOk("select date_add(timestamp_col, interval " + col + " " +
             timeUnit.toString() + ") from functional.alltypes");
         AnalyzesOk("select date_sub(timestamp_col, interval " + col + " " +
+            timeUnit.toString() + ") from functional.alltypes");
+        AnalyzesOk("select date_add(NULL, interval " + col + " " +
+            timeUnit.toString() + ") from functional.alltypes");
+        AnalyzesOk("select date_sub(NULL, interval " + col + " " +
             timeUnit.toString() + ") from functional.alltypes");
       }
     }
@@ -1393,15 +1524,15 @@ public class AnalyzerTest {
         "which is incompatible with expected type 'INT'.");
     // Cast from STRING to INT.
     AnalyzesOk("select date_add(timestamp_col, interval cast('10' as int) years) " +
-       " from functional.alltypes");
+        " from functional.alltypes");
 
     // Invalid time unit. Non-function-call like version.
     AnalysisError("select timestamp_col + interval 10 error from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
-        "'timestamp_col + INTERVAL 10 error'.");
+         "'timestamp_col + INTERVAL 10 error'.");
     AnalysisError("select timestamp_col - interval 10 error from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
-        "'timestamp_col - INTERVAL 10 error'.");
+         "'timestamp_col - INTERVAL 10 error'.");
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 10 error + timestamp_col from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
@@ -1443,6 +1574,43 @@ public class AnalyzerTest {
     AnalysisError("select coalesce()");
   }
 
+  /**
+   * Tests that functions with NULL arguments get resolved properly,
+   * and that proper errors are reported when the non-null arguments
+   * cannot be cast to match a signature.
+   */
+  @Test
+  public void TestNullFunctionArguments() {
+    // Test fixed arg functions using 'substring' as representative.
+    AnalyzesOk("select substring(NULL, 1, 2)");
+    AnalyzesOk("select substring('a', NULL, 2)");
+    AnalyzesOk("select substring('a', 1, NULL)");
+    AnalyzesOk("select substring(NULL, NULL, NULL)");
+    // Cannot cast non-null args to match a signature.
+    AnalysisError("select substring(1, NULL, NULL)",
+        "No matching function with those arguments: " +
+            "substring (TINYINT, NULL_TYPE, NULL_TYPE)");
+    AnalysisError("select substring(NULL, 'a', NULL)",
+        "No matching function with those arguments: " +
+            "substring (NULL_TYPE, STRING, NULL_TYPE)");
+
+    // Test vararg functions with 'concat' as representative.
+    AnalyzesOk("select concat(NULL, 'a', 'b')");
+    AnalyzesOk("select concat('a', NULL, 'b')");
+    AnalyzesOk("select concat('a', 'b', NULL)");
+    AnalyzesOk("select concat(NULL, NULL, NULL)");
+    // Cannot cast non-null args to match a signature.
+    AnalysisError("select concat(NULL, 1, 'b')",
+        "No matching function with those arguments: " +
+            "concat (NULL_TYPE, TINYINT, STRING)");
+    AnalysisError("select concat('a', NULL, 1)",
+        "No matching function with those arguments: " +
+            "concat (STRING, NULL_TYPE, TINYINT)");
+    AnalysisError("select concat(1, 'b', NULL)",
+        "No matching function with those arguments: " +
+            "concat (TINYINT, STRING, NULL_TYPE)");
+  }
+
   @Test
   public void TestCaseExpr() throws AnalysisException {
     // No case expr.
@@ -1464,7 +1632,7 @@ public class AnalyzerTest {
     AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then timestamp_col " +
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
         "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
-        "of exprs '20' and 'timestamp_col'.");
+         "of exprs '20' and 'timestamp_col'.");
 
     // With case expr.
     AnalyzesOk("select case int_col when 20 then 30 else 15 end " +
@@ -1490,7 +1658,7 @@ public class AnalyzerTest {
     AnalysisError("select case bigint_col when int_col then 30 " +
         "when double_col then timestamp_col else 15 end from functional.alltypes",
         "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
-        "of exprs '30' and 'timestamp_col'.");
+         "of exprs '30' and 'timestamp_col'.");
 
     // Test different type classes (all types are tested in BE tests).
     AnalyzesOk("select case when true then 1 end");
@@ -1498,6 +1666,12 @@ public class AnalyzerTest {
     AnalyzesOk("select case when true then 'abc' end");
     AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' " +
         "as timestamp) end");
+    // Test NULLs.
+    AnalyzesOk("select case NULL when 1 then 2 else 3 end");
+    AnalyzesOk("select case 1 when NULL then 2 else 3 end");
+    AnalyzesOk("select case 1 when 2 then NULL else 3 end");
+    AnalyzesOk("select case 1 when 2 then 3 else NULL end");
+    AnalyzesOk("select case NULL when NULL then NULL else NULL end");
   }
 
   @Test
@@ -1506,6 +1680,11 @@ public class AnalyzerTest {
     AnalyzesOk("select if(1 != 2, false, false)");
     AnalyzesOk("select if(bool_col, false, true) from functional.alltypes");
     AnalyzesOk("select if(bool_col, int_col, double_col) from functional.alltypes");
+    // Test NULLs.
+    AnalyzesOk("select if(NULL, false, true) from functional.alltypes");
+    AnalyzesOk("select if(bool_col, NULL, true) from functional.alltypes");
+    AnalyzesOk("select if(bool_col, false, NULL) from functional.alltypes");
+    AnalyzesOk("select if(NULL, NULL, NULL) from functional.alltypes");
 
     // if() only accepts three arguments
     AnalysisError("select if(true, false, true, true)",
@@ -1540,6 +1719,13 @@ public class AnalyzerTest {
     // Make sure table aliases aren't visible across union operands.
     AnalyzesOk("select a.smallint_col from functional.alltypes a " +
         "union select a.int_col from functional.alltypessmall a");
+    // All columns compatible with NULL.
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from functional.alltypes union " +
+        "select NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL, NULL, NULL, NULL, NULL, NULL," +
+        "NULL from functional.alltypes");
 
     // No from clause. Has literals and NULLs. Requires implicit casts.
     AnalyzesOk("select 1, 2, 3 " +
@@ -1597,14 +1783,14 @@ public class AnalyzerTest {
     AnalysisError("select bool_col from functional.alltypes " +
         "union select string_col from functional.alltypes",
         "Incompatible return types 'BOOLEAN' and 'STRING' " +
-        "of exprs 'bool_col' and 'string_col'.");
+            "of exprs 'bool_col' and 'string_col'.");
     // Incompatible types, longer union chain.
     AnalysisError("select int_col, string_col from functional.alltypes " +
         "union select tinyint_col, bool_col from functional.alltypes " +
         "union select smallint_col, int_col from functional.alltypes " +
         "union select smallint_col, bool_col from functional.alltypes",
         "Incompatible return types 'STRING' and 'BOOLEAN' of " +
-        "exprs 'string_col' and 'bool_col'.");
+            "exprs 'string_col' and 'bool_col'.");
     // Invalid ordinal in order by.
     AnalysisError("(select int_col from functional.alltypes) " +
         "union (select int_col from functional.alltypessmall) order by 2",
@@ -1751,7 +1937,7 @@ public class AnalyzerTest {
 
     AnalysisError("alter table functional.alltypes drop column year",
         "Cannot drop partition column: year");
-    
+
     // Tables should always have at least 1 column
     AnalysisError("alter table functional_seq_snap.bad_seq_snap drop column field",
         "Cannot drop column 'field' from functional_seq_snap.bad_seq_snap. " +
@@ -1783,7 +1969,7 @@ public class AnalyzerTest {
 
     AnalysisError("alter table functional.alltypes change column int_col Tinyint_col int",
         "Column already exists: Tinyint_col");
-    
+
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
         "Unknown database: db_does_not_exist");
@@ -1799,9 +1985,9 @@ public class AnalyzerTest {
                "set location '/a/b'");
     AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
                "set fileformat parquetfile");
-    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " + 
+    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='partition1') set fileformat parquetfile");
-    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " + 
+    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='PaRtiTion1') set location '/a/b/c'");
 
     // Partition spec does not exist
@@ -1820,10 +2006,10 @@ public class AnalyzerTest {
     AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
                   "set location '/a/b/c'",
                   "Table is not partitioned: functional.alltypesnopart");
-    AnalysisError("alter table functional.stringpartitionkey PARTITION " + 
+    AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set location '/a/b'",
                   "No matching partition spec found: (string_col='partition2')");
-    AnalysisError("alter table functional.stringpartitionkey PARTITION " + 
+    AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set fileformat sequencefile",
                   "No matching partition spec found: (string_col='partition2')");
 
@@ -1859,7 +2045,7 @@ public class AnalyzerTest {
     AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
         "Unknown database: db_does_not_exist");
   }
-  
+
   @Test
   public void TestDrop() throws AnalysisException {
     AnalyzesOk("drop database functional");
@@ -1954,6 +2140,12 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, " +
         "string_col, timestamp_col, NULL, NULL from functional.alltypes");
+    // Fully dynamic partitions with NULL partition keys and column values.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year, month)" +
+        "select NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL from functional.alltypes");
     // Fully dynamic partitions. Order of corresponding select list items doesn't matter,
     // as long as they appear at the very end of the select list.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
@@ -1967,9 +2159,21 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col, month " +
         "from functional.alltypes");
+    // Partially dynamic partitions with NULL static partition key value.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=NULL, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year from " +
+        "functional.alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year from " +
+        "functional.alltypes");
+    // Partially dynamic partitions with NULL static partition key value.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col, year from " +
         "functional.alltypes");
@@ -2004,8 +2208,8 @@ public class AnalyzerTest {
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
-        "The select list items corresponding to dynamic partition keys " +
-        "must be at the end of the select list.");
+            "The select list items corresponding to dynamic partition keys " +
+            "must be at the end of the select list.");
     // No corresponding select list items of partially dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month)" +
@@ -2013,8 +2217,8 @@ public class AnalyzerTest {
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'month'.\n" +
-        "The select list items corresponding to dynamic partition keys " +
-        "must be at the end of the select list.");
+            "The select list items corresponding to dynamic partition keys " +
+            "must be at the end of the select list.");
     // No corresponding select list items of partially dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month=4)" +
@@ -2022,24 +2226,24 @@ public class AnalyzerTest {
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
-        "The select list items corresponding to dynamic partition keys " +
-        "must be at the end of the select list.");
+            "The select list items corresponding to dynamic partition keys " +
+            "must be at the end of the select list.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
-        "compatible.\n" +
-        "Target table expects 11 columns but the select statement returns 13.");
+            "compatible.\n" +
+            "Target table expects 11 columns but the select statement returns 13.");
     // Select '*' includes partitioning columns
     // but they don't appear at the end of the select list.
     AnalysisError("insert " + qualifier +
         " table functional.alltypessmall partition (year, month)" +
         "select * from functional.alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
-        "compatible.\n" +
-        "Incompatible types 'INT' and 'STRING' in column " +
-        "'functional.alltypes.string_col'.");
+            "compatible.\n" +
+            "Incompatible types 'INT' and 'STRING' in column " +
+            "'functional.alltypes.string_col'.");
   }
 
   /**
@@ -2058,6 +2262,11 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from " +
         "functional.alltypes");
+    // All NULL column values.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart " +
+        "select NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL, NULL, NULL, NULL, NULL " +
+        "from functional.alltypes");
 
     String hbaseQuery =  "INSERT " + qualifier + " TABLE " +
         "functional.hbaseinsertalltypesagg select id, bigint_col, bool_col, " +
@@ -2088,6 +2297,18 @@ public class AnalyzerTest {
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
+    // Static partition with NULL partition keys.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=NULL, month=NULL)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
+    // Static partition with NULL column values.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=NULL, month=NULL)" +
+        "select NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL, NULL, NULL, NULL, NULL " +
         "from functional.alltypes");
     // Static partition with NULL partition keys.
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
@@ -2204,7 +2425,7 @@ public class AnalyzerTest {
         "Unsupported type 'BINARY' in 'bin_col'.");
     // Mixed supported/unsupported types.
     AnalysisError("select int_col, dec_col, str_col, bin_col " +
-    		"from functional.unsupported_types",
+        "from functional.unsupported_types",
         "Unsupported type 'DECIMAL' in 'dec_col'.");
   }
 

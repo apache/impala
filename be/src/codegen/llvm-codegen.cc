@@ -260,6 +260,8 @@ string LlvmCodeGen::GetIR(bool full_module) const {
 
 Type* LlvmCodeGen::GetType(PrimitiveType type) {
   switch (type) {
+    case TYPE_NULL:
+      return Type::getInt1Ty(context());
     case TYPE_BOOLEAN:
       return Type::getInt1Ty(context());
     case TYPE_TINYINT:
@@ -299,6 +301,8 @@ Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, void* ptr) {
 
 Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
   switch (type) {
+    case TYPE_NULL:
+      return ConstantInt::get(context(), APInt(8, val));
     case TYPE_TINYINT:
       return ConstantInt::get(context(), APInt(8, val));
     case TYPE_SMALLINT:
@@ -628,6 +632,9 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
 
   Value* compare = NULL;
   switch (type) {
+    case TYPE_NULL:
+      compare = false_value();
+      break;
     case TYPE_BOOLEAN:
       if (min) {
         // For min, return x && y
@@ -683,6 +690,8 @@ Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
     return NULL;
   }
   switch (type) {
+    case TYPE_NULL:
+      return false_value();
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:

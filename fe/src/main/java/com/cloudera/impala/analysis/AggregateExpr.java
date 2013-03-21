@@ -173,18 +173,18 @@ public class AggregateExpr extends Expr {
     Expr arg = (Expr) getChild(0);
 
     // SUM and AVG cannot be applied to non-numeric types
-    if (op == Operator.SUM && !arg.type.isNumericType()) {
+    if (op == Operator.SUM && !arg.type.isNumericType() && !arg.type.isNull()) {
         throw new AnalysisException(
                       "SUM requires a numeric parameter: " + this.toSql());
     }
-    if (op == Operator.AVG &&
-        (!arg.type.isNumericType() && arg.type != PrimitiveType.TIMESTAMP)) {
+    if (op == Operator.AVG && !arg.type.isNumericType()
+        && arg.type != PrimitiveType.TIMESTAMP && !arg.type.isNull()) {
       throw new AnalysisException(
                     "AVG requires a numeric or timestamp parameter: " + this.toSql());
     }
 
     if ((op == Operator.MERGE_PC || op == Operator.MERGE_PCSA)
-        && !arg.type.isStringType()) {
+        && !arg.type.isStringType() && !arg.type.isNull()) {
       Preconditions.checkState(false,
           "MERGEPC(SA) expects string type input but gets " +
           arg.type.toString());

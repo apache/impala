@@ -60,6 +60,8 @@ bool ParseString(const string& str, T* val) {
 
 void* ExprValue::TryParse(const string& str, PrimitiveType type) {
   switch(type) {
+    case TYPE_NULL:
+      return NULL;
     case TYPE_BOOLEAN:
       if (ParseString<bool>(str, &bool_val)) return &bool_val;
       break;
@@ -125,10 +127,13 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_ex
 }
 
 Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data) {
-  DCHECK(data != NULL);
+  DCHECK(type == TYPE_NULL || data != NULL);
   Expr* result = NULL;
 
   switch (type) {
+    case TYPE_NULL:
+      result = new NullLiteral(TYPE_NULL);
+      break;
     case TYPE_BOOLEAN:
       result = new BoolLiteral(*reinterpret_cast<bool*>(data));
       break;
@@ -158,6 +163,9 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
   Expr* result = NULL;
 
   switch (type) {
+    case TYPE_NULL:
+      result = new NullLiteral(TYPE_NULL);
+      break;
     case TYPE_BOOLEAN:
       if (ParseString<bool>(str, &val.bool_val))
         result = new BoolLiteral(&val.bool_val);
@@ -601,7 +609,7 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", 
-        codegen->GetPtrType(TYPE_BOOLEAN)));
+        codegen->GetPtrType(TYPE_NULL)));
 
   Function* function = prototype.GeneratePrototype();
   DCHECK(function != NULL);
@@ -611,6 +619,8 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
 
 Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
   switch (type()) {
+    case TYPE_NULL:
+      return ConstantInt::get(codegen->context(), APInt(1, 0, true));
     case TYPE_BOOLEAN:
       return ConstantInt::get(codegen->context(), APInt(1, 0, true));
     case TYPE_TINYINT:
@@ -680,6 +690,10 @@ void* Expr::EvalCodegendComputeFn(Expr* expr, TupleRow* row) {
   void* result = NULL;
   bool is_null = false;
   switch (expr->type()) {
+    case TYPE_NULL: {
+      is_null = true;
+      break;
+    }
     case TYPE_BOOLEAN: {
       BoolComputeFn new_func = reinterpret_cast<BoolComputeFn>(func);
       expr->result_.bool_val = new_func(row, NULL, &is_null);

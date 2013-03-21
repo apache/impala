@@ -195,7 +195,6 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.error), "ERROR");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
     tokenIdMap.put(new Integer(SqlParserSymbols.NUMERIC_OVERFLOW), "NUMERIC OVERFLOW");
-    tokenIdMap.put(new Integer(SqlParserSymbols.BOOL_LITERAL), "BOOL LITERAL");
   }
   
   public static boolean isKeyword(Integer tokenId) {        

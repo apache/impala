@@ -20,6 +20,7 @@ import com.cloudera.impala.thrift.TBoolLiteral;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 
+// TODO: Decide between keeping only this class or only BoolLiteral and NullLiteral.
 public class BoolLiteral extends LiteralExpr {
   private final boolean value;
 

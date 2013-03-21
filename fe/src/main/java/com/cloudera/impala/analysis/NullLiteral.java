@@ -18,10 +18,10 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 
+// TODO: Decide between keeping only this class or only BoolLiteral and NullLiteral.
 public class NullLiteral extends LiteralExpr {
   public NullLiteral() {
-    // TODO: should NULL be a type?
-    type = PrimitiveType.BOOLEAN;
+    type = PrimitiveType.NULL_TYPE;
   }
 
   @Override

@@ -587,12 +587,6 @@ public class Analyzer {
    * lastCompatibleExpr is passed for error reporting purposes,
    * but note that lastCompatibleExpr may not yet have lastCompatibleType,
    * because it was not cast yet.
-   *
-   * @param lastCompatibleType
-   * @param expr
-   * @param lastExprIndex
-   * @return
-   * @throws AnalysisException
    */
   public PrimitiveType getCompatibleType(PrimitiveType lastCompatibleType,
       Expr lastCompatibleExpr, Expr expr)
@@ -617,9 +611,6 @@ public class Analyzer {
    * Calls analyze() on each of the exprs.
    * Throw an AnalysisException if the types are incompatible,
    * returns compatible type otherwise.
-   *
-   * @param exprs
-   * @throws AnalysisException
    */
   public PrimitiveType castAllToCompatibleType(List<Expr> exprs)
       throws AnalysisException {
@@ -628,8 +619,8 @@ public class Analyzer {
     PrimitiveType compatibleType = null;
     for (int i = 0; i < exprs.size(); ++i) {
       exprs.get(i).analyze(this);
-      compatibleType = getCompatibleType(compatibleType,
-          lastCompatibleExpr, exprs.get(i));
+      compatibleType = getCompatibleType(compatibleType, lastCompatibleExpr,
+          exprs.get(i));
     }
     // Add implicit casts if necessary.
     for (int i = 0; i < exprs.size(); ++i) {

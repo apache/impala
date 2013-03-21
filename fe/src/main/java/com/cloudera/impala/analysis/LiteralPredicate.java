@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TLiteralPredicate;
@@ -39,6 +41,12 @@ public class LiteralPredicate extends Predicate {
     this.value = val;
     this.isNull = isNull;
     this.selectivity = (isNull || !val ? 0 : 1);
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+    type = (isNull) ? PrimitiveType.NULL_TYPE : PrimitiveType.BOOLEAN;
   }
 
   public boolean isNull() {

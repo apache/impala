@@ -539,6 +539,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public final Expr castTo(PrimitiveType targetType) throws AnalysisException {
     PrimitiveType type = PrimitiveType.getAssignmentCompatibleType(this.type, targetType);
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type, targetType);
+    // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
+    // is compatible with all types and no cast is necessary.
+    if (targetType.isNull()) {
+      return this;
+    }
     // requested cast must be to assignment-compatible type
     // (which implies no loss of precision)
     Preconditions.checkArgument(type == targetType);

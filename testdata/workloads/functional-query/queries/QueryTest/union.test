@@ -706,7 +706,7 @@ select 2, 'b', NULL, 20.0f
 union all
 select 3, 'c', NULL, 30.0f
 ---- TYPES
-tinyint, string, boolean, float
+tinyint, string, null, float
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0
@@ -720,7 +720,7 @@ select 2, 'b', NULL, 20.0f
 union distinct
 select 1, 'a', NULL, 10.0f
 ---- TYPES
-tinyint, string, boolean, float
+tinyint, string, null, float
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0

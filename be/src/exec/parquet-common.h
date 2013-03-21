@@ -28,6 +28,7 @@ const uint32_t PARQUET_CURRENT_VERSION = 1;
 // PrimitiveType enum
 const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = { 
   parquet::Type::BOOLEAN,     // Invalid
+  parquet::Type::BOOLEAN,     // NULL type
   parquet::Type::BOOLEAN,
   parquet::Type::INT32,
   parquet::Type::INT32,

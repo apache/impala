@@ -84,16 +84,19 @@ public class LikePredicate extends Predicate {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (getChild(0).getType() != PrimitiveType.STRING) {
+    if (getChild(0).getType() != PrimitiveType.STRING
+        && !getChild(0).getType().isNull()) {
       throw new AnalysisException(
-          "left operand of " + op.toString() + " must be of type STRING: " + this.toSql());
+          "left operand of " + op.toString() + " must be of type STRING: " + toSql());
     }
-    if (getChild(1).getType() != PrimitiveType.STRING) {
+    if (getChild(1).getType() != PrimitiveType.STRING
+        && !getChild(1).getType().isNull()) {
       throw new AnalysisException(
-          "right operand of " + op.toString() + " must be of type STRING: " + this.toSql());
+          "right operand of " + op.toString() + " must be of type STRING: " + toSql());
     }
 
-    if (getChild(1).isLiteral() && (op == Operator.RLIKE || op == Operator.REGEXP)) {
+    if (!getChild(1).getType().isNull() && getChild(1).isLiteral()
+        && (op == Operator.RLIKE || op == Operator.REGEXP)) {
       // let's make sure the pattern works
       // TODO: this checks that it's a Java-supported regex, but the syntax supported
       // by the backend is Posix; add a call to the backend to check the re syntax

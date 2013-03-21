@@ -125,9 +125,22 @@ void* LikePredicate::RegexFn(Expr* e, TupleRow* row) {
 Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
   DCHECK_EQ(children_.size(), 2);
+  switch (opcode_) {
+    case TExprOpcode::LIKE:
+      compute_fn_ = LikeFn;
+      break;
+    case TExprOpcode::REGEX:
+      compute_fn_ = RegexFn;
+      break;
+    default:
+      stringstream error;
+      error << "Invalid LIKE operator: " << opcode_;
+      return Status(error.str());
+  }
   if (GetChild(1)->IsConstant()) {
     // determine pattern and decide on eval fn
     StringValue* pattern = static_cast<StringValue*>(GetChild(1)->GetValue(NULL));
+    if (pattern == NULL) return Status::OK;
     string pattern_str(pattern->ptr, pattern->len);
     // Generate a regex search to look for simple patterns: 
     // - "%anything%": This maps to a fast substring search implementation. 
@@ -181,19 +194,6 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
       return Status("Invalid regular expression: " + pattern_str);
     }
     compute_fn_ = ConstantRegexFn;
-  } else {
-    switch (opcode_) {
-      case TExprOpcode::LIKE:
-        compute_fn_ = LikeFn;
-        break;
-      case TExprOpcode::REGEX:
-        compute_fn_ = RegexFn;
-        break;
-      default:
-        stringstream error;
-        error << "Invalid LIKE operator: " << opcode_;
-        return Status(error.str());
-    }
   }
   return Status::OK;
 }
