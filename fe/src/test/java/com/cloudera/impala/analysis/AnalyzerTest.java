@@ -1631,6 +1631,167 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestAlterTableAddPartition() throws AnalysisException {
+    // Add different partitions for different column types
+    AnalyzesOk("alter table functional.alltypes add partition(year=2050, month=10)");
+    AnalyzesOk("alter table functional.alltypes add partition(month=10, year=2050)");
+    AnalyzesOk(
+        "alter table functional.insert_string_partitioned add partition(s2='1234')");
+
+    // Can't add partitions to unpartitioned tables
+    AnalysisError("alter table functional.alltypesnopart add partition (i=1)",
+        "Table is not partitioned: functional.alltypesnopart");
+    AnalysisError("alter table functional.hbasealltypesagg add partition (i=1)",
+        "Table is not partitioned: functional.hbasealltypesagg");
+
+    // Duplicate partition key
+    AnalysisError("alter table functional.alltypes add partition(year=2050, year=2051)",
+        "Duplicate partition key name: year");
+    // Not a partition column
+    AnalysisError("alter table functional.alltypes add partition(year=2050, int_col=1)",
+        "Column 'int_col' is not a partition column in table: functional.alltypes");
+
+    // Not a valid column
+    AnalysisError("alter table functional.alltypes add partition(year=2050, blah=1)",
+        "Partition column 'blah' not found in table: functional.alltypes");
+
+    // Data types don't match
+    AnalysisError(
+        "alter table functional.insert_string_partitioned add partition(s2=1234)",
+        "Target table not compatible.\nIncompatible types 'STRING' and 'SMALLINT' " +
+        "in column 's2'");
+
+    // Loss of precision
+    AnalysisError(
+        "alter table functional.alltypes add partition(year=100000000000, month=10)",
+        "Partition key value may result in loss of precision.\nWould need to cast" +
+        " '100000000000' to 'INT' for partition column: year");
+
+
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes add partition (i=1)",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist add partition (i=1)",
+        "Unknown table: functional.table_does_not_exist");
+  }
+
+  @Test
+  public void TestAlterTableAddReplaceColumns() throws AnalysisException {
+    AnalyzesOk("alter table functional.alltypes add columns (new_col int)");
+    AnalyzesOk("alter table functional.alltypes add columns (c1 string comment 'hi')");
+    AnalyzesOk(
+        "alter table functional.alltypes replace columns (c1 int comment 'c', c2 int)");
+
+    // Column name must be unique for add
+    AnalysisError("alter table functional.alltypes add columns (int_col int)",
+        "Column already exists: int_col");
+    // Add a column with same name as a partition column
+    AnalysisError("alter table functional.alltypes add columns (year int)",
+        "Column name conflicts with existing partition column: year");
+
+    // Replace should not throw an error if the column already exists
+    AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
+    // It is not possible to replace a partition column
+    AnalysisError("alter table functional.alltypes replace columns (Year int)",
+        "Column name conflicts with existing partition column: year");
+
+    // Duplicate column names
+    AnalysisError("alter table functional.alltypes add columns (c1 int, c1 int)",
+        "Duplicate column name: c1");
+
+    AnalysisError("alter table functional.alltypes replace columns (c1 int, C1 int)",
+        "Duplicate column name: c1");
+
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes add columns (i int)",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist add columns (i int)",
+        "Unknown table: functional.table_does_not_exist");
+  }
+
+  @Test
+  public void TestAlterTableDropColumn() throws AnalysisException {
+    AnalyzesOk("alter table functional.alltypes drop column int_col");
+
+    AnalysisError("alter table functional.alltypes drop column no_col",
+        "Column 'no_col' does not exist in table: functional.alltypes");
+
+    AnalysisError("alter table functional.alltypes drop column year",
+        "Cannot drop partition column: year");
+    
+    // Tables should always have at least 1 column
+    AnalysisError("alter table functional_seq_snap.bad_seq_snap drop column field",
+        "Cannot drop column 'field' from functional_seq_snap.bad_seq_snap. " +
+        "Tables must contain at least 1 column.");
+
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes drop column col1",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist drop column col1",
+        "Unknown table: functional.table_does_not_exist");
+  }
+
+  @Test
+  public void TestAlterTableChangeColumn() throws AnalysisException {
+    // Rename a column
+    AnalyzesOk("alter table functional.alltypes change column int_col int_col2 int");
+    // Rename and change the datatype
+    AnalyzesOk("alter table functional.alltypes change column int_col c2 string");
+    // Change only the datatype
+    AnalyzesOk("alter table functional.alltypes change column int_col int_col tinyint");
+    // Add a comment to a column.
+    AnalyzesOk("alter table functional.alltypes change int_col int_col int comment 'c'");
+
+    AnalysisError("alter table functional.alltypes change column no_col c1 int",
+        "Column 'no_col' does not exist in table: functional.alltypes");
+
+    AnalysisError("alter table functional.alltypes change column year year int",
+        "Cannot modify partition column: year");
+
+    AnalysisError("alter table functional.alltypes change column int_col Tinyint_col int",
+        "Column already exists: Tinyint_col");
+    
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist change c1 c2 double",
+        "Unknown table: functional.table_does_not_exist");
+  }
+
+  @Test
+  public void TestAlterTableSet() throws AnalysisException {
+    AnalyzesOk("alter table functional.alltypes set fileformat sequencefile");
+    AnalyzesOk("alter table functional.alltypes set location '/a/b'");
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes set fileformat sequencefile",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist set fileformat rcfile",
+        "Unknown table: functional.table_does_not_exist");
+    AnalysisError("alter table db_does_not_exist.alltypes set location '/a/b'",
+        "Unknown database: db_does_not_exist");
+    AnalysisError("alter table functional.table_does_not_exist set location '/a/b'",
+        "Unknown table: functional.table_does_not_exist");
+  }
+
+  @Test
+  public void TestAlterTableRename() throws AnalysisException {
+    AnalyzesOk("alter table functional.alltypes rename to new_alltypes");
+    AnalyzesOk("alter table functional.alltypes rename to functional.new_alltypes");
+    AnalysisError("alter table functional.alltypes rename to functional.alltypes",
+        "Table already exists: functional.alltypes");
+    AnalysisError("alter table functional.alltypes rename to functional.alltypesagg",
+        "Table already exists: functional.alltypesagg");
+
+    AnalysisError("alter table functional.table_does_not_exist rename to new_table",
+        "Unknown table: functional.table_does_not_exist");
+    AnalysisError("alter table db_does_not_exist.alltypes rename to new_table",
+        "Unknown database: db_does_not_exist");
+
+    AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
+        "Unknown database: db_does_not_exist");
+  }
+  
+  @Test
   public void TestDrop() throws AnalysisException {
     AnalyzesOk("drop database functional");
     AnalyzesOk("drop table functional.alltypes");

@@ -81,6 +81,11 @@ class DateLiteral extends LiteralExpr {
 
   @Override
   public String toSql() {
+    return getStringValue();
+  }
+
+  @Override
+  public String getStringValue() {
     return acceptedFormat.format(value);
   }
 

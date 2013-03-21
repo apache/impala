@@ -69,6 +69,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -149,6 +150,10 @@ public class Frontend {
           new TColumnDesc("name", TPrimitiveType.STRING),
           new TColumnDesc("type", TPrimitiveType.STRING),
           new TColumnDesc("comment", TPrimitiveType.STRING)));
+    } else if (analysis.isAlterTableStmt()) {
+      ddl.ddl_type = TDdlType.ALTER_TABLE;
+      ddl.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateTableStmt()) {
       ddl.ddl_type = TDdlType.CREATE_TABLE;
       ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
@@ -173,6 +178,82 @@ public class Frontend {
 
     result.setResult_set_metadata(metadata);
     result.setDdl_exec_request(ddl);
+  }
+
+  /**
+   * Appends one or more columns to the given table, optionally replacing all existing
+   * columns.
+   */
+  public void alterTableAddReplaceCols(TableName tableName, List<TColumnDef> columns,
+      boolean replaceExistingCols)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableAddReplaceCols(tableName, columns, replaceExistingCols);
+  }
+
+  /**
+   * Adds a new partition to an existing table.
+   */
+  public void alterTableAddPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, String location, boolean ifNotExists)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableAddPartition(tableName, partitionSpec, location, ifNotExists);
+  }
+
+  /**
+   * Drops a column from an existing table.
+   */
+  public void alterTableDropCol(TableName tableName, String colName)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableDropCol(tableName, colName);
+  }
+
+  /**
+   * Drops a partition from an existing table.
+   */
+  public void alterTableDropPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, boolean ifExists)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableDropPartition(tableName, partitionSpec, ifExists);
+  }
+
+  /**
+   * Changes the column definition of an existing column.
+   */
+  public void alterTableChangeCol(TableName tableName, String colName,
+      TColumnDef newColDef) throws MetaException, org.apache.thrift.TException,
+      InvalidObjectException, ImpalaException, TableLoadingException {
+    catalog.alterTableChangeCol(tableName, colName, newColDef);
+  }
+
+  /**
+   * Renames a table.
+   */
+  public void alterTableRename(TableName tableName, TableName newTableName)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableRename(tableName, newTableName);
+  }
+
+  /**
+   * Changes the file format for the given table.
+   */
+  public void alterTableSetFileFormat(TableName tableName, FileFormat fileFormat)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableSetFileFormat(tableName, fileFormat);
+  }
+
+  /**
+   * Changes the HDFS storage location for the given table.
+   */
+  public void alterTableSetLocation(TableName tableName, String location)
+      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.alterTableSetLocation(tableName, location);
   }
 
   /**

@@ -53,6 +53,11 @@ public class BoolLiteral extends LiteralExpr {
 
   @Override
   public String toSql() {
+    return getStringValue();
+  }
+
+  @Override
+  public String getStringValue() {
     return value ? "TRUE" : "FALSE";
   }
 

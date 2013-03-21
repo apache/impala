@@ -165,18 +165,19 @@ parser code {:
   }
 :};
 
-terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
-  KW_CASE, KW_CAST, KW_CREATE, KW_COMMENT, KW_COUNT, KW_DATABASE, KW_DATABASES, KW_DATE,
-  KW_DATETIME, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
-  KW_DELIMITED, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_EXISTS, KW_EXTERNAL, KW_FALSE,
-  KW_FIELDS, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING, KW_IF, KW_IS,
+terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT,
+  KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_CREATE, KW_COLUMN, KW_COLUMNS,
+  KW_COMMENT, KW_COUNT, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DESC,
+  KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV, KW_DELIMITED,
+  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_EXISTS, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
+  KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING, KW_IF, KW_IS,
   KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOCATION,
   KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_PARQUETFILE,
-  KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RLIKE, KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS,
-  KW_SELECT, KW_SEQUENCEFILE, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
-  KW_TABLES, KW_TERMINATED, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN,
-  KW_WHERE, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE,
-  KW_TABLE, KW_PARTITION, KW_INTERVAL;
+  KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RLIKE, KW_RIGHT, KW_ROW,
+  KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SET, KW_SEQUENCEFILE, KW_SHOW, KW_SEMI,
+  KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED, KW_TINYINT, KW_TO,
+  KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE, KW_THEN,
+  KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -240,12 +241,16 @@ nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal BinaryPredicate.Operator binary_comparison_operator;
 nonterminal InsertStmt insert_stmt;
+nonterminal ArrayList<PartitionKeyValue> partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
+nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
 nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
 nonterminal PartitionKeyValue partition_key_value;
+nonterminal PartitionKeyValue static_partition_key_value;
 nonterminal Expr expr_or_predicate;
 nonterminal Qualifier union_op;
 
+nonterminal AlterTableStmt alter_tbl_stmt;
 nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropTableStmt drop_tbl_stmt;
 nonterminal CreateDbStmt create_db_stmt;
@@ -254,18 +259,22 @@ nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal ColumnDef column_def;
 nonterminal ArrayList<ColumnDef> column_def_list;
 nonterminal ArrayList<ColumnDef> partition_column_defs;
-// Options for CREATE DATABASE/TABLE
+// Options for DDL commands - CREATE/DROP/ALTER
 nonterminal String comment_val;
 nonterminal Boolean external_val;
 nonterminal FileFormat file_format_val;
+nonterminal FileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
+nonterminal Boolean replace_existing_cols_val;
 nonterminal String location_val;
 nonterminal RowFormat row_format_val;
 nonterminal String terminator_val;
 // Used to simplify commands that accept either KW_DATABASE(S) or KW_SCHEMA(S)
 nonterminal String db_or_schema_kw;
 nonterminal String dbs_or_schemas_kw;
+// Used to simplify commands where KW_COLUMN is optional
+nonterminal String kw_column_or_empty;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -296,6 +305,8 @@ stmt ::=
   {: RESULT = show_dbs; :}
   | describe_stmt:describe
   {: RESULT = describe; :}
+  | alter_tbl_stmt:alter_tbl
+  {: RESULT = alter_tbl; :}
   | create_tbl_like_stmt:create_tbl_like
   {: RESULT = create_tbl_like; :}
   | create_tbl_stmt:create_tbl
@@ -317,6 +328,43 @@ insert_stmt ::=
   {: RESULT = new InsertStmt(table, false, list, query); :}
   ;
 
+alter_tbl_stmt ::=
+  KW_ALTER KW_TABLE table_name:table replace_existing_cols_val:replace KW_COLUMNS
+  LPAREN column_def_list:col_defs RPAREN
+  {: RESULT = new AlterTableAddReplaceColsStmt(table, col_defs, replace); :}
+  | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
+    partition_spec:partition location_val:location
+  {: 
+    RESULT = new AlterTableAddPartitionStmt(table, partition, location, if_not_exists);
+  :}
+  | KW_ALTER KW_TABLE table_name:table KW_DROP kw_column_or_empty IDENT:col_name
+  {: RESULT = new AlterTableDropColStmt(table, col_name); :}
+  | KW_ALTER KW_TABLE table_name:table KW_CHANGE kw_column_or_empty IDENT:col_name
+    column_def:col_def
+  {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
+  | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
+    partition_spec:partition
+  {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists); :}
+  | KW_ALTER KW_TABLE table_name:table KW_SET KW_FILEFORMAT file_format_val:file_format
+  {: RESULT = new AlterTableSetFileFormatStmt(table, file_format); :}
+  | KW_ALTER KW_TABLE table_name:table KW_SET KW_LOCATION STRING_LITERAL:location
+  {: RESULT = new AlterTableSetLocationStmt(table, location); :}
+  | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
+  {: RESULT = new AlterTableRenameStmt(table, new_table); :}
+  ;
+
+kw_column_or_empty ::=
+  KW_COLUMN
+  | /* empty */
+  ;
+
+replace_existing_cols_val ::=
+  KW_REPLACE
+  {: RESULT = true; :}
+  | KW_ADD
+  {: RESULT = false; :}
+  ;
+
 create_db_stmt ::=
   KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists IDENT:db_name
   comment_val:comment location_val:location
@@ -336,7 +384,7 @@ create_tbl_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
   table_name:table LPAREN column_def_list:col_defs RPAREN
   partition_column_defs:partition_col_defs comment_val:comment
-  row_format_val:row_format file_format_val:file_format location_val:location
+  row_format_val:row_format file_format_create_table_val:file_format location_val:location
   {:
     RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
         row_format, file_format, location, if_not_exists);
@@ -395,17 +443,22 @@ terminator_val ::=
   {: RESULT = null; :}
   ;
 
-file_format_val ::=
-  KW_STORED KW_AS KW_PARQUETFILE
-  {: RESULT = FileFormat.PARQUETFILE; :}
-  | KW_STORED KW_AS KW_TEXTFILE
-  {: RESULT = FileFormat.TEXTFILE; :}
-  | KW_STORED KW_AS KW_SEQUENCEFILE
-  {: RESULT = FileFormat.SEQUENCEFILE; :}
-  | KW_STORED KW_AS KW_RCFILE
-  {: RESULT = FileFormat.RCFILE; :}
+file_format_create_table_val ::=
+  KW_STORED KW_AS file_format_val:file_format
+  {: RESULT = file_format; :}
   | /* empty - default to TEXTFILE */
   {: RESULT = FileFormat.TEXTFILE; :}
+  ;
+
+file_format_val ::=
+  KW_PARQUETFILE
+  {: RESULT = FileFormat.PARQUETFILE; :}
+  | KW_TEXTFILE
+  {: RESULT = FileFormat.TEXTFILE; :}
+  | KW_SEQUENCEFILE
+  {: RESULT = FileFormat.SEQUENCEFILE; :}
+  | KW_RCFILE
+  {: RESULT = FileFormat.RCFILE; :}
   ;
 
 partition_column_defs ::=
@@ -482,18 +535,46 @@ partition_key_value_list ::=
   :}
   ;
 
+// A partition spec is a set of static partition key/value pairs. This is a bit
+// different than a partition clause in an INSERT statement because that allows
+// for dynamic and static partition key/values.
+partition_spec ::=
+  KW_PARTITION LPAREN static_partition_key_value_list:list RPAREN
+  {: RESULT = list; :}
+  | /* Empty */
+  {: RESULT = new ArrayList<PartitionKeyValue>(); :}
+  ;
+
+static_partition_key_value_list ::=
+  static_partition_key_value:item
+  {:
+    ArrayList<PartitionKeyValue> list = new ArrayList<PartitionKeyValue>();
+    list.add(item);
+    RESULT = list;
+  :}
+  | static_partition_key_value_list:list COMMA static_partition_key_value:item
+  {:
+    list.add(item);
+    RESULT = list;
+  :}
+  ;
+
 partition_key_value ::=
   // Dynamic partition key values.
   IDENT:column
   {: RESULT = new PartitionKeyValue(column, null); :}
+  | static_partition_key_value:partition
+  {: RESULT = partition; :}
+  ;
+
+static_partition_key_value ::=
   // Static partition key values.
-  | IDENT:column EQUAL literal:value
-  {: RESULT = new PartitionKeyValue(column, (LiteralExpr)value); :}
+  IDENT:column EQUAL literal:value
+  {: RESULT = new PartitionKeyValue(column, (LiteralExpr) value); :}
   // Static partition key value with NULL.
   | IDENT:column EQUAL KW_NULL
   {: RESULT = new PartitionKeyValue(column, new NullLiteral()); :}
   ;
-
 
 // Our parsing of UNION is slightly different from MySQL's:
 // http://dev.mysql.com/doc/refman/5.5/en/union.html

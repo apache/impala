@@ -68,6 +68,11 @@ public class FloatLiteral extends LiteralExpr {
 
   @Override
   public String toSql() {
+    return getStringValue();
+  }
+
+  @Override
+  public String getStringValue() {
     return Double.toString(value);
   }
 

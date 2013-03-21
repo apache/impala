@@ -65,6 +65,11 @@ public class IntLiteral extends LiteralExpr {
   }
 
   @Override
+  public String getStringValue() {
+    return Long.toString(value);
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
       return false;
@@ -74,7 +79,7 @@ public class IntLiteral extends LiteralExpr {
 
   @Override
   public String toSql() {
-    return Long.toString(value);
+    return getStringValue();
   }
 
   @Override

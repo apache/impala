@@ -84,6 +84,8 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
       }
       return Status::OK;
     }
+    case TDdlType::ALTER_TABLE:
+      return impala_server_->AlterTable(exec_request->alter_table_params);
     case TDdlType::CREATE_DATABASE:
       return impala_server_->CreateDatabase(exec_request->create_db_params);
     case TDdlType::CREATE_TABLE_LIKE:

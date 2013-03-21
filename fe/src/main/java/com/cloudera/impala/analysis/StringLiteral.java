@@ -63,6 +63,11 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
+  public String getStringValue() {
+    return value;
+  }
+
+  @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
         || targetType == this.type);

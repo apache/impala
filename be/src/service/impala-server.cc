@@ -592,6 +592,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     exec_hs2_metadata_op_id_ =
         jni_env->GetMethodID(fe_class, "execHiveServer2MetadataOp", "([B)[B");
     EXIT_IF_EXC(jni_env);
+    alter_table_id_ = jni_env->GetMethodID(fe_class, "alterTable", "([B)V");
+    EXIT_IF_EXC(jni_env);
     create_table_id_ = jni_env->GetMethodID(fe_class, "createTable", "([B)V");
     EXIT_IF_EXC(jni_env);
     create_table_like_id_ = jni_env->GetMethodID(fe_class, "createTableLike", "([B)V");
@@ -1195,6 +1197,18 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   return Status::OK;
 }
 
+Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
+  if (FLAGS_use_planservice) {
+    return Status("AlterTable not supported with external planservice");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+  jni_env->CallObjectMethod(fe_, alter_table_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
 Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
   if (FLAGS_use_planservice) {
    return Status("CreateDatabase not supported with external planservice");
@@ -1209,7 +1223,7 @@ Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
 
 Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
   if (FLAGS_use_planservice) {
-    return Status("CreateTable not supported with external planservice");
+    return Status("CreateTableLike not supported with external planservice");
   }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;

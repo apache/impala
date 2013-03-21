@@ -820,6 +820,145 @@ public class ParserTest {
   }
 
   @Test
+  public void TestAlterTableAddReplaceColumns() {
+    String[] addReplaceKw = {"ADD", "REPLACE"};
+    for (String addReplace: addReplaceKw) {
+      ParsesOk(String.format(
+          "ALTER TABLE Foo %s COLUMNS (i int, s string)", addReplace));
+      ParsesOk(String.format(
+          "ALTER TABLE TestDb.Foo %s COLUMNS (i int, s string)", addReplace));
+      ParsesOk(String.format(
+          "ALTER TABLE TestDb.Foo %s COLUMNS (i int)", addReplace));
+      ParsesOk(String.format(
+          "ALTER TABLE TestDb.Foo %s COLUMNS (i int comment 'hi')", addReplace));
+
+      // Negative syntax tests
+      ParserError(String.format("ALTER TABLE TestDb.Foo %s COLUMNS i int", addReplace));
+      ParserError(String.format(
+          "ALTER TABLE TestDb.Foo %s COLUMNS (int i)", addReplace));
+      ParserError(String.format(
+          "ALTER TABLE TestDb.Foo %s COLUMNS (i int COMMENT)", addReplace));
+      ParserError(String.format("ALTER TestDb.Foo %s COLUMNS (i int)", addReplace));
+      ParserError(String.format("ALTER TestDb.Foo %s COLUMNS", addReplace));
+      ParserError(String.format("ALTER TestDb.Foo %s COLUMNS ()", addReplace));
+      ParserError(String.format("ALTER Foo %s COLUMNS (i int, s string)", addReplace));
+      ParserError(String.format("ALTER TABLE %s COLUMNS (i int, s string)", addReplace));
+      // Don't yet support ALTER TABLE ADD COLUMN syntax
+      ParserError(String.format("ALTER TABLE Foo %s COLUMN i int", addReplace));
+      ParserError(String.format("ALTER TABLE Foo %s COLUMN (i int)", addReplace));
+    }
+  }
+
+  @Test
+  public void TestAlterTableAddPartition() {
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (i=1)");
+    ParsesOk("ALTER TABLE TestDb.Foo ADD IF NOT EXISTS PARTITION (i=1, s='Hello')");
+    ParsesOk("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION '/a/b'");
+
+    // Cannot use dynamic partition syntax
+    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (partcol)");
+    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, partcol)");
+    // Location needs to be a string literal
+    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION a/b");
+
+    ParserError("ALTER TABLE Foo ADD IF EXISTS PARTITION (i=1, s='Hello')");
+    ParserError("ALTER TABLE TestDb.Foo ADD (i=1, s='Hello')");
+    ParserError("ALTER TABLE TestDb.Foo ADD (i=1)");
+    ParserError("ALTER TABLE Foo (i=1)");
+    ParserError("ALTER TABLE TestDb.Foo PARTITION (i=1)");
+    ParserError("ALTER TABLE Foo ADD PARTITION");
+    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION ()");
+    ParserError("ALTER Foo ADD PARTITION (i=1)");
+    ParserError("ALTER TABLE ADD PARTITION (i=1)");
+  }
+
+  @Test
+  public void TestAlterTableDropColumn() {
+    // KW_COLUMN is optional
+    String[] columnKw = {"COLUMN", ""};
+    for (String kw: columnKw) {
+      ParsesOk(String.format("ALTER TABLE Foo DROP %s col1", kw));
+      ParsesOk(String.format("ALTER TABLE TestDb.Foo DROP %s col1", kw));
+
+      // Negative syntax tests
+      ParserError(String.format("ALTER TABLE TestDb.Foo DROP %s col1, col2", kw));
+      ParserError(String.format("ALTER TABLE TestDb.Foo DROP %s", kw));
+      ParserError(String.format("ALTER TABLE Foo DROP %s 'col1'", kw));
+      ParserError(String.format("ALTER Foo DROP %s col1", kw));
+      ParserError(String.format("ALTER TABLE DROP %s col1", kw));
+      ParserError(String.format("ALTER TABLE DROP %s", kw));
+    }
+  }
+
+  @Test
+  public void TestAlterTableDropPartition() {
+    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=1)");
+    ParsesOk("ALTER TABLE TestDb.Foo DROP IF EXISTS PARTITION (i=1, s='Hello')");
+
+    // Cannot use dynamic partition syntax
+    ParserError("ALTER TABLE Foo DROP PARTITION (partcol)");
+    ParserError("ALTER TABLE Foo DROP PARTITION (i=1, j)");
+
+    ParserError("ALTER TABLE Foo DROP IF NOT EXISTS PARTITION (i=1, s='Hello')");
+    ParserError("ALTER TABLE TestDb.Foo DROP (i=1, s='Hello')");
+    ParserError("ALTER TABLE TestDb.Foo DROP (i=1)");
+    ParserError("ALTER TABLE Foo (i=1)");
+    ParserError("ALTER TABLE TestDb.Foo PARTITION (i=1)");
+    ParserError("ALTER TABLE Foo DROP PARTITION");
+    ParserError("ALTER TABLE TestDb.Foo DROP PARTITION ()");
+    ParserError("ALTER Foo DROP PARTITION (i=1)");
+    ParserError("ALTER TABLE DROP PARTITION (i=1)");
+  }
+
+  @Test
+  public void TestAlterTableChangeColumn() {
+    // KW_COLUMN is optional
+    String[] columnKw = {"COLUMN", ""};
+    for (String kw: columnKw) {
+      ParsesOk(String.format("ALTER TABLE Foo.Bar CHANGE %s c1 c2 int", kw));
+      ParsesOk(String.format("ALTER TABLE Foo CHANGE %s c1 c2 int comment 'hi'", kw));
+
+      // Negative syntax tests
+      ParserError(String.format("ALTER TABLE Foo CHANGE %s c1 int c2", kw));
+      ParserError(String.format("ALTER TABLE Foo CHANGE %s col1 int", kw));
+      ParserError(String.format("ALTER TABLE Foo CHANGE %s col1", kw));
+      ParserError(String.format("ALTER TABLE Foo CHANGE %s", kw));
+      ParserError(String.format("ALTER TABLE CHANGE %s c1 c2 int", kw));
+    }
+  }
+ 
+  @Test
+  public void TestAlterTableSet() {
+    // Supported file formats
+    for (FileFormat format: FileFormat.values()) {
+      ParsesOk("ALTER TABLE Foo SET FILEFORMAT " + format);
+      ParsesOk("ALTER TABLE TestDb.Foo SET FILEFORMAT " + format);
+      ParserError("ALTER TABLE TestDb.Foo SET " + format);
+      ParserError("ALTER TABLE TestDb.Foo " + format);
+    }
+    ParserError("ALTER TABLE TestDb.Foo SET FILEFORMAT");
+
+    ParsesOk("ALTER TABLE Foo SET LOCATION '/a/b/c'");
+    ParsesOk("ALTER TABLE TestDb.Foo SET LOCATION '/a/b/c'");
+    ParserError("ALTER TABLE TestDb.Foo SET LOCATION abc");
+    ParserError("ALTER TABLE TestDb.Foo SET LOCATION");
+    ParserError("ALTER TABLE TestDb.Foo SET");
+  }
+
+  @Test
+  public void TestAlterTableRename() {
+    ParsesOk("ALTER TABLE TestDb.Foo RENAME TO TestDb.Foo2");
+    ParsesOk("ALTER TABLE Foo RENAME TO TestDb.Foo2");
+    ParsesOk("ALTER TABLE TestDb.Foo RENAME TO Foo2");
+    ParsesOk("ALTER TABLE Foo RENAME TO Foo2");
+    ParserError("ALTER TABLE Foo RENAME TO 'Foo2'");
+    ParserError("ALTER TABLE Foo RENAME Foo2");
+    ParserError("ALTER TABLE Foo RENAME TO");
+    ParserError("ALTER TABLE Foo TO Foo2");
+    ParserError("ALTER TABLE Foo TO Foo2");
+  }
+
+  @Test
   public void TestCreateTable() {
     // Support unqualified and fully-qualified table names
     ParsesOk("CREATE TABLE Foo (i int)");
@@ -959,7 +1098,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT\n");
+        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT\n");
 
     // missing select list
     ParserError("select from t",

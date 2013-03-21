@@ -34,6 +34,16 @@ import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TAlterTableType;
+import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
+import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableChangeColParams;
+import com.cloudera.impala.thrift.TAlterTableDropColParams;
+import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableRenameParams;
+import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
+import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TCreateDbParams;
@@ -50,6 +60,7 @@ import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 
 import com.google.common.collect.Lists;
 
@@ -115,6 +126,62 @@ public class JniFrontend {
       return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
+    }
+  }
+
+  public void alterTable(byte[] thriftAlterTableParams)
+      throws ImpalaException, MetaException, org.apache.thrift.TException,
+      InvalidObjectException, ImpalaException, TableLoadingException {
+    TAlterTableParams params = new TAlterTableParams();
+    deserializeThrift(params, thriftAlterTableParams);
+    switch (params.getAlter_type()) {
+      case ADD_REPLACE_COLUMNS:
+        TAlterTableAddReplaceColsParams addReplaceColParams =
+            params.getAdd_replace_cols_params(); 
+        frontend.alterTableAddReplaceCols(TableName.fromThrift(params.getTable_name()),
+            addReplaceColParams.getColumns(),
+            addReplaceColParams.isReplace_existing_cols());
+        break;
+      case ADD_PARTITION:
+        TAlterTableAddPartitionParams addPartParams = params.getAdd_partition_params();
+        frontend.alterTableAddPartition(TableName.fromThrift(params.getTable_name()),
+            addPartParams.getPartition_spec(), addPartParams.getLocation(), 
+            addPartParams.isIf_not_exists());
+        break;
+      case DROP_COLUMN:
+        TAlterTableDropColParams dropColParams = params.getDrop_col_params(); 
+        frontend.alterTableDropCol(TableName.fromThrift(params.getTable_name()),
+            dropColParams.getCol_name());
+        break;
+      case CHANGE_COLUMN:
+        TAlterTableChangeColParams changeColParams = params.getChange_col_params();
+        frontend.alterTableChangeCol(TableName.fromThrift(params.getTable_name()),
+            changeColParams.getCol_name(), changeColParams.getNew_col_def());
+        break;
+      case DROP_PARTITION:
+        TAlterTableDropPartitionParams dropPartParams = params.getDrop_partition_params();
+        frontend.alterTableDropPartition(TableName.fromThrift(params.getTable_name()),
+            dropPartParams.getPartition_spec(), dropPartParams.isIf_exists());
+        break;
+      case RENAME_TABLE:
+        TAlterTableRenameParams renameParams = params.getRename_params(); 
+        frontend.alterTableRename(TableName.fromThrift(params.getTable_name()),
+            TableName.fromThrift(renameParams.getNew_table_name()));
+        break;
+      case SET_FILE_FORMAT:
+        TAlterTableSetFileFormatParams fileFormatParams =
+            params.getSet_file_format_params();
+        frontend.alterTableSetFileFormat(TableName.fromThrift(params.getTable_name()),
+            FileFormat.fromThrift(fileFormatParams.getFile_format()));
+        break; 
+      case SET_LOCATION:
+        TAlterTableSetLocationParams setLocationParams = params.getSet_location_params();
+        frontend.alterTableSetLocation(TableName.fromThrift(params.getTable_name()),
+            setLocationParams.getLocation());
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unknown ALTER TABLE operation type: " + params.getAlter_type());
     }
   }
 

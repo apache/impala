@@ -559,6 +559,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status DescribeTable(const std::string& db, const std::string& table,
       TDescribeTableResult* columns);
 
+  // Modifies an existing table's metastore metadata. The specific type of operation is
+  // defined by the TAlterTableType field in TAlterTableParams. Some supported operations
+  // include renaming tables, adding/dropping columns/partitions from tables, and changing
+  // a table's file format. Returns OK if the operation was successfull, otherwise a
+  // Status object with information on the error will be returned.
+  Status AlterTable(const TAlterTableParams& alter_table_params);
+
   // Creates a new database in the metastore with the specified name. Returns OK if the
   // database was successfully created, otherwise CANCELLED is returned with details on
   // the specific error. Common errors include creating a database that already exists
@@ -730,6 +737,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
+  jmethodID alter_table_id_; // JniFrontend.alterTable
   jmethodID create_database_id_; // JniFrontend.createDatabase
   jmethodID create_table_id_; // JniFrontend.createTable
   jmethodID create_table_like_id_; // JniFrontend.createTableLike

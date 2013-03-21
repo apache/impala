@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Iterator;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Random;
@@ -56,6 +57,7 @@ import com.google.common.collect.MapMaker;
 
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -73,8 +75,8 @@ public class Catalog {
   private final boolean lazy;
   private int nextTableId;
   private final MetaStoreClientPool metaStoreClientPool;
-  // Lock used to synchronize metastore CREATE/DROP TABLE/DATABASE requests.
-  private final Object metastoreCreateDropLock = new Object();
+  // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
+  private final Object metastoreDdlLock = new Object();
 
   // map from db name to DB
   private final LazyDbMap dbs;
@@ -228,6 +230,16 @@ public class Catalog {
   }
 
   /**
+   * Thrown by some methods when a table column is not found in the metastore
+   */
+  public static class ColumnNotFoundException extends ImpalaException {
+    // Dummy serial ID to satisfy Eclipse
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public ColumnNotFoundException(String s) { super(s); }
+  }
+
+  /**
    * Thrown by some methods when a table can't be found in the metastore
    */
   public static class TableNotFoundException extends ImpalaException {
@@ -307,6 +319,242 @@ public class Catalog {
   }
 
   /**
+   * Appends one or more columns to the given table, optionally replacing all existing
+   * columns. After performing the operation the table metadata is marked as invalid and
+   * will be reloaded on the next access.
+   */
+  public void alterTableAddReplaceCols(TableName tableName, List<TColumnDef> columns,
+      boolean replaceExistingCols) throws MetaException, InvalidObjectException,
+      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
+       TableLoadingException {
+    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+
+    List<FieldSchema> newColumns = buildFieldSchemaList(columns);
+    if (replaceExistingCols) {
+      msTbl.getSd().setCols(newColumns);
+    } else {
+      // Append the new column to the existing list of columns.
+      for (FieldSchema fs: buildFieldSchemaList(columns)) {
+        msTbl.getSd().addToCols(fs);
+      }
+    }
+    applyAlterTable(msTbl);
+  }
+
+  /**
+   * Changes the column definition of an existing column. This can be used to rename a
+   * column, add a comment to a column, or change the datatype of a column.
+   */
+  public void alterTableChangeCol(TableName tableName, String colName,
+      TColumnDef newColDef) throws MetaException, InvalidObjectException,
+      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
+       TableLoadingException, ColumnNotFoundException {
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      // Find the matching column name and change it.
+      Iterator<FieldSchema> iterator = msTbl.getSd().getColsIterator();
+      while (iterator.hasNext()) {
+        FieldSchema fs = iterator.next();
+        if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
+          TColumnDesc colDesc = newColDef.getColumnDesc();
+          fs.setName(colDesc.getColumnName());
+          fs.setType(colDesc.getColumnType().toString().toLowerCase());
+          // Don't overwrite the existing comment unless a new comment is given
+          if (newColDef.getComment() != null) {
+            fs.setComment(newColDef.getComment());
+          }
+          break;
+        }
+        if (!iterator.hasNext()) {
+          throw new ColumnNotFoundException(
+              String.format("Column name %s not found in table %s.", colName, tableName));
+        }
+      }
+      applyAlterTable(msTbl);
+    }
+  }
+
+  /**
+   * Adds a new partition to the given table. After performing the operation the table
+   * metadata is marked as invalid and will be reloaded on the next access.
+   */
+  public void alterTableAddPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, String location, boolean ifNotExists)
+      throws MetaException, AlreadyExistsException, InvalidObjectException,
+      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
+      TableLoadingException {
+    org.apache.hadoop.hive.metastore.api.Partition partition =
+        new org.apache.hadoop.hive.metastore.api.Partition();
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      partition.setDbName(tableName.getDb());
+      partition.setTableName(tableName.getTbl());
+
+      List<String> values = Lists.newArrayList();
+      // Need to add in the values in the same order they are defined in the table.
+      for (FieldSchema fs: msTbl.getPartitionKeys()) {
+        for (TPartitionKeyValue kv: partitionSpec) {
+          if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+            values.add(kv.getValue());
+          }
+        }
+      }
+      partition.setValues(values);
+      StorageDescriptor sd = msTbl.getSd().deepCopy();
+      sd.setLocation(location);
+      partition.setSd(sd);
+      try {
+        getMetaStoreClient().getHiveClient().add_partition(partition);
+      } catch (AlreadyExistsException e) {
+        if (!ifNotExists) {
+          throw e;
+        }
+        LOG.info(String.format("Ignoring '%s' when adding partition to %s because" +
+            " ifNotExists is true.", e, tableName));
+      }
+      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
+    }
+  }
+
+  /**
+   * Drops an existing partition from the given table. After performing the operation the
+   * table metadata is marked as invalid and will be reloaded on the next access.
+   */
+  public void alterTableDropPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, boolean ifExists) throws MetaException,
+      NoSuchObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
+      TableNotFoundException, TableLoadingException {
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      List<String> values = Lists.newArrayList();
+      // Need to add in the values in the same order they are defined in the table.
+      for (FieldSchema fs: msTbl.getPartitionKeys()) {
+        for (TPartitionKeyValue kv: partitionSpec) {
+          if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+            values.add(kv.getValue());
+          }
+        }
+      }
+      try {
+        getMetaStoreClient().getHiveClient().dropPartition(tableName.getDb(),
+            tableName.getTbl(), values);
+      } catch (NoSuchObjectException e) {
+        if (!ifExists) {
+          throw e;
+        }
+        LOG.info(String.format("Ignoring '%s' when dropping partition from %s because" +
+            " ifExists is true.", e, tableName));
+      }
+      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
+    }
+  }
+
+  /**
+   * Removes a column from the given table. After performing the operation the
+   * table metadata is marked as invalid and will be reloaded on the next access.
+   */
+  public void alterTableDropCol(TableName tableName, String colName) 
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, TableNotFoundException, ColumnNotFoundException,
+      TableLoadingException {
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+
+      // Find the matching column name and remove it.
+      Iterator<FieldSchema> iterator = msTbl.getSd().getColsIterator();
+      while (iterator.hasNext()) {
+        FieldSchema fs = iterator.next();
+        if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
+          iterator.remove();
+          break;
+        }
+        if (!iterator.hasNext()) {
+          throw new ColumnNotFoundException(
+              String.format("Column name %s not found in table %s.", colName, tableName));
+        }
+      }
+      applyAlterTable(msTbl);
+    }
+  }
+
+  /**
+   * Renames an existing table. After renaming the table, the metadata is marked as
+   * invalid and will be reloaded on the next access.
+   */
+  public void alterTableRename(TableName tableName, TableName newTableName) 
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      msTbl.setDbName(newTableName.getDb());
+      msTbl.setTableName(newTableName.getTbl());
+      getMetaStoreClient().getHiveClient().alter_table(
+          tableName.getDb(), tableName.getTbl(), msTbl);
+      // Remove the old table name from the cache and then invalidate the new table.
+      Db db = dbs.get(tableName.getDb());
+      if (db != null) db.removeTable(tableName.getTbl());
+      invalidateTable(newTableName.getDb(), newTableName.getTbl(), false);
+    }
+  }
+
+  /**
+   * Changes the file format for the given table. This is a metadata only operation,
+   * existing table data will not be converted to the new format. After changing the file
+   * format the table metadata is marked as invalid and will be reloaded on the next
+   * access.
+   */
+  public void alterTableSetFileFormat(TableName tableName, FileFormat fileFormat) 
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(fileFormat,
+        RowFormat.DEFAULT_ROW_FORMAT);
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      msTbl.getSd().setInputFormat(sd.getInputFormat());
+      msTbl.getSd().setOutputFormat(sd.getOutputFormat());
+      msTbl.getSd().getSerdeInfo().setSerializationLib(
+          sd.getSerdeInfo().getSerializationLib());
+      applyAlterTable(msTbl);
+    }
+  }
+
+  /**
+   * Changes the HDFS storage location for the given table. This is a metadata only
+   * operation, existing table data will not be as part of changing the location.
+   */
+  public void alterTableSetLocation(TableName tableName, String location)
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      msTbl.getSd().setLocation(location);
+      applyAlterTable(msTbl);
+    }
+  }
+
+  /**
+   * Applies an ALTER TABLE command to the metastore table. The caller should take the
+   * metastoreDdlLock before calling this method.
+   * Note: The metastore interface is not very safe because it only accepts a
+   * an entire metastore.api.Table object rather than a delta of what to change. This
+   * means an external modification to the table could be overwritten by an ALTER TABLE 
+   * command if the metadata is not completely in-sync. This affects both Hive and
+   * Impala, but is more important in Impala because the metadata is cached for a
+   * longer period of time.
+   */
+  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl) 
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException {
+    MetaStoreClient msClient = getMetaStoreClient();
+    try {
+      msClient.getHiveClient().alter_table(
+          msTbl.getDbName(), msTbl.getTableName(), msTbl);
+    } finally {
+      msClient.release();
+      invalidateTable(msTbl.getDbName(), msTbl.getTableName(), true);
+    }
+  }
+
+  /**
    * Creates a new database in the metastore and adds the db name to the internal
    * metadata cache, marking its metadata to be lazily loaded on the next access.
    * Re-throws any Hive Meta Store exceptions encountered during the create, these
@@ -338,7 +586,7 @@ public class Catalog {
       db.setLocationUri(location);
     }
     LOG.info("Creating database " + dbName);
-    synchronized (metastoreCreateDropLock) {
+    synchronized (metastoreDdlLock) {
       try {
         getMetaStoreClient().getHiveClient().createDatabase(db);
       } catch (AlreadyExistsException e) {
@@ -366,7 +614,7 @@ public class Catalog {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.dropDatabase");
     LOG.info("Dropping database " + dbName);
-    synchronized (metastoreCreateDropLock) {
+    synchronized (metastoreDdlLock) {
       getMetaStoreClient().getHiveClient().dropDatabase(dbName, false, ifExists);
       dbs.remove(dbName);
     }
@@ -385,7 +633,7 @@ public class Catalog {
       org.apache.thrift.TException {
     checkTableNameFullyQualified(tableName);
     LOG.info(String.format("Dropping table %s", tableName));
-    synchronized (metastoreCreateDropLock) {
+    synchronized (metastoreDdlLock) {
       getMetaStoreClient().getHiveClient().dropTable(
           tableName.getDb(), tableName.getTbl(), true, ifExists);
       Db db = dbs.get(tableName.getDb());
@@ -510,7 +758,7 @@ public class Catalog {
       boolean ifNotExists) throws MetaException, NoSuchObjectException,
       AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException {
     MetaStoreClient msClient = getMetaStoreClient();
-    synchronized (metastoreCreateDropLock) {
+    synchronized (metastoreDdlLock) {
       try {
         msClient.getHiveClient().createTable(newTable);
       } catch (AlreadyExistsException e) {
@@ -522,9 +770,7 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      Db db = dbs.get(newTable.getDbName());
-      Preconditions.checkNotNull(db);
-      db.invalidateTable(newTable.getTableName(), false);
+      invalidateTable(newTable.getDbName(), newTable.getTableName(), false);
     }
   }
 
@@ -675,5 +921,26 @@ public class Catalog {
           String.format("Table not found: %s.%s", dbName, tableName));
     }
     return table;
+  }
+
+  /**
+   * Returns a deep copy of the metastore.api.Table object for the given TableName.
+   */ 
+  private org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable(
+      TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
+      TableLoadingException {
+    checkTableNameFullyQualified(tableName);
+    return getTable(tableName.getDb(), tableName.getTbl()).getMetaStoreTable().deepCopy();
+  }
+
+  /*
+   * Marks the table as invalid so the next access will trigger a metadata load. If
+   * the database does not exist no error is returned (there is nothing to invalidate).
+   */
+  private void invalidateTable(String dbName, String tableName, boolean ifExists) {
+    Db db = getDb(dbName);
+    if (db != null) {
+      db.invalidateTable(tableName, ifExists);
+    }
   }
 }

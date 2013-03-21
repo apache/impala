@@ -1,0 +1,281 @@
+====
+---- QUERY
+create database alter_table_test_db
+---- RESULTS
+====
+---- QUERY
+create database alter_table_test_db2
+---- RESULTS
+====
+---- QUERY
+use alter_table_test_db
+---- RESULTS
+====
+---- QUERY
+# First create an unpartitioned table
+create table t1 (i int) location '/test-warehouse/t1_tmp1'
+---- RESULTS
+====
+---- QUERY
+describe t1
+---- RESULTS
+'i','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Add some columns
+alter table t1 add columns (t tinyint, s string comment 'Str Col')
+---- RESULTS
+====
+---- QUERY
+describe t1
+---- RESULTS
+'i','int',''
+'t','tinyint',''
+'s','string','Str Col'
+---- TYPES
+string,string,string
+====
+---- QUERY
+alter table t1 rename to t2
+---- RESULTS
+====
+---- QUERY
+show tables
+---- RESULTS
+'t2'
+---- TYPES
+string
+====
+---- QUERY
+# Move the table to a different database
+alter table t2 rename to alter_table_test_db2.t1_inotherdb
+---- RESULTS
+====
+---- QUERY
+# No longer appears in this database
+show tables
+---- RESULTS
+---- TYPES
+string
+====
+---- QUERY
+# Shows up in the second database
+show tables in alter_table_test_db2
+---- RESULTS
+'t1_inotherdb'
+---- TYPES
+string
+====
+---- QUERY
+# Move the table back to this database
+alter table alter_table_test_db2.t1_inotherdb rename to t2
+---- RESULTS
+====
+---- QUERY
+# make sure the new table shows the same columns as the old table
+describe t2
+---- RESULTS
+'i','int',''
+'t','tinyint',''
+'s','string','Str Col'
+---- TYPES
+string,string,string
+====
+---- QUERY
+alter table t2 drop column t
+---- RESULTS
+====
+---- QUERY
+# The dropped column no longer shows up
+describe t2
+---- RESULTS
+'i','int',''
+'s','string','Str Col'
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Replace the columns with new values
+alter table t2 replace columns (c1 bigint comment 'id col', c2 string, c3 int)
+---- RESULTS
+====
+---- QUERY
+describe t2
+---- RESULTS
+'c1','bigint','id col'
+'c2','string',''
+'c3','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Should be able to read/write using the new column types
+insert overwrite table t2 select 1, '50', 2 from functional.alltypes limit 2
+---- RESULTS
+: 2
+====
+---- QUERY
+select * from t2
+---- RESULTS
+1,'50',2
+1,'50',2
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+alter table t2 change column c2 int_col int comment 'changed to int col'
+---- RESULTS
+====
+---- QUERY
+alter table t2 change column c1 id_col bigint
+---- RESULTS
+====
+---- QUERY
+alter table t2 change column c3 c3 int comment 'added a comment'
+---- RESULTS
+====
+---- QUERY
+describe t2
+---- RESULTS
+'id_col','bigint','id col'
+'int_col','int','changed to int col'
+'c3','int','added a comment'
+---- TYPES
+string,string,string
+====
+---- QUERY
+select * from t2
+---- RESULTS
+1,50,2
+1,50,2
+---- TYPES
+bigint,int,int
+====
+---- QUERY
+create external table jointbl_test like functional.jointbl
+---- RESULTS
+====
+---- QUERY
+# Expect new table to be empty
+select * from jointbl_test
+---- RESULTS
+---- TYPES
+bigint,string,int,int
+====
+---- QUERY
+# change the location to point to some data
+alter table jointbl_test set location '/test-warehouse/jointbl'
+---- RESULTS
+====
+---- QUERY
+# should get some results back now
+select * from jointbl_test order by test_id limit 3
+---- RESULTS
+1001,'Name1',94611,5000
+1002,'Name2',94611,5000
+1003,'Name3',94611,5000
+---- TYPES
+bigint,string,int,int
+====
+---- QUERY
+# change the location to point to some data in another file format
+alter table jointbl_test set location '/test-warehouse/jointbl_seq'
+---- RESULTS
+====
+---- QUERY
+# since the file format doesn't match, wrong results will be returned
+select test_id from jointbl_test order by test_id limit 3
+---- RESULTS
+NULL
+---- TYPES
+bigint
+====
+---- QUERY
+# change the table fileformat to match the data
+alter table jointbl_test set fileformat sequencefile
+---- RESULTS
+====
+---- QUERY
+# now the proper data should be returned
+select * from jointbl_test order by test_id limit 3
+---- RESULTS
+1001,'Name1',94611,5000
+1002,'Name2',94611,5000
+1003,'Name3',94611,5000
+---- TYPES
+bigint,string,int,int
+====
+---- QUERY
+# Create a partitioned table
+create table t_part (i int) partitioned by (j int, s string)
+---- RESULTS
+====
+---- QUERY
+alter table t_part add partition (j=1, s='2012')
+---- RESULTS
+====
+---- QUERY
+alter table t_part add if not exists partition (j=1, s='2012')
+---- RESULTS
+====
+---- QUERY
+alter table t_part add partition (j=1, s='2013')
+---- RESULTS
+====
+---- QUERY
+insert overwrite table t_part partition(j=1, s='2012') select 2 from functional.alltypes limit 3
+---- RESULTS
+j=1/s=2012/: 3
+====
+---- QUERY
+insert overwrite table t_part partition(j=1, s='2013') select 3 from functional.alltypes limit 2
+---- RESULTS
+j=1/s=2013/: 2
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+2,1,'2012'
+3,1,'2013'
+3,1,'2013'
+---- TYPES
+int,int,string
+====
+---- QUERY
+alter table t_part drop partition (j=1, s='2013')
+---- RESULTS
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+2,1,'2012'
+---- TYPES
+int,int,string
+====
+---- QUERY
+# rename a partitioned table
+alter table t_part rename to t_part2
+---- RESULTS
+====
+---- QUERY
+# only the new table shows up
+show tables like 't_part*'
+---- RESULTS
+'t_part2'
+====
+---- QUERY
+# should be able to read the same data from this table
+select i, j, s from t_part2
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+2,1,'2012'
+---- TYPES
+int,int,string
+====

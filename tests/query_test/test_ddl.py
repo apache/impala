@@ -22,10 +22,11 @@ class TestDdlStatements(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   def setup_method(self, method):
-    self.cleanup_db('ddl_test_db')
+    map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
 
   def teardown_method(self, method):
-    self.cleanup_db('ddl_test_db')
+    return
+    map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
 
   def cleanup_db(cls, db_name):
     # To drop a db, we need to first drop all the tables in that db
@@ -33,7 +34,12 @@ class TestDdlStatements(ImpalaTestSuite):
       for table_name in cls.hive_client.get_all_tables(db_name):
         cls.hive_client.drop_table(db_name, table_name, True)
       cls.hive_client.drop_database(db_name, True, False)
+    cls.client.refresh()
 
   @pytest.mark.execute_serially
-  def test_create_tables(self, vector):
+  def test_create(self, vector):
     self.run_test_case('QueryTest/create', vector)
+
+  @pytest.mark.execute_serially
+  def test_alter_table(self, vector):
+    self.run_test_case('QueryTest/alter-table', vector)

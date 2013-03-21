@@ -34,6 +34,11 @@ public class NullLiteral extends LiteralExpr {
 
   @Override
   public String toSql() {
+    return getStringValue();
+  }
+
+  @Override
+  public String getStringValue() {
     return "NULL";
   }
 

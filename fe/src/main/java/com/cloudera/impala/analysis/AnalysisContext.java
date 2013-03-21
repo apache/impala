@@ -43,6 +43,10 @@ public class AnalysisContext {
     private ParseNode stmt;
     private Analyzer analyzer;
 
+    public boolean isAlterTableStmt() {
+      return stmt instanceof AlterTableStmt;
+    }
+
     public boolean isQueryStmt() {
       return stmt instanceof QueryStmt;
     }
@@ -90,11 +94,16 @@ public class AnalysisContext {
     public boolean isDdlStmt() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateDbStmt() ||
-          isDropDbStmt() || isDropTableStmt();
+          isDropDbStmt() || isDropTableStmt() || isAlterTableStmt();
     }
 
     public boolean isDmlStmt() {
       return isInsertStmt();
+    }
+
+    public AlterTableStmt getAlterTableStmt() {
+      Preconditions.checkState(isAlterTableStmt());
+      return (AlterTableStmt) stmt; 
     }
 
     public CreateTableLikeStmt getCreateTableLikeStmt() {
