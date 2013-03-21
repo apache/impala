@@ -37,8 +37,12 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -450,10 +454,11 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Create columns corresponding to fieldSchemas. Throws a
-   * TableLoadingException if the metadata is incompatible with what we support.
+   * Create columns corresponding to fieldSchemas, including column statistics.
+   * Throws a TableLoadingException if the metadata is incompatible with what we
+   * support.
    */
-  private void loadColumns(List<FieldSchema> fieldSchemas)
+  private void loadColumns(List<FieldSchema> fieldSchemas, HiveMetaStoreClient client)
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s : fieldSchemas) {
@@ -468,6 +473,19 @@ public class HdfsTable extends Table {
       colsByPos.add(col);
       colsByName.put(s.getName(), col);
       ++pos;
+
+      // load stats
+      ColumnStatistics colStats = null;
+      try {
+        colStats = client.getTableColumnStatistics(db.getName(), name, s.getName());
+      } catch (Exception e) {
+        // don't try to load stats for this column
+        continue;
+      }
+
+      // we should never see more than one ColumnStatisticsObj here
+      if (colStats.getStatsObj().size() > 1) continue;
+      col.updateStats(colStats.getStatsObj().get(0).getStatsData());
     }
   }
 
@@ -497,6 +515,7 @@ public class HdfsTable extends Table {
       addPartition(msTbl.getSd(), new ArrayList<LiteralExpr>());
       return;
     }
+
     for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
       // load key values
       List<LiteralExpr> keyValues = Lists.newArrayList();
@@ -517,18 +536,41 @@ public class HdfsTable extends Table {
           }
         }
       }
-      addPartition(msPartition.getSd(), keyValues);
+      HdfsPartition partition = addPartition(msPartition.getSd(), keyValues);
+
+      if (partition != null && msPartition.getParameters() != null) {
+        partition.setNumRows(getRowCount(msPartition.getParameters()));
+      }
     }
+  }
+
+  /**
+   * Returns the value of the ROW_COUNT constant, or -1 if not found.
+   */
+  private long getRowCount(Map<String, String> parameters) {
+    if (parameters == null) return -1;
+    for (Map.Entry<String, String> e: parameters.entrySet()) {
+      if (e.getKey().equals(StatsSetupConst.ROW_COUNT)) {
+        try {
+          long numRows = Long.valueOf(e.getValue());
+          return numRows;
+        } catch (NumberFormatException exc) {
+          // ignore
+        }
+      }
+    }
+    return -1;
   }
 
   /**
    * Adds a new HdfsPartition to internal partition list, populating with file format
    * information and file locations. If a partition contains no files, it's not added.
+   * Returns new partition or null, if none was added.
    *
    * @throws InvalidStorageDescriptorException if the supplied storage descriptor contains
    *         metadata that Impala can't understand.
    */
-  private void addPartition(StorageDescriptor storageDescriptor,
+  private HdfsPartition addPartition(StorageDescriptor storageDescriptor,
       List<LiteralExpr> partitionKeyExprs)
       throws IOException, InvalidStorageDescriptorException {
     HdfsStorageDescriptor fileFormatDescriptor =
@@ -552,8 +594,10 @@ public class HdfsTable extends Table {
           new HdfsPartition(this, partitionKeyExprs, fileFormatDescriptor,
                             fileDescriptors);
       partitions.add(partition);
+      return partition;
     } else {
       LOG.warn("Path " + path + " does not exist for partition. Ignoring.");
+      return null;
     }
   }
 
@@ -584,11 +628,14 @@ public class HdfsTable extends Table {
           partKeys.size() + tblFields.size());
       fieldSchemas.addAll(partKeys);
       fieldSchemas.addAll(tblFields);
-      loadColumns(fieldSchemas);
+      loadColumns(fieldSchemas, client);
 
       // The number of clustering columns is the number of partition keys.
       numClusteringCols = partKeys.size();
       loadPartitions(client.listPartitions(db.getName(), name, Short.MAX_VALUE), msTbl);
+
+      // load table stats
+      numRows = getRowCount(msTbl.getParameters());
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {

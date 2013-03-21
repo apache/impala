@@ -282,7 +282,6 @@ public class Frontend {
     for (Column column: table.getColumnsInHiveOrder()) {
       TColumnDef colDef = new TColumnDef(
           new TColumnDesc(column.getName(), column.getType().toThrift()));
-      LOG.info("describe comment:  " + column.getComment());
       colDef.setComment(column.getComment());
       columns.add(colDef);
     }

@@ -113,6 +113,12 @@ public enum PrimitiveType {
     }
   }
 
+  public boolean isFixedLengthType() {
+    return this == BOOLEAN || this == TINYINT || this == SMALLINT || this == INT
+        || this == BIGINT || this == FLOAT || this == DOUBLE || this == DATE
+        || this == DATETIME || this == TIMESTAMP;
+  }
+
   private static ArrayList<PrimitiveType> numericTypes;
   static {
     numericTypes = Lists.newArrayList();

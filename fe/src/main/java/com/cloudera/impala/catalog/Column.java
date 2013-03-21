@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 
 /**
  * Internal representation of column-related metadata.
@@ -25,6 +26,8 @@ public class Column {
   private final String comment;
   private int position;  // in table
 
+  private final ColumnStats stats;
+
   public Column(String name, PrimitiveType type, int position) {
     this(name, type, null, position);
   }
@@ -34,6 +37,7 @@ public class Column {
     this.type = type;
     this.comment = comment;
     this.position = position;
+    this.stats = new ColumnStats(type);
   }
 
   public String getComment() {
@@ -56,4 +60,9 @@ public class Column {
     this.position = position;
   }
 
+  public ColumnStats getStats() { return stats; }
+
+  public void updateStats(ColumnStatisticsData statsData) {
+    stats.update(type, statsData);
+  }
 }

@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.List;
+import java.util.Map;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
@@ -25,6 +26,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Query-relevant information for one table partition. Not thread safe due to a static
@@ -65,6 +67,13 @@ public class HdfsPartition {
   private final HdfsTable table;
   private final List<LiteralExpr> partitionKeyValues;
 
+  // estimated number of rows in partition; -1: unknown
+  private long numRows = -1;
+
+  // partition-specific stats for each column
+  // TODO: fill this
+  private final Map<Column, ColumnStats> columnStats = Maps.newHashMap();
+
   private static long partitionIdCounter = 0;
 
   // A unique ID for each partition, used to identify a partition in the thrift
@@ -86,6 +95,12 @@ public class HdfsPartition {
   public long getId() { return id; }
 
   public HdfsTable getTable() { return table; }
+
+  public void setNumRows(long numRows) {
+    this.numRows = numRows;
+  }
+
+  public long getNumRows() { return numRows; }
 
   /**
    * Returns an immutable list of partition key expressions

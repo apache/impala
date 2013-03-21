@@ -49,6 +49,9 @@ public abstract class Table {
   /** Number of clustering columns. */
   protected int numClusteringCols;
 
+  // estimated number of rows in table; -1: unknown
+  protected long numRows = -1;
+
   /**
    * colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
    * the clustering columns.
@@ -71,6 +74,10 @@ public abstract class Table {
 
   public TableId getId() {
     return id;
+  }
+
+  public long getNumRows() {
+    return numRows;
   }
 
   /**
