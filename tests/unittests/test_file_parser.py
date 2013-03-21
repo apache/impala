@@ -4,7 +4,6 @@
 #
 import logging
 import pytest
-import os
 from tests.util.test_file_parser import *
 from tests.common.base_test_suite import BaseTestSuite
 
@@ -16,7 +15,7 @@ test_text = """
 # comment
 SELECT blah from Foo
 s
----- RESULTS: VERIFY_IS_SUBSET
+---- RESULTS
 'Hi'
 ---- TYPES
 string
@@ -42,7 +41,8 @@ SELECT int_col from Bar
 231
 ---- TYPES
 int
-===="""
+====
+"""
 
 VALID_SECTIONS = ['QUERY', 'RESULTS', 'TYPES']
 
