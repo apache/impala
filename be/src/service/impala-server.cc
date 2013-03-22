@@ -164,6 +164,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
       }
       profile_.AddChild(coord_->query_profile());
+      profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
+      // TODO: it would be good to have the plan here as well.
     }
   } else {
     ddl_executor_.reset(new DdlExecutor(impala_server_));
