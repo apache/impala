@@ -25,6 +25,7 @@
 #include "gen-cpp/Opcodes_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/RuntimeProfile_types.h"
+#include "gen-cpp/ImpalaService_types.h"
 
 namespace impala {
 
@@ -39,12 +40,16 @@ std::ostream& operator<<(std::ostream& os, const TAggregationOp::type& op);
 std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
 std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
+std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
+std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
+std::string PrintTStmtType(const TStmtType::type& type);
+std::string PrintQueryState(const beeswax::QueryState::type& type);
 
 // Returns a string "<product version number> (build <build hash>)\nBuilt on <build time>"
 // This is used to set gflags build version

@@ -42,6 +42,7 @@
 #define BILLION (MILLION * 1000)
 
 using namespace std;
+using namespace beeswax;
 
 namespace impala {
 
@@ -58,10 +59,23 @@ namespace impala {
 // Macro to stamp out operator<< for thrift enums.  Why doesn't thrift do this?
 #define THRIFT_ENUM_OUTPUT_FN(E) THRIFT_ENUM_OUTPUT_FN_IMPL(E , _##E##_VALUES_TO_NAMES)
 
+// Macro to implement Print function that returns string for thrift enums
+#define THRIFT_ENUM_PRINT_FN(E) \
+  string Print##E(const E::type& e) {\
+    stringstream ss;\
+    ss << e;\
+    return ss.str();\
+  }
+
 THRIFT_ENUM_OUTPUT_FN(TExprOpcode);
 THRIFT_ENUM_OUTPUT_FN(TAggregationOp);
 THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);
 THRIFT_ENUM_OUTPUT_FN(THdfsCompression);
+THRIFT_ENUM_OUTPUT_FN(TStmtType);
+THRIFT_ENUM_OUTPUT_FN(QueryState);
+
+THRIFT_ENUM_PRINT_FN(TStmtType);
+THRIFT_ENUM_PRINT_FN(QueryState);
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {
   os << PrintId(id);

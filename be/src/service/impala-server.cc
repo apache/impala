@@ -163,9 +163,13 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
       }
-      profile_.AddChild(coord_->query_profile());
-      profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
       // TODO: it would be good to have the plan here as well.
+      profile_.AddChild(&summary_info_);
+      summary_info_.AddInfoString("Sql Statement", exec_request->sql_stmt);
+      summary_info_.AddInfoString("Start Time", start_time().DebugString());
+      summary_info_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
+      summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
+      profile_.AddChild(coord_->query_profile());
     }
   } else {
     ddl_executor_.reset(new DdlExecutor(impala_server_));
@@ -173,6 +177,12 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   }
 
   return Status::OK;
+}
+
+void ImpalaServer::QueryExecState::Done() {
+  end_time_ = TimestampValue::local_time();
+  summary_info_.AddInfoString("End Time", end_time().DebugString());
+  summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
@@ -627,7 +637,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   Webserver::PathHandlerCallback profile_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
-  exec_env->webserver()->RegisterPathHandler("/query_profile", profile_callback);
+  exec_env->webserver()->
+      RegisterPathHandler("/query_profile", profile_callback, true, false);
 
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics());
@@ -1060,6 +1071,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
     query_exec_state_map_.erase(entry);
   }
 
+  exec_state->Done();
   ArchiveQuery(*exec_state);
 
   if (exec_state->coord() != NULL) {
@@ -1720,7 +1732,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
       request.sql_stmt : "N/A";
   stmt_type = request.stmt_type;
   start_time = exec_state.start_time();
-  end_time = TimestampValue::local_time();
+  end_time = exec_state.end_time();
   has_coord = false;
 
   Coordinator* coord = exec_state.coord();

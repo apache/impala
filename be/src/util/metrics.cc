@@ -36,7 +36,7 @@ Status Metrics::Init(Webserver* webserver) {
 
     Webserver::PathHandlerCallback json_callback =
         bind<void>(mem_fn(&Metrics::JsonCallback), this, _1, _2);
-    webserver->RegisterPathHandler("/jsonmetrics", json_callback, false);
+    webserver->RegisterPathHandler("/jsonmetrics", json_callback, false, false);
   }
 
   return Status::OK;

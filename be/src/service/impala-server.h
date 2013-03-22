@@ -261,6 +261,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       : exec_env_(exec_env),
         coord_(NULL),
         profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
+        summary_info_(&profile_pool_, "Summary"),
         eos_(false),
         query_state_(beeswax::QueryState::CREATED),
         current_batch_(NULL),
@@ -303,6 +304,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Caller needs to hold lock().
     void Cancel();
 
+    // This is called when the query is done (finished, cancelled, or failed).
+    void Done();
+
     bool eos() { return eos_; }
     Coordinator* coord() const { return coord_.get(); }
     int num_rows_fetched() const { return num_rows_fetched_; }
@@ -318,6 +322,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
     const RuntimeProfile& profile() const { return profile_; }
     const TimestampValue& start_time() const { return start_time_; }
+    const TimestampValue& end_time() const { return end_time_; }
 
    private:
     TUniqueId query_id_;
@@ -333,6 +338,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     RuntimeState local_runtime_state_;
     ObjectPool profile_pool_;
     RuntimeProfile profile_;
+    RuntimeProfile summary_info_;
     RuntimeProfile::Counter* planner_timer_;
     vector<Expr*> output_exprs_;
     bool eos_;  // if true, there are no more rows to return
@@ -348,8 +354,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // To get access to UpdateMetastore
     ImpalaServer* impala_server_;
 
-    // Start time of the query
-    TimestampValue start_time_;
+    // Start/end time of the query
+    TimestampValue start_time_, end_time_;
 
     // Core logic of FetchRows(). Does not update query_state_/status_.
     Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);

@@ -51,32 +51,38 @@ class Webserver {
   void Stop();
 
   // Register a callback for a URL path. Path should not include the
-  // http://hostname/ prefix. If is_styled is true, a link to this page is
+  // http://hostname/ prefix. If is_styled is true, the page is meant to be for
+  // people to look at and is styled.  If false, it is meant to be for machines to 
+  // scrape.  If is_on_nav_bar is true,  a link to this page is
   // printed in the navigation bar at the top of each debug page. Otherwise the
   // link does not appear, and the page is rendered without HTML headers and
-  // footers. This option is used for pages that are typically read by machine.
+  // footers. 
   // The first registration's choice of is_styled overrides all
   // subsequent registrations for that URL.
   void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback,
-                           bool is_styled = true);
+                           bool is_styled = true, bool is_on_nav_bar = true);
 
  private:
   // Container class for a list of path handler callbacks for a single URL.
   class PathHandler {
    public:
-    PathHandler(bool is_styled)
-        : is_styled_(is_styled) {};
+    PathHandler(bool is_styled, bool is_on_nav_bar)
+        : is_styled_(is_styled), is_on_nav_bar_(is_on_nav_bar) {}
 
     void AddCallback(const PathHandlerCallback& callback) {
       callbacks_.push_back(callback);
     }
 
     bool is_styled() const { return is_styled_; }
+    bool is_on_nav_bar() const { return is_on_nav_bar_; }
     const std::vector<PathHandlerCallback>& callbacks() const { return callbacks_; }
 
    private:
-    // If true, the page appears in the navigation bar.
+    // If true, the page appears is rendered styled.
     bool is_styled_;
+
+    // If true, the page appears in the navigation bar.
+    bool is_on_nav_bar_;
 
     // List of callbacks to render output for this page, called in order.
     std::vector<PathHandlerCallback> callbacks_;

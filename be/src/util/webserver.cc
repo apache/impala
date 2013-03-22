@@ -230,11 +230,12 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
 }
 
 void Webserver::RegisterPathHandler(const string& path,
-    const PathHandlerCallback& callback, bool is_styled) {
+    const PathHandlerCallback& callback, bool is_styled, bool is_on_nav_bar) {
   mutex::scoped_lock lock(path_handlers_lock_);
   PathHandlerMap::iterator it = path_handlers_.find(path);
   if (it == path_handlers_.end()) {
-    it = path_handlers_.insert(make_pair(path, PathHandler(is_styled))).first;
+    it = path_handlers_.insert(
+        make_pair(path, PathHandler(is_styled, is_on_nav_bar))).first;
   }
   it->second.AddCallback(callback);
 }
@@ -278,7 +279,7 @@ void Webserver::BootstrapPageHeader(stringstream* output) {
   (*output) << PAGE_HEADER;
   (*output) << NAVIGATION_BAR_PREFIX;
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
-    if (handler.second.is_styled()) {
+    if (handler.second.is_on_nav_bar()) {
       (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first
                 << "</a></li>";
     }
