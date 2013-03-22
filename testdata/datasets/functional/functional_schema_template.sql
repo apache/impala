@@ -558,7 +558,17 @@ CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
+  ":key,
+bools:bool_col,
+ints:tinyint_col,
+	ints:smallint_col,
+ints:int_col,
+    ints:bigint_col,
+floats:float_col,
+floats:double_col,
+strings:date_string_col,
+strings:string_col,
+strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
 ---- LOAD

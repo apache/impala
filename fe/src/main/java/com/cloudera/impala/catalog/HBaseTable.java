@@ -91,7 +91,8 @@ public class HBaseTable extends Table {
     for (int i = 0; i < columnSpecs.length; i++) {
       String mappingSpec = columnSpecs[i];
       String[] mapInfo = mappingSpec.split("#");
-      String colInfo = mapInfo[0];
+      // Trim column info so that serdeproperties with new lines still parse correctly.
+      String colInfo = mapInfo[0].trim();
 
       int idxFirst = colInfo.indexOf(":");
       int idxLast = colInfo.lastIndexOf(":");
