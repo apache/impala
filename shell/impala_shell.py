@@ -89,8 +89,8 @@ class ImpalaShell(cmd.Cmd):
     self.default_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
     self.show_profiles = options.show_profiles
-    # Tracks the last query executed. Stored as a tuple of: (query_handle, query_string)
-    self.last_query = None
+    # Tracks query handle of the last query executed. Used by the 'profile' command.
+    self.last_query_handle = None
     try:
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
@@ -232,7 +232,7 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('refresh')
       if self.default_db:
         self.cmdqueue.append('use %s' % self.default_db)
-    self.last_query = None
+    self.last_query_handle = None
     return True
 
   def __connect(self):
@@ -377,7 +377,7 @@ class ImpalaShell(cmd.Cmd):
     self.__print_runtime_profile_if_enabled(handle)
     self.__print_if_verbose(
       "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end - start))
-    self.last_query = (handle, query.query)
+    self.last_query_handle = handle
     return self.__close_query_handle(handle)
 
   def __close_query_handle(self, handle):
@@ -420,11 +420,10 @@ class ImpalaShell(cmd.Cmd):
     if len(args) > 0:
       print "'profile' does not accept any arguments"
       return False
-    elif self.last_query is None or len(self.last_query) != 2:
+    elif self.last_query_handle is None:
       print 'No previous query available to profile'
       return False
-    print 'Query: %s' % self.last_query[1]
-    self.__print_runtime_profile(self.last_query[0])
+    self.__print_runtime_profile(self.last_query_handle)
     return True
 
   def do_select(self, args):
@@ -496,7 +495,7 @@ class ImpalaShell(cmd.Cmd):
     self.__print_runtime_profile_if_enabled(handle)
     num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
     self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
-    self.last_query = (handle, query.query)
+    self.last_query_handle = handle
     return True
 
   def __cancel_query(self, handle):
