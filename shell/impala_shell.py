@@ -29,7 +29,6 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
-from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
@@ -84,8 +83,8 @@ class ImpalaShell(cmd.Cmd):
     self.imp_service = None
     self.transport = None
     self.fetch_batch_size = 1024
-    self.query_options = {}
-    self.__make_default_options()
+    self.default_query_options = {}
+    self.set_query_options = {}
     self.query_state = QueryState._NAMES_TO_VALUES
     self.refresh_after_connect = options.refresh_after_connect
     self.default_db = options.default_db
@@ -106,19 +105,26 @@ class ImpalaShell(cmd.Cmd):
     self.is_interrupted = threading.Event()
     signal.signal(signal.SIGINT, self.__signal_handler)
 
-  def __get_option_name(self, option):
-    return TImpalaQueryOptions._VALUES_TO_NAMES[option]
-
-  def __make_default_options(self):
-    self.query_options = {}
-    for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
-      self.query_options[self.__get_option_name(option)] = default
-
-  def __print_options(self):
-    print '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.query_options.iteritems()])
+  def __print_options(self, options):
+    if not options:
+      print '\tNo options available.'
+    else:
+      print '\n'.join(["\t%s: %s" % (k,v) for (k,v) in options.iteritems()])
 
   def __options_to_string_list(self):
-    return ["%s=%s" % (k,v) for (k,v) in self.query_options.iteritems()]
+    return ["%s=%s" % (k,v) for (k,v) in self.set_query_options.iteritems()]
+
+  def __build_default_query_options_dict(self):
+    # The default query options are retrieved from a rpc call, and are dependent
+    # on the impalad to which a connection has been established. They need to be
+    # refreshed each time a connection is made. This is particularly helpful when
+    # there is a version mismatch between the shell and the impalad.
+    get_default_query_options = self.imp_service.get_default_configuration(False)
+    options, status = self.__do_rpc(lambda: get_default_query_options)
+    if status != RpcStatus.OK:
+      print 'Unable to retrive default query options'
+    for option in options:
+      self.default_query_options[option.key.upper()] = option.value
 
   def do_shell(self, args):
     """Run a command on the shell
@@ -175,9 +181,16 @@ class ImpalaShell(cmd.Cmd):
 
     """
     # TODO: Expand set to allow for setting more than just query options.
+    if not self.connected:
+      print "Query options currently set:"
+      self.__print_options(self.set_query_options)
+      print "Connect to an impalad to see the default query options"
+      return True
     if len(args) == 0:
-      self.__print_if_verbose("Impala query options:")
-      self.__print_options()
+      print "Default query options:"
+      self.__print_options(self.default_query_options)
+      print "Query options currently set:"
+      self.__print_options(self.set_query_options)
       return True
 
     tokens = args.split("=")
@@ -185,14 +198,26 @@ class ImpalaShell(cmd.Cmd):
       print "Error: SET <option>=<value>"
       return False
     option_upper = tokens[0].upper()
-    if option_upper not in ImpalaService.TImpalaQueryOptions._NAMES_TO_VALUES.keys():
+    if option_upper not in self.default_query_options.keys():
       print "Unknown query option: %s" % (tokens[0],)
-      available_options = \
-          '\n\t'.join(ImpalaService.TImpalaQueryOptions._NAMES_TO_VALUES.keys())
-      print "Available query options are: \n\t%s" % available_options
+      print "Available query options, with their default values are:"
+      self.__print_options(self.default_query_options)
       return False
-    self.query_options[option_upper] = tokens[1]
+    self.set_query_options[option_upper] = tokens[1]
     self.__print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
+    return True
+
+  def do_unset(self, args):
+    """Unset a query option"""
+    if len(args.split()) != 1:
+      print 'Usage: unset <option>'
+      return False
+    option = args.upper()
+    if self.set_query_options.get(option):
+      print 'Unsetting %s' % option
+      del self.set_query_options[option]
+    else:
+      print "No option called %s is set" % args
     return True
 
   def do_quit(self, args):
@@ -235,6 +260,14 @@ class ImpalaShell(cmd.Cmd):
       if self.default_db:
         self.cmdqueue.append('use %s' % self.default_db)
     self.last_query_handle = None
+    self.__build_default_query_options_dict()
+    # Check if any of query options set by the user are inconsistent
+    # with the impalad being connected to
+    for set_option in self.set_query_options.keys():
+      if set_option not in set(self.default_query_options.keys()):
+        print ('%s is not supported for the impalad being '
+               'connected to, ignoring.' % set_option)
+        del self.set_query_options[set_option]
     return True
 
   def __connect(self):
