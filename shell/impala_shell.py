@@ -23,6 +23,7 @@ import os
 import signal
 import threading
 from optparse import OptionParser
+import getpass
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -72,6 +73,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
+    self.user = getpass.getuser()
     self.is_alive = True
     self.use_kerberos = options.use_kerberos
     self.verbose = options.verbose
@@ -289,6 +291,11 @@ class ImpalaShell(cmd.Cmd):
 
     return 1.0
 
+  def __create_beeswax_query_handle(self):
+    handle = BeeswaxService.Query()
+    handle.hadoop_user = self.user
+    return handle
+
   def __construct_table_header(self, handle):
     """ Constructs the table header for a given query handle.
 
@@ -403,7 +410,7 @@ class ImpalaShell(cmd.Cmd):
       print message
 
   def do_create(self, args):
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "create %s" % (args,)
     query.configuration = self.__options_to_string_list()
 
@@ -411,7 +418,7 @@ class ImpalaShell(cmd.Cmd):
     return status == RpcStatus.OK
 
   def do_drop(self, args):
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "drop %s" % (args,)
     query.configuration = self.__options_to_string_list()
 
@@ -431,35 +438,35 @@ class ImpalaShell(cmd.Cmd):
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "select %s" % (args,)
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
   def do_use(self, args):
     """Executes a USE... query"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "use %s" % (args,)
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
   def do_show(self, args):
     """Executes a SHOW... query, fetching all rows"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "show %s" % (args,)
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
   def do_describe(self, args):
     """Executes a DESCRIBE... query, fetching all rows"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "describe %s" % (args,)
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
   def do_insert(self, args):
     """Executes an INSERT query"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     query.query = "insert %s" % (args,)
     query.configuration = self.__options_to_string_list()
     print "Query: %s" % (query.query,)
@@ -567,7 +574,7 @@ class ImpalaShell(cmd.Cmd):
 
   def do_explain(self, args):
     """Explain the query execution plan"""
-    query = BeeswaxService.Query()
+    query = self.__create_beeswax_query_handle()
     # Args is all text except for 'explain', so no need to strip it out
     query.query = args
     query.configuration = self.__options_to_string_list()

@@ -15,6 +15,7 @@ import time
 import sys
 import shlex
 import traceback
+import getpass
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -47,7 +48,7 @@ class QueryResult(object):
     self.query = query
     self.success = success
     # Insert returns an int, convert into list to have a uniform data type.
-    # TODO: We shold revisit this if we have more datatypes to deal with.
+    # TODO: We should revisit this if we have more datatypes to deal with.
     self.data = data
     if not isinstance(self.data, list):
       self.data = str(self.data)
@@ -168,6 +169,7 @@ class ImpalaBeeswaxClient(object):
     """
     query = BeeswaxService.Query()
     query.query = query_string
+    query.hadoop_user = getpass.getuser()
     query.configuration = self.__options_to_string_list()
     return self.__do_rpc(lambda: self.imp_service.query(query,))
 

@@ -145,7 +145,16 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
   shared_ptr<QueryExecState> exec_state;
   ThriftServer::SessionKey* session_key = ThriftServer::GetThreadSessionKey();
-  status = Execute(query_request, *session_key, &exec_state);
+  shared_ptr<SessionState> session;
+  GetSessionState(*session_key, &session);
+  DCHECK(session != NULL);  // We made these keys...
+  {
+    // The session is created when it connects.  We don't know the user until 
+    // something is run.
+    lock_guard<mutex> l(session->lock);
+    if (session->user.empty()) session->user = query.hadoop_user;
+  }
+  status = Execute(query_request, session, query_request.sessionState, &exec_state);
 
   if (!status.ok()) {
     // raise Syntax error or access violation;
@@ -182,7 +191,16 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   shared_ptr<QueryExecState> exec_state;
   ThriftServer::SessionKey* session_key = ThriftServer::GetThreadSessionKey();
-  status = Execute(query_request, *session_key, &exec_state);
+  shared_ptr<SessionState> session;
+  GetSessionState(*session_key, &session);
+  DCHECK(session != NULL);  // We made these keys...
+  {
+    // The session is created when it connects.  We don't know the user until 
+    // something is run.
+    lock_guard<mutex> l(session->lock);
+    if (session->user.empty()) session->user = query.hadoop_user;
+  }
+  status = Execute(query_request, session, query_request.sessionState, &exec_state);
 
   if (!status.ok()) {
     // raise Syntax error or access violation;
@@ -428,6 +446,7 @@ void ImpalaServer::SessionStart(const ThriftServer::SessionKey& session_key) {
   // DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
   shared_ptr<SessionState> state;
   state.reset(new SessionState);
+  state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->database = "default";
   state->session_type = BEESWAX;
@@ -447,11 +466,9 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   request->stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
-    shared_ptr<SessionState> session_state;
-    RETURN_IF_ERROR(GetSessionState(*ThriftServer::GetThreadSessionKey(),
-        &session_state));
-    lock_guard<mutex> l(session_state->lock, adopt_lock_t());
-    session_state->ToThrift(&request->sessionState);
+    shared_ptr<SessionState> session;
+    RETURN_IF_ERROR(GetSessionState(*ThriftServer::GetThreadSessionKey(), &session));
+    session->ToThrift(&request->sessionState);
   }
 
   // Override default query options with Query.Configuration

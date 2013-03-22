@@ -113,8 +113,18 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
 void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
     const TMetadataOpRequest& request,
     TOperationHandle* handle, apache::hive::service::cli::thrift::TStatus* status) {
+  shared_ptr<SessionState> session;
+  GetSessionState(session_key, &session);
+  if (session == NULL) {
+    status->__set_statusCode(
+        apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+    status->__set_errorMessage("Invalid session key");
+    status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
+    return;
+  }
+
   shared_ptr<QueryExecState> exec_state;
-  exec_state.reset(new QueryExecState(session_key, exec_env_, this));
+  exec_state.reset(new QueryExecState(exec_env_, this, session, TSessionState()));
   // start execution of metadata first;
   Status exec_status = exec_state->Exec(request);
   if (!exec_status.ok()) {
@@ -128,7 +138,7 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
   exec_state->UpdateQueryState(QueryState::FINISHED);
 
   // register exec state after execution is success
-  Status register_status = RegisterQuery(session_key, exec_state->query_id(), exec_state);
+  Status register_status = RegisterQuery(session, exec_state->query_id(), exec_state);
   if (!register_status.ok())
   {
     status->__set_statusCode(
@@ -194,8 +204,8 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
     shared_ptr<SessionState> session_state;
     RETURN_IF_ERROR(GetSessionState(execute_request.sessionHandle.sessionId.guid,
         &session_state));
-    lock_guard<mutex> l(session_state->lock, adopt_lock_t());
     session_state->ToThrift(&client_request->sessionState);
+    lock_guard<mutex> l(session_state->lock);
     client_request->queryOptions = session_state->default_query_options;
   }
 
@@ -229,8 +239,10 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // query options.
   // TODO: put secret in session state map and check it
   shared_ptr<SessionState> state(new SessionState());
+  state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->session_type = HIVESERVER2;
+  state->user = request.username;
 
   // TODO: request.configuration might specify database.
   state->database = "default";
@@ -300,7 +312,14 @@ void ImpalaServer::ExecuteStatement(
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
-  status = Execute(query_request, request.sessionHandle.sessionId.guid, &exec_state);
+  shared_ptr<SessionState> session; 
+  GetSessionState(request.sessionHandle.sessionId.guid, &session);
+  if (session == NULL) {
+    HS2_RETURN_IF_ERROR(
+        return_val, Status("Invalid session key"), SQLSTATE_GENERAL_ERROR);
+  }
+
+  status = Execute(query_request, session, query_request.sessionState, &exec_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   return_val.__isset.operationHandle = true;

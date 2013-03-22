@@ -170,6 +170,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       summary_info_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
       summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
       summary_info_.AddInfoString("Impala Version", GetVersionString());
+      summary_info_.AddInfoString("User", user());
+      summary_info_.AddInfoString("Default Db", default_db());
       profile_.AddChild(coord_->query_profile());
     }
   } else {
@@ -793,7 +795,9 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 
 void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,
     bool render_end_time, stringstream* output) {
-  (*output) << "<tr><td>" << record.id << "</td>"
+  (*output) << "<tr>"
+            << "<td>" << record.user << "</td>"
+            << "<td>" << record.default_db << "</td>"
             << "<td>" << record.stmt << "</td>"
             << "<td>"
             << _TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second
@@ -839,16 +843,17 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   (*output) << "This page lists all registered queries, i.e., those that are not closed "
     " nor cancelled.<br/>" << endl;
   (*output) << query_exec_state_map_.size() << " queries in flight" << endl;
-  (*output) << "<table class='table table-hover table-border'><tr><th>Query Id</th>"
-            << endl;
-  (*output) << "<th>Statement</th>" << endl;
-  (*output) << "<th>Query Type</th>" << endl;
-  (*output) << "<th>Start Time</th>" << endl;
-  (*output) << "<th>Backend Progress</th>" << endl;
-  (*output) << "<th>State</th>" << endl;
-  (*output) << "<th># rows fetched</th>" << endl;
-  (*output) << "<th>Profile</th>" << endl;
-  (*output) << "</tr>";
+  (*output) << "<table class='table table-hover table-border'><tr>"
+            << "<th>User</th>" << endl
+            << "<th>Default Db</th>" << endl
+            << "<th>Statement</th>" << endl
+            << "<th>Query Type</th>" << endl
+            << "<th>Start Time</th>" << endl
+            << "<th>Backend Progress</th>" << endl
+            << "<th>State</th>" << endl
+            << "<th># rows fetched</th>" << endl
+            << "<th>Profile</th>" << endl
+            << "</tr>";
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
     QueryStateRecord record(*exec_state.second, false);
     RenderSingleQueryTableRow(record, false, output);
@@ -871,17 +876,18 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
 
   // Print the query log
   (*output) << "<h2>Finished Queries</h2>";
-  (*output) << "<table class='table table-hover table-border'><tr><th>Query Id</th>"
-            << endl;
-  (*output) << "<th>Statement</th>" << endl;
-  (*output) << "<th>Query Type</th>" << endl;
-  (*output) << "<th>Start Time</th>" << endl;
-  (*output) << "<th>End Time</th>" << endl;
-  (*output) << "<th>Backend Progress</th>" << endl;
-  (*output) << "<th>State</th>" << endl;
-  (*output) << "<th># rows fetched</th>" << endl;
-  (*output) << "<th>Profile</th>" << endl;
-  (*output) << "</tr>";
+  (*output) << "<table class='table table-hover table-border'><tr>"
+            << "<th>User</th>" << endl
+            << "<th>Default Db</th>" << endl
+            << "<th>Statement</th>" << endl
+            << "<th>Query Type</th>" << endl
+            << "<th>Start Time</th>" << endl
+            << "<th>End Time</th>" << endl
+            << "<th>Backend Progress</th>" << endl
+            << "<th>State</th>" << endl
+            << "<th># rows fetched</th>" << endl
+            << "<th>Profile</th>" << endl
+            << "</tr>";
 
   {
     lock_guard<mutex> l(query_log_lock_);
@@ -900,8 +906,11 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
   (*output) << "There are " << session_state_map_.size() << " active sessions." << endl
             << "<table class='table table-bordered table-hover'>"
             << "<tr><th>Session Type</th>"
+            << "<th>User</th>"
             << "<th>Session Key</th>"
-            << "<th>Default Database</th><th>Start Time</th></tr>" << endl;
+            << "<th>Default Database</th>"
+            << "<th>Start Time</th></tr>" 
+            << endl;
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
     string session_type;
     string session_key;
@@ -920,6 +929,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
     }
     (*output) << "<tr>"
               << "<td>" << session_type << "</td>"
+              << "<td>" << session.second->user << "</td>"
               << "<td>" << session_key << "</td>"
               << "<td>" << session.second->database << "</td>"
               << "<td>" << session.second->start_time.DebugString() << "</td>"
@@ -1006,12 +1016,13 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
 ImpalaServer::~ImpalaServer() {}
 
 Status ImpalaServer::Execute(const TClientRequest& request,
-    const ThriftServer::SessionKey& session_key,
+    shared_ptr<SessionState> session_state,
+    const TSessionState& query_session_state,
     shared_ptr<QueryExecState>* exec_state) {
   bool registered_exec_state;
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
-  Status status = ExecuteInternal(request, session_key, &registered_exec_state,
-      exec_state);
+  Status status = ExecuteInternal(request, session_state, query_session_state,
+      &registered_exec_state, exec_state);
   if (!status.ok() && registered_exec_state) {
     UnregisterQuery((*exec_state)->query_id());
   }
@@ -1019,9 +1030,15 @@ Status ImpalaServer::Execute(const TClientRequest& request,
 }
 
 Status ImpalaServer::ExecuteInternal(
-    const TClientRequest& request, const ThriftServer::SessionKey& session_key,
-    bool* registered_exec_state, shared_ptr<QueryExecState>* exec_state) {
-  exec_state->reset(new QueryExecState(session_key, exec_env_, this));
+    const TClientRequest& request, 
+    shared_ptr<SessionState> session_state,
+    const TSessionState& query_session_state,
+    bool* registered_exec_state, 
+    shared_ptr<QueryExecState>* exec_state) {
+  DCHECK(session_state != NULL);
+
+  exec_state->reset(
+      new QueryExecState(exec_env_, this, session_state, query_session_state));
   *registered_exec_state = false;
 
   TExecRequest result;
@@ -1033,9 +1050,7 @@ Status ImpalaServer::ExecuteInternal(
   if (result.stmt_type == TStmtType::DDL &&
       result.ddl_exec_request.ddl_type == TDdlType::USE) {
     {
-      shared_ptr<SessionState> session_state;
-      RETURN_IF_ERROR(GetSessionState(session_key, &session_state));
-      lock_guard<mutex> l(session_state->lock, adopt_lock_t());
+      lock_guard<mutex> l(session_state->lock);
       session_state->database = result.ddl_exec_request.use_db_params.db;
     }
     exec_state->reset();
@@ -1048,7 +1063,7 @@ Status ImpalaServer::ExecuteInternal(
 
   // register exec state before starting execution in order to handle incoming
   // status reports
-  RETURN_IF_ERROR(RegisterQuery(session_key, result.request_id, *exec_state));
+  RETURN_IF_ERROR(RegisterQuery(session_state, result.request_id, *exec_state));
   *registered_exec_state = true;
 
   // start execution of query; also starts fragment status reports
@@ -1068,11 +1083,13 @@ Status ImpalaServer::ExecuteInternal(
   return Status::OK;
 }
 
-Status ImpalaServer::RegisterQuery(const ThriftServer::SessionKey& session_key,
+Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     const TUniqueId& query_id, const shared_ptr<QueryExecState>& exec_state) {
-  shared_ptr<SessionState> session_state;
-  RETURN_IF_ERROR(GetSessionState(session_key, &session_state));
-  lock_guard<mutex> l2(session_state->lock, adopt_lock_t());
+  lock_guard<mutex> l2(session_state->lock);
+  if (session_state->closed) {
+    return Status("Session has been closed, ignoring query.");
+  }
+
   lock_guard<mutex> l(query_exec_state_map_lock_);
 
   QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
@@ -1398,6 +1415,13 @@ Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionKey& sessio
     }
     session_state = entry->second;
     session_state_map_.erase(session_key);
+  }
+  DCHECK(session_state != NULL);
+
+  {
+    lock_guard<mutex> l(session_state->lock);
+    DCHECK(!session_state->closed);
+    session_state->closed = true;
   }
 
   // Unregister all open queries from this session.
@@ -1757,6 +1781,7 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
 }
 
 void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
+  lock_guard<mutex> l(lock);
   state->database = database;
 }
 
@@ -1808,6 +1833,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   stmt = (request.stmt_type != TStmtType::DDL && request.__isset.sql_stmt) ?
       request.sql_stmt : "N/A";
   stmt_type = request.stmt_type;
+  user = exec_state.user();
+  default_db = exec_state.default_db();
   start_time = exec_state.start_time();
   end_time = exec_state.end_time();
   has_coord = false;
