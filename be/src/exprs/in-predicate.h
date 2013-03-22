@@ -22,6 +22,9 @@
 namespace impala {
 
 class InPredicate : public Predicate {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+
  protected:
   friend class Expr;
 

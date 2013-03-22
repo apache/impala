@@ -335,13 +335,17 @@ class Expr {
   // - args: args to call this compute function with
   // - null_block: block in caller function to jump to if the child is null
   // - not_null_block: block in caller function to jump to if the child is not null
+  // - result_var_name: name of the variable for child result.  This is the name 
+  //   generated in the IR so it's only useful for debugging.
   llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* caller,
-      llvm::Value** args, llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
+      llvm::Value** args, llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block,
+      const char* result_var_name = "child_result");
 
   // This is a wrapper around CodegenGetValue() that is used by a parent Expr node to
   // call a child.  The parent args are used to call the child function.
   llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* parent,
-      llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
+      llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block,
+      const char* result_var_name = "child_result");
 
   // Returns the llvm return type for this expr
   llvm::Type* GetLlvmReturnType(LlvmCodeGen* codegen) const;

@@ -645,21 +645,23 @@ void Expr::CodegenSetIsNullArg(LlvmCodeGen* codegen, BasicBlock* block, bool val
 }
 
 Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* caller, 
-    Value* args[3], BasicBlock* null_block, BasicBlock* not_null_block) {
+    Value* args[3], BasicBlock* null_block, BasicBlock* not_null_block,
+    const char* result_var_name) {
   DCHECK(codegen_fn() != NULL);
   LlvmCodeGen::LlvmBuilder builder(caller);
   Value* result = builder.CreateCall3(
-      codegen_fn(), args[0], args[1], args[2], "child_result");
+      codegen_fn(), args[0], args[1], args[2], result_var_name);
   Value* is_null_val = builder.CreateLoad(args[2], "child_null");
   builder.CreateCondBr(is_null_val, null_block, not_null_block);
   return result;
 }
 
 Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* parent, 
-    BasicBlock* null_block, BasicBlock* not_null_block) {
+    BasicBlock* null_block, BasicBlock* not_null_block, const char* result_var_name) {
   Function::arg_iterator parent_args = parent->getParent()->arg_begin();
   Value* args[3] = { parent_args++, parent_args++, parent_args };
-  return CodegenGetValue(codegen, parent, args, null_block, not_null_block);
+  return CodegenGetValue(
+      codegen, parent, args, null_block, not_null_block, result_var_name);
 }
 
 // typedefs for jitted compute functions  
