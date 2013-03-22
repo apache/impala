@@ -66,6 +66,7 @@ class SimpleScheduler : public Scheduler {
   virtual void GetAllKnownHosts(HostList* hostports);
 
   virtual bool HasLocalHost(const TNetworkAddress& data_location) {
+    boost::lock_guard<boost::mutex> lock(host_map_lock_);
     HostLocalityMap::iterator entry = host_map_.find(data_location.hostname);
     return (entry != host_map_.end());
   }
