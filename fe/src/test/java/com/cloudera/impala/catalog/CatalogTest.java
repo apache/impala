@@ -313,6 +313,25 @@ public class CatalogTest {
     assertNull(nonExistentDb);
   }
 
+  @Test
+  public void testLoadingUnsupportedTableTypes() {
+    try {
+      Table table = catalog.getDb("functional").getTable("hive_view");
+      fail("Expected TableLoadingException when loading VIRTUAL_VIEW");
+    } catch (TableLoadingException e) {
+      assertEquals("Unsupported table type 'VIRTUAL_VIEW' for: functional.hive_view",
+          e.getMessage());
+    }
+
+    try {
+      Table table = catalog.getDb("functional").getTable("hive_index_tbl");
+      fail("Expected TableLoadingException when loading INDEX_TABLE");
+    } catch (TableLoadingException e) {
+      assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
+          e.getMessage());
+    }
+  }
+
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
   // test validates that our representation of the catalog fixes this and removes the
   // escape char.

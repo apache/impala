@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 
 import com.cloudera.impala.analysis.Expr;
@@ -97,6 +98,13 @@ public abstract class Table {
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           client.getTable(db.getName(), tblName);
+
+      // Check that the Hive TableType is supported
+      TableType tableType = TableType.valueOf(msTbl.getTableType());
+      if (tableType != TableType.EXTERNAL_TABLE && tableType != TableType.MANAGED_TABLE) {
+        throw new TableLoadingException(String.format(
+            "Unsupported table type '%s' for: %s.%s", tableType, db.getName(), tblName));
+      }
 
       // Determine the table type
       Table table = null;
