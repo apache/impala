@@ -60,8 +60,9 @@ public class HBaseTable extends Table {
   private static final String hbaseInputFormat =
     "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
 
-  protected HBaseTable(TableId id, Db db, String name, String owner) {
-    super(id,db, name, owner);
+  protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+      Db db, String name, String owner) {
+    super(id, msTbl, db, name, owner);
   }
 
   // Parse the column description string to the column families and column

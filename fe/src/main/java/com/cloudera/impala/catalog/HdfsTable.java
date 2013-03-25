@@ -435,8 +435,9 @@ public class HdfsTable extends Table {
     return HdfsFileFormat.isHdfsFormatClass(sd.getInputFormat());
   }
 
-  protected HdfsTable(TableId id, Db db, String name, String owner) {
-    super(id, db, name, owner);
+  protected HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl, Db db,
+      String name, String owner) {
+    super(id, msTbl, db, name, owner);
     this.partitions = Lists.newArrayList();
   }
 

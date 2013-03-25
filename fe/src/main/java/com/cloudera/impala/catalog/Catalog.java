@@ -59,7 +59,8 @@ import com.cloudera.impala.thrift.TColumnDesc;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
- * This class caches db-, table- and column-related metadata.
+ * This class caches db-, table- and column-related metadata. Metadata updates (via DDL
+ * operations like CREATE and DROP) are currently serialized for simplicity.
  * Although this class is thread safe, it does not guarantee consistency with the
  * MetaStore. It is important to keep in mind that there may be external (potentially
  * conflicting) concurrent metastore updates occurring at any time. This class does
@@ -471,7 +472,7 @@ public class Catalog {
   public void createTableLike(TableName tableName, TableName srcTableName,
       boolean isExternal, String location, boolean ifNotExists) throws MetaException,
       NoSuchObjectException, AlreadyExistsException, InvalidObjectException,
-      org.apache.thrift.TException {
+      org.apache.thrift.TException, ImpalaException, TableLoadingException {
     checkTableNameFullyQualified(tableName);
     checkTableNameFullyQualified(srcTableName);
     if (ifNotExists && containsTable(tableName.getDb(), tableName.getTbl())) {
@@ -479,10 +480,9 @@ public class Catalog {
           "ifNotExists is true.", tableName));
       return;
     }
-    // getTable() returns a deep copy of the Hive Table object
+    Table srcTable = getTable(srcTableName.getDb(), srcTableName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
-        getMetaStoreClient().getHiveClient().getTable(srcTableName.getDb(),
-                                                      srcTableName.getTbl());
+        srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tableName.getDb());
     tbl.setTableName(tableName.getTbl());
     if (tbl.getParameters() == null) {
@@ -522,7 +522,9 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      dbs.get(newTable.getDbName()).invalidateTable(newTable.getTableName(), false);
+      Db db = dbs.get(newTable.getDbName());
+      Preconditions.checkNotNull(db);
+      db.invalidateTable(newTable.getTableName(), false);
     }
   }
 
@@ -652,5 +654,26 @@ public class Catalog {
   public boolean containsTable(String dbName, String tableName) {
     Db db = getDb(dbName);
     return db != null && db.containsTable(tableName);
+  }
+
+  /**
+   * Returns the Table object for the given dbName/tableName. This will trigger a
+   * metadata load if the table metadata is not yet cached.
+   * @throws DatabaseNotFoundException - If the database does not exist.
+   * @throws TableNotFoundException - If the table does not exist.
+   * @throws TableLoadingException - If there is an error loading the table metadata.
+   */
+  public Table getTable(String dbName, String tableName) throws
+      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database not found: " + dbName);
+    }
+    Table table = db.getTable(tableName);
+    if (table == null) {
+      throw new TableNotFoundException(
+          String.format("Table not found: %s.%s", dbName, tableName));
+    }
+    return table;
   }
 }

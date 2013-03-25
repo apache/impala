@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TableName;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.ImpalaException;
@@ -119,7 +120,7 @@ public class JniFrontend {
 
   public void createDatabase(byte[] thriftCreateDbParams)
       throws ImpalaException, MetaException, org.apache.thrift.TException,
-      AlreadyExistsException,InvalidObjectException {
+      AlreadyExistsException, InvalidObjectException {
     TCreateDbParams params = new TCreateDbParams();
     deserializeThrift(params, thriftCreateDbParams);
     frontend.createDatabase(params.getDb(), params.getComment(), params.getLocation(),
@@ -141,8 +142,8 @@ public class JniFrontend {
 
   public void createTableLike(byte[] thriftCreateTableLikeParams)
       throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException,
-      InvalidObjectException {
+      org.apache.thrift.TException, AlreadyExistsException, InvalidObjectException,
+      TableLoadingException {
     TCreateTableLikeParams params = new TCreateTableLikeParams();
     deserializeThrift(params, thriftCreateTableLikeParams);
     frontend.createTableLike(TableName.fromThrift(params.getTable_name()), 

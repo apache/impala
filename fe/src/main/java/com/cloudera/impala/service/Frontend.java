@@ -201,7 +201,8 @@ public class Frontend {
   public void createTableLike(TableName tableName, TableName oldTableName,
       boolean isExternal,String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException {
+      AlreadyExistsException, InvalidObjectException, ImpalaException,
+      TableLoadingException {
     catalog.createTableLike(tableName, oldTableName, isExternal,
         location, ifNotExists);
   }

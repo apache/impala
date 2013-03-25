@@ -41,6 +41,7 @@ import com.google.common.collect.Maps;
  */
 public abstract class Table {
   protected final TableId id;
+  private final org.apache.hadoop.hive.metastore.api.Table msTable;
   protected final Db db;
   protected final String name;
   protected final String owner;
@@ -57,8 +58,10 @@ public abstract class Table {
   /**  map from lowercase col. name to Column */
   protected final Map<String, Column> colsByName;
 
-  protected Table(TableId id, Db db, String name, String owner) {
+  protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
+      String name, String owner) {
     this.id = id;
+    this.msTable = msTable;
     this.db = db;
     this.name = name;
     this.owner = owner;
@@ -68,6 +71,14 @@ public abstract class Table {
 
   public TableId getId() {
     return id;
+  }
+
+  /**
+   * Returns the metastore.api.Table object this Table was created from. Returns null
+   * if the derived Table object was not created from a metastore Table (ex. InlineViews).
+   */
+  public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
+    return msTable;
   }
 
   /**
@@ -109,9 +120,9 @@ public abstract class Table {
       // Determine the table type
       Table table = null;
       if (HBaseTable.isHBaseTable(msTbl)) {
-        table = new HBaseTable(id, db, tblName, msTbl.getOwner());
+        table = new HBaseTable(id, msTbl, db, tblName, msTbl.getOwner());
       } else if (HdfsTable.isHdfsTable(msTbl)) {
-        table = new HdfsTable(id, db, tblName, msTbl.getOwner());
+        table = new HdfsTable(id, msTbl, db, tblName, msTbl.getOwner());
       } else {
         throw new TableLoadingException("Unrecognized table type for table: " + tblName);
       }

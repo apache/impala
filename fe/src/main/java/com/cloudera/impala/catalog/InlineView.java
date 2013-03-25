@@ -36,7 +36,7 @@ public class InlineView extends Table {
    * @param alias alias of the inline view; must not be null;
    */
   public InlineView(String alias) {
-    super(null, null, alias, null);
+    super(null, null, null, alias, null);
     Preconditions.checkArgument(alias != null);
   }
 
