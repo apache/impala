@@ -439,3 +439,18 @@ int, int, int, int, int, int, int, int
 8,8,NULL,1,1,NULL,1,1
 9,9,NULL,1,1,NULL,1,1
 ====
+---- QUERY
+# test full outer join where the RHS is empty and the LHS has a very low selectivity
+# test query filed in IMP-791
+SELECT a.string_col ts2
+FROM alltypes a
+     FULL OUTER JOIN (
+         select * from alltypessmall where id < 0
+     ) b
+     ON a.id=b.id AND a.id = 1
+ORDER BY ts2 DESC LIMIT 10;
+---- TYPES
+string
+---- RESULTS
+'1'
+====

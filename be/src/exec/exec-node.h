@@ -58,6 +58,7 @@ class ExecNode {
 
   // Performs any preparatory work prior to calling GetNext().
   // Can be called repeatedly (after calls to Close()).
+  // Caller must not be holding any io buffers. This will cause deadlock.
   virtual Status Open(RuntimeState* state) = 0;
 
   // Retrieves rows and returns them via row_batch. Sets eos to true
@@ -71,6 +72,7 @@ class ExecNode {
   // In other words, if the memory holding the tuple data will be referenced
   // by the callee in subsequent GetNext() calls, it must *not* be attached to the
   // row_batch's tuple_data_pool.
+  // Caller must not be holding any io buffers. This will cause deadlock.
   // TODO: AggregationNode and HashJoinNode cannot be "re-opened" yet.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
 
