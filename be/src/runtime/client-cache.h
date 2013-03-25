@@ -48,10 +48,11 @@ namespace impala {
 // TODO: in order to reduce locking overhead when getting/releasing clients,
 // add call to hand back pointer to list stored in ClientCache and add separate lock
 // to list (or change to lock-free list)
+// TODO: reduce locking overhead and by adding per-address client caches, each with its
+// own lock.
 // TODO: More graceful handling of clients that have failed (maybe better
 // handled by a smart-wrapper of the interface object).
 // TODO: limits on total number of clients, and clients per-backend
-// TODO: requiring caller to release client is very prone to leaking.
 class ClientCacheHelper {
  public:
   // Callback method which produces a client object when one cannot be
@@ -70,8 +71,8 @@ class ClientCacheHelper {
   // created.
   Status ReopenClient(ClientFactory factory_method, void** client_key);
 
-  // Return a client to the cache, without closing it
-  void ReleaseClient(void* client_key);
+  // Return a client to the cache, without closing it, and set *client_key to NULL.
+  void ReleaseClient(void** client_key);
 
   // Close all connections to a host (e.g., in case of failure) so that on their
   // next use they will have to be Reopen'ed.
@@ -116,6 +117,52 @@ class ClientCacheHelper {
       void** client_key);
 };
 
+template<class T>
+class ClientCache;
+
+// A scoped client connection to help manage clients from a client cache.
+//
+// Example:
+//   {
+//     ImpalaInternalServiceConnection client(cache, address, &status);
+//     try {
+//       client->TransmitData(...);
+//     } catch (TTransportException& e) {
+//       // Retry
+//       RETURN_IF_ERROR(client.Reopen());
+//       client->TransmitData(...);
+//     }
+//   }
+// ('client' is released back to cache upon destruction.)
+template<class T>
+class ClientConnection {
+ public:
+  ClientConnection(ClientCache<T>* client_cache, TNetworkAddress address, Status* status)
+    : client_cache_(client_cache),
+      client_(NULL) {
+    *status = client_cache_->GetClient(address, &client_);
+    if (status->ok()) DCHECK(client_ != NULL);
+  }
+
+  ~ClientConnection() {
+    if (client_ != NULL) {
+      client_cache_->ReleaseClient(&client_);
+    }
+  }
+
+  Status Reopen() {
+    return client_cache_->ReopenClient(&client_);
+  }
+
+  T* operator->() const {
+    return client_;
+  }
+
+ private:
+  ClientCache<T>* client_cache_;
+  T* client_;
+};
+
 // Generic cache of Thrift clients for a given service type.
 // This class is thread-safe.
 template<class T>
@@ -127,28 +174,6 @@ class ClientCache {
     client_factory_ =
         boost::bind<ThriftClientImpl*>(
             boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);
-  }
-
-  // Obtains a pointer to a Thrift interface object (of type T),
-  // backed by a live transport which is already open. Returns
-  // Status::OK unless there was an error opening the transport.
-  Status GetClient(const TNetworkAddress& hostport, T** iface) {
-    return client_cache_helper_.GetClient(hostport, client_factory_,
-        reinterpret_cast<void**>(iface));
-  }
-
-  // Close and delete the underlying transport. Return a new client connecting to the
-  // same host/port.
-  // Return an error status if a new connection cannot be established and *client will be
-  // NULL in that case.
-  Status ReopenClient(T** client) {
-    return client_cache_helper_.ReopenClient(client_factory_,
-        reinterpret_cast<void**>(client));
-  }
-
-  // Return the client to the cache
-  void ReleaseClient(T* client) {
-    return client_cache_helper_.ReleaseClient(reinterpret_cast<void*>(client));
   }
 
   // Close all clients connected to the supplied address, (e.g., in
@@ -177,6 +202,8 @@ class ClientCache {
   }
 
  private:
+  friend class ClientConnection<T>;
+
   // Most operations in this class are thin wrappers around the
   // equivalent in ClientCacheHelper, which is a non-templated cache
   // to avoid inlining lots of code wherever this cache is used.
@@ -184,6 +211,28 @@ class ClientCache {
 
   // Function pointer, bound to MakeClient, which produces clients when the cache is empty
   ClientCacheHelper::ClientFactory client_factory_;
+
+  // Obtains a pointer to a Thrift interface object (of type T),
+  // backed by a live transport which is already open. Returns
+  // Status::OK unless there was an error opening the transport.
+  Status GetClient(const TNetworkAddress& hostport, T** iface) {
+    return client_cache_helper_.GetClient(hostport, client_factory_,
+        reinterpret_cast<void**>(iface));
+  }
+
+  // Close and delete the underlying transport. Return a new client connecting to the
+  // same host/port.
+  // Return an error status if a new connection cannot be established and *client will be
+  // NULL in that case.
+  Status ReopenClient(T** client) {
+    return client_cache_helper_.ReopenClient(client_factory_,
+        reinterpret_cast<void**>(client));
+  }
+
+  // Return the client to the cache and set *client to NULL.
+  void ReleaseClient(T** client) {
+    return client_cache_helper_.ReleaseClient(reinterpret_cast<void**>(client));
+  }
 
   // Factory method to produce a new ThriftClient<T> for the wrapped cache
   ThriftClientImpl* MakeClient(const TNetworkAddress& hostport, void** client_key) {
@@ -198,6 +247,7 @@ class ClientCache {
 // to any other backend.
 class ImpalaInternalServiceClient;
 typedef ClientCache<ImpalaInternalServiceClient> ImpalaInternalServiceClientCache;
+typedef ClientConnection<ImpalaInternalServiceClient> ImpalaInternalServiceConnection;
 
 }
 

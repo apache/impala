@@ -111,10 +111,10 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
   return Status::OK;
 }
 
-void ClientCacheHelper::ReleaseClient(void* client_key) {
-  DCHECK(client_key != NULL) << "Trying to release NULL client";
+void ClientCacheHelper::ReleaseClient(void** client_key) {
+  DCHECK(*client_key != NULL) << "Trying to release NULL client";
   lock_guard<mutex> lock(lock_);
-  ClientMap::iterator i = client_map_.find(client_key);
+  ClientMap::iterator i = client_map_.find(*client_key);
   DCHECK(i != client_map_.end());
   ThriftClientImpl* info = i->second;
   VLOG_RPC << "releasing client for "
@@ -122,10 +122,11 @@ void ClientCacheHelper::ReleaseClient(void* client_key) {
   ClientCacheMap::iterator j =
       client_cache_.find(MakeNetworkAddress(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());
-  j->second.push_back(client_key);
+  j->second.push_back(*client_key);
   if (metrics_enabled_) {
     clients_in_use_metric_->Increment(-1);
   }
+  *client_key = NULL;
 }
 
 void ClientCacheHelper::CloseConnections(const TNetworkAddress& hostport) {

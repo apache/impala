@@ -775,11 +775,10 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
             << " host=" << exec_state->backend_address;
   lock_guard<mutex> l(exec_state->lock);
 
-  // this client needs to have been released when this function finishes
-  ImpalaInternalServiceClient* backend_client;
-  RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(exec_state->backend_address,
-                                                       &backend_client));
-  DCHECK(backend_client != NULL);
+  Status status;
+  ImpalaInternalServiceConnection backend_client(
+      exec_env_->client_cache(), exec_state->backend_address, &status);
+  RETURN_IF_ERROR(status);
 
   TExecPlanFragmentResult thrift_result;
   try {
@@ -792,7 +791,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
       // the first failure and force a reopen of the transport.
       // TODO: Improve client-cache so that we don't need to do this.
       VLOG_RPC << "Retrying ExecPlanFragment: " << e.what();
-      Status status = exec_env_->client_cache()->ReopenClient(&backend_client);
+      Status status = backend_client.Reopen();
       if (!status.ok()) {
         exec_state->status = status;
         return status;
@@ -806,11 +805,9 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
         << " failed: " << e.what();
     VLOG_QUERY << msg.str();
     exec_state->status = Status(msg.str());
-    exec_env_->client_cache()->ReleaseClient(backend_client);
     return exec_state->status;
   }
   exec_state->status = thrift_result.status;
-  exec_env_->client_cache()->ReleaseClient(backend_client);
   if (exec_state->status.ok()) {
     exec_state->initiated = true;
     exec_state->stopwatch.Start();
@@ -868,13 +865,12 @@ void Coordinator::CancelRemoteFragments() {
 
     // if we get an error while trying to get a connection to the backend,
     // keep going
-    ImpalaInternalServiceClient* backend_client;
-    Status status = exec_env_->client_cache()->GetClient(exec_state->backend_address,
-                                                         &backend_client);
+    Status status;
+    ImpalaInternalServiceConnection backend_client(
+        exec_env_->client_cache(), exec_state->backend_address, &status);
     if (!status.ok()) {
       continue;
     }
-    DCHECK(backend_client != NULL);
 
     TCancelPlanFragmentParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
@@ -888,7 +884,7 @@ void Coordinator::CancelRemoteFragments() {
         backend_client->CancelPlanFragment(res, params);
       } catch (TTransportException& e) {
         VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
-        Status status = exec_env_->client_cache()->ReopenClient(&backend_client);
+        Status status = backend_client.Reopen();
         if (!status.ok()) {
           exec_state->status.AddError(status);
           continue;
@@ -902,14 +898,11 @@ void Coordinator::CancelRemoteFragments() {
           << " failed: " << e.what();
       // make a note of the error status, but keep on cancelling the other fragments
       exec_state->status.AddErrorMsg(msg.str());
-      exec_env_->client_cache()->ReleaseClient(backend_client);
       continue;
     }
     if (res.status.status_code != TStatusCode::OK) {
       exec_state->status.AddErrorMsg(algorithm::join(res.status.error_msgs, "; "));
     }
-
-    exec_env_->client_cache()->ReleaseClient(backend_client);
   }
 
   // notify that we completed with an error

@@ -467,14 +467,14 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   DCHECK(status.ok() || done);  // if !status.ok() => done
   Status exec_status = UpdateStatus(status);
 
-  ImpalaInternalServiceClient* coord;
-  if (!client_cache_->GetClient(coord_hostport_, &coord).ok()) {
+  Status coord_status;
+  ImpalaInternalServiceConnection coord(client_cache_, coord_hostport_, &coord_status);
+  if (!coord_status.ok()) {
     stringstream s;
     s << "couldn't get a client for " << coord_hostport_;
     UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
     return;
   }
-  DCHECK(coord != NULL);
 
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
@@ -515,7 +515,7 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
       coord->ReportExecStatus(res, params);
     } catch (TTransportException& e) {
       VLOG_RPC << "Retrying ReportExecStatus: " << e.what();
-      rpc_status = client_cache_->ReopenClient(&coord);
+      rpc_status = coord.Reopen();
       if (!rpc_status.ok()) {
         // we need to cancel the execution of this fragment
         UpdateStatus(rpc_status);
@@ -531,7 +531,6 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     VLOG_QUERY << msg.str();
     rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
   }
-  client_cache_->ReleaseClient(coord);
 
   if (!rpc_status.ok()) {
     // we need to cancel the execution of this fragment

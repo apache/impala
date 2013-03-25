@@ -30,6 +30,7 @@
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/thrift-client.h"
+#include "util/thrift-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -61,11 +62,9 @@ class DataStreamSender::Channel {
           const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
           PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
-      client_(NULL),
       client_cache_(NULL),
       row_desc_(row_desc),
-      ipaddress_(destination.hostname),
-      port_(destination.port),
+      address_(MakeNetworkAddress(destination.hostname, destination.port)),
       fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
@@ -73,12 +72,6 @@ class DataStreamSender::Channel {
       // TODO: figure out how to size batch_
     int capacity = max(1, buffer_size / max(row_desc.GetRowSize(), 1));
     batch_.reset(new RowBatch(row_desc, capacity));
-  }
-
-  ~Channel() {
-    if (client_cache_ != NULL && client_ != NULL) {
-      client_cache_->ReleaseClient(client_);
-    }
   }
 
   // Initialize channel.
@@ -108,12 +101,10 @@ class DataStreamSender::Channel {
  private:
   DataStreamSender* parent_;
 
-  ImpalaInternalServiceClient* client_;
-  ImpalaInternalServiceClientCache* client_cache_;  // the one to which to return client_
+  ImpalaInternalServiceClientCache* client_cache_;
 
   const RowDescriptor& row_desc_;
-  string ipaddress_;
-  int port_;
+  TNetworkAddress address_;
   TUniqueId fragment_instance_id_;
   PlanNodeId dest_node_id_;
 
@@ -129,8 +120,8 @@ class DataStreamSender::Channel {
   thread rpc_thread_;  // sender thread
   Status rpc_status_;  // status of most recently finished TransmitData rpc
 
-  // Synchronously call client_'s TransmitData() and update rpc_status_
-  // based on return value (or set to error if RPC failed).
+  // Synchronously call TransmitData() on a client from client_cache_ and update
+  // rpc_status_ based on return value (or set to error if RPC failed).
   // Should only run in rpc_thread_.
   void TransmitData();
 
@@ -141,10 +132,7 @@ class DataStreamSender::Channel {
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
-  Status status = client_cache_->GetClient(
-      MakeNetworkAddress(ipaddress_, port_), &client_);
-  if (!status.ok()) client_ = NULL;
-  return status;
+  return Status::OK;
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
@@ -160,12 +148,10 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
 
 void DataStreamSender::Channel::TransmitData() {
   DCHECK(in_flight_batch_ != NULL);
-  DCHECK(client_ != NULL);
   try {
     VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
              << " dest_node=" << dest_node_id_
              << " #rows=" << in_flight_batch_->num_rows;
-    SCOPED_TIMER(parent_->thrift_transmit_timer_);
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
     params.__set_dest_fragment_instance_id(fragment_instance_id_);
@@ -173,18 +159,26 @@ void DataStreamSender::Channel::TransmitData() {
     params.__set_row_batch(*in_flight_batch_);  // yet another copy
     params.__set_eos(false);
 
-    TTransmitDataResult res;
-    try {
-      client_->TransmitData(res, params);
-    } catch (TTransportException& e) {
-      VLOG_RPC << "Retrying TransmitData: " << e.what();
-      rpc_status_ = client_cache_->ReopenClient(&client_);
-      if (!rpc_status_.ok()) {
-        client_ = NULL;
-        return;
-      }
-      client_->TransmitData(res, params);
+    ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
+    if (!rpc_status_.ok()) {
+      return;
     }
+
+    TTransmitDataResult res;
+    {
+      SCOPED_TIMER(parent_->thrift_transmit_timer_);
+      try {
+        client->TransmitData(res, params);
+      } catch (TTransportException& e) {
+        VLOG_RPC << "Retrying TransmitData: " << e.what();
+        rpc_status_ = client.Reopen();
+        if (!rpc_status_.ok()) {
+          return;
+        }
+        client->TransmitData(res, params);
+      }
+    }
+
     if (res.status.status_code != TStatusCode::OK) {
       rpc_status_ = res.status;
     } else {
@@ -194,7 +188,7 @@ void DataStreamSender::Channel::TransmitData() {
     }
   } catch (TException& e) {
     stringstream msg;
-    msg << "TransmitData() to " << ipaddress_ << ":" << port_ << " failed:\n" << e.what();
+    msg << "TransmitData() to " << address_ << " failed:\n" << e.what();
     rpc_status_ = Status(msg.str());
     return;
   }
@@ -248,11 +242,6 @@ Status DataStreamSender::Channel::Close() {
   VLOG_RPC << "Channel::Close() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
-  if (client_ == NULL) {
-    DCHECK_EQ(batch_->num_rows(), 0);
-    DCHECK(rpc_status_.ok());
-    return Status::OK;
-  }
 
   if (batch_->num_rows() > 0) {
     // flush
@@ -260,6 +249,11 @@ Status DataStreamSender::Channel::Close() {
   }
   // if the last transmitted batch resulted in a error, return that error
   RETURN_IF_ERROR(GetSendStatus());
+  Status status;
+  ImpalaInternalServiceConnection client(client_cache_, address_, &status);
+  if (!status.ok()) {
+    return status;
+  }
   try {
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
@@ -269,20 +263,19 @@ Status DataStreamSender::Channel::Close() {
     TTransmitDataResult res;
     VLOG_RPC << "calling TransmitData to close channel";
     try {
-      client_->TransmitData(res, params);
+      client->TransmitData(res, params);
     } catch (TTransportException& e) {
       VLOG_RPC << "Retrying TransmitData: " << e.what();
-      rpc_status_ = client_cache_->ReopenClient(&client_);
+      rpc_status_ = client.Reopen();
       if (!rpc_status_.ok()) {
         return rpc_status_;
       }
-      client_->TransmitData(res, params);
+      client->TransmitData(res, params);
     }
     return Status(res.status);
   } catch (TException& e) {
     stringstream msg;
-    msg << "CloseChannel() to "
-        << ipaddress_ << ":" << port_ << " failed:\n" << e.what();
+    msg << "CloseChannel() to " << address_ << " failed:\n" << e.what();
     return Status(msg.str());
   }
   return Status::OK;
