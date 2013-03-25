@@ -213,6 +213,13 @@ class RuntimeProfile {
   void ToThrift(TRuntimeProfileTree* tree);
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes);
 
+  // Serializes the runtime profile to a string.  This first serializes
+  // the object using thrift compact binary format and then encodes
+  // it as base64.  This is not a lightweight operation and should not
+  // be in the hot path.
+  std::string SerializeToBase64String() const;
+  void SerializeToBase64String(std::stringstream* out) const;
+
   // Divides all counters by n
   void Divide(int n);
 

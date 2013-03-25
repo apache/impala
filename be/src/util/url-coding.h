@@ -16,16 +16,32 @@
 #define UTIL_URL_CODING_H
 
 #include <string>
+#include <vector>
+#include <boost/cstdint.hpp>
 
 namespace impala {
 
 // Utility method to URL-encode a string (that is, replace special
 // characters with %<hex value in ascii>).
 void UrlEncode(const std::string& in, std::string* out);
+void UrlEncode(const std::vector<uint8_t>& in, std::string* out);
 
 // Utility method to decode a string that was URL-encoded. Returns
 // true unless the string could not be correctly decoded.
 bool UrlDecode(const std::string& in, std::string* out);
+
+// Utility method to encode input as base-64 encoded.  This is not
+// very performant (multiple string copies) and should not be used
+// in a hot path.
+void Base64Encode(const std::vector<uint8_t>& in, std::string* out);
+void Base64Encode(const std::vector<uint8_t>& in, std::stringstream* out);
+void Base64Encode(const std::string& in, std::string* out);
+void Base64Encode(const std::string& in, std::stringstream* out);
+
+// Utility method to decode base64 encoded strings.  Also not extremely
+// performant.
+// Returns true unless the string could not be correctly decoded.
+bool Base64Decode(const std::string& in, std::string* out);
 
 }
 

@@ -12,22 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sstream>
-#include <boost/foreach.hpp>
-#include <boost/algorithm/string.hpp>
-
 #include "util/url-coding.h"
+
+#include <exception>
+#include <sstream>
+#include <boost/algorithm/string.hpp>
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+#include <boost/foreach.hpp>
+
+#include "common/logging.h"
 
 using namespace impala;
 using namespace std;
 using namespace boost;
+using namespace boost::archive::iterators;
 
 namespace impala {
 
-void UrlEncode(const string& in, string* out) {
-  (*out).reserve(in.size());
+static inline void UrlEncode(const char* in, int in_len, string* out) {
+  (*out).reserve(in_len);
   stringstream ss;
-  BOOST_FOREACH(const char& ch, in) {
+  for (int i = 0; i < in_len; ++i) {
+    const char ch = in[i];
     if (isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
       ss << ch;
     } else {
@@ -36,6 +44,18 @@ void UrlEncode(const string& in, string* out) {
   }
 
   (*out) = ss.str();
+}
+
+void UrlEncode(const vector<uint8_t>& in, string* out) {
+  if (in.empty()) {
+    *out = "";
+  } else {
+    UrlEncode(reinterpret_cast<const char*>(&in[0]), in.size(), out);
+  }
+}
+
+void UrlEncode(const string& in, string* out) {
+  UrlEncode(in.c_str(), in.size(), out);
 }
 
 // Adapted from
@@ -65,6 +85,74 @@ bool UrlDecode(const string& in, string* out) {
       (*out) += in[i];
     }
   }
+  return true;
+}
+
+static inline void Base64Encode(const char* in, int in_len, stringstream* out) {
+  typedef base64_from_binary<transform_width<const char*, 6, 8> > base64_encode;
+  // Base64 encodes 8 byte chars as 6 bit values.
+  stringstream::pos_type len_before = out->tellp();
+  copy(base64_encode(in), base64_encode(in + in_len), ostream_iterator<char>(*out));
+  int bytes_written = out->tellp() - len_before;
+  // Pad with = to make it valid base64 encoded string
+  int num_pad = bytes_written % 4; 
+  if (num_pad != 0) {
+    num_pad = 4 - num_pad;
+    for (int i = 0; i < num_pad; ++i) {
+      (*out) << "=";
+    }
+  }
+  DCHECK_EQ(out->str().size() % 4, 0);
+}
+
+void Base64Encode(const vector<uint8_t>& in, string* out) {
+  if (in.empty()) {
+    *out = "";
+  } else {
+    stringstream ss;
+    Base64Encode(in, &ss);
+    *out = ss.str();
+  }
+}
+
+void Base64Encode(const vector<uint8_t>& in, stringstream* out) {
+  if (!in.empty()) {
+    // Boost does not like non-null terminated strings
+    string tmp(reinterpret_cast<const char*>(&in[0]), in.size());
+    Base64Encode(tmp.c_str(), tmp.size(), out);
+  }
+}
+
+void Base64Encode(const string& in, string* out) {
+  stringstream ss;
+  Base64Encode(in.c_str(), in.size(), &ss);
+  *out = ss.str();
+}
+
+void Base64Encode(const string& in, stringstream* out) {
+  Base64Encode(in.c_str(), in.size(), out);
+}
+
+bool Base64Decode(const string& in, string* out) {
+  typedef transform_width<
+      binary_from_base64<string::const_iterator> , 8, 6> base64_decode;
+  string tmp = in;
+  // Replace padding with base64 encoded NULL
+  replace(tmp.begin(), tmp.end(), '=', 'A'); 
+  try {
+    *out = string(base64_decode(tmp.begin()), base64_decode(tmp.end()));
+  } catch(std::exception& e) {
+    return false;
+  }
+
+  // Remove trailing '\0' that were added as padding.  Since \0 is special,
+  // the boost functions get confused so do this manually.
+  int num_padded_chars = 0;
+  for (int i = out->size() - 1; i >= 0; --i) {
+    if ((*out)[i] != '\0') break;
+    ++num_padded_chars;
+  }
+  out->resize(out->size() - num_padded_chars);
   return true;
 }
 

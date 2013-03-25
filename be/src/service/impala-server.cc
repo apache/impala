@@ -169,6 +169,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       summary_info_.AddInfoString("Start Time", start_time().DebugString());
       summary_info_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
       summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
+      summary_info_.AddInfoString("Impala Version", GetVersionString());
       profile_.AddChild(coord_->query_profile());
     }
   } else {
@@ -639,6 +640,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
   exec_env->webserver()->
       RegisterPathHandler("/query_profile", profile_callback, true, false);
+  
+  Webserver::PathHandlerCallback profile_encoded_callback =
+      bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
+  exec_env->webserver()->RegisterPathHandler("/query_profile_encoded", 
+      profile_encoded_callback, false, false);
 
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics());
@@ -683,44 +689,65 @@ Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
   return Status::OK;
 }
 
-void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  // We expect the query id to be passed as two parameters, 'hi' and 'lo'. If
-  // either are absent, we cannot proceed.
+// We expect the query id to be passed as two parameters, 'hi' and 'lo'. If
+// either are absent, we cannot proceed.
+// Returns true if the query id was present and valid; false otherwise.
+static bool ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
   int64_t hi, lo;
   Webserver::ArgumentMap::const_iterator it = args.find("hi");
   if (it == args.end()) {
-    (*output) << "No query specified";
-    return;
+    return false;
   } else {
     StringParser::ParseResult parse_result;
     hi = StringParser::StringToInt<int64_t>(it->second.c_str(), it->second.length(),
              &parse_result);
     if (parse_result != StringParser::PARSE_SUCCESS) {
-      (*output) << "Invalid query id";
-      return;
+      return false;
     }
   }
 
   it = args.find("lo");
   if (it == args.end()) {
-    (*output) << "No query specified";
-    return;
+    return false;
   } else {
     StringParser::ParseResult parse_result;
     lo = StringParser::StringToInt<int64_t>(it->second.c_str(), it->second.length(),
              &parse_result);
     if (parse_result != StringParser::PARSE_SUCCESS) {
-      (*output) << "Invalid query id";
-      return;
+      return false;
     }
   }
+  id->hi = hi;
+  id->lo = lo;
+  return true;
+}
 
+void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
   TUniqueId unique_id;
-  unique_id.hi = hi;
-  unique_id.lo = lo;
+  if (!ParseQueryId(args, &unique_id)) {
+    (*output) << "Invalid query id";
+    return;
+  }
+  
   (*output) << "<pre>";
-  Status status = GetRuntimeProfileStr(unique_id, output);
+  Status status = GetRuntimeProfileStr(unique_id, false, output);
+  if (!status.ok()) {
+    (*output) << status.GetErrorMsg();
+  }
+  (*output) << "</pre>";
+}
+
+void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
+  TUniqueId unique_id;
+  if (!ParseQueryId(args, &unique_id)) {
+    (*output) << "Invalid query id";
+    return;
+  }
+
+  (*output) << "<pre>";
+  Status status = GetRuntimeProfileStr(unique_id, true, output);
   if (!status.ok()) {
     (*output) << status.GetErrorMsg();
   }
@@ -728,14 +755,18 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
 }
 
 Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
-    stringstream* output) {
+    bool base64_encoded, stringstream* output) {
   DCHECK(output != NULL);
   // Search for the query id in the active query map
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
     QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
     if (exec_state != query_exec_state_map_.end()) {
-      exec_state->second->profile().PrettyPrint(output);
+      if (base64_encoded) {
+        exec_state->second->profile().SerializeToBase64String(output);
+      } else {
+        exec_state->second->profile().PrettyPrint(output);
+      }
       return Status::OK;
     }
   }
@@ -749,7 +780,11 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       ss << "Query id " << PrintId(query_id) << " not found.";
       return Status(ss.str());
     }
-    (*output) << query_record->second->profile_str;
+    if (base64_encoded) {
+      (*output) << query_record->second->encoded_profile_str;
+    } else {
+      (*output) << query_record->second->profile_str;
+    }
   }
   return Status::OK;
 }
@@ -1748,6 +1783,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
     stringstream ss;
     exec_state.profile().PrettyPrint(&ss);
     profile_str = ss.str();
+    encoded_profile_str = exec_state.profile().SerializeToBase64String();
   }
 }
 

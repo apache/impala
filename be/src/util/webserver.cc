@@ -90,7 +90,9 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* ou
   (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
   (*output) << "<h2>Status Pages</h2>";
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
-    (*output) << "<a href=\"" << handler.first << "\">" << handler.first << "</a><br/>";
+    if (handler.second.is_on_nav_bar()) {
+      (*output) << "<a href=\"" << handler.first << "\">" << handler.first << "</a><br/>";
+    }
   }
 }
 

@@ -15,8 +15,10 @@
 #include "util/runtime-profile.h"
 
 #include "common/object-pool.h"
-#include "util/debug-util.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
+#include "util/thrift-util.h"
+#include "util/url-coding.h"
 
 #include <iomanip>
 #include <iostream>
@@ -389,6 +391,22 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     bool indent = children[i].second;
     profile->PrettyPrint(s, prefix + (indent ? "  " : ""));
   }
+}
+
+string RuntimeProfile::SerializeToBase64String() const {
+  stringstream ss;
+  SerializeToBase64String(&ss);
+  return ss.str();
+}
+
+void RuntimeProfile::SerializeToBase64String(stringstream* out) const {
+  TRuntimeProfileTree thrift_object;
+  const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
+  ThriftSerializer serializer(true);
+  std::vector<uint8_t> serialized_buffer;
+  Status status = serializer.Serialize(&thrift_object, &serialized_buffer);
+  if (!status.ok()) return;
+  Base64Encode(serialized_buffer, out);
 }
 
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) {

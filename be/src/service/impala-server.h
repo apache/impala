@@ -469,7 +469,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // match is found there, the query log is searched. Returns OK if the profile was
   // found, otherwise a Status object with an error message will be returned. The
   // output stream will not be modified on error.
-  Status GetRuntimeProfileStr(const TUniqueId& query_id, std::stringstream* output);
+  // If base64_encoded, outputs the base64 encoded profile output, otherwise the human
+  // readable string.
+  Status GetRuntimeProfileStr(const TUniqueId& query_id, bool base64_encoded,
+      std::stringstream* output);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);
@@ -479,7 +482,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void QueryStatePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
+  // Webserver callback.  Prints the query profile (via PrettyPrint)
   void QueryProfilePathHandler(const Webserver::ArgumentMap& args,
+      std::stringstream* output);
+  
+  // Webserver callback.  Prints the query profile as a base64 encoded object.
+  void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback that prints a table of active sessions.
@@ -556,6 +564,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   struct QueryStateRecord {
     // Pretty-printed runtime profile. TODO: Copy actual profile object
     std::string profile_str;
+
+    // Base64 encoded runtime profile
+    std::string encoded_profile_str;
 
     // Query id
     TUniqueId id;
