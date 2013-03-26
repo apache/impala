@@ -160,7 +160,6 @@ class HdfsScanNode : public ScanNode {
 
   // Adds a materialized row batch for the scan node.  This is called from scanner
   // threads.
-  // If the scan node is done, the row batch will be discarded.
   // This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
@@ -312,9 +311,11 @@ class HdfsScanNode : public ScanNode {
   // Thread group for all scanner worker threads
   boost::thread_group scanner_threads_;
 
-  // Lock and condition variable protecting materialized_row_batches_.  Row batches
-  // are produced by the scanner threads and consumed by the main thread in GetNext
-  // Lock to protect materialized_row_batches_
+  // Lock and condition variables protecting materialized_row_batches_.  Row batches are
+  // produced asynchronously by the scanner threads and consumed by the main thread in
+  // GetNext.  Row batches must be processed by the main thread in the order they are
+  // queued to avoid freeing attached resources prematurely (row batches will never depend
+  // on resources attached to earlier batches in the queue).
   // This lock cannot be taken together with any other locks except lock_.
   boost::mutex row_batches_lock_;
   boost::condition_variable row_batch_added_cv_;

@@ -526,6 +526,7 @@ Status HdfsRCFileScanner::ProcessRange() {
     }
     context_->CommitRows(num_to_commit);
     if (scan_node_->ReachedLimit()) break;
+    if (context_->cancelled()) return Status::CANCELLED;
   }
   return Status::OK;
 }

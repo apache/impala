@@ -651,12 +651,8 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
       row_batch_consumed_cv_.wait(l);
     }
 
-    if (UNLIKELY(done_)) {
-      __sync_fetch_and_add(&num_owned_io_buffers_, -1 * row_batch->num_io_buffers());
-      delete row_batch;
-      return;
-    }
-
+    // We must enqueue row_batch even if we're done (rather than dropping it) in case
+    // already queued batches depend on its attached resources.
     materialized_row_batches_.push_back(row_batch);
   }
   row_batch_added_cv_.notify_one();

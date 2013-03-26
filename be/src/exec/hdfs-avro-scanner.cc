@@ -224,6 +224,7 @@ Status HdfsAvroScanner::ProcessRange() {
                                        max_tuples, &num_records));
       }
       if (scan_node_->ReachedLimit()) return Status::OK;
+      if (context_->cancelled()) return Status::CANCELLED;
     }
 
     if (!stream_->compact_data()) {

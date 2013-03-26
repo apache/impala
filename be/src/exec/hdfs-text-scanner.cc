@@ -265,7 +265,8 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     } 
 
     // Scanning was aborted by main thread
-    if (context_->cancelled()) break;
+    if (context_->cancelled()) return Status::CANCELLED;
+    if (scan_node_->ReachedLimit()) return Status::OK;
   }
 
   return Status::OK;

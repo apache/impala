@@ -188,6 +188,9 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
   DCHECK(header_->is_compressed);
 
   while (!stream_->eosr() || num_buffered_records_in_compressed_block_ > 0) {
+    if (scan_node_->ReachedLimit()) return Status::OK;
+    if (context_->cancelled()) return Status::CANCELLED;
+
     if (num_buffered_records_in_compressed_block_ == 0) {
       if (stream_->eosr()) return Status::OK;
       // No more decompressed data, decompress the next block
@@ -287,7 +290,8 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   }
 
   int max_added_tuples = (scan_node_->limit() == -1) ?
-                         num_to_commit : scan_node_->limit() - scan_node_->rows_returned();
+                         num_to_commit :
+                         scan_node_->limit() - scan_node_->rows_returned();
 
   // Materialize parsed cols to tuples
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
@@ -390,6 +394,7 @@ Status HdfsSequenceScanner::ProcessRange() {
 
     if (add_row) context_->CommitRows(1);
     if (scan_node_->ReachedLimit()) break;
+    if (context_->cancelled()) return Status::CANCELLED;
   }
 
   return Status::OK;
