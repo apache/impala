@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+import java.util.Set;
 import java.util.ArrayList;
 
 import com.cloudera.impala.catalog.FileFormat;
@@ -28,10 +29,10 @@ import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Represents a CREATE TABLE statement.
- * TODO: Add support for creating partitioned tables (IMPALA-102)
  */
 public class CreateTableStmt extends ParseNodeBase {
   private final ArrayList<ColumnDef> columnDefs;
@@ -193,18 +194,31 @@ public class CreateTableStmt extends ParseNodeBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
-    
+
     if (analyzer.getCatalog().getDb(dbName) == null) {
       throw new AnalysisException("Database does not exist: " + dbName);
     }
 
     if (analyzer.getCatalog().containsTable(dbName, getTbl()) && !ifNotExists) {
       throw new AnalysisException(String.format("Table already exists: %s.%s",
-          dbName, getTbl())); 
+          dbName, getTbl()));
     }
 
     if (columnDefs.size() == 0) {
       throw new AnalysisException("A table requires at least 1 column");
+    }
+
+    // Check that all the column names are unique.
+    Set<String> colNames = Sets.newHashSet();
+    for (ColumnDef colDef: columnDefs) {
+      if (!colNames.add(colDef.getColName().toLowerCase())) {
+        throw new AnalysisException("Duplicate column name: " + colDef.getColName());
+      }
+    }
+    for (ColumnDef colDef: partitionColumnDefs) {
+      if (!colNames.add(colDef.getColName().toLowerCase())) {
+        throw new AnalysisException("Duplicate column name: " + colDef.getColName());
+      }
     }
   }
 }

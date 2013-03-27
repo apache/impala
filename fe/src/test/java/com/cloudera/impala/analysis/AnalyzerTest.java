@@ -1672,6 +1672,14 @@ public class AnalyzerTest {
         "terminated by '|'");
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
+    AnalysisError("create table new_table (i int, I string)",
+        "Duplicate column name: I");
+    AnalysisError("create table new_table (c1 double, col2 int, c1 double, c4 string)",
+        "Duplicate column name: c1");
+    AnalysisError("create table new_table (i int, s string) PARTITIONED BY (i int)",
+        "Duplicate column name: i");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (C int, c2 int, c int)",
+        "Duplicate column name: c");
   }
 
   @Test
