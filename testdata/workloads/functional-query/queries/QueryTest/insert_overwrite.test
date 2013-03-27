@@ -3,7 +3,7 @@
 # insert overwrite into unpartitioned table
 insert overwrite table insert_overwrite_nopart 
 select int_col
-from functional.tinyinttable
+from tinyinttable
 ---- SETUP
 RESET insert_overwrite_nopart
 ---- RESULTS
@@ -33,7 +33,7 @@ int
 # Now do an overwrite that should delete what was just written
 insert overwrite table insert_overwrite_nopart
 select 10
-from functional.tinyinttable
+from tinyinttable
 ---- RESULTS
 : 10
 ====
@@ -61,7 +61,7 @@ int
 # TODO: IMP-240 - Hive will delete data even for inserts that write nothing. When we fix IMP-240, this test should fail. 
 insert overwrite table insert_overwrite_nopart
 select 3
-from functional.tinyinttable
+from tinyinttable
 limit 0
 ---- RESULTS
 ====
@@ -77,7 +77,7 @@ bigint
 insert overwrite table insert_overwrite_partitioned
 PARTITION(col2=5)
 select int_col
-from functional.tinyinttable
+from tinyinttable
 ---- SETUP
 RESET insert_overwrite_partitioned
 ---- RESULTS
@@ -107,7 +107,7 @@ int,int
 insert overwrite table insert_overwrite_partitioned
 PARTITION(col2=6)
 select int_col
-from functional.tinyinttable
+from tinyinttable
 ---- SETUP
 RESET insert_overwrite_nopart
 ---- RESULTS
@@ -147,7 +147,7 @@ int,int
 # Overwrite one partition, check that the other partition remains intact
 insert overwrite table insert_overwrite_partitioned
 partition(col2=5)
-select 10 from functional.tinyinttable
+select 10 from tinyinttable
 ---- RESULTS
 col2=5/: 10
 ====
@@ -184,7 +184,7 @@ int,int
 insert overwrite table insert_overwrite_partitioned
 partition(col2)
 select int_col, int_col 
-from functional.tinyinttable
+from tinyinttable
 ---- SETUP
 DROP PARTITIONS insert_overwrite_partitioned
 ---- RESULTS
@@ -223,7 +223,7 @@ int,int
 # Overwrite dynamic partition. Limit to 1 row without actually using limit, which forces non-parallel insert
 insert overwrite table insert_overwrite_partitioned
 partition(col2)
-select 10, 0 from functional.tinyinttable
+select 10, 0 from tinyinttable
 where int_col = 0
 ---- RESULTS
 col2=0/: 1

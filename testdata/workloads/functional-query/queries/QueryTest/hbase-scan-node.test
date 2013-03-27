@@ -330,7 +330,7 @@ bigint
 ====
 ---- QUERY
 # show that the hdfs table has identical results
-select count(*) from functional.alltypesagg where smallint_col is null and string_col is not null
+select count(*) from alltypesagg where smallint_col is null and string_col is not null
 ---- TYPES
 bigint
 ---- RESULTS
@@ -348,7 +348,7 @@ bigint
 ====
 ---- QUERY
 # Compare this hdfs-equivalent query with the above one.
-select count(*) from functional.alltypesagg where smallint_col is null
+select count(*) from alltypesagg where smallint_col is null
 ---- TYPES
 bigint
 ---- RESULTS

@@ -141,7 +141,7 @@ NULL,10,450,900,10,1089
 ====
 ---- QUERY
 # count distinct order by the same agg expr
-select count(distinct id) as count_id from functional.alltypessmall order by count_id limit 100
+select count(distinct id) as count_id from alltypessmall order by count_id limit 100
 ---- TYPES
 bigint
 ---- RESULTS
@@ -149,7 +149,7 @@ bigint
 ====
 ---- QUERY
 # count distinct order by a diff agg expr
-select count(distinct id) as sum_id from functional.alltypessmall order by max(distinct id)
+select count(distinct id) as sum_id from alltypessmall order by max(distinct id)
 limit 100
 ---- TYPES
 bigint

@@ -1,13 +1,13 @@
 ====
 ---- QUERY : TPCH-Q17_QUERY_1
 # Q17 - Small-Quantity-Order Revenue Query
-insert overwrite table tpch.lineitem_tmp
+insert overwrite table lineitem_tmp
 select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
 from lineitem
 group by l_partkey
 ---- SETUP
-RESET tpch.lineitem_tmp
-RELOAD tpch.lineitem_tmp
+RESET lineitem_tmp
+RELOAD lineitem_tmp
 ---- RESULTS
 : 200000
 ====
@@ -18,7 +18,7 @@ select round(sum(l_extendedprice) / 7.0, 5) as avg_yearly
 from lineitem l
   join part p
     on (p.p_partkey = l.l_partkey)
-  join tpch.lineitem_tmp lt
+  join lineitem_tmp lt
     on (lt.t_partkey = p.p_partkey)
 where
   p.p_brand = 'Brand#23' and

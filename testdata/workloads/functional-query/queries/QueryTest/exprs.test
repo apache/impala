@@ -360,7 +360,7 @@ bigint
 #891,891,890109,890109,8892188910,8892188910,9771626610293.455,9771626610293.455,9.859473533519994e+16,9.859473533519994e+16
 #====
 # LIKE exprs w/ the like/regex pattern coming from a column
-select * from functional.LikeTbl
+select * from LikeTbl
 ---- TYPES
 string, string, string, string, string
 ---- RESULTS
@@ -381,7 +381,7 @@ string, string, string, string, string
 'two','%two%','n%two%','.*two.*','n.*two.*'
 ====
 ---- QUERY
-select str_col, match_like_col from functional.LikeTbl
+select str_col, match_like_col from LikeTbl
 where str_col LIKE match_like_col
 ---- TYPES
 string, string
@@ -402,14 +402,14 @@ string, string
 '','%'
 ====
 ---- QUERY
-select str_col, match_like_col from functional.LikeTbl
+select str_col, match_like_col from LikeTbl
 where str_col NOT LIKE match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, match_like_col from functional.LikeTbl
+select str_col, match_like_col from LikeTbl
 where str_col LIKE no_match_like_col
 ---- TYPES
 string, string
@@ -417,7 +417,7 @@ string, string
 '','%'
 ====
 ---- QUERY
-select str_col, no_match_like_col from functional.LikeTbl
+select str_col, no_match_like_col from LikeTbl
 where str_col NOT LIKE no_match_like_col
 ---- TYPES
 string, string
@@ -437,7 +437,7 @@ string, string
 'two','n%two%'
 ====
 ---- QUERY
-select str_col, match_regex_col from functional.LikeTbl
+select str_col, match_regex_col from LikeTbl
 where str_col REGEXP match_regex_col
 ---- TYPES
 string, string
@@ -458,21 +458,21 @@ string, string
 '','.*'
 ====
 ---- QUERY
-select str_col, no_match_regex_col from functional.LikeTbl
+select str_col, no_match_regex_col from LikeTbl
 where str_col REGEXP no_match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, match_regex_col from functional.LikeTbl
+select str_col, match_regex_col from LikeTbl
 where str_col NOT REGEXP match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, no_match_regex_col from functional.LikeTbl
+select str_col, no_match_regex_col from LikeTbl
 where str_col NOT REGEXP no_match_regex_col
 ---- TYPES
 string, string
@@ -913,7 +913,7 @@ timestamp, timestamp, timestamp, timestamp
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ====
 ---- QUERY
-select now(), now(), now(), now() from functional.alltypestiny
+select now(), now(), now(), now() from alltypestiny
 ---- TYPES
 timestamp, timestamp, timestamp, timestamp
 ---- RESULTS
@@ -930,7 +930,7 @@ regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ---- QUERY
 # Check that now() returns the same value when evaluated on different nodes
 # (alltypessmall is partitioned)
-select min(now()), max(now()) from functional.alltypessmall
+select min(now()), max(now()) from alltypessmall
 ---- TYPES
 timestamp, timestamp
 ---- RESULTS

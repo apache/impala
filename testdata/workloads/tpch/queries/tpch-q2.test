@@ -1,7 +1,7 @@
 ====
 ---- QUERY : TPCH-Q2_QUERY_1
 # Q2 - Minimum Cost Supplier Query
-insert overwrite table tpch.q2_minimum_cost_supplier_tmp1
+insert overwrite table q2_minimum_cost_supplier_tmp1
 select
   s.s_acctbal,
   s.s_name,
@@ -22,21 +22,21 @@ from partsupp ps
   join region r
     on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
 ---- SETUP
-RESET tpch.q2_minimum_cost_supplier_tmp1
-RELOAD tpch.q2_minimum_cost_supplier_tmp1
+RESET q2_minimum_cost_supplier_tmp1
+RELOAD q2_minimum_cost_supplier_tmp1
 ---- RESULTS
 : 642
 ====
 ---- QUERY : TPCH-Q2_QUERY_2
-insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
+insert overwrite table q2_minimum_cost_supplier_tmp2
 select
   p_partkey,
   min(ps_supplycost)
-from  tpch.q2_minimum_cost_supplier_tmp1
+from  q2_minimum_cost_supplier_tmp1
 group by p_partkey
 ---- SETUP
-RESET tpch.q2_minimum_cost_supplier_tmp2
-RELOAD tpch.q2_minimum_cost_supplier_tmp2
+RESET q2_minimum_cost_supplier_tmp2
+RELOAD q2_minimum_cost_supplier_tmp2
 ---- RESULTS
 : 460
 ====
@@ -51,8 +51,8 @@ select
   t1.s_address,
   t1.s_phone,
   t1.s_comment
-from tpch.q2_minimum_cost_supplier_tmp1 t1
-join tpch.q2_minimum_cost_supplier_tmp2 t2
+from q2_minimum_cost_supplier_tmp1 t1
+join q2_minimum_cost_supplier_tmp2 t2
   on (t1.p_partkey = t2.p_partkey and t1.ps_supplycost = t2.ps_min_supplycost)
 order by
   s_acctbal desc,

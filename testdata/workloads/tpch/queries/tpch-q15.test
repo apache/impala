@@ -1,7 +1,7 @@
 ====
 ---- QUERY : TPCH-Q15_QUERY_1
 # Q15 - Top Supplier Query
-insert overwrite table tpch.revenue
+insert overwrite table revenue
 select
   l_suppkey as supplier_no,
   sum(l_extendedprice * (1 - l_discount)) as total_revenue
@@ -9,18 +9,18 @@ from lineitem
 where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
 group by l_suppkey
 ---- SETUP
-RESET tpch.revenue
-RELOAD tpch.revenue
+RESET revenue
+RELOAD revenue
 ---- RESULTS
 : 10000
 ====
 ---- QUERY : TPCH-Q15_QUERY_2
-insert overwrite table tpch.max_revenue
+insert overwrite table max_revenue
 select max(total_revenue)
-from tpch.revenue
+from revenue
 ---- SETUP
-RESET tpch.max_revenue
-RELOAD tpch.max_revenue
+RESET max_revenue
+RELOAD max_revenue
 ---- RESULTS
 : 1
 ====
@@ -33,9 +33,9 @@ select
   s_phone,
   total_revenue
 from supplier s
-join tpch.revenue r
+join revenue r
   on (s.s_suppkey = r.supplier_no)
-join tpch.max_revenue m
+join max_revenue m
   on (r.total_revenue = m.max_revenue)
 order by s_suppkey
 limit 100

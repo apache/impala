@@ -72,7 +72,7 @@ insert overwrite table alltypesinsert
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
-from functional.alltypessmall
+from alltypessmall
 where year=2009 and month=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -121,7 +121,7 @@ insert into table alltypesinsert
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
-from functional.alltypessmall
+from alltypessmall
 where year=2009 and month=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -143,7 +143,7 @@ insert overwrite table alltypesinsert
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
-from functional.alltypessmall
+from alltypessmall
 where year=2009 and month>1 and month<=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -243,7 +243,7 @@ insert into table alltypesinsert
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
-from functional.alltypessmall
+from alltypessmall
 where year=2009 and month>=1 and month<4
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -267,7 +267,7 @@ insert overwrite table alltypesinsert
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-from functional.alltypessmall
+from alltypessmall
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS
@@ -392,7 +392,7 @@ insert into table alltypesinsert
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-from functional.alltypessmall
+from alltypessmall
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- RESULTS

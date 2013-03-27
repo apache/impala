@@ -349,6 +349,13 @@ def generate_statements(output_name, test_vectors, sections,
       db = '{0}{1}'.format(db_name, db_suffix)
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
+      # Empty tables (tables with no "LOAD" sections) are assumed to be used for insert
+      # testing. Since Impala currently only supports inserting into TEXT and PARQUET we
+      # need to create these tables with a supported insert format.
+      create_file_format = file_format
+      if not load_local and not insert:
+        create_file_format = 'text' if 'file_format' != 'parquet' else 'parquet'
+
       if table_names and (table_name.lower() not in table_names):
         print 'Skipping table: %s.%s' % (db, table_name)
         continue
@@ -376,7 +383,7 @@ def generate_statements(output_name, test_vectors, sections,
         assert columns, "No CREATE or COLUMNS section defined for table " + table_name
         avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
         table_template = build_table_template(
-          file_format, columns, partition_columns, row_format, avro_schema_dir)
+          create_file_format, columns, partition_columns, row_format, avro_schema_dir)
         # Write Avro schema to local file
         if not os.path.exists(avro_schema_dir):
           os.makedirs(avro_schema_dir)
@@ -385,7 +392,7 @@ def generate_statements(output_name, test_vectors, sections,
 
       output.create.append(
         build_create_statement(table_template, table_name, db_name, db_suffix,
-                               file_format, codec, hdfs_location))
+                               create_file_format, codec, hdfs_location))
 
       # The ALTER statement in hive does not accept fully qualified table names.
       # We need the use statement.

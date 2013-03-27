@@ -124,7 +124,7 @@ class ImpalaTestSuite(BaseTestSuite):
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, updated_sections)
 
-  def execute_test_case_setup(self, setup_section, vector):
+  def execute_test_case_setup(self, setup_section, table_format):
     """
     Executes a test case 'SETUP' section
 
@@ -135,15 +135,15 @@ class ImpalaTestSuite(BaseTestSuite):
     DROP PARTITIONS <table name> - Drop all partitions from the table
     RELOAD - Reload the catalog
     """
-    setup_section = QueryTestSectionReader.build_query(setup_section, vector, '')
+    setup_section = QueryTestSectionReader.build_query(setup_section, table_format, '')
     for row in setup_section.split('\n'):
       row = row.lstrip()
       if row.startswith('RESET'):
         table_name = row.split('RESET')[1]
-        self.__reset_table(table_name.strip(), vector)
+        self.__reset_table(table_name.strip(), table_format)
       elif row.startswith('DROP PARTITIONS'):
         table_name = row.split('DROP PARTITIONS')[1]
-        self.__drop_partitions(table_name.strip(), vector)
+        self.__drop_partitions(table_name.strip(), table_format)
       elif row.startswith('RELOAD'):
         self.client.refresh()
       else:
@@ -198,9 +198,9 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def __drop_partitions(self, table_name, vector):
+  def __drop_partitions(self, table_name, table_format):
     """Drops all partitions in the given table"""
-    db_name, table_name = ImpalaTestSuite.__get_db_from_table_name(table_name, vector)
+    db_name =  QueryTestSectionReader.get_db_name(table_format)
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
@@ -227,9 +227,9 @@ class ImpalaTestSuite(BaseTestSuite):
       assert False, 'Test file not found: %s' % file_name
     return parse_query_test_file(test_file_path)
 
-  def __reset_table(self, table_name, vector):
+  def __reset_table(self, table_name, table_format):
     """Resets a table (drops and recreates the table)"""
-    db_name, table_name = ImpalaTestSuite.__get_db_from_table_name(table_name, vector)
+    db_name =  QueryTestSectionReader.get_db_name(table_format)
     table = self.hive_client.get_table(db_name, table_name)
     assert table is not None
     self.hive_client.drop_table(db_name, table_name, True)

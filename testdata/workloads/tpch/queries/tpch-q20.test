@@ -1,18 +1,18 @@
 ====
 ---- QUERY : TPCH-Q20_QUERY_1
 # Q20 - Potential Part Promotion Query
-insert overwrite table tpch.q20_tmp1
+insert overwrite table q20_tmp1
 select distinct p_partkey
 from part
 where p_name like 'forest%'
 ---- SETUP
-RESET tpch.q20_tmp1
-RELOAD tpch.q20_tmp1
+RESET q20_tmp1
+RELOAD q20_tmp1
 ---- RESULTS
 : 2127
 ====
 ---- QUERY : TPCH-Q20_QUERY_2
-insert overwrite table tpch.q20_tmp2
+insert overwrite table q20_tmp2
 select
   l_partkey,
   l_suppkey,
@@ -25,38 +25,38 @@ group by
   l_partkey,
   l_suppkey
 ---- SETUP
-RESET tpch.q20_tmp2
-RELOAD tpch.q20_tmp2
+RESET q20_tmp2
+RELOAD q20_tmp2
 ---- RESULTS
 : 543210
 ====
 ---- QUERY : TPCH-Q20_QUERY_3
-insert overwrite table tpch.q20_tmp3
+insert overwrite table q20_tmp3
 select
   ps_suppkey,
   ps_availqty,
   sum_quantity
 from partsupp ps
-  join tpch.q20_tmp2 t2
+  join q20_tmp2 t2
     on (ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey)
-  join tpch.q20_tmp1 t1
+  join q20_tmp1 t1
     on (ps.ps_partkey = t1.p_partkey)
 ---- SETUP
-RESET tpch.q20_tmp3
-RELOAD tpch.q20_tmp3
+RESET q20_tmp3
+RELOAD q20_tmp3
 ---- RESULTS
 : 5843
 ====
 ---- QUERY : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
-insert overwrite table tpch.q20_tmp4
+insert overwrite table q20_tmp4
 select ps_suppkey
-from tpch.q20_tmp3
+from q20_tmp3
 where ps_availqty > sum_quantity
 group by ps_suppkey
 ---- SETUP
-RESET tpch.q20_tmp4
-RELOAD tpch.q20_tmp4
+RESET q20_tmp4
+RELOAD q20_tmp4
 ---- RESULTS
 : 4397
 ====
@@ -69,7 +69,7 @@ from supplier s
   join nation n
     on (s.s_nationkey = n.n_nationkey and
         n.n_name = 'CANADA')
-join tpch.q20_tmp4 t4
+join q20_tmp4 t4
   on (s.s_suppkey = t4.ps_suppkey)
 order by
   s_name
