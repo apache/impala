@@ -42,13 +42,14 @@ add_library(Util
 #  perf-counters.cc
   progress-updater.cc
   runtime-profile.cc
+  service-util.cc
+  static-asserts.cc
   thrift-util.cc
   thrift-client.cc
   thrift-server.cc
-  static-asserts.cc
   url-parser.cc
   url-coding.cc
-  )
+)
 
 add_library(Webserver STATIC
   ${MONGOOSE_SRC_DIR}/mongoose.c

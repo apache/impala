@@ -50,10 +50,11 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/jni-util.h"
+#include "util/service-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
-#include "util/jni-util.h"
 #include "util/webserver.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -618,9 +619,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     planservice_transport_->open();
   }
 
-  Webserver::PathHandlerCallback default_callback =
+  Webserver::PathHandlerCallback memz_callback = &ServiceUtil::RenderMemUsage;
+  exec_env->webserver()->RegisterPathHandler("/memz", memz_callback);
+
+  Webserver::PathHandlerCallback varz_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);
-  exec_env->webserver()->RegisterPathHandler("/varz", default_callback);
+  exec_env->webserver()->RegisterPathHandler("/varz", varz_callback);
 
   Webserver::PathHandlerCallback query_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryStatePathHandler), this, _1, _2);
