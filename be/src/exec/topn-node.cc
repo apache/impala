@@ -52,6 +52,7 @@ Status TopNNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
       is_asc_order_.begin(), tnode.sort_node.is_asc_order.begin(),
       tnode.sort_node.is_asc_order.end());
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
+  abort_on_default_limit_exceeded_ = tnode.sort_node.is_default_limit;
   return Status::OK;
 }
 
@@ -94,6 +95,8 @@ Status TopNNode::Prepare(RuntimeState* state) {
   Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc());
   Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc());
   tuple_pool_->set_limits(*state->mem_limits());
+  abort_on_default_limit_exceeded_ = abort_on_default_limit_exceeded_ &&
+      state->abort_on_default_limit_exceeded();
   return Status::OK;
 }
 
@@ -109,6 +112,9 @@ Status TopNNode::Open(RuntimeState* state) {
     RETURN_IF_CANCELLED(state);
     batch.Reset();
     RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
+    if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
+      return Status("DEFAULT_ORDER_BY_LIMIT has been exceeded.");
+    }
     for (int i = 0; i < batch.num_rows(); ++i) {
       InsertTupleRow(batch.GetRow(i));
     }

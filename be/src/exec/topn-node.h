@@ -69,6 +69,10 @@ class TopNNode : public ExecNode {
   std::vector<TupleDescriptor*> tuple_descs_;
   std::vector<bool> is_asc_order_;
 
+  // True if the limit_ comes from DEFAULT_ORDER_BY_LIMIT and the query option
+  // ABORT_ON_DEFAULT_LIMIT_EXCEEDED is set.
+  bool abort_on_default_limit_exceeded_;
+
   // Create two copies of the exprs for evaluating over the TupleRows.
   // The result of the evaluation is stored in the Expr, so it's not efficient to use
   // one set of Expr to compare TupleRows.

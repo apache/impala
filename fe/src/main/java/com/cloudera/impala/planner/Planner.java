@@ -608,7 +608,9 @@ public class Planner {
     SortInfo sortInfo = selectStmt.getSortInfo();
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1 || defaultOrderByLimit != -1);
-      root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true);
+      boolean isDefaultLimit = (selectStmt.getLimit() == -1);
+      root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true,
+          isDefaultLimit);
       // Don't assign conjuncts here. If this is the tree for an inline view, and
       // it contains a limit clause, we need to evaluate the conjuncts inherited
       // from the enclosing select block *after* the limit.
@@ -1036,7 +1038,8 @@ public class Planner {
         throw new NotImplementedException(
             "ORDER BY without LIMIT currently not supported");
       }
-      result = new SortNode(new PlanNodeId(nodeIdGenerator), result, sortInfo, true);
+      result = new SortNode(new PlanNodeId(nodeIdGenerator), result, sortInfo, true,
+          false);
     }
     result.setLimit(unionStmt.getLimit());
 

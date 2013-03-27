@@ -156,6 +156,8 @@ struct TSortNode {
   2: required list<bool> is_asc_order
   // Indicates whether the backend service should use topn vs. sorting
   3: required bool use_top_n;
+  // Indicates whether the imposed limit comes DEFAULT_ORDER_BY_LIMIT.
+  4: required bool is_default_limit
 }
 
 struct TMergeNode {

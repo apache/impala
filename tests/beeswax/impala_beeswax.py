@@ -189,7 +189,9 @@ class ImpalaBeeswaxClient(object):
       if query_state == self.query_states["FINISHED"]:
         break
       elif query_state == self.query_states["EXCEPTION"]:
-        raise ImpalaBeeswaxException("Query aborted", None)
+        error_log = self.__do_rpc(
+          lambda: self.imp_service.get_log(query_handle.log_context))
+        raise ImpalaBeeswaxException("Query aborted:" + error_log, None)
       time.sleep(0.05)
 
   def get_state(self, query_handle):

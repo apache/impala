@@ -1484,6 +1484,10 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
+      case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
+        query_options->abort_on_default_limit_exceeded =
+            iequals(value, "true") || iequals(value, "1");
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1738,6 +1742,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::DEBUG_ACTION:
         val << query_option.debug_action;
+        break;
+      case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
+        val << query_option.abort_on_default_limit_exceeded;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

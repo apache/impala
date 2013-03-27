@@ -37,11 +37,14 @@ import com.google.common.collect.Lists;
 public class SortNode extends PlanNode {
   private final SortInfo info;
   private final boolean useTopN;
+  private final boolean isDefaultLimit;
 
-  public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN) {
+  public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
+      boolean isDefaultLimit) {
     super(id);
     this.info = info;
     this.useTopN = useTopN;
+    this.isDefaultLimit = isDefaultLimit;
     this.tupleIds.addAll(input.getTupleIds());
     this.nullableTupleIds.addAll(input.getNullableTupleIds());
     this.children.add(input);
@@ -56,6 +59,7 @@ public class SortNode extends PlanNode {
     super(id, inputSortNode);
     this.info = inputSortNode.info;
     this.useTopN = inputSortNode.useTopN;
+    this.isDefaultLimit = inputSortNode.isDefaultLimit;
     this.children.add(child);
   }
 
@@ -87,7 +91,8 @@ public class SortNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SORT_NODE;
     msg.sort_node = new TSortNode(
-        Expr.treesToThrift(info.getOrderingExprs()), info.getIsAscOrder(), useTopN);
+        Expr.treesToThrift(info.getOrderingExprs()), info.getIsAscOrder(), useTopN,
+        isDefaultLimit);
   }
 
   @Override

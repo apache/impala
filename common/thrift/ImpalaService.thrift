@@ -88,6 +88,9 @@ enum TImpalaQueryOptions {
   // If the string doesn't have the required format or if any of its components is
   // invalid, the option is ignored. 
   DEBUG_ACTION,
+  
+  // If true, raise an error when the DEFAULT_ORDER_BY_LIMIT has been reached.
+  ABORT_ON_DEFAULT_LIMIT_EXCEEDED,
 }
 
 // Default values for each query option in ImpalaService.TImpalaQueryOptions

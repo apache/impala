@@ -329,6 +329,9 @@ class ImpalaShell(cmd.Cmd):
       elif query_state == self.query_state["EXCEPTION"]:
         print 'Query aborted, unable to fetch data'
         if self.connected:
+          log, status = self._ImpalaShell__do_rpc(
+            lambda: self.imp_service.get_log(handle.log_context))
+          print log
           return self.__close_query_handle(handle)
         else:
           return False

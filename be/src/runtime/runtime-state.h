@@ -78,6 +78,9 @@ class RuntimeState {
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   int batch_size() const { return query_options_.batch_size; }
   bool abort_on_error() const { return query_options_.abort_on_error; }
+  bool abort_on_default_limit_exceeded() const {
+    return query_options_.abort_on_default_limit_exceeded;
+  }
   int max_errors() const { return query_options_.max_errors; }
   int max_io_buffers() const { return query_options_.max_io_buffers; }
   int num_scanner_threads() const { return query_options_.num_scanner_threads; }

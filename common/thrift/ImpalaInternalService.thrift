@@ -65,6 +65,7 @@ struct TQueryOptions {
   11: optional i64 default_order_by_limit = -1
   12: optional string debug_action = ""
   13: optional i64 mem_limit = 0
+  14: optional bool abort_on_default_limit_exceeded = 0
 }
 
 // A scan range plus the parameters needed to execute that scan.

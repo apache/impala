@@ -185,6 +185,9 @@ public class ImpaladClientExecutor {
         case DEBUG_ACTION:
           optionValue = String.valueOf(queryOptions.getDebug_action());
           break;
+        case ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
+          optionValue = String.valueOf(queryOptions.isAbort_on_default_limit_exceeded());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }
