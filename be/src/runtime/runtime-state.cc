@@ -130,7 +130,9 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 
 void RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
-  error_log_.push_back(error);
+  if (error_log_.size() < query_options_.max_errors) {
+    error_log_.push_back(error);
+  }
 }
 
 void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {

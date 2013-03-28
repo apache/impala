@@ -105,14 +105,14 @@ class RuntimeState {
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
 
-  // Appends error to the error_log_
+  // Appends error to the error_log_ if there is space
   void LogError(const std::string& error);
 
   // Returns true if the error log has not reached max_errors_.
-  bool LogHasSpace() const { return error_log_.size() < query_options_.max_errors; }
-
-  // Clears the error log.
-  void ClearErrorLog() { error_log_.clear(); }
+  bool LogHasSpace() {
+    boost::lock_guard<boost::mutex> l(error_log_lock_);
+    return error_log_.size() < query_options_.max_errors;
+  }
 
   // Report that num_errors occurred while parsing file_name.
   void ReportFileErrors(const std::string& file_name, int num_errors);

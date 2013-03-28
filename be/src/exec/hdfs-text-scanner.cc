@@ -344,7 +344,6 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 }
 
 void HdfsTextScanner::LogRowParseError(stringstream* ss, int row_idx) {
-  DCHECK(state_->LogHasSpace());
   DCHECK_LT(row_idx, row_end_locations_.size());
   char* row_end = row_end_locations_[row_idx];
   char* row_start;
