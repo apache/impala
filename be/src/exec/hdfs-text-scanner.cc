@@ -135,6 +135,8 @@ void HdfsTextScanner::ResetScanner() {
 }
 
 Status HdfsTextScanner::FinishScanRange() {
+  if (scan_node_->ReachedLimit()) return Status::OK;
+
   // For text we always need to scan past the scan range to find the next delimiter
   while (true) {
     bool eosr;
