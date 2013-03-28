@@ -12,20 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "util/default-path-handlers.h"
+
 #include <sstream>
 #include <fstream>
 #include <sys/stat.h>
+#include <boost/algorithm/string.hpp>
+#include <google/malloc_extension.h>
 
 #include "common/logging.h"
-#include "util/default-path-handlers.h"
 #include "util/webserver.h"
 #include "util/logging.h"
 
 using namespace std;
 using namespace google;
+using namespace boost;
 using namespace impala;
 
-DEFINE_int64(web_log_bytes, 1024 * 1024, 
+DEFINE_int64(web_log_bytes, 1024 * 1024,
     "The maximum number of bytes to display on the debug webserver's log page");
 
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
@@ -61,7 +65,23 @@ void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
   (*output) << "<pre>" << CommandlineFlagsIntoString() << "</pre>";
 }
 
+// Registered to handle "/memz", and prints out memory allocation statistics.
+void MemUsageHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+#ifdef ADDRESS_SANITIZER
+  (*output) << "Memory tracking is not available with address sanitizer builds.";
+#else
+  (*output) << "<pre>";
+  char buf[2048];
+  MallocExtension::instance()->GetStats(buf, 2048);
+  // Replace new lines with <br> for html
+  string tmp(buf);
+  replace_all(tmp, "\n", "<br>");
+  (*output) << tmp << "</pre>";
+#endif
+}
+
 void impala::AddDefaultPathHandlers(Webserver* webserver) {
   webserver->RegisterPathHandler("/logs", LogsHandler);
   webserver->RegisterPathHandler("/varz", FlagsHandler);
+  webserver->RegisterPathHandler("/memz", MemUsageHandler);
 }

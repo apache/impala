@@ -51,7 +51,6 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/jni-util.h"
-#include "util/service-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
@@ -618,9 +617,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     planservice_client_.reset(new ImpalaPlanServiceClient(planservice_protocol_));
     planservice_transport_->open();
   }
-
-  Webserver::PathHandlerCallback memz_callback = &ServiceUtil::RenderMemUsage;
-  exec_env->webserver()->RegisterPathHandler("/memz", memz_callback);
 
   Webserver::PathHandlerCallback varz_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);

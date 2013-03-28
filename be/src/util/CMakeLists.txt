@@ -42,7 +42,6 @@ add_library(Util
 #  perf-counters.cc
   progress-updater.cc
   runtime-profile.cc
-  service-util.cc
   static-asserts.cc
   thrift-util.cc
   thrift-client.cc
