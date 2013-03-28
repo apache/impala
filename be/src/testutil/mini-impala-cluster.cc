@@ -22,7 +22,6 @@
 #include "exec/hbase-table-scanner.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
-#include "testutil/test-exec-env.h"
 #include "util/authorization.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
@@ -30,22 +29,18 @@
 #include "util/logging.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
+#include "testutil/in-process-servers.h"
 
 DEFINE_int32(num_backends, 3, "The number of backends to start");
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_string(principal);
+DECLARE_bool(use_statestore);
 
 using namespace impala;
 using namespace std;
-
-namespace impala {
-TestExecEnv* test_env_;
-ThriftServer* beeswax_server_;
-ThriftServer* hs2_server_;
-ThriftServer* be_server_;
-}
+using namespace boost;
 
 int main(int argc, char** argv) {
   InitDaemon(argc, argv);
@@ -66,19 +61,34 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(HBaseTableFactory::Init());
   InitFeSupport();
 
-  // Create an in-process Impala server and in-process backends for test environment.
-  LOG(INFO) << "Creating test env with " << FLAGS_num_backends << " backends";
-  test_env_ = new TestExecEnv(FLAGS_num_backends, FLAGS_be_port + 1);
-  LOG(INFO) << "Starting backends";
-  test_env_->StartBackends();
-  EXIT_IF_ERROR(CreateImpalaServer(test_env_, FLAGS_beeswax_port, FLAGS_hs2_port,
-      FLAGS_be_port, &beeswax_server_, &hs2_server_, &be_server_, NULL));
-  be_server_->Start();
-  beeswax_server_->Start();
-  hs2_server_->Start();
-  beeswax_server_->Join();
-  hs2_server_->Join();
-  delete beeswax_server_;
-  delete hs2_server_;
-  delete be_server_;
+  int base_be_port = FLAGS_be_port;
+  int base_subscriber_port = 21500;
+  int base_webserver_port = 25000;
+
+  int beeswax_port = 21000;
+  int hs2_port = 21050;
+
+  scoped_ptr<InProcessStateStore> state_store(new InProcessStateStore(23000, 25100));
+  if (FLAGS_use_statestore) EXIT_IF_ERROR(state_store->Start());
+
+  vector<InProcessImpalaServer*> impala_servers;
+  for (int i = 0; i < FLAGS_num_backends; ++i) {
+    impala_servers.push_back(
+        new InProcessImpalaServer(FLAGS_hostname, base_be_port + i,
+                                  base_subscriber_port + i, base_webserver_port + i,
+                                  FLAGS_hostname, 23000));
+    // First server in the list runs client servers
+    if (i == 0) {
+      EXIT_IF_ERROR(impala_servers[i]->StartWithClientServers(beeswax_port, hs2_port,
+                                                              FLAGS_use_statestore));
+    } else {
+      EXIT_IF_ERROR(impala_servers[i]->StartAsBackendOnly(FLAGS_use_statestore));
+    }
+  }
+
+  impala_servers[0]->Join();
+
+  BOOST_FOREACH(InProcessImpalaServer* server, impala_servers) {
+    delete server;
+  }
 }

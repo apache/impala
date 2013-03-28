@@ -26,7 +26,6 @@
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
 #include "runtime/raw-value.h"
-#include "testutil/test-exec-env.h"
 #include "util/authorization.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"

@@ -44,6 +44,13 @@ class MemLimit;
 class ExecEnv {
  public:
   ExecEnv();
+
+  ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
+          int webserver_port, const std::string& statestore_host, int statestore_port);
+
+
+  // Empty destructor because the compiler-generated one requires full
+  // declarations for classes in scoped_ptrs.
   virtual ~ExecEnv();
 
   SubscriptionManager* subscription_mgr() {

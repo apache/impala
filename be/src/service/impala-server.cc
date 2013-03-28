@@ -642,10 +642,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
   exec_env->webserver()->
       RegisterPathHandler("/query_profile", profile_callback, true, false);
-  
+
   Webserver::PathHandlerCallback profile_encoded_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
-  exec_env->webserver()->RegisterPathHandler("/query_profile_encoded", 
+  exec_env->webserver()->RegisterPathHandler("/query_profile_encoded",
       profile_encoded_callback, false, false);
 
   // Initialize impalad metrics
@@ -731,7 +731,7 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
     (*output) << "Invalid query id";
     return;
   }
-  
+
   (*output) << "<pre>";
   Status status = GetRuntimeProfileStr(unique_id, false, output);
   if (!status.ok()) {
@@ -974,11 +974,6 @@ void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   Scheduler::HostList backends;
 
-  // TODO: Remove when TestExecEnv is less convoluted
-  if (exec_env_->scheduler() == NULL) {
-    (*output) << "No scheduler";
-    return;
-  }
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
 
   (*output) << "<h2>Known Backends "

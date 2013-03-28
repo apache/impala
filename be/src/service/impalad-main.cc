@@ -31,7 +31,6 @@
 #include "common/status.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
-#include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/network-util.h"

@@ -74,9 +74,10 @@ Webserver::Webserver()
 
 }
 
-Webserver::Webserver(const string& interface, const int port)
+Webserver::Webserver(const int port)
   : port_(port),
-    interface_(interface) {
+    // Serve on all interfaces
+    interface_("0.0.0.0") {
 
 }
 

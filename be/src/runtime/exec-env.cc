@@ -47,7 +47,6 @@ namespace impala {
 
 ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
-    subscription_mgr_(new SubscriptionManager()),
     client_cache_(new ImpalaInternalServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
     htable_factory_(new HBaseTableFactory()),
@@ -60,12 +59,46 @@ ExecEnv::ExecEnv()
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // a standalone single backend)
   if (FLAGS_use_statestore) {
+    subscription_mgr_.reset(new SubscriptionManager());
+
     scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID,
-        metrics_.get()));
+                                         metrics_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
+    subscription_mgr_.reset(NULL);
+  }
+  Status status = disk_io_mgr_->Init();
+  CHECK(status.ok());
+
+  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
+}
+
+ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
+                 int webserver_port, const string& statestore_host, int statestore_port)
+    : stream_mgr_(new DataStreamMgr()),
+      client_cache_(new ImpalaInternalServiceClientCache()),
+      fs_cache_(new HdfsFsCache()),
+      htable_factory_(new HBaseTableFactory()),
+      disk_io_mgr_(new DiskIoMgr()),
+      webserver_(new Webserver(webserver_port)),
+      metrics_(new Metrics()),
+      mem_limit_(FLAGS_mem_limit > 0 ? new MemLimit(FLAGS_mem_limit) : NULL),
+      enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
+      tz_database_(TimezoneDatabase()) {
+  if (FLAGS_use_statestore && statestore_port > 0) {
+    subscription_mgr_.reset(new SubscriptionManager(hostname, subscriber_port,
+                                                    statestore_host, statestore_port));
+
+    scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID,
+                                         metrics_.get()));
+
+  } else {
+    vector<TNetworkAddress> addresses;
+    addresses.push_back(MakeNetworkAddress(hostname, backend_port));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
+    subscription_mgr_.reset(NULL);
   }
   Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
@@ -89,9 +122,11 @@ Status ExecEnv::StartServices() {
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
 
-  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
+  if (FLAGS_use_statestore && subscription_mgr_.get() != NULL) {
+    RETURN_IF_ERROR(subscription_mgr_->Start());
+  }
 
-  if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
+  if (scheduler_.get() != NULL) RETURN_IF_ERROR(scheduler_->Init());
 
   return Status::OK;
 }

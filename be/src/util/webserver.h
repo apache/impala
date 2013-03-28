@@ -34,9 +34,9 @@ class Webserver {
   typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
       PathHandlerCallback;
 
-  // If interface is set to the empty string the socket will bind to all available
+  // Using this constructor, the webserver will bind to all available
   // interfaces.
-  Webserver(const std::string& interface, const int port);
+  Webserver(const int port);
 
   // Uses FLAGS_webserver_{port, interface}
   Webserver();
@@ -52,11 +52,11 @@ class Webserver {
 
   // Register a callback for a URL path. Path should not include the
   // http://hostname/ prefix. If is_styled is true, the page is meant to be for
-  // people to look at and is styled.  If false, it is meant to be for machines to 
+  // people to look at and is styled.  If false, it is meant to be for machines to
   // scrape.  If is_on_nav_bar is true,  a link to this page is
   // printed in the navigation bar at the top of each debug page. Otherwise the
   // link does not appear, and the page is rendered without HTML headers and
-  // footers. 
+  // footers.
   // The first registration's choice of is_styled overrides all
   // subsequent registrations for that URL.
   void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback,

@@ -23,7 +23,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil STATIC
   impalad-query-executor.cc  
-  test-exec-env.cc
+  in-process-servers.cc
 )
 
 add_executable(mini-impala-cluster

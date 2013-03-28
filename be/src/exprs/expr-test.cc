@@ -43,7 +43,7 @@
 #include "util/thrift-server.h"
 #include "util/thrift-client.h"
 #include "util/thrift-util.h"
-#include "testutil/test-exec-env.h"
+#include "testutil/in-process-servers.h"
 #include "testutil/impalad-query-executor.h"
 #include "service/impala-server.h"
 #include "service/fe-support.h"
@@ -62,9 +62,6 @@ using namespace Apache::Hadoop::Hive;
 
 namespace impala {
 ImpaladQueryExecutor* executor_;
-TestExecEnv* test_env_;
-ThriftServer* beeswax_server_;
-ThriftServer* be_server_;
 
 class ExprTest : public testing::Test {
  protected:
@@ -2226,16 +2223,12 @@ int main(int argc, char **argv) {
   // Create an in-process Impala server and in-process backends for test environment.
   FLAGS_impalad = "localhost:21000";
   VLOG_CONNECTION << "creating test env";
-  test_env_ = new TestExecEnv(2, FLAGS_be_port + 1);
   VLOG_CONNECTION << "starting backends";
-  test_env_->StartBackends();
-
-  EXIT_IF_ERROR(CreateImpalaServer(test_env_, FLAGS_beeswax_port, 0, FLAGS_be_port,
-      &beeswax_server_, NULL, &be_server_, NULL));
-  beeswax_server_->Start();
-  be_server_->Start();
-
-  // exec_env_.reset(new ExecEnv());
+  InProcessImpalaServer* impala_server =
+      new InProcessImpalaServer("localhost", FLAGS_be_port, 0, 0, "", 0);
+  EXIT_IF_ERROR(
+      impala_server->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1,
+                                            false));
   executor_ = new ImpaladQueryExecutor();
   EXIT_IF_ERROR(executor_->Setup());
 
