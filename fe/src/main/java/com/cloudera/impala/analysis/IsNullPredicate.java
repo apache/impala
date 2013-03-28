@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TIsNullPredicate;
@@ -40,6 +43,32 @@ public class IsNullPredicate extends Predicate {
   @Override
   public String toSql() {
     return getChild(0).toSql() + (isNotNull ? " IS NOT NULL" : " IS NULL");
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+
+    // determine selectivity
+    Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
+    if (isSingleColumnPredicate(slotRefRef, null)) {
+      SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
+      Table table = slotDesc.getParent().getTable();
+      if (table != null && table.getNumRows() > 0) {
+        long numRows = table.getNumRows();
+        if (isNotNull) {
+          selectivity =
+              (double) (numRows - slotDesc.getStats().getNumNulls()) / (double) numRows;
+        } else {
+          selectivity = (double) slotDesc.getStats().getNumNulls() / (double) numRows;
+        }
+        selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+      }
+    } else {
+      // TODO: increase this to make sure we don't end up favoring broadcast joins
+      // due to underestimated cardinalities?
+      selectivity = 0.1;
+    }
   }
 
   @Override

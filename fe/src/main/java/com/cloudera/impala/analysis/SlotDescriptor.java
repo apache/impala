@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
@@ -38,6 +39,8 @@ public class SlotDescriptor {
   private int nullIndicatorByte;  // index into byte array
   private int nullIndicatorBit; // index within byte
   private int slotIdx;          // index within tuple struct
+
+  private ColumnStats stats;  // only set if 'column' isn't set
 
   SlotDescriptor(int id, TupleDescriptor parent) {
     this.id = new SlotId(id);
@@ -122,6 +125,17 @@ public class SlotDescriptor {
 
   public void setSlotIdx(int slotIdx) {
     this.slotIdx = slotIdx;
+  }
+
+  public ColumnStats getStats() {
+    if (stats == null) {
+      if (column != null) {
+        stats = column.getStats();
+      } else {
+        stats = new ColumnStats(type);
+      }
+    }
+    return stats;
   }
 
   public TSlotDescriptor toThrift() {

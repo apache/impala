@@ -117,7 +117,6 @@ public class PlanFragment {
     markRefdSlots(analyzer);
     if (planRoot != null) {
       setRowTupleIds(planRoot, null);
-      planRoot.finalize(analyzer);
     }
     if (destNodeId != null) {
       Preconditions.checkState(sink == null);

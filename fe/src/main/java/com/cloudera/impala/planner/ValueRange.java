@@ -53,6 +53,10 @@ public class ValueRange {
     return result;
   }
 
+  public boolean isEqRange() {
+    return lowerBound == upperBound && lowerBoundInclusive && upperBoundInclusive;
+  }
+
   /**
    * Determines whether a given constant expr is within the range.
    * Does this by constructing predicate that represents the range,

@@ -17,10 +17,14 @@ package com.cloudera.impala.planner;
 import java.util.Iterator;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -35,6 +39,7 @@ import com.google.common.collect.Lists;
  *
  */
 public class SortNode extends PlanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
   private final SortInfo info;
   private final boolean useTopN;
   private final boolean isDefaultLimit;
@@ -72,6 +77,20 @@ public class SortNode extends PlanNode {
   @Override
   public void setCompactData(boolean on) {
     this.compactData = on;
+  }
+
+  @Override
+  public void finalize(Analyzer analyzer) throws InternalException {
+    super.finalize(analyzer);
+    cardinality = getChild(0).cardinality;
+    if (hasLimit()) {
+      if (cardinality == -1) {
+        cardinality = limit;
+      } else {
+        cardinality = Math.min(cardinality, limit);
+      }
+    }
+    LOG.info("finalize Sort: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

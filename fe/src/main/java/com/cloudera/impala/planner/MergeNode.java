@@ -14,8 +14,10 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.ArrayList;
 import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
@@ -23,6 +25,7 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TMergeNode;
@@ -38,6 +41,8 @@ import com.google.common.collect.Lists;
  * results.
  */
 public class MergeNode extends PlanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(MergeNode.class);
+
   // Expr lists corresponding to the input query stmts.
   // The ith resultExprList belongs to the ith child.
   protected final List<List<Expr>> resultExprLists = Lists.newArrayList();
@@ -53,13 +58,6 @@ public class MergeNode extends PlanNode {
     super(id, Lists.newArrayList(tupleId));
     this.rowTupleIds.add(tupleId);
   }
-
-  /*
-  protected MergeNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
-    super(id, tupleIds);
-    this.rowTupleIds.addAll(tupleIds);
-  }
-  */
 
   protected MergeNode(PlanNodeId id, MergeNode node) {
     super(id, node);
@@ -77,6 +75,20 @@ public class MergeNode extends PlanNode {
       // output tuple
       Preconditions.checkState(tupleIds.size() == 1);
     }
+  }
+
+  @Override
+  public void finalize(Analyzer analyzer) throws InternalException {
+    super.finalize(analyzer);
+    cardinality = constExprLists.size();
+    for (PlanNode child: children) {
+      // ignore missing child cardinality info in the hope it won't matter enough
+      // to change the planning outcome
+      if (child.cardinality > 0) {
+        cardinality += child.cardinality;
+      }
+    }
+    LOG.info("finalize Merge: cardinality=" + Long.toString(cardinality));
   }
 
   public List<List<Expr>> getResultExprLists() {

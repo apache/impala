@@ -72,6 +72,7 @@ public class SlotRef extends Expr {
       throw new AnalysisException("Unsupported type '"
           + type.toString() + "' in '" + toSql() + "'.");
     }
+    numDistinctValues = desc.getStats().getNumDistinctValues();
   }
 
   @Override

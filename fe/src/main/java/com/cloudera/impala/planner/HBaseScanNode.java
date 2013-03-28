@@ -28,6 +28,8 @@ import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -61,6 +63,7 @@ import com.google.common.collect.Maps;
  * Only families/qualifiers specified in TupleDescriptor will be retrieved in the backend.
  */
 public class HBaseScanNode extends ScanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(HBaseScanNode.class);
   private final TupleDescriptor desc;
 
   // One range per clustering column. The range bounds are expected to be constants.
@@ -112,7 +115,20 @@ public class HBaseScanNode extends ScanNode {
         stopKey = convertToBytes(((StringLiteral) rowRange.upperBound).getValue(),
                                   rowRange.upperBoundInclusive);
       }
+      if (rowRange.isEqRange()) {
+        cardinality = 1;
+      } else {
+        // TODO: fix this
+        cardinality = 100000;
+      }
+    } else {
+      // TODO: fix this
+      cardinality = 100000;
     }
+    cardinality *= computeSelectivity();
+    cardinality = Math.max(0, cardinality);
+    LOG.info("finalize HbaseScan: cardinality=" + Long.toString(cardinality));
+
     // Convert predicates to HBase filters.
     createHBaseFilters(analyzer);
   }

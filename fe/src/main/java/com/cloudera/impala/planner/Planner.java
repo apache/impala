@@ -91,6 +91,7 @@ public class Planner {
     LOG.info("create single-node plan");
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
+    if (singleNodePlan != null) singleNodePlan.finalize(analyzer);
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
     if (queryOptions.num_nodes == 1 || singleNodePlan == null) {
       // single-node execution; we're almost done

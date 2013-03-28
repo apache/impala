@@ -38,6 +38,7 @@ public class LiteralPredicate extends Predicate {
     super();
     this.value = val;
     this.isNull = isNull;
+    this.selectivity = (isNull || !val ? 0 : 1);
   }
 
   public boolean isNull() {

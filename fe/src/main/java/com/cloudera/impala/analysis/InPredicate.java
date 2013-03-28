@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TInPredicate;
@@ -37,6 +38,18 @@ public class InPredicate extends Predicate {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(children);
+
+    Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
+    Reference<Integer> idxRef = new Reference<Integer>();
+    if (isSingleColumnPredicate(slotRefRef, idxRef)
+        && idxRef.getRef() == 0
+        && slotRefRef.getRef().getNumDistinctValues() > 0) {
+      selectivity = (double) (getChildren().size() - 1)
+          / (double) slotRefRef.getRef().getNumDistinctValues();
+      selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+    } else {
+      selectivity = Expr.defaultSelectivity;
+    }
   }
 
   @Override

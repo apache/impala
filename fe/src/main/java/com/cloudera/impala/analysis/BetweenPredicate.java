@@ -52,6 +52,9 @@ public class BetweenPredicate extends Predicate {
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(originalChildren);
 
+    // TODO: improve with histograms
+    selectivity = Expr.defaultSelectivity;
+
     // Rewrite between predicate into a conjunctive/disjunctive compound predicate.
     if (isNotBetween) {
       // Rewrite into disjunction.

@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -107,6 +108,19 @@ public class BinaryPredicate extends Predicate {
     Preconditions.checkState(match != null);
     Preconditions.checkState(match.returnType == PrimitiveType.BOOLEAN);
     this.opcode = match.opcode;
+
+    // determine selectivity
+    Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
+    if (op == Operator.EQ
+        && isSingleColumnPredicate(slotRefRef, null)
+        && slotRefRef.getRef().getNumDistinctValues() > 0) {
+      Preconditions.checkState(slotRefRef.getRef() != null);
+      selectivity = 1.0 / slotRefRef.getRef().getNumDistinctValues();
+      selectivity = Math.max(0, Math.min(1, selectivity));
+    } else {
+      // TODO: improve using histograms, once they show up
+      selectivity = Expr.defaultSelectivity;
+    }
   }
 
   /**

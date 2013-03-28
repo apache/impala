@@ -16,22 +16,28 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Aggregation computation.
  *
  */
 public class AggregationNode extends PlanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(AggregationNode.class);
   private final AggregateInfo aggInfo;
 
   // Set to true if this aggregation node contains aggregate functions that require
@@ -73,6 +79,34 @@ public class AggregationNode extends PlanNode {
   @Override
   public void setCompactData(boolean on) {
     this.compactData = on;
+  }
+
+  @Override
+  public void finalize(Analyzer analyzer) throws InternalException {
+    super.finalize(analyzer);
+    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+    cardinality = 1;
+    // cardinality: product of # of distinct values produced by grouping exprs
+    for (Expr groupingExpr: groupingExprs) {
+      long numDistinct = groupingExpr.getNumDistinctValues();
+      if (numDistinct == -1) {
+        cardinality = -1;
+        break;
+      }
+      // This is prone to overflow, because we keep multiplying cardinalities,
+      // even if the grouping exprs are functionally dependent (example:
+      // group by the primary key of a table plus a number of other columns from that
+      // same table)
+      // TODO: try to recognize functional dependencies
+      cardinality *= numDistinct;
+    }
+    // take HAVING predicate into account
+    if (cardinality > 0) {
+      cardinality *= computeSelectivity();
+    }
+    // if we ended up with an overflow, the estimate is certain to be wrong
+    if (cardinality < 0) cardinality = -1;
+    LOG.info("finalize Agg: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

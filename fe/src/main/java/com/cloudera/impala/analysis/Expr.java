@@ -47,10 +47,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   protected boolean isAnalyzed;  // true after analyze() has been called
   protected TExprOpcode opcode;  // opcode for this expr
 
+  // estimated probability of a predicate evaluating to true;
+  // set during analysis;
+  // between 0 and 1 if valid: invalid: -1
+  protected double selectivity;
+
+  // to be used where we can't come up with a better estimate
+  protected static double defaultSelectivity = 0.1;
+
+  // estimated number of distinct values produced by Expr; invalid: -1
+  // set during analysis
+  protected long numDistinctValues;
+
   protected Expr() {
     super();
     type = PrimitiveType.INVALID_TYPE;
     opcode = TExprOpcode.INVALID_OPCODE;
+    selectivity = -1.0;
+    numDistinctValues = -1;
   }
 
   public ExprId getId() {
@@ -69,6 +83,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return opcode;
   }
 
+  public double getSelectivity() { return selectivity; }
+
+  public long getNumDistinctValues() { return numDistinctValues; }
+
   /* Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
    * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
@@ -78,6 +96,21 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       child.analyze(analyzer);
     }
     isAnalyzed = true;
+
+    if (isConstant()) {
+      numDistinctValues = 1;
+    } else {
+      // if this Expr contains slotrefs, we estimate the # of distinct values
+      // to be the maximum such number for any of the slotrefs;
+      // the subclass analyze() function may well want to override this, if it
+      // knows better
+      List<SlotRef> slotRefs = Lists.newArrayList();
+      this.collect(SlotRef.class, slotRefs);
+      numDistinctValues = -1;
+      for (SlotRef slotRef: slotRefs) {
+        numDistinctValues = Math.max(numDistinctValues, slotRef.numDistinctValues);
+      }
+    }
   }
 
   /**
@@ -601,5 +634,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return Objects.toStringHelper(this.getClass())
         .add("id", id)
         .add("type", type).toString();
+  }
+
+  /**
+   * If 'this' is a SlotRef or a Cast that wraps a SlotRef, returns that SlotRef.
+   * Otherwise returns null.
+   */
+  public SlotRef unwrapSlotRef() {
+    if (this instanceof SlotRef) {
+      return (SlotRef) this;
+    } else if (this instanceof CastExpr && getChild(0) instanceof SlotRef) {
+      return (SlotRef) getChild(0);
+    } else {
+      return null;
+    }
   }
 }

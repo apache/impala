@@ -35,7 +35,7 @@ public class ColumnStats {
   private float avgSerializedSize;  // in bytes; includes serialization overhead
   private long maxSize;  // in bytes
   private long numDistinctValues;
-  private boolean hasNulls;
+  private long numNulls;
 
   /**
    * For fixed-length type (those which don't need additional storage besides
@@ -45,7 +45,7 @@ public class ColumnStats {
     avgSerializedSize = -1;
     maxSize = -1;
     numDistinctValues = -1;
-    hasNulls = true;
+    numNulls = -1;
     if (colType.isFixedLengthType()) {
       avgSerializedSize = colType.getSlotSize();
       maxSize = colType.getSlotSize();
@@ -64,8 +64,8 @@ public class ColumnStats {
     this.numDistinctValues = numDistinctValues;
   }
 
-  public void setHasNulls(boolean hasNulls) {
-    this.hasNulls = hasNulls;
+  public void setNumNulls(long numNulls) {
+    this.numNulls = numNulls;
   }
 
   public float getAvgSerializedSize() {
@@ -81,7 +81,11 @@ public class ColumnStats {
   }
 
   public boolean hasNulls() {
-    return hasNulls;
+    return numNulls > 0;
+  }
+
+  public long getNumNulls() {
+    return numNulls;
   }
 
   public boolean hasAvgSerializedSize() {
@@ -101,7 +105,7 @@ public class ColumnStats {
       case BOOLEAN:
         Preconditions.checkState(statsData.isSetBooleanStats());
         BooleanColumnStatsData boolStats = statsData.getBooleanStats();
-        hasNulls = boolStats.getNumNulls() > 0;
+        numNulls = boolStats.getNumNulls();
         break;
       case TINYINT:
       case SMALLINT:
@@ -110,20 +114,20 @@ public class ColumnStats {
         Preconditions.checkState(statsData.isSetLongStats());
         LongColumnStatsData longStats = statsData.getLongStats();
         numDistinctValues = longStats.getNumDVs();
-        hasNulls = longStats.getNumNulls() > 0;
+        numNulls = longStats.getNumNulls();
         break;
       case FLOAT:
       case DOUBLE:
         Preconditions.checkState(statsData.isSetDoubleStats());
         DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
         numDistinctValues = doubleStats.getNumDVs();
-        hasNulls = doubleStats.getNumNulls() > 0;
+        numNulls = doubleStats.getNumNulls();
         break;
       case STRING:
         Preconditions.checkState(statsData.isSetStringStats());
         StringColumnStatsData stringStats = statsData.getStringStats();
         numDistinctValues = stringStats.getNumDVs();
-        hasNulls = stringStats.getNumNulls() > 0;
+        numNulls = stringStats.getNumNulls();
         maxSize = stringStats.getMaxColLen();
         avgSerializedSize = PrimitiveType.STRING.getSlotSize()
             + Double.valueOf(stringStats.getAvgColLen()).floatValue();
@@ -131,7 +135,7 @@ public class ColumnStats {
       case BINARY:
         Preconditions.checkState(statsData.isSetBinaryStats());
         BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
-        hasNulls = binaryStats.getNumNulls() > 0;
+        numNulls = binaryStats.getNumNulls();
         maxSize = binaryStats.getMaxColLen();
         avgSerializedSize = PrimitiveType.BINARY.getSlotSize()
             + Double.valueOf(binaryStats.getAvgColLen()).floatValue();
@@ -145,7 +149,7 @@ public class ColumnStats {
         .add("avgSerializedSize", avgSerializedSize)
         .add("maxSize", maxSize)
         .add("numDistinct", numDistinctValues)
-        .add("hasNulls", hasNulls)
+        .add("numNulls", numNulls)
         .toString();
   }
 }

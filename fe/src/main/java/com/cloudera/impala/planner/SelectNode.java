@@ -14,21 +14,12 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Node that applies conjuncts and a limit clause. Has exactly one child.
@@ -45,6 +36,13 @@ public class SelectNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SELECT_NODE;
+  }
+
+  @Override
+  public void finalize(Analyzer analyzer) throws InternalException {
+    super.finalize(analyzer);
+    cardinality = Math.round(((double) getChild(0).cardinality) * computeSelectivity());
+    Preconditions.checkState(cardinality >= 0);
   }
 
   @Override

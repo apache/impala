@@ -57,6 +57,8 @@ public class LikePredicate extends Predicate {
     children.add(e1);
     Preconditions.checkNotNull(e2);
     children.add(e2);
+    // TODO: improve with histograms?
+    selectivity = 0.1;
   }
 
   @Override

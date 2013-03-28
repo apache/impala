@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TTupleDescriptor;
@@ -35,6 +36,8 @@ public class TupleDescriptor {
 
   private int byteSize;  // of all slots plus null indicators
   private int numNullBytes;
+
+  private float avgSerializedSize;  // in bytes; includes serialization overhead
 
   TupleDescriptor(int id) {
     this.id = new TupleId(id);
@@ -73,6 +76,10 @@ public class TupleDescriptor {
     return isMaterialized;
   }
 
+  public float getAvgSerializedSize() {
+    return avgSerializedSize;
+  }
+
   public String debugString() {
     String tblStr = (table == null ? "null" : table.getFullName());
     List<String> slotStrings = Lists.newArrayList();
@@ -105,8 +112,16 @@ public class TupleDescriptor {
       slotsBySize.add(new ArrayList<SlotDescriptor>());
     }
 
+    // populate slotsBySize; also compute avgSerializedSize
     int numNullableSlots = 0;
     for (SlotDescriptor d: slots) {
+      ColumnStats stats = d.getStats();
+      if (stats.hasAvgSerializedSize()) {
+        avgSerializedSize += d.getStats().getAvgSerializedSize();
+      } else {
+        // TODO: for computed slots, try to come up with stats estimates
+        avgSerializedSize += d.getType().getSlotSize();
+      }
       if (d.getIsMaterialized()) {
         slotsBySize.get(d.getType().getSlotSize()).add(d);
         if (d.getIsNullable()) {
@@ -165,9 +180,13 @@ public class TupleDescriptor {
    * (checks that both have the same number of slots and that slots are of the same type)
    */
   public boolean isCompatible(TupleDescriptor desc) {
-    if (slots.size() != desc.slots.size()) return false;
+    if (slots.size() != desc.slots.size()) {
+      return false;
+    }
     for (int i = 0; i < slots.size(); ++i) {
-      if (slots.get(i).getType() != desc.slots.get(i).getType()) return false;
+      if (slots.get(i).getType() != desc.slots.get(i).getType()) {
+        return false;
+      }
     }
     return true;
   }

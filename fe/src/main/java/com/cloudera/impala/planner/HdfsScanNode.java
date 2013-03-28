@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
@@ -87,34 +86,53 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(keyFilters);
 
     LOG.info("collecting partitions for table " + tbl.getName());
-    for (HdfsPartition p: tbl.getPartitions()) {
-      if (p.getFileDescriptors().size() == 0) {
-        // No point scanning partitions that have no data
-        continue;
-      }
-
-      Preconditions.checkState(
-          p.getPartitionValues().size() == tbl.getNumClusteringCols());
-      // check partition key values against key ranges, if set
-      Preconditions.checkState(keyFilters.size() == p.getPartitionValues().size());
-      boolean matchingPartition = true;
-      for (int i = 0; i < keyFilters.size(); ++i) {
-        SingleColumnFilter keyFilter = keyFilters.get(i);
-        if (keyFilter != null
-            && !keyFilter.isTrue(analyzer, p.getPartitionValues().get(i))) {
-          matchingPartition = false;
-          break;
+    if (tbl.getPartitions().isEmpty()) {
+      cardinality = tbl.getNumRows();
+    } else {
+      cardinality = 0;
+      boolean hasValidPartitionCardinality = false;
+      for (HdfsPartition p: tbl.getPartitions()) {
+        if (p.getFileDescriptors().size() == 0) {
+          // No point scanning partitions that have no data
+          continue;
         }
-      }
-      if (!matchingPartition) {
-        // skip this partition, it's outside the key filters
-        continue;
-      }
-      // HdfsPartition is immutable, so it's ok to copy by reference
-      partitions.add(p);
 
-      totalBytes += p.getSize();
+        Preconditions.checkState(
+            p.getPartitionValues().size() == tbl.getNumClusteringCols());
+        // check partition key values against key ranges, if set
+        Preconditions.checkState(keyFilters.size() == p.getPartitionValues().size());
+        boolean matchingPartition = true;
+        for (int i = 0; i < keyFilters.size(); ++i) {
+          SingleColumnFilter keyFilter = keyFilters.get(i);
+          if (keyFilter != null
+              && !keyFilter.isTrue(analyzer, p.getPartitionValues().get(i))) {
+            matchingPartition = false;
+            break;
+          }
+        }
+        if (!matchingPartition) {
+          // skip this partition, it's outside the key filters
+          continue;
+        }
+        // HdfsPartition is immutable, so it's ok to copy by reference
+        partitions.add(p);
+
+        // ignore partitions with missing stats in the hope they don't matter
+        // enough to change the planning outcome
+        if (p.getNumRows() > 0) {
+          cardinality += p.getNumRows();
+          hasValidPartitionCardinality = true;
+        }
+        totalBytes += p.getSize();
+      }
+      // if none of the partitions knew its number of rows, we fall back on
+      // the table stats
+      if (!hasValidPartitionCardinality) cardinality = tbl.getNumRows();
     }
+
+    Preconditions.checkState(cardinality >= 0 || cardinality == -1);
+    if (cardinality > 0) cardinality *= computeSelectivity();
+    LOG.info("finalize HdfsScan: cardinality=" + Long.toString(cardinality));
   }
 
   @Override
@@ -225,7 +243,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Raises NotImplementedException if any of the partitions uses an unsupported file 
+   * Raises NotImplementedException if any of the partitions uses an unsupported file
    * format.  This is useful for experimental formats, which we currently don't have.
    * Can only be called after finalize().
    */

@@ -74,6 +74,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected List<Predicate> conjuncts = Lists.newArrayList();
 
+  // estimate of the output cardinality of this node; set in finalize();
+  // invalid: -1
+  protected long cardinality;
+
   //  Node should compact data.
   protected boolean compactData;
 
@@ -82,12 +86,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
+    this.cardinality = -1;
   }
 
   protected PlanNode(PlanNodeId id) {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
+    this.cardinality = -1;
   }
 
   /**
@@ -100,6 +106,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.rowTupleIds = Lists.newArrayList(node.rowTupleIds);
     this.nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
     this.conjuncts = Expr.cloneList(node.conjuncts, null);
+    this.cardinality = -1;
     this.compactData = node.compactData;
   }
 
@@ -233,15 +240,27 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Computes internal state. Call this once on the root of the plan tree before
-   * calling toThrift(). The default implementation simply calls finalize()
-   * on the children.
+   * Computes internal state, including cardinality.
+   * Call this once on the root of the plan tree before calling toThrift(). The default
+   * implementation simply calls finalize() on the children.
    */
   public void finalize(Analyzer analyzer) throws InternalException {
     for (PlanNode child: children) {
       child.finalize(analyzer);
     }
   }
+
+  /**
+   * Compute the product of the selectivies of all conjuncts.
+   */
+  protected double computeSelectivity() {
+    double prod = 1.0;
+    for (Predicate p: conjuncts) {
+      prod *= p.getSelectivity();
+    }
+    return prod;
+  }
+
 
   /**
    * Appends ids of slots that need to be materialized for this tree of nodes.

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TExprOpcode;
@@ -86,5 +87,31 @@ public class CompoundPredicate extends Predicate {
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.COMPOUND_PRED;
     msg.setOpcode(op.toThrift());
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+
+    if (getChild(0).selectivity == -1
+        || children.size() == 2 && getChild(1).selectivity == -1) {
+      // give up if we're missing an input
+      selectivity = -1;
+      return;
+    }
+
+    switch (op) {
+      case AND:
+        selectivity = getChild(0).selectivity * getChild(1).selectivity;
+        break;
+      case OR:
+        selectivity = getChild(0).selectivity + getChild(1).selectivity
+            - getChild(0).selectivity * getChild(1).selectivity;
+        break;
+      case NOT:
+        selectivity = 1.0 - getChild(0).selectivity;
+        break;
+    }
+    selectivity = Math.max(0.0, Math.min(1.0, selectivity));
   }
 }
