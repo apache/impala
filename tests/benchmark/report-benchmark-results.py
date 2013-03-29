@@ -315,6 +315,10 @@ def write_junit_output_file(results, output_file):
 # read results file in CSV format, then copies to a list and returns the value
 def read_csv_result_file(file_name):
   results = []
+
+  # The default field size limit is too small to read big runtime profiles. Set
+  # the limit to an artibrarily large value.
+  csv.field_size_limit(sys.maxint)
   for row in csv.reader(open(file_name, 'rb'), delimiter='|'):
     # Backwards compatibility:
     # Older results may not have runtime profile, so fill this in if detected.

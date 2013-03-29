@@ -109,6 +109,9 @@ def save_results(result_map, output_csv_file, is_impala_result=True):
     LOG.error('Result map is None')
     return
 
+  # The default field size limit is too small to write big runtime profiles. Set
+  # the limit to an artibrarily large value.
+  csv.field_size_limit(sys.maxint)
   csv_writer = csv.writer(open(output_csv_file, 'wb'), delimiter='|',
                           quoting=csv.QUOTE_MINIMAL)
 
