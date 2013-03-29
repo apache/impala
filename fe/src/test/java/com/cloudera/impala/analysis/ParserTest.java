@@ -335,10 +335,12 @@ public class ParserTest {
     ParsesOk("select a from `default`.`t`");
     ParsesOk("select a from `default`.t");
     ParsesOk("select a from default.`t`");
+    ParsesOk("select 01a from default.`01_t`");
 
     ParsesOk("select `a` from default.t");
     ParsesOk("select `tbl`.`a` from default.t");
     ParsesOk("select `db`.`tbl`.`a` from default.t");
+    ParsesOk("select `12db`.`tbl`.`12_a` from default.t");
 
     // Mixed quoting
     ParsesOk("select `db`.tbl.`a` from default.t");
@@ -827,6 +829,8 @@ public class ParserTest {
     ParsesOk("CREATE TABLE IF NOT EXISTS Bar2 LIKE Bar1");
     ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1");
     ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1 LOCATION '/a/b'");
+    // Table and column names starting with digits.
+    ParsesOk("CREATE TABLE 01_Foo (01_i int, 02_j string)");
 
     ParsesOk("CREATE TABLE Foo (i int, s string)");
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string)");

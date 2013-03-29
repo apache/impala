@@ -201,7 +201,7 @@ LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
 
-IdentifierOrKwContents = [:jletter:][:jletterdigit:]* | "&&" | "||"
+IdentifierOrKwContents = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
 
 IdentifierOrKw = \`{IdentifierOrKwContents}\` | {IdentifierOrKwContents}
 IntegerLiteral = [:digit:][:digit:]*
