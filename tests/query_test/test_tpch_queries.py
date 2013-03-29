@@ -19,8 +19,8 @@ class TestTpchQuery(ImpalaTestSuite):
     # execute over
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format == 'seq' and\
-          v.get_value('table_format').compression_codec == 'snap' and\
+          v.get_value('table_format').file_format == 'text' and\
+          v.get_value('table_format').compression_codec == 'none' and\
           v.get_value('table_format').compression_type != 'record')
 
     cls.TestMatrix.add_constraint(lambda v:\
