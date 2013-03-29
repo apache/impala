@@ -1474,37 +1474,37 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
   } else {
     switch (option) {
       case TImpalaQueryOptions::ABORT_ON_ERROR:
-        query_options->abort_on_error =
-            iequals(value, "true") || iequals(value, "1");
+        query_options->__set_abort_on_error(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::MAX_ERRORS:
-        query_options->max_errors = atoi(value.c_str());
+        query_options->__set_max_errors(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::DISABLE_CODEGEN:
-        query_options->disable_codegen =
-            iequals(value, "true") || iequals(value, "1");
+        query_options->__set_disable_codegen(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::BATCH_SIZE:
-        query_options->batch_size = atoi(value.c_str());
+        query_options->__set_batch_size(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::MEM_LIMIT:
-        query_options->mem_limit = ParseMemLimit(value);
+        query_options->__set_mem_limit(ParseMemLimit(value));
         break;
       case TImpalaQueryOptions::NUM_NODES:
-        query_options->num_nodes = atoi(value.c_str());
+        query_options->__set_num_nodes(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-        query_options->max_scan_range_length = atol(value.c_str());
+        query_options->__set_max_scan_range_length(atol(value.c_str()));
         break;
       case TImpalaQueryOptions::MAX_IO_BUFFERS:
-        query_options->max_io_buffers = atoi(value.c_str());
+        query_options->__set_max_io_buffers(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
-        query_options->num_scanner_threads = atoi(value.c_str());
+        query_options->__set_num_scanner_threads(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        query_options->allow_unsupported_formats =
-            iequals(value, "true") || iequals(value, "1");
+        query_options->__set_allow_unsupported_formats(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
         query_options->__set_default_order_by_limit(atoi(value.c_str()));
@@ -1513,8 +1513,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_debug_action(value.c_str());
         break;
       case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
-        query_options->abort_on_default_limit_exceeded =
-            iequals(value, "true") || iequals(value, "1");
+        query_options->__set_abort_on_default_limit_exceeded(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

@@ -462,7 +462,6 @@ void ImpalaServer::SessionEnd(const ThriftServer::SessionKey& session_key) {
 Status ImpalaServer::QueryToTClientRequest(const Query& query,
     TClientRequest* request) {
   request->queryOptions = default_query_options_;
-  request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
