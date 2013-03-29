@@ -14,12 +14,29 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import com.cloudera.impala.planner.HBaseTableSink;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HRegionLocation;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.io.hfile.Compression;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -33,6 +50,7 @@ import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
+import org.apache.log4j.Logger;
 
 /**
  * Impala representation of HBase table metadata,
@@ -48,8 +66,11 @@ import com.google.common.base.Preconditions;
  *
  */
 public class HBaseTable extends Table {
+  private static final Logger LOG = Logger.getLogger(HBaseTable.class);
   // Copied from Hive's HBaseStorageHandler.java.
   public static final String DEFAULT_PREFIX = "default.";
+  public static final int ROW_COUNT_ESTIMATE_BATCH_SIZE = 10;
+
   // Column referring to HBase row key.
   // Hive (including metastore) currently doesn't support composite HBase keys.
   protected HBaseColumn rowKey;
@@ -60,6 +81,11 @@ public class HBaseTable extends Table {
   // Input format class for HBase tables read by Hive.
   private static final String hbaseInputFormat =
     "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
+
+  // Keep the conf around
+  private final static Configuration hbaseConf = HBaseConfiguration.create();
+
+  private HTable hTable = null;
 
   protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
@@ -131,6 +157,7 @@ public class HBaseTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     try {
       hbaseTableName = getHBaseTableName(msTbl);
+      hTable = new HTable(hbaseConf, hbaseTableName);
       Map<String, String> serdeParam = msTbl.getSd().getSerdeInfo().getParameters();
       String hbaseColumnsMapping = serdeParam.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
 
@@ -199,6 +226,111 @@ public class HBaseTable extends Table {
       }
     }
     return tableName;
+  }
+
+  /**
+   * Get an estimate of the number of rows in regions between startRowKey and
+   * endRowKey. The more store files there are the more this will be off.  Also
+   * this does not take into account any rows that are in the memstore.
+   *
+   * The values computed here should be cached so that in high qps workloads
+   * the nn is not overwhelmed.  Could be done in load(); Synchronized to make
+   * sure that only one thread at a time is using the htable.
+   *
+   * @param startRowKey First row key in the range
+   * @param endRowKey Last row key in the range
+   * @return The estimated number of rows in the regions between the row keys.
+   */
+  public synchronized long getEstimatedRowCount(byte[] startRowKey, byte[] endRowKey) {
+
+    Preconditions.checkNotNull(startRowKey);
+    Preconditions.checkNotNull(endRowKey);
+
+    long rowSize  = 0;
+    long rowCount = 0;
+    long hdfsSize = 0;
+    boolean isCompressed = false;
+
+    try {
+      Path tableDir = HTableDescriptor.getTableDir(
+          FSUtils.getRootDir(hbaseConf), Bytes.toBytes(hbaseTableName));
+      FileSystem fs = tableDir.getFileSystem(hbaseConf);
+
+      // Check to see if things are compressed.
+      // If they are we'll estimate a compression factor.
+      HColumnDescriptor[] families =
+          hTable.getTableDescriptor().getColumnFamilies();
+      for (HColumnDescriptor desc: families) {
+        isCompressed |= desc.getCompression() != Compression.Algorithm.NONE;
+      }
+
+      // For every region in the range.
+      List<HRegionLocation> locations =
+          hTable.getRegionsInRange(startRowKey, endRowKey);
+      for(HRegionLocation location: locations) {
+        long currentHdfsSize = 0;
+        long currentRowSize  = 0;
+        long currentRowCount = 0;
+
+        HRegionInfo info = location.getRegionInfo();
+        // Get the size on hdfs
+        Path regionDir = tableDir.suffix("/" + info.getEncodedName());
+        currentHdfsSize += fs.getContentSummary(regionDir).getLength();
+
+        Scan s = new Scan(info.getStartKey());
+        // Get a small sample of rows
+        s.setBatch(ROW_COUNT_ESTIMATE_BATCH_SIZE);
+        // Try and get every version so the row's size can be used to estimate.
+        s.setMaxVersions(Short.MAX_VALUE);
+        // Don't cache the blocks as we don't think these are
+        // necessarily important blocks.
+        s.setCacheBlocks(false);
+        // Try and get deletes too so their size can be counted.
+        s.setRaw(true);
+        ResultScanner rs = hTable.getScanner(s);
+
+        // And get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
+        // for a representative sample
+        for (int i = 0; i < ROW_COUNT_ESTIMATE_BATCH_SIZE; i++) {
+          Result r = rs.next();
+          if (r == null) break;
+          currentRowCount += 1;
+          for (KeyValue kv : r.list()) {
+            // some extra row size added to make up for shared overhead
+            currentRowSize += kv.getRowLength() // row key
+                + 4 // row key length field
+                + kv.getFamilyLength() // Column family bytes
+                + 4  // family length field
+                + kv.getQualifierLength() // qualifier bytes
+                + 4 // qualifier length field
+                + kv.getValueLength() // length of the value
+                + 4 // value length field
+                + 10; // extra overhead for hfile index, checksums, metadata, etc
+          }
+        }
+        // add these values to the cumulative totals in one shot just
+        // in case there was an error in between getting the hdfs
+        // size and the row/column sizes.
+        hdfsSize += currentHdfsSize;
+        rowCount += currentRowCount;
+        rowSize  += currentRowSize;
+      }
+    } catch (IOException ioe) {
+      // Print the stack trace, but we'll ignore it
+      // as this is just an estimate.
+      // TODO: Put this into the per query log.
+      LOG.error("Error computing HBase row count estimate", ioe);
+    }
+
+    // If there are no rows then no need to estimate.
+    if (rowCount == 0) return 0;
+
+    // if something went wrong then set a signal value.
+    if (rowSize <= 0 || hdfsSize <= 0) return -1;
+
+    // estimate the number of rows.
+    double bytesPerRow = rowSize / (double) rowCount;
+    return (long) ((isCompressed ? 2 : 1) * (hdfsSize / bytesPerRow));
   }
 
   @Override
