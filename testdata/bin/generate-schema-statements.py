@@ -353,8 +353,10 @@ def generate_statements(output_name, test_vectors, sections,
       # testing. Since Impala currently only supports inserting into TEXT and PARQUET we
       # need to create these tables with a supported insert format.
       create_file_format = file_format
+      create_codec = codec
       if not load_local and not insert:
-        create_file_format = 'text' if 'file_format' != 'parquet' else 'parquet'
+        create_codec = 'none'
+        create_file_format = 'text' if file_format != 'parquet' else 'parquet'
 
       if table_names and (table_name.lower() not in table_names):
         print 'Skipping table: %s.%s' % (db, table_name)
@@ -390,9 +392,8 @@ def generate_statements(output_name, test_vectors, sections,
         with open("%s/%s.json" % (avro_schema_dir, table_name),"w") as f:
           f.write(avro_schema(columns))
 
-      output.create.append(
-        build_create_statement(table_template, table_name, db_name, db_suffix,
-                               create_file_format, codec, hdfs_location))
+      output.create.append(build_create_statement(table_template, table_name, db_name,
+          db_suffix, create_file_format, create_codec, hdfs_location))
 
       # The ALTER statement in hive does not accept fully qualified table names.
       # We need the use statement.
