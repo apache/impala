@@ -76,8 +76,8 @@ class PerfResultDataStore(object):
       compression_codec, compression_type = ['none', 'none']
     else:
       compression_codec, compression_type = compression.split('/')
-    result = cursor.execute("select file_type_id from FileType where format='%s' and "\
-                            "compression_codec='%s' and compression_type='%s'" %
+    result = cursor.execute("select file_type_id from FileType where format=%s and "\
+                            "compression_codec=%s and compression_type=%s",
                             (file_format, compression_codec, compression_type))
 
     file_format_id = cursor.fetchone()
@@ -85,20 +85,20 @@ class PerfResultDataStore(object):
 
   @cursor_wrapper
   def __get_query_id(self, query_name, query, cursor):
-    result = cursor.execute("select query_id from Query where name='%s'" % (query_name))
+    result = cursor.execute("select query_id from Query where name=%s", query_name)
     query_id = cursor.fetchone()
     return query_id[0] if query_id else None
 
   @cursor_wrapper
   def __get_workload_id(self, workload, scale_factor, cursor):
-    result = cursor.execute("select workload_id from Workload where name='%s' and "\
-                            "scale_factor='%s'" % (workload, scale_factor))
+    result = cursor.execute("select workload_id from Workload where name=%s and "\
+                            "scale_factor=%s", (workload, scale_factor))
     workload_id = cursor.fetchone()
     return workload_id[0] if workload_id else None
 
   @cursor_wrapper
   def __insert_run_info(self, run_info, cursor):
-    cursor.execute("insert into RunInfo (run_info) values ('%s')" % run_info)
+    cursor.execute("insert into RunInfo (run_info) values (%s)", run_info)
     result = cursor.execute("SELECT LAST_INSERT_ID()")
     run_info_id = cursor.fetchone()
     return run_info_id[0] if run_info_id else None
@@ -110,14 +110,14 @@ class PerfResultDataStore(object):
     result = cursor.execute("insert into ExecutionResults (run_info_id, query_id, "\
         "workload_id, file_type_id, num_clients, cluster_name, executor_name,  avg_time,"\
         " stddev, run_date, version, notes, num_iterations, profile, is_official) values"\
-        "(%d, %d, %d, %d, %d, '%s', '%s', %s, %s, '%s', '%s', '%s', %d, '%s', %s)" %\
+        "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", \
         (run_info_id, query_id, workload_id, file_type_id, num_clients, cluster_name,
          executor_name, avg_time, stddev, run_date, version, notes, num_iterations,
          runtime_profile, is_official))
 
   @cursor_wrapper
   def __insert_query_info(self, name, query, cursor):
-    cursor.execute("insert into Query (name, query) values ('%s', '%s')" % (name, query))
+    cursor.execute("insert into Query (name, query) values (%s, %s)",  (name, query))
     result = cursor.execute("SELECT LAST_INSERT_ID()")
     query_id = cursor.fetchone()
     return query_id[0] if query_id else None
@@ -125,7 +125,7 @@ class PerfResultDataStore(object):
   @cursor_wrapper
   def __insert_workload_info(self, name, scale_factor, cursor):
     cursor.execute("insert into Workload (name, scale_factor) "\
-        "values('%s', '%s')" % (name, scale_factor))
+        "values(%s, %s)", (name, scale_factor))
     result = cursor.execute("SELECT LAST_INSERT_ID()")
     workload_id = cursor.fetchone()
     return workload_id[0] if workload_id else None
@@ -141,7 +141,7 @@ class PerfResultDataStore(object):
                             "join Query q on (e.query_id = q.query_id) "\
                             "join Workload w on (e.workload_id = w.workload_id) "\
                             "join FileType f on (e.file_type_id = f.file_type_id) "\
-                            "where e.run_info_id=%d" % run_info_id)
+                            "where e.run_info_id=%d", run_info_id)
     results = cursor.fetchall()
     for row in results:
       print row
