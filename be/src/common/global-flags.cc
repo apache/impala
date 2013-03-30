@@ -34,4 +34,7 @@ DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
 DEFINE_string(principal, "", "Kerberos principal name");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos key file");
 
-DEFINE_int64(mem_limit, 0, "Process memory limit in bytes; 0: no limit");
+DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
+              "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "
+              "or percentage of the physical memory ('<int>%'). "
+              "Defaults to bytes if no unit is given");

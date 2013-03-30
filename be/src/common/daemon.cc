@@ -17,13 +17,14 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/logging.h"
+#include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/thrift-util.h"
 
 DECLARE_string(hostname);
 
 void impala::InitDaemon(int argc, char** argv) {
-  // Set the default hostname.  The user can override this with the hostname flag.
+  // Set the default hostname. The user can override this with the hostname flag.
   GetHostname(&FLAGS_hostname);
 
   google::SetVersionString(impala::GetBuildVersion());
@@ -37,7 +38,9 @@ void impala::InitDaemon(int argc, char** argv) {
   InitThriftLogging();
   CpuInfo::Init();
   DiskInfo::Init();
+  MemInfo::Init();
 
   LOG(INFO) << CpuInfo::DebugString();
   LOG(INFO) << DiskInfo::DebugString();
+  LOG(INFO) << MemInfo::DebugString();
 }

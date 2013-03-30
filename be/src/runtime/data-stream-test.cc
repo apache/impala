@@ -31,6 +31,7 @@
 #include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/thrift-server.h"
+#include "util/mem-info.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
@@ -490,6 +491,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
+  impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("data-stream-test"));

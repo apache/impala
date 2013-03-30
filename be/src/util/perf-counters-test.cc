@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
+#include "util/mem-info.h"
 #include "util/perf-counters.h"
 
 using namespace std;
@@ -65,6 +66,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
+  impala::MemInfo::Init();
   return RUN_ALL_TESTS();
 }
 

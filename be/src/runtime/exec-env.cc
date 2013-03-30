@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
+#include <gflags/gflags.h>
 
 #include "common/logging.h"
 #include "common/service-ids.h"
@@ -32,6 +33,9 @@
 #include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
+#include "util/parse-util.h"
+#include "util/mem-info.h"
+#include "util/debug-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;
@@ -41,7 +45,7 @@ DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DECLARE_int32(be_port);
-DECLARE_int64(mem_limit);
+DECLARE_string(mem_limit);
 
 namespace impala {
 
@@ -53,7 +57,7 @@ ExecEnv::ExecEnv()
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     metrics_(new Metrics()),
-    mem_limit_(FLAGS_mem_limit > 0 ? new MemLimit(FLAGS_mem_limit) : NULL),
+    mem_limit_(NULL),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
@@ -84,7 +88,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
       disk_io_mgr_(new DiskIoMgr()),
       webserver_(new Webserver(webserver_port)),
       metrics_(new Metrics()),
-      mem_limit_(FLAGS_mem_limit > 0 ? new MemLimit(FLAGS_mem_limit) : NULL),
+      mem_limit_(NULL),
       enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
       tz_database_(TimezoneDatabase()) {
   if (FLAGS_use_statestore && statestore_port > 0) {
@@ -112,6 +116,29 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
+
+  // Initialize global memory limit.
+  int64_t bytes_limit = 0;
+  bool is_percent;
+  // --mem_limit="" means no memory limit
+  bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent);
+  if (bytes_limit == -1) {
+    return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
+  }
+  // Limit of 0 means no memory limit.
+  if (bytes_limit > 0) {
+    mem_limit_.reset(new MemLimit(bytes_limit));
+  }
+  if (bytes_limit > MemInfo::physical_mem()) {
+    LOG(WARNING) << "Memory limit "
+                 << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                 << " exceeds physical memory of "
+                 << PrettyPrinter::Print(MemInfo::physical_mem(),
+                    TCounterType::BYTES);
+  }
+  LOG(INFO) << "Using global memory limit: "
+            << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
     AddDefaultPathHandlers(webserver_.get());

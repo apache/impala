@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_UTIL_PARSE_UTIL_H
-#define IMPALA_UTIL_PARSE_UTIL_H
+#ifndef IMPALA_UTIL_STRING_PARSER_H
+#define IMPALA_UTIL_STRING_PARSER_H
 
 #include <limits>
 #include "common/compiler-util.h"

@@ -17,6 +17,7 @@
 
 import pytest
 import sys
+import re
 from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
@@ -37,7 +38,13 @@ class TestQueryMemLimit(ImpalaTestSuite):
   # dynamically, even if it is a rough approximation.
   # A mem_limit is expressed in bytes, with values <= 0 signifying no cap.
   # These values are either really small, unlimited, or have a really large cap.
-  MEM_LIMITS = [-1, 0, 1, 10, 100, 1000, 10000, sys.maxint]
+  SYS_MAXINT = str(sys.maxint)
+  MEM_LIMITS = ["-1", "0", "1", "10", "100", "1000", "10000", SYS_MAXINT,
+                SYS_MAXINT + "b", SYS_MAXINT + "B",
+                SYS_MAXINT + "m", SYS_MAXINT + "M",
+                SYS_MAXINT + "g", SYS_MAXINT + "G",
+                # invalid per-query memory limits
+                "xyz", "100%", SYS_MAXINT + "k", "k" + SYS_MAXINT] 
 
   @classmethod
   def get_workload(self):
@@ -67,7 +74,7 @@ class TestQueryMemLimit(ImpalaTestSuite):
     exec_options['mem_limit'] = mem_limit
     query = vector.get_value('query')
     table_format = vector.get_value('table_format')
-    if mem_limit <= 0 or mem_limit == sys.maxint:
+    if mem_limit == "0" or re.match(self.SYS_MAXINT + "[bBmMgG]?$", mem_limit):
       # should succeed
       self.__exec_query(query, exec_options, True, table_format)
     else:

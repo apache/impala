@@ -26,6 +26,7 @@
 #include "codegen/llvm-codegen.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
+#include "util/mem-info.h"
 
 using namespace llvm;
 using namespace std;
@@ -92,6 +93,7 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
+  impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
 
   return RUN_ALL_TESTS();

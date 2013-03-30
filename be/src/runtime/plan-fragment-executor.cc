@@ -35,6 +35,8 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/container-util.h"
+#include "util/parse-util.h"
+#include "util/mem-info.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
@@ -91,8 +93,17 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
   if (request.query_options.mem_limit > 0) {
     // we have a per-query limit
-    mem_limit_.reset(new MemLimit(request.query_options.mem_limit));
+    int64_t bytes_limit = request.query_options.mem_limit;
+    mem_limit_.reset(new MemLimit(bytes_limit));
     runtime_state_->mem_limits()->push_back(mem_limit_.get());
+    if (bytes_limit > MemInfo::physical_mem()) {
+      LOG(WARNING) << "Memory limit "
+                   << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                   << " exceeds physical memory of "
+                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+    }
+    VLOG_QUERY << "Using query memory limit: "
+               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
 
   // set up desc tbl

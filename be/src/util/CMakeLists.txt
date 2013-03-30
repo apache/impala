@@ -35,8 +35,10 @@ add_library(Util
   integer-array.cc
   jni-util.cc
   logging.cc
+  mem-info.cc
   metrics.cc
   network-util.cc
+  parse-util.cc
   path-builder.cc
 # TODO: not supported on RHEL 5
 #  perf-counters.cc

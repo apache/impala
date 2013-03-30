@@ -39,6 +39,7 @@
 #include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
+#include "util/mem-info.h"
 #include "util/string-parser.h"
 #include "util/thrift-server.h"
 #include "util/thrift-client.h"
@@ -2216,6 +2217,7 @@ int main(int argc, char **argv) {
   InitThriftLogging();
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
+  impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
 
   EXIT_IF_ERROR(JniUtil::Init());

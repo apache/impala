@@ -51,6 +51,7 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/jni-util.h"
+#include "util/parse-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
@@ -1459,11 +1460,6 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
   return Status::OK;
 }
 
-static int64_t ParseMemLimit(const string& str_val) {
-  // TODO: implement
-  return atoi(str_val.c_str());
-}
-
 Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
     TQueryOptions* query_options) {
   int option = GetQueryOption(key);
@@ -1487,9 +1483,19 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::BATCH_SIZE:
         query_options->__set_batch_size(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::MEM_LIMIT:
-        query_options->__set_mem_limit(ParseMemLimit(value));
+      case TImpalaQueryOptions::MEM_LIMIT: {
+        // Parse the mem limit spec and validate it.
+        bool is_percent;
+        int64_t bytes_limit = ParseUtil::ParseMemSpec(value, &is_percent);
+        if (bytes_limit == -1) {
+          return Status("Failed to parse mem limit from '" + value + "'.");
+        }
+        if (is_percent) {
+          return Status("Invalid query memory limit with percent '" + value + "'.");
+        }
+        query_options->__set_mem_limit(bytes_limit);
         break;
+      }
       case TImpalaQueryOptions::NUM_NODES:
         query_options->__set_num_nodes(atoi(value.c_str()));
         break;
