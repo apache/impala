@@ -346,8 +346,6 @@ public class HBaseScanNode extends ScanNode {
     if (!Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
       output.append(prefix + "  STOP KEY: " + printKey(stopKey) + "\n");
     }
-    output.append(prefix +  "  ESTIMATED ROWS BEFORE FILTER: " +
-        tbl.getEstimatedRowCount(this.startKey, this.stopKey)  + "\n");
     if (!filters.isEmpty()) {
       output.append(prefix + "  HBASE FILTERS: ");
       if (filters.size() == 1) {
