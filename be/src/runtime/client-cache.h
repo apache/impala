@@ -66,7 +66,7 @@ class ClientCacheHelper {
 
   // Close and delete the underlying transport and remove the client from client_map_.
   // Return a new client connecting to the same host/port.
-  // Return an error status and client_key would be set to NULL if a new client cannot
+  // Return an error status and set client_key to NULL if a new client cannot
   // created.
   Status ReopenClient(ClientFactory factory_method, void** client_key);
 

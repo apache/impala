@@ -180,6 +180,7 @@ void DataStreamSender::Channel::TransmitData() {
       VLOG_RPC << "Retrying TransmitData: " << e.what();
       rpc_status_ = client_cache_->ReopenClient(&client_);
       if (!rpc_status_.ok()) {
+        client_ = NULL;
         return;
       }
       client_->TransmitData(res, params);

@@ -56,7 +56,6 @@ Status ClientCacheHelper::GetClient(const TNetworkAddress& hostport,
     info_list.pop_front();
   } else {
     RETURN_IF_ERROR(CreateClient(hostport, factory_method, client_key));
-
   }
 
   if (metrics_enabled_) {
@@ -98,7 +97,11 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
   auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, client_key));
   VLOG_CONNECTION << "CreateClient(): adding new client for "
                   << client_impl->ipaddress() << ":" << client_impl->port();
-  RETURN_IF_ERROR(client_impl->Open());
+  Status status = client_impl->Open();
+  if (!status.ok()) {
+    *client_key = NULL;
+    return status;
+  }
   // Because the client starts life 'checked out', we don't add it to the cache map
   client_map_[*client_key] = client_impl.get();
   client_impl.release();
@@ -109,6 +112,7 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
 }
 
 void ClientCacheHelper::ReleaseClient(void* client_key) {
+  DCHECK(client_key != NULL) << "Trying to release NULL client";
   lock_guard<mutex> lock(lock_);
   ClientMap::iterator i = client_map_.find(client_key);
   DCHECK(i != client_map_.end());
