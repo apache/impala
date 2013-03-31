@@ -259,8 +259,8 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('refresh')
       if self.default_db:
         self.cmdqueue.append('use %s' % self.default_db)
+      self.__build_default_query_options_dict()
     self.last_query_handle = None
-    self.__build_default_query_options_dict()
     # Check if any of query options set by the user are inconsistent
     # with the impalad being connected to
     for set_option in self.set_query_options.keys():
