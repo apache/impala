@@ -38,13 +38,18 @@ class TestQueryMemLimit(ImpalaTestSuite):
   # dynamically, even if it is a rough approximation.
   # A mem_limit is expressed in bytes, with values <= 0 signifying no cap.
   # These values are either really small, unlimited, or have a really large cap.
-  SYS_MAXINT = str(sys.maxint)
-  MEM_LIMITS = ["-1", "0", "1", "10", "100", "1000", "10000", SYS_MAXINT,
-                SYS_MAXINT + "b", SYS_MAXINT + "B",
-                SYS_MAXINT + "m", SYS_MAXINT + "M",
-                SYS_MAXINT + "g", SYS_MAXINT + "G",
+  MAXINT_BYTES = str(sys.maxint)
+  MAXINT_MB = str(sys.maxint/(1024*1024))
+  MAXINT_GB = str(sys.maxint/(1024*1024*1024))
+  # We expect the tests with MAXINT_* using valid units [bmg] to succeed.
+  PASS_REGEX = re.compile("(%s|%s|%s)[bmg]?$" % (MAXINT_BYTES, MAXINT_MB, MAXINT_GB),
+                          re.I)
+  MEM_LIMITS = ["-1", "0", "1", "10", "100", "1000", "10000", MAXINT_BYTES,
+                MAXINT_BYTES + "b", MAXINT_BYTES + "B",
+                MAXINT_MB + "m", MAXINT_MB + "M",
+                MAXINT_GB + "g", MAXINT_GB + "G",
                 # invalid per-query memory limits
-                "xyz", "100%", SYS_MAXINT + "k", "k" + SYS_MAXINT] 
+                "-1234", "-3.14", "xyz", "100%", MAXINT_BYTES + "k", "k" + MAXINT_BYTES]
 
   @classmethod
   def get_workload(self):
@@ -74,7 +79,7 @@ class TestQueryMemLimit(ImpalaTestSuite):
     exec_options['mem_limit'] = mem_limit
     query = vector.get_value('query')
     table_format = vector.get_value('table_format')
-    if mem_limit == "0" or re.match(self.SYS_MAXINT + "[bBmMgG]?$", mem_limit):
+    if mem_limit in["0", "-1"] or self.PASS_REGEX.match(mem_limit):
       # should succeed
       self.__exec_query(query, exec_options, True, table_format)
     else:

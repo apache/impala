@@ -1501,7 +1501,7 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         // Parse the mem limit spec and validate it.
         bool is_percent;
         int64_t bytes_limit = ParseUtil::ParseMemSpec(value, &is_percent);
-        if (bytes_limit == -1) {
+        if (bytes_limit < 0) {
           return Status("Failed to parse mem limit from '" + value + "'.");
         }
         if (is_percent) {

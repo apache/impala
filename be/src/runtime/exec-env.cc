@@ -122,7 +122,7 @@ Status ExecEnv::StartServices() {
   bool is_percent;
   // --mem_limit="" means no memory limit
   bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent);
-  if (bytes_limit == -1) {
+  if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
   }
   // Limit of 0 means no memory limit.

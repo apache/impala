@@ -55,7 +55,7 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent) {
   int64_t bytes;
   if (multiplier != -1) {
     // Parse float - MB or GB
-    float limit_val = StringParser::StringToFloat<float>(mem_spec_str.data(),
+    double limit_val = StringParser::StringToFloat<double>(mem_spec_str.data(),
         number_str_len, &result);
     if (result != StringParser::PARSE_SUCCESS) return -1;
     bytes = multiplier * limit_val;
@@ -70,6 +70,10 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent) {
     } else {
       bytes = limit_val;
     }
+  }
+  // Accept -1 as indicator for infinite memory that we report by a 0 return value.
+  if (bytes == -1) {
+    return 0;
   }
 
   return bytes;

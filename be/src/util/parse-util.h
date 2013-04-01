@@ -31,7 +31,7 @@ class ParseUtil {
   // '<float>[gG]' -> in gigabytes
   // '<int>%'      -> in percent of MemInfo::physical_mem()
   // Requires MemInfo to be initialized for the '%' spec to work.
-  // Returns 0 if mem_spec_str is empty.
+  // Returns 0 if mem_spec_str is empty or '-1'.
   // Returns -1 if parsing failed.
   static int64_t ParseMemSpec(const std::string& mem_spec_str, bool* is_percent);
 };
