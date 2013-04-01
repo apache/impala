@@ -15,9 +15,12 @@
 package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Preconditions;
 
 /**
@@ -27,12 +30,15 @@ import com.google.common.base.Preconditions;
 public class AnalysisContext {
   private final Catalog catalog;
 
-  // The name of the database to use if one is not explicitly specified by a query. 
+  // The name of the database to use if one is not explicitly specified by a query.
   private final String defaultDatabase;
+
+  private final TQueryGlobals queryGlobals;
 
   public AnalysisContext(Catalog catalog, String defaultDb) {
     this.catalog = catalog;
     defaultDatabase = defaultDb;
+    queryGlobals = createQueryGlobals();
   }
 
   public AnalysisContext(Catalog catalog) {
@@ -188,7 +194,7 @@ public class AnalysisContext {
       if (result.stmt == null) {
         return null;
       }
-      result.analyzer = new Analyzer(catalog, defaultDatabase);
+      result.analyzer = new Analyzer(catalog, defaultDatabase, queryGlobals);
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
@@ -197,4 +203,20 @@ public class AnalysisContext {
       throw new AnalysisException(parser.getErrorMsg(stmt), e);
     }
   }
+
+  public TQueryGlobals getQueryGlobals() { return queryGlobals; }
+
+  /**
+   * Create query global parameters to be set in each TPlanExecRequest.
+   */
+  private TQueryGlobals createQueryGlobals() {
+    SimpleDateFormat formatter =
+        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+    TQueryGlobals queryGlobals = new TQueryGlobals();
+    Calendar currentDate = Calendar.getInstance();
+    String nowStr = formatter.format(currentDate.getTime());
+    queryGlobals.setNow_string(nowStr);
+    return queryGlobals;
+  }
+
 }

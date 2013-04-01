@@ -107,7 +107,8 @@ public class ValueRange {
     TExpr thriftExpr = p.treeToThrift();
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
-      boolean result = FeSupport.EvalPredicate(serializer.serialize(thriftExpr));
+      boolean result = FeSupport.EvalPredicate(serializer.serialize(thriftExpr),
+          serializer.serialize(analyzer.getQueryGlobals()));
       return result;
     } catch (TException e) {
       // this should never happen

@@ -32,15 +32,16 @@ public class FeSupport {
 
   private static boolean loaded = false;
 
-  public native static boolean NativeEvalPredicate(byte[] thriftPredicate);
+  public native static boolean NativeEvalPredicate(byte[] thriftPredicate,
+      byte[] thriftQueryGlobals);
 
-  public static boolean EvalPredicate(byte[] thriftPredicate) {
+  public static boolean EvalPredicate(byte[] thriftPredicate, byte[] thriftQueryGlobals) {
     try {
-      return NativeEvalPredicate(thriftPredicate);
+      return NativeEvalPredicate(thriftPredicate, thriftQueryGlobals);
     } catch (UnsatisfiedLinkError e) {
       loadLibrary();
     }
-    return NativeEvalPredicate(thriftPredicate);
+    return NativeEvalPredicate(thriftPredicate, thriftQueryGlobals);
   }
 
   /**

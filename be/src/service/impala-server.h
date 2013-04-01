@@ -353,7 +353,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
     // local runtime_state_ in case we don't have a coord_
-    RuntimeState local_runtime_state_;
+    boost::scoped_ptr<RuntimeState> local_runtime_state_;
     ObjectPool profile_pool_;
     RuntimeProfile profile_;
     RuntimeProfile summary_info_;

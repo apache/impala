@@ -33,6 +33,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
+import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -52,6 +53,7 @@ public class Analyzer {
   private final Catalog catalog;
   private final String defaultDb;
   private final IdGenerator<ExprId> conjunctIdGenerator;
+  private final TQueryGlobals queryGlobals;
 
   // An analyzer is a repository for a single select block. A select block can be a top
   // level select statement, or a inline view select block. An inline
@@ -104,19 +106,20 @@ public class Analyzer {
   private final Set<ExprId> whereClauseConjuncts = Sets.newHashSet();
 
   /**
-   * Analyzer constructor for top level statement.
+   * Analyzer constructor for AnalyzerTest.
    * @param catalog
    */
   public Analyzer(Catalog catalog) {
-    this(catalog, Catalog.DEFAULT_DB);
+    this(catalog, Catalog.DEFAULT_DB, new TQueryGlobals());
   }
 
-  public Analyzer(Catalog catalog, String defaultDb) {
+  public Analyzer(Catalog catalog, String defaultDb, TQueryGlobals queryGlobals) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
     this.defaultDb = defaultDb;
     this.conjunctIdGenerator = new IdGenerator<ExprId>();
+    this.queryGlobals = queryGlobals;
   }
 
   /**
@@ -131,6 +134,7 @@ public class Analyzer {
     this.defaultDb = parentAnalyzer.defaultDb;
     // make sure we don't create duplicate ids across entire stmt
     this.conjunctIdGenerator = parentAnalyzer.conjunctIdGenerator;
+    this.queryGlobals = parentAnalyzer.queryGlobals;
   }
 
   /**
@@ -639,5 +643,9 @@ public class Analyzer {
 
   public String getDefaultDb() {
     return defaultDb;
+  }
+
+  public TQueryGlobals getQueryGlobals() {
+    return queryGlobals;
   }
 }

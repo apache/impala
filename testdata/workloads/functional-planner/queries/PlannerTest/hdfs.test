@@ -1,3 +1,28 @@
+# all partitions are pruned during planning
+select * FROM functional.alltypes
+where cast(year as string) = to_date( from_unixtime(unix_timestamp()) )
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HDFS table=functional.alltypes #partitions=0 size=0B (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+====
 # predicate is evaluated by the scan node
 select zip, count(*)
 from functional.testtbl

@@ -31,6 +31,7 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/client-cache.h"
+#include "runtime/timestamp-value.h"
 #include "service/impala-server.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
@@ -50,15 +51,19 @@ using namespace apache::thrift::server;
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes) {
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes,
+    jbyteArray thrift_query_globals_bytes) {
   ObjectPool obj_pool;
   TExpr thrift_predicate;
   DeserializeThriftMsg(env, thrift_predicate_bytes, &thrift_predicate);
+  TQueryGlobals query_globals;
+  DeserializeThriftMsg(env, thrift_query_globals_bytes, &query_globals);
+  RuntimeState state(query_globals.now_string);
   Expr* e;
   Status status = Expr::CreateExprTree(&obj_pool, thrift_predicate, &e);
   if (status.ok()) {
     // TODO: codegen this as well.
-    status = Expr::Prepare(e, NULL, RowDescriptor(), true);
+    status = Expr::Prepare(e, &state, RowDescriptor(), true);
   }
   if (!status.ok()) {
     string error_msg;
@@ -90,7 +95,7 @@ void InitFeSupport() {
   JNINativeMethod nm;
   jclass native_backend_cl = env->FindClass("com/cloudera/impala/service/FeSupport");
   nm.name = const_cast<char*>("NativeEvalPredicate");
-  nm.signature = const_cast<char*>("([B)Z");
+  nm.signature = const_cast<char*>("([B[B)Z");
   nm.fnPtr = reinterpret_cast<void*>(
       ::Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate);
   env->RegisterNatives(native_backend_cl, &nm, 1);

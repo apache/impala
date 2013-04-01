@@ -84,7 +84,8 @@ public class SingleColumnFilter {
       TExpr thriftExpr = literalConjunct.treeToThrift();
       TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
       try {
-        if (!FeSupport.EvalPredicate(serializer.serialize(thriftExpr))) {
+        if (!FeSupport.EvalPredicate(serializer.serialize(thriftExpr),
+                serializer.serialize(analyzer.getQueryGlobals()))) {
           return false;
         }
       } catch (TException e) {

@@ -139,11 +139,11 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no
       // coordinator fragment actually executing to drive the sink.
       // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
-      local_runtime_state_.Init(
+      local_runtime_state_.reset(new RuntimeState(
           exec_request->request_id, exec_request->query_options,
           query_exec_request.query_globals.now_string,
-          NULL /* = we don't expect to be executing anything here */);
-      RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
+          NULL /* = we don't expect to be executing anything here */));
+      RETURN_IF_ERROR(PrepareSelectListExprs(local_runtime_state_.get(),
           query_exec_request.fragments[0].output_exprs, RowDescriptor()));
     } else {
       // If the first fragment has a "limit 0", simply set EOS to true and return.

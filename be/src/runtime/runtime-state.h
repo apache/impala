@@ -63,8 +63,9 @@ class RuntimeState {
                const TQueryOptions& query_options,
                const std::string& now, ExecEnv* exec_env);
 
-  // RuntimeState for executing queries w/o a from clause.
-  RuntimeState();
+  // RuntimeState for executing expr in fe-support.
+  RuntimeState(const std::string& now);
+
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
 

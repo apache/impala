@@ -571,11 +571,9 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string
 TEST_F(ExprTest, NullLiteral) {
   // TODO: how do we get the planner to use null literal vs literal predicate?
   // For now, just make it manually.  It is used by the partition creation code.
-  RuntimeState state;
-
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
-    Status status = Expr::Prepare(&expr, &state, RowDescriptor());
+    Status status = Expr::Prepare(&expr, NULL, RowDescriptor());
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(expr.GetValue(NULL) == NULL);
   }
