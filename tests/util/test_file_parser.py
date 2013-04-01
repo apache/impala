@@ -202,6 +202,7 @@ def write_test_file(test_file_name, test_file_sections):
         if section_name == 'RESULTS' and test_case.get('VERIFIER'):
           full_section_name = '%s: %s' % (section_name, test_case['VERIFIER'])
         test_file_text.append("%s %s" % (SUBSECTION_DELIMITER, full_section_name))
-        test_file_text.append(test_case[section_name])
+        if test_case[section_name].strip():
+          test_file_text.append(test_case[section_name])
     test_file_text.append(SECTION_DELIMITER)
     test_file.write(('\n').join(test_file_text))

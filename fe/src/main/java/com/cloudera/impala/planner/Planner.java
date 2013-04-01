@@ -87,7 +87,8 @@ public class Planner {
       throws NotImplementedException, InternalException {
     // Set queryStmt from analyzed SELECT or INSERT query.
     QueryStmt queryStmt = null;
-    if (analysisResult.isInsertStmt()) {
+    if (analysisResult.isInsertStmt() ||
+        analysisResult.isCreateTableAsSelectStmt()) {
       queryStmt = analysisResult.getInsertStmt().getQueryStmt();
     } else {
       queryStmt = analysisResult.getQueryStmt();
@@ -128,13 +129,15 @@ public class Planner {
     }
 
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
-    if (analysisResult.isInsertStmt()) {
+    if (analysisResult.isInsertStmt() ||
+        analysisResult.isCreateTableAsSelectStmt()) {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
       if (queryOptions.num_nodes != 1) {
         // repartition on partition keys
         rootFragment = repartitionForInsert(
             rootFragment, insertStmt.getPartitionKeyExprs(), analyzer, fragments);
       }
+
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
     }

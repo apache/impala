@@ -98,7 +98,7 @@ class Coordinator {
   // Populates and prepares output_exprs from the coordinator's fragment if there is one,
   // and LLVM optimizes them together with the fragment's other exprs.
   // A call to Exec() must precede all other member function calls.
-  Status Exec(const TUniqueId& query_id, TQueryExecRequest* request,
+  Status Exec(const TUniqueId& query_id, const TQueryExecRequest& request,
               const TQueryOptions& query_options, std::vector<Expr*>* output_exprs);
 
   // Blocks until result rows are ready to be retrieved via GetNext(), or, if the

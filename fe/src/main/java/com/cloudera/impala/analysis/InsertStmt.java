@@ -15,12 +15,15 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
@@ -38,6 +41,9 @@ import com.google.common.collect.Sets;
  *
  */
 public class InsertStmt extends StatementBase {
+  // Insert formats currently supported by Impala.
+  private final static EnumSet<FileFormat> SUPPORTED_INSERT_FORMATS =
+      EnumSet.of(FileFormat.PARQUETFILE, FileFormat.TEXTFILE);
   // List of inline views that may be referenced in queryStmt.
   private final WithClause withClause;
   // Target table name as seen by the parser
@@ -112,12 +118,23 @@ public class InsertStmt extends StatementBase {
       selectListExprs = Lists.newArrayList();
     }
 
-    if (!targetTableName.isFullyQualified()) {
-      this.targetTableName =
-          new TableName(analyzer.getDefaultDb(), targetTableName.getTbl());
+    // If the table has not yet been set, load it from the Catalog. This allows for
+    // callers to set a table to analyze that may not actually be created in the Catalog.
+    // One example use case is CREATE TABLE AS SELECT which must run analysis on the
+    // INSERT before the table has actually been created.
+    if (table == null) {
+      if (!targetTableName.isFullyQualified()) {
+        targetTableName =
+            new TableName(analyzer.getDefaultDb(), targetTableName.getTbl());
+      }
+      table = analyzer.getTable(targetTableName, Privilege.INSERT);
+    } else {
+      targetTableName = new TableName(table.getDb().getName(), table.getName());
+      PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
+      analyzer.getCatalog().checkAccess(analyzer.getUser(),
+          pb.onTable(table.getDb().getName(), table.getName()).allOf(Privilege.INSERT)
+          .toRequest());
     }
-
-    table = analyzer.getTable(targetTableName, Privilege.INSERT);
 
     // We do not support inserting into views.
     if (table instanceof View) {
@@ -451,28 +468,16 @@ public class InsertStmt extends StatementBase {
     return castExpr;
   }
 
-  public TableName getTargetTableName() {
-    return targetTableName;
-  }
-
-  public Table getTargetTable() {
-    return table;
-  }
-
-  public boolean isOverwrite() {
-    return overwrite;
-  }
+  public TableName getTargetTableName() { return targetTableName; }
+  public Table getTargetTable() { return table; }
+  public void setTargetTable(Table table) { this.table = table; }
+  public boolean isOverwrite() { return overwrite; }
 
   /**
    * Only valid after analysis
    */
-  public QueryStmt getQueryStmt() {
-    return queryStmt;
-  }
-
-  public List<Expr> getPartitionKeyExprs() {
-    return partitionKeyExprs;
-  }
+  public QueryStmt getQueryStmt() { return queryStmt; }
+  public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs; }
 
   public DataSink createDataSink() {
     // analyze() must have been called before.

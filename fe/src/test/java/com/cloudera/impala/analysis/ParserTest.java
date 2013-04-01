@@ -1509,6 +1509,32 @@ public class ParserTest {
   }
 
   @Test
+  public void TestCreateTableAsSelect() {
+    ParsesOk("CREATE TABLE Foo AS SELECT 1, 2, 3");
+    ParsesOk("CREATE TABLE Foo AS SELECT * from foo.bar");
+    ParsesOk("CREATE TABLE Foo.Bar AS SELECT int_col, bool_col from tbl limit 10");
+    ParsesOk("CREATE TABLE Foo.Bar LOCATION '/a/b' AS SELECT * from foo");
+    ParsesOk("CREATE TABLE IF NOT EXISTS Foo.Bar LOCATION '/a/b' AS SELECT * from foo");
+    ParsesOk("CREATE TABLE Foo STORED AS PARQUETFILE AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT 1");
+
+    // With clause works
+    ParsesOk("CREATE TABLE Foo AS with t1 as (select 1) select * from t1");
+
+    // Incomplete AS SELECT statement
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT");
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS WITH");
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS");
+
+    // INSERT statements are not allowed
+    ParserError("CREATE TABLE Foo AS INSERT INTO Foo SELECT 1");
+
+    // Column and partition definitions not allowed
+    ParserError("CREATE TABLE Foo(i int) AS SELECT 1");
+    ParserError("CREATE TABLE Foo PARTITIONED BY(i int) AS SELECT 1");
+  }
+
+  @Test
   public void TestDrop() {
     ParsesOk("DROP TABLE Foo");
     ParsesOk("DROP TABLE Foo.Bar");

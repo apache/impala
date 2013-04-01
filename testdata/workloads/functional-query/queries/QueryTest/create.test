@@ -2,7 +2,6 @@
 ---- QUERY
 use default
 ---- RESULTS
-
 ====
 ---- QUERY
 # Make sure the database doesn't exist
@@ -10,14 +9,12 @@ show databases like 'ddl_test_db'
 ---- SETUP
 RELOAD
 ---- RESULTS
-
 ---- TYPES
 STRING
 ====
 ---- QUERY
 create database ddl_test_db
 ---- RESULTS
-
 ====
 ---- QUERY
 # It should show up now
@@ -32,17 +29,14 @@ STRING
 # IF NOT EXISTS is specified.
 create database if not exists ddl_test_db
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables in ddl_test_db
 ---- RESULTS
-
 ====
 ---- QUERY
 create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
 ---- RESULTS
-
 ====
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
@@ -54,7 +48,6 @@ ESCAPED BY '\\'
 LINES TERMINATED BY '\n'
 STORED AS TEXTFILE
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables in ddl_test_db
@@ -96,7 +89,6 @@ INT, STRING
 ---- QUERY
 create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
 ---- RESULTS
-
 ====
 ---- QUERY
 # Partition columns are displayed as part of DESCRIBE <table>
@@ -139,7 +131,6 @@ INT, STRING, INT
 ---- QUERY
 use ddl_test_db
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables
@@ -153,7 +144,6 @@ STRING
 # Make sure we create the table in the proper database after a "use"
 create table testtbl2(f float, d double) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables
@@ -167,7 +157,6 @@ STRING
 ---- QUERY
 drop table testtbl2
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables
@@ -182,7 +171,6 @@ STRING
 create table alltypes_test like functional_seq_snap.alltypes
 stored as parquetfile
 ---- RESULTS
-
 ====
 ---- QUERY
 # Make sure no data exists for this table
@@ -216,7 +204,6 @@ BIGINT
 alter table alltypes_test partition (year=2009, month=4)
 set fileformat textfile
 ---- RESULTS
-
 ====
 ---- QUERY
 select count(*) from alltypes_test
@@ -230,7 +217,6 @@ BIGINT
 create external table jointbl_like like functional_rc_gzip.jointbl
 location '/test-warehouse/jointbl_rc_gzip'
 ---- RESULTS
-
 ====
 ---- QUERY
 # should get some results back
@@ -246,7 +232,6 @@ BIGINT, STRING, INT, INT
 # CREATE TABLE LIKE on unpartitioned table.
 create table testtbl_like like testtbl
 ---- RESULTS
-
 ====
 ---- QUERY
 # Make sure the new table can be queried and no data exists for this table.
@@ -260,13 +245,11 @@ BIGINT
 # No error is thrown when IF NOT EXISTS is specified and the table already exists.
 create table if not exists testtbl_like like testtbl
 ---- RESULTS
-
 ====
 ---- QUERY
 # IF NOT EXISTS also applies when the src table is the same as the new table.
 create table if not exists testtbl_like like testtbl_like
 ---- RESULTS
-
 ====
 ---- QUERY
 insert overwrite table testtbl_like
@@ -287,58 +270,180 @@ select * from testtbl_like
 INT, STRING
 ====
 ---- QUERY
+# Ensure that a table can be created using CTAS
+create table ctas_join stored as parquetfile as
+select j.*, a.int_col, 1*2
+from functional.jointbl j join functional_seq_snap.alltypes a
+  on (j.alltypes_id=a.id)
+---- RESULTS
+'Inserted 12 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+describe ctas_join
+---- RESULTS
+'test_id','bigint',''
+'test_name','string',''
+'test_zip','int',''
+'alltypes_id','int',''
+'int_col','int',''
+'_c2','bigint',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * from ctas_join
+---- RESULTS
+1001,'Name1',94611,5000,0,2
+1002,'Name2',94611,5000,0,2
+1003,'Name3',94611,5000,0,2
+1004,'Name4',94611,5000,0,2
+1005,'Name5',94611,5000,0,2
+1106,'Name6',94612,5000,0,2
+1006,'Name16',94612,5000,0,2
+1006,'Name6',94616,5000,0,2
+1106,'Name16',94612,5000,0,2
+1106,'Name6',94616,5000,0,2
+1006,'Name16',94616,5000,0,2
+1106,'Name16',94616,5000,0,2
+---- TYPES
+BIGINT, STRING, INT, INT, INT, BIGINT
+====
+---- QUERY
+# Since the table already exists, the second CTAS should be a no-op
+create table if not exists ctas_join stored as parquetfile as
+select j.*, a.int_col, 1*2
+from functional.jointbl j join functional_seq_snap.alltypes a
+  on (j.alltypes_id=a.id) limit 1
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join
+---- RESULTS
+1001,'Name1',94611,5000,0,2
+1002,'Name2',94611,5000,0,2
+1003,'Name3',94611,5000,0,2
+1004,'Name4',94611,5000,0,2
+1005,'Name5',94611,5000,0,2
+1106,'Name6',94612,5000,0,2
+1006,'Name16',94612,5000,0,2
+1006,'Name6',94616,5000,0,2
+1106,'Name16',94612,5000,0,2
+1106,'Name6',94616,5000,0,2
+1006,'Name16',94616,5000,0,2
+1106,'Name16',94616,5000,0,2
+---- TYPES
+BIGINT, STRING, INT, INT, INT, BIGINT
+====
+---- QUERY
+# Validate CTAS with LIMIT 0
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 0
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+describe ctas_join_limit0
+---- RESULTS
+'test_id','bigint',''
+'test_name','string',''
+'test_zip','int',''
+'alltypes_id','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+# Validate CTAS with LIMIT 0
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 0
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 4
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+drop table ctas_join
+---- RESULTS
+====
+---- QUERY
+drop table ctas_join_limit0
+---- RESULTS
+====
+---- QUERY
 drop table testtbl
 ---- RESULTS
-
 ====
 ---- QUERY
 drop table testtbl_part
 ---- RESULTS
-
 ====
 ---- QUERY
 drop table alltypes_test
 ---- RESULTS
-
 ====
 ---- QUERY
 drop table jointbl_like
 ---- RESULTS
-
 ====
 ---- QUERY
 drop table testtbl_like
 ---- RESULTS
-
 ====
 ---- QUERY
 show tables
 ---- RESULTS
-
 ---- TYPES
 STRING
 ====
 ---- QUERY
 drop table if exists non_existent_db.tbl
 ---- RESULTS
-
 ====
 ---- QUERY
 # Need to switch databases before dropping
 use default
 ---- RESULTS
-
 ====
 ---- QUERY
 drop database ddl_test_db
 ---- RESULTS
-
 ====
 ---- QUERY
 # Should be gone now
 show databases like 'ddl_test_db'
 ---- RESULTS
-
 ---- TYPES
 STRING
 ====

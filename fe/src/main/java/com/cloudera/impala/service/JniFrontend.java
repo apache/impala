@@ -21,14 +21,13 @@ import java.io.InputStreamReader;
 import java.io.InvalidObjectException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.rmi.NoSuchObjectException;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -38,11 +37,10 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HAUtil;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Appender;
 import org.apache.log4j.FileAppender;
+import org.apache.log4j.PropertyConfigurator;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -50,7 +48,6 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.log4j.PropertyConfigurator;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -59,17 +56,12 @@ import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
-import com.cloudera.impala.thrift.TCreateDbParams;
-import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
-import com.cloudera.impala.thrift.TCreateTableLikeParams;
-import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TDdlExecRequest;
+import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
-import com.cloudera.impala.thrift.TDropDbParams;
-import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
@@ -160,28 +152,18 @@ public class JniFrontend {
     }
   }
 
-  public void alterTable(byte[] thriftAlterTableParams)
+  public byte[] execDdlRequest(byte[] thriftDdlExecRequest)
       throws ImpalaException, MetaException, org.apache.thrift.TException,
       InvalidObjectException, ImpalaException, TableLoadingException {
-    TAlterTableParams params = new TAlterTableParams();
-    deserializeThrift(params, thriftAlterTableParams);
-    frontend.getDdlExecutor().alterTable(params);
-  }
-
-  public void alterView(byte[] thriftAlterViewParams)
-      throws ImpalaException, MetaException, org.apache.thrift.TException,
-      InvalidObjectException, ImpalaException, TableLoadingException {
-    TCreateOrAlterViewParams params = new TCreateOrAlterViewParams();
-    deserializeThrift(params, thriftAlterViewParams);
-    frontend.getDdlExecutor().alterView(params);
-  }
-
-  public void createDatabase(byte[] thriftCreateDbParams)
-      throws ImpalaException, MetaException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException {
-    TCreateDbParams params = new TCreateDbParams();
-    deserializeThrift(params, thriftCreateDbParams);
-    frontend.getDdlExecutor().createDatabase(params);
+    TDdlExecRequest request = new TDdlExecRequest();
+    deserializeThrift(request, thriftDdlExecRequest);
+    TDdlExecResponse response = frontend.getDdlExecutor().execDdlRequest(request);
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(response);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   /**
@@ -201,51 +183,6 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
-  }
-
-  public void createTable(byte[] thriftCreateTableParams)
-      throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException,
-      InvalidObjectException {
-    TCreateTableParams params = new TCreateTableParams();
-    deserializeThrift(params, thriftCreateTableParams);
-    frontend.getDdlExecutor().createTable(params);
-  }
-
-  public void createView(byte[] thriftCreateViewParams)
-      throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException,
-      InvalidObjectException {
-    TCreateOrAlterViewParams params = new TCreateOrAlterViewParams();
-    deserializeThrift(params, thriftCreateViewParams);
-    frontend.getDdlExecutor().createView(params);
-  }
-
-  public void createTableLike(byte[] thriftCreateTableLikeParams)
-      throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException, InvalidObjectException,
-      TableLoadingException {
-    TCreateTableLikeParams params = new TCreateTableLikeParams();
-    deserializeThrift(params, thriftCreateTableLikeParams);
-    frontend.getDdlExecutor().createTableLike(params);
-  }
-
-  public void dropDatabase(byte[] thriftDropDbParams)
-      throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException, InvalidOperationException,
-      InvalidObjectException {
-    TDropDbParams params = new TDropDbParams();
-    deserializeThrift(params, thriftDropDbParams);
-    frontend.getDdlExecutor().dropDatabase(params);
-  }
-
-  public void dropTableOrView(byte[] thriftDropTableObjectParams)
-      throws ImpalaException, MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException, InvalidOperationException,
-      InvalidObjectException {
-    TDropTableOrViewParams params = new TDropTableOrViewParams();
-    deserializeThrift(params, thriftDropTableObjectParams);
-    frontend.getDdlExecutor().dropTableOrView(params);
   }
 
   /**

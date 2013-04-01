@@ -321,6 +321,17 @@ public class AuthorizationTest {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Table already exists: tpch.lineitem");
     }
+
+    // Create table AS SELECT positive and negative cases for SELECT privilege.
+    AuthzOk("create table tpch.new_table as select * from functional.alltypesagg");
+    AuthzError("create table tpch.new_table as select * from functional.alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
+
+    AuthzError("create table functional.tbl as select 1",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.tbl");
+
     // Create table IF NOT EXISTS, user does not have permission and table exists.
     AuthzError("create table if not exists functional_seq.alltypes (i int)",
         "User '%s' does not have privileges to execute 'CREATE' on: " +

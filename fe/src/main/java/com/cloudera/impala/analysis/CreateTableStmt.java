@@ -41,10 +41,10 @@ public class CreateTableStmt extends StatementBase {
   private final boolean isExternal;
   private final boolean ifNotExists;
   private final FileFormat fileFormat;
-  private final HdfsURI location;
   private final ArrayList<ColumnDef> partitionColumnDefs;
   private final RowFormat rowFormat;
   private final TableName tableName;
+  private HdfsURI location;
 
   // Set during analysis
   private String dbName;
@@ -83,8 +83,25 @@ public class CreateTableStmt extends StatementBase {
     this.tableName = tableName;
   }
 
-  public String getTbl() {
-    return tableName.getTbl();
+  public String getTbl() { return tableName.getTbl(); }
+  public TableName getTblName() { return tableName; }
+  public List<ColumnDef> getColumnDefs() { return columnDefs; }
+  public List<ColumnDef> getPartitionColumnDefs() { return partitionColumnDefs; }
+  public String getComment() { return comment; }
+  public boolean isExternal() { return isExternal; }
+  public boolean getIfNotExists() { return ifNotExists; }
+  public HdfsURI getLocation() { return location; }
+  public void setLocation(HdfsURI location) { this.location = location; }
+  public FileFormat getFileFormat() { return fileFormat; }
+  public RowFormat getRowFormat() { return rowFormat; }
+
+  /**
+   * Can only be called after analysis, returns the owner of this table (the user from
+   * the current session).
+   */
+  public String getOwner() {
+    Preconditions.checkNotNull(owner);
+    return owner;
   }
 
   /**
@@ -96,47 +113,8 @@ public class CreateTableStmt extends StatementBase {
     return dbName;
   }
 
-  public List<ColumnDef> getColumnDefs() {
-    return columnDefs;
-  }
-
-  public List<ColumnDef> getPartitionColumnDefs() {
-    return partitionColumnDefs;
-  }
-
-  public String getComment() {
-    return comment;
-  }
-
-  public boolean isExternal() {
-    return isExternal;
-  }
-
-  public boolean getIfNotExists() {
-    return ifNotExists;
-  }
-
-  public HdfsURI getLocation() {
-    return location;
-  }
-
-  public FileFormat getFileFormat() {
-    return fileFormat;
-  }
-
-  public String getOwner() {
-    Preconditions.checkNotNull(owner);
-    return owner;
-  }
-
-  public RowFormat getRowFormat() {
-    return rowFormat;
-  }
-
   @Override
-  public String debugString() {
-    return toSql();
-  }
+  public String debugString() { return toSql(); }
 
   @Override
   public String toSql() {

@@ -31,7 +31,8 @@ class Frontend;
 // operations and may in the future include CREATE and ALTER.
 // One DdlExecutor is typically created per query statement.
 // Rows are returned in result_set.
-// All rows are available to be read after Exec() returns.
+// All rows are available to be read after Exec() returns except for the case of CREATE
+// TABLE AS SELECT where results will be ready after Wait().
 class DdlExecutor {
  public:
   DdlExecutor(Frontend* frontend);
@@ -40,27 +41,40 @@ class DdlExecutor {
   // result_set().
   Status Exec(const TDdlExecRequest& exec_request, const TSessionState& session);
 
-  // Runs a metadata operation to completion. Once Exec() returns, all rows are
+  // Runs a metadata operation to completion. Once Exec()/Wait() returns, all rows are
   // available in result_set() and the result set schema can be retrieved from
   // result_set_metadata().
   Status Exec(const TMetadataOpRequest& exec_request);
 
-  // Returns the list of rows retrieved in Exec().
-  const std::vector<TResultRow>& result_set() { return result_set_; }
+  // Returns the list of rows returned by the DDL operation.
+  const std::vector<TResultRow>& result_set() const { return result_set_; }
 
   // Returns the metadata of the result set. Only available if using
-  // Exec(TMetadataOpRequest)
+  // Exec(TMetadataOpRequest).
   const TResultSetMetadata& result_set_metadata() { return result_set_metadata_; }
+
+  // Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
+  // If called before Exec(), this will return NULL. Note that not all DDL operations
+  // return a TDdlExecResponse. The pseudo-"DDL" requests (USE/SHOW/DESCRIBE/RESET) do
+  // not currently populate this, although it will still be initialized as part of
+  // Exec().
+  const TDdlExecResponse* exec_response() const { return exec_response_.get(); }
+
+  // Copies results into result_set_
+  void SetResultSet(const std::vector<std::string>& results);
 
  private:
   // The list of all materialized rows after Exec() has been called; empty before that.
   std::vector<TResultRow> result_set_;
 
-  // Schema of result_set_. Only available if using Exec(TMetadataOpRequest)
+  // Schema of result_set_. Only available if using Exec(TMetadataOpRequest).
   TResultSetMetadata result_set_metadata_;
 
   // Used to execute catalog queries to the Frontend via JNI. Not owned here.
   Frontend* frontend_;
+
+  // Response from executing the DDL request, see exec_response().
+  boost::scoped_ptr<TDdlExecResponse> exec_response_;
 };
 
 }

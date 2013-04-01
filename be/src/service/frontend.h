@@ -80,48 +80,12 @@ class Frontend {
   Status DescribeTable(const TDescribeTableParams& params,
       TDescribeTableResult* response);
 
-  // Modifies an existing table's metastore metadata. The specific type of operation is
-  // defined by the TAlterTableType field in TAlterTableParams. Some supported operations
-  // include renaming tables, adding/dropping columns/partitions from tables, and changing
-  // a table's file format. Returns OK if the operation was successfull, otherwise a
-  // Status object with information on the error will be returned.
-  Status AlterTable(const TAlterTableParams& alter_table_params);
-
-  // Modifies an existing view's definition in the metastore metadata.
-  // Returns a non-ok status if the view doesn't exist or if the existing metastore
-  // entry refers to a table and not a view.
-  Status AlterView(const TCreateOrAlterViewParams& alter_view_params);
-
-  // Creates a new database in the metastore with the specified name. Returns OK if the
-  // database was successfully created, otherwise CANCELLED is returned with details on
-  // the specific error. Common errors include creating a database that already exists
-  // and metastore connectivity problems.
-  Status CreateDatabase(const TCreateDbParams& create_db_params);
-
-  // Creates a new table in the metastore with the specified name. Returns OK if the
-  // table was successfully created, otherwise CANCELLED is returned. Common errors
-  // include creating a table that already exists, creating a table in a database that
-  // does not exist, and metastore connectivity problems.
-  Status CreateTable(const TCreateTableParams& create_table_params);
-
-  // Creates a new table in the metastore that is a based on the table definition of a
-  // given source table. This is a metadata only operation - no data is copied.
-  Status CreateTableLike(const TCreateTableLikeParams& create_table_like_params);
-
-  // Creates a new view in the metastore with the specified name. Returns OK if the
-  // view was created, otherwise a Status detailing the error. Common errors
-  // include creating a view whose name already exists (as another table or view),
-  // creating a view in a database that does not exist,
-  // and metastore connectivity problems.
-  Status CreateView(const TCreateOrAlterViewParams& create_view_params);
-
-  // Drops the specified database from the metastore. Returns OK if the database
-  // drop was successful, otherwise CANCELLED is returned.
-  Status DropDatabase(const TDropDbParams& drop_db_params);
-
-  // Drops the specified table/view from the metastore. Returns OK if the
-  // table/view drop was successful, otherwise a Status with an error message.
-  Status DropTableOrView(const TDropTableOrViewParams& drop_table_or_view_params);
+  // Executes the given TDdlExecRequest and returns a response with details on the
+  // result of the operation. Returns OK if the operation was successfull,
+  // otherwise a Status object with information on the error will be returned. Only
+  // supports true DDL operations (CREATE/ALTER/DROP), pseudo-DDL operations such as
+  // SHOW/RESET/USE should be executed using their appropriate executor functions.
+  Status ExecDdlRequest(const TDdlExecRequest& params, TDdlExecResponse* resp);
 
   // Reset the metadata
   Status ResetMetadata(const TResetMetadataParams& reset_metadata_params);
@@ -158,14 +122,7 @@ class Frontend {
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
-  jmethodID alter_table_id_; // JniFrontend.alterTable
-  jmethodID alter_view_id_; // JniFrontend.alterView
-  jmethodID create_database_id_; // JniFrontend.createDatabase
-  jmethodID create_table_id_; // JniFrontend.createTable
-  jmethodID create_table_like_id_; // JniFrontend.createTableLike
-  jmethodID create_view_id_; // JniFrontend.createView
-  jmethodID drop_database_id_; // JniFrontend.dropDatabase
-  jmethodID drop_table_or_view_id_; // JniFrontend.dropTableOrView
+  jmethodID exec_ddl_request_id_; // JniFrontend.execDdlRequest
   jmethodID reset_metadata_id_; // JniFrontend.resetMetadata
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;

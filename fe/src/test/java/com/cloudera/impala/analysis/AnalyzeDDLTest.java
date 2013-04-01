@@ -463,6 +463,48 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestCreateTableAsSelect() throws AnalysisException {
+    // Constant select.
+    AnalyzesOk("create table newtbl as select 1+2, 'abc'");
+
+    // Select from partitioned and unpartitioned tables using different
+    // queries.
+    AnalyzesOk("create table newtbl stored as textfile " +
+        "as select * from functional.jointbl");
+    AnalyzesOk("create table newtbl stored as parquetfile " +
+        "as select * from functional.alltypes");
+    AnalyzesOk("create table newtbl as select int_col from functional.alltypes");
+
+    AnalyzesOk("create table functional.newtbl " +
+        "as select count(*) as CNT from functional.alltypes");
+    AnalyzesOk("create table functional.tbl as select a.* from functional.alltypes a " +
+        "join functional.alltypes b on (a.int_col=b.int_col) limit 1000");
+
+    // Table already exists with and without IF NOT EXISTS
+    AnalysisError("create table functional.alltypes as select 1",
+        "Table already exists: functional.alltypes");
+    AnalyzesOk("create table if not exists functional.alltypes as select 1");
+
+    // Database does not exist
+    AnalysisError("create table db_does_not_exist.new_table as select 1",
+        "Database does not exist: db_does_not_exist");
+
+    // Analysis errors in the SELECT statement
+    AnalysisError("create table newtbl as select * from tbl_does_not_exist",
+        "Table does not exist: default.tbl_does_not_exist");
+    AnalysisError("create table newtbl as select 1 as c1, 2 as c1",
+        "Duplicate column name: c1");
+
+    // Unsupported file formats
+    AnalysisError("create table foo stored as sequencefile as select 1",
+        "CREATE TABLE AS SELECT does not support (SEQUENCEFILE) file format. " +
+         "Supported formats are: (PARQUETFILE, TEXTFILE)");
+    AnalysisError("create table foo stored as RCFILE as select 1",
+        "CREATE TABLE AS SELECT does not support (RCFILE) file format. " +
+         "Supported formats are: (PARQUETFILE, TEXTFILE)");
+  }
+
+  @Test
   public void TestCreateTable() throws AnalysisException {
     AnalyzesOk("create table functional.new_table (i int)");
     AnalyzesOk("create table if not exists functional.alltypes (i int)");

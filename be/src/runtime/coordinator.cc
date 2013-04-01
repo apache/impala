@@ -281,28 +281,28 @@ static void ProcessQueryOptions(
 }
 
 Status Coordinator::Exec(
-    const TUniqueId& query_id, TQueryExecRequest* request,
+    const TUniqueId& query_id, const TQueryExecRequest& request,
     const TQueryOptions& query_options, vector<Expr*>* output_exprs) {
-  DCHECK_GT(request->fragments.size(), 0);
-  needs_finalization_ = request->__isset.finalize_params;
+  DCHECK_GT(request.fragments.size(), 0);
+  needs_finalization_ = request.__isset.finalize_params;
   if (needs_finalization_) {
-    finalize_params_ = request->finalize_params;
+    finalize_params_ = request.finalize_params;
   }
 
-  stmt_type_ = request->stmt_type;
+  stmt_type_ = request.stmt_type;
 
   query_id_ = query_id;
   VLOG_QUERY << "Exec() query_id=" << query_id_;
-  desc_tbl_ = request->desc_tbl;
-  query_globals_ = request->query_globals;
+  desc_tbl_ = request.desc_tbl;
+  query_globals_ = request.query_globals;
   query_options_ = query_options;
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
   SCOPED_TIMER(query_profile_->total_time_counter());
 
-  RETURN_IF_ERROR(ComputeScanRangeAssignment(*request));
-  ComputeFragmentExecParams(*request);
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(request));
+  ComputeFragmentExecParams(request);
 
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
@@ -313,7 +313,7 @@ Status Coordinator::Exec(
 
   // we run the root fragment ourselves if it is unpartitioned
   bool has_coordinator_fragment =
-      request->fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+      request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
 
   if (has_coordinator_fragment) {
     executor_.reset(new PlanFragmentExecutor(
@@ -325,14 +325,14 @@ Status Coordinator::Exec(
     // had a chance to register with the stream mgr.
     TExecPlanFragmentParams rpc_params;
     SetExecPlanFragmentParams(
-        0, request->fragments[0], 0, fragment_exec_params_[0], 0, coord, &rpc_params);
+        0, request.fragments[0], 0, fragment_exec_params_[0], 0, coord, &rpc_params);
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
 
     // Prepare output_exprs before optimizing the LLVM module. The other exprs of this
     // coordinator fragment have been prepared in executor_->Prepare().
     DCHECK(output_exprs != NULL);
     RETURN_IF_ERROR(Expr::CreateExprTrees(
-        runtime_state()->obj_pool(), request->fragments[0].output_exprs, output_exprs));
+        runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
     for (int i = 0; i < output_exprs->size(); ++i) {
       RETURN_IF_ERROR(
           Expr::Prepare((*output_exprs)[i], runtime_state(), row_desc(), false));
@@ -355,8 +355,8 @@ Status Coordinator::Exec(
   }
 
   // Initialize per fragment profile data
-  fragment_profiles_.resize(request->fragments.size());
-  for (int i = 0; i < request->fragments.size(); ++i) {
+  fragment_profiles_.resize(request.fragments.size());
+  for (int i = 0; i < request.fragments.size(); ++i) {
     fragment_profiles_[i].num_instances = 0;
 
     // Special case fragment idx 0 if there is a coordinator. There is only one
@@ -399,7 +399,7 @@ Status Coordinator::Exec(
   int backend_num = 0;
 
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
-       fragment_idx < request->fragments.size(); ++fragment_idx) {
+       fragment_idx < request.fragments.size(); ++fragment_idx) {
     FragmentExecParams& params = fragment_exec_params_[fragment_idx];
 
     // set up exec states
@@ -415,7 +415,7 @@ Status Coordinator::Exec(
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
           obj_pool()->Add(new BackendExecState(this, coord, backend_num,
-              request->fragments[fragment_idx], fragment_idx,
+              request.fragments[fragment_idx], fragment_idx,
               params, instance_idx, backend_debug_options, obj_pool()));
       backend_exec_states_[backend_num] = exec_state;
       ++backend_num;
@@ -444,7 +444,7 @@ Status Coordinator::Exec(
   // spends most of the time waiting and doing very little work.  Holding on to
   // the token causes underutilization of the machine.  If there are 12 queries
   // on this node, that's 12 tokens reserved for no reason.
-  if (has_coordinator_fragment && request->fragments.size() > 1) {
+  if (has_coordinator_fragment && request.fragments.size() > 1) {
     executor_->ReleaseThreadToken();
   }
 
@@ -636,8 +636,8 @@ Status Coordinator::Wait() {
   }
 
   if (stmt_type_ == TStmtType::DML) {
-    // For DML queries, when Wait is done, the query is complete.  Report
-    // Aggregate query profiles at this point.
+    // For DML queries, when Wait is done, the query is complete.  Report aggregate
+    // query profiles at this point.
     // TODO: make sure ReportQuerySummary gets called on error
     ReportQuerySummary();
   }

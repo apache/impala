@@ -136,15 +136,8 @@ public abstract class Table {
             "Unsupported table type '%s' for: %s.%s", tableType, db.getName(), tblName));
       }
 
-      // Create a table of appropriate type and have it load itself.
-      Table table = null;
-      if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
-        table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
-      } else if (msTbl.getSd().getInputFormat().equals(HBaseTable.getInputFormat())) {
-        table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
-      } else if (HdfsFileFormat.isHdfsFormatClass(msTbl.getSd().getInputFormat())) {
-        table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
-      }
+      // Create a table of appropriate type and have it load itself
+      Table table = fromMetastoreTable(id, client, db, msTbl);
       if (table == null) {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + msTbl.getTableName());
@@ -159,6 +152,25 @@ public abstract class Table {
       throw new TableLoadingException(
           "Failed to load metadata for table: " + tblName, e);
     }
+  }
+
+  /**
+   * Creates a table of the appropriate type based on the given hive.metastore.api.Table
+   * object.
+   */
+  public static Table fromMetastoreTable(TableId id,
+      HiveMetaStoreClient client, Db db,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    // Create a table of appropriate type
+    Table table = null;
+    if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
+      table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (msTbl.getSd().getInputFormat().equals(HBaseTable.getInputFormat())) {
+      table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (HdfsFileFormat.isHdfsFormatClass(msTbl.getSd().getInputFormat())) {
+      table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    }
+    return table;
   }
 
   protected static PrimitiveType getPrimitiveType(String typeName) {

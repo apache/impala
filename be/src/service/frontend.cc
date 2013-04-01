@@ -60,14 +60,7 @@ Frontend::Frontend() {
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
-    {"alterTable", "([B)V", &alter_table_id_},
-    {"alterView", "([B)V", &alter_view_id_},
-    {"createTable", "([B)V", &create_table_id_},
-    {"createTableLike", "([B)V", &create_table_like_id_},
-    {"createView", "([B)V", &create_view_id_},
-    {"createDatabase", "([B)V", &create_database_id_},
-    {"dropTableOrView", "([B)V", &drop_table_or_view_id_},
-    {"dropDatabase", "([B)V", &drop_database_id_},
+    {"execDdlRequest", "([B)[B", &exec_ddl_request_id_},
     {"resetMetadata", "([B)V", &reset_metadata_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
 
@@ -157,36 +150,8 @@ Status Frontend::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   return CallJniMethodWithThriftArgs(update_metastore_id_, catalog_update);
 }
 
-Status Frontend::AlterTable(const TAlterTableParams& params) {
-  return CallJniMethodWithThriftArgs(alter_table_id_, params);
-}
-
-Status Frontend::AlterView(const TCreateOrAlterViewParams& params) {
-  return CallJniMethodWithThriftArgs(alter_view_id_, params);
-}
-
-Status Frontend::CreateDatabase(const TCreateDbParams& params) {
-  return CallJniMethodWithThriftArgs(create_database_id_, params);
-}
-
-Status Frontend::CreateTableLike(const TCreateTableLikeParams& params) {
-  return CallJniMethodWithThriftArgs(create_table_like_id_, params);
-}
-
-Status Frontend::CreateTable(const TCreateTableParams& params) {
-  return CallJniMethodWithThriftArgs(create_table_id_, params);
-}
-
-Status Frontend::CreateView(const TCreateOrAlterViewParams& params) {
-  return CallJniMethodWithThriftArgs(create_view_id_, params);
-}
-
-Status Frontend::DropDatabase(const TDropDbParams& params) {
-  return CallJniMethodWithThriftArgs(drop_database_id_, params);
-}
-
-Status Frontend::DropTableOrView(const TDropTableOrViewParams& params) {
-  return CallJniMethodWithThriftArgs(drop_table_or_view_id_, params);
+Status Frontend::ExecDdlRequest(const TDdlExecRequest& params, TDdlExecResponse* resp) {
+  return CallJniMethodWithThriftArgs(exec_ddl_request_id_, params, resp);
 }
 
 Status Frontend::ResetMetadata(const TResetMetadataParams& params) {

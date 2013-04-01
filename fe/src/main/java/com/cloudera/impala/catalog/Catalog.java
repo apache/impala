@@ -29,7 +29,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
 
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
@@ -503,5 +507,32 @@ public class Catalog {
       } catch (NumberFormatException e) {}
     }
     return -1;
+  }
+
+  /**
+   * Returns the HDFS path where the metastore would create the given table. If the table
+   * has a "location" set, that will be returned. Otherwise the path will be resolved
+   * based on the location of the parent database. The metastore folder hierarchy is:
+   * <warehouse directory>/<db name>.db/<table name>
+   * Except for items in the default database which will be:
+   * <warehouse directory>/<table name>
+   * This method handles both of these cases.
+   */
+  public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
+      throws NoSuchObjectException, MetaException, TException {
+    MetaStoreClient client = getMetaStoreClient();
+    try {
+      // If the table did not have its path set, build the path based on the the
+      // location property of the parent database.
+      if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
+        String dbLocation =
+            client.getHiveClient().getDatabase(msTbl.getDbName()).getLocationUri();
+        return new Path(dbLocation, msTbl.getTableName().toLowerCase());
+      } else {
+        return new Path(msTbl.getSd().getLocation());
+      }
+    } finally {
+      client.release();
+    }
   }
 }

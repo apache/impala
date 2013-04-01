@@ -273,6 +273,7 @@ nonterminal StatementBase alter_view_stmt;
 nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
+nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
@@ -335,6 +336,8 @@ stmt ::=
   {: RESULT = alter_tbl; :}
   | alter_view_stmt:alter_view
   {: RESULT = alter_view; :}
+  | create_tbl_as_select_stmt:create_tbl_as_select
+  {: RESULT = create_tbl_as_select; :}
   | create_tbl_like_stmt:create_tbl_like
   {: RESULT = create_tbl_like; :}
   | create_tbl_stmt:create_tbl
@@ -487,6 +490,21 @@ create_tbl_like_stmt ::=
   {:
     RESULT = new CreateTableLikeStmt(table, other_table, external, comment,
         null, location, if_not_exists);
+  :}
+  ;
+
+create_tbl_as_select_stmt ::=
+  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table comment_val:comment row_format_val:row_format
+  file_format_create_table_val:file_format location_val:location
+  KW_AS query_stmt:query
+  {:
+    // Initialize with empty List of columns and partition columns. The
+    // columns will be added from the query statment during analysis
+    CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
+        new ArrayList<ColumnDef>(), external, comment, row_format,
+        file_format, location, if_not_exists);
+    RESULT = new CreateTableAsSelectStmt(create_stmt, query);
   :}
   ;
 

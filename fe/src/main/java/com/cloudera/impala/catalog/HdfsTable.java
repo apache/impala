@@ -252,8 +252,8 @@ public class HdfsTable extends Table {
     }
   }
 
-  protected HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl, Db db,
-      String name, String owner) {
+  protected HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+      Db db, String name, String owner) {
     super(id, msTbl, db, name, owner);
     this.partitions = Lists.newArrayList();
   }
@@ -632,7 +632,13 @@ public class HdfsTable extends Table {
 
       // populate with both partition keys and regular columns
       List<FieldSchema> partKeys = msTbl.getPartitionKeys();
-      List<FieldSchema> tblFields = client.getFields(db.getName(), name);
+      List<FieldSchema> tblFields = Lists.newArrayList();
+      String inputFormat = msTbl.getSd().getInputFormat();
+      if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
+        tblFields.addAll(client.getFields(db.getName(), name));
+      } else {
+        tblFields.addAll(msTbl.getSd().getCols());
+      }
       List<FieldSchema> fieldSchemas = new ArrayList<FieldSchema>(
           partKeys.size() + tblFields.size());
       fieldSchemas.addAll(partKeys);
@@ -642,8 +648,8 @@ public class HdfsTable extends Table {
       loadColumns(fieldSchemas, client);
 
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions;
-      if (oldValue != null && oldValue.lastDdlTime > -1 &&
-          oldValue.lastDdlTime == this.lastDdlTime) {
+      if ((oldValue == this) || (oldValue != null && oldValue.lastDdlTime > -1 &&
+          oldValue.lastDdlTime == this.lastDdlTime)) {
         Preconditions.checkArgument(oldValue instanceof HdfsTable);
         // Reuse the old metastore partitions if the table has not been altered.
         msPartitions = ((HdfsTable)oldValue).getMetaStorePartitions();
@@ -662,7 +668,6 @@ public class HdfsTable extends Table {
       LOG.info("table #rows=" + Long.toString(numRows));
 
       // populate Avro schema if necessary
-      String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
         avroSchema = getAvroSchema();
       }

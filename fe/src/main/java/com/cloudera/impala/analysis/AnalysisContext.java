@@ -79,6 +79,10 @@ public class AnalysisContext {
       return stmt instanceof CreateViewStmt;
     }
 
+    public boolean isCreateTableAsSelectStmt() {
+      return stmt instanceof CreateTableAsSelectStmt;
+    }
+
     public boolean isCreateTableStmt() {
       return stmt instanceof CreateTableStmt;
     }
@@ -121,7 +125,8 @@ public class AnalysisContext {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateViewStmt() ||
           isCreateDbStmt() || isDropDbStmt() || isDropTableOrViewStmt() ||
-          isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt();
+          isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt() ||
+          isCreateTableAsSelectStmt();
     }
 
     public boolean isDmlStmt() {
@@ -146,6 +151,11 @@ public class AnalysisContext {
     public CreateViewStmt getCreateViewStmt() {
       Preconditions.checkState(isCreateViewStmt());
       return (CreateViewStmt) stmt;
+    }
+
+    public CreateTableAsSelectStmt getCreateTableAsSelectStmt() {
+      Preconditions.checkState(isCreateTableAsSelectStmt());
+      return (CreateTableAsSelectStmt) stmt;
     }
 
     public CreateTableStmt getCreateTableStmt() {
@@ -179,8 +189,12 @@ public class AnalysisContext {
     }
 
     public InsertStmt getInsertStmt() {
-      Preconditions.checkState(isInsertStmt());
-      return (InsertStmt) stmt;
+      if (isCreateTableAsSelectStmt()) {
+        return getCreateTableAsSelectStmt().getInsertStmt();
+      } else {
+        Preconditions.checkState(isInsertStmt());
+        return (InsertStmt) stmt;
+      }
     }
 
     public UseStmt getUseStmt() {

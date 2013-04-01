@@ -471,7 +471,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __expect_result_metadata(self, query_str):
     """ Given a query string, return True if impalad expects result metadata"""
-    excluded_query_types = ['use', 'alter', 'create', 'drop']
+    excluded_query_types = ['use', 'alter', 'drop']
     if True in set(map(query_str.startswith, excluded_query_types)):
       return False
     return True
@@ -512,7 +512,6 @@ class ImpalaShell(cmd.Cmd):
       return True
 
     # Results are ready, fetch them till they're done.
-    self.__print_if_verbose('Query finished, fetching results ...')
     column_names = self.__get_column_names(handle)
     if self.write_delimited:
       formatter = DelimitedOutputFormatter(field_delim=self.output_delimiter)

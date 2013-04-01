@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -44,12 +45,12 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
+import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.PartitionNotFoundException;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
@@ -66,6 +67,8 @@ import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TDdlExecRequest;
+import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -85,6 +88,45 @@ public class DdlExecutor {
 
   public DdlExecutor(Catalog catalog) {
     this.catalog = catalog;
+  }
+
+  public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest)
+      throws MetaException, NoSuchObjectException, InvalidOperationException, TException,
+      TableLoadingException, ImpalaException {
+    TDdlExecResponse response = new TDdlExecResponse();
+    switch (ddlRequest.ddl_type) {
+      case ALTER_TABLE:
+        alterTable(ddlRequest.getAlter_table_params());
+        break;
+      case ALTER_VIEW:
+        alterView(ddlRequest.getAlter_view_params());
+        break;
+      case CREATE_DATABASE:
+        createDatabase(ddlRequest.getCreate_db_params());
+        break;
+      case CREATE_TABLE_AS_SELECT:
+        response.setNew_table_created(createTable(ddlRequest.getCreate_table_params()));
+        break;
+      case CREATE_TABLE:
+        createTable(ddlRequest.getCreate_table_params());
+        break;
+      case CREATE_TABLE_LIKE:
+        createTableLike(ddlRequest.getCreate_table_like_params());
+        break;
+      case CREATE_VIEW:
+        createView(ddlRequest.getCreate_view_params());
+        break;
+      case DROP_DATABASE:
+        dropDatabase(ddlRequest.getDrop_db_params());
+        break;
+      case DROP_TABLE:
+      case DROP_VIEW:
+        dropTableOrView(ddlRequest.getDrop_table_or_view_params());
+        break;
+      default: throw new IllegalStateException("Unexpected DDL exec request type: " +
+          ddlRequest.ddl_type.toString());
+    }
+    return response;
   }
 
   /**
@@ -244,8 +286,8 @@ public class DdlExecutor {
             "IF NOT EXISTS was specified.", e, dbName));
       } finally {
         msClient.release();
+        catalog.addDb(dbName);
       }
-      catalog.addDb(dbName);
     }
   }
 
@@ -315,8 +357,11 @@ public class DdlExecutor {
    * @param location - Hdfs path to use as the location for table data or null to use
    *                   default location.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
+   * @return Returns true if a new table was created in the metastore as a result of this
+   *         call. Returns false if creation was skipped - this indicates the table already
+   *         existed and the caller specified IF NOT EXISTS.
    */
-  public void createTable(TCreateTableParams params)
+  public boolean createTable(TCreateTableParams params)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
       InvalidObjectException, org.apache.thrift.TException, AuthorizationException {
     Preconditions.checkNotNull(params);
@@ -331,42 +376,12 @@ public class DdlExecutor {
         internalUser, Privilege.CREATE)) {
       LOG.info(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
-      return;
+      return false;
     }
     org.apache.hadoop.hive.metastore.api.Table tbl =
-        new org.apache.hadoop.hive.metastore.api.Table();
-    tbl.setDbName(tableName.getDb());
-    tbl.setTableName(tableName.getTbl());
-    tbl.setOwner(params.getOwner());
-    tbl.setParameters(new HashMap<String, String>());
-
-    if (params.getComment() != null) {
-      tbl.getParameters().put("comment", params.getComment());
-    }
-    if (params.is_external) {
-      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
-      tbl.putToParameters("EXTERNAL", "TRUE");
-    } else {
-      tbl.setTableType(TableType.MANAGED_TABLE.toString());
-    }
-
-    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(
-        FileFormat.fromThrift(params.getFile_format()),
-        RowFormat.fromThrift(params.getRow_format()));
-
-    if (params.getLocation() != null) {
-      sd.setLocation(params.getLocation());
-    }
-    // Add in all the columns
-    sd.setCols(buildFieldSchemaList(params.getColumns()));
-    tbl.setSd(sd);
-    if (params.getPartition_columns() != null) {
-      // Add in any partition keys that were specified
-      tbl.setPartitionKeys(buildFieldSchemaList(params.getPartition_columns()));
-    }
-
+        createMetaStoreTable(params);
     LOG.info(String.format("Creating table %s", tableName));
-    createTable(tbl, params.if_not_exists);
+    return createTable(tbl, params.if_not_exists);
   }
 
   /**
@@ -386,7 +401,6 @@ public class DdlExecutor {
         tableName.getTbl(), internalUser, Privilege.CREATE)) {
       LOG.info(String.format("Skipping view creation because %s already exists and " +
           "ifNotExists is true.", tableName));
-      return;
     }
 
     // Create new view.
@@ -471,7 +485,7 @@ public class DdlExecutor {
     createTable(tbl, params.if_not_exists);
   }
 
-  private void createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+  private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       boolean ifNotExists) throws MetaException, NoSuchObjectException,
       AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException,
       AuthorizationException {
@@ -486,11 +500,13 @@ public class DdlExecutor {
         LOG.info(String.format("Ignoring '%s' when creating table %s.%s because " +
             "IF NOT EXISTS was specified.", e,
             newTable.getDbName(), newTable.getTableName()));
+        return false;
       } finally {
         msClient.release();
+        Db db = catalog.getDb(newTable.getDbName(), internalUser, Privilege.CREATE);
+        if (db != null) db.addTable(newTable.getTableName());
       }
-      Db db = catalog.getDb(newTable.getDbName(), internalUser, Privilege.CREATE);
-      if (db != null) db.addTable(newTable.getTableName());
+      return true;
     }
   }
 
@@ -885,5 +901,51 @@ public class DdlExecutor {
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     }
+  }
+
+  /**
+   * Utility function that creates a hive.metastore.api.Table object based on the given
+   * TCreateTableParams.
+   * TODO: Extract metastore object creation utility functions into a separate
+   * helper/factory class.
+   */
+  public static org.apache.hadoop.hive.metastore.api.Table
+      createMetaStoreTable(TCreateTableParams params) {
+    Preconditions.checkNotNull(params);
+    TableName tableName = TableName.fromThrift(params.getTable_name());
+    org.apache.hadoop.hive.metastore.api.Table tbl =
+        new org.apache.hadoop.hive.metastore.api.Table();
+    tbl.setDbName(tableName.getDb());
+    tbl.setTableName(tableName.getTbl());
+    tbl.setOwner(params.getOwner());
+    tbl.setParameters(new HashMap<String, String>());
+
+    if (params.getComment() != null) {
+      tbl.getParameters().put("comment", params.getComment());
+    }
+    if (params.is_external) {
+      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
+      tbl.putToParameters("EXTERNAL", "TRUE");
+    } else {
+      tbl.setTableType(TableType.MANAGED_TABLE.toString());
+    }
+
+    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(
+        FileFormat.fromThrift(params.getFile_format()),
+        RowFormat.fromThrift(params.getRow_format()));
+
+    if (params.getLocation() != null) {
+      sd.setLocation(params.getLocation());
+    }
+    // Add in all the columns
+    sd.setCols(buildFieldSchemaList(params.getColumns()));
+    tbl.setSd(sd);
+    if (params.getPartition_columns() != null) {
+      // Add in any partition keys that were specified
+      tbl.setPartitionKeys(buildFieldSchemaList(params.getPartition_columns()));
+    } else {
+      tbl.setPartitionKeys(new ArrayList<FieldSchema>());
+    }
+    return tbl;
   }
 }

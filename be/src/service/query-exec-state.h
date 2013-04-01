@@ -204,7 +204,7 @@ class ImpalaServer::QueryExecState {
   // up the output exprs for subsequent calls to FetchRows().
   // Also sets up profile and pre-execution counters.
   // Non-blocking.
-  Status ExecQueryOrDmlRequest();
+  Status ExecQueryOrDmlRequest(const TQueryExecRequest& query_exec_request);
 
   // Executes a LOAD DATA
   Status ExecLoadDataRequest();
@@ -227,6 +227,11 @@ class ImpalaServer::QueryExecState {
 
   // Gather and publish all required updates to the metastore
   Status UpdateMetastore();
+
+  // Sets the result set for a CREATE TABLE AS SELECT statement. The results will not be
+  // ready until all BEs complete execution. This can be called as part of Wait(),
+  // at which point results will be avilable.
+  void SetCreateTableAsSelectResultSet();
 };
 
 }

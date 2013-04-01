@@ -28,8 +28,18 @@ DdlExecutor::DdlExecutor(Frontend* frontend)
   DCHECK(frontend != NULL);
 }
 
+void DdlExecutor::SetResultSet(const vector<string>& results) {
+  result_set_.resize(results.size());
+  for (int i = 0; i < results.size(); ++i) {
+    result_set_[i].__isset.colVals = true;
+    result_set_[i].colVals.resize(1);
+    result_set_[i].colVals[0].__set_stringVal(results[i]);
+  }
+}
+
 Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
     const TSessionState& session) {
+  exec_response_.reset(new TDdlExecResponse());
   switch (exec_request.ddl_type) {
     case TDdlType::SHOW_TABLES: {
       const TShowTablesParams* params = &exec_request.show_tables_params;
@@ -42,14 +52,8 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       TGetTablesResult table_names;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
           &session, &table_names));
-
       // Set the result set
-      result_set_.resize(table_names.tables.size());
-      for (int i = 0; i < table_names.tables.size(); ++i) {
-        result_set_[i].__isset.colVals = true;
-        result_set_[i].colVals.resize(1);
-        result_set_[i].colVals[0].__set_stringVal(table_names.tables[i]);
-      }
+      SetResultSet(table_names.tables);
       return Status::OK;
     }
     case TDdlType::SHOW_DBS: {
@@ -59,45 +63,33 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
           frontend_->GetDbNames(db_pattern, &session, &db_names));
-
       // Set the result set
-      result_set_.resize(db_names.dbs.size());
-      for (int i = 0; i < db_names.dbs.size(); ++i) {
-        result_set_[i].__isset.colVals = true;
-        result_set_[i].colVals.resize(1);
-        result_set_[i].colVals[0].__set_stringVal(db_names.dbs[i]);
-      }
+      SetResultSet(db_names.dbs);
       return Status::OK;
     }
     case TDdlType::DESCRIBE: {
       TDescribeTableResult response;
       RETURN_IF_ERROR(frontend_->DescribeTable(exec_request.describe_table_params,
           &response));
-
       // Set the result set
       result_set_ = response.results;
       return Status::OK;
     }
     case TDdlType::ALTER_TABLE:
-      return frontend_->AlterTable(exec_request.alter_table_params);
     case TDdlType::ALTER_VIEW:
-      return frontend_->AlterView(exec_request.alter_view_params);
     case TDdlType::CREATE_DATABASE:
-      return frontend_->CreateDatabase(exec_request.create_db_params);
     case TDdlType::CREATE_TABLE_LIKE:
-      return frontend_->CreateTableLike(
-          exec_request.create_table_like_params);
     case TDdlType::CREATE_TABLE:
-      return frontend_->CreateTable(exec_request.create_table_params);
+    case TDdlType::CREATE_TABLE_AS_SELECT:
     case TDdlType::CREATE_VIEW:
-      return frontend_->CreateView(exec_request.create_view_params);
     case TDdlType::DROP_DATABASE:
-      return frontend_->DropDatabase(exec_request.drop_db_params);
     case TDdlType::DROP_TABLE:
-    case TDdlType::DROP_VIEW:
-      return frontend_->DropTableOrView(exec_request.drop_table_or_view_params);
-    case TDdlType::RESET_METADATA:
+    case TDdlType::DROP_VIEW: {
+      return frontend_->ExecDdlRequest(exec_request, exec_response_.get());
+    }
+    case TDdlType::RESET_METADATA: {
       return frontend_->ResetMetadata(exec_request.reset_metadata_params);
+    }
     default: {
       stringstream ss;
       ss << "Unknown DDL exec request type: " << exec_request.ddl_type;

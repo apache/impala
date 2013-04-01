@@ -19,6 +19,7 @@
 #include "exec/ddl-executor.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 
 using namespace std;
@@ -87,7 +88,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   switch (exec_request->stmt_type) {
     case TStmtType::QUERY:
     case TStmtType::DML:
-      return ExecQueryOrDmlRequest();
+      DCHECK(exec_request_.__isset.query_exec_request);
+      return ExecQueryOrDmlRequest(exec_request_.query_exec_request);
     case TStmtType::EXPLAIN: {
       request_result_set_.reset(new vector<TResultRow>(
           exec_request_.explain_result.results));
@@ -100,13 +102,30 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         parent_session_->database = exec_request_.ddl_exec_request.use_db_params.db;
         return Status::OK;
       }
+
       ddl_executor_.reset(new DdlExecutor(frontend_));
       Status status = ddl_executor_->Exec(exec_request_.ddl_exec_request,
           query_session_state_);
       {
         lock_guard<mutex> l(lock_);
-        return UpdateQueryStatus(status);
+        RETURN_IF_ERROR(UpdateQueryStatus(status));
       }
+
+      // If this is a CTAS request, there will usually be more work to do
+      // after executing the CREATE TABLE statement (the INSERT portion of the operation).
+      // The exception is if the user specified IF NOT EXISTS and the table already
+      // existed, in which case we do not execute the INSERT.
+      if (ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+        if (ddl_executor_->exec_response()->new_table_created) {
+          // At this point, the remainder of the CTAS request executes
+          // like a normal DML request.
+          DCHECK(exec_request_.__isset.query_exec_request);
+          RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
+        } else {
+          DCHECK(exec_request_.ddl_exec_request.create_table_params.if_not_exists);
+        }
+      }
+      return Status::OK;
     }
     case TStmtType::LOAD: {
       DCHECK(exec_request_.__isset.load_data_request);
@@ -124,10 +143,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   }
 }
 
-Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest() {
-  DCHECK(exec_request_.__isset.query_exec_request);
-  TQueryExecRequest& query_exec_request = exec_request_.query_exec_request;
-
+Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
+    const TQueryExecRequest& query_exec_request) {
   // we always need at least one plan fragment
   DCHECK_GT(query_exec_request.fragments.size(), 0);
 
@@ -149,19 +166,20 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest() {
       query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
   DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
 
-  // If the first fragment has a "limit 0", simply set EOS to true and return.
-  // TODO: Remove this check if this is an INSERT. To be compatible with
-  // Hive, OVERWRITE inserts must clear out target tables / static
-  // partitions even if no rows are written.
+  // If the first fragment has a "limit 0" and this is a query, simply set eos_
+  // to true and return.
+  // TODO: To be compatible with Hive, INSERT OVERWRITE must clear out target
+  // tables / static partitions even if no rows are written.
   DCHECK(query_exec_request.fragments[0].__isset.plan);
-  if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
+  if (query_exec_request.fragments[0].plan.nodes[0].limit == 0 &&
+      query_exec_request.stmt_type == TStmtType::QUERY) {
     eos_ = true;
     return Status::OK;
   }
 
   coord_.reset(new Coordinator(exec_env_));
   Status status = coord_->Exec(
-      query_id_, &query_exec_request, exec_request_.query_options, &output_exprs_);
+      query_id_, query_exec_request, exec_request_.query_options, &output_exprs_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
@@ -196,11 +214,13 @@ Status ImpalaServer::QueryExecState::Wait() {
     // DML operations and a subset of the DDL operations.
     eos_ = true;
   } else {
+    if (ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+      SetCreateTableAsSelectResultSet();
+    }
     // Rows are available now, so start the 'wait' timer that tracks how
     // long Impala waits for the client to fetch rows.
     client_wait_sw_.Start();
   }
-
   return Status::OK;
 }
 
@@ -332,9 +352,10 @@ void ImpalaServer::QueryExecState::Cancel() {
 }
 
 Status ImpalaServer::QueryExecState::UpdateMetastore() {
-  if (stmt_type() != TStmtType::DML) return Status::OK;
-
-  DCHECK(exec_request().__isset.query_exec_request);
+  if (!exec_request().__isset.query_exec_request ||
+      exec_request().query_exec_request.stmt_type != TStmtType::DML) {
+    return Status::OK;
+  }
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (!query_exec_request.__isset.finalize_params) return Status::OK;
 
@@ -378,6 +399,25 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   current_batch_row_ = 0;
   eos_ = current_batch_ == NULL;
   return Status::OK;
+}
+
+void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
+  DCHECK(ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
+  int total_num_rows_inserted = 0;
+  // There will only be rows inserted in the case a new table was created
+  // as part of this operation.
+  if (ddl_executor_->exec_response()->new_table_created) {
+    DCHECK(coord_.get());
+    BOOST_FOREACH(const PartitionRowCount::value_type& p,
+        coord_->partition_row_counts()) {
+      total_num_rows_inserted += p.second;
+    }
+  }
+  stringstream ss;
+  ss << "Inserted " << total_num_rows_inserted << " row(s)";
+  LOG(INFO) << ss.str();
+  vector<string> results(1, ss.str());
+  ddl_executor_->SetResultSet(results);
 }
 
 }

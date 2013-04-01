@@ -545,7 +545,9 @@ struct TQueryExecRequest {
   8: optional string query_plan
 
   // The statement type governs when the coordinator can judge a query to be finished.
-  // DML queries are complete after Wait(), SELECTs may not be.
+  // DML queries are complete after Wait(), SELECTs may not be. Generally matches
+  // the stmt_type of the parent TExecRequest, but in some cases (such as CREATE TABLE
+  // AS SELECT), these may differ.
   9: required Types.TStmtType stmt_type
 }
 
@@ -558,12 +560,22 @@ enum TDdlType {
   ALTER_VIEW,
   CREATE_DATABASE,
   CREATE_TABLE,
+  CREATE_TABLE_AS_SELECT,
   CREATE_TABLE_LIKE,
   CREATE_VIEW,
   DROP_DATABASE,
   DROP_TABLE,
   DROP_VIEW,
   RESET_METADATA
+}
+
+struct TDdlExecResponse {
+  // Set only for CREATE TABLE AS SELECT statements. Will be true iff the statement
+  // resulted in a new table being created in the Metastore. This is used to
+  // determine if a CREATE TABLE IF NOT EXISTS AS SELECT ... actually creates a new
+  // table or whether creation was skipped because the table already existed, in which
+  // case this flag would be false
+  1: optional bool new_table_created;
 }
 
 struct TDdlExecRequest {

@@ -191,6 +191,12 @@ public class Frontend {
       ddl.ddl_type = TDdlType.CREATE_TABLE;
       ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateTableAsSelectStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_TABLE_AS_SELECT;
+      ddl.setCreate_table_params(
+          analysis.getCreateTableAsSelectStmt().getCreateStmt().toThrift());
+      metadata.setColumnDescs(Arrays.asList(
+          new TColumnDesc("summary", TPrimitiveType.STRING)));
     } else if (analysis.isCreateTableLikeStmt()) {
       ddl.ddl_type = TDdlType.CREATE_TABLE_LIKE;
       ddl.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
@@ -328,15 +334,16 @@ public class Frontend {
    * TClientRequest.
    */
   public TExecRequest createExecRequest(
-      TClientRequest request, StringBuilder explainString)
-      throws AuthorizationException, InternalException, AnalysisException,
-      NotImplementedException {
+      TClientRequest request, StringBuilder explainString) throws
+      AnalysisException, AuthorizationException, NotImplementedException,
+      InternalException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog,
         request.sessionState.database,
         new User(request.sessionState.user));
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("analyze query " + request.stmt);
     analysisResult = analysisCtxt.analyze(request.stmt);
+
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();
@@ -346,7 +353,9 @@ public class Frontend {
     if (analysisResult.isDdlStmt()) {
       result.stmt_type = TStmtType.DDL;
       createDdlExecRequest(analysisResult, result);
-      return result;
+
+      // All DDL operations except for CTAS are done with analysis at this point.
+      if (!analysisResult.isCreateTableAsSelectStmt()) return result;
     } else if (analysisResult.isLoadDataStmt()) {
       result.stmt_type = TStmtType.LOAD;
       result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
@@ -356,10 +365,10 @@ public class Frontend {
     }
 
     // create TQueryExecRequest
-    Preconditions.checkState(
-        analysisResult.isQueryStmt() || analysisResult.isDmlStmt());
-    TQueryExecRequest queryExecRequest = new TQueryExecRequest();
+    Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
+        || analysisResult.isCreateTableAsSelectStmt());
 
+    TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     // create plan
     LOG.info("create plan");
     Planner planner = new Planner();
@@ -412,6 +421,7 @@ public class Frontend {
       // fill in the metadata
       LOG.info("create result set metadata");
       result.stmt_type = TStmtType.QUERY;
+      result.query_exec_request.stmt_type = result.stmt_type;
       TResultSetMetadata metadata = new TResultSetMetadata();
       QueryStmt queryStmt = analysisResult.getQueryStmt();
       int colCnt = queryStmt.getColLabels().size();
@@ -423,8 +433,15 @@ public class Frontend {
       }
       result.setResult_set_metadata(metadata);
     } else {
-      Preconditions.checkState(analysisResult.isInsertStmt());
-      result.stmt_type = TStmtType.DML;
+      Preconditions.checkState(analysisResult.isInsertStmt() ||
+          analysisResult.isCreateTableAsSelectStmt());
+
+      // For CTAS the overall TExecRequest statement type is DDL, but the
+      // query_exec_request should be DML
+      result.stmt_type =
+          analysisResult.isCreateTableAsSelectStmt() ? TStmtType.DDL : TStmtType.DML;
+      result.query_exec_request.stmt_type = TStmtType.DML;
+
       // create finalization params of insert stmt
       InsertStmt insertStmt = analysisResult.getInsertStmt();
       if (insertStmt.getTargetTable() instanceof HdfsTable) {
@@ -438,10 +455,6 @@ public class Frontend {
         queryExecRequest.setFinalize_params(finalizeParams);
       }
     }
-
-    // Copy the statement type into the TQueryExecRequest so that it
-    // is visible to the coordinator.
-    result.query_exec_request.stmt_type = result.stmt_type;
     return result;
   }
 
