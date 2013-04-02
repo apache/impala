@@ -14,29 +14,43 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableType;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 /**
- * Represents an ALTER TABLE SET FILEFORMAT statement.
+ * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.
  */
 public class AlterTableSetFileFormatStmt extends AlterTableStmt {
   private final FileFormat fileFormat;
+  private final List<PartitionKeyValue> partitionSpec;
 
-  public AlterTableSetFileFormatStmt(TableName tableName, FileFormat fileFormat) {
+  public AlterTableSetFileFormatStmt(TableName tableName,
+      List<PartitionKeyValue> partitionSpec, FileFormat fileFormat) {
     super(tableName); 
     this.fileFormat = fileFormat;
+    this.partitionSpec = ImmutableList.copyOf(partitionSpec);
   }
 
   public FileFormat getFileFormat() {
     return fileFormat;
+  }
+
+  public List<PartitionKeyValue> getPartitionSpec() {
+    return partitionSpec;
   }
 
   @Override
@@ -45,7 +59,36 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
     params.setAlter_type(TAlterTableType.SET_FILE_FORMAT);
     TAlterTableSetFileFormatParams fileFormatParams =
         new TAlterTableSetFileFormatParams(fileFormat.toThrift());
+    for (PartitionKeyValue kv: partitionSpec) {
+      fileFormatParams.addToPartition_spec(
+          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
+    }
     params.setSet_file_format_params(fileFormatParams);
     return params;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+    // Alterting the table, rather than the partition.
+    if (partitionSpec.size() == 0) {
+      return;
+    }
+
+    Table table = getTargetTable();
+    String tableName = getDb() + "." + getTbl();
+
+    // Make sure the target table is partitioned.
+    if (table.getMetaStoreTable().getPartitionKeysSize() == 0) {
+      throw new AnalysisException("Table is not partitioned: " + tableName);
+    }
+
+    // If the table is partitioned it should be an HdfsTable
+    HdfsTable hdfsTable = (HdfsTable) table;   
+    Preconditions.checkNotNull(hdfsTable);
+    if (hdfsTable.getPartition(partitionSpec) == null) {
+      throw new AnalysisException("No matching partition spec found: (" + 
+          Joiner.on(", ").join(partitionSpec) + ")");
+    }
   }
 }

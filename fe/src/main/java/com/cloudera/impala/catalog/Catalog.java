@@ -48,6 +48,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -238,6 +239,17 @@ public class Catalog {
 
     public ColumnNotFoundException(String s) { super(s); }
   }
+
+  /**
+   * Thrown by some methods when a Partition is not found in the metastore
+   */
+  public static class PartitionNotFoundException extends ImpalaException {
+    // Dummy serial ID to satisfy Eclipse
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public PartitionNotFoundException(String s) { super(s); }
+  }
+
 
   /**
    * Thrown by some methods when a table can't be found in the metastore
@@ -498,37 +510,73 @@ public class Catalog {
   }
 
   /**
-   * Changes the file format for the given table. This is a metadata only operation,
-   * existing table data will not be converted to the new format. After changing the file
-   * format the table metadata is marked as invalid and will be reloaded on the next
-   * access.
+   * Changes the file format for the given table or partition. This is a metadata only
+   * operation, existing table data will not be converted to the new format. After
+   * changing the file format the table metadata is marked as invalid and will be reloaded
+   * on the next access.
    */
-  public void alterTableSetFileFormat(TableName tableName, FileFormat fileFormat) 
-      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
-      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
-    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(fileFormat,
-        RowFormat.DEFAULT_ROW_FORMAT);
-    synchronized (metastoreDdlLock) {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-      msTbl.getSd().setInputFormat(sd.getInputFormat());
-      msTbl.getSd().setOutputFormat(sd.getOutputFormat());
-      msTbl.getSd().getSerdeInfo().setSerializationLib(
-          sd.getSerdeInfo().getSerializationLib());
-      applyAlterTable(msTbl);
+  public void alterTableSetFileFormat(TableName tableName, 
+      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
+      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
+      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+    Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
+    if (partitionSpec == null) {
+      synchronized (metastoreDdlLock) {
+        org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+        setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat); 
+        applyAlterTable(msTbl);
+      }
+    } else {
+      synchronized (metastoreDdlLock) {
+        HdfsPartition partition = getHdfsPartition(
+            tableName.getDb(), tableName.getTbl(), partitionSpec);
+        org.apache.hadoop.hive.metastore.api.Partition msPartition = 
+            partition.getMetaStorePartition();
+        Preconditions.checkNotNull(msPartition);
+        setStorageDescriptorFileFormat(msPartition.getSd(), fileFormat);
+        applyAlterPartition(tableName, msPartition);
+      }
     }
+  }
+
+  /**
+   * Helper method for setting the file format on a given storage descriptor.
+   */ 
+  private void setStorageDescriptorFileFormat(StorageDescriptor sd,
+      FileFormat fileFormat) {
+    StorageDescriptor tempSd =
+        HiveStorageDescriptorFactory.createSd(fileFormat, RowFormat.DEFAULT_ROW_FORMAT);
+    sd.setInputFormat(tempSd.getInputFormat());
+    sd.setOutputFormat(tempSd.getOutputFormat());
+    sd.getSerdeInfo().setSerializationLib(
+        tempSd.getSerdeInfo().getSerializationLib());
   }
 
   /**
    * Changes the HDFS storage location for the given table. This is a metadata only
    * operation, existing table data will not be as part of changing the location.
    */
-  public void alterTableSetLocation(TableName tableName, String location)
-      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
-      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
-    synchronized (metastoreDdlLock) {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-      msTbl.getSd().setLocation(location);
-      applyAlterTable(msTbl);
+  public void alterTableSetLocation(TableName tableName, 
+      List<TPartitionKeyValue> partitionSpec, String location) throws MetaException,
+      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
+      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+    Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
+    if (partitionSpec == null) {
+      synchronized (metastoreDdlLock) {
+        org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+        msTbl.getSd().setLocation(location);
+        applyAlterTable(msTbl);
+      }
+    } else {
+      synchronized (metastoreDdlLock) {
+        HdfsPartition partition = getHdfsPartition(tableName.getDb(), tableName.getTbl(),
+            partitionSpec);
+        org.apache.hadoop.hive.metastore.api.Partition msPartition = 
+            partition.getMetaStorePartition();
+        Preconditions.checkNotNull(msPartition);
+        msPartition.getSd().setLocation(location);
+        applyAlterPartition(tableName, msPartition);
+      }
     }
   }
 
@@ -551,6 +599,19 @@ public class Catalog {
     } finally {
       msClient.release();
       invalidateTable(msTbl.getDbName(), msTbl.getTableName(), true);
+    }
+  }
+
+  private void applyAlterPartition(TableName tableName, 
+      org.apache.hadoop.hive.metastore.api.Partition msPartition) throws MetaException,
+      InvalidObjectException, org.apache.thrift.TException {
+    MetaStoreClient msClient = getMetaStoreClient();
+    try {
+      msClient.getHiveClient().alter_partition(
+          tableName.getDb(), tableName.getTbl(), msPartition);
+    } finally {
+      msClient.release();
+      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
   }
 
@@ -921,6 +982,31 @@ public class Catalog {
           String.format("Table not found: %s.%s", dbName, tableName));
     }
     return table;
+  }
+
+  /**
+   * Returns the HdfsPartition oject for the given dbName/tableName and partition spec.
+   * This will trigger a metadata load if the table metadata is not yet cached.
+   * @throws DatabaseNotFoundException - If the database does not exist.
+   * @throws TableNotFoundException - If the table does not exist.
+   * @throws PartitionNotFoundException - If the partition does not exist.
+   * @throws TableLoadingException - If there is an error loading the table metadata.
+   */
+  public HdfsPartition getHdfsPartition(String dbName, String tableName,
+      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
+      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+    String partitionNotFoundMsg =
+        "Partition not found: " + Joiner.on(", ").join(partitionSpec);
+    Table table = getTable(dbName, tableName);
+    // This is not an Hdfs table, throw an error.
+    if (!(table instanceof HdfsTable)) {
+      throw new PartitionNotFoundException(partitionNotFoundMsg);
+    }
+    // Get the HdfsPartition object for the given partition spec.
+    HdfsPartition partition =
+        ((HdfsTable) table).getPartitionFromThriftPartitionSpec(partitionSpec);
+    if (partition == null) throw new PartitionNotFoundException(partitionNotFoundMsg);
+    return partition;
   }
 
   /**

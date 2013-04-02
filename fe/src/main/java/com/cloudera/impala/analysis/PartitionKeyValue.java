@@ -44,4 +44,8 @@ public class PartitionKeyValue {
   public boolean isStatic() {
     return !isDynamic();
   }
+
+  public String toString() {
+    return colName + "=" + value.toSql();
+  }
 }

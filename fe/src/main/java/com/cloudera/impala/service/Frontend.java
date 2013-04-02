@@ -241,19 +241,21 @@ public class Frontend {
   /**
    * Changes the file format for the given table.
    */
-  public void alterTableSetFileFormat(TableName tableName, FileFormat fileFormat)
-      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
-      ImpalaException, TableLoadingException {
-    catalog.alterTableSetFileFormat(tableName, fileFormat);
+  public void alterTableSetFileFormat(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
+      org.apache.thrift.TException, InvalidObjectException, ImpalaException,
+      TableLoadingException {
+    catalog.alterTableSetFileFormat(tableName, partitionSpec, fileFormat);
   }
 
   /**
    * Changes the HDFS storage location for the given table.
    */
-  public void alterTableSetLocation(TableName tableName, String location)
-      throws MetaException, org.apache.thrift.TException, InvalidObjectException,
-      ImpalaException, TableLoadingException {
-    catalog.alterTableSetLocation(tableName, location);
+  public void alterTableSetLocation(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, String location) throws MetaException,
+      org.apache.thrift.TException, InvalidObjectException, ImpalaException,
+      TableLoadingException {
+    catalog.alterTableSetLocation(tableName, partitionSpec, location);
   }
 
   /**

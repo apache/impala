@@ -171,13 +171,22 @@ public class JniFrontend {
       case SET_FILE_FORMAT:
         TAlterTableSetFileFormatParams fileFormatParams =
             params.getSet_file_format_params();
+        List<TPartitionKeyValue> fileFormatPartitionSpec = null;
+        if (fileFormatParams.isSetPartition_spec()) {
+          fileFormatPartitionSpec = fileFormatParams.getPartition_spec();
+        }
         frontend.alterTableSetFileFormat(TableName.fromThrift(params.getTable_name()),
+            fileFormatPartitionSpec,
             FileFormat.fromThrift(fileFormatParams.getFile_format()));
         break; 
       case SET_LOCATION:
         TAlterTableSetLocationParams setLocationParams = params.getSet_location_params();
+        List<TPartitionKeyValue> partitionSpec = null;
+        if (setLocationParams.isSetPartition_spec()) {
+          partitionSpec = setLocationParams.getPartition_spec();
+        }
         frontend.alterTableSetLocation(TableName.fromThrift(params.getTable_name()),
-            setLocationParams.getLocation());
+            partitionSpec, setLocationParams.getLocation());
         break;
       default:
         throw new UnsupportedOperationException(

@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -50,14 +51,17 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
+import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HdfsTableSink;
+import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Objects;
@@ -67,6 +71,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Internal representation of table-related metadata of an hdfs-resident table.
@@ -449,6 +454,71 @@ public class HdfsTable extends Table {
     return partitions;
   }
 
+  /**
+   * Gets the HdfsPartition matching the given partition spec. Returns null if no match
+   * was found.
+   */
+  public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
+    List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
+    for (PartitionKeyValue kv: partitionSpec) {
+      partitionKeyValues.add(
+          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
+    }
+    return getPartitionFromThriftPartitionSpec(partitionKeyValues);
+  }
+
+  /**
+   * Gets the HdfsPartition matching the Thrift version of the partition spec.
+   * Returns null if no match was found.
+   */
+  public HdfsPartition getPartitionFromThriftPartitionSpec(
+      List<TPartitionKeyValue> partitionSpec) {
+    // First, build a list of the partition values to search for in the same order they
+    // are defined in the table.
+    List<String> targetValues = Lists.newArrayList();
+    Set<String> keys = Sets.newHashSet();
+    for (FieldSchema fs: getMetaStoreTable().getPartitionKeys()) {
+      for (TPartitionKeyValue kv: partitionSpec) {
+        if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+          targetValues.add(kv.getValue().toLowerCase());
+          // Same key was specified twice
+          if (!keys.add(kv.getName().toLowerCase())) {
+            return null;
+          }
+        }
+      }
+    }
+
+    // Make sure the number of values match up and that some values were found.
+    if (targetValues.size() == 0 || 
+       (targetValues.size() != getMetaStoreTable().getPartitionKeysSize())) {
+      return null;
+    } 
+   
+    // Now search through all the partitions and check if their partition key values match
+    // the values being searched for. 
+    for (HdfsPartition partition: getPartitions()) {
+      // Skip the default partition
+      if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) { 
+        continue;
+      }
+      List<LiteralExpr> partitionValues = partition.getPartitionValues();
+      Preconditions.checkState(partitionValues.size() == targetValues.size());
+      boolean matchFound = true;
+      for (int i = 0; i < targetValues.size(); ++i) {
+        if (!targetValues.get(i).equals(partitionValues.get(i)
+            .getStringValue().toLowerCase())) {
+          matchFound = false;
+          break;
+        }
+      }
+      if (matchFound) {
+        return partition;
+      }
+    }
+    return null;
+  }
+
   public boolean isClusteringColumn(Column col) {
     return col.getPosition() < getNumClusteringCols();
   }
@@ -512,7 +582,7 @@ public class HdfsTable extends Table {
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
-      addPartition(msTbl.getSd(), new ArrayList<LiteralExpr>());
+      addPartition(msTbl.getSd(), null, new ArrayList<LiteralExpr>());
       return;
     }
 
@@ -536,7 +606,7 @@ public class HdfsTable extends Table {
           }
         }
       }
-      HdfsPartition partition = addPartition(msPartition.getSd(), keyValues);
+      HdfsPartition partition = addPartition(msPartition.getSd(), msPartition, keyValues);
 
       if (partition != null && msPartition.getParameters() != null) {
         partition.setNumRows(getRowCount(msPartition.getParameters()));
@@ -571,6 +641,7 @@ public class HdfsTable extends Table {
    *         metadata that Impala can't understand.
    */
   private HdfsPartition addPartition(StorageDescriptor storageDescriptor,
+      org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyExprs)
       throws IOException, InvalidStorageDescriptorException {
     HdfsStorageDescriptor fileFormatDescriptor =
@@ -591,7 +662,7 @@ public class HdfsTable extends Table {
       }
 
       HdfsPartition partition =
-          new HdfsPartition(this, partitionKeyExprs, fileFormatDescriptor,
+          new HdfsPartition(this, msPartition, partitionKeyExprs, fileFormatDescriptor,
                             fileDescriptors);
       partitions.add(partition);
       return partition;

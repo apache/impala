@@ -1762,6 +1762,38 @@ public class AnalyzerTest {
   public void TestAlterTableSet() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes set fileformat sequencefile");
     AnalyzesOk("alter table functional.alltypes set location '/a/b'");
+    AnalyzesOk("alter table functional.alltypes PARTITION (Year=2010, month=11) " +
+               "set location '/a/b'");
+    AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
+               "set fileformat parquetfile");
+    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " + 
+               "(string_col='partition1') set fileformat parquetfile");
+    AnalyzesOk("alter table functional.stringpartitionkey PARTITION " + 
+               "(string_col='PaRtiTion1') set location '/a/b/c'");
+
+    // Partition spec does not exist
+    AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
+                  "set location '/a/b'",
+                  "No matching partition spec found: (year=2014, month=11)");
+    AnalysisError("alter table functional.alltypes PARTITION (year=2010, year=2010) " +
+                  "set location '/a/b'",
+                  "No matching partition spec found: (year=2010, year=2010)");
+    AnalysisError("alter table functional.alltypes PARTITION (month=11, year=2014) " +
+                  "set fileformat sequencefile",
+                  "No matching partition spec found: (month=11, year=2014)");
+    AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
+                  "set fileformat sequencefile",
+                  "Table is not partitioned: functional.alltypesnopart");
+    AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
+                  "set location '/a/b/c'",
+                  "Table is not partitioned: functional.alltypesnopart");
+    AnalysisError("alter table functional.stringpartitionkey PARTITION " + 
+                  "(string_col='partition2') set location '/a/b'",
+                  "No matching partition spec found: (string_col='partition2')");
+    AnalysisError("alter table functional.stringpartitionkey PARTITION " + 
+                  "(string_col='partition2') set fileformat sequencefile",
+                  "No matching partition spec found: (string_col='partition2')");
+
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes set fileformat sequencefile",
         "Unknown database: db_does_not_exist");
@@ -1771,6 +1803,10 @@ public class AnalyzerTest {
         "Unknown database: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist set location '/a/b'",
         "Unknown table: functional.table_does_not_exist");
+    AnalysisError("alter table functional.no_tbl partition(i=1) set location '/a/b'",
+        "Unknown table: functional.no_tbl");
+    AnalysisError("alter table no_db.alltypes partition(i=1) set fileformat textfile",
+        "Unknown database: no_db");
   }
 
   @Test

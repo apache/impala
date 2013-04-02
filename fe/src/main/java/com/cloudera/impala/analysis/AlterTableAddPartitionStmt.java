@@ -86,7 +86,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     TAlterTableAddPartitionParams addPartParams = new TAlterTableAddPartitionParams();
     for (PartitionKeyValue kv: partitionSpec) {
       addPartParams.addToPartition_spec(
-          new TPartitionKeyValue(kv.getColName(),kv.getValue().getStringValue()));
+          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
     }
     addPartParams.setLocation(getLocation());
     addPartParams.setIf_not_exists(ifNotExists);

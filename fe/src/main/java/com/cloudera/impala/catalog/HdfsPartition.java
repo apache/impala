@@ -88,9 +88,19 @@ public class HdfsPartition {
    */
   private final HdfsStorageDescriptor fileFormatDescriptor;
 
+  private final org.apache.hadoop.hive.metastore.api.Partition msPartition;
+
   private final List<HdfsPartition.FileDescriptor> fileDescriptors;
 
   public HdfsStorageDescriptor getInputFormatDescriptor() { return fileFormatDescriptor; }
+
+  /**
+   * Returns the metastore.api.Partition object this HdfsPartition represents. Returns
+   * null if this is the default partition.
+   */
+  public org.apache.hadoop.hive.metastore.api.Partition getMetaStorePartition() {
+    return msPartition;
+  }
 
   public long getId() { return id; }
 
@@ -115,20 +125,25 @@ public class HdfsPartition {
     return partitionKeyValues;
   }
 
-  private HdfsPartition(HdfsTable table, List<LiteralExpr> partitionKeyValues,
+  private HdfsPartition(HdfsTable table,
+      org.apache.hadoop.hive.metastore.api.Partition msPartition,
+      List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors, long id) {
     this.table = table;
+    this.msPartition = msPartition;
     this.partitionKeyValues = ImmutableList.copyOf(partitionKeyValues);
     this.fileDescriptors = ImmutableList.copyOf(fileDescriptors);
     this.fileFormatDescriptor = fileFormatDescriptor;
     this.id = id;
   }
 
-  public HdfsPartition(HdfsTable table, List<LiteralExpr> partitionKeyValues,
+  public HdfsPartition(HdfsTable table, 
+      org.apache.hadoop.hive.metastore.api.Partition msPartition,
+      List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors) {
-    this(table, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
+    this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
         partitionIdCounter++);
   }
 
@@ -136,7 +151,7 @@ public class HdfsPartition {
       HdfsTable table, HdfsStorageDescriptor storageDescriptor) {
     List<LiteralExpr> emptyExprList = Lists.newArrayList();
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
-    HdfsPartition partition = new HdfsPartition(table, emptyExprList,
+    HdfsPartition partition = new HdfsPartition(table, null, emptyExprList,
         storageDescriptor, emptyFileDescriptorList,
         ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
     return partition;

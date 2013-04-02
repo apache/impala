@@ -352,10 +352,12 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
     partition_spec:partition
   {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists); :}
-  | KW_ALTER KW_TABLE table_name:table KW_SET KW_FILEFORMAT file_format_val:file_format
-  {: RESULT = new AlterTableSetFileFormatStmt(table, file_format); :}
-  | KW_ALTER KW_TABLE table_name:table KW_SET KW_LOCATION STRING_LITERAL:location
-  {: RESULT = new AlterTableSetLocationStmt(table, location); :}
+  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET KW_FILEFORMAT
+    file_format_val:file_format
+  {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
+  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET 
+    KW_LOCATION STRING_LITERAL:location
+  {: RESULT = new AlterTableSetLocationStmt(table, partition, location); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableRenameStmt(table, new_table); :}
   ;

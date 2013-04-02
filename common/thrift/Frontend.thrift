@@ -184,16 +184,22 @@ struct TAlterTableChangeColParams {
   2: required TColumnDef new_col_def
 }
 
-// Parameters for ALTER TABLE SET FILEFORMAT commands.
+// Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
 struct TAlterTableSetFileFormatParams { 
   // New file format
   1: required TFileFormat file_format
+
+  // An optional partition spec, set if modifying the fileformat of a partition.
+  2: optional list<TPartitionKeyValue> partition_spec
 }
 
-// Parameters for ALTER TABLE SET location commands.
+// Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
 struct TAlterTableSetLocationParams { 
   // New HDFS storage location of the table
   1: required string location
+
+  // An optional partition spec, set if modifying the location of a partition.
+  2: optional list<TPartitionKeyValue> partition_spec
 }
 
 // Parameters for all ALTER TABLE commands.

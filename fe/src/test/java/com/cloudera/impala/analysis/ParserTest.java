@@ -929,6 +929,9 @@ public class ParserTest {
     for (FileFormat format: FileFormat.values()) {
       ParsesOk("ALTER TABLE Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo SET FILEFORMAT " + format);
+      ParsesOk("ALTER TABLE TestDb.Foo PARTITION (a=1) SET FILEFORMAT " + format);
+      ParsesOk("ALTER TABLE Foo PARTITION (s='str') SET FILEFORMAT " + format);
+      ParserError("ALTER TABLE TestDb.Foo PARTITION (i=5) SET " + format);
       ParserError("ALTER TABLE TestDb.Foo SET " + format);
       ParserError("ALTER TABLE TestDb.Foo " + format);
     }
@@ -936,6 +939,18 @@ public class ParserTest {
 
     ParsesOk("ALTER TABLE Foo SET LOCATION '/a/b/c'");
     ParsesOk("ALTER TABLE TestDb.Foo SET LOCATION '/a/b/c'");
+
+    ParsesOk("ALTER TABLE Foo PARTITION (i=1,s='str') SET LOCATION '/a/i=1/s=str'");
+    ParsesOk("ALTER TABLE Foo PARTITION (s='str') SET LOCATION '/a/i=1/s=str'");
+
+    ParserError("ALTER TABLE Foo PARTITION (s) SET LOCATION '/a'");
+    ParserError("ALTER TABLE Foo PARTITION () SET LOCATION '/a'");
+    ParserError("ALTER TABLE Foo PARTITION ('str') SET FILEFORMAT TEXTFILE");
+    ParserError("ALTER TABLE Foo PARTITION (a=1, 5) SET FILEFORMAT TEXTFILE");
+    ParserError("ALTER TABLE Foo PARTITION () SET FILEFORMAT PARQUETFILE");
+    ParserError("ALTER TABLE Foo PARTITION (,) SET FILEFORMAT PARQUETFILE");
+    ParserError("ALTER TABLE Foo PARTITION (a=1) SET FILEFORMAT");
+    ParserError("ALTER TABLE Foo PARTITION (a=1) SET LOCATION");
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION abc");
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION");
     ParserError("ALTER TABLE TestDb.Foo SET");
