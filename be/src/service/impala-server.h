@@ -314,6 +314,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // This is called when the query is done (finished, cancelled, or failed).
     void Done();
 
+    SessionState* parent_session() { return parent_session_.get(); }
     const std::string user() const { return parent_session_->user; }
     const std::string default_db() const { return query_session_state_.database; }
     bool eos() { return eos_; }
@@ -321,7 +322,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     int num_rows_fetched() const { return num_rows_fetched_; }
     const TResultSetMetadata* result_metadata() { return &result_metadata_; }
     const TUniqueId& query_id() const { return query_id_; }
-    const ThriftServer::SessionKey& session_id() const { return session_id_; }
     const TExecRequest& exec_request() const { return exec_request_; }
     TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
     boost::mutex* lock() { return &lock_; }
@@ -335,7 +335,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     const TimestampValue& end_time() const { return end_time_; }
 
    private:
-    ThriftServer::SessionKey session_id_;
     TUniqueId query_id_;
     boost::mutex lock_;  // protects all following fields
     ExecEnv* exec_env_;

@@ -1133,15 +1133,10 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
   }
 
   exec_state->Done();
-  // If this function is called from CloseSessionInternal, the session has already
-  // been removed.
+
   {
-    lock_guard<mutex> l(session_state_map_lock_);
-    SessionStateMap::iterator i = session_state_map_.find(exec_state->session_id());
-    if (i != session_state_map_.end()) {
-      lock_guard<mutex> l2(i->second->lock);
-      i->second->inflight_queries.erase(query_id);
-    }
+    lock_guard<mutex> l(exec_state->parent_session()->lock);
+    exec_state->parent_session()->inflight_queries.erase(query_id);
   }
 
   ArchiveQuery(*exec_state);
@@ -1437,14 +1432,19 @@ Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionKey& sessio
   }
   DCHECK(session_state != NULL);
 
+  unordered_set<TUniqueId> inflight_queries;
   {
     lock_guard<mutex> l(session_state->lock);
     DCHECK(!session_state->closed);
     session_state->closed = true;
+    // Once closed is set to true, no more queries can be started. The inflight list
+    // will not grow.
+    inflight_queries.insert(session_state->inflight_queries.begin(),
+        session_state->inflight_queries.end());
   }
 
   // Unregister all open queries from this session.
-  BOOST_FOREACH(const TUniqueId& query_id, session_state->inflight_queries) {
+  BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
     UnregisterQuery(query_id);
   }
 
