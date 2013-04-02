@@ -66,6 +66,12 @@ class StringBuffer {
     string_value_.len = 0;
   }
 
+  // Clears the underlying buffer and StringValue
+  void Reset() {
+    string_value_.len = 0;
+    buffer_size_ = 0;
+  }
+
   // Returns whether the current string is empty
   bool Empty() const {
     return string_value_.len == 0;

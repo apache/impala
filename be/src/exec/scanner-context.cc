@@ -41,8 +41,7 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
 
   streams_.push_back(state->obj_pool()->Add(new Stream(this)));
   streams_[0]->AddBuffer(initial_buffer);
-  streams_[0]->compact_data_ = scan_node_->compact_data() ||
-      scan_node->tuple_desc()->string_slots().empty();
+  streams_[0]->compact_data_ = scan_node_->compact_data();
 
   NewRowBatch();
 }
@@ -193,7 +192,15 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
   *out_buffer = NULL;
   *eos = true;
 
-  boundary_buffer_->Clear();
+  // Any previously allocated boundary buffers must have been processed by the
+  // scanner. Attach the boundary pool to the current row batch.
+  if (compact_data()) {
+    boundary_buffer_->Clear();
+  } else {
+    parent_->current_row_batch_->tuple_data_pool()->AcquireData(
+        boundary_pool_.get(), false);
+    boundary_buffer_->Reset();
+  }
 
   {
     // Any previously allocated boundary buffers must have been processed by the

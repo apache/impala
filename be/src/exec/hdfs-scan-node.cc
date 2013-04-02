@@ -296,6 +296,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
   tuple_pool_->set_limits(*state->mem_limits());
   partition_key_pool_->set_limits(*state->mem_limits());
+  compact_data_ |= tuple_desc_->string_slots().empty();
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.

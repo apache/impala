@@ -439,7 +439,7 @@ inline bool HdfsAvroScanner::ReadPrimitive(
       if (!ReadWriteUtil::SkipBytes(data, data_len, len, &parse_status_)) return false;
       StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
       str_slot->len = len;
-      if (scan_node_->compact_data()) {
+      if (stream_->compact_data()) {
         str_slot->ptr = reinterpret_cast<char*>(pool->Allocate(len));
         memcpy(str_slot->ptr, ptr, len);
       } else {
