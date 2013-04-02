@@ -178,7 +178,7 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
     if (desc_it == per_file_splits_.end()) {
       desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
       per_file_splits_[path] = desc;
-      RETURN_IF_ERROR(GetFileSize(hdfs_connection(), path.c_str(), &desc->file_length));
+      desc->file_length = split.file_length;
     } else {
       desc = desc_it->second;
     }

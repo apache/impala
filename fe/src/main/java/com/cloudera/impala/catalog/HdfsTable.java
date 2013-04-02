@@ -39,8 +39,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
@@ -89,6 +87,7 @@ public class HdfsTable extends Table {
    */
   public static class BlockMetadata {
     private final String fileName;
+    private final long fileLength; // total size of the file that the block belongs to
     private final long offset;
     private final long length;
 
@@ -99,16 +98,18 @@ public class HdfsTable extends Table {
     // schedule scan ranges
     private int[] diskIds;
 
-    public BlockMetadata(String fileName, BlockLocation blockLocation,
+    public BlockMetadata(String fileName, long fileLength, BlockLocation blockLocation,
                          String[] hostPorts) {
       Preconditions.checkNotNull(blockLocation);
       this.fileName = fileName;
+      this.fileLength = fileLength;
       this.offset = blockLocation.getOffset();
       this.length = blockLocation.getLength();
       this.hostPorts = hostPorts;
     }
 
     public String getFileName() { return fileName; }
+    public long getFileLength() { return fileLength; }
     public long getOffset() { return offset; }
     public long getLength() { return length; }
     public String[] getHostPorts() { return hostPorts; }
@@ -163,7 +164,7 @@ public class HdfsTable extends Table {
     /**
      * Add metadata for a single block and update uniqueHostPorts/-FileNames.
      */
-    public void addBlock(String fileName, BlockLocation location,
+    public void addBlock(String fileName, long fileLength, BlockLocation location,
         ConcurrentHashMap<String, String> uniqueHostPorts) {
       // update uniqueFileNames
       String recordedFileName = uniqueFileNames.get(fileName);
@@ -193,7 +194,8 @@ public class HdfsTable extends Table {
         }
       }
 
-      blockMetadata.add(new BlockMetadata(recordedFileName, location, recordedHostPorts));
+      blockMetadata.add(new BlockMetadata(recordedFileName, fileLength, location,
+          recordedHostPorts));
     }
 
     /**
@@ -361,8 +363,8 @@ public class HdfsTable extends Table {
         if (locations != null) {
           blocks.addAll(Arrays.asList(locations));
           for (int i = 0; i < locations.length; ++i) {
-            result.addBlock(fileDescriptor.getFilePath(), locations[i],
-                            partition.getTable().uniqueHostPorts);
+            result.addBlock(fileDescriptor.getFilePath(), fileDescriptor.getFileLength(),
+                locations[i], partition.getTable().uniqueHostPorts);
           }
         }
       } catch (IOException e) {
@@ -554,7 +556,9 @@ public class HdfsTable extends Table {
       }
 
       // we should never see more than one ColumnStatisticsObj here
-      if (colStats.getStatsObj().size() > 1) continue;
+      if (colStats.getStatsObj().size() > 1) {
+        continue;
+      }
       col.updateStats(colStats.getStatsObj().get(0).getStatsData());
     }
   }
@@ -618,7 +622,9 @@ public class HdfsTable extends Table {
    * Returns the value of the ROW_COUNT constant, or -1 if not found.
    */
   private long getRowCount(Map<String, String> parameters) {
-    if (parameters == null) return -1;
+    if (parameters == null) {
+      return -1;
+    }
     for (Map.Entry<String, String> e: parameters.entrySet()) {
       if (e.getKey().equals(StatsSetupConst.ROW_COUNT)) {
         try {

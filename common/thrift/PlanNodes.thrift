@@ -71,6 +71,9 @@ struct THdfsFileSplit {
   // ID of partition in parent THdfsScanNode. Meaningful only
   // in the context of a single THdfsScanNode, may not be unique elsewhere.
   4: required i64 partition_id
+  
+  // total size of the hdfs file
+  5: required i64 file_length
 }
 
 // key range for single THBaseScanNode
