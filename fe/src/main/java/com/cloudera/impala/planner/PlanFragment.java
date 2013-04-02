@@ -114,7 +114,6 @@ public class PlanFragment {
    */
   public void finalize(Analyzer analyzer, boolean validateFileFormats)
       throws InternalException, NotImplementedException {
-    markRefdSlots(analyzer);
     if (planRoot != null) {
       setRowTupleIds(planRoot, null);
     }
@@ -134,6 +133,14 @@ public class PlanFragment {
         hdfsScanNode.validateFileFormat();
       }
     }
+  }
+
+  /**
+   * Return the number of nodes on which the plan fragment will execute.
+   * invalid: -1
+   */
+  public int getNumNodes() {
+    return dataPartition == DataPartition.UNPARTITIONED ? 1 : planRoot.getNumNodes();
   }
 
   /**
@@ -256,48 +263,6 @@ public class PlanFragment {
     Preconditions.checkState(newRoot.getChildren().size() == 1);
     newRoot.setChild(0, planRoot);
     planRoot = newRoot;
-  }
-
-  /**
-   * Mark slots that are being referenced by the plan tree itself or by the
-   * outputExprs exprs as materialized. If the latter is null, mark all slots in
-   * planRoot's tupleIds() as being referenced. All aggregate slots are materialized.
-   *
-   * TODO: instead of materializing everything produced by the plan root, derived
-   * referenced slots from destination fragment and add a materialization node
-   * if not all output is needed by destination fragment
-   * TODO 2: should the materialization decision be cost-based?
-   */
-  private void markRefdSlots(Analyzer analyzer) {
-    if (planRoot == null) {
-      return;
-    }
-    List<SlotId> refdIdList = Lists.newArrayList();
-    planRoot.getMaterializedIds(analyzer, refdIdList);
-
-    if (outputExprs != null) {
-      Expr.getIds(outputExprs, null, refdIdList);
-    }
-
-    HashSet<SlotId> refdIds = Sets.newHashSet(refdIdList);
-    for (TupleDescriptor tupleDesc: analyzer.getDescTbl().getTupleDescs()) {
-      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-        if (refdIds.contains(slotDesc.getId())) {
-          slotDesc.setIsMaterialized(true);
-        }
-      }
-    }
-
-    if (outputExprs == null) {
-      // mark all slots in planRoot.getTupleIds() as materialized
-      ArrayList<TupleId> tids = planRoot.getTupleIds();
-      for (TupleId tid: tids) {
-        TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tid);
-        for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-          slotDesc.setIsMaterialized(true);
-        }
-      }
-    }
   }
 
 }

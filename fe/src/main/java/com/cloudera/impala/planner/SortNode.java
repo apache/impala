@@ -80,8 +80,8 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
-    super.finalize(analyzer);
+  protected void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
     cardinality = getChild(0).cardinality;
     if (hasLimit()) {
       if (cardinality == -1) {
@@ -90,7 +90,7 @@ public class SortNode extends PlanNode {
         cardinality = Math.min(cardinality, limit);
       }
     }
-    LOG.info("finalize Sort: cardinality=" + Long.toString(cardinality));
+    LOG.info("stats Sort: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

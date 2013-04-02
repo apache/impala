@@ -215,20 +215,24 @@ Status HashJoinNode::Open(RuntimeState* state) {
 
   eos_ = false;
 
+  // TODO: fix problems with asynchronous cancellation
   // Kick-off the construction of the build-side table in a separate
   // thread, so that the left child can do any initialisation in parallel.
   promise<Status> thread_status;
   thread build_thread =
       thread(bind(&HashJoinNode::BuildSideThread, this, state, &thread_status));
 
-  // Open the probe-side child so that it may perform any initialisation in parallel
-  RETURN_IF_ERROR(child(0)->Open(state));
+  // Open the probe-side child so that it may perform any initialisation in parallel.
+  // Don't exit even if we see an error, we still need to wait for the build thread
+  // to finish.
+  Status open_status = child(0)->Open(state);
 
   // Blocks until ConstructHashTable has returned, after which
   // the hash table is fully constructed and we can start the probe
   // phase.
   RETURN_IF_ERROR(thread_status.get_future().get());
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
+  RETURN_IF_ERROR(open_status);
 
   // seed probe batch and current_probe_row_, etc.
   while (true) {

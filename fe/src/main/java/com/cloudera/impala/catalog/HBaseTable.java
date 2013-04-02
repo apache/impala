@@ -357,6 +357,11 @@ public class HBaseTable extends Table {
     return hbaseTableName;
   }
 
+  public int getNumNodes() {
+    // TODO: implement
+    return 100;
+  }
+
   public static boolean isHBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return msTbl.getSd().getInputFormat().equals(hbaseInputFormat);
   }

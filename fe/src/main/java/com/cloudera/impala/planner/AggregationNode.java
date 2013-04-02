@@ -82,13 +82,16 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
-    super.finalize(analyzer);
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
     List<Expr> groupingExprs = aggInfo.getGroupingExprs();
     cardinality = 1;
     // cardinality: product of # of distinct values produced by grouping exprs
     for (Expr groupingExpr: groupingExprs) {
       long numDistinct = groupingExpr.getNumDistinctValues();
+      // TODO: remove these before 1.0
+      LOG.info("grouping expr: " + groupingExpr.toSql() + " #distinct="
+          + Long.toString(numDistinct));
       if (numDistinct == -1) {
         cardinality = -1;
         break;
@@ -98,15 +101,21 @@ public class AggregationNode extends PlanNode {
       // group by the primary key of a table plus a number of other columns from that
       // same table)
       // TODO: try to recognize functional dependencies
+      // TODO: as a shortcut, instead of recognizing functional dependencies,
+      // limit the contribution of a single table to the number of rows
+      // of that table (so that when we're grouping by the primary key col plus
+      // some others, the estimate doesn't overshoot dramatically)
       cardinality *= numDistinct;
     }
     // take HAVING predicate into account
+    LOG.info("Agg: cardinality=" + Long.toString(cardinality));
     if (cardinality > 0) {
-      cardinality *= computeSelectivity();
+      cardinality = Math.round((double) cardinality * computeSelectivity());
+      LOG.info("sel=" + Double.toString(computeSelectivity()));
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality < 0) cardinality = -1;
-    LOG.info("finalize Agg: cardinality=" + Long.toString(cardinality));
+    LOG.info("stats Agg: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

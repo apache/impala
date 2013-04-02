@@ -34,19 +34,25 @@ ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     num_senders_(0),
-    stream_recvr_(NULL) {
+    stream_recvr_(NULL),
+    input_row_desc_(descs, tnode.exchange_node.input_row_tuples,
+        vector<bool>(
+          tnode.nullable_tuples.begin(),
+          tnode.nullable_tuples.begin() + tnode.exchange_node.input_row_tuples.size())),
+    next_row_idx_(0) {
 }
 
 Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   convert_row_batch_timer_ = ADD_TIMER(runtime_profile(), "ConvertRowBatchTime");
+  LOG(INFO) << "Exch id=" << id_ << "\ninput_desc=" << input_row_desc_.DebugString()
+            << "\noutput_desc=" << row_descriptor_.DebugString();
 
   // TODO: figure out appropriate buffer size
-  // row descriptor of this node and the incoming stream should be the same.
   DCHECK_GT(num_senders_, 0);
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    row_descriptor_, state->fragment_instance_id(), id_, num_senders_,
+    input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
     FLAGS_exchg_node_buffer_size_bytes, runtime_profile()));
   return Status::OK;
 }
@@ -65,44 +71,48 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     return Status::OK;
   }
 
-  bool is_cancelled;
-  scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch(&is_cancelled));
-  VLOG_FILE << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
-            << " #rows=" << (input_batch.get() != NULL ? input_batch->num_rows() : 0)
-            << " is_cancelled=" << (is_cancelled ? "true" : "false")
-            << " instance_id=" << state->fragment_instance_id();
-  if (is_cancelled) return Status(TStatusCode::CANCELLED);
-  output_batch->Reset();
-  *eos = (input_batch.get() == NULL);
-  if (*eos) return Status::OK;
+  while (true) {
+    {
+      SCOPED_TIMER(convert_row_batch_timer_);
+      // copy rows until we hit the limit/capacity or until we exhaust input_batch_
+      while (!ReachedLimit() && !output_batch->IsFull()
+          && input_batch_.get() != NULL && next_row_idx_ < input_batch_->capacity()) {
+        TupleRow* src = input_batch_->GetRow(next_row_idx_);
+        ++next_row_idx_;
+        int j = output_batch->AddRow();
+        TupleRow* dest = output_batch->GetRow(j);
+        // if the input row is shorter than the output row, make sure not to leave
+        // uninitialized Tuple* around
+        output_batch->ClearRow(dest);
+        // this works as expected if rows from input_batch form a prefix of
+        // rows in output_batch
+        input_batch_->CopyRow(src, dest);
+        output_batch->CommitLastRow();
+        ++num_rows_returned_;
+      }
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
-  SCOPED_TIMER(convert_row_batch_timer_);
-
-  // We assume that we can always move the entire input batch into the output batch
-  // (if that weren't the case, the code would be more complicated).
-  DCHECK_GE(output_batch->capacity(), input_batch->capacity());
-
-  // copy all rows (up to limit) and attach all mempools from the input batch
-  DCHECK(input_batch->row_desc().IsPrefixOf(output_batch->row_desc()));
-  int i = 0;
-  for (; i < input_batch->num_rows(); ++i) {
-    TupleRow* src = input_batch->GetRow(i);
-    int j = output_batch->AddRow();
-    DCHECK_EQ(i, j);
-    TupleRow* dest = output_batch->GetRow(i);
-    // this works as expected if rows from input_batch form a prefix of
-    // rows in output_batch
-    input_batch->CopyRow(src, dest);
-    output_batch->CommitLastRow();
-    ++num_rows_returned_;
-    if (ReachedLimit()) {
-      *eos = true;
-      break;
+      if (ReachedLimit()) {
+        *eos = true;
+        return Status::OK;
+      }
+      if (output_batch->IsFull()) return Status::OK;
     }
+
+    // we need more rows
+    if (input_batch_.get() != NULL) input_batch_->TransferResourceOwnership(output_batch);
+    bool is_cancelled;
+    input_batch_.reset(stream_recvr_->GetBatch(&is_cancelled));
+    VLOG_FILE << "exch: has batch=" << (input_batch_.get() == NULL ? "false" : "true")
+              << " #rows=" << (input_batch_.get() != NULL ? input_batch_->num_rows() : 0)
+              << " is_cancelled=" << (is_cancelled ? "true" : "false")
+              << " instance_id=" << state->fragment_instance_id();
+    if (is_cancelled) return Status(TStatusCode::CANCELLED);
+    *eos = (input_batch_.get() == NULL);
+    if (*eos) return Status::OK;
+    next_row_idx_ = 0;
+    DCHECK(input_batch_->row_desc().IsPrefixOf(output_batch->row_desc()));
   }
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  input_batch->TransferResourceOwnership(output_batch);
-  return Status::OK;
 }
 
 void ExchangeNode::DebugString(int indentation_level, std::stringstream* out) const {

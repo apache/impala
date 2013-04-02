@@ -27,7 +27,7 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TEqJoinCondition;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -81,9 +81,11 @@ public class HashJoinNode extends PlanNode {
     }
   }
 
+  public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts; }
+
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
-    super.finalize(analyzer);
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
 
     // For a join between child(0) and child(1), we look for join conditions "L.c = R.d"
     // (with L being from child(0) and R from child(1)) and use as the cardinality
@@ -109,22 +111,25 @@ public class HashJoinNode extends PlanNode {
 
     long maxNumDistinct = 0;
     for (Pair<Expr, Expr> eqJoinPredicate: eqJoinConjuncts) {
-      if (eqJoinPredicate.first.unwrapSlotRef() == null) {
-        continue;
-      }
+      if (eqJoinPredicate.first.unwrapSlotRef() == null) continue;
       SlotRef rhsSlotRef = eqJoinPredicate.second.unwrapSlotRef();
-      if (rhsSlotRef == null) {
-        continue;
-      }
+      if (rhsSlotRef == null) continue;
       SlotDescriptor slotDesc = rhsSlotRef.getDesc();
-      if (slotDesc == null) {
-        continue;
-      }
+      if (slotDesc == null) continue;
       ColumnStats stats = slotDesc.getStats();
-      if (!stats.hasNumDistinctValues()) {
-        continue;
+      if (!stats.hasNumDistinctValues()) continue;
+      long numDistinct = stats.getNumDistinctValues();
+      Table rhsTbl = slotDesc.getParent().getTable();
+      if (rhsTbl != null && rhsTbl.getNumRows() != -1) {
+        // we can't have more distinct values than rows in the table, even though
+        // the metastore stats may think so
+        LOG.info("#distinct=" + numDistinct + " #rows="
+            + Long.toString(rhsTbl.getNumRows()));
+        numDistinct = Math.min(numDistinct, rhsTbl.getNumRows());
       }
-      maxNumDistinct = Math.max(maxNumDistinct, stats.getNumDistinctValues());
+      maxNumDistinct = Math.max(maxNumDistinct, numDistinct);
+      LOG.info("min slotref=" + rhsSlotRef.toSql() + " #distinct="
+          + Long.toString(numDistinct));
     }
 
     if (maxNumDistinct == 0) {
@@ -136,8 +141,11 @@ public class HashJoinNode extends PlanNode {
       cardinality = Math.round(
           (double) getChild(0).cardinality
             * (double) getChild(1).cardinality / (double) maxNumDistinct);
+      // TODO: remove log output before 1.0
+      LOG.info("lhs card=" + Long.toString(getChild(0).cardinality) + " rhs card="
+          + Long.toString(getChild(1).cardinality));
     }
-    LOG.info("finalize HashJoin: cardinality=" + Long.toString(cardinality));
+    LOG.info("stats HashJoin: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

@@ -80,10 +80,14 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Compute file paths and key values based on key ranges.
+   * This finalize() implementation also includes the computeStats() logic
+   * (and there is no computeStats()), because it's easier to do that during
+   * ValueRange construction.
    */
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
     Preconditions.checkNotNull(keyFilters);
+    super.finalize(analyzer);
 
     LOG.info("collecting partitions for table " + tbl.getName());
     if (tbl.getPartitions().isEmpty()) {
@@ -131,8 +135,15 @@ public class HdfsScanNode extends ScanNode {
     }
 
     Preconditions.checkState(cardinality >= 0 || cardinality == -1);
-    if (cardinality > 0) cardinality *= computeSelectivity();
+    if (cardinality > 0) {
+      LOG.info("cardinality=" + Long.toString(cardinality) + " sel=" + Double.toString(computeSelectivity()));
+      cardinality = Math.round((double) cardinality * computeSelectivity());
+    }
     LOG.info("finalize HdfsScan: cardinality=" + Long.toString(cardinality));
+
+    // TODO: take actual partitions into account
+    numNodes = tbl.getNumNodes();
+    LOG.info("finalize HdfsScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override
@@ -182,7 +193,7 @@ public class HdfsScanNode extends ScanNode {
           TScanRange scanRange = new TScanRange();
           scanRange.setHdfs_file_split(
               new THdfsFileSplit(block.getFileName(), currentOffset,
-                currentLength, partition.getPartition().getId(), block.getFileLength()));
+                currentLength, partition.getPartition().getId(), block.getFileSize()));
           TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
           scanRangeLocations.scan_range = scanRange;
           scanRangeLocations.locations = locations;

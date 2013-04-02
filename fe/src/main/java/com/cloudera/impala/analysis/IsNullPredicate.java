@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
@@ -23,6 +25,7 @@ import com.cloudera.impala.thrift.TIsNullPredicate;
 import com.google.common.base.Preconditions;
 
 public class IsNullPredicate extends Predicate {
+  private final static Logger LOG = LoggerFactory.getLogger(IsNullPredicate.class);
   private final boolean isNotNull;
 
   public IsNullPredicate(Expr e, boolean isNotNull) {
@@ -69,6 +72,7 @@ public class IsNullPredicate extends Predicate {
       // due to underestimated cardinalities?
       selectivity = 0.1;
     }
+    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   @Override

@@ -80,6 +80,9 @@ public abstract class Table {
     return numRows;
   }
 
+  // number of nodes that contain data for this table; -1: unknown
+  public abstract int getNumNodes();
+
   /**
    * Returns the metastore.api.Table object this Table was created from. Returns null
    * if the derived Table object was not created from a metastore Table (ex. InlineViews).

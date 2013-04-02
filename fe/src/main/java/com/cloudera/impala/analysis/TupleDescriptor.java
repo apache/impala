@@ -17,6 +17,9 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
@@ -27,6 +30,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class TupleDescriptor {
+  private final static Logger LOG = LoggerFactory.getLogger(TupleDescriptor.class);
   private final TupleId id;
   private final ArrayList<SlotDescriptor> slots;
   private Table table;  // underlying table, if there is one

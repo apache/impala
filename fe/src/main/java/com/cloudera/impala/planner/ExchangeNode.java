@@ -17,6 +17,9 @@ package com.cloudera.impala.planner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -40,17 +43,28 @@ public class ExchangeNode extends PlanNode {
 
   /**
    * Create ExchangeNode that consumes output of inputNode.
+   * An ExchangeNode doesn't have an input node as a child, which is why we
+   * need to compute the cardinality here.
    */
   public ExchangeNode(PlanNodeId id, PlanNode inputNode, boolean copyConjuncts) {
     super(id, inputNode);
     if (!copyConjuncts) {
       this.conjuncts = Lists.newArrayList();
     }
+    if (hasLimit()) {
+      cardinality = Math.min(limit, inputNode.cardinality);
+    } else {
+      cardinality = inputNode.cardinality;
+    }
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
+    msg.exchange_node = new TExchangeNode();
+    for (TupleId tid: tupleIds) {
+      msg.exchange_node.addToInput_row_tuples(tid.asInt());
+    }
   }
 
   @Override

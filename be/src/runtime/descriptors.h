@@ -334,6 +334,8 @@ class RowDescriptor {
   RowDescriptor() {}
 
   // Returns total size in bytes.
+  // TODO: also take avg string lengths into account, ie, change this
+  // to GetAvgRowSize()
   int GetRowSize() const;
 
   static const int INVALID_IDX = -1;

@@ -15,6 +15,8 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
@@ -23,7 +25,7 @@ import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TInPredicate;
 
 public class InPredicate extends Predicate {
-
+  private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
   private final boolean isNotIn;
 
   // First child is the comparison expr for which we
@@ -50,6 +52,7 @@ public class InPredicate extends Predicate {
     } else {
       selectivity = Expr.defaultSelectivity;
     }
+    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   @Override

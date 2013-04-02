@@ -144,13 +144,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (4)
+  EXCHANGE (5)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
-  RANDOM
+  HASH_PARTITIONED: t1.id
   STREAM DATA SINK
-    EXCHANGE ID: 4
+    EXCHANGE ID: 5
     UNPARTITIONED
 
   HASH JOIN
@@ -158,20 +158,29 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-        PREDICATES: t1.zip = 94611
-        TUPLE IDS: 0 
       EXCHANGE (3)
+        TUPLE IDS: 0 
+      EXCHANGE (4)
         TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: t2.id
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    HASH_PARTITIONED: t1.id
+
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+    PREDICATES: t1.zip = 94611
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -501,13 +510,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (7)
+  EXCHANGE (8)
     TUPLE IDS: 0 1 3 
 
 Plan Fragment 1
-  RANDOM
+  HASH_PARTITIONED: c.id
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 8
     UNPARTITIONED
 
   HASH JOIN
@@ -516,17 +525,16 @@ Plan Fragment 1
       c.id = a.tinyint_col
     OTHER PREDICATES: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
     TUPLE IDS: 0 1 3 
-      SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-        PREDICATES: c.string_col < '7'
-        TUPLE IDS: 0 
       EXCHANGE (6)
+        TUPLE IDS: 0 
+      EXCHANGE (7)
         TUPLE IDS: 1 3 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: a.tinyint_col
 
   HASH JOIN
     JOIN OP: INNER JOIN
@@ -548,6 +556,16 @@ Plan Fragment 3
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (2) compact
     PREDICATES: b.float_col > 4.5
     TUPLE IDS: 3 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: c.id
+
+  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+    PREDICATES: c.string_col < '7'
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -1107,13 +1125,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (4)
+  EXCHANGE (5)
     TUPLE IDS: 0 2N 
 
 Plan Fragment 1
-  RANDOM
+  HASH_PARTITIONED: a.test_name
   STREAM DATA SINK
-    EXCHANGE ID: 4
+    EXCHANGE ID: 5
     UNPARTITIONED
 
   HASH JOIN
@@ -1121,20 +1139,29 @@ Plan Fragment 1
     HASH PREDICATES:
       a.test_name = b.name
     TUPLE IDS: 0 2N 
-      SCAN HDFS table=functional.jointbl #partitions=1 size=433B (0)
-        PREDICATES: a.test_id <= 1006
-        TUPLE IDS: 0 
       EXCHANGE (3)
+        TUPLE IDS: 0 
+      EXCHANGE (4)
         TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: b.name
 
   SCAN HDFS table=functional.dimtbl #partitions=1 size=171B (1) compact
     TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    HASH_PARTITIONED: a.test_name
+
+  SCAN HDFS table=functional.jointbl #partitions=1 size=433B (0)
+    PREDICATES: a.test_id <= 1006
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/jointbl/data.csv 0:433
@@ -1187,26 +1214,26 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (10)
+  EXCHANGE (11)
     TUPLE IDS: 5 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 38>
   STREAM DATA SINK
-    EXCHANGE ID: 10
+    EXCHANGE ID: 11
     UNPARTITIONED
 
   AGGREGATE
   OUTPUT: SUM(<slot 39>)
   GROUP BY: <slot 38>
   TUPLE IDS: 5 
-    EXCHANGE (8)
+    EXCHANGE (9)
       TUPLE IDS: 5 
 
 Plan Fragment 2
-  RANDOM
+  HASH_PARTITIONED: c.id
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 9
     HASH_PARTITIONED: <slot 38>
 
   AGGREGATE
@@ -1218,16 +1245,16 @@ Plan Fragment 2
       HASH PREDICATES:
         c.id = a.tinyint_col
       TUPLE IDS: 0 1N 3N 
-        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-          TUPLE IDS: 0 
         EXCHANGE (7)
+          TUPLE IDS: 0 
+        EXCHANGE (8)
           TUPLE IDS: 1 3 
 
 Plan Fragment 3
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: a.tinyint_col
 
   HASH JOIN
     JOIN OP: INNER JOIN
@@ -1247,6 +1274,15 @@ Plan Fragment 4
 
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (2) compact
     TUPLE IDS: 3 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c.id
+
+  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -1449,26 +1485,26 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (13)
+  EXCHANGE (14)
     TUPLE IDS: 6 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 35>
   STREAM DATA SINK
-    EXCHANGE ID: 13
+    EXCHANGE ID: 14
     UNPARTITIONED
 
   AGGREGATE
   OUTPUT: SUM(<slot 36>)
   GROUP BY: <slot 35>
   TUPLE IDS: 6 
-    EXCHANGE (11)
+    EXCHANGE (12)
       TUPLE IDS: 6 
 
 Plan Fragment 2
-  RANDOM
+  HASH_PARTITIONED: c.id
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 12
     HASH_PARTITIONED: <slot 35>
 
   AGGREGATE
@@ -1480,16 +1516,16 @@ Plan Fragment 2
       HASH PREDICATES:
         c.id = <slot 30>
       TUPLE IDS: 0 4 
-        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-          TUPLE IDS: 0 
         EXCHANGE (10)
+          TUPLE IDS: 0 
+        EXCHANGE (11)
           TUPLE IDS: 4 
 
 Plan Fragment 3
   HASH_PARTITIONED: <slot 30>
   STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
+    EXCHANGE ID: 11
+    HASH_PARTITIONED: <slot 30>
 
   AGGREGATE
   OUTPUT: SUM(<slot 31>)
@@ -1526,6 +1562,15 @@ Plan Fragment 5
 
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (2) compact
     TUPLE IDS: 3 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    HASH_PARTITIONED: c.id
+
+  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610

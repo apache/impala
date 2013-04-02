@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.planner;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -25,6 +27,7 @@ import com.google.common.base.Preconditions;
  * Node that applies conjuncts and a limit clause. Has exactly one child.
  */
 public class SelectNode extends PlanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(SelectNode.class);
 
   protected SelectNode(PlanNodeId id, PlanNode child) {
     super(id, child.getTupleIds());
@@ -39,10 +42,15 @@ public class SelectNode extends PlanNode {
   }
 
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
-    super.finalize(analyzer);
-    cardinality = Math.round(((double) getChild(0).cardinality) * computeSelectivity());
-    Preconditions.checkState(cardinality >= 0);
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
+    if (getChild(0).cardinality == -1) {
+      cardinality = -1;
+    } else {
+      cardinality = Math.round(((double) getChild(0).cardinality) * computeSelectivity());
+      Preconditions.checkState(cardinality >= 0);
+    }
+    LOG.info("stats Select: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

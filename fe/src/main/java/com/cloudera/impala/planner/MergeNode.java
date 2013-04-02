@@ -78,8 +78,8 @@ public class MergeNode extends PlanNode {
   }
 
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
-    super.finalize(analyzer);
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
     cardinality = constExprLists.size();
     for (PlanNode child: children) {
       // ignore missing child cardinality info in the hope it won't matter enough
@@ -88,7 +88,7 @@ public class MergeNode extends PlanNode {
         cardinality += child.cardinality;
       }
     }
-    LOG.info("finalize Merge: cardinality=" + Long.toString(cardinality));
+    LOG.info("stats Merge: cardinality=" + Long.toString(cardinality));
   }
 
   public List<List<Expr>> getResultExprLists() {

@@ -138,18 +138,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
 
-  if (runtime_state_->llvm_codegen() != NULL) {
-    // After prepare, all functions should have been code-generated.  At this point
-    // we optimize all the functions.
-    Status status = runtime_state_->llvm_codegen()->OptimizeModule();
-    if (!status.ok()) {
-      LOG(ERROR) << "Error with codegen for this query: " << status.GetErrorMsg();
-      // TODO: propagate this to the coordinator and user?  Not really actionable
-      // for them but we'd like them to let us know.
-    }
-    // If codegen failed, we automatically fall back to not using codegen.
-  }
-
   // set scan ranges
   vector<ExecNode*> scan_nodes;
   vector<TScanRangeParams> no_scan_ranges;
@@ -181,6 +169,18 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set up profile counters
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
+
+  // After preparing the plan and initializing the output sink, all functions should
+  // have been code-generated.  At this point we optimize all the functions.
+  if (runtime_state_->llvm_codegen() != NULL) {
+    Status status = runtime_state_->llvm_codegen()->OptimizeModule();
+    if (!status.ok()) {
+      LOG(ERROR) << "Error with codegen for this query: " << status.GetErrorMsg();
+      // TODO: propagate this to the coordinator and user?  Not really actionable
+      // for them but we'd like them to let us know.
+    }
+    // If codegen failed, we automatically fall back to not using codegen.
+  }
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   row_batch_->tuple_data_pool()->set_limits(*runtime_state_->mem_limits());

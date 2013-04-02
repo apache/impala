@@ -93,10 +93,18 @@ public class HBaseScanNode extends ScanNode {
     this.keyRanges = keyRanges;
   }
 
+  /**
+   * This finalize() implementation also includes the computeStats() logic
+   * (and there is no computeStats()), because it's easier to do that during
+   * ValueRange construction.
+   */
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
     Preconditions.checkNotNull(keyRanges);
     Preconditions.checkState(keyRanges.size() == 1);
+    super.finalize(analyzer);
+    HBaseTable tbl = (HBaseTable) desc.getTable();
+
     // If ValueRange is not null, transform it into start/stopKey by printing the values.
     // At present, we only do that for string-mapped keys because the hbase
     // data is stored as text.
@@ -118,12 +126,10 @@ public class HBaseScanNode extends ScanNode {
       if (rowRange.isEqRange()) {
         cardinality = 1;
       } else {
-        // TODO: fix this
-        cardinality = 100000;
+        cardinality = tbl.getEstimatedRowCount(startKey, stopKey);
       }
     } else {
-      // TODO: fix this
-      cardinality = 100000;
+      cardinality = tbl.getEstimatedRowCount(startKey, stopKey);
     }
     cardinality *= computeSelectivity();
     cardinality = Math.max(0, cardinality);
@@ -131,6 +137,10 @@ public class HBaseScanNode extends ScanNode {
 
     // Convert predicates to HBase filters.
     createHBaseFilters(analyzer);
+
+    // TODO: take actual regions into account
+    numNodes = desc.getTable().getNumNodes();
+    LOG.info("finalize HbaseScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override

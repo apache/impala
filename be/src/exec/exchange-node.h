@@ -22,6 +22,8 @@
 
 namespace impala {
 
+class RowBatch;
+
 // Receiver node for data streams. This simply feeds row batches received from the
 // data stream into the execution tree.
 // The data stream is created in Prepare() and closed in the d'tor.
@@ -43,6 +45,15 @@ class ExchangeNode : public ExecNode {
  private:
   int num_senders_;  // needed for stream_recvr_ construction
   boost::scoped_ptr<DataStreamRecvr> stream_recvr_;
+
+  // our input rows are a prefix of the rows we produce
+  RowDescriptor input_row_desc_;
+
+  // the size of our input batches does not necessarily match the capacity
+  // of our output batches, which means that we need to buffer the input
+  boost::scoped_ptr<RowBatch> input_batch_;
+
+  int next_row_idx_;  // next row to copy
   
   // time spent reconstructing received rows
   RuntimeProfile::Counter* convert_row_batch_timer_;   

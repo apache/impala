@@ -46,7 +46,7 @@ from alltypes
 join (select id from alltypessmall order by id limit 10) a using (id)
 ---- TYPES
 INT, INT
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,0
 1,1
 2,2

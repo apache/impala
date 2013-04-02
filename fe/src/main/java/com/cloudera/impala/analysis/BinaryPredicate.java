@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
@@ -27,6 +30,8 @@ import com.google.common.base.Preconditions;
  *
  */
 public class BinaryPredicate extends Predicate {
+  private final static Logger LOG = LoggerFactory.getLogger(BinaryPredicate.class);
+
   public enum Operator {
     EQ("=", FunctionOperator.EQ),
     NE("!=", FunctionOperator.NE),
@@ -121,6 +126,7 @@ public class BinaryPredicate extends Predicate {
       // TODO: improve using histograms, once they show up
       selectivity = Expr.defaultSelectivity;
     }
+    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   /**

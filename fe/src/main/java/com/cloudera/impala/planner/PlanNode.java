@@ -25,6 +25,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -74,9 +75,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected List<Predicate> conjuncts = Lists.newArrayList();
 
-  // estimate of the output cardinality of this node; set in finalize();
+  // estimate of the output cardinality of this node; set in computeStats();
   // invalid: -1
   protected long cardinality;
+
+  // number of nodes on which the plan tree rooted at this node would execute;
+  // set in computeStats(); invalid: -1
+  protected int numNodes;
+
+  // sum of tupleIds' avgSerializedSizes; set in computeStats()
+  protected float avgRowSize;
 
   //  Node should compact data.
   protected boolean compactData;
@@ -129,6 +137,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean hasLimit() {
     return limit > -1;
   }
+
+  public long getCardinality() { return cardinality; }
+  public int getNumNodes() { return numNodes; }
+  public float getAvgRowSize() { return avgRowSize; }
 
   /** Set the value of compactData in all children. */
   public void setCompactData(boolean on) {
@@ -240,13 +252,33 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Computes internal state, including cardinality.
-   * Call this once on the root of the plan tree before calling toThrift(). The default
-   * implementation simply calls finalize() on the children.
+   * Computes internal state, including planner-relevant statistics.
+   * Call this once on the root of the plan tree before calling toThrift().
+   * Subclasses need to override this.
    */
   public void finalize(Analyzer analyzer) throws InternalException {
     for (PlanNode child: children) {
       child.finalize(analyzer);
+    }
+    computeStats(analyzer);
+  }
+
+  /**
+   * Computes planner statistics: avgRowSize, numNodes, cardinality.
+   * Subclasses need to override this.
+   * Assumes that it has already been called on all children.
+   * This is broken out of finalize() so that it can be called separately
+   * from finalize() (to facilitate inserting additional nodes during plan
+   * partitioning w/o the need to call finalize() recursively on the whole tree again).
+   */
+  protected void computeStats(Analyzer analyzer) {
+    avgRowSize = 0.0F;
+    for (TupleId tid: tupleIds) {
+      TupleDescriptor desc = analyzer.getTupleDesc(tid);
+      avgRowSize += desc.getAvgSerializedSize();
+    }
+    if (!children.isEmpty()) {
+      numNodes = getChild(0).numNodes;
     }
   }
 
@@ -300,5 +332,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       output.append(exprs.get(i).toSql());
     }
     return output.toString();
+  }
+
+  /**
+   * Returns true if stats-related variables are valid.
+   */
+  protected boolean hasValidStats() {
+    return (numNodes == -1 || numNodes >= 0) && (cardinality == -1 || cardinality >= 0);
   }
 }

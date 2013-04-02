@@ -79,4 +79,8 @@ public class InlineView extends Table {
         "Inline View should never be the target of an insert");
   }
 
+  public int getNumNodes() {
+    throw new UnsupportedOperationException("InlineView.getNumNodes() not supported");
+  }
+
 }

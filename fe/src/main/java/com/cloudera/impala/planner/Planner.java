@@ -17,6 +17,7 @@ package com.cloudera.impala.planner;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -34,8 +35,10 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
+import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
@@ -52,6 +55,7 @@ import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 
 /**
@@ -91,6 +95,11 @@ public class Planner {
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
     if (singleNodePlan != null) {
+      // compute referenced slots before calling computeMemLayout()
+      markRefdSlots(analyzer, singleNodePlan, queryStmt.getResultExprs());
+      // compute mem layout *before* finalize(); finalize() may reference
+      // TupleDescriptor.avgSerializedSize
+      analyzer.getDescTbl().computeMemLayout();
       singleNodePlan.finalize(analyzer);
     }
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
@@ -117,18 +126,58 @@ public class Planner {
       // set up table sink for root fragment
       rootFragment.setSink(analysisResult.getInsertStmt().createDataSink());
     }
-    // set output exprs before calling finalize()
     rootFragment.setOutputExprs(queryStmt.getResultExprs());
 
     LOG.info("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
       fragment.finalize(analyzer, !queryOptions.allow_unsupported_formats);
     }
-    // compute mem layout after finalize()
-    analyzer.getDescTbl().computeMemLayout();
 
     Collections.reverse(fragments);
     return fragments;
+  }
+
+  /**
+   * Mark slots that are being referenced by the plan tree itself or by the
+   * outputExprs exprs as materialized. If the latter is null, mark all slots in
+   * planRoot's tupleIds() as being referenced. All aggregate slots are materialized.
+   *
+   * TODO: instead of materializing everything produced by the plan root, derived
+   * referenced slots from destination fragment and add a materialization node
+   * if not all output is needed by destination fragment
+   * TODO 2: should the materialization decision be cost-based?
+   */
+  private void markRefdSlots(
+      Analyzer analyzer, PlanNode planRoot, ArrayList<Expr> outputExprs) {
+    if (planRoot == null) {
+      return;
+    }
+    List<SlotId> refdIdList = Lists.newArrayList();
+    planRoot.getMaterializedIds(analyzer, refdIdList);
+
+    if (outputExprs != null) {
+      Expr.getIds(outputExprs, null, refdIdList);
+    }
+
+    HashSet<SlotId> refdIds = Sets.newHashSet(refdIdList);
+    for (TupleDescriptor tupleDesc: analyzer.getDescTbl().getTupleDescs()) {
+      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+        if (refdIds.contains(slotDesc.getId())) {
+          slotDesc.setIsMaterialized(true);
+        }
+      }
+    }
+
+    if (outputExprs == null) {
+      // mark all slots in planRoot.getTupleIds() as materialized
+      ArrayList<TupleId> tids = planRoot.getTupleIds();
+      for (TupleId tid: tids) {
+        TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tid);
+        for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+          slotDesc.setIsMaterialized(true);
+        }
+      }
+    }
   }
 
   /**
@@ -189,7 +238,8 @@ public class Planner {
       result = createAggregationFragment(
           (AggregationNode) root, childFragments.get(0), fragments);
     } else if (root instanceof SortNode) {
-      result = createTopnFragment((SortNode) root, childFragments.get(0), fragments);
+      result =
+          createTopnFragment((SortNode) root, childFragments.get(0), fragments, analyzer);
     } else {
       throw new InternalException(
           "Cannot create plan fragment for this node type: " + root.getExplainString());
@@ -199,7 +249,7 @@ public class Planner {
     fragments.add(result);
 
     if (!isPartitioned && result.isPartitioned()) {
-      result = createMergeFragment(result);
+      result = createMergeFragment(result, analyzer);
       fragments.add(result);
     }
 
@@ -211,12 +261,15 @@ public class Planner {
    * an ExchangeNode.
    * Requires that input fragment be partitioned.
    */
-  private PlanFragment createMergeFragment(PlanFragment inputFragment) {
+  private PlanFragment createMergeFragment(
+      PlanFragment inputFragment, Analyzer analyzer) {
     Preconditions.checkState(inputFragment.isPartitioned());
 
     // exchange node clones the behavior of its input, aside from the conjuncts
     PlanNode mergePlan = new ExchangeNode(
         new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot(), false);
+    mergePlan.computeStats(analyzer);
+    Preconditions.checkState(mergePlan.hasValidStats());
     PlanNodeId exchId = mergePlan.getId();
     PlanFragment fragment =
         new PlanFragment(mergePlan, DataPartition.UNPARTITIONED);
@@ -235,16 +288,98 @@ public class Planner {
   }
 
   /**
-   * Doesn't create a new fragment, but modifies leftChildFragment to execute
-   * a hash join.
+   * Creates either a broadcast join or a repartitioning join, depending on the
+   * expected cost.
+   * If any of the inputs to the cost computation is unknown, it assumes the cost
+   * will be 0. Costs being equal, it'll favor partitioned over broadcast joins.
+   * TODO: revisit this
+   * TODO: don't create a broadcast join if we already anticipate that this will
+   * exceed the query's memory budget.
    */
   private PlanFragment createHashJoinFragment(
       HashJoinNode node, PlanFragment rightChildFragment,
       PlanFragment leftChildFragment, ArrayList<PlanFragment> fragments) {
-    node.setChild(0, leftChildFragment.getPlanRoot());
-    connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
-    leftChildFragment.setPlanRoot(node);
-    return leftChildFragment;
+    // broadcast: send the rightChildFragment's output to each node executing
+    // the leftChildFragment; the cost across all nodes is proportional to the
+    // total amount of data sent
+    PlanNode rhsTree = rightChildFragment.getPlanRoot();
+    long broadcastCost = 0;
+    if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
+      broadcastCost = Math.round(
+          (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize()
+          * (double) leftChildFragment.getNumNodes());
+    }
+    LOG.info("broadcast: cost=" + Long.toString(broadcastCost));
+    LOG.info("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+        + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
+        + Integer.toString(leftChildFragment.getNumNodes()));
+
+    // repartition: both left- and rightChildFragment are partitioned on the
+    // join exprs
+    // TODO: take existing partition of input fragments into account to avoid
+    // unnecessary repartitioning
+    PlanNode lhsTree = leftChildFragment.getPlanRoot();
+    long partitionCost = 0;
+    if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
+      partitionCost = Math.round(
+          (double) lhsTree.getCardinality() * lhsTree.getAvgRowSize()
+          + (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
+    }
+    LOG.info("partition: cost=" + Long.toString(partitionCost));
+    LOG.info("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
+        + Float.toString(lhsTree.getAvgRowSize()));
+    LOG.info("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+        + Float.toString(rhsTree.getAvgRowSize()));
+    LOG.info(rhsTree.getExplainString());
+
+    if (broadcastCost < partitionCost) {
+      // Doesn't create a new fragment, but modifies leftChildFragment to execute
+      // the join; the build input is provided by an ExchangeNode, which is the
+      // destination of the rightChildFragment's output
+      node.setChild(0, leftChildFragment.getPlanRoot());
+      connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
+      leftChildFragment.setPlanRoot(node);
+      return leftChildFragment;
+    } else {
+      // Create a new parent fragment containing a HashJoin node with two
+      // ExchangeNodes as inputs; the latter are the destinations of the
+      // left- and rightChildFragments, which now partition their output
+      // on their respective join exprs.
+      // The new fragment is hash-partitioned on the lhs input join exprs.
+      // TODO: create equivalence classes based on equality predicates
+
+      // first, extract join exprs
+      List<Pair<Expr, Expr>> eqJoinConjuncts = node.getEqJoinConjuncts();
+      List<Expr> lhsJoinExprs = Lists.newArrayList();
+      List<Expr> rhsJoinExprs = Lists.newArrayList();
+      for (Pair<Expr, Expr> pair: eqJoinConjuncts) {
+        // no remapping necessary
+        lhsJoinExprs.add(pair.first.clone(null));
+        rhsJoinExprs.add(pair.second.clone(null));
+      }
+
+      // create the parent fragment containing the HashJoin node
+      DataPartition lhsJoinPartition =
+          new DataPartition(TPartitionType.HASH_PARTITIONED,
+                            Expr.cloneList(lhsJoinExprs, null));
+      PlanNode lhsExchange = new ExchangeNode(
+          new PlanNodeId(nodeIdGenerator), leftChildFragment.getPlanRoot(), false);
+      DataPartition rhsJoinPartition =
+          new DataPartition(TPartitionType.HASH_PARTITIONED, rhsJoinExprs);
+      PlanNode rhsExchange = new ExchangeNode(
+          new PlanNodeId(nodeIdGenerator), rightChildFragment.getPlanRoot(), false);
+      node.setChild(0, lhsExchange);
+      node.setChild(1, rhsExchange);
+      PlanFragment joinFragment = new PlanFragment(node, lhsJoinPartition);
+
+      // connect the child fragments
+      leftChildFragment.setDestination(joinFragment, lhsExchange.getId());
+      leftChildFragment.setOutputPartition(lhsJoinPartition);
+      rightChildFragment.setDestination(joinFragment, rhsExchange.getId());
+      rightChildFragment.setOutputPartition(rhsJoinPartition);
+
+      return joinFragment;
+    }
   }
 
   /**
@@ -501,7 +636,7 @@ public class Planner {
    *   merges the output of the child and does another top-n computation
    */
   private PlanFragment createTopnFragment(SortNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments) {
+      PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer) {
     node.setChild(0, childFragment.getPlanRoot());
     childFragment.addPlanRoot(node);
     if (!childFragment.isPartitioned()) {
@@ -510,7 +645,7 @@ public class Planner {
 
     // we're doing top-n in a single unpartitioned new fragment
     // that merges the output of childFragment
-    PlanFragment mergeFragment = createMergeFragment(childFragment);
+    PlanFragment mergeFragment = createMergeFragment(childFragment, analyzer);
     // insert sort node that repeats the child's sort
     SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
     LOG.info("childsortnode limit: " + Long.toString(childSortNode.getLimit()));
@@ -521,6 +656,8 @@ public class Planner {
     exchNode.unsetLimit();
     PlanNode mergeNode =
         new SortNode(new PlanNodeId(nodeIdGenerator), childSortNode, exchNode);
+    mergeNode.computeStats(analyzer);
+    Preconditions.checkState(mergeNode.hasValidStats());
     mergeFragment.setPlanRoot(mergeNode);
 
     return mergeFragment;
@@ -552,6 +689,8 @@ public class Planner {
     }
     // evaluate conjuncts in SelectNode
     SelectNode selectNode = new SelectNode(new PlanNodeId(nodeIdGenerator), root);
+    selectNode.computeStats(analyzer);
+    Preconditions.checkState(selectNode.hasValidStats());
     selectNode.getConjuncts().addAll(conjuncts);
     analyzer.markConjunctsAssigned(conjuncts);
     return selectNode;
@@ -609,12 +748,16 @@ public class Planner {
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
       root = new AggregationNode(new PlanNodeId(nodeIdGenerator), root, aggInfo);
+      root.computeStats(analyzer);
+      Preconditions.checkState(root.hasValidStats());
       // if we're computing DISTINCT agg fns, the analyzer already created the
       // 2nd phase agginfo
       if (aggInfo.isDistinctAgg()) {
         root = new AggregationNode(
             new PlanNodeId(nodeIdGenerator), root,
             aggInfo.getSecondPhaseDistinctAggInfo());
+        root.computeStats(analyzer);
+        Preconditions.checkState(root.hasValidStats());
       }
       // add Having clause
       assignConjuncts(root, analyzer);
@@ -627,6 +770,8 @@ public class Planner {
       boolean isDefaultLimit = (selectStmt.getLimit() == -1);
       root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true,
           isDefaultLimit);
+      root.computeStats(analyzer);
+      Preconditions.checkState(root.hasValidStats());
       // Don't assign conjuncts here. If this is the tree for an inline view, and
       // it contains a limit clause, we need to evaluate the conjuncts inherited
       // from the enclosing select block *after* the limit.

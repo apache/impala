@@ -171,6 +171,12 @@ struct TMergeNode {
   2: required list<list<Exprs.TExpr>> const_expr_lists
 }
 
+struct TExchangeNode {
+  // The ExchangeNode's input rows form a prefix of the output rows it produces;
+  // this describes the composition of that prefix
+  1: required list<Types.TTupleId> input_row_tuples
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -195,6 +201,7 @@ struct TPlanNode {
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node
   14: optional TMergeNode merge_node
+  15: optional TExchangeNode exchange_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

@@ -14,14 +14,19 @@
 
 package com.cloudera.impala.catalog;
 
-import com.google.common.base.Objects;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Objects;
 
 /**
  * Internal representation of column-related metadata.
  * Owned by Catalog instance.
  */
 public class Column {
+  private final static Logger LOG = LoggerFactory.getLogger(Column.class);
+
   private final String name;
   private final PrimitiveType type;
   private final String comment;
@@ -65,6 +70,7 @@ public class Column {
 
   public void updateStats(ColumnStatisticsData statsData) {
     stats.update(type, statsData);
+    LOG.info("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
   }
 
   @Override

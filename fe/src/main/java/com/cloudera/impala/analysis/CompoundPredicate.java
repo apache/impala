@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -25,6 +27,8 @@ import com.google.common.base.Preconditions;
  *
  */
 public class CompoundPredicate extends Predicate {
+  private final static Logger LOG = LoggerFactory.getLogger(CompoundPredicate.class);
+
   public enum Operator {
     AND("AND", TExprOpcode.COMPOUND_AND),
     OR("OR", TExprOpcode.COMPOUND_OR),
@@ -113,5 +117,6 @@ public class CompoundPredicate extends Predicate {
         break;
     }
     selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 }
