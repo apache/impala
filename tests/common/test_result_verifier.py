@@ -143,6 +143,7 @@ def verify_query_result_is_equal(expected_results, actual_results):
 # add more verifiers in the future. If a tag is not found, it defaults to verifying
 # equality.
 VERIFIER_MAP = {'VERIFY_IS_SUBSET' : verify_query_result_is_subset,
+                'VERIFY_IS_EQUAL_SORTED'  : verify_query_result_is_equal,
                 'VERIFY_IS_EQUAL'  : verify_query_result_is_equal,
                  None              : verify_query_result_is_equal}
 
@@ -206,6 +207,10 @@ def verify_raw_results(test_section, exec_result, file_format):
   verifier = test_section.get('VERIFIER')
 
   order_matters = contains_order_by(exec_result.query)
+  # If the test result section is explicitly annotated to specify order does not matter,
+  # then sort the actual and expected results before verification.
+  if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
+    order_matters = False
   expected = QueryTestResult(expected_results.split('\n'), expected_types, order_matters)
   actual = QueryTestResult(parse_result_rows(exec_result), actual_types, order_matters)
   assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + vefifier

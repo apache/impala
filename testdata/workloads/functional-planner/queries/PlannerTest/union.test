@@ -269,7 +269,43 @@ Plan Fragment 0
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
       TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (3)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+    SELECT CONSTANT
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  MERGE (4)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+      TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -302,7 +338,47 @@ Plan Fragment 0
       SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  TUPLE IDS: 2 
+    EXCHANGE (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+    SELECT CONSTANT
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+      TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3190,4 +3266,256 @@ NODE 1:
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   LOCATIONS:
+====
+// UNION ALL with only constant selects
+select 1, 'a', NULL, 10.f
+union all
+select 2, 'b', NULL, 20.f
+union all
+select 3, 'c', NULL, 30.f
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    SELECT CONSTANT
+    SELECT CONSTANT
+    SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    SELECT CONSTANT
+    SELECT CONSTANT
+    SELECT CONSTANT
+---- SCANRANGELOCATIONS
+====
+// UNION DISTINCT with only constant selects
+select 1, 'a', NULL, 10.0f
+union distinct
+select 2, 'b', NULL, 20.0f
+union distinct
+select 3, 'c', NULL, 30.0f
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>, <slot 2>, <slot 3>
+  TUPLE IDS: 0 
+    MERGE (0)
+      TUPLE IDS: 0 
+      SELECT CONSTANT
+      SELECT CONSTANT
+      SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>, <slot 2>, <slot 3>
+  TUPLE IDS: 0 
+    MERGE (0)
+      TUPLE IDS: 0 
+      SELECT CONSTANT
+      SELECT CONSTANT
+      SELECT CONSTANT
+---- SCANRANGELOCATIONS
+====
+// UNION ALL/DISTINCT with mixed constant selects and non-constant selects
+select 1, 'a', NULL, 10.f
+union all
+select int_col, string_col, bool_col, float_col from functional.alltypestiny
+union distinct
+select 3, 'c', NULL, 30.f
+union all
+select int_col, string_col, bool_col, float_col from functional.alltypestiny
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (3)
+    TUPLE IDS: 2 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 8>, <slot 9>, <slot 10>, <slot 11>
+    TUPLE IDS: 2 
+      MERGE (0)
+        TUPLE IDS: 2 
+        SELECT CONSTANT
+        SELECT CONSTANT
+        SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1)
+          TUPLE IDS: 0 
+    SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (4)
+      TUPLE IDS: 1 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (8)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (4)
+      TUPLE IDS: 1 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 2 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 8>, <slot 9>, <slot 10>, <slot 11>
+    TUPLE IDS: 2 
+      EXCHANGE (5)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+    SELECT CONSTANT
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 2 
+    SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+====
+// UNION ALL/DISTINCT with mixed constant selects and non-constant selects and nested unions
+(select 500
+ union all
+ (select int_col from functional.alltypestiny where year=2009 and month=2
+  order by 1 limit 3
+  union all
+  select 500)
+)
+union distinct
+select int_col from functional.alltypestiny where year=2009 and month=1  
+union all
+select 503
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (5)
+    TUPLE IDS: 4 
+    SELECT CONSTANT
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 8>
+    TUPLE IDS: 4 
+      MERGE (0)
+        TUPLE IDS: 4 
+        SELECT CONSTANT
+        SELECT CONSTANT
+        TOP-N
+        ORDER BY: int_col ASC
+        LIMIT: 3
+        TUPLE IDS: 0 
+          SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+            TUPLE IDS: 0 
+        SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (3)
+          TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (12)
+    TUPLE IDS: 4 
+
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 4 
+    SELECT CONSTANT
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 8>
+    TUPLE IDS: 4 
+      EXCHANGE (8)
+        TUPLE IDS: 4 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SELECT CONSTANT
+    SELECT CONSTANT
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (3)
+      TUPLE IDS: 3 
+
+Plan Fragment 5
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: int_col ASC
+    LIMIT: 3
+    TUPLE IDS: 0 
+      EXCHANGE (6)
+        TUPLE IDS: 0 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: int_col ASC
+  LIMIT: 3
+  TUPLE IDS: 0 
+    SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
 ====

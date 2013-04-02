@@ -58,7 +58,9 @@ public class PlannerTest {
 
   private StringBuilder PrintScanRangeLocations(TQueryExecRequest execRequest) {
     StringBuilder result = new StringBuilder();
-    if (execRequest.per_node_scan_ranges == null) return result;
+    if (execRequest.per_node_scan_ranges == null) {
+      return result;
+    }
     for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
         execRequest.per_node_scan_ranges.entrySet()) {
       result.append("NODE " + entry.getKey().toString() + ":\n");

@@ -51,7 +51,6 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 
@@ -91,7 +90,9 @@ public class Planner {
     LOG.info("create single-node plan");
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
-    if (singleNodePlan != null) singleNodePlan.finalize(analyzer);
+    if (singleNodePlan != null) {
+      singleNodePlan.finalize(analyzer);
+    }
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
     if (queryOptions.num_nodes == 1 || singleNodePlan == null) {
       // single-node execution; we're almost done
@@ -158,7 +159,7 @@ public class Planner {
    * partitioned; the partition function is derived from the inputs.
    */
   private PlanFragment createPlanFragments(
-      PlanNode root, Analyzer analyzer, boolean isPartitioned, 
+      PlanNode root, Analyzer analyzer, boolean isPartitioned,
       ArrayList<PlanFragment> fragments)
       throws InternalException, NotImplementedException {
     ArrayList<PlanFragment> childFragments = Lists.newArrayList();
@@ -182,7 +183,8 @@ public class Planner {
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments, analyzer);
     } else if (root instanceof MergeNode) {
-      result = createMergeNodeFragment((MergeNode) root, childFragments, analyzer);
+      result = createMergeNodeFragment((MergeNode) root, childFragments, fragments,
+          analyzer);
     } else if (root instanceof AggregationNode) {
       result = createAggregationFragment(
           (AggregationNode) root, childFragments.get(0), fragments);
@@ -252,9 +254,6 @@ public class Planner {
    * Each of the child fragments receives a MergeNode as a new plan root (with
    * the child fragment's plan tree as its only input), so that each child
    * fragment's output is mapped onto the MergeNode's result tuple id.
-   * Throws NotImplementedException if mergeNode contains constant result
-   * exprs (which need to be placed in the parent fragment).
-   * TODO: handle MergeNodes with constant select list exprs.
    * TODO: if this is implementing a UNION DISTINCT, the parent of the mergeNode
    * is a duplicate-removing AggregationNode, which might make sense to apply
    * to the children as well, in order to reduce the amount of data that needs
@@ -264,13 +263,14 @@ public class Planner {
    * all child fragments that are also unpartitioned
    */
   private PlanFragment createMergeNodeFragment(MergeNode mergeNode,
-      ArrayList<PlanFragment> childFragments, Analyzer analyzer)
-      throws NotImplementedException {
+      ArrayList<PlanFragment> childFragments, ArrayList<PlanFragment> fragments,
+      Analyzer analyzer) {
     Preconditions.checkState(mergeNode.getChildren().size() == childFragments.size());
-    Preconditions.checkState(mergeNode.getChildren().size() > 1);
-    if (!mergeNode.getConstExprLists().isEmpty()) {
-      throw new NotImplementedException(
-          "Distributed UNION with constant SELECT clauses not implemented.");
+
+    // If the mergeNode only has constant exprs, return it in an unpartitioned fragment.
+    if (mergeNode.getChildren().isEmpty()) {
+      Preconditions.checkState(!mergeNode.getConstExprLists().isEmpty());
+      return new PlanFragment(mergeNode, DataPartition.UNPARTITIONED);
     }
 
     // create an ExchangeNode to perform the merge operation of mergeNode;
@@ -294,6 +294,21 @@ public class Planner {
       childMergeNode.addChild(childFragment.getPlanRoot(), resultExprs);
       childFragment.setPlanRoot(childMergeNode);
       childFragment.setDestination(parentFragment, exchNode.getId());
+    }
+
+    // Add an unpartitioned child fragment with a MergeNode for the constant exprs.
+    if (!mergeNode.getConstExprLists().isEmpty()) {
+      MergeNode childMergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator),
+          mergeNode);
+      childMergeNode.getConstExprLists().addAll(mergeNode.getConstExprLists());
+      // Clear original constant exprs to make sure nobody else picks them up.
+      mergeNode.getConstExprLists().clear();
+      PlanFragment childFragment =
+          new PlanFragment(childMergeNode, DataPartition.UNPARTITIONED);
+      childFragment.setPlanRoot(childMergeNode);
+      childFragment.setDestination(parentFragment, exchNode.getId());
+      childFragments.add(childFragment);
+      fragments.add(childFragment);
     }
     return parentFragment;
   }
@@ -386,7 +401,7 @@ public class Planner {
         // the parent fragment is partitioned on the grouping exprs;
         // substitute grouping exprs to reference the *output* of the agg, not the input
         // TODO: add infrastructure so that all PlanNodes have smaps to make this
-        // process of turning exprs into executable exprs less ad-hoc; might even want to 
+        // process of turning exprs into executable exprs less ad-hoc; might even want to
         // introduce another mechanism that simply records a mapping of slots
         List<Expr> partitionExprs =
             Expr.cloneList(groupingExprs, node.getAggInfo().getSMap());
@@ -428,7 +443,7 @@ public class Planner {
       List<Expr> partitionExprs =
           Expr.cloneList(groupingExprs, node.getAggInfo().getSMap());
       mergePartition =
-          new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs); 
+          new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
     } else {
       // We need to do
       // - child fragment:

@@ -4,7 +4,7 @@
 select * from alltypestiny
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -23,7 +23,7 @@ union all
 select * from alltypestiny where year=2009 and month=2
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -40,7 +40,7 @@ union all
 select * from alltypestiny where year=2009 and month=2 limit 1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -54,7 +54,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=2
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -71,7 +71,7 @@ union all
 select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, double, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
@@ -90,7 +90,7 @@ union distinct
 select 2009,1,1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
@@ -156,7 +156,7 @@ union all
 select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -173,7 +173,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -190,7 +190,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -205,7 +205,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -221,7 +221,7 @@ union all
 select * from alltypestiny where year=2009 and month=1  
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -239,7 +239,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -259,7 +259,7 @@ union all
 select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -281,7 +281,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -304,7 +304,7 @@ union all
    limit 10)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -325,7 +325,7 @@ union all
 select * from alltypestiny where year=2009 and month=1  
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -343,7 +343,7 @@ union all
    order by 3 limit 3)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
@@ -360,7 +360,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -376,7 +376,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -394,7 +394,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -412,7 +412,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -429,7 +429,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1  
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -445,7 +445,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1  
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -463,7 +463,7 @@ union all
          select * from alltypestiny where year=2009 and month=3)))
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -488,7 +488,7 @@ union distinct
          select * from alltypestiny where year=2009 and month=3)))
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
@@ -625,7 +625,7 @@ select x.* from
 where x.int_col < 5 and x.bool_col = false
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
@@ -642,23 +642,6 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
 ---- QUERY
-# Test UNION ALL with only constant selects (no table descriptors).
-select 1, 1.0, 'hello'
-union all
-select 2, 2.0, 'world'
-union all
-select 3, 3.0, 'foo'
-union all
-select 3, 3.0, 'bar'
----- TYPES
-tinyint, float, string
----- RESULTS
-1,1,'hello'
-2,2,'world'
-3,3,'bar'
-3,3,'foo'
-====
----- QUERY
 # Test UNION ALL with mixed constant and non-constant selects. Also tests implicit casts.
 select 10, 10.0, "abcde"
 union all
@@ -671,7 +654,7 @@ select tinyint_col, double_col, string_col
 from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, double, string
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,0,'0'
 0,0,'0'
 1,1.100000023841858,'1'
@@ -714,4 +697,31 @@ select count(*) from (
 bigint
 ---- RESULTS
 7300
+====
+---- QUERY
+# UNION ALL with only constant selects
+select 1, 'a', NULL, 10.0f
+union all
+select 2, 'b', NULL, 20.0f
+union all
+select 3, 'c', NULL, 30.0f
+---- TYPES
+tinyint, string, boolean, float
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'a',NULL,10.0
+2,'b',NULL,20.0
+3,'c',NULL,30.0
+====
+---- QUERY
+# UNION DISTINCT with only constant selects
+select 1, 'a', NULL, 10.0f
+union distinct
+select 2, 'b', NULL, 20.0f
+union distinct
+select 1, 'a', NULL, 10.0f
+---- TYPES
+tinyint, string, boolean, float
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'a',NULL,10.0
+2,'b',NULL,20.0
 ====
