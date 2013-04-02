@@ -38,7 +38,7 @@ namespace impala {
 DataStreamMgr::StreamControlBlock::StreamControlBlock(
     const RowDescriptor& row_desc, const TUniqueId& fragment_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size,
-    RuntimeProfile* profile) 
+    RuntimeProfile* profile)
   : fragment_id_(fragment_id),
     dest_node_id_(dest_node_id),
     row_desc_(row_desc),
@@ -46,10 +46,13 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
     num_remaining_senders_(num_senders) {
-  bytes_received_counter_ = 
+  bytes_received_counter_ =
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
-  deserialize_row_batch_timer_ = 
+  deserialize_row_batch_timer_ =
       ADD_TIMER(profile, "DeserializeRowBatchTimer");
+  buffer_full_wall_timer_ = ADD_TIMER(profile, "SendersBlockedWallTimer");
+  buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer");
+  data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
@@ -57,6 +60,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   // wait until something shows up or we know we're done
   while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
     VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
+    SCOPED_TIMER(data_arrival_timer_);
     data_arrival_.wait(l);
   }
   if (is_cancelled_) {
@@ -89,14 +93,47 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
   }
   COUNTER_UPDATE(bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
+
   // if there's something in the queue and this batch will push us over the
   // buffer limit we need to wait until the batch gets drained
   while (!batch_queue_.empty() && num_buffered_bytes_ + batch_size > buffer_limit_ &&
       !is_cancelled_) {
+    SCOPED_TIMER(buffer_full_total_timer_);
     VLOG_ROW << " wait removal: empty=" << (batch_queue_.empty() ? 1 : 0)
              << " #buffered=" << num_buffered_bytes_
              << " batch_size=" << batch_size << "\n";
-    data_removal_.wait(l);
+
+    // We only want one thread running the timer at any one time. Only
+    // one thread may lock the try_lock, and that 'winner' starts the
+    // scoped timer.
+    bool got_timer_lock = false;
+    {
+      try_mutex::scoped_try_lock timer_lock(buffer_wall_timer_lock_);
+      if (timer_lock) {
+        SCOPED_TIMER(buffer_full_wall_timer_);
+        data_removal_.wait(l);
+        got_timer_lock = true;
+      } else {
+        data_removal_.wait(l);
+        got_timer_lock = false;
+      }
+    }
+    // If we had the timer lock, wake up another writer to make sure
+    // that they (if no-one else) starts the timer. The guarantee is
+    // that if no thread has the try_lock, the thread that we wake up
+    // here will obtain it and run the timer.
+    //
+    // We must have given up the try_lock by this point, otherwise the
+    // woken thread might not successfully take the lock once it has
+    // woken up. (In fact, no other thread will run in AddBatch until
+    // this thread exits because of mutual exclusion around lock_, but
+    // it's good not to rely on that fact).
+    //
+    // The timer may therefore be an underestimate by the amount of
+    // time it takes this thread to finish (and yield lock_) and the
+    // notified thread to be woken up and to acquire the try_lock. In
+    // practice, this time is small relative to the total wait time.
+    if (got_timer_lock) data_removal_.notify_one();
   }
 
   // If we've been cancelled, just return and drop the incoming row batch.  This lets
@@ -133,7 +170,7 @@ void DataStreamMgr::StreamControlBlock::CancelStream() {
   data_removal_.notify_all();
 
   // Delete any batches queued in batch_queue_
-  for (RowBatchQueue::iterator it = batch_queue_.begin(); 
+  for (RowBatchQueue::iterator it = batch_queue_.begin();
       it != batch_queue_.end(); ++it) {
     delete it->second;
   }
@@ -205,7 +242,7 @@ Status DataStreamMgr::CloseSender(
   shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
   if (cb == NULL) {
     // TODO: it is possible that the control block has been torn down by another
-    // thread so this is innocuous.  How can we determine if this is a real issue? 
+    // thread so this is innocuous.  How can we determine if this is a real issue?
     return Status::OK;
   }
   cb->DecrementSenders();

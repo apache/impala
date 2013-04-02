@@ -47,6 +47,9 @@ class TRowBatch;
 // DataStreamMgr also allows asynchronous cancellation of streams via Cancel()
 // which unblocks all DataStreamRecvr::GetBatch() calls that are made on behalf
 // of the cancelled fragment id.
+//
+// TODO: The recv buffers used in DataStreamRecvr should count against
+// per-query memory limits.
 class DataStreamMgr {
  public:
   DataStreamMgr() {}
@@ -59,7 +62,7 @@ class DataStreamMgr {
       const RowDescriptor& row_desc, const TUniqueId& fragment_id,
       PlanNodeId dest_node_id, int num_senders, int buffer_size,
       RuntimeProfile* profile);
-  
+
   // Adds a row batch to the stream identified by fragment_id/dest_node_id if the stream
   // has not been cancelled.
   // The call blocks if this ends up pushing the stream over its buffering limit;
@@ -100,6 +103,14 @@ class DataStreamMgr {
 
     // Adds a row batch to this stream's queue if this stream has not been cancelled;
     // blocks if this will make the stream exceed its buffer limit.
+    //
+    // For example, for an NxN broadcast, there will be N threads on N
+    // clients talking to up-to N threads on N servers. Those server
+    // threads share a buffer per-exchange-node in their
+    // StreamControlBlock (so one per incoming plan fragment), so
+    // typically you'll have N threads contending to write to a single
+    // buffer. If there is no space in the buffer, they will block the
+    // sender until space is available.
     void AddBatch(const TRowBatch& batch);
 
     // Decrement the number of remaining senders and signal eos ("new data")
@@ -149,6 +160,25 @@ class DataStreamMgr {
 
     RuntimeProfile::Counter* bytes_received_counter_;
     RuntimeProfile::Counter* deserialize_row_batch_timer_;
+
+    // Total time (summed across all threads) spent waiting for the
+    // recv buffer to be drained so that new batches can be
+    // added. Remote plan fragments are blocked for the same amount of
+    // time.
+    RuntimeProfile::Counter* buffer_full_total_timer_;
+
+    // Protects access to buffer_full_wall_timer_. We only want one
+    // thread to be running the timer at any time, and we use this
+    // try_mutex to enforce this condition. If a thread does not get
+    // the lock, it continues to execute, but without running the
+    // timer.
+    boost::try_mutex buffer_wall_timer_lock_;
+
+    // Wall time senders spend waiting for the recv buffer to have capacity.
+    RuntimeProfile::Counter* buffer_full_wall_timer_;
+
+    // Total time spent waiting for data to arrive in the recv buffer
+    RuntimeProfile::Counter* data_arrival_timer_;
   };
 
   ObjectPool pool_;  // holds control blocks

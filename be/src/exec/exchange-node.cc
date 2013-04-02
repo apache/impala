@@ -27,6 +27,9 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 
+DEFINE_int32(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
+             "(Advanced) Maximum size of per-query receive-side buffer");
+
 ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
@@ -36,15 +39,15 @@ ExchangeNode::ExchangeNode(
 
 Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  
+
   convert_row_batch_timer_ = ADD_TIMER(runtime_profile(), "ConvertRowBatchTime");
 
   // TODO: figure out appropriate buffer size
   // row descriptor of this node and the incoming stream should be the same.
   DCHECK_GT(num_senders_, 0);
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    row_descriptor_, state->fragment_instance_id(), id_, num_senders_, 1024 * 1024,
-    runtime_profile()));
+    row_descriptor_, state->fragment_instance_id(), id_, num_senders_,
+    FLAGS_exchg_node_buffer_size_bytes, runtime_profile()));
   return Status::OK;
 }
 
