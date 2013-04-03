@@ -13,7 +13,7 @@ use alter_table_test_db
 ====
 ---- QUERY
 # First create an unpartitioned table
-create table t1 (i int) location '/test-warehouse/t1_tmp1'
+create external table t1 (i int) location '/test-warehouse/t1_tmp1'
 ---- RESULTS
 ====
 ---- QUERY
@@ -208,8 +208,10 @@ select * from jointbl_test order by test_id limit 3
 bigint,string,int,int
 ====
 ---- QUERY
-# Create a partitioned table
-create table t_part (i int) partitioned by (j int, s string)
+# Create a partitioned table. Specify the location so we know what dirs need
+# to be cleaned after the test finishes executing.
+create external table t_part (i int) partitioned by (j int, s string)
+location '/test-warehouse/t_part_tmp'
 ---- RESULTS
 ====
 ---- QUERY

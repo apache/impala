@@ -3,6 +3,8 @@
 # Impala tests for DDL statements
 import logging
 import pytest
+import shlex
+from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
@@ -22,11 +24,18 @@ class TestDdlStatements(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   def setup_method(self, method):
-    map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
+    self.teardown_method(method)
 
   def teardown_method(self, method):
-    return
     map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
+    self.cleanup_hdfs_dirs()
+
+  def cleanup_hdfs_dirs(self):
+    # Cleanup the test table HDFS dirs between test runs so there are no errors the next
+    # time a table is created with the same location. This also helps remove any stale
+    # data from the last test run.
+    call(["hadoop", "fs", "-rm", "-r", "-f", "/test-warehouse/t1_tmp1/"], shell=False)
+    call(["hadoop", "fs", "-rm", "-r", "-f", "/test-warehouse/t_part_tmp/"], shell=False)
 
   def cleanup_db(cls, db_name):
     # To drop a db, we need to first drop all the tables in that db
