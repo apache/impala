@@ -6,6 +6,8 @@ from hive_metastore import ThriftHiveMetastore
 from hive_service import ThriftHive
 from hive_service.ttypes import HiveServerException
 from optparse import OptionParser
+from subprocess import call
+from sys import exit
 from thrift.transport import TTransport
 from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
@@ -19,6 +21,8 @@ COMPUTE_STATS_STATEMENT =\
 # information see: HIVE-4119 and HIVE-4122.
 COMPUTE_COLUMN_STATS_STATEMENT =\
     'USE %(db_name)s; ANALYZE TABLE %(table_name)s COMPUTE STATISTICS FOR COLUMNS %(col)s'
+
+HIVE_ARGS = "-hiveconf hive.root.logger=ERROR,console"
 
 def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None):
   """
@@ -53,11 +57,14 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
 
     for table in all_tables.intersection(selected_tables):
       statement = __build_compute_stat_statement(hive_metastore_client, db, table)
-      try:
-        print 'Executing: %s' % statement
-        map(hive_client.execute, statement.split(';'))
-      except HiveServerException as e:
-        print 'Error executing statement:\n%s' % e
+      print 'Executing: %s' % statement
+      # For some still unknown reason, computing table stats using the hive meta store
+      # client no longer works (it did work at one point in Hive v0.9). No errors are
+      # thrown, but tables are set to have 0 rows. It seems to work fine when run via
+      # the Hive CLI, so just use that for now.
+      exit_code = call(["hive " + HIVE_ARGS + " -e \"" + statement + ";\""], shell=True)
+      if exit_code != 0:
+        sys.exit(exit_code)
   hive_transport.close()
 
 def __build_compute_stat_statement(metastore_client, db_name, table_name):
