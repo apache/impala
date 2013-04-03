@@ -55,8 +55,9 @@ MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_t
                                         'testutil/mini-impala-cluster')
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 SET_CLASSPATH_SCRIPT_PATH = os.path.join(IMPALA_HOME, 'bin/set-classpath.sh')
-IMPALAD_ARGS = "-beeswax_port=%d -hs2_port=%d -be_port=%d -state_store_subscriber_port=%d "\
-               "-webserver_port=%d " + options.impalad_args
+IMPALAD_ARGS = "-beeswax_port=%d -hs2_port=%d -be_port=%d "\
+               "-state_store_subscriber_port=%d -webserver_port=%d "\
+               "-cdh_version=$IMPALA_CDH_VERSION " + options.impalad_args
 STATE_STORE_ARGS = options.state_store_args
 REDIRECT_STR = "> %(file_name)s 2>&1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 120

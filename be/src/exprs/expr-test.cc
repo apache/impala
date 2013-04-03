@@ -53,6 +53,7 @@
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 DECLARE_string(impalad);
+DECLARE_bool(abort_on_config_error);
 
 using namespace impala;
 using namespace llvm;
@@ -2220,8 +2221,10 @@ int main(int argc, char **argv) {
 
   EXIT_IF_ERROR(JniUtil::Init());
 
-  // Create an in-process Impala server and in-process backends for test environment.
+  // Create an in-process Impala server and in-process backends for test environment
+  // without any startup validation check
   FLAGS_impalad = "localhost:21000";
+  FLAGS_abort_on_config_error = false;
   VLOG_CONNECTION << "creating test env";
   VLOG_CONNECTION << "starting backends";
   InProcessImpalaServer* impala_server =

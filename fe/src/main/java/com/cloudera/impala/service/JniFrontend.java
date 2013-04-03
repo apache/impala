@@ -14,12 +14,28 @@
 
 package com.cloudera.impala.service;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.io.InvalidObjectException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.rmi.NoSuchObjectException;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.HAUtil;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -34,21 +50,20 @@ import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableChangeColParams;
 import com.cloudera.impala.thrift.TAlterTableDropColParams;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableRenameParams;
-import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
+import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TCreateDbParams;
-import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
+import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TDropDbParams;
@@ -61,15 +76,6 @@ import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-
-import com.google.common.collect.Lists;
-
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -119,7 +125,6 @@ public class JniFrontend {
     TExecRequest result = frontend.createExecRequest(request, explainString);
     LOG.info(explainString.toString());
 
-    //LOG.info("returned TQueryExecRequest2: " + result.toString());
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
@@ -137,7 +142,7 @@ public class JniFrontend {
     switch (params.getAlter_type()) {
       case ADD_REPLACE_COLUMNS:
         TAlterTableAddReplaceColsParams addReplaceColParams =
-            params.getAdd_replace_cols_params(); 
+            params.getAdd_replace_cols_params();
         frontend.alterTableAddReplaceCols(TableName.fromThrift(params.getTable_name()),
             addReplaceColParams.getColumns(),
             addReplaceColParams.isReplace_existing_cols());
@@ -145,11 +150,11 @@ public class JniFrontend {
       case ADD_PARTITION:
         TAlterTableAddPartitionParams addPartParams = params.getAdd_partition_params();
         frontend.alterTableAddPartition(TableName.fromThrift(params.getTable_name()),
-            addPartParams.getPartition_spec(), addPartParams.getLocation(), 
+            addPartParams.getPartition_spec(), addPartParams.getLocation(),
             addPartParams.isIf_not_exists());
         break;
       case DROP_COLUMN:
-        TAlterTableDropColParams dropColParams = params.getDrop_col_params(); 
+        TAlterTableDropColParams dropColParams = params.getDrop_col_params();
         frontend.alterTableDropCol(TableName.fromThrift(params.getTable_name()),
             dropColParams.getCol_name());
         break;
@@ -164,7 +169,7 @@ public class JniFrontend {
             dropPartParams.getPartition_spec(), dropPartParams.isIf_exists());
         break;
       case RENAME_TABLE:
-        TAlterTableRenameParams renameParams = params.getRename_params(); 
+        TAlterTableRenameParams renameParams = params.getRename_params();
         frontend.alterTableRename(TableName.fromThrift(params.getTable_name()),
             TableName.fromThrift(renameParams.getNew_table_name()));
         break;
@@ -178,7 +183,7 @@ public class JniFrontend {
         frontend.alterTableSetFileFormat(TableName.fromThrift(params.getTable_name()),
             fileFormatPartitionSpec,
             FileFormat.fromThrift(fileFormatParams.getFile_format()));
-        break; 
+        break;
       case SET_LOCATION:
         TAlterTableSetLocationParams setLocationParams = params.getSet_location_params();
         List<TPartitionKeyValue> partitionSpec = null;
@@ -382,18 +387,145 @@ public class JniFrontend {
     return CONF.get(confName, "");
   }
 
+  public class CdhVersion implements Comparable<CdhVersion> {
+    private final int major;
+    private final int minor;
+
+    public CdhVersion(String versionString) throws IllegalArgumentException {
+      String[] version = versionString.split("\\.");
+      if (version.length != 2) {
+        throw new IllegalArgumentException("Invalid version string:" + versionString);
+      }
+      try {
+        major = Integer.parseInt(version[0]);
+        minor = Integer.parseInt(version[1]);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Invalid version string:" + versionString);
+      }
+    }
+
+    public int compareTo(CdhVersion o) {
+      return (this.major == o.major) ? (this.minor - o.minor) : (this.major - o.major);
+    }
+
+    @Override
+    public String toString() {
+      return major + "." + minor;
+    }
+  }
+
   /**
    * Returns an error string describing all configuration issues. If no config issues are
    * found, returns an empty string.
-   * @return
+   * If user does not provide a CDH version, use our best guess to guess the version.
+   * If user provides a CDH version, runs check again that version. If the user provided
+   * version does not match our guess, considered that as an error.
    */
-  public String checkHadoopConfig() {
-    StringBuilder output = new StringBuilder();
+  public String checkHadoopConfig(String userSpecifiedCdhVersionStr) {
+    CdhVersion guessedCdhVersion = guessCdhVersionFromNnWebUi();
+    CdhVersion checkedCdhVersion;
+    CdhVersion cdh41 = new CdhVersion("4.1");
 
-    output.append(checkShortCircuitRead(CONF));
+    StringBuilder output = new StringBuilder();
+    if (userSpecifiedCdhVersionStr.isEmpty()) {
+      if (guessedCdhVersion == null) {
+        // Can't guess a version. We need one from the user.
+        output.append("Impala can't determine CDH version. Please specify the installed" +
+            "CDH version using -cdh_version flag.\n");
+        return output.toString();
+      }
+      // No CDH version from the user, use our best guess
+      checkedCdhVersion = guessedCdhVersion;
+    } else {
+      CdhVersion userSpecifiedCdhVersion;
+      try {
+        userSpecifiedCdhVersion = new CdhVersion(userSpecifiedCdhVersionStr);
+      } catch (Exception e) {
+        output.append("Illegal -cdh_version specified (\"")
+            .append(userSpecifiedCdhVersionStr)
+            .append("\"). -cdh_version must be <major>.<minor>.");
+        return output.toString();
+      }
+      if (guessedCdhVersion != null) {
+        // Return a warning if the user specified version does not match our best guess.
+        if (userSpecifiedCdhVersion.compareTo(guessedCdhVersion) != 0) {
+          output.append("The installed CDH version seems to be ")
+              .append(guessedCdhVersion)
+              .append(" but -cdh_version indicated that it is ")
+              .append(userSpecifiedCdhVersionStr)
+              .append(". Please confirm the CDH version and if there are no " +
+                  "more configuration errors, please start impala with" +
+                  " abort_on_config_error=false.\n");
+        }
+      }
+      checkedCdhVersion = userSpecifiedCdhVersion;
+    }
+
+    if (checkedCdhVersion.compareTo(cdh41) == 0) {
+      output.append(checkShortCircuitReadCdh41(CONF));
+    } else {
+      output.append(checkShortCircuitRead(CONF));
+    }
     output.append(checkBlockLocationTracking(CONF));
 
     return output.toString();
+  }
+
+  /**
+   * Guess the CDH version by looking at the version info string from the Namenode web UI
+   * Return the CDH version or null (if we can't determine the version)
+   */
+  private CdhVersion guessCdhVersionFromNnWebUi() {
+    try {
+      // On a large cluster, avoid hitting the name node at the same time
+      Random randomGenerator = new Random();
+      Thread.sleep(randomGenerator.nextInt(2000));
+    } catch (Exception e) {
+    }
+
+    try {
+      String nnUrl = getCurrentNameNodeAddress();
+      if (nnUrl == null) {
+        return null;
+      }
+      URL nnWebUi = new URL("http://" + nnUrl + "/dfshealth.jsp");
+      URLConnection conn = nnWebUi.openConnection();
+      BufferedReader in = new BufferedReader(
+          new InputStreamReader(conn.getInputStream()));
+      String inputLine;
+      while ((inputLine = in.readLine()) != null) {
+        if (inputLine.contains("Version:")) {
+          // Parse the version string cdh<major>.<minor>
+          Pattern cdhVersionPattern = Pattern.compile("cdh\\d\\.\\d");
+          Matcher versionMatcher = cdhVersionPattern.matcher(inputLine);
+          if (versionMatcher.find()) {
+            // Strip out "cdh" before passing to CdhVersion
+            return new CdhVersion(versionMatcher.group().substring(3));
+          }
+          return null;
+        }
+      }
+    } catch (Exception e) {
+      LOG.info(e.toString());
+    }
+    return null;
+  }
+
+  /**
+   * Derive the namenode http address from the current file system,
+   * either default or as set by "-fs" in the generic options.
+   *
+   * @return Returns http address or null if failure.
+   */
+  private String getCurrentNameNodeAddress() throws Exception {
+    // get the filesystem object to verify it is an HDFS system
+    FileSystem fs;
+    fs = FileSystem.get(CONF);
+    if (!(fs instanceof DistributedFileSystem)) {
+      LOG.error("FileSystem is " + fs.getUri());
+      return null;
+    }
+    return DFSUtil.getInfoServer(HAUtil.getAddressOfActive(fs), CONF, false);
   }
 
   /**
@@ -408,7 +540,7 @@ public class JniFrontend {
 
     // dfs.domain.socket.path must be set properly
     String domainSocketPath = conf.getTrimmed(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
-            DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
+        DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
     if (domainSocketPath.isEmpty()) {
       errorCause.append(prefix);
       errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
@@ -433,6 +565,91 @@ public class JniFrontend {
       errorCause.append(" is not enabled.\n");
     }
 
+    // dfs.client.use.legacy.blockreader.local must be set to false
+    if (conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
+        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
+      errorCause.append(" should not be enabled.\n");
+    }
+
+    if (errorCause.length() > 0) {
+      output.append(errorMessage);
+      output.append(errorCause);
+    }
+
+    return output.toString();
+  }
+
+  /**
+   * Check short circuit read for CDH 4.1.
+   * Return an empty string if short circuit read is properly enabled. If not, return an
+   * error string describing the issues.
+   */
+  private String checkShortCircuitReadCdh41(Configuration conf) {
+    StringBuilder output = new StringBuilder();
+    String errorMessage = "ERROR: short-circuit local reads is disabled because\n";
+    String prefix = "  - ";
+    StringBuilder errorCause = new StringBuilder();
+
+    // Client side checks
+    // dfs.client.read.shortcircuit must be set to true.
+    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY);
+      errorCause.append(" is not enabled.\n");
+    }
+
+    // dfs.client.use.legacy.blockreader.local must be set to true
+    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
+        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
+      errorCause.append(" is not enabled.\n");
+    }
+
+    // Server side checks
+    // Check data node server side configuration by reading the CONF from the data node
+    // web UI
+    String dnWebUiAddr = CONF.get(DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY,
+        DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_DEFAULT);
+    URL dnWebUiUrl = null;
+    try {
+      dnWebUiUrl = new URL("http://" + dnWebUiAddr + "/conf");
+    } catch (Exception e) {
+      LOG.info(e.toString());
+    }
+    Configuration dnConf = new Configuration(false);
+    dnConf.addResource(dnWebUiUrl);
+
+    // dfs.datanode.data.dir.perm should be at least 750
+    int permissionInt = 0;
+    try {
+      String permission = dnConf.get(DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY,
+          DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT);
+      permissionInt = Integer.parseInt(permission);
+    } catch (Exception e) {
+    }
+    if (permissionInt < 750) {
+      errorCause.append(prefix);
+      errorCause.append("Data node configuration ");
+      errorCause.append(DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY);
+      errorCause.append(" is not properly set. It should be set to 750.\n");
+    }
+
+    // dfs.block.local-path-access.user should contain the user account impala is running
+    // under
+    String accessUser = dnConf.get(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY);
+    if (accessUser == null || !accessUser.contains(System.getProperty("user.name"))) {
+      errorCause.append(prefix);
+      errorCause.append("Data node configuration ");
+      errorCause.append(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY);
+      errorCause.append(" is not properly set. It should contain ");
+      errorCause.append(System.getProperty("user.name"));
+      errorCause.append("\n");
+    }
+
     if (errorCause.length() > 0) {
       output.append(errorMessage);
       output.append(errorCause);
@@ -446,12 +663,33 @@ public class JniFrontend {
    * return an error string describing the issues.
    */
   private String checkBlockLocationTracking(Configuration conf) {
+    StringBuilder output = new StringBuilder();
+    String errorMessage = "ERROR: block location tracking is not properly enabled " +
+        "because\n";
+    String prefix = "  - ";
+    StringBuilder errorCause = new StringBuilder();
     if (!conf.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
         DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT)) {
-      return "ERROR: block location tracking is disabled because " +
-          DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED + " is not enabled.\n";
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED);
+      errorCause.append(" is not enabled.\n");
     }
-    return "";
+
+    // dfs.client.file-block-storage-locations.timeout should be >= 500
+    // TODO: OPSAPS-12765 - it should be >= 3000, but use 500 for now until CM refresh
+    if (conf.getInt(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT,
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_DEFAULT) < 500) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT);
+      errorCause.append(" is too low. It should be at least 3000.\n");
+    }
+
+    if (errorCause.length() > 0) {
+      output.append(errorMessage);
+      output.append(errorCause);
+    }
+
+    return output.toString();
   }
 
   public void resetCatalog() {

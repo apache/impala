@@ -4,6 +4,10 @@
     <name>dfs.datanode.hdfs-blocks-metadata.enabled</name>
     <value>true</value>
   </property>
+  <property>
+    <name>dfs.client.file-block-storage-locations.timeout</name>
+    <value>500</value>
+  </property>
 
   <!-- Configurations to enable short circuit reads -->
   <property>
