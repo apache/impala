@@ -14,9 +14,11 @@
 
 package com.cloudera.impala.analysis;
 
+import com.google.common.base.Preconditions;
+
 /**
- * Representation of a single column:value element in the PARTITION (...) clause of an insert
- * statement.
+ * Representation of a single column:value element in the PARTITION (...) clause of an
+ * insert or alter table statement.
  */
 public class PartitionKeyValue {
   // Name of partitioning column.
@@ -46,6 +48,20 @@ public class PartitionKeyValue {
   }
 
   public String toString() {
-    return colName + "=" + value.toSql();
+    return isStatic() ? colName + "=" + value.toSql() : colName;
+  }
+
+  /*
+   * Utility method that returns the string value for the given partition key. For
+   * NULL values (a NullLiteral type) this will return the given value for the null
+   * partition key.
+   */
+  public static String getPartitionKeyValueString(PartitionKeyValue partitionKeyValue, 
+      String nullPartitionKeyValue) {
+    Preconditions.checkNotNull(partitionKeyValue);
+    if (partitionKeyValue.getValue() instanceof NullLiteral) {
+      return nullPartitionKeyValue;
+    }
+    return partitionKeyValue.getValue().getStringValue();
   }
 }

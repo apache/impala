@@ -36,6 +36,10 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
   private final String location;
   private final List<PartitionKeyValue> partitionSpec;
 
+  // The value Hive is configured to use for NULL partition key values.
+  // Set during analysis.
+  private String nullPartitionKeyValue;
+
   public AlterTableSetLocationStmt(TableName tableName,
       List<PartitionKeyValue> partitionSpec, String location) {
     super(tableName);
@@ -53,6 +57,11 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     return partitionSpec;
   }
 
+  private String getNullPartitionKeyValue() {
+    Preconditions.checkNotNull(nullPartitionKeyValue);
+    return nullPartitionKeyValue;
+  }
+
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
@@ -60,8 +69,9 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     TAlterTableSetLocationParams locationParams =
         new TAlterTableSetLocationParams(location);
     for (PartitionKeyValue kv: partitionSpec) {
-      locationParams.addToPartition_spec(
-          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
+      String value =
+          PartitionKeyValue.getPartitionKeyValueString(kv, getNullPartitionKeyValue());
+      locationParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
     }
     params.setSet_location_params(locationParams);
     return params;
@@ -84,11 +94,12 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     }
 
     // If the table is partitioned it should be an HdfsTable
+    Preconditions.checkState(table instanceof HdfsTable);
     HdfsTable hdfsTable = (HdfsTable) table;   
-    Preconditions.checkNotNull(hdfsTable);
     if (hdfsTable.getPartition(partitionSpec) == null) {
       throw new AnalysisException("No matching partition spec found: (" + 
           Joiner.on(", ").join(partitionSpec) + ")");
     }
+    nullPartitionKeyValue = hdfsTable.getNullPartitionKeyValue();
   }
 }

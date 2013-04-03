@@ -850,6 +850,8 @@ public class ParserTest {
     ParsesOk("ALTER TABLE Foo ADD PARTITION (i=1)");
     ParsesOk("ALTER TABLE TestDb.Foo ADD IF NOT EXISTS PARTITION (i=1, s='Hello')");
     ParsesOk("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION '/a/b'");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (i=NULL)");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (i=NULL, j=2, k=NULL)");
 
     // Cannot use dynamic partition syntax
     ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (partcol)");
@@ -890,6 +892,8 @@ public class ParserTest {
   public void TestAlterTableDropPartition() {
     ParsesOk("ALTER TABLE Foo DROP PARTITION (i=1)");
     ParsesOk("ALTER TABLE TestDb.Foo DROP IF EXISTS PARTITION (i=1, s='Hello')");
+    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL)");
+    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL, j=2, k=NULL)");
 
     // Cannot use dynamic partition syntax
     ParserError("ALTER TABLE Foo DROP PARTITION (partcol)");

@@ -38,6 +38,10 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
   private final FileFormat fileFormat;
   private final List<PartitionKeyValue> partitionSpec;
 
+  // The value Hive is configured to use for NULL partition key values.
+  // Set during analysis.
+  private String nullPartitionKeyValue;
+
   public AlterTableSetFileFormatStmt(TableName tableName,
       List<PartitionKeyValue> partitionSpec, FileFormat fileFormat) {
     super(tableName); 
@@ -53,6 +57,11 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
     return partitionSpec;
   }
 
+  private String getNullPartitionKeyValue() {
+    Preconditions.checkNotNull(nullPartitionKeyValue);
+    return nullPartitionKeyValue;
+  }
+
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
@@ -60,8 +69,11 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
     TAlterTableSetFileFormatParams fileFormatParams =
         new TAlterTableSetFileFormatParams(fileFormat.toThrift());
     for (PartitionKeyValue kv: partitionSpec) {
+      String value =
+          PartitionKeyValue.getPartitionKeyValueString(kv, getNullPartitionKeyValue());
       fileFormatParams.addToPartition_spec(
-          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
+          new TPartitionKeyValue(kv.getColName(), value));
+      
     }
     params.setSet_file_format_params(fileFormatParams);
     return params;
@@ -84,11 +96,12 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
     }
 
     // If the table is partitioned it should be an HdfsTable
+    Preconditions.checkState(table instanceof HdfsTable);
     HdfsTable hdfsTable = (HdfsTable) table;   
-    Preconditions.checkNotNull(hdfsTable);
     if (hdfsTable.getPartition(partitionSpec) == null) {
       throw new AnalysisException("No matching partition spec found: (" + 
           Joiner.on(", ").join(partitionSpec) + ")");
     }
+    nullPartitionKeyValue = hdfsTable.getNullPartitionKeyValue();
   }
 }

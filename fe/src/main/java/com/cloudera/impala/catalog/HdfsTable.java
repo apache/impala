@@ -457,14 +457,23 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Returns the value Hive is configured to use for NULL partition key values.
+   * Set during load.
+   */
+  public String getNullPartitionKeyValue() {
+    return nullPartitionKeyValue;
+  }
+
+  /**
    * Gets the HdfsPartition matching the given partition spec. Returns null if no match
    * was found.
    */
   public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
-      partitionKeyValues.add(
-          new TPartitionKeyValue(kv.getColName(), kv.getValue().getStringValue()));
+      String value = kv.getValue() instanceof NullLiteral ?
+          getNullPartitionKeyValue() : kv.getValue().getStringValue();
+      partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
     }
     return getPartitionFromThriftPartitionSpec(partitionKeyValues);
   }
@@ -500,7 +509,6 @@ public class HdfsTable extends Table {
     // Now search through all the partitions and check if their partition key values match
     // the values being searched for. 
     for (HdfsPartition partition: getPartitions()) {
-      // Skip the default partition
       if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) { 
         continue;
       }
@@ -508,8 +516,9 @@ public class HdfsTable extends Table {
       Preconditions.checkState(partitionValues.size() == targetValues.size());
       boolean matchFound = true;
       for (int i = 0; i < targetValues.size(); ++i) {
-        if (!targetValues.get(i).equals(partitionValues.get(i)
-            .getStringValue().toLowerCase())) {
+        String value = partitionValues.get(i) instanceof NullLiteral ? 
+            getNullPartitionKeyValue() : partitionValues.get(i).getStringValue();
+        if (!targetValues.get(i).equals(value.toLowerCase())) {
           matchFound = false;
           break;
         }

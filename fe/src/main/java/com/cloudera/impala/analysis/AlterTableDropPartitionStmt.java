@@ -75,8 +75,9 @@ public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
     params.setAlter_type(TAlterTableType.DROP_PARTITION);
     TAlterTableDropPartitionParams addPartParams = new TAlterTableDropPartitionParams();
     for (PartitionKeyValue kv: partitionSpec) {
-      addPartParams.addToPartition_spec(
-          new TPartitionKeyValue(kv.getColName(),kv.getValue().getStringValue()));
+      String value =
+          PartitionKeyValue.getPartitionKeyValueString(kv, getNullPartitionKeyValue());
+      addPartParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
     }
     addPartParams.setIf_exists(ifExists);
     params.setDrop_partition_params(addPartParams);

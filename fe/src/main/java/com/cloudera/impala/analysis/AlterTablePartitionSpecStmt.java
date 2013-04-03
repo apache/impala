@@ -20,6 +20,7 @@ import java.util.ArrayList;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 
@@ -36,6 +37,10 @@ import com.google.common.collect.Sets;
 public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
   protected final List<PartitionKeyValue> partitionSpec;
 
+  // The value Hive is configured to use for NULL partition key values.
+  // Set during analysis.
+  private String nullPartitionKeyValue;
+
   public AlterTablePartitionSpecStmt(TableName tableName,
       List<PartitionKeyValue> partitionSpec) {
     super(tableName); 
@@ -45,6 +50,13 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
 
   public List<PartitionKeyValue> getPartitionSpec() {
     return partitionSpec;
+  }
+
+  // The value Hive is configured to use for NULL partition key values.
+  // Set during analysis.
+  protected String getNullPartitionKeyValue() {
+    Preconditions.checkNotNull(nullPartitionKeyValue);
+    return nullPartitionKeyValue;
   }
 
   @Override
@@ -88,6 +100,9 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
         throw new AnalysisException(String.format(
             "Column '%s' is not a partition column in table: %s",
              pk.getColName(), tableName));
+      } else if (pk.getValue() instanceof NullLiteral) {
+        // No need for further analysis checks of this partition key value.
+        continue;
       }
 
       PrimitiveType colType = c.getType();
@@ -107,5 +122,9 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
             pk.getValue().toSql(), colType.toString(), pk.getColName()));
       }
     }
+    // Only HDFS tables are partitioned.
+    Preconditions.checkState(table instanceof HdfsTable);
+    HdfsTable hdfsTable = (HdfsTable) table;
+    nullPartitionKeyValue = hdfsTable.getNullPartitionKeyValue();
   }
 }

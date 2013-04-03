@@ -227,21 +227,116 @@ alter table t_part add partition (j=1, s='2013')
 ---- RESULTS
 ====
 ---- QUERY
-insert overwrite table t_part partition(j=1, s='2012') select 2 from functional.alltypes limit 3
+insert overwrite table t_part partition(j=1, s='2012') select 2 from functional.alltypes limit 2
 ---- RESULTS
-j=1/s=2012/: 3
+j=1/s=2012/: 2
 ====
 ---- QUERY
-insert overwrite table t_part partition(j=1, s='2013') select 3 from functional.alltypes limit 2
+insert overwrite table t_part partition(j=1, s='2013') select 3 from functional.alltypes limit 3
 ---- RESULTS
-j=1/s=2013/: 2
+j=1/s=2013/: 3
 ====
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
 2,1,'2012'
 2,1,'2012'
+3,1,'2013'
+3,1,'2013'
+3,1,'2013'
+---- TYPES
+int,int,string
+====
+---- QUERY
+alter table t_part add partition (j=NULL, s='2013')
+---- RESULTS
+====
+---- QUERY
+alter table t_part add partition (j=NULL, s=NULL)
+---- RESULTS
+====
+#---- QUERY
+# This isn't currently working due to IMPALA-190
+#insert overwrite table t_part partition(j=NULL, s=NULL)
+#select 4 from functional.alltypes limit 4
+#---- RESULTS
+#j=1/s=2013/: 4
+#====
+#---- QUERY
+#select i, j, s from t_part
+#---- RESULTS
+#2,1,'2012'
+#2,1,'2012'
+#3,1,'2013'
+#3,1,'2013'
+#3,1,'2013'
+#4,NULL,NULL
+#4,NULL,NULL
+#4,NULL,NULL
+#4,NULL,NULL
+#4,NULL,NULL
+#---- TYPES
+#int,int,string
+#====
+#---- QUERY
+#insert overwrite table t_part partition(j=NULL, s='2013')
+#select 5 from functional.alltypes limit 5
+#---- RESULTS
+#j=1/s=2013/: 4
+#====
+#---- QUERY
+#select i, j, s from t_part
+#---- RESULTS
+#2,1,'2012'
+#2,1,'2012'
+#3,1,'2013'
+#3,1,'2013'
+#3,1,'2013'
+#4,NULL,'NULL'
+#4,NULL,'NULL'
+#4,NULL,'NULL'
+#4,NULL,'NULL'
+#4,NULL,'NULL'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#---- TYPES
+#int,int,string
+#====
+---- QUERY
+alter table t_part drop partition (j=NULL, s=NULL)
+---- RESULTS
+====
+#---- QUERY
+#select i, j, s from t_part
+#---- RESULTS
+#2,1,'2012'
+#2,1,'2012'
+#3,1,'2013'
+#3,1,'2013'
+#3,1,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#5,NULL,'2013'
+#---- TYPES
+#int,int,string
+#====
+---- QUERY
+alter table t_part drop partition (j=NULL, s='2013')
+---- RESULTS
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
 2,1,'2012'
+2,1,'2012'
+3,1,'2013'
 3,1,'2013'
 3,1,'2013'
 ---- TYPES
@@ -254,7 +349,6 @@ alter table t_part drop partition (j=1, s='2013')
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
-2,1,'2012'
 2,1,'2012'
 2,1,'2012'
 ---- TYPES
@@ -275,7 +369,6 @@ show tables like 't_part*'
 # should be able to read the same data from this table
 select i, j, s from t_part2
 ---- RESULTS
-2,1,'2012'
 2,1,'2012'
 2,1,'2012'
 ---- TYPES

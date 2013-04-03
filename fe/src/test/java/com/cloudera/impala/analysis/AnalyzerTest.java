@@ -1631,48 +1631,63 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestAlterTableAddPartition() throws AnalysisException {
-    // Add different partitions for different column types
-    AnalyzesOk("alter table functional.alltypes add partition(year=2050, month=10)");
-    AnalyzesOk("alter table functional.alltypes add partition(month=10, year=2050)");
-    AnalyzesOk(
-        "alter table functional.insert_string_partitioned add partition(s2='1234')");
+  public void TestAlterTableAddDropPartition() throws AnalysisException {
+    String[] addDrop = {"add", "drop"};
+    for (String kw: addDrop) { 
+      // Add different partitions for different column types
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=2050, month=10)");
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(month=10, year=2050)");
+      AnalyzesOk("alter table functional.insert_string_partitioned " + kw +
+          " partition(s2='1234')");
 
-    // Can't add partitions to unpartitioned tables
-    AnalysisError("alter table functional.alltypesnopart add partition (i=1)",
-        "Table is not partitioned: functional.alltypesnopart");
-    AnalysisError("alter table functional.hbasealltypesagg add partition (i=1)",
-        "Table is not partitioned: functional.hbasealltypesagg");
+      // Can't add/drop partitions to/from unpartitioned tables
+      AnalysisError("alter table functional.alltypesnopart " + kw + " partition (i=1)",
+          "Table is not partitioned: functional.alltypesnopart");
+      AnalysisError("alter table functional.hbasealltypesagg " + kw +
+          " partition (i=1)", "Table is not partitioned: functional.hbasealltypesagg");
 
-    // Duplicate partition key
-    AnalysisError("alter table functional.alltypes add partition(year=2050, year=2051)",
-        "Duplicate partition key name: year");
-    // Not a partition column
-    AnalysisError("alter table functional.alltypes add partition(year=2050, int_col=1)",
-        "Column 'int_col' is not a partition column in table: functional.alltypes");
+      // Duplicate partition key name
+      AnalysisError("alter table functional.alltypes " + kw +
+          " partition(year=2050, year=2051)", "Duplicate partition key name: year");
+      // Not a partition column
+      AnalysisError("alter table functional.alltypes " + kw +
+          " partition(year=2050, int_col=1)",
+          "Column 'int_col' is not a partition column in table: functional.alltypes");
 
-    // Not a valid column
-    AnalysisError("alter table functional.alltypes add partition(year=2050, blah=1)",
-        "Partition column 'blah' not found in table: functional.alltypes");
+      // Null partition values
+      AnalyzesOk(
+          "alter table functional.alltypes " + kw + " partition(year=NULL, month=1)");
+      AnalyzesOk(
+          "alter table functional.alltypes " + kw + " partition(year=NULL, month=NULL)");
 
-    // Data types don't match
-    AnalysisError(
-        "alter table functional.insert_string_partitioned add partition(s2=1234)",
-        "Target table not compatible.\nIncompatible types 'STRING' and 'SMALLINT' " +
-        "in column 's2'");
+      // Not a valid column
+      AnalysisError("alter table functional.alltypes " + kw +
+          " partition(year=2050, blah=1)",
+          "Partition column 'blah' not found in table: functional.alltypes");
 
-    // Loss of precision
-    AnalysisError(
-        "alter table functional.alltypes add partition(year=100000000000, month=10)",
-        "Partition key value may result in loss of precision.\nWould need to cast" +
-        " '100000000000' to 'INT' for partition column: year");
+      // Data types don't match
+      AnalysisError(
+          "alter table functional.insert_string_partitioned " + kw +
+          " partition(s2=1234)",
+          "Target table not compatible.\nIncompatible types 'STRING' and 'SMALLINT' " +
+          "in column 's2'");
+
+      // Loss of precision
+      AnalysisError(
+          "alter table functional.alltypes " + kw +
+          " partition(year=100000000000, month=10)",
+          "Partition key value may result in loss of precision.\nWould need to cast" +
+          " '100000000000' to 'INT' for partition column: year");
 
 
-    // Table/Db does not exist
-    AnalysisError("alter table db_does_not_exist.alltypes add partition (i=1)",
-        "Unknown database: db_does_not_exist");
-    AnalysisError("alter table functional.table_does_not_exist add partition (i=1)",
-        "Unknown table: functional.table_does_not_exist");
+      // Table/Db does not exist
+      AnalysisError("alter table db_does_not_exist.alltypes " + kw +
+          " partition (i=1)", "Unknown database: db_does_not_exist");
+      AnalysisError("alter table functional.table_does_not_exist " + kw +
+          " partition (i=1)", "Unknown table: functional.table_does_not_exist");
+    }
   }
 
   @Test
