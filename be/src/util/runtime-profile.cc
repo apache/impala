@@ -218,6 +218,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 
   // Add all the total times in all the children
   int64_t total_child_time = 0;
+  lock_guard<mutex> l(children_lock_);
   for (int i = 0; i < children_.size(); ++i) {
     total_child_time += children_[i].first->total_time_counter()->value();
   }
