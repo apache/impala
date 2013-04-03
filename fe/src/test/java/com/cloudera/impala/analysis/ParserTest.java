@@ -686,46 +686,42 @@ public class ParserTest {
    * @param overwrite
    *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
    */
-  private void testInsert(boolean overwrite) {
-    String qualifier = null;
-    if (overwrite) {
-      qualifier = "overwrite";
-    } else {
-      qualifier = "into";
-    }
+  private void testInsert(boolean overwrite, boolean use_kw_table) {
+    String qualifier = overwrite ? "overwrite" : "into";
+    qualifier = use_kw_table ? qualifier + " table" : qualifier;
+    
     // Entire unpartitioned table.
-    ParsesOk("insert " + qualifier + " table t select a from src where b > 5");
+    ParsesOk("insert " + qualifier + " t select a from src where b > 5");
     // Static partition with one partitioning key.
-    ParsesOk("insert " + qualifier + " table t partition (pk1=10) select a from src where b > 5");
+    ParsesOk(
+        "insert " + qualifier + " t partition (pk1=10) select a from src where b > 5");
     // Dynamic partition with one partitioning key.
-    ParsesOk("insert " + qualifier + " table t partition (pk1) select a from src where b > 5");
+    ParsesOk("insert " + qualifier + " t partition (pk1) select a from src where b > 5");
     // Static partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " table t partition (pk1=10, pk2=20) " +
+    ParsesOk("insert " + qualifier + " t partition (pk1=10, pk2=20) " +
         "select a from src where b > 5");
     // Fully dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " table t partition (pk1, pk2) " +
+    ParsesOk("insert " + qualifier + " t partition (pk1, pk2) " +
         "select a from src where b > 5");
     // Partially dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " table t partition (pk1=10, pk2) " +
+    ParsesOk("insert " + qualifier + " t partition (pk1=10, pk2) " +
         "select a from src where b > 5");
     // Partially dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " table t partition (pk1, pk2=20) " +
+    ParsesOk("insert " + qualifier + " t partition (pk1, pk2=20) " +
         "select a from src where b > 5");
     // Static partition with two NULL partitioning keys.
-    ParsesOk("insert " + qualifier + " table t partition (pk1=NULL, pk2=NULL) " +
+    ParsesOk("insert " + qualifier + " t partition (pk1=NULL, pk2=NULL) " +
         "select a from src where b > 5");
   }
 
   @Test public void TestInsert() {
     // Positive tests.
-    testInsert(true);
-    testInsert(false);
+    testInsert(true, false);
+    testInsert(true, true);
+    testInsert(false, false);
+    testInsert(false, true);
     // Missing 'overwrite/insert'.
     ParserError("insert table t select a from src where b > 5");
-    // Missing 'table'.
-    ParserError("insert overwrite t select a from src where b > 5");
-    // Missing 'table'.
-    ParserError("insert into t select a from src where b > 5");
     // Missing target table identifier.
     ParserError("insert overwrite table select a from src where b > 5");
     // Missing target table identifier.

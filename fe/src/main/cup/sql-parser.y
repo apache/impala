@@ -274,7 +274,9 @@ nonterminal String terminator_val;
 nonterminal String db_or_schema_kw;
 nonterminal String dbs_or_schemas_kw;
 // Used to simplify commands where KW_COLUMN is optional
-nonterminal String kw_column_or_empty;
+nonterminal String optional_kw_column;
+// Used to simplify commands where KW_TABLE is optional
+nonterminal String optional_kw_table;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -320,12 +322,17 @@ stmt ::=
   ;
 
 insert_stmt ::=
-  KW_INSERT KW_OVERWRITE KW_TABLE table_name:table
+  KW_INSERT KW_OVERWRITE optional_kw_table table_name:table
   partition_clause:list query_stmt:query
   {: RESULT = new InsertStmt(table, true, list, query); :}
-  | KW_INSERT KW_INTO KW_TABLE table_name:table
+  | KW_INSERT KW_INTO optional_kw_table table_name:table
   partition_clause:list query_stmt:query
   {: RESULT = new InsertStmt(table, false, list, query); :}
+  ;
+
+optional_kw_table ::=
+  KW_TABLE
+  | /* empty */
   ;
 
 alter_tbl_stmt ::=
@@ -337,9 +344,9 @@ alter_tbl_stmt ::=
   {: 
     RESULT = new AlterTableAddPartitionStmt(table, partition, location, if_not_exists);
   :}
-  | KW_ALTER KW_TABLE table_name:table KW_DROP kw_column_or_empty IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_DROP optional_kw_column IDENT:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
-  | KW_ALTER KW_TABLE table_name:table KW_CHANGE kw_column_or_empty IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_CHANGE optional_kw_column IDENT:col_name
     column_def:col_def
   {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
@@ -353,7 +360,7 @@ alter_tbl_stmt ::=
   {: RESULT = new AlterTableRenameStmt(table, new_table); :}
   ;
 
-kw_column_or_empty ::=
+optional_kw_column ::=
   KW_COLUMN
   | /* empty */
   ;
