@@ -18,6 +18,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/thread.hpp>
 #include <string>
 
 #include "exec/exec-node.h"
@@ -58,7 +59,7 @@ class HashJoinNode : public ExecNode {
 
  protected:
   void DebugString(int indentation_level, std::stringstream* out) const;
-  
+
  private:
   boost::scoped_ptr<HashTable> hash_tbl_;
   HashTable::Iterator hash_tbl_iterator_;
@@ -98,10 +99,10 @@ class HashJoinNode : public ExecNode {
   std::vector<int> build_tuple_idx_;
   int build_tuple_size_;
 
-  // byte size of result tuple row (sum of the tuple ptrs, not the tuple data).  
+  // byte size of result tuple row (sum of the tuple ptrs, not the tuple data).
   // This should be the same size as the probe tuple row.
   int result_tuple_row_size_;
-  
+
   // llvm function for build batch
   llvm::Function* codegen_process_build_batch_fn_;
 
@@ -109,7 +110,7 @@ class HashJoinNode : public ExecNode {
   // HashJoinNode::ProcessBuildBatch
   typedef void (*ProcessBuildBatchFn)(HashJoinNode*, RowBatch*);
   ProcessBuildBatchFn process_build_batch_fn_;
-  
+
   // llvm function object for probe batch
   llvm::Function* codegen_process_probe_batch_fn_;
 
@@ -117,7 +118,7 @@ class HashJoinNode : public ExecNode {
   typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);
   // Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
-  
+
   RuntimeProfile::Counter* build_timer_;   // time to build hash table
   RuntimeProfile::Counter* probe_timer_;   // time to probe
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
@@ -127,7 +128,17 @@ class HashJoinNode : public ExecNode {
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
-  // GetNext helper function for the common join cases: Inner join, left semi and left 
+  // Supervises ConstructHashTable in a separate thread, and
+  // returns its status in the promise parameter.
+  void BuildSideThread(RuntimeState* state, boost::promise<Status>* status);
+
+  // We parallelise building the build-side with Open'ing the
+  // probe-side. If, for example, the probe-side child is another
+  // hash-join node, it can start to build its own build-side at the
+  // same time.
+  Status ConstructHashTable(RuntimeState* state);
+
+  // GetNext helper function for the common join cases: Inner join, left semi and left
   // outer
   Status LeftJoinGetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
@@ -137,7 +148,7 @@ class HashJoinNode : public ExecNode {
   //    continue processing a batch in the middle
   //  max_added_rows: maximum rows that can be added to out_batch
   // return the number of rows added to out_batch
-  int ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch, int max_added_rows); 
+  int ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch, int max_added_rows);
 
   // Construct the build hash table, adding all the rows in 'build_batch'
   void ProcessBuildBatch(RowBatch* build_batch);
@@ -162,7 +173,7 @@ class HashJoinNode : public ExecNode {
   // hash table.
   // Returns NULL if codegen was not possible.
   llvm::Function* CodegenProcessBuildBatch(LlvmCodeGen*, llvm::Function* hash_fn);
-  
+
   // Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
   // hash_fn is the codegen'd function for computing hashes over tuple rows in the
   // hash table.
