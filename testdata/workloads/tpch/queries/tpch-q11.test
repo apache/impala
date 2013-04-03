@@ -18,7 +18,7 @@ RELOAD q11_sum_tmp
 ====
 ---- QUERY : TPCH-Q11_QUERY_2
 insert overwrite table q11_sum_tmp
-select sum(part_value) as total_value
+select round(sum(part_value), 1)
 from q11_part_tmp
 ---- SETUP
 RESET q11_part_tmp

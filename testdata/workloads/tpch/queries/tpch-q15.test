@@ -4,7 +4,7 @@
 insert overwrite table revenue
 select
   l_suppkey as supplier_no,
-  sum(l_extendedprice * (1 - l_discount)) as total_revenue
+  round(sum(l_extendedprice * (1 - l_discount)), 1)
 from lineitem
 where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
 group by l_suppkey
@@ -42,5 +42,5 @@ limit 100
 ---- TYPES
 bigint, string, string, string, double
 ---- RESULTS
-8449,'Supplier#000008449','Wp34zim9qYFbVctdW','20-469-856-8873',1772630
+8449,'Supplier#000008449','Wp34zim9qYFbVctdW','20-469-856-8873',1772627.2
 ====

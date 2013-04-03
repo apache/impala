@@ -233,7 +233,7 @@ Plan Fragment 0
   OUTPUT: MIN(ps_supplycost)
   GROUP BY: p_partkey
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
+    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -257,7 +257,7 @@ Plan Fragment 1
   OUTPUT: MIN(ps_supplycost)
   GROUP BY: p_partkey
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
+    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
       TUPLE IDS: 0 
 ====
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
@@ -292,9 +292,9 @@ Plan Fragment 0
         t1.p_partkey = t2.p_partkey
         t1.ps_supplycost = t2.ps_min_supplycost
       TUPLE IDS: 0 1 
-        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
+        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
           TUPLE IDS: 0 
-        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=5.94KB (1) compact
+        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB (1) compact
           TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -322,7 +322,7 @@ Plan Fragment 1
         t1.p_partkey = t2.p_partkey
         t1.ps_supplycost = t2.ps_min_supplycost
       TUPLE IDS: 0 1 
-        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=106.93KB (0)
+        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
           TUPLE IDS: 0 
         EXCHANGE (4)
           TUPLE IDS: 1 
@@ -333,7 +333,7 @@ Plan Fragment 2
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=5.94KB (1) compact
+  SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB (1) compact
     TUPLE IDS: 1 
 ====
 # Q3 - Shipping Priority Query
@@ -1810,7 +1810,7 @@ Plan Fragment 0
   OUTPUT: SUM(part_value)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q11_part_tmp #partitions=1 size=490.14KB (0)
+    SCAN HDFS table=tpch.q11_part_tmp #partitions=1 size=509.46KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -1834,7 +1834,7 @@ Plan Fragment 1
   OUTPUT: SUM(part_value)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q11_part_tmp #partitions=1 size=490.14KB (0)
+    SCAN HDFS table=tpch.q11_part_tmp #partitions=1 size=509.46KB (0)
       TUPLE IDS: 0 
 ====
 # Q12 - Shipping Mode and Order Priority Query
@@ -2264,7 +2264,7 @@ Plan Fragment 0
   OUTPUT: MAX(total_revenue)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue #partitions=1 size=125.70KB (0)
+    SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -2288,7 +2288,7 @@ Plan Fragment 1
   OUTPUT: MAX(total_revenue)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue #partitions=1 size=125.70KB (0)
+    SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (0)
       TUPLE IDS: 0 
 ====
 # Modifications - Added limit
@@ -2324,9 +2324,9 @@ Plan Fragment 0
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
               TUPLE IDS: 0 
-            SCAN HDFS table=tpch.revenue #partitions=1 size=125.70KB (1) compact
+            SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
               TUPLE IDS: 1 
-        SCAN HDFS table=tpch.max_revenue #partitions=1 size=12B (3) compact
+        SCAN HDFS table=tpch.max_revenue #partitions=1 size=10B (3) compact
           TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -2371,7 +2371,7 @@ Plan Fragment 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.max_revenue #partitions=1 size=12B (3) compact
+  SCAN HDFS table=tpch.max_revenue #partitions=1 size=10B (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
@@ -2380,7 +2380,7 @@ Plan Fragment 3
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.revenue #partitions=1 size=125.70KB (1) compact
+  SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
     TUPLE IDS: 1 
 ====
 # Q16 - Parts/Supplier Relation Query
@@ -2628,7 +2628,7 @@ Plan Fragment 0
             SCAN HDFS table=tpch.part #partitions=1 size=22.83MB (1) compact
               PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
               TUPLE IDS: 1 
-        SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.64MB (3) compact
+        SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.16MB (3) compact
           TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -2674,7 +2674,7 @@ Plan Fragment 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.64MB (3) compact
+  SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.16MB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
@@ -3632,7 +3632,7 @@ Plan Fragment 0
               SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (0)
                 PREDICATES: substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
                 TUPLE IDS: 0 
-              SCAN HDFS table=tpch.q22_customer_tmp1 #partitions=1 size=10B (1) compact
+              SCAN HDFS table=tpch.q22_customer_tmp1 #partitions=1 size=9B (1) compact
                 TUPLE IDS: 1 
           SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (3) compact
             TUPLE IDS: 2 
@@ -3708,6 +3708,6 @@ Plan Fragment 4
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.q22_customer_tmp1 #partitions=1 size=10B (1) compact
+  SCAN HDFS table=tpch.q22_customer_tmp1 #partitions=1 size=9B (1) compact
     TUPLE IDS: 1 
 ====

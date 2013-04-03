@@ -2,7 +2,7 @@
 ---- QUERY : TPCH-Q17_QUERY_1
 # Q17 - Small-Quantity-Order Revenue Query
 insert overwrite table lineitem_tmp
-select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
+select l_partkey as t_partkey, round(0.2 * avg(l_quantity), 2) as t_avg_quantity
 from lineitem
 group by l_partkey
 ---- SETUP

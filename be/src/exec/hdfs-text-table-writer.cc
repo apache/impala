@@ -65,6 +65,12 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
     TupleRow* current_row = all_rows ?
         batch->GetRow(row_idx) : batch->GetRow(row_group_indices[row_idx]);
     stringstream row_stringstream;
+
+    // The default stringstream output precision is not very high, making it impossible
+    // to properly output doubles (they get rounded to ints).  Set a more reasonable 
+    // precision.
+    row_stringstream.precision(RawValue::ASCII_PRECISION);
+
     // There might be a select expr for partition cols as well, but we shouldn't be
     // writing their values to the row. Since there must be at least
     // num_non_partition_cols select exprs, and we assume that by convention any

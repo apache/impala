@@ -7,7 +7,7 @@
 # and had to have a column to join on.
 insert overwrite table q22_customer_tmp1
 select
-  avg(c_acctbal) avg_acctbal,
+  round(avg(c_acctbal), 1) avg_acctbal,
   substr(c_name, 1, 1) as cust_name_char
 from customer c
 where
