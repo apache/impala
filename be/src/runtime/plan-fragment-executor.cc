@@ -56,8 +56,7 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     report_status_cb_(report_status_cb),
     report_thread_active_(false),
     done_(false),
-    prepared_(false),
-    data_sink_timer_(NULL) {
+    prepared_(false) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
@@ -138,7 +137,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
-  
+
   if (runtime_state_->llvm_codegen() != NULL) {
     // After prepare, all functions should have been code-generated.  At this point
     // we optimize all the functions.
@@ -164,17 +163,16 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   PrintVolumeIds(params.per_node_scan_ranges);
 
-  // set up sink, if required  
+  // set up sink, if required
   if (request.fragment.__isset.output_sink) {
     RETURN_IF_ERROR(DataSink::CreateDataSink(obj_pool(),
         request.fragment.output_sink, request.fragment.output_exprs, params,
         row_desc(), &sink_));
     RETURN_IF_ERROR(sink_->Init(runtime_state()));
-    
+
     RuntimeProfile* sink_profile = sink_->profile();
     if (sink_profile != NULL) {
       profile()->AddChild(sink_profile);
-      data_sink_timer_ = ADD_TIMER(sink_profile, "DataSinkTime");
     }
   } else {
     sink_.reset(NULL);
@@ -218,9 +216,9 @@ void PlanFragmentExecutor::PrintVolumeIds(
   }
   profile()->AddInfoString("Hdfs split stats (<volume id>:<# splits>/<split lengths>)",
      str.str());
-  
+
   VLOG_FILE << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
-            << query_id_ << ":\n" 
+            << query_id_ << ":\n"
             << str.str();
 }
 
@@ -271,7 +269,8 @@ Status PlanFragmentExecutor::OpenInternal() {
         VLOG_ROW << PrintRow(row, row_desc());
       }
     }
-    SCOPED_TIMER(data_sink_timer_);
+
+    SCOPED_TIMER(profile()->total_time_counter());
     RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
   }
 
@@ -285,10 +284,10 @@ Status PlanFragmentExecutor::OpenInternal() {
   // channel) in Close is safe.
 
   // TODO: If this returns an error, the d'tor will call Close again. We should
-  // audit the sinks to check that this is ok, or change that behaviour. 
+  // audit the sinks to check that this is ok, or change that behaviour.
   RETURN_IF_ERROR(sink_->Close(runtime_state()));
 
-  // Setting to NULL ensures that the d'tor won't double-close the sink. 
+  // Setting to NULL ensures that the d'tor won't double-close the sink.
   sink_.reset(NULL);
   done_ = true;
 
@@ -322,7 +321,7 @@ void PlanFragmentExecutor::ReportProfile() {
 
     // timed_wait can return because the timeout occurred or the condition variable
     // was signaled.  We can't rely on its return value to distinguish between the
-    // two cases (e.g. there is a race here where the wait timed out but before grabbing 
+    // two cases (e.g. there is a race here where the wait timed out but before grabbing
     // the lock, the condition variable was signaled).  Instead, we will use an external
     // flag, report_thread_active_, to coordinate this.
     stop_report_thread_cv_.timed_wait(l, timeout);
@@ -338,7 +337,7 @@ void PlanFragmentExecutor::ReportProfile() {
     if (!report_thread_active_) break;
     SendReport(false);
   }
-  
+
   VLOG_FILE << "exiting reporting thread: instance_id="
             << runtime_state_->fragment_instance_id();
 }

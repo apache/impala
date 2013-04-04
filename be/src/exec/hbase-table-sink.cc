@@ -43,6 +43,10 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
 }
 
 Status HBaseTableSink::Init(RuntimeState* state) {
+  runtime_profile_ = state->obj_pool()->Add(
+      new RuntimeProfile(state->obj_pool(), "HbaseTableSink"));
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   // Get the hbase table descriptor.  The table name will be used.
   table_desc_ = static_cast<HBaseTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
@@ -62,6 +66,7 @@ Status HBaseTableSink::Init(RuntimeState* state) {
 }
 
 Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Since everything is set up just forward everything to the writer.
   RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
   (*state->num_appended_rows())[""] += batch->num_rows();
@@ -69,6 +74,8 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status HBaseTableSink::Close(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   if (hbase_table_writer_.get() != NULL) {
     RETURN_IF_ERROR(hbase_table_writer_->Close(state));
     hbase_table_writer_.reset(NULL);

@@ -161,6 +161,12 @@ class DataStreamMgr {
     RuntimeProfile::Counter* bytes_received_counter_;
     RuntimeProfile::Counter* deserialize_row_batch_timer_;
 
+    // Time spent waiting until the first batch arrives
+    RuntimeProfile::Counter* first_batch_wait_timer_;
+
+    // Set to true when the first batch has been received
+    bool received_first_batch_;
+
     // Total time (summed across all threads) spent waiting for the
     // recv buffer to be drained so that new batches can be
     // added. Remote plan fragments are blocked for the same amount of

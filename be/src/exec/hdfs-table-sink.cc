@@ -75,6 +75,10 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
 }
 
 Status HdfsTableSink::Init(RuntimeState* state) {
+  runtime_profile_ = state->obj_pool()->Add(
+      new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   // TODO: Consider a system-wide random number generator, initialised in a single place.
   ptime now = microsec_clock::local_time();
   long seed = (now.time_of_day().seconds() * 1000)
@@ -165,8 +169,6 @@ Status HdfsTableSink::Init(RuntimeState* state) {
     return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
   }
 
-  runtime_profile_ = state->obj_pool()->Add(
-      new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
   rows_inserted_counter_ =
       ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
   memory_used_counter_ =
@@ -359,6 +361,8 @@ inline Status HdfsTableSink::GetOutputPartition(
 }
 
 Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   // If there are no partition keys then just pass the whole batch to one partition.
   if (dynamic_partition_key_exprs_.empty()) {
     // If there are no dynamic keys just use an empty key.
@@ -426,6 +430,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
 }
 
 Status HdfsTableSink::Close(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Close Hdfs files, and copy return stats to runtime state.
   for (PartitionMap::iterator cur_partition =
            partition_keys_to_output_partitions_.begin();

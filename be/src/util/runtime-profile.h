@@ -66,10 +66,10 @@ class ObjectPool;
 // Runtime profile is a group of profiling counters.  It supports adding named counters
 // and being able to serialize and deserialize them.
 // The profiles support a tree structure to form a hierarchy of counters.
-// Runtime profiles supports measuring wall clock rate based counters.  There is a 
+// Runtime profiles supports measuring wall clock rate based counters.  There is a
 // single thread per process that will convert an amount (i.e. bytes) counter to a
 // corresponding rate based counter.  This thread wakes up at fixed intervals and updates
-// all of the rate counters.  
+// all of the rate counters.
 // Thread-safe.
 class RuntimeProfile {
  public:
@@ -154,11 +154,11 @@ class RuntimeProfile {
   // relative to the parent.
   // If location is non-null, child will be inserted after location.  Location must
   // already be added to the profile.
-  void AddChild(RuntimeProfile* child, 
+  void AddChild(RuntimeProfile* child,
       bool indent = true, RuntimeProfile* location = NULL);
 
   // Merges the src profile into this one, combining counters that have an identical
-  // path. Info strings from profiles are not merged. 'src' would be a const if it 
+  // path. Info strings from profiles are not merged. 'src' would be a const if it
   // weren't for locking.
   // Calling this concurrently on two RuntimeProfiles in reverse order results in
   // undefined behavior.
@@ -178,7 +178,7 @@ class RuntimeProfile {
   // Add a derived counter with 'name'/'type'. The counter is owned by the
   // RuntimeProfile object.
   // Returns NULL if the counter already exists.
-  DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type, 
+  DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type,
       const DerivedCounterFunction& counter_fn);
 
   // Add a set of thread counters prefixed with 'prefix'. Returns a ThreadCounters object
@@ -253,8 +253,8 @@ class RuntimeProfile {
   // The rate counter has units in src_counter unit per second.
   Counter* AddRateCounter(const std::string& name, Counter* src_counter);
 
-  // Stops updating the value of 'rate_counter'. Rate counters are updated 
-  // periodically so should be removed as soon as the underlying amount counter is 
+  // Stops updating the value of 'rate_counter'. Rate counters are updated
+  // periodically so should be removed as soon as the underlying amount counter is
   // no longer going to change.
   void StopRateCounterUpdates(Counter* rate_counter);
 
@@ -264,13 +264,17 @@ class RuntimeProfile {
   void ComputeTimeInProfile();
 
  private:
-  // Pool for allocated counters
+  // Pool for allocated counters. Usually owned by the creator of this
+  // object, but occasionally allocated in the constructor.
   ObjectPool* pool_;
+
+  // True if we have to delete the pool_ on destruction.
+  bool own_pool_;
 
   // Name for this runtime profile.
   std::string name_;
 
-  // user-supplied, uninterpreted metadata.  
+  // user-supplied, uninterpreted metadata.
   int64_t metadata_;
 
   // Map from counter names to counters.  The profile owns the memory for the
@@ -312,7 +316,7 @@ class RuntimeProfile {
 
     // Lock protecting state below
     boost::mutex lock;
-    
+
     // If true, tear down the update thread.
     volatile bool done_;
 
@@ -327,7 +331,7 @@ class RuntimeProfile {
   // Singleton object that keeps track of all rate counters and the thread
   // for updating them.
   static RateCounterUpdateState rate_counters_state_;
-  
+
   // Create a subtree of runtime profiles from nodes, starting at *node_idx.
   // On return, *node_idx is the index one past the end of this subtree
   static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
@@ -336,8 +340,8 @@ class RuntimeProfile {
   // Update a subtree of profiles from nodes, rooted at *idx.
   // On return, *idx points to the node immediately following this subtree.
   void Update(const std::vector<TRuntimeProfileNode>& nodes, int* idx);
-  
-  // Helper function to compute compute the fraction of the total time spent in 
+
+  // Helper function to compute compute the fraction of the total time spent in
   // this profile and its children.
   // Called recusively.
   void ComputeTimeInProfile(int64_t total_time);
@@ -345,7 +349,7 @@ class RuntimeProfile {
   // Registers a rate counter to be updated by the update thread.
   // dst/src is assumed to be of compatible types.
   static void RegisterRateCounter(Counter* src_counter, Counter* dst_counter);
-  
+
   // Loop for rate counter update thread.  This thread wakes up once in a while
   // and updates all the added rate counters.
   static void RateCounterUpdateLoop();
@@ -374,8 +378,10 @@ class ScopedTimer {
 
   // Update counter when object is destroyed
   ~ScopedTimer() {
-    sw_.Stop();
-    if (counter_ != NULL) counter_->Update(sw_.ElapsedTime());
+    if (counter_ != NULL) {
+      sw_.Stop();
+      counter_->Update(sw_.ElapsedTime());
+    }
   }
 
  private:
@@ -409,10 +415,10 @@ class ThreadCounterMeasurement {
     int ret = getrusage(RUSAGE_THREAD, &usage);
     DCHECK_EQ(ret, 0);
     int64_t utime_diff =
-        (usage.ru_utime.tv_sec - usage_base_.ru_utime.tv_sec) * 1000L * 1000L * 1000L + 
+        (usage.ru_utime.tv_sec - usage_base_.ru_utime.tv_sec) * 1000L * 1000L * 1000L +
         (usage.ru_utime.tv_usec - usage_base_.ru_utime.tv_usec) * 1000L;
-    int64_t stime_diff = 
-        (usage.ru_stime.tv_sec - usage_base_.ru_stime.tv_sec) * 1000L * 1000L * 1000L + 
+    int64_t stime_diff =
+        (usage.ru_stime.tv_sec - usage_base_.ru_stime.tv_sec) * 1000L * 1000L * 1000L +
         (usage.ru_stime.tv_usec - usage_base_.ru_stime.tv_usec) * 1000L;
     counters_->total_time_->Update(sw_.ElapsedTime());
     counters_->user_time_->Update(utime_diff);

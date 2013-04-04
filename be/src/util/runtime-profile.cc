@@ -29,8 +29,8 @@ using namespace boost;
 using namespace std;
 
 namespace impala {
-  
-// Period to update rate counters in ms.  
+
+// Period to update rate counters in ms.
 static const int RATE_COUNTER_UPDATE_PERIOD = 500;
 
 // Thread counters name
@@ -44,6 +44,7 @@ RuntimeProfile::RateCounterUpdateState RuntimeProfile::rate_counters_state_;
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
+  own_pool_(false),
   name_(name),
   metadata_(-1),
   counter_total_time_(TCounterType::TIME_NS),
@@ -56,6 +57,7 @@ RuntimeProfile::~RuntimeProfile() {
   for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
     StopRateCounterUpdates(iter->second);
   }
+  if (own_pool_) delete pool_;
 }
 
 RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
@@ -79,7 +81,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   }
 
   profile->info_strings_ = node.info_strings;
-  
+
   ++*idx;
   for (int i = 0; i < node.num_children; ++i) {
     profile->AddChild(RuntimeProfile::CreateFromThrift(pool, nodes, idx));
@@ -108,7 +110,7 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
       }
     }
   }
-  
+
   {
     lock_guard<mutex> l(children_lock_);
     lock_guard<mutex> m(other->children_lock_);
@@ -161,11 +163,11 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       }
     }
   }
-  
+
   {
     lock_guard<mutex> l(info_strings_lock_);
     const InfoStrings& info_strings = node.info_strings;
-    for (InfoStrings::const_iterator it = info_strings.begin(); 
+    for (InfoStrings::const_iterator it = info_strings.begin();
         it != info_strings.end(); ++it) {
       info_strings_[it->first] = it->second;
     }
@@ -225,7 +227,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 
   int64_t local_time = total_time_counter()->value() - total_child_time;
   // Counters have some margin, set to 0 if it was negative.
-  local_time = ::max(0L, local_time); 
+  local_time = ::max(0L, local_time);
   local_time_percent_ = static_cast<double>(local_time) / total;
   local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
 
@@ -293,7 +295,7 @@ RuntimeProfile::Counter* RuntimeProfile::AddCounter(
 }
 
 RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
-    const std::string& name, TCounterType::type type, 
+    const std::string& name, TCounterType::type type,
     const DerivedCounterFunction& counter_fn) {
   lock_guard<mutex> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
@@ -359,14 +361,14 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     stream << "("
            << PrettyPrinter::Print(total_time->second->value(),
                total_time->second->type())
-           << " " << setprecision(2) << local_time_percent_ 
+           << " " << setprecision(2) << local_time_percent_
            << "%)";
   }
   stream << endl;
-  
+
   {
     lock_guard<mutex> l(info_strings_lock_);
-    for (InfoStrings::const_iterator it = info_strings_.begin(); 
+    for (InfoStrings::const_iterator it = info_strings_.begin();
         it != info_strings_.end(); ++it) {
       stream << prefix << "  " << it->first << ": " << it->second << endl;
     }
@@ -496,12 +498,12 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
   RegisterRateCounter(src_counter, dst_counter);
   return dst_counter;
 }
-  
+
 void RuntimeProfile::RegisterRateCounter(Counter* src_counter, Counter* dst_counter) {
   RateCounterInfo counter;
   counter.src_counter = src_counter;
   counter.elapsed_ms = 0;
-  
+
   lock_guard<mutex> l(rate_counters_state_.lock);
   if (rate_counters_state_.update_thread.get() == NULL) {
     rate_counters_state_.update_thread.reset(
@@ -537,8 +539,8 @@ void RuntimeProfile::RateCounterUpdateLoop() {
     int elapsed_ms = elapsed.total_milliseconds();
 
     lock_guard<mutex> l(rate_counters_state_.lock);
-    for (RateCounterUpdateState::RateCounterMap::iterator it = 
-        rate_counters_state_.counters.begin(); 
+    for (RateCounterUpdateState::RateCounterMap::iterator it =
+        rate_counters_state_.counters.begin();
         it != rate_counters_state_.counters.end(); ++it) {
       it->second.elapsed_ms += elapsed_ms;
       int64_t value = it->second.src_counter->value();

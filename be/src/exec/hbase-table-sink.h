@@ -61,6 +61,9 @@ class HBaseTableSink : public DataSink {
   // Owned by the RuntimeState.
   const std::vector<TExpr>& select_list_texprs_;
   std::vector<Expr*> output_exprs_;
+
+  // Allocated from runtime state's pool.
+  RuntimeProfile* runtime_profile_;
 };
 
 }  // namespace impala

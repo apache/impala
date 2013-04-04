@@ -258,9 +258,8 @@ class Coordinator {
   typedef boost::unordered_map<TUniqueId, BackendExecState*> BackendExecStateMap;
   BackendExecStateMap backend_exec_state_map_;
 
-  // Return executor_'s runtime state's object pool, if executor_ is set,
-  // otherwise return a local object pool.
-  ObjectPool* obj_pool();
+  // Returns a local object pool.
+  ObjectPool* obj_pool() { return obj_pool_.get(); }
 
   // True if execution has completed, false otherwise.
   bool execution_completed_;
@@ -300,8 +299,7 @@ class Coordinator {
   // string for the destination means that a file is to be deleted.
   FileMoveMap files_to_move_;
 
-  // Object pool used used only if no fragment is executing (otherwise
-  // we use the executor's object pool), use obj_pool() to access
+  // Object pool owned by the coordinator. Any executor will have its own pool.
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Aggregate counters for the entire query.
@@ -341,6 +339,9 @@ class Coordinator {
 
   // The set of hosts that the query will run on. Populated in Exec.
   boost::unordered_set<TNetworkAddress> unique_hosts_;
+
+  // Total time spent in finalization (typically 0 except for INSERT into hdfs tables)
+  RuntimeProfile::Counter* finalization_timer_;
 
   // Populates fragment_exec_params_.
   void ComputeFragmentExecParams(const TQueryExecRequest& exec_request);

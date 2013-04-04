@@ -142,7 +142,7 @@ class PlanFragmentExecutor {
   bool report_thread_active_;  // true if we started the thread
 
   // true if plan_->GetNext() indicated that it's done
-  bool done_; 
+  bool done_;
 
   // true if Prepare() returned OK
   bool prepared_;
@@ -165,10 +165,8 @@ class PlanFragmentExecutor {
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
 
-  // Number of rows returned by this fragment 
+  // Number of rows returned by this fragment
   RuntimeProfile::Counter* rows_produced_counter_;
-  // Time spent in data sink.
-  RuntimeProfile::Counter* data_sink_timer_;
 
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
@@ -193,7 +191,7 @@ class PlanFragmentExecutor {
   void UpdateStatus(const Status& status);
 
   // Executes Open() logic and returns resulting status. Does not set status_.
-  // If this plan fragment has no sink, OpenInternal() does nothing. 
+  // If this plan fragment has no sink, OpenInternal() does nothing.
   // If this plan fragment has a sink and OpenInternal() returns without an
   // error condition, all rows will have been sent to the sink, the sink will
   // have been closed, a final report will have been sent and the report thread will

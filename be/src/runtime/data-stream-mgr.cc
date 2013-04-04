@@ -53,6 +53,7 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
   buffer_full_wall_timer_ = ADD_TIMER(profile, "SendersBlockedWallTimer");
   buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer");
   data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
+  first_batch_wait_timer_ = ADD_TIMER(profile, "FirstBatchArrivalWaitTime");
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
@@ -61,6 +62,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
     VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
     SCOPED_TIMER(data_arrival_timer_);
+    SCOPED_TIMER(received_first_batch_ ? NULL : first_batch_wait_timer_);
     data_arrival_.wait(l);
   }
   if (is_cancelled_) {
@@ -72,6 +74,8 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
     DCHECK_EQ(num_remaining_senders_, 0);
     return NULL;
   }
+
+  received_first_batch_ = true;
 
   DCHECK(!batch_queue_.empty());
   RowBatch* result = batch_queue_.front().second;

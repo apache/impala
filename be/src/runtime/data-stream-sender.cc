@@ -323,12 +323,14 @@ DataStreamSender::~DataStreamSender() {
 
 Status DataStreamSender::Init(RuntimeState* state) {
   DCHECK(state != NULL);
+  profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
+  SCOPED_TIMER(profile_->total_time_counter());
+
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
   RETURN_IF_ERROR(Expr::Prepare(partition_exprs_, state, row_desc_));
 
-  profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
   uncompressed_bytes_counter_ =
@@ -341,6 +343,7 @@ Status DataStreamSender::Init(RuntimeState* state) {
 }
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile_->total_time_counter());
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()

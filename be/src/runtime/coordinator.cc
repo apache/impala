@@ -222,7 +222,7 @@ Coordinator::Coordinator(ExecEnv* exec_env)
     num_backends_(0),
     num_remaining_backends_(0),
     num_scan_ranges_(0),
-    obj_pool_(NULL) {
+    obj_pool_(new ObjectPool()) {
 }
 
 Coordinator::~Coordinator() {
@@ -320,13 +320,14 @@ Status Coordinator::Exec(
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
   } else {
     executor_.reset(NULL);
-    obj_pool_.reset(new ObjectPool());
   }
 
   // register coordinator's fragment profile now, before those of the backends,
   // so it shows up at the top
   aggregate_profile_ = obj_pool()->Add(
       new RuntimeProfile(obj_pool(), "Aggregate Profile"));
+  finalization_timer_ = ADD_TIMER(aggregate_profile_, "FinalizationTimer");
+
   query_profile_->AddChild(aggregate_profile_);
   if (executor_.get() != NULL) {
     query_profile_->AddChild(executor_->profile());
@@ -465,6 +466,7 @@ Status Coordinator::FinalizeQuery() {
   DCHECK(has_called_wait_);
   DCHECK(needs_finalization_);
 
+  SCOPED_TIMER(finalization_timer_);
   hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
 
   // TODO: If this process fails, the state of the table's data is left
@@ -569,6 +571,7 @@ Status Coordinator::WaitForAllBackends() {
 
 Status Coordinator::Wait() {
   lock_guard<mutex> l(wait_lock_);
+  SCOPED_TIMER(query_profile_->total_time_counter());
   if (has_called_wait_) return Status::OK;
   has_called_wait_ = true;
   if (executor_.get() != NULL) {
@@ -1022,11 +1025,6 @@ const RowDescriptor& Coordinator::row_desc() const {
 
 RuntimeState* Coordinator::runtime_state() {
   return executor_.get() == NULL ? NULL : executor_->runtime_state();
-}
-
-ObjectPool* Coordinator::obj_pool() {
-  return executor_.get() == NULL ? obj_pool_.get() :
-    executor_->runtime_state()->obj_pool();
 }
 
 bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
