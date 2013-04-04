@@ -25,10 +25,11 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-GzipCompressor::GzipCompressor(MemPool* mem_pool, bool reuse_buffer, Format format)
+GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer),
     format_(format) {
   bzero(&stream_, sizeof(stream_));
+  Init();
 }
 
 GzipCompressor::~GzipCompressor() {
@@ -52,6 +53,33 @@ Status GzipCompressor::Init() {
   return Status::OK;
 }
 
+int GzipCompressor::MaxCompressedLen(int input_length) {
+  return deflateBound(&stream_, input_length);
+}
+
+Status GzipCompressor::Compress(int input_length, uint8_t* input,
+    int* output_length, uint8_t* output) {
+  DCHECK_GE(*output_length, MaxCompressedLen(input_length));
+  stream_.next_in = reinterpret_cast<Bytef*>(input);
+  stream_.avail_in = input_length;
+  stream_.next_out = reinterpret_cast<Bytef*>(output);
+  stream_.avail_out = *output_length;
+
+  int ret = 0;
+  if ((ret = deflate(&stream_, Z_FINISH)) != Z_STREAM_END) {
+    stringstream ss;
+    ss << "zlib deflate failed: " << stream_.msg;
+    return Status(ss.str());
+  }
+
+  *output_length = *output_length - stream_.avail_out;
+
+  if (deflateReset(&stream_) != Z_OK) {
+    return Status("zlib deflateReset failed: " + string(stream_.msg));
+  }
+  return Status::OK;
+}
+
 Status GzipCompressor::ProcessBlock(int input_length, uint8_t* input,
                                     int* output_length, uint8_t** output) {
   // If length is set then the output has been allocated.
@@ -59,32 +87,16 @@ Status GzipCompressor::ProcessBlock(int input_length, uint8_t* input,
     buffer_length_ = *output_length;
     out_buffer_ = *output;
   } else {
-    int len = deflateBound(&stream_, input_length);
+    int len = MaxCompressedLen(input_length);
     if (!reuse_buffer_ || buffer_length_ < len || out_buffer_ == NULL) {
+      DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
       buffer_length_ = len;
       out_buffer_ = memory_pool_->Allocate(buffer_length_);
     }
   }
 
-  stream_.next_in = reinterpret_cast<Bytef*>(input);
-  stream_.avail_in = input_length;
-  stream_.next_out = reinterpret_cast<Bytef*>(out_buffer_);
-  stream_.avail_out = buffer_length_;
-
-  int ret = 0;
-  if ((ret = deflate(&stream_, Z_FINISH)) != Z_STREAM_END) {
-    stringstream ss;
-    ss << "zlib deflate failed: "
-       << (ret == Z_OK ? "buffer too small" : string(stream_.msg));
-    return Status(ss.str());
-  }
-
+  RETURN_IF_ERROR(Compress(input_length, input, output_length, out_buffer_));
   *output = out_buffer_;
-  *output_length = stream_.total_out;
-
-  if (deflateReset(&stream_) != Z_OK) {
-    return Status("zlib deflateReset failed: " + string(stream_.msg));
-  }
   return Status::OK;
 }
 
@@ -191,27 +203,38 @@ SnappyCompressor::SnappyCompressor(MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer) {
 }
 
+int SnappyCompressor::MaxCompressedLen(int input_length) {
+  return snappy::MaxCompressedLength(input_length);
+}
+
+Status SnappyCompressor::Compress(int input_len, uint8_t* input,
+    int *output_len, uint8_t* output) {
+  DCHECK_GE(*output_len, MaxCompressedLen(input_len));
+  size_t out_len;
+  snappy::RawCompress(reinterpret_cast<const char*>(input),
+      static_cast<size_t>(input_len),
+      reinterpret_cast<char*>(output), &out_len);
+  *output_len = out_len;
+  return Status::OK;
+}
+
 Status SnappyCompressor::ProcessBlock(int input_length, uint8_t* input,
                                       int *output_length, uint8_t** output) {
-  size_t length = snappy::MaxCompressedLength(input_length);
-  if (*output_length != 0 && *output_length < length) {
+  int max_compressed_len = MaxCompressedLen(input_length);
+  if (*output_length != 0 && *output_length < max_compressed_len) {
     return Status("ProcessBlock: output length too small");
   }
 
   if (*output_length != 0) {
     buffer_length_ = *output_length;
     out_buffer_ = *output;
-  } else if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < length) {
-    buffer_length_ = length;
+  } else if (!reuse_buffer_ || 
+      out_buffer_ == NULL || buffer_length_ < max_compressed_len) {
+    DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
+    buffer_length_ = max_compressed_len;
     out_buffer_ = memory_pool_->Allocate(buffer_length_);
     *output = out_buffer_;
   }
 
-  size_t out_len;
-  snappy::RawCompress(reinterpret_cast<const char*>(input),
-      static_cast<size_t>(input_length),
-      reinterpret_cast<char*>(out_buffer_), &out_len);
-
-  *output_length = out_len;
-  return Status::OK;
+  return Compress(input_length, input, output_length, out_buffer_);
 }

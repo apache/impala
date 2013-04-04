@@ -25,7 +25,9 @@
 
 namespace impala {
 
-// Create a compressor object.
+// Different compression classes.  The classes all expose the same API and
+// abstracts the underlying calls to the compression libraries.
+// TODO: reconsider the abstracted API
 
 class GzipCompressor : public Codec {
  public:
@@ -37,8 +39,19 @@ class GzipCompressor : public Codec {
   };
 
   // If gzip is set then we create gzip otherwise lzip.
-  GzipCompressor(MemPool* mem_pool, bool reuse_buffer, Format format);
+  GzipCompressor(Format format, MemPool* mem_pool = NULL, bool reuse_buffer = false);
+
   virtual ~GzipCompressor();
+
+  // Returns an upper bound on the max compressed length.
+  int MaxCompressedLen(int input_len);
+
+  // Compresses 'input' into 'output'.  Output must be preallocated and
+  // at least big enough.
+  // *output_length should be called with the length of the output buffer and on return
+  // is the length of the output.
+  Status Compress(int input_length, uint8_t* input, 
+      int* output_length, uint8_t* output);
 
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
@@ -87,12 +100,22 @@ class SnappyBlockCompressor : public Codec {
 
 class SnappyCompressor : public Codec {
  public:
-  SnappyCompressor(MemPool* mem_pool, bool reuse_buffer);
+  SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual ~SnappyCompressor() { }
 
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
+  
+  // Returns an upper bound on the max compressed length.
+  int MaxCompressedLen(int input_len);
+
+  // Compresses 'input' into 'output'.  Output must be preallocated and
+  // at least big enough.
+  // *output_length should be called with the length of the output buffer and on return
+  // is the length of the output.
+  Status Compress(int input_length, uint8_t* input, 
+      int* output_length, uint8_t* output);
 
  protected:
   // Snappy does not need initialization

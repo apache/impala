@@ -46,6 +46,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/timestamp-value.h"
 #include "statestore/simple-scheduler.h"
+#include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
@@ -97,6 +98,7 @@ DEFINE_string(default_query_options, "", "key=value pair of default query option
     " impalad, separated by ','");
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
                                  "the query log has unbounded size.");
+DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
 DEFINE_string(cdh_version, "", "The CDH version installed: 4.1, 4.2 or empty"
     " (system will try to determine the version)");
 
@@ -805,7 +807,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
     QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
     if (exec_state != query_exec_state_map_.end()) {
       if (base64_encoded) {
-        exec_state->second->profile().SerializeToBase64String(output);
+        exec_state->second->profile().SerializeToArchiveString(output);
       } else {
         exec_state->second->profile().PrettyPrint(output);
       }
@@ -893,7 +895,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << "<th>Profile</th>" << endl
             << "</tr>";
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
-    QueryStateRecord record(*exec_state.second, false);
+    QueryStateRecord record(*exec_state.second);
     RenderSingleQueryTableRow(record, false, output);
   }
 
@@ -1035,8 +1037,27 @@ void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
 }
 
 void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
+  string encoded_profile_str;
+
+  if (FLAGS_log_query_to_file) {
+    // GLOG chops logs off past the max log len.  Output the profile to the log
+    // in parts.
+    // TODO: is there a better way?
+    int max_output_len = google::LogMessage::kMaxLogMessageLen - 1000;
+    DCHECK_GT(max_output_len, 1000);
+    encoded_profile_str = query.profile().SerializeToArchiveString();
+    int num_lines = BitUtil::Ceil(encoded_profile_str.size(), max_output_len);
+    int encoded_str_len = encoded_profile_str.size();
+    for (int i = 0; i < num_lines; ++i) {
+      int len = ::min(max_output_len, encoded_str_len - i * max_output_len);
+      LOG(INFO) << "Query " << query.query_id() << " finished ("
+                << (i + 1) << "/" << num_lines << ") "
+                << string(encoded_profile_str.c_str() + i * max_output_len, len);
+    }
+  }
+
   if (FLAGS_query_log_size == 0) return;
-  QueryStateRecord record(query);
+  QueryStateRecord record(query, true, encoded_profile_str);
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
@@ -1902,7 +1923,7 @@ void ImpalaServer::MembershipCallback(
 }
 
 ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_state,
-    bool copy_profile) {
+    bool copy_profile, const string& encoded_profile) {
   id = exec_state.query_id();
   const TExecRequest& request = exec_state.exec_request();
 
@@ -1927,7 +1948,11 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
     stringstream ss;
     exec_state.profile().PrettyPrint(&ss);
     profile_str = ss.str();
-    encoded_profile_str = exec_state.profile().SerializeToBase64String();
+    if (encoded_profile.empty()) {
+      encoded_profile_str = exec_state.profile().SerializeToArchiveString();
+    } else {
+      encoded_profile_str = encoded_profile;
+    }
   }
 }
 

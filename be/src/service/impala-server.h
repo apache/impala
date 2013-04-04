@@ -644,7 +644,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),
     // otherwise leave this.profile empty.
-    QueryStateRecord(const QueryExecState& exec_state, bool copy_profile=true);
+    // If encoded_str is non-empty, it is the base64 encoded string for 
+    // exec_state->profile.
+    QueryStateRecord(const QueryExecState& exec_state, bool copy_profile = false,
+        const std::string& encoded_str = "");
   };
 
   // Helper method to render a single QueryStateRecord as an HTML table

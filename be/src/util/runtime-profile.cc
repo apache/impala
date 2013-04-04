@@ -15,6 +15,7 @@
 #include "util/runtime-profile.h"
 
 #include "common/object-pool.h"
+#include "util/compress.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/thrift-util.h"
@@ -26,7 +27,6 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/foreach.hpp>
-
 
 using namespace boost;
 using namespace std;
@@ -448,20 +448,31 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   }
 }
 
-string RuntimeProfile::SerializeToBase64String() const {
+string RuntimeProfile::SerializeToArchiveString() const {
   stringstream ss;
-  SerializeToBase64String(&ss);
+  SerializeToArchiveString(&ss);
   return ss.str();
 }
 
-void RuntimeProfile::SerializeToBase64String(stringstream* out) const {
+void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   TRuntimeProfileTree thrift_object;
   const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
   ThriftSerializer serializer(true);
-  std::vector<uint8_t> serialized_buffer;
+  vector<uint8_t> serialized_buffer;
   Status status = serializer.Serialize(&thrift_object, &serialized_buffer);
   if (!status.ok()) return;
-  Base64Encode(serialized_buffer, out);
+
+  // Compress the serialized thrift string.  This uses string keys and is very 
+  // easy to compress.
+  GzipCompressor compressor(GzipCompressor::ZLIB);
+  vector<uint8_t> compressed_buffer;
+  compressed_buffer.resize(compressor.MaxCompressedLen(serialized_buffer.size()));
+  int result_len = compressed_buffer.size();
+  compressor.Compress(serialized_buffer.size(), &serialized_buffer[0], &result_len,
+      &compressed_buffer[0]);
+  compressed_buffer.resize(result_len);
+
+  Base64Encode(compressed_buffer, out);
 }
 
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) {

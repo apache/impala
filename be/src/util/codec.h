@@ -105,6 +105,7 @@ class Codec {
   //   output_length: Length of the output, if known, 0 otherwise.  
   // Output:
   //   output: Pointer to processed data
+  // If this needs to allocate memory, a mempool must be passed into the c'tor.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output)  = 0;
 

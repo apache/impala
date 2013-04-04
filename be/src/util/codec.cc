@@ -91,13 +91,13 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
       *compressor = NULL;
       return Status::OK;
     case THdfsCompression::GZIP:
-      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::GZIP);
+      *compressor = new GzipCompressor(GzipCompressor::GZIP, mem_pool, reuse);
       break;
     case THdfsCompression::DEFAULT:
-      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::ZLIB);
+      *compressor = new GzipCompressor(GzipCompressor::ZLIB, mem_pool, reuse);
       break;
     case THdfsCompression::DEFLATE:
-      *compressor = new GzipCompressor(mem_pool, reuse, GzipCompressor::DEFLATE);
+      *compressor = new GzipCompressor(GzipCompressor::DEFLATE, mem_pool, reuse);
       break;
     case THdfsCompression::BZIP2:
       *compressor = new BzipCompressor(mem_pool, reuse);
