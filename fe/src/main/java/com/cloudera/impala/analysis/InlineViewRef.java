@@ -76,6 +76,14 @@ public class InlineViewRef extends TableRef {
     desc = analyzer.registerInlineViewRef(this);
     isAnalyzed = true;  // true now that we have assigned desc
 
+    // For constant selects we materialize its exprs into a tuple.
+    if (materializedTupleIds.isEmpty()) {
+      Preconditions.checkState(queryStmt instanceof SelectStmt);
+      Preconditions.checkState(((SelectStmt) queryStmt).getTableRefs().isEmpty());
+      desc.setIsMaterialized(true);
+      materializedTupleIds.add(desc.getId());
+    }
+
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
 

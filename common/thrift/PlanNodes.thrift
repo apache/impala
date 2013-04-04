@@ -164,11 +164,13 @@ struct TSortNode {
 }
 
 struct TMergeNode {
+  // A MergeNode could be the left input of a join and needs to know which tuple to write.
+  1: required Types.TTupleId tuple_id
   // List or expr lists materialized by this node.
   // There is one list of exprs per query stmt feeding into this merge node.
-  1: required list<list<Exprs.TExpr>> result_expr_lists
+  2: required list<list<Exprs.TExpr>> result_expr_lists
   // Separate list of expr lists coming from a constant select stmts.
-  2: required list<list<Exprs.TExpr>> const_expr_lists
+  3: required list<list<Exprs.TExpr>> const_expr_lists
 }
 
 struct TExchangeNode {

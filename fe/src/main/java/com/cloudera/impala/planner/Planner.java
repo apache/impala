@@ -946,8 +946,8 @@ public class Planner {
     // evaluated inside the subquery tree;
     // if it does contain a limit clause, it's not correct to have the view plan
     // evaluate predicates from the enclosing scope.
+    List<Predicate> conjuncts = Lists.newArrayList();
     if (!inlineViewRef.getViewStmt().hasLimitClause()) {
-      List<Predicate> conjuncts = Lists.newArrayList();
       for (Predicate p:
           analyzer.getUnassignedConjuncts(inlineViewRef.getMaterializedTupleIds())) {
         if (canEvalPredicate(inlineViewRef.getMaterializedTupleIds(), p, analyzer)) {
@@ -956,6 +956,21 @@ public class Planner {
       }
       inlineViewRef.getAnalyzer().registerConjuncts(conjuncts);
       analyzer.markConjunctsAssigned(conjuncts);
+    }
+
+    // Turn a constant select into a MergeNode that materializes the exprs.
+    QueryStmt viewStmt = inlineViewRef.getViewStmt();
+    if (viewStmt instanceof SelectStmt) {
+      SelectStmt selectStmt = (SelectStmt) viewStmt;
+      if (selectStmt.getTableRefs().isEmpty()) {
+        // Analysis should have generated a tuple id into which to materialize the exprs.
+        Preconditions.checkState(inlineViewRef.getMaterializedTupleIds().size() == 1);
+        MergeNode mergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator),
+            inlineViewRef.getMaterializedTupleIds().get(0));
+        mergeNode.getConstExprLists().add(selectStmt.getResultExprs());
+        mergeNode.getConjuncts().addAll(conjuncts);
+        return mergeNode;
+      }
     }
 
     return createQueryPlan(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer(), -1);
@@ -1056,10 +1071,10 @@ public class Planner {
       }
 
       Expr lhsExpr = null;
-      if (p.getChild(0).isBound(lhsIds)) {
-        lhsExpr = p.getChild(0);
-      } else if (p.getChild(1).isBound(lhsIds)) {
+      if (p.getChild(1).isBound(lhsIds)) {
         lhsExpr = p.getChild(1);
+      } else if (p.getChild(0).isBound(lhsIds)) {
+        lhsExpr = p.getChild(0);
       } else {
         // not an equi-join condition between lhsIds and rhsId
         continue;

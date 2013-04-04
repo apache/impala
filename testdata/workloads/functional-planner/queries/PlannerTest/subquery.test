@@ -1594,3 +1594,226 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
   LOCATIONS:
 ====
+# Constant selects in subqueries
+select * from (select 1, 2) x
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    SELECT CONSTANT
+====
+# Constant selects in subqueries with predicate
+select * from (select y from (select 1 y) a where y < 10) b
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    PREDICATES: 1 < 10
+    SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 0 
+    PREDICATES: 1 < 10
+    SELECT CONSTANT
+====
+# Union of constant selects in subquery
+# TODO: We could combine the merge nodes below.
+select * from (select 1 union all select 2 union all select * from (select 3) y) x
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  MERGE (0)
+    TUPLE IDS: 1 
+    SELECT CONSTANT
+    SELECT CONSTANT
+    MERGE (1)
+      TUPLE IDS: 0 
+      SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (2)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  MERGE (4)
+    TUPLE IDS: 1 
+    SELECT CONSTANT
+    SELECT CONSTANT
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  MERGE (3)
+    TUPLE IDS: 1 
+    MERGE (1)
+      TUPLE IDS: 0 
+      SELECT CONSTANT
+====
+# Inner join on inline views made up of constant selects
+select * from (select 1 a, 2 b) x
+inner join (select 1 a, 3 b) y on x.a = y.a
+inner join (select 1 a, 3 b) z on z.b = y.b
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      3 = 3
+    TUPLE IDS: 0 1 2 
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          1 = 1
+          3 = 3
+        TUPLE IDS: 0 1 
+          MERGE (0)
+            TUPLE IDS: 0 
+            PREDICATES: 1 = 1, 3 = 3
+            SELECT CONSTANT
+          MERGE (1)
+            TUPLE IDS: 1 
+            SELECT CONSTANT
+      MERGE (3)
+        TUPLE IDS: 2 
+        SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      3 = 3
+    TUPLE IDS: 0 1 2 
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          1 = 1
+          3 = 3
+        TUPLE IDS: 0 1 
+          MERGE (0)
+            TUPLE IDS: 0 
+            PREDICATES: 1 = 1, 3 = 3
+            SELECT CONSTANT
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (3)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (1)
+    TUPLE IDS: 1 
+    SELECT CONSTANT
+====
+# Semi and inner join on a table and on inline views made up of constant selects
+select * from functional.alltypessmall x
+left semi join (select 1 a, 3 b) y on y.a = x.id
+inner join (select 1 a, 3 b) z on z.b = y.b
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      3 = 3
+    TUPLE IDS: 0 1 2 
+      HASH JOIN
+        JOIN OP: LEFT SEMI JOIN
+        HASH PREDICATES:
+          x.id = 1
+          3 = 3
+        TUPLE IDS: 0 1 
+          SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+            PREDICATES: 1 = x.id
+            TUPLE IDS: 0 
+          MERGE (1)
+            TUPLE IDS: 1 
+            SELECT CONSTANT
+      MERGE (3)
+        TUPLE IDS: 2 
+        SELECT CONSTANT
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (7)
+    TUPLE IDS: 0 1 2 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      3 = 3
+    TUPLE IDS: 0 1 2 
+      HASH JOIN
+        JOIN OP: LEFT SEMI JOIN
+        HASH PREDICATES:
+          x.id = 1
+          3 = 3
+        TUPLE IDS: 0 1 
+          SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
+            PREDICATES: 1 = x.id
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (3)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (1)
+    TUPLE IDS: 1 
+    SELECT CONSTANT
+====

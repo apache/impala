@@ -26,13 +26,12 @@ namespace impala {
 MergeNode::MergeNode(ObjectPool* pool, const TPlanNode& tnode,
                      const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
+      tuple_id_(tnode.merge_node.tuple_id),
       const_result_expr_idx_(0),
       child_idx_(INVALID_CHILD_IDX),
       child_row_batch_(NULL),
       child_eos_(false),
       child_row_idx_(0) {
-  DCHECK_EQ(1, tnode.row_tuples.size());
-  tuple_id_ = tnode.row_tuples[0];
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
   DCHECK(status.ok())

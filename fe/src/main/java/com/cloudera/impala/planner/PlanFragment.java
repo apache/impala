@@ -56,7 +56,7 @@ import com.google.common.collect.Sets;
  */
 public class PlanFragment {
   private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
-  
+
   // root of plan tree executed by this fragment
   private PlanNode planRoot;
 

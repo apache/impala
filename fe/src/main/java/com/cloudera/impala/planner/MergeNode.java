@@ -54,13 +54,17 @@ public class MergeNode extends PlanNode {
   // Output tuple materialized by this node.
   protected final List<TupleDescriptor> tupleDescs = Lists.newArrayList();
 
+  protected final TupleId tupleId;
+
   protected MergeNode(PlanNodeId id, TupleId tupleId) {
     super(id, Lists.newArrayList(tupleId));
     this.rowTupleIds.add(tupleId);
+    this.tupleId = tupleId;
   }
 
   protected MergeNode(PlanNodeId id, MergeNode node) {
     super(id, node);
+    this.tupleId = node.tupleId;
   }
 
   public void addConstExprList(List<Expr> exprs) {
@@ -111,7 +115,7 @@ public class MergeNode extends PlanNode {
     for (List<Expr> constTexprList : constExprLists) {
       constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
-    msg.merge_node = new TMergeNode(texprLists, constTexprLists);
+    msg.merge_node = new TMergeNode(tupleId.asInt(), texprLists, constTexprLists);
     msg.node_type = TPlanNodeType.MERGE_NODE;
   }
 

@@ -85,11 +85,13 @@ public class DescriptorTable {
     TDescriptorTable result = new TDescriptorTable();
     HashSet<Table> referencedTbls = Sets.newHashSet();
     for (TupleDescriptor tupleD: tupleDescs.values()) {
-      // inline view has a non-materialized tuple descriptor in the descriptor table
-      // just for type checking, which we need to skip 
+      // inline view of a non-constant select has a non-materialized tuple descriptor
+      // in the descriptor table just for type checking, which we need to skip
       if (tupleD.getIsMaterialized()) {
         result.addToTupleDescriptors(tupleD.toThrift());
-        if (tupleD.getTable() != null) {
+        // an inline view of a constant select has a materialized tuple
+        // but its table has no id
+        if (tupleD.getTable() != null && tupleD.getTable().getId() != null) {
           referencedTbls.add(tupleD.getTable());
         }
         for (SlotDescriptor slotD: tupleD.getSlots()) {

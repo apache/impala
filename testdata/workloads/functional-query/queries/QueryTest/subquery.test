@@ -472,3 +472,48 @@ bigint, string, int, int, bigint, string, int
 1006,'Name6',94616,15000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
+# Constant selects in subqueries
+select * from (select 1, 2) x
+---- TYPES
+tinyint, tinyint
+---- RESULTS
+1,2
+====
+---- QUERY
+# Constant selects in subqueries
+select * from (select y from (select 1 y) a where y < 10) b
+---- TYPES
+tinyint
+---- RESULTS
+====
+---- QUERY
+# Constant selects in subqueries
+select * from (select 1 union all select 2 union all select * from (select 3) y) x
+---- TYPES
+tinyint
+---- RESULTS
+1
+2
+3
+====
+---- QUERY
+# Join on inline views made up of constant selects
+select * from (select 1 a, 2 b) x
+inner join (select 1 a, 3 b) y on x.a = y.a
+inner join (select 1 a, 3 b) z on z.b = y.b
+---- TYPES
+tinyint, tinyint, tinyint, tinyint, tinyint, tinyint
+---- RESULTS
+1,2,1,3,1,3
+====
+---- QUERY
+# Semi and inner join on a table and on inline views made up of constant selects
+select x.date_string_col, y.*, z.* from functional.alltypessmall x
+left semi join (select 1 a, 3 b) y on y.a = x.id
+inner join (select 1 a, 3 b) z on z.b = y.b
+---- TYPES
+string, tinyint, tinyint, tinyint, tinyint
+---- RESULTS
+'01/01/09',1,3,1,3
+====
