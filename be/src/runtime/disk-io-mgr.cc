@@ -504,7 +504,8 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
     shut_down_(false),
     total_bytes_read_counter_(TCounterType::BYTES),
     read_timer_(TCounterType::TIME_NS),
-    num_allocated_buffers_(0) {
+    num_allocated_buffers_(0),
+    num_buffers_in_readers_(0) {
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
 }
