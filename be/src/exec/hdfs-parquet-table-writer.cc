@@ -20,12 +20,14 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/bit-util.h"
+#include "util/buffer-builder.h"
 #include "util/hdfs-util.h"
 #include "util/integer-array.h"
 #include "util/rle-encoding.h"
 #include "util/thrift-util.h"
 
 #include <sstream>
+#include <snappy.h>
 
 #include "gen-cpp/ImpalaService_types.h"
 
@@ -50,11 +52,13 @@ using namespace apache::thrift;
 // This codegen is specific to the column expr (and type) and encoding.  The
 // parent writer object would combine all the generated AppendRow from all 
 // the columns and run that function over row batches.
+// TODO: we need to pass in the compression from the FE/metadata
 class HdfsParquetTableWriter::ColumnWriter {
  public:
   // expr - the expression to generate output values for this column.
   ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr) 
     : parent_(parent), expr_(expr), 
+      codec_(CompressionCodec::SNAPPY),    // Default to snappy compressed
       num_data_pages_(0), current_page_(NULL),
       num_values_(0),
       total_byte_size_(0) {
@@ -121,6 +125,11 @@ class HdfsParquetTableWriter::ColumnWriter {
     // Data for buffered values.  For non-bool columns, this is where the output
     // is accumulated.  For bool columns, this is a ptr into bool_values (no
     // memory is allocated for it).
+    uint8_t* values_buffer;
+
+    // This is the payload for the data page.  This includes the definition/repetition
+    // levels data and the encoded values.  If compression is enabled, this is the
+    // compressed data.
     uint8_t* data;
 
     // If true, this data page has been finalized.  All sizes are computed, header is
@@ -130,6 +139,10 @@ class HdfsParquetTableWriter::ColumnWriter {
 
   HdfsParquetTableWriter* parent_;
   Expr* expr_;
+
+  // Compression codec for this column
+  parquet::CompressionCodec::type codec_;
+  
   vector<DataPage> pages_;
 
   // Number of pages in 'pages_' that are used.  'pages_' is reused between flushes
@@ -187,7 +200,7 @@ inline int HdfsParquetTableWriter::ColumnWriter::EncodePlain(void* value) const 
   int len = 4;
   void* ptr = &int_val;
   uint8_t* dst_ptr = 
-      current_page_->data + current_page_->header.uncompressed_page_size;
+      current_page_->values_buffer + current_page_->header.uncompressed_page_size;
   
   // Special case bool and string
   switch (expr_->type()) {
@@ -257,17 +270,8 @@ Status HdfsParquetTableWriter::ColumnWriter::Flush(int64_t* file_pos) {
     RETURN_IF_ERROR(parent_->Write(buffer, len));
     *file_pos += len;
 
-    // Write definition (null) data.  
-    RETURN_IF_ERROR(parent_->Write<int32_t>(page.def_levels->len()));
-    RETURN_IF_ERROR(parent_->Write(page.def_levels->buffer(), page.def_levels->len()));
-    
-    // TODO: write repetition data when we support nested types.
-
     // Write the page data
-    DCHECK_GE(page.header.compressed_page_size, page.num_def_bytes);
-    RETURN_IF_ERROR(parent_->Write(page.data, 
-        page.header.compressed_page_size - page.num_def_bytes));
-
+    RETURN_IF_ERROR(parent_->Write(page.data, page.header.compressed_page_size));
     *file_pos += page.header.compressed_page_size;
   }
   return Status::OK;
@@ -290,15 +294,54 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   current_page_->def_levels->Flush();
   current_page_->num_def_bytes = sizeof(int32_t) + current_page_->def_levels->len();
   current_page_->header.uncompressed_page_size += current_page_->num_def_bytes;
-  // TODO: compress data here
-  current_page_->header.compressed_page_size = 
-      current_page_->header.uncompressed_page_size;
+
+  // At this point we know all the data for the data page.  Combine them into one
+  // buffer
+  char* uncompressed_data = NULL;
+  if (codec_ == CompressionCodec::UNCOMPRESSED) {
+    uncompressed_data = reinterpret_cast<char*>(parent_->col_mem_pool_->Allocate(
+        current_page_->header.uncompressed_page_size));
+  } else {
+    // We have compression.  Combine into the staging buffer.
+    parent_->compression_staging_buffer_.resize(
+        current_page_->header.uncompressed_page_size);
+    uncompressed_data = reinterpret_cast<char*>(&parent_->compression_staging_buffer_[0]);
+  }
+
+  BufferBuilder buffer(uncompressed_data, current_page_->header.uncompressed_page_size);
+  
+  // Copy the definition (null) data
+  int num_def_level_bytes = current_page_->def_levels->len();
+  
+  buffer.Append(num_def_level_bytes);
+  buffer.Append(current_page_->def_levels->buffer(), num_def_level_bytes);
+  // TODO: copy repetition data when we support nested types.
+  buffer.Append(current_page_->values_buffer, buffer.capacity() - buffer.size());
+
+  if (codec_ != CompressionCodec::UNCOMPRESSED) {
+    DCHECK_EQ(codec_, CompressionCodec::SNAPPY);
+    int max_compressed_size = 
+        snappy::MaxCompressedLength(current_page_->header.uncompressed_page_size);
+    uint8_t* compressed_data = parent_->col_mem_pool_->Allocate(max_compressed_size);
+    size_t compressed_size;
+    snappy::RawCompress(uncompressed_data, current_page_->header.uncompressed_page_size,
+        reinterpret_cast<char*>(compressed_data), &compressed_size);
+
+    current_page_->data = compressed_data;
+    current_page_->header.compressed_page_size = compressed_size;
+  } else {
+    current_page_->data = reinterpret_cast<uint8_t*>(uncompressed_data);
+    current_page_->header.compressed_page_size = 
+        current_page_->header.uncompressed_page_size;
+  }
+
   bytes_added += current_page_->num_def_bytes;
     
   // Add the size of the data page header
-  uint8_t* buffer;
+  uint8_t* header_buffer;
   uint32_t header_len = 0;
-  parent_->thrift_serializer_->Serialize(&current_page_->header, &header_len, &buffer);
+  parent_->thrift_serializer_->Serialize(
+      &current_page_->header, &header_len, &header_buffer);
   bytes_added += header_len;
 
   current_page_->finalized = true;
@@ -331,14 +374,13 @@ void HdfsParquetTableWriter::ColumnWriter::NewPage() {
       current_page_->bool_values = parent_->state_->obj_pool()->Add(
           new IntegerArrayBuilder(
               1, DATA_PAGE_SIZE, parent_->col_mem_pool_.get()));
-      current_page_->data = current_page_->bool_values->array();
+      current_page_->values_buffer = current_page_->bool_values->array();
     } else {
       current_page_->bool_values = NULL;
-      current_page_->data = parent_->col_mem_pool_->Allocate(DATA_PAGE_SIZE);
+      current_page_->values_buffer = parent_->col_mem_pool_->Allocate(DATA_PAGE_SIZE);
     }
     current_page_->header.__set_data_page_header(header);
   }
-  DCHECK(current_page_ != NULL);
   current_page_->finalized = false;
 }
 
@@ -402,7 +444,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
     metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_->type()];
     metadata.encodings.push_back(Encoding::PLAIN);
     metadata.path_in_schema.push_back(table_desc_->col_names()[i + num_clustering_cols]);
-    metadata.codec = CompressionCodec::UNCOMPRESSED;
+    metadata.codec = columns_[i]->codec_;
     current_row_group_->columns[i].__set_meta_data(metadata);
   }
 

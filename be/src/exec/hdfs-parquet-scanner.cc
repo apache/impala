@@ -33,6 +33,8 @@
 #include "util/runtime-profile.h"
 #include "util/thrift-util.h"
 
+#include <snappy.h>
+
 using namespace std;
 using namespace boost;
 using namespace impala;
@@ -82,6 +84,7 @@ class HdfsParquetScanner::ColumnReader {
   ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc) 
     : parent_(parent),
       desc_(desc),
+      decompressed_data_pool_(new MemPool()),
       num_buffered_values_(0) {
   }
 
@@ -107,6 +110,9 @@ class HdfsParquetScanner::ColumnReader {
 
   const parquet::ColumnMetaData* metadata_;
   ScannerContext::Stream* stream_;
+
+  // Pool to allocate decompression buffers from.
+  boost::scoped_ptr<MemPool> decompressed_data_pool_;
 
   // Header for current data page.
   parquet::PageHeader current_page_header_;
@@ -137,6 +143,8 @@ Status HdfsParquetScanner::Prepare() {
     column_readers_[i] = scan_node_->runtime_state()->obj_pool()->Add(
         new ColumnReader(this, scan_node_->materialized_slots()[i]));
   }
+  
+  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
 
   return Status::OK;
 }
@@ -155,6 +163,10 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
   uint8_t* buffer;
   int num_bytes;
   bool eos;
+
+  // We're about to move to the next data page.  The previous data page is 
+  // now complete, pass along the memory allocated for it.
+  parent_->context_->AcquirePool(decompressed_data_pool_.get());
 
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
@@ -201,6 +213,27 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
 
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
+
+    if (metadata_->codec == parquet::CompressionCodec::SNAPPY) {
+      SCOPED_TIMER(parent_->decompress_timer_);
+      size_t uncompressed_size;
+      bool success = snappy::GetUncompressedLength(reinterpret_cast<const char*>(data_),
+          current_page_header_.compressed_page_size, &uncompressed_size);
+      if (!success || uncompressed_size != current_page_header_.uncompressed_page_size) {
+        return Status("Corrupt data page");
+      }
+
+      uint8_t* decompressed_buffer = 
+          decompressed_data_pool_->Allocate(uncompressed_size);
+      success = snappy::RawUncompress(reinterpret_cast<const char*>(data_), 
+          current_page_header_.compressed_page_size, 
+          reinterpret_cast<char*>(decompressed_buffer));
+      if (!success) return Status("Corrupt data page");
+      data_ = decompressed_buffer;
+    } else {
+      // TODO: handle the other codecs.
+      DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
+    }
     
     // Initialize the definition level data
     int32_t num_definition_bytes = 0;
@@ -509,9 +542,11 @@ Status HdfsParquetScanner::InitColumns() {
     DCHECK(stream != NULL);
     column_readers_[i]->stream_ = stream;
 
-    if (scan_node_->materialized_slots()[i]->type() != TYPE_STRING) {
-      // Non-string types are always compact.  This lets us recycle buffers
-      // more efficiently.
+    if (scan_node_->materialized_slots()[i]->type() != TYPE_STRING ||
+        col_chunk.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
+      // Non-string types are always compact.  Compressed columns don't reference data
+      // in the io buffers after tuple materialization.  In both cases, we can set compact
+      // to true and recycle buffers more promptly.
       stream->set_compact_data(true);
     }
 
@@ -558,6 +593,15 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
          << encodings[i] << " for column " << col_idx;
       return Status(ss.str());
     }
+  }
+
+  // Check the compression is supported
+  if (file_data.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED &&
+      file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY) {
+    stringstream ss;
+    ss << "File " << stream_->filename() << " uses an unsupported compression: " 
+        << file_data.meta_data.codec << " for column " << col_idx;
+    return Status(ss.str());
   }
 
   // Check the type in the file is compatible with the catalog metadata.

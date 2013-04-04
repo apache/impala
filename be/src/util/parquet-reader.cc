@@ -16,6 +16,7 @@
 #include <sstream>
 #include <vector>
 #include <gflags/gflags.h>
+#include <snappy.h>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/TApplicationException.h>
@@ -214,8 +215,12 @@ int main(int argc, char** argv) {
   int pages_read = 0;
   int num_rows = 0;
   int total_page_header_size = 0;
-  int total_column_data_size = 0;
+  int total_compressed_data_size = 0;
+  int total_uncompressed_data_size = 0;
   vector<int> column_sizes;
+
+  // Buffer to decompress data into.  Reused across pages.
+  vector<char> decompression_buffer;
 
   for (int i = 0; i < file_metadata.row_groups.size(); ++i) {
     cerr << "Reading row group " << i << endl;
@@ -231,6 +236,13 @@ int main(int argc, char** argv) {
       
       uint8_t* col_end = buffer + col.file_offset;
       uint8_t* data = buffer + col.meta_data.data_page_offset;
+
+      CompressionCodec::type codec = col.meta_data.codec;
+      if (codec != CompressionCodec::UNCOMPRESSED &&
+          codec != CompressionCodec::SNAPPY) {
+        cerr << "Unsupported compression codec: " << codec;
+        assert(false);
+      }
       
       // Loop through the entire column chunk.  This lets us walk all the pages.
       while (data < col_end) {
@@ -244,7 +256,8 @@ int main(int argc, char** argv) {
         data += header_size;
         total_page_header_size += header_size;
         column_sizes[c] += header.compressed_page_size;
-        total_column_data_size += header.compressed_page_size;
+        total_compressed_data_size += header.compressed_page_size;
+        total_uncompressed_data_size += header.uncompressed_page_size;
 
         // Skip non-data or non-plain encoding
         if (header.type != PageType::DATA_PAGE || 
@@ -257,10 +270,26 @@ int main(int argc, char** argv) {
 
         int num_values = header.data_page_header.num_values;
         if (c == 0) num_rows += num_values;
+        
+        uint8_t* data_page_data = data;
 
-        int32_t num_definition_bytes = *reinterpret_cast<int32_t*>(data);
-        uint8_t* definition_data = data + sizeof(int32_t);
-        uint8_t* values = data + num_definition_bytes + sizeof(int32_t);
+        // Decompress if necessary
+        if (codec == CompressionCodec::SNAPPY) {
+          size_t uncompressed_size;
+          bool success = snappy::GetUncompressedLength(reinterpret_cast<const char*>(data), 
+              header.compressed_page_size, &uncompressed_size);
+          assert(success);
+          assert(uncompressed_size == header.uncompressed_page_size);
+          decompression_buffer.resize(uncompressed_size);
+          success = snappy::RawUncompress(reinterpret_cast<const char*>(data), 
+              header.compressed_page_size, &decompression_buffer[0]);
+          assert(success);
+          data_page_data = reinterpret_cast<uint8_t*>(&decompression_buffer[0]);
+        }
+
+        int32_t num_definition_bytes = *reinterpret_cast<int32_t*>(data_page_data);
+        uint8_t* definition_data = data_page_data + sizeof(int32_t);
+        uint8_t* values = data_page_data + num_definition_bytes + sizeof(int32_t);
     
         int num_output_values = num_values;
         if (FLAGS_values_per_data_page >= 0) {
@@ -302,6 +331,8 @@ int main(int argc, char** argv) {
       assert(data == col_end);
     }
   }
+  double compression_ratio = 
+      (double)total_uncompressed_data_size / total_compressed_data_size;
   stringstream ss;
   ss << "\nSummary:\n"
      << "  Rows: " << num_rows << endl
@@ -311,8 +342,10 @@ int main(int argc, char** argv) {
      << "(" << (metadata_len / (double)file_len) << ")" << endl
      << "  Total page header size: " << total_page_header_size 
      << "(" << (total_page_header_size / (double)file_len) << ")" << endl;
-  ss << "  Column byte sizes: " << total_column_data_size 
-     << "(" << (total_column_data_size / (double)file_len) << ")" << endl;
+  ss << "  Column compressed size: " << total_compressed_data_size 
+     << "(" << (total_compressed_data_size / (double)file_len) << ")" << endl;
+  ss << "  Column uncompressed size: " << total_uncompressed_data_size  
+     << "(" << compression_ratio << ")" << endl;
   for (int i = 0; i < column_sizes.size(); ++i) {
     ss << "    " << "Col " << i << ": " << column_sizes[i]
        << "(" << (column_sizes[i] / (double)file_len) << ")" << endl;

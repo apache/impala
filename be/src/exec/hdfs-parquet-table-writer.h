@@ -76,10 +76,10 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   static const int DATA_PAGE_SIZE = 64 * 1024;
 
   // Default row group size.  In bytes.
-  static const int ROW_GROUP_SIZE = 256 * 1024 * 1024;
+  static const int ROW_GROUP_SIZE = 1024 * 1024 * 1024;
 
   // Default hdfs block size.  In Bytes.
-  static const int HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
+  static const int HDFS_BLOCK_SIZE = 1024 * 1024 * 1024;
 
   // Minimum file size.  If the configured size is less, fail.
   static const int HDFS_MIN_FILE_SIZE = 8 * 1024 * 1024;
@@ -106,7 +106,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // Adds a row group to the metadata and updates current_row_group_ to the
   // new row group.  current_row_group_ will be flushed.
   Status AddRowGroup();
-  
+
   // Thrift serializer utility object.  Reusing this object allows for
   // fewer memory allocations.
   boost::scoped_ptr<ThriftSerializer> thrift_serializer_;
@@ -143,6 +143,10 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // calls since the writer may stop in the middle of a row batch and ask for a new
   // file.
   int row_idx_;
+    
+  // Staging buffer to use to compress data.  This is used only if compression is
+  // enabled and is reused between all data pages.
+  std::vector<uint8_t> compression_staging_buffer_;
 };
 
 }

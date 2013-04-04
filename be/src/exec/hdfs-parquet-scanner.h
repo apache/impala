@@ -75,6 +75,9 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
+  
+  // Time spent decompressing bytes
+  RuntimeProfile::Counter* decompress_timer_;
 
   // Reads data from all the columns (in parallel) and assembles rows into the context
   // object.
