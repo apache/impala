@@ -255,78 +255,75 @@ alter table t_part add partition (j=NULL, s='2013')
 alter table t_part add partition (j=NULL, s=NULL)
 ---- RESULTS
 ====
-#---- QUERY
-# This isn't currently working due to IMPALA-190
-#insert overwrite table t_part partition(j=NULL, s=NULL)
-#select 4 from functional.alltypes limit 4
-#---- RESULTS
-#j=1/s=2013/: 4
-#====
-#---- QUERY
-#select i, j, s from t_part
-#---- RESULTS
-#2,1,'2012'
-#2,1,'2012'
-#3,1,'2013'
-#3,1,'2013'
-#3,1,'2013'
-#4,NULL,NULL
-#4,NULL,NULL
-#4,NULL,NULL
-#4,NULL,NULL
-#4,NULL,NULL
-#---- TYPES
-#int,int,string
-#====
-#---- QUERY
-#insert overwrite table t_part partition(j=NULL, s='2013')
-#select 5 from functional.alltypes limit 5
-#---- RESULTS
-#j=1/s=2013/: 4
-#====
-#---- QUERY
-#select i, j, s from t_part
-#---- RESULTS
-#2,1,'2012'
-#2,1,'2012'
-#3,1,'2013'
-#3,1,'2013'
-#3,1,'2013'
-#4,NULL,'NULL'
-#4,NULL,'NULL'
-#4,NULL,'NULL'
-#4,NULL,'NULL'
-#4,NULL,'NULL'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#---- TYPES
-#int,int,string
-#====
+---- QUERY
+insert overwrite table t_part partition(j=NULL, s=NULL)
+select 4 from functional.alltypes limit 5
+---- RESULTS
+j=__HIVE_DEFAULT_PARTITION__/s=__HIVE_DEFAULT_PARTITION__/: 5
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+3,1,'2013'
+3,1,'2013'
+3,1,'2013'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+---- TYPES
+int,int,string
+====
+---- QUERY
+insert overwrite table t_part partition(j=NULL, s='2013')
+select 5 from functional.alltypes limit 5
+---- RESULTS
+j=__HIVE_DEFAULT_PARTITION__/s=2013/: 5
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+3,1,'2013'
+3,1,'2013'
+3,1,'2013'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+4,NULL,'NULL'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+---- TYPES
+int,int,string
+====
 ---- QUERY
 alter table t_part drop partition (j=NULL, s=NULL)
 ---- RESULTS
 ====
-#---- QUERY
-#select i, j, s from t_part
-#---- RESULTS
-#2,1,'2012'
-#2,1,'2012'
-#3,1,'2013'
-#3,1,'2013'
-#3,1,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#5,NULL,'2013'
-#---- TYPES
-#int,int,string
-#====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+2,1,'2012'
+2,1,'2012'
+3,1,'2013'
+3,1,'2013'
+3,1,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+5,NULL,'2013'
+---- TYPES
+int,int,string
+====
 ---- QUERY
 alter table t_part drop partition (j=NULL, s='2013')
 ---- RESULTS

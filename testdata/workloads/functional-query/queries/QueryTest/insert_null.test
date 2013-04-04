@@ -26,3 +26,122 @@ string
 ---- RESULTS
 '\N,,NULL,\\N,\N'
 ====
+---- QUERY
+# Test NULL partition keys using static partition insert. Both partitions keys are NULL.
+insert overwrite table alltypesinsert
+partition(year=NULL, month=NULL)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- RESULTS
+year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/: 25
+====
+---- QUERY
+# Verify contents of alltypesinsert.
+select count(*) from alltypesinsert where year is null and month is null
+---- TYPES
+bigint
+---- RESULTS
+25
+====
+---- QUERY
+# Verify that dropping NULL partitions works in the SETUP section.
+select * from alltypesinsert
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- TYPES
+int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
+---- RESULTS
+====
+---- QUERY
+# Test NULL partition keys using static partition insert. Year partition key is NULL.
+insert overwrite table alltypesinsert
+partition(year=NULL, month=10)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- RESULTS
+year=__HIVE_DEFAULT_PARTITION__/month=10/: 25
+====
+---- QUERY
+# Verify contents of alltypesinsert.
+select cout(*) from alltypesinsert where year is null and month=10
+---- TYPES
+bigint
+---- RESULTS
+25
+====
+---- QUERY
+# Test NULL partition keys using static partition insert. Month partition key is NULL.
+insert overwrite table alltypesinsert
+partition(year=2008, month=NULL)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- RESULTS
+year=2008/month=__HIVE_DEFAULT_PARTITION__/: 25
+====
+---- QUERY
+# Verify contents of alltypesinsert.
+select count(*) from alltypesinsert where year=2008 and month is null
+---- TYPES
+bigint
+---- RESULTS
+25
+====
+# Test NULL partition keys using dynamic partition insert.
+---- QUERY
+insert overwrite table alltypesinsert
+partition(year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col,
+cast(if(bool_col, NULL, 2007) as int) as year, cast(if(tinyint_col % 3 = 0, NULL, 6) as int) as month
+from alltypessmall
+where year=2009 and month=4
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+year=2007/month=6/: 8
+year=2007/month=__HIVE_DEFAULT_PARTITION__/: 5
+year=__HIVE_DEFAULT_PARTITION__/month=6/: 7
+year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/: 5
+====
+---- QUERY
+# Verify contents of each new partition in alltypesinsert.
+select count(*) from alltypesinsert where year=2007 and month=6
+---- TYPES
+bigint
+---- RESULTS
+8
+====
+---- QUERY
+# Verify contents of each new partition in alltypesinsert.
+select count(*) from alltypesinsert where year=2007 and month is null
+---- TYPES
+bigint
+---- RESULTS
+5
+====
+---- QUERY
+# Verify contents of each new partition in alltypesinsert.
+select count(*) from alltypesinsert where year is null and month=6
+---- TYPES
+bigint
+---- RESULTS
+7
+====
+---- QUERY
+# Verify contents of each new partition in alltypesinsert.
+select count(*) from alltypesinsert where year is null and month is null
+---- TYPES
+bigint
+---- RESULTS
+5
+====

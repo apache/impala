@@ -129,10 +129,16 @@ Status HdfsTableSink::Init(RuntimeState* state) {
           // A query like: INSERT INTO TABLE... PARTITION(year=2009) SELECT month FROM...
           // would lead to both partitions having the same key modulo ignored constant
           // partition keys. So only keep a reference to the partition which matches
-          // partition_key_values for constant values, since only that will be written to.
-          if (!RawValue::Eq(partition->partition_key_values()[i]->GetValue(NULL),
-                           partition_key_exprs_[i]->GetValue(NULL),
-                           partition_key_exprs_[i]->type())) {
+          // partition_key_values for constant values, since only that is written to.
+          void* table_partition_key_value =
+              partition->partition_key_values()[i]->GetValue(NULL);
+          void* target_partition_key_value = partition_key_exprs_[i]->GetValue(NULL);
+          if (table_partition_key_value == NULL && target_partition_key_value == NULL) {
+            break;
+          }
+          if (table_partition_key_value == NULL || target_partition_key_value == NULL
+              || !RawValue::Eq(table_partition_key_value, target_partition_key_value,
+                               partition_key_exprs_[i]->type())) {
             relevant_partition = false;
             break;
           }
@@ -200,7 +206,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
     void* value = partition_key_exprs_[j]->GetValue(current_row_);
     // NULL partition keys get a special value to be compatible with Hive.
     if (value == NULL) {
-      common_suffix << null_partition_key_value_;
+      common_suffix << table_desc_->null_partition_key_value();
     } else {
       string value_str;
       partition_key_exprs_[j]->PrintValue(value, &value_str);
