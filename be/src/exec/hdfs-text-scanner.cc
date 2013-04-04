@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "exec/hdfs-text-scanner.h"
+
 #include "codegen/llvm-codegen.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/hdfs-text-scanner.h"
+#include "exec/scanner-context.inline.h"
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
