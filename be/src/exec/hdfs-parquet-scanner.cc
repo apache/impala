@@ -39,21 +39,31 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
+// Issue just the footer range for each file.  We'll then parse the footer and pick out
+// the columns we want.
+void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
-  // Issue just the footer range for each file.  We'll then parse the footer and pick
-  // out the columns we want.  We are expecting each file to be one hdfs block (so
-  // all the scan range offsets should be 0).  This is not incorrect but we will
-  // issue a warning.
   for (int i = 0; i < files.size(); ++i) {
+    // Set to true if this scanner is assigned the first split (hdfs block) in the file,
+    // i.e. the split with offset 0. Since Parquet scanners always read entire files, we
+    // only read a file if we're assigned the first split to avoid reading multi-block
+    // files with multiple scanners.
+    bool assigned_first_split = false;
     for (int j = 0; j < files[i]->splits.size(); ++j) {
       DiskIoMgr::ScanRange* split = files[i]->splits[j];
       if (split->offset() != 0) {
+        // We are expecting each file to be one hdfs block (so all the scan range offsets
+        // should be 0).  This is not incorrect but we will issue a warning.
         LOG(WARNING) << "Parquet file should not be split into multiple hdfs-blocks."
                      << " file=" << files[i]->filename;
+        // We assign the entire file to one scan range, so mark all but one split
+        // (i.e. the first split) as complete
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
+      } else {
+        assigned_first_split = true;
       }
     }
+    if (!assigned_first_split) continue;
 
     // Compute the offset of the file footer
     DCHECK_GT(files[i]->file_length, 0);

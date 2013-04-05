@@ -455,10 +455,17 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
         this, per_type_files[THdfsFileFormat::LZO_TEXT]));
   }
-  
+
+  if (progress_.done()) {
+    // No scan ranges queued, nothing to do
+    DCHECK_EQ(queued_ranges_.size(), 0);
+    done_ = true;
+    return Status::OK;
+  }
+
   // Start up disk thread which in turn drives the scanner threads.
   disk_read_thread_.reset(new thread(&HdfsScanNode::DiskThread, this));
-  
+
   // scanners have added their initial ranges, issue the first batch to the io mgr.
   // TODO: gdb seems to cause a SIGSEGV when the java call this triggers in the
   // I/O threads when the thread created above appears during that operation. 
