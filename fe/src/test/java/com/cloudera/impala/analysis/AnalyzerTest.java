@@ -1632,7 +1632,7 @@ public class AnalyzerTest {
 
   @Test
   public void TestAlterTableAddDropPartition() throws AnalysisException {
-    String[] addDrop = {"add", "drop"};
+    String[] addDrop = {"add if not exists", "drop if exists"};
     for (String kw: addDrop) { 
       // Add different partitions for different column types
       AnalyzesOk("alter table functional.alltypes " + kw +
@@ -1688,6 +1688,24 @@ public class AnalyzerTest {
       AnalysisError("alter table functional.table_does_not_exist " + kw +
           " partition (i=1)", "Unknown table: functional.table_does_not_exist");
     }
+
+    // IF NOT EXISTS properly checks for partition existence
+    AnalyzesOk("alter table functional.alltypes add " +
+          "partition(year=2050, month=10)");
+    AnalysisError("alter table functional.alltypes add " +
+          "partition(year=2010, month=10)",
+          "Partition spec already exists: (year=2010, month=10).");
+    AnalyzesOk("alter table functional.alltypes add if not exists " +
+          " partition(year=2010, month=10)");
+
+    // IF EXISTS properly checks for partition existence
+    AnalyzesOk("alter table functional.alltypes drop " +
+          "partition(year=2010, month=10)");
+    AnalysisError("alter table functional.alltypes drop " +
+          "partition(year=2050, month=10)",
+          "Partition spec does not exist: (year=2050, month=10).");
+    AnalyzesOk("alter table functional.alltypes drop if exists " +
+          "partition(year=2050, month=10)");
   }
 
   @Test

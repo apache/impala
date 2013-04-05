@@ -20,8 +20,7 @@ import java.util.ArrayList;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableType;
@@ -82,5 +81,17 @@ public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
     addPartParams.setIf_exists(ifExists);
     params.setDrop_partition_params(addPartParams);
     return params;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+    Table targetTable = getTargetTable();
+    Preconditions.checkState(targetTable != null && targetTable instanceof HdfsTable);
+    HdfsTable hdfsTable = (HdfsTable) targetTable;
+    if (!ifExists && hdfsTable.getPartition(partitionSpec) == null) {
+      throw new AnalysisException("Partition spec does not exist: (" + 
+          Joiner.on(", ").join(partitionSpec) + ").");
+    }
   }
 }

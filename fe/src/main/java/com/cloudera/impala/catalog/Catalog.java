@@ -397,6 +397,13 @@ public class Catalog {
       TableLoadingException {
     org.apache.hadoop.hive.metastore.api.Partition partition =
         new org.apache.hadoop.hive.metastore.api.Partition();
+    if (ifNotExists && containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
+        partitionSpec)) {
+      LOG.info(String.format("Skipping partition creation because (%s) already exists " +
+          "and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
+      return;
+    }
+
     synchronized (metastoreDdlLock) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       partition.setDbName(tableName.getDb());
@@ -436,6 +443,14 @@ public class Catalog {
       List<TPartitionKeyValue> partitionSpec, boolean ifExists) throws MetaException,
       NoSuchObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
+
+    if (ifExists && !containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
+        partitionSpec)) {
+      LOG.info(String.format("Skipping partition drop because (%s) does not exist " +
+          "and ifExists is true.", Joiner.on(", ").join(partitionSpec)));
+      return;
+    }
+
     synchronized (metastoreDdlLock) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       List<String> values = Lists.newArrayList();
@@ -961,6 +976,23 @@ public class Catalog {
   public boolean containsTable(String dbName, String tableName) {
     Db db = getDb(dbName);
     return db != null && db.containsTable(tableName);
+  }
+
+  /**
+   * Returns true if the table contains the given partition spec, otherwise false.
+   * This may will trigger a metadata load if the table metadata is not yet cached.
+   * @throws DatabaseNotFoundException - If the database does not exist.
+   * @throws TableNotFoundException - If the table does not exist.
+   * @throws TableLoadingException - If there is an error loading the table metadata.
+   */
+  public boolean containsHdfsPartition(String dbName, String tableName,
+      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
+      TableNotFoundException, TableLoadingException {
+    try {
+      return getHdfsPartition(dbName, tableName, partitionSpec) != null;
+    } catch (PartitionNotFoundException e) {
+      return false;
+    }
   }
 
   /**
