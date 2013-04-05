@@ -568,9 +568,7 @@ Status DiskIoMgr::RegisterReader(hdfsFS hdfs, int max_io_buffers,
   if (max_parallel_ranges > 0) {
     (*reader)->max_parallel_scan_ranges_ = max_parallel_ranges;
   } else {
-    // TODO: reconsider this heuristic.  We want to keep all the cores busy
-    // but not cause excessive context switches.
-    (*reader)->max_parallel_scan_ranges_ = 2 * CpuInfo::num_cores();
+    (*reader)->max_parallel_scan_ranges_ = default_parallel_scan_ranges();
   }
   SetMaxIoBuffers(*reader, max_io_buffers);
   return Status::OK;
@@ -681,10 +679,10 @@ bool DiskIoMgr::SetMaxIoBuffers(ReaderContext* reader, int max_io_buffers) {
   return true;
 }
 
-int DiskIoMgr::num_empty_buffers(ReaderContext* reader) {
-  unique_lock<mutex> (reader->lock_);
-  // This can be less than 0 if the quota was lowered after some reads happened
-  return ::max(reader->num_buffers_quota_ - reader->num_used_buffers_, 0);
+int DiskIoMgr::default_parallel_scan_ranges() {
+  // TODO: reconsider this heuristic.  We want to keep all the cores busy
+  // but not cause excessive context switches.
+  return 2 * CpuInfo::num_cores();
 }
 
 void DiskIoMgr::set_read_timer(ReaderContext* r, RuntimeProfile::Counter* c) {

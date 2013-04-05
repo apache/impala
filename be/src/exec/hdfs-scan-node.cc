@@ -68,6 +68,11 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_partition_keys_(0),
       num_owned_io_buffers_(0),
       done_(false),
+      num_queued_io_buffers_(0),
+      // TODO: this is a somewhat random heuristic.  Allow queueing up to 2 buffers
+      // per range.  This should take into account mem limits.
+      max_queued_io_buffers_(2 * DiskIoMgr::default_parallel_scan_ranges()),
+      num_blocked_scanners_(0),
       partition_key_pool_(new MemPool()),
       counters_reported_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
@@ -498,6 +503,9 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   materialized_row_batches_.clear();
   
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
+  DCHECK_EQ(num_queued_io_buffers_, 0);
+  DCHECK_EQ(num_blocked_scanners_, 0);
+
   if (reader_context_ != NULL) {
     runtime_state_->io_mgr()->UnregisterReader(reader_context_);
   }
@@ -566,7 +574,10 @@ void HdfsScanNode::StartNewScannerThread(DiskIoMgr::BufferDescriptor* buffer) {
   metadata->stream = context->GetStream();
 
   // Track this context as active
-  active_contexts_.insert(context);
+  {
+    unique_lock<mutex> l(disk_thread_resource_lock_);
+    active_contexts_.insert(context);
+  }
 
   HdfsScanner* scanner = CreateScanner(partition);
   scanner_threads_.add_thread(new thread(&HdfsScanNode::ScannerThread, this,
@@ -581,6 +592,18 @@ void HdfsScanNode::DiskThread() {
   while (true) {
     bool eos = false;
     DiskIoMgr::BufferDescriptor* buffer_desc = NULL;
+    
+    {
+      unique_lock<mutex> lock(disk_thread_resource_lock_);
+      DCHECK_LE(num_blocked_scanners_, active_contexts_.size());
+      while (num_blocked_scanners_ < active_contexts_.size() &&
+             num_queued_io_buffers_ >= max_queued_io_buffers_ &&
+             !done_) {
+        disk_thread_resource_cv_.wait(lock);
+      }
+      if (done_) break;
+    }
+
     Status status = 
         runtime_state_->io_mgr()->GetNext(reader_context_, &buffer_desc, &eos);
 
@@ -642,6 +665,7 @@ void HdfsScanNode::DiskThread() {
         it != active_contexts_.end(); ++it) {
       (*it)->Cancel();
     }
+    unique_lock<mutex> l(disk_thread_resource_lock_);
     active_contexts_.clear();
   }
 
@@ -678,7 +702,10 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) 
 
   // Scanner thread completed. Take a look and update the status 
   unique_lock<recursive_mutex> l(lock_);
-  active_contexts_.erase(context);
+  {
+    unique_lock<mutex> l(disk_thread_resource_lock_);
+    active_contexts_.erase(context);
+  }
   ScannerContext::Stream* stream = context->GetStream();
   DCHECK(stream != NULL);
   

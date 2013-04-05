@@ -336,7 +336,8 @@ class DiskIoMgr {
   // Dumps the disk io mgr queues (for readers and disks)
   std::string DebugString();
 
-  int num_empty_buffers(ReaderContext*);
+  // Returns the default number of parallel scan ranges per reader.
+  static int default_parallel_scan_ranges();
 
   // Validates the internal state is consistent.  This is intended to only be used
   // for debugging.

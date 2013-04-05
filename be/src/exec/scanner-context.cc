@@ -102,6 +102,7 @@ void ScannerContext::Stream::SetInitialBuffer(DiskIoMgr::BufferDescriptor* buffe
 
 void ScannerContext::Stream::ReturnAllBuffers() {
   completed_buffers_.insert(completed_buffers_.end(), buffers_.begin(), buffers_.end());
+  parent_->scan_node_->UpdateNumQueuedBuffers(-buffers_.size());
   buffers_.clear();
   for (list<DiskIoMgr::BufferDescriptor*>::iterator it = completed_buffers_.begin();
       it != completed_buffers_.end(); ++it) {
@@ -119,6 +120,7 @@ void ScannerContext::Stream::AttachCompletedResources(bool done) {
     // First attach any pending resources from all the streams
     completed_buffers_.insert(completed_buffers_.end(), 
         buffers_.begin(), buffers_.end());
+    parent_->scan_node_->UpdateNumQueuedBuffers(-buffers_.size());
     buffers_.clear();
     current_buffer_ = NULL;
   }
@@ -153,6 +155,7 @@ void ScannerContext::Stream::AttachCompletedResources(bool done) {
 void ScannerContext::Stream::RemoveFirstBuffer() {
   DCHECK(current_buffer_ != NULL);
   DCHECK(!buffers_.empty());
+  parent_->scan_node_->UpdateNumQueuedBuffers(-1);
   buffers_.pop_front();
 
   completed_buffers_.push_back(current_buffer_);
@@ -176,7 +179,9 @@ Status ScannerContext::Stream::GetRawBytes(uint8_t** out_buffer, int* len, bool*
   {
     unique_lock<mutex> l(parent_->lock_);
     while (!parent_->cancelled_ && buffers_.empty()) {
+      parent_->scan_node_->UpdateNumBlockedScanners(1);
       read_ready_cv_.wait(l);
+      parent_->scan_node_->UpdateNumBlockedScanners(-1);
     }
 
     if (parent_->cancelled_) {
@@ -228,7 +233,9 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
     unique_lock<mutex> l(parent_->lock_);
    
     while (!parent_->cancelled_ && buffers_.empty() && !eosr()) {
+      parent_->scan_node_->UpdateNumBlockedScanners(1);
       read_ready_cv_.wait(l);
+      parent_->scan_node_->UpdateNumBlockedScanners(-1);
     }
 
     if (parent_->cancelled_) return Status::CANCELLED;
@@ -277,6 +284,7 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
       current_buffer_ = buffer_desc;
       current_buffer_bytes_left_ = current_buffer_->len();
       current_buffer_pos_ = reinterpret_cast<uint8_t*>(current_buffer_->buffer());
+      parent_->scan_node_->UpdateNumQueuedBuffers(1);
       buffers_.push_back(current_buffer_);
 
       if (current_buffer_bytes_left_ == 0) {
@@ -352,6 +360,7 @@ void ScannerContext::Stream::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
       DCHECK_GT(total_len_, 0);
     }
 
+    parent_->scan_node_->UpdateNumQueuedBuffers(1);
     buffers_.push_back(buffer);
 
     // These variables are read without a lock in GetBytes.  There is a race in 
@@ -376,16 +385,17 @@ void ScannerContext::Stream::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
 void ScannerContext::Close() {
   {
     unique_lock<mutex> l(lock_);
-    AddFinalBatch();
-    DCHECK(current_row_batch_ == NULL);
-
-    // Set variables to NULL to make sure this object is not being used after Complete()
     done_ = true;
-    for (int i = 0; i < streams_.size(); ++i) {
-      streams_[i]->read_eosr_ = false;
-      streams_[i]->current_buffer_ = NULL;
-      streams_[i]->current_buffer_pos_ = NULL;
-    }
+  }
+  
+  AddFinalBatch();
+  DCHECK(current_row_batch_ == NULL);
+
+  // Set variables to NULL to make sure this object is not being used after Close()
+  for (int i = 0; i < streams_.size(); ++i) {
+    streams_[i]->read_eosr_ = false;
+    streams_[i]->current_buffer_ = NULL;
+    streams_[i]->current_buffer_pos_ = NULL;
   }
   
   for (int i = 0; i < streams_.size(); ++i) {

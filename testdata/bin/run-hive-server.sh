@@ -8,4 +8,4 @@ $IMPALA_HOME/testdata/bin/kill-hive-server.sh
 
 # Starts hive-server on the specified port
 hive --service hiveserver -p $HIVE_SERVER_PORT &
-sleep 1
+sleep 5

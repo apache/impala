@@ -338,6 +338,22 @@ class HdfsScanNode : public ScanNode {
   // TODO: we can split out 'external' functions for internal functions and make this
   // lock non-recursive.
   boost::recursive_mutex lock_;
+  
+  // Lock and condition variable for 'num_queued_io_buffers_' and 'num_blocked_scanners_'
+  // This condition variable and counters are used to gate when the disk thread reads
+  // from the io mgr.  If we are below the max queued limit or all the scanner threads are
+  // blocked, read from the io mgr.
+  // If this lock and 'lock_' need to be taken together, take 'lock_' first.
+  boost::mutex disk_thread_resource_lock_;
+  boost::condition_variable disk_thread_resource_cv_;
+
+  // The total number of buffers queued in all scanner threads.  If this is at the 
+  // max_queued_io_buffers_, the disk thread will be throttled.
+  int num_queued_io_buffers_;
+  int max_queued_io_buffers_;
+  
+  // The number of scanner threads that are blocked on io buffers.
+  int num_blocked_scanners_;
 
   // Pool for allocating partition key tuple and string buffers
   boost::scoped_ptr<MemPool> partition_key_pool_;
@@ -346,6 +362,8 @@ class HdfsScanNode : public ScanNode {
   std::vector<DiskIoMgr::ScanRange*> queued_ranges_;
 
   // ScannerContexts that are currently still running.
+  // While the scan node is not done (done_ == false), the disk_thread_resource_lock_
+  // needs to be taken before updating this.
   boost::unordered_set<ScannerContext*> active_contexts_;
 
   // Status of failed operations.  This is set asynchronously in DiskThread and
@@ -388,6 +406,29 @@ class HdfsScanNode : public ScanNode {
   // as the scan node is complete (before all the spawned threads terminate) to get
   // the most accurate results.
   void UpdateCounters();
+
+  // Updates the number of queued buffers in the scanner threads
+  void UpdateNumQueuedBuffers(int delta) {
+    if (delta == 0) return;
+    boost::unique_lock<boost::mutex> l(disk_thread_resource_lock_);
+    num_queued_io_buffers_ += delta;
+    DCHECK_GE(num_queued_io_buffers_, 0);
+    if (num_queued_io_buffers_ < max_queued_io_buffers_) {
+      disk_thread_resource_cv_.notify_one();
+    }
+  }
+
+  // Update the number of scanner threads that are blocked on io
+  void UpdateNumBlockedScanners(int delta) {
+    DCHECK(delta == -1 || delta == 1);
+    boost::unique_lock<boost::mutex> l(disk_thread_resource_lock_);
+    num_blocked_scanners_ += delta;
+    DCHECK_GE(num_blocked_scanners_, 0);
+    if (!done_) DCHECK_LE(num_blocked_scanners_, active_contexts_.size());
+    if (num_blocked_scanners_ == active_contexts_.size()) {
+      disk_thread_resource_cv_.notify_one();
+    }
+  }
 };
 
 }

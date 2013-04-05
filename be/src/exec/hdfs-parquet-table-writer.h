@@ -136,8 +136,13 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // in a few places.
   int64_t file_pos_;
 
-  // Memory for column/block buffers
-  boost::scoped_ptr<MemPool> col_mem_pool_;
+  // Memory for column/block buffers that are reused for the duration of the 
+  // writer (i.e. reused across files).
+  boost::scoped_ptr<MemPool> reusable_col_mem_pool_;
+
+  // Memory for column/block buffers that is allocated per file.  We need to
+  // reset this pool after flushing a file.
+  boost::scoped_ptr<MemPool> per_file_mem_pool_;
 
   // Current position in the batch being written.  This must be persistent across
   // calls since the writer may stop in the middle of a row batch and ask for a new

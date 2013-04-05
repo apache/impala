@@ -299,7 +299,7 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   // buffer
   char* uncompressed_data = NULL;
   if (codec_ == CompressionCodec::UNCOMPRESSED) {
-    uncompressed_data = reinterpret_cast<char*>(parent_->col_mem_pool_->Allocate(
+    uncompressed_data = reinterpret_cast<char*>(parent_->per_file_mem_pool_->Allocate(
         current_page_->header.uncompressed_page_size));
   } else {
     // We have compression.  Combine into the staging buffer.
@@ -322,7 +322,7 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
     DCHECK_EQ(codec_, CompressionCodec::SNAPPY);
     int max_compressed_size = 
         snappy::MaxCompressedLength(current_page_->header.uncompressed_page_size);
-    uint8_t* compressed_data = parent_->col_mem_pool_->Allocate(max_compressed_size);
+    uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
     size_t compressed_size;
     snappy::RawCompress(uncompressed_data, current_page_->header.uncompressed_page_size,
         reinterpret_cast<char*>(compressed_data), &compressed_size);
@@ -368,16 +368,17 @@ void HdfsParquetTableWriter::ColumnWriter::NewPage() {
     header.definition_level_encoding = Encoding::RLE;
     header.repetition_level_encoding = Encoding::BIT_PACKED;
     current_page_->def_levels = parent_->state_->obj_pool()->Add(
-        new RleEncoder(parent_->col_mem_pool_->Allocate(DATA_PAGE_SIZE),
+        new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),
             DATA_PAGE_SIZE));
     if (expr_->type() == TYPE_BOOLEAN) {
       current_page_->bool_values = parent_->state_->obj_pool()->Add(
           new IntegerArrayBuilder(
-              1, DATA_PAGE_SIZE, parent_->col_mem_pool_.get()));
+              1, DATA_PAGE_SIZE, parent_->reusable_col_mem_pool_.get()));
       current_page_->values_buffer = current_page_->bool_values->array();
     } else {
       current_page_->bool_values = NULL;
-      current_page_->values_buffer = parent_->col_mem_pool_->Allocate(DATA_PAGE_SIZE);
+      current_page_->values_buffer = 
+          parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE);
     }
     current_page_->header.__set_data_page_header(header);
   }
@@ -392,7 +393,7 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
       current_row_group_(NULL),
       row_count_(0),
       file_size_limit_(0),
-      col_mem_pool_(new MemPool),
+      reusable_col_mem_pool_(new MemPool),
       row_idx_(0) {
 }
 
@@ -453,6 +454,12 @@ Status HdfsParquetTableWriter::AddRowGroup() {
 
 Status HdfsParquetTableWriter::InitNewFile() {
   DCHECK(current_row_group_ == NULL);
+
+  if (per_file_mem_pool_.get() != NULL) {
+    COUNTER_SET(parent_->memory_used_counter(), 
+        per_file_mem_pool_->peak_allocated_bytes());
+  }
+  per_file_mem_pool_.reset(new MemPool);
   
   // Get the file limit
   RETURN_IF_ERROR(HdfsTableSink::GetFileBlockSize(output_, &file_size_limit_));
@@ -535,7 +542,12 @@ Status HdfsParquetTableWriter::Finalize() {
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
     
-  COUNTER_SET(parent_->memory_used_counter(), col_mem_pool_->peak_allocated_bytes());
+  COUNTER_SET(parent_->memory_used_counter(), 
+      reusable_col_mem_pool_->peak_allocated_bytes());
+  if (per_file_mem_pool_.get() != NULL) {
+    COUNTER_SET(parent_->memory_used_counter(), 
+        per_file_mem_pool_->peak_allocated_bytes());
+  }
   COUNTER_UPDATE(parent_->rows_inserted_counter(), row_count_);
   return Status::OK;
 }
