@@ -129,8 +129,10 @@ class Coordinator::BackendExecState {
       done(false),
       profile_created(false),
       total_ranges_complete(0) {
-    profile = obj_pool->Add(
-        new RuntimeProfile(obj_pool, "Instance " + PrintId(fragment_instance_id)));
+    stringstream ss;
+    ss << "Instance " << PrintId(fragment_instance_id)
+       << " (host=" << backend_address << ")";
+    profile = obj_pool->Add(new RuntimeProfile(obj_pool, ss.str()));
     coord->SetExecPlanFragmentParams(backend_num, fragment, fragment_idx, params,
         instance_idx, coord_address, &rpc_params);
     if (debug_options != NULL) {
