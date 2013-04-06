@@ -48,7 +48,7 @@ using namespace boost;
 
 namespace impala {
 
-ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :  
+ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :
     mem_buffer_(new TMemoryBuffer(initial_buffer_size)) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> factory;
@@ -146,4 +146,10 @@ std::ostream& operator<<(std::ostream& out, const TColumnValue& colval) {
   return out;
 }
 
+bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b) {
+  int cmp = a.hostname.compare(b.hostname);
+  if (cmp < 0) return true;
+  if (cmp == 0) return a.port < b.port;
+  return false;
+}
 }

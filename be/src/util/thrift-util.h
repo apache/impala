@@ -186,6 +186,10 @@ std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 // Print a TColumnValue. If null, print "NULL".
 std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);
 
+// Compares two TNetworkAddresses alphanumerically by their host:port
+// string representation
+bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b);
+
 }
 
 #endif

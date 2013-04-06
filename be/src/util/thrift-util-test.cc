@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include <gtest/gtest.h>
+#include "util/network-util.h"
 #include "util/thrift-util.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
@@ -25,7 +26,7 @@ using namespace std;
 
 namespace impala {
 
-TEST(ThriftUtil, SimpleSerializeDeserialize) { 
+TEST(ThriftUtil, SimpleSerializeDeserialize) {
   Status status;
   // Loop over compact and binary protocols
   for (int i = 0; i < 2; ++i) {
@@ -45,13 +46,13 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     uint8_t* buffer2 = NULL;
     uint32_t len1 = 0;
     uint32_t len2 = 0;
-    
+
     status = serializer.Serialize(&counter, &len1, &buffer1);
     EXPECT_TRUE(status.ok());
 
     EXPECT_EQ(len1, msg.size());
     EXPECT_TRUE(memcmp(buffer1, &msg[0], len1) == 0);
-    
+
     // Serialize again and ensure the memory buffer is the same and being reused.
     status = serializer.Serialize(&counter, &len2, &buffer2);
     EXPECT_TRUE(status.ok());
@@ -67,10 +68,23 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
   }
 }
 
+TEST(ThriftUtil, TNetworkAddressComparator) {
+  EXPECT_TRUE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
+                                        MakeNetworkAddress("zzzz", 500)));
+  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("zzzz", 500),
+                                         MakeNetworkAddress("aaaa", 500)));
+  EXPECT_TRUE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
+                                        MakeNetworkAddress("aaaa", 501)));
+  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 501),
+                                         MakeNetworkAddress("aaaa", 500)));
+
+  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
+                                         MakeNetworkAddress("aaaa", 500)));
+}
+
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

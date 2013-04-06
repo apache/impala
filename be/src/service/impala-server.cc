@@ -50,6 +50,7 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/jni-util.h"
+#include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
@@ -995,9 +996,8 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   Scheduler::HostList backends;
-
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
-
+  sort(backends.begin(), backends.end(), TNetworkAddressComparator);
   (*output) << "<h2>Known Backends "
             << "(" << backends.size() << ")"
             << "</h2>";
