@@ -16,12 +16,18 @@
 #ifndef IMPALA_UTIL_NON_PRIMITIVE_METRICS_H
 #define IMPALA_UTIL_NON_PRIMITIVE_METRICS_H
 
+#include "util/metrics.h"
+
 #include <string>
 #include <vector>
 #include <set>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
-#include "util/metrics.h"
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 
 namespace impala {
 
@@ -139,6 +145,45 @@ class MapMetric : public Metrics::Metric<std::map<K, V> > {
   virtual void PrintValue(std::stringstream* out) {
     PrintToString(false, out);
   }
+};
+
+// Metric which accumulates min, max and mean of all values
+// Printed output looks like:
+// name: last: 0.0141562, min: 4.546e-06, max: 0.0243637, mean: 0.00336871, stddev:0.03366
+template <typename T>
+class StatsMetric : public Metrics::Metric<T> {
+ public:
+  StatsMetric(const std::string& key, const T& value)
+      : Metrics::Metric<T>(key, value) { }
+
+  void Update(const T& value) {
+    boost::lock_guard<boost::mutex> l(this->lock_);
+    this->value_ = value;
+    this->acc_(value);
+  }
+
+  virtual void PrintValueJson(std::stringstream* out) {
+    (*out) << "{ last: " << this->value_
+           << ", min: " << boost::accumulators::min(this->acc_)
+           << ", max: " << boost::accumulators::max(this->acc_)
+           << ", mean: " << boost::accumulators::mean(this->acc_)
+           << ", stddev:" << sqrt(boost::accumulators::variance(this->acc_))
+           << " }";
+  }
+
+  virtual void PrintValue(std::stringstream* out) {
+    (*out) << " last: " << this->value_
+           << ", min: " << boost::accumulators::min(this->acc_)
+           << ", max: " << boost::accumulators::max(this->acc_)
+           << ", mean: " << boost::accumulators::mean(this->acc_)
+           << ", stddev:" << sqrt(boost::accumulators::variance(this->acc_));
+  }
+ private:
+  boost::accumulators::accumulator_set<T,
+      boost::accumulators::features<boost::accumulators::tag::mean,
+                                    boost::accumulators::tag::min,
+                                    boost::accumulators::tag::max,
+                                    boost::accumulators::tag::variance> > acc_;
 };
 
 };

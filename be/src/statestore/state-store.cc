@@ -18,6 +18,7 @@
 #include "statestore/state-store.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "statestore/failure-detector.h"
+#include "util/stopwatch.h"
 #include "util/thrift-util.h"
 #include "util/webserver.h"
 
@@ -42,6 +43,8 @@ DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running")
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
 const string STATESTORE_LIVE_SUBSCRIBERS = "statestore.live-backends";
 const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
+const string STATESTORE_LAST_UPDATE_LOOP_TIME =
+    "statestore.last-update-loop-time.seconds";
 
 const StateStore::TopicEntry::Value StateStore::TopicEntry::NULL_VALUE = "";
 
@@ -121,6 +124,8 @@ StateStore::StateStore(Metrics* metrics)
   subscriber_set_metric_ =
       metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
                                                     set<string>()));
+  last_heartbeat_loop_time_metric_ = metrics->RegisterMetric(
+      new StatsMetric<double>(STATESTORE_LAST_UPDATE_LOOP_TIME, 0.0));
 }
 
 void StateStore::RegisterWebpages(Webserver* webserver) {
@@ -194,7 +199,7 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     subscribers_.insert(make_pair(subscriber_id,
         Subscriber(subscriber_id, location, topic_registrations)));
     failure_detector_->UpdateHeartbeat(subscriber_id, true);
-    num_subscribers_metric_->Increment(1L);
+    num_subscribers_metric_->Update(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
   }
 
@@ -379,9 +384,15 @@ Status StateStore::MainLoop() {
   // cheap to contend for a mutex compared to the cost of opening and
   // writing to a socket.
 
+  // subscribers_lock_ is also held while the work queue is being
+  // built, to avoid concurrent modification of the subscriber set.
+
   while (!ShouldExit()) {
+    MonotonicStopWatch loop_timer;
+    loop_timer.Start();
     {
-      unique_lock<mutex> l(worker_lock_);
+      unique_lock<mutex> subscriber_lock(subscribers_lock_);
+      unique_lock<mutex> worker_lock(worker_lock_);
       BOOST_FOREACH(SubscriberMap::value_type& subscriber, subscribers_) {
         subscriber_work_queue_.push_back(&subscriber.second);
       }
@@ -400,7 +411,9 @@ Status StateStore::MainLoop() {
         last_subscriber_processed_.wait(l);
       }
     }
-
+    loop_timer.Stop();
+    last_heartbeat_loop_time_metric_->Update(
+        loop_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     // TODO: configure this
     usleep(500 * 1000);
   }

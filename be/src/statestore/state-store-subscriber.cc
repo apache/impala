@@ -73,9 +73,15 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
       is_registered_(false) {
   client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_address_.hostname,
-                                                           state_store_address_.port));
+                                                          state_store_address_.port));
   connected_to_statestore_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric("statestore-subscriber.connected", false);
+  last_recovery_time_metric_ =
+      metrics->CreateAndRegisterPrimitiveMetric(
+          "statestore-subscriber.last-recovery-time", 0.0);
+  heartbeat_interval_metric_ =
+      metrics->RegisterMetric(
+          new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time", 0.0));
 }
 
 Status StateStoreSubscriber::AddTopic(const StateStore::TopicId& topic_id,
@@ -107,6 +113,7 @@ Status StateStoreSubscriber::Register() {
   client_->iface()->RegisterSubscriber(response, request);
   Status status = Status(response.status);
   if (status.ok()) connected_to_statestore_metric_->Update(true);
+  heartbeat_interval_timer_.Start();
   return status;
 }
 
@@ -138,6 +145,8 @@ void StateStoreSubscriber::RecoveryModeChecker() {
       // When entering recovery mode, the class-wide lock_ is taken to
       // ensure mutual exclusion with any operations in flight.
       lock_guard<mutex> l(lock_);
+      MonotonicStopWatch recovery_timer;
+      recovery_timer.Start();
       connected_to_statestore_metric_->Update(false);
       LOG(INFO) << subscriber_id_
                 << ": Connection with state-store lost, entering recovery mode";
@@ -158,12 +167,17 @@ void StateStoreSubscriber::RecoveryModeChecker() {
                        << status.GetErrorMsg();
           usleep(SLEEP_INTERVAL_MS * 1000);
         }
+        last_recovery_time_metric_->Update(
+            recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
       }
       // When we're successful in re-registering, we don't do anything
       // to re-send our updates to the state-store. It is the
       // responsibility of individual clients to post missing updates
       // back to the state-store. This saves a lot of complexity where
       // we would otherwise have to cache updates here.
+
+      last_recovery_time_metric_->Update(
+          recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     }
 
     usleep(SLEEP_INTERVAL_MS * 1000);
@@ -172,14 +186,27 @@ void StateStoreSubscriber::RecoveryModeChecker() {
 
 void StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
     vector<TTopicUpdate>* topic_updates) {
-  lock_guard<mutex> l(lock_);
-  BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
-    BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
-      // TODO: Consider filtering the topics to only send registered topics to callbacks
-      callback(topic_deltas, topic_updates);
-    }
-  }
   failure_detector_->UpdateHeartbeat(STATE_STORE_ID, true);
+
+  // We don't want to block here because this is an RPC, and delaying
+  // the return causes the state-store to delay sending the next batch
+  // of heartbeats. The only time that lock_ will be taken once
+  // UpdateState might be called is in RecoveryModeChecker; if we're
+  // in recovery mode we don't want to process the update.
+  try_mutex::scoped_try_lock l(lock_);
+  if (l) {
+    // Only record heartbeats received when not in recovery mode
+    heartbeat_interval_metric_->Update(
+        heartbeat_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
+    BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
+      BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
+        // TODO: Consider filtering the topics to only send registered topics to callbacks
+        callback(topic_deltas, topic_updates);
+      }
+    }
+  } else {
+    VLOG(1) << "In recovery mode, ignoring update.";
+  }
 }
 
 

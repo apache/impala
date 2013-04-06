@@ -62,7 +62,7 @@ class Metrics {
   class Metric : GenericMetric {
    public:
     // Sets current metric value to parameter
-    void Update(const T& value) {
+    virtual void Update(const T& value) {
       boost::lock_guard<boost::mutex> l(lock_);
       value_ = value;
     }
@@ -103,6 +103,8 @@ class Metrics {
 
     Metric(const std::string& key, const T& value)
         : value_(value), key_(key) { }
+
+    virtual ~Metric() { }
 
    protected:
     // Subclasses are required to implement this to print a string

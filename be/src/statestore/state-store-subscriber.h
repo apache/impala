@@ -24,6 +24,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "statestore/state-store.h"
+#include "util/stopwatch.h"
 #include "util/thrift-util.h"
 #include "util/thrift-client.h"
 #include "util/metrics.h"
@@ -167,12 +168,23 @@ class StateStoreSubscriber {
   // Metric to indicate if we are successfully registered with the statestore
   Metrics::BooleanMetric* connected_to_statestore_metric_;
 
+  // Amount of time last spent in recovery mode
+  Metrics::DoubleMetric* last_recovery_time_metric_;
+
+  // Accumulated statistics on the frequency of heartbeats
+  StatsMetric<double>* heartbeat_interval_metric_;
+
+  // Tracks the time between heartbeats
+  MonotonicStopWatch heartbeat_interval_timer_;
+
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StateStoreSubscriberThriftIf;
 
   // Called when the state-store sends a heartbeat. Each registered
   // callback is called in turn with the given list of topic deltas,
   // and any updates are aggregated in topic_updates.
+  // If the subscriber is in recovery mode, this method returns
+  // immediately.
   void UpdateState(const TopicDeltaMap& topic_deltas,
       std::vector<TTopicUpdate>* topic_updates);
 

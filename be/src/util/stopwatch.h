@@ -38,7 +38,7 @@ class StopWatch {
       running_ = true;
     }
   }
-  
+
   void Stop() {
     if (running_) {
       total_time_ += Rdtsc() - start_;
@@ -53,21 +53,21 @@ class StopWatch {
 
   static uint64_t Rdtsc() {
     uint32_t lo, hi;
-    __asm__ __volatile__ (      
+    __asm__ __volatile__ (
       "xorl %%eax,%%eax \n        cpuid"
       ::: "%rax", "%rbx", "%rcx", "%rdx");
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
     return (uint64_t)hi << 32 | lo;
   }
- 
+
  private:
   uint64_t start_, total_time_;
   bool running_;
 };
 
 // Stop watch for reporting elapsed time in nanosec based on CLOCK_MONOTONIC.
-// It is as fast as Rdtsc. 
-// It is also accurate because it not affected by cpu frequency changes and 
+// It is as fast as Rdtsc.
+// It is also accurate because it not affected by cpu frequency changes and
 // it is not affected by user setting the system clock.
 // CLOCK_MONOTONIC represents monotonic time since some unspecified starting point.
 // It is good for computing elapsed time.
@@ -92,6 +92,15 @@ class MonotonicStopWatch {
     }
   }
 
+  // Restarts the timer. Returns the elapsed time until this point.
+  uint64_t Reset() {
+    uint64_t ret = ElapsedTime();
+    if (running_) {
+      clock_gettime(CLOCK_MONOTONIC, &start_);
+    }
+    return ret;
+  }
+
   // Returns time in nanosecond.
   uint64_t ElapsedTime() {
     if (!running_) return total_time_;
@@ -110,4 +119,3 @@ class MonotonicStopWatch {
 }
 
 #endif
-

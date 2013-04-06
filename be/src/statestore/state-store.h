@@ -73,7 +73,7 @@ class Status;
 class StateStore {
  public:
   // A SubscriberId uniquely identifies a single subscriber, and is
-  // provided by the susbcriber at registration time.
+  // provided by the subscriber at registration time.
   typedef std::string SubscriberId;
 
   // A TopicId uniquely identifies a single topic
@@ -98,6 +98,8 @@ class StateStore {
   // heartbeats to subscribers, and coordinates handing work to them
   // until told to exit via SetExitFlag. This method blocks until the
   // exit flag is set.
+  //
+  // Acquires both subscribers_lock_ and worker_lock_, in that order.
   //
   // Returns OK unless there is an unrecoverable error.
   Status MainLoop();
@@ -204,12 +206,11 @@ class StateStore {
     TopicEntry::Version last_version_;
   };
 
-  // A note about locking: no two mutexes should be held at the same
-  // time. It has so far been possible to implement mutual exclusion
-  // without requiring more than one lock to be held
-  // concurrently. Subscribers and Topics should be accessed under
+  // Note on locking: Subscribers and Topics should be accessed under
   // their own coarse locks, and worker threads will use worker_lock_
   // to ensure safe access to the subscriber work queue.
+  // Only MainLoop needs to hold two locks at once, to copy between
+  // subscribers_ and subscriber_work_queue_.
 
   // Protects access to exit_flag_, but is used mostly to ensure
   // visibility of updates between threads..
@@ -301,6 +302,9 @@ class StateStore {
   // Metric that track the registered, non-failed subscribers.
   Metrics::IntMetric* num_subscribers_metric_;
   SetMetric<std::string>* subscriber_set_metric_;
+
+  // Metric to track time spent performing a full set of heartbeats to all subscribers
+  StatsMetric<double>* last_heartbeat_loop_time_metric_;
 
   // Shared mutex that protects all subsequent members, which are used
   // to coordinate work between the master thread and the worker
