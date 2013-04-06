@@ -167,7 +167,8 @@ string
 ====
 ---- QUERY
 # CREATE TABLE LIKE on partitioned table
-create table alltypes_test like functional.alltypes
+create table alltypes_test like functional_seq_snap.alltypes
+stored as parquetfile
 ---- RESULTS
 ====
 ---- QUERY
@@ -178,10 +179,11 @@ select count(*) from alltypes_test
 ---- TYPES
 BIGINT
 ====
----- QUERY 
+---- QUERY
+# Should be able to insert into this table
 insert overwrite table alltypes_test
 partition (year=2009, month=4)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes where year=2009 and month=4
 ---- RESULTS
@@ -194,6 +196,36 @@ select count(*) from alltypes_test
 300
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# Show this was actually a different file format (parquet) by trying to
+# change the format to textfile and reading the results.
+alter table alltypes_test partition (year=2009, month=4)
+set fileformat textfile
+---- RESULTS
+====
+---- QUERY
+select count(*) from alltypes_test
+---- RESULTS
+127
+---- TYPES
+BIGINT
+====
+---- QUERY
+# This should copy the file format from the source table (rc)
+create external table jointbl_like like functional_rc_gzip.jointbl
+location '/test-warehouse/jointbl_rc_gzip'
+---- RESULTS
+====
+---- QUERY
+# should get some results back
+select * from jointbl_like order by test_id limit 3
+---- RESULTS
+1001,'Name1',94611,5000
+1002,'Name2',94611,5000
+1003,'Name3',94611,5000
+---- TYPES
+bigint,string,int,int
 ====
 ---- QUERY
 # CREATE TABLE LIKE on unpartitioned table.
@@ -246,6 +278,10 @@ drop table testtbl_part
 ====
 ---- QUERY
 drop table alltypes_test
+---- RESULTS
+====
+---- QUERY
+drop table jointbl_like
 ---- RESULTS
 ====
 ---- QUERY

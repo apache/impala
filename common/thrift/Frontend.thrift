@@ -263,8 +263,14 @@ struct TCreateTableLikeParams {
   // Do not throw an error if a table of the same name already exists.
   4: required bool if_not_exists
 
+  // Optional file format for this table
+  5: optional TFileFormat file_format
+
+  // Optional comment for the table
+  6: optional string comment
+
   // Optional storage location for the table
-  5: optional string location
+  7: optional string location
 }
 
 // Parameters of CREATE TABLE commands

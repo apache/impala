@@ -387,11 +387,19 @@ create_db_stmt ::=
 
 create_tbl_like_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
-  table_name:table KW_LIKE table_name:other_table location_val:location
+  table_name:table KW_LIKE table_name:other_table comment_val:comment
+  KW_STORED KW_AS file_format_val:file_format location_val:location
   {:
-    RESULT = new CreateTableLikeStmt(table, other_table, external, location,
-        if_not_exists);
-  :} 
+    RESULT = new CreateTableLikeStmt(table, other_table, external, comment,
+        file_format, location, if_not_exists);
+  :}
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+    table_name:table KW_LIKE table_name:other_table comment_val:comment
+    location_val:location
+  {:
+    RESULT = new CreateTableLikeStmt(table, other_table, external, comment,
+        null, location, if_not_exists);
+  :}
   ;
 
 create_tbl_stmt ::=

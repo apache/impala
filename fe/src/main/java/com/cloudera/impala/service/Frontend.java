@@ -269,11 +269,11 @@ public class Frontend {
    * Creates a new table in the metastore.
    */
   public void createTableLike(TableName tableName, TableName oldTableName,
-      boolean isExternal,String location, boolean ifNotExists)
-      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException, ImpalaException,
-      TableLoadingException {
-    catalog.createTableLike(tableName, oldTableName, isExternal,
+      boolean isExternal, String comment, FileFormat fileFormat, String location,
+      boolean ifNotExists) throws MetaException, NoSuchObjectException,
+      org.apache.thrift.TException, AlreadyExistsException, InvalidObjectException,
+      ImpalaException, TableLoadingException {
+    catalog.createTableLike(tableName, oldTableName, isExternal, comment, fileFormat,
         location, ifNotExists);
   }
 

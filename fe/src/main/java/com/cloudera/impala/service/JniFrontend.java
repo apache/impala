@@ -227,9 +227,18 @@ public class JniFrontend {
       TableLoadingException {
     TCreateTableLikeParams params = new TCreateTableLikeParams();
     deserializeThrift(params, thriftCreateTableLikeParams);
+    FileFormat fileFormat = null;
+    if (params.isSetFile_format()) {
+      fileFormat = FileFormat.fromThrift(params.getFile_format());
+    }
+    String comment = null;
+    if (params.isSetComment()) {
+      comment = params.getComment();
+    }
     frontend.createTableLike(TableName.fromThrift(params.getTable_name()),
         TableName.fromThrift(params.getSrc_table_name()),
-        params.isIs_external(), params.getLocation(), params.isIf_not_exists());
+        params.isIs_external(), comment, fileFormat, params.getLocation(),
+        params.isIf_not_exists());
   }
 
   public void dropDatabase(byte[] thriftDropDbParams)

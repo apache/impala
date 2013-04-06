@@ -689,7 +689,7 @@ public class ParserTest {
   private void testInsert(boolean overwrite, boolean use_kw_table) {
     String qualifier = overwrite ? "overwrite" : "into";
     qualifier = use_kw_table ? qualifier + " table" : qualifier;
-    
+
     // Entire unpartitioned table.
     ParsesOk("insert " + qualifier + " t select a from src where b > 5");
     // Static partition with one partitioning key.
@@ -926,7 +926,7 @@ public class ParserTest {
       ParserError(String.format("ALTER TABLE CHANGE %s c1 c2 int", kw));
     }
   }
- 
+
   @Test
   public void TestAlterTableSet() {
     // Supported file formats
@@ -983,6 +983,13 @@ public class ParserTest {
     ParsesOk("CREATE TABLE IF NOT EXISTS Bar2 LIKE Bar1");
     ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1");
     ParsesOk("CREATE EXTERNAL TABLE IF NOT EXISTS Bar2 LIKE Bar1 LOCATION '/a/b'");
+    ParsesOk("CREATE TABLE Foo2 LIKE Foo COMMENT 'sdafsdf'");
+    ParsesOk("CREATE TABLE Foo2 LIKE Foo COMMENT ''");
+    ParsesOk("CREATE TABLE Foo2 LIKE Foo STORED AS PARQUETFILE");
+    ParsesOk("CREATE TABLE Foo2 LIKE Foo COMMENT 'tbl' " +
+        "STORED AS PARQUETFILE LOCATION '/a/b'");
+    ParsesOk("CREATE TABLE Foo2 LIKE Foo STORED AS TEXTFILE LOCATION '/a/b'");
+
     // Table and column names starting with digits.
     ParsesOk("CREATE TABLE 01_Foo (01_i int, 02_j string)");
 
@@ -1017,6 +1024,11 @@ public class ParserTest {
     }
     ParserError("CREATE TABLE Foo (i int, s string) STORED AS SEQFILE");
     ParserError("CREATE TABLE Foo (i int, s string) STORED TEXTFILE");
+    ParserError("CREATE TABLE Foo LIKE Bar STORED AS TEXT");
+    ParserError("CREATE TABLE Foo LIKE Bar COMMENT");
+    ParserError("CREATE TABLE Foo LIKE Bar STORED TEXTFILE");
+    ParserError("CREATE TABLE Foo LIKE Bar STORED AS");
+    ParserError("CREATE TABLE Foo LIKE Bar LOCATION");
 
     // Row format syntax
     ParsesOk("CREATE TABLE T (i int) ROW FORMAT DELIMITED");
@@ -1064,7 +1076,6 @@ public class ParserTest {
     // Invalid syntax
     ParserError("CREATE TABLE IF EXISTS Foo.Bar (i int)");
     ParserError("CREATE TABLE Bar LIKE Bar2 (i int)");
-    ParserError("CREATE TABLE Bar LIKE Bar2 STORED AS TEXTFILE");
     ParserError("CREATE IF NOT EXISTS TABLE Foo.Bar (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED TEXTFILE");
     ParserError("CREATE TABLE Foo (d double) AS TEXTFILE");

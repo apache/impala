@@ -37,6 +37,8 @@ public class CreateTableLikeStmt extends ParseNodeBase {
   private final TableName tableName;
   private final TableName srcTableName;
   private final boolean isExternal;
+  private final String comment;
+  private final FileFormat fileFormat;
   private final String location;
   private final boolean ifNotExists;
 
@@ -49,16 +51,21 @@ public class CreateTableLikeStmt extends ParseNodeBase {
    * @param tableName - Name of the new table
    * @param srcTableName - Name of the source table (table to copy)
    * @param isExternal - If true, the table's data will be preserved if dropped.
+   * @param comment - Comment to attach to the table
+   * @param fileFormat - File format of the table
    * @param location - The HDFS location of where the table data will stored.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String location, boolean ifNotExists) {
+      boolean isExternal, String comment, FileFormat fileFormat, String location,
+      boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
     this.tableName = tableName;
     this.srcTableName = srcTableName;
     this.isExternal = isExternal;
+    this.comment = comment;
+    this.fileFormat = fileFormat;
     this.location = location;
     this.ifNotExists = ifNotExists;
   }
@@ -97,6 +104,14 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     return ifNotExists;
   }
 
+  public String getComment() {
+    return comment;
+  }
+
+  public FileFormat getFileFormat() {
+    return fileFormat;
+  }
+
   public String getLocation() {
     return location;
   }
@@ -111,7 +126,7 @@ public class CreateTableLikeStmt extends ParseNodeBase {
       sb.append("EXTERNAL ");
     }
     sb.append("TABLE ");
-    if (ifNotExists) { 
+    if (ifNotExists) {
       sb.append("IF NOT EXISTS ");
     }
     if (tableName.getDb() != null) {
@@ -122,9 +137,14 @@ public class CreateTableLikeStmt extends ParseNodeBase {
       sb.append(srcTableName.getDb() + ".");
     }
     sb.append(srcTableName.getTbl());
-
+    if (comment != null) {
+      sb.append(" COMMENT '" + comment + "'");
+    }
+    if (fileFormat != null) {
+      sb.append(" STORED AS " + fileFormat);
+    }
     if (location != null) {
-      sb.append(" LOCATION = '" + location + "'");
+      sb.append(" LOCATION '" + location + "'");
     }
     return sb.toString();
   }
@@ -134,6 +154,10 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     params.setTable_name(new TTableName(getDb(), getTbl()));
     params.setSrc_table_name(new TTableName(getSrcDb(), getSrcTbl()));
     params.setIs_external(isExternal());
+    params.setComment(comment);
+    if (fileFormat != null) {
+      params.setFile_format(fileFormat.toThrift());
+    }
     params.setLocation(location);
     params.setIf_not_exists(getIfNotExists());
     return params;
@@ -155,12 +179,12 @@ public class CreateTableLikeStmt extends ParseNodeBase {
 
     if (!analyzer.getCatalog().containsTable(srcDbName, getSrcTbl())) {
       throw new AnalysisException(String.format("Source table does not exist: %s.%s",
-          srcDbName, getSrcTbl())); 
+          srcDbName, getSrcTbl()));
     }
 
     if (analyzer.getCatalog().containsTable(dbName, getTbl()) && !ifNotExists) {
       throw new AnalysisException(String.format("Table already exists: %s.%s",
-          dbName, getTbl())); 
+          dbName, getTbl()));
     }
   }
 }

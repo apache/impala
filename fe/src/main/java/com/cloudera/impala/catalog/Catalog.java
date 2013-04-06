@@ -136,7 +136,7 @@ public class Catalog {
     /**
      * Invalidate the metadata for the given db name and marks the db metadata load
      * state as uninitialized. Invalidating the metadata will cause the next access to
-     * the db to reload (synchronize) its metadata from the metastore. 
+     * the db to reload (synchronize) its metadata from the metastore.
      * If ifExists is true, this will only invalidate if the db name already exists in
      * the dbNameMap. If ifExists is false, the db metadata will be invalidated and the
      * metadata state will be set as UNINITIALIZED (potentially adding a new item to the
@@ -157,7 +157,7 @@ public class Catalog {
     }
 
     /**
-     * Removes the database from the metadata cache 
+     * Removes the database from the metadata cache
      */
     public void remove(String dbName) {
       dbName = dbName.toLowerCase();
@@ -313,7 +313,7 @@ public class Catalog {
         }
         throw new IllegalStateException(e);
       }
-      
+
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
@@ -480,7 +480,7 @@ public class Catalog {
    * Removes a column from the given table. After performing the operation the
    * table metadata is marked as invalid and will be reloaded on the next access.
    */
-  public void alterTableDropCol(TableName tableName, String colName) 
+  public void alterTableDropCol(TableName tableName, String colName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, ColumnNotFoundException,
       TableLoadingException {
@@ -508,7 +508,7 @@ public class Catalog {
    * Renames an existing table. After renaming the table, the metadata is marked as
    * invalid and will be reloaded on the next access.
    */
-  public void alterTableRename(TableName tableName, TableName newTableName) 
+  public void alterTableRename(TableName tableName, TableName newTableName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
     synchronized (metastoreDdlLock) {
@@ -530,7 +530,7 @@ public class Catalog {
    * changing the file format the table metadata is marked as invalid and will be reloaded
    * on the next access.
    */
-  public void alterTableSetFileFormat(TableName tableName, 
+  public void alterTableSetFileFormat(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
@@ -538,14 +538,14 @@ public class Catalog {
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-        setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat); 
+        setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat);
         applyAlterTable(msTbl);
       }
     } else {
       synchronized (metastoreDdlLock) {
         HdfsPartition partition = getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), partitionSpec);
-        org.apache.hadoop.hive.metastore.api.Partition msPartition = 
+        org.apache.hadoop.hive.metastore.api.Partition msPartition =
             partition.getMetaStorePartition();
         Preconditions.checkNotNull(msPartition);
         setStorageDescriptorFileFormat(msPartition.getSd(), fileFormat);
@@ -556,7 +556,7 @@ public class Catalog {
 
   /**
    * Helper method for setting the file format on a given storage descriptor.
-   */ 
+   */
   private void setStorageDescriptorFileFormat(StorageDescriptor sd,
       FileFormat fileFormat) {
     StorageDescriptor tempSd =
@@ -571,7 +571,7 @@ public class Catalog {
    * Changes the HDFS storage location for the given table. This is a metadata only
    * operation, existing table data will not be as part of changing the location.
    */
-  public void alterTableSetLocation(TableName tableName, 
+  public void alterTableSetLocation(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, String location) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
@@ -586,7 +586,7 @@ public class Catalog {
       synchronized (metastoreDdlLock) {
         HdfsPartition partition = getHdfsPartition(tableName.getDb(), tableName.getTbl(),
             partitionSpec);
-        org.apache.hadoop.hive.metastore.api.Partition msPartition = 
+        org.apache.hadoop.hive.metastore.api.Partition msPartition =
             partition.getMetaStorePartition();
         Preconditions.checkNotNull(msPartition);
         msPartition.getSd().setLocation(location);
@@ -600,12 +600,12 @@ public class Catalog {
    * metastoreDdlLock before calling this method.
    * Note: The metastore interface is not very safe because it only accepts a
    * an entire metastore.api.Table object rather than a delta of what to change. This
-   * means an external modification to the table could be overwritten by an ALTER TABLE 
+   * means an external modification to the table could be overwritten by an ALTER TABLE
    * command if the metadata is not completely in-sync. This affects both Hive and
    * Impala, but is more important in Impala because the metadata is cached for a
    * longer period of time.
    */
-  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl) 
+  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException {
     MetaStoreClient msClient = getMetaStoreClient();
     try {
@@ -617,7 +617,7 @@ public class Catalog {
     }
   }
 
-  private void applyAlterPartition(TableName tableName, 
+  private void applyAlterPartition(TableName tableName,
       org.apache.hadoop.hive.metastore.api.Partition msPartition) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException {
     MetaStoreClient msClient = getMetaStoreClient();
@@ -725,7 +725,7 @@ public class Catalog {
    * @param tableName - Fully qualified name of the new table.
    * @param column - List of column definitions for the new table.
    * @param partitionColumn - List of partition column definitions for the new table.
-   * @param isExternal 
+   * @param isExternal
    *    If true, table is created as external which means the data will not be deleted
    *    if dropped. External tables can also be created on top of existing data.
    * @param comment - Optional comment to attach to the table (null for no comment).
@@ -774,29 +774,33 @@ public class Catalog {
     }
 
     LOG.info(String.format("Creating table %s", tableName));
-    createTable(tbl, ifNotExists); 
+    createTable(tbl, ifNotExists);
   }
 
   /**
    * Creates a new table in the metastore based on the definition of an existing table.
    * No data is copied as part of this process, it is a metadata only operation. If the
    * creation succeeds, an entry is added to the metadata cache to lazily load the new
-   * table's metadata on the next access. 
+   * table's metadata on the next access.
    *
    * @param tableName - Fully qualified name of the new table.
    * @param srcTableName - Fully qualified name of the old table.
-   * @param isExternal 
+   * @param isExternal
    *    If true, table is created as external which means the data will not be deleted
    *    if dropped. External tables can also be created on top of existing data.
-   * @param comment - Optional comment to attach to the table (null for no comment).
+   * @param comment - Optional comment to attach to the table or an empty string for no
+                      comment. Null to copy comment from the source table.
+   * @param fileFormat - The file format for the new table or null to copy file format
+   *                     from source table.
    * @param location - Hdfs path to use as the location for table data or null to use
    *                   default location.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public void createTableLike(TableName tableName, TableName srcTableName,
-      boolean isExternal, String location, boolean ifNotExists) throws MetaException,
-      NoSuchObjectException, AlreadyExistsException, InvalidObjectException,
-      org.apache.thrift.TException, ImpalaException, TableLoadingException {
+      boolean isExternal, String comment, FileFormat fileFormat, String location,
+      boolean ifNotExists) throws MetaException, NoSuchObjectException,
+      AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException,
+      ImpalaException, TableLoadingException {
     checkTableNameFullyQualified(tableName);
     checkTableNameFullyQualified(srcTableName);
     if (ifNotExists && containsTable(tableName.getDb(), tableName.getTbl())) {
@@ -812,22 +816,28 @@ public class Catalog {
     if (tbl.getParameters() == null) {
       tbl.setParameters(new HashMap<String, String>());
     }
+    if (comment != null) {
+      tbl.getParameters().put("comment", comment);
+    }
     // The EXTERNAL table property should not be copied from the old table.
     if (isExternal) {
       tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
       tbl.putToParameters("EXTERNAL", "TRUE");
-    } else { 
+    } else {
       tbl.setTableType(TableType.MANAGED_TABLE.toString());
       if (tbl.getParameters().containsKey("EXTERNAL")) {
-        tbl.getParameters().remove("EXTERNAL");  
+        tbl.getParameters().remove("EXTERNAL");
       }
     }
     // The LOCATION property should not be copied from the old table. If the location
     // is null (the caller didn't specify a custom location) this will clear the value
-    // and the table will use the default table location from the parent database. 
+    // and the table will use the default table location from the parent database.
     tbl.getSd().setLocation(location);
+    if (fileFormat != null) {
+      setStorageDescriptorFileFormat(tbl.getSd(), fileFormat);
+    }
     LOG.info(String.format("Creating table %s LIKE %s", tableName, srcTableName));
-    createTable(tbl, ifNotExists); 
+    createTable(tbl, ifNotExists);
   }
 
   private void createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
@@ -938,7 +948,7 @@ public class Catalog {
    * If matchPattern is null, all strings are considered to match. If it is the
    * empty string, no strings match.
    */
-  private List<String> filterStringsByPattern(Iterable<String> candidates, 
+  private List<String> filterStringsByPattern(Iterable<String> candidates,
       String matchPattern) {
     List<String> filtered = Lists.newArrayList();
     if (matchPattern == null) {
@@ -948,13 +958,13 @@ public class Catalog {
       // Hive ignores pretty much all metacharacters, so we have to escape them.
       final String metaCharacters = "+?.^()]\\/{}";
       final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
-      
+
       for (String pattern: Arrays.asList(matchPattern.split("\\|"))) {
         Matcher matcher = regex.matcher(pattern);
         pattern = matcher.replaceAll("\\\\$1").replace("*", ".*");
         patterns.add(pattern);
       }
-      
+
       for (String candidate: candidates) {
         for (String pattern: patterns) {
           // Empty string matches nothing in Hive's implementation
@@ -1043,7 +1053,7 @@ public class Catalog {
 
   /**
    * Returns a deep copy of the metastore.api.Table object for the given TableName.
-   */ 
+   */
   private org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable(
       TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
