@@ -26,6 +26,7 @@ CLEAN_ACTION=1
 TESTDATA_ACTION=1
 TESTS_ACTION=1
 FORMAT_CLUSTER=1
+FORMAT_METASTORE=1
 TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
 SNAPSHOT_FILE=
@@ -52,12 +53,20 @@ do
     -notestdata)
       TESTDATA_ACTION=0
       FORMAT_CLUSTER=0
+      FORMAT_METASTORE=0
       ;;
     -skiptests)
       TESTS_ACTION=0
       ;;
     -noformat)
       FORMAT_CLUSTER=0
+      FORMAT_METASTORE=0
+      ;;
+    -noformat_cluster)
+      FORMAT_CLUSTER=0
+      ;;
+    -noformat_metastore)
+      FORMAT_METASTORE=0
       ;;
     -codecoverage_debug)
       TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
@@ -80,6 +89,8 @@ do
       echo "[-noclean] : omits cleaning all packages before building"
       echo "[-notestdata] : omits recreating the metastore and loading test data"
       echo "[-noformat] : prevents formatting the minicluster and metastore db"
+      echo "[-noformat_cluster] : prevents formatting the minicluster"
+      echo "[-noformat_metastore] : prevents formatting the metastore db"
       echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the"\
            "cost of performance"
       echo "[-skiptests] : skips execution of all tests"
@@ -151,7 +162,7 @@ fi
 ${IMPALA_HOME}/testdata/bin/kill-all.sh
 
 # Generate the Hadoop configs needed by Impala
-if [ $FORMAT_CLUSTER -eq 1 ]; then
+if [ $FORMAT_METASTORE -eq 1 ]; then
   ${IMPALA_HOME}/bin/create-test-configuration.sh -create_metastore
 else
   ${IMPALA_HOME}/bin/create-test-configuration.sh
@@ -179,7 +190,7 @@ mvn dependency:copy-dependencies
 
 # build frontend
 # Package first since any test failure will prevent the package phase from completing.
-# We need to do this before loading data so that hive can see the trevni input/output
+# We need to do this before loading data so that hive can see the parquet input/output
 # classes.
 mvn package -DskipTests=true
 
@@ -188,10 +199,9 @@ echo "Creating shell tarball"
 ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
 cd $IMPALA_FE_DIR
-if [ $FORMAT_CLUSTER -eq 1 ]
-then
+if [ $FORMAT_CLUSTER -eq 1 ]; then
   mvn -Pload-testdata process-test-resources -Dcluster.format
-else
+elif [ $TESTDATA_ACTION -eq 1 ] || [ $TESTS_ACTION -eq 1 ]; then
   mvn -Pload-testdata process-test-resources
 fi
 

@@ -21,31 +21,31 @@ timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=4);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=5);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=6);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=7);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=8);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=9);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=10);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=11);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=12);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=11);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=12);
 
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=4);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=5);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=6);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=7);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=8);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=9);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=10);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=11);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=12);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=11);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=12);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -118,10 +118,10 @@ timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=4);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -154,10 +154,10 @@ timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2009, month=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=4);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -173,42 +173,42 @@ functional
 ---- BASE_TABLE_NAME
 alltypesinsert
 ---- CREATE
-CREATE TABLE {db_name}{db_suffix}.{table_name} LIKE {db_name}.alltypes;
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} LIKE {db_name}.alltypes;
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypesnopart_insert
 ---- CREATE
-CREATE TABLE {db_name}{db_suffix}.{table_name} like {db_name}.alltypesnopart;
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} like {db_name}.alltypesnopart;
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_overwrite_nopart
 ---- CREATE
-CREATE TABLE {db_name}{db_suffix}.{table_name} (col1 int);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int);
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_overwrite_partitioned
 ---- CREATE
-CREATE TABLE {db_name}{db_suffix}.{table_name} (col1 int) PARTITIONED BY (col2 int);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int) PARTITIONED BY (col2 int);
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_string_partitioned
 ---- CREATE
-CREATE TABLE {db_name}{db_suffix}.{table_name} (s1 string) PARTITIONED BY (s2 string);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (s1 string) PARTITIONED BY (s2 string);
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypeserror
 ---- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -223,18 +223,16 @@ CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\'
 stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 USE {db_name}{db_suffix};
-ALTER TABLE {table_name} ADD
-PARTITION (year=2009, month=1)
-PARTITION (year=2009, month=2)
-PARTITION (year=2009, month=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=3);
 
 -- Create external temp table with desired file format with same data file location
--- Tmp tables must not specify an escape character; we don't want any
+-- Tmp tables must not specify an escape character we don't want any
 -- data transformation to happen when inserting it into tmp tables.
-DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name}_tmp (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   id STRING,
   bool_col STRING,
   tinyint_col STRING,
@@ -250,11 +248,10 @@ PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
 STORED AS {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 ---- DEPENDENT_LOAD
 -- Create a temp table in text format that interprets the data as strings
-DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
-CREATE EXTERNAL TABLE {db_name}.{table_name}_tmp (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}.{table_name}_tmp (
   id STRING,
   bool_col STRING,
   tinyint_col STRING,
@@ -270,22 +267,21 @@ PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{table_name}';
+LOCATION '{table_name}';
 -- Make metastore aware of the partition directories
 -- ALTER table does not take a fully qualified table name.
 USE {db_name};
-ALTER TABLE {table_name}_tmp ADD
-PARTITION (year=2009, month=1)
-PARTITION (year=2009, month=2)
-PARTITION (year=2009, month=3);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
 
 -- Step 4: Stream the data from tmp text table to desired format tmp table
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}_tmp PARTITION (year, month)
 SELECT * FROM {db_name}.{table_name}_tmp;
 
 -- Cleanup the temp tables
-DROP TABLE {db_name}.{table_name}_tmp;
-DROP TABLE {db_name}{db_suffix}.{table_name}_tmp;
+DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
@@ -296,7 +292,7 @@ functional
 ---- BASE_TABLE_NAME
 alltypeserrornonulls
 ---- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+CREATE EXTERNAL TABLE IF NOT EXISTS  {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -311,18 +307,17 @@ CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\'
 stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 -- Make metastore aware of the new partitions directories
 -- ALTER does not take a fully qualified name.
 USE {db_name}{db_suffix};
-ALTER TABLE {table_name} ADD
-PARTITION (year=2009, month=1)
-PARTITION (year=2009, month=2)
-PARTITION (year=2009, month=3);
+
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009, month=3);
 
 -- Create external temp table with desired file format with same data file location
-DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name}_tmp (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   id STRING,
   bool_col STRING,
   tinyint_col STRING,
@@ -339,11 +334,10 @@ ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
   ESCAPED BY '\\'
 STORED AS {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 ---- DEPENDENT_LOAD
 -- Create a temp table in text format that interprets the data as strings
-DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
-CREATE EXTERNAL TABLE {db_name}.{table_name}_tmp (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}.{table_name}_tmp (
   id STRING,
   bool_col STRING,
   tinyint_col STRING,
@@ -360,22 +354,21 @@ ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
   ESCAPED BY '\\'
 STORED AS TEXTFILE
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/alltypeserrornonulls';
+LOCATION 'alltypeserrornonulls';
 
 -- Make metastore aware of the partition directories
 USE {db_name};
-ALTER TABLE {table_name}_tmp ADD
-PARTITION (year=2009, month=1)
-PARTITION (year=2009, month=2)
-PARTITION (year=2009, month=3);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
 
 -- Step 4: Stream the data from tmp text table to desired format tmp table
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}_tmp PARTITION (year, month)
 SELECT * FROM {db_name}.{table_name}_tmp;
 
 -- Cleanup the temp tables
-DROP TABLE {db_name}.{table_name}_tmp;
-DROP TABLE {db_name}{db_suffix}.{table_name}_tmp;
+DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
@@ -404,16 +397,16 @@ timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=4);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=5);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=6);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=7);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=8);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=9);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=10);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
@@ -453,16 +446,16 @@ timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=4);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=5);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=6);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=7);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=8);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=9);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=10);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
@@ -542,8 +535,8 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/LikeTbl/data.csv' OVERWRITE INTO 
 functional
 ---- BASE_TABLE_NAME
 hbasealltypessmall
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -580,8 +573,8 @@ FROM functional.alltypessmall;
 functional
 ---- BASE_TABLE_NAME
 hbasealltypeserror
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -604,8 +597,8 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
 functional
 ---- BASE_TABLE_NAME
 hbasealltypeserrornonulls
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -628,8 +621,8 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
 functional
 ---- BASE_TABLE_NAME
 hbasealltypesagg
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -656,8 +649,8 @@ FROM functional.alltypesagg;
 functional
 ---- BASE_TABLE_NAME
 hbaseinsertalltypesagg
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -680,8 +673,8 @@ TBLPROPERTIES("hbase.table.name" = "hbaseinsertalltypesagg");
 functional
 ---- BASE_TABLE_NAME
 hbasestringids
----- CREATE
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id string,
   bool_col boolean,
   tinyint_col tinyint,
@@ -811,16 +804,16 @@ date_string_col string
 string_col string
 timestamp_col timestamp
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=1);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=2);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=3);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=4);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=5);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=6);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=7);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=8);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=9);
-ALTER TABLE {table_name} ADD PARTITION(year=2010, month=1, day=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=10);
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM {db_name}.{table_name} where id % 4 = 0;
 insert into table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM {db_name}.{table_name} where id % 4 = 1;
@@ -873,7 +866,7 @@ string_col string
 ---- COLUMNS
 id int
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION (string_col = "partition1");
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (string_col = "partition1");
 ====
 ---- DATASET
 functional
@@ -947,16 +940,16 @@ bool_col boolean
 ---- ROW_FORMAT
 delimited fields terminated by ',' escaped by '\n'
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION(id=0);
-ALTER TABLE {table_name} ADD PARTITION(id=1);
-ALTER TABLE {table_name} ADD PARTITION(id=2);
-ALTER TABLE {table_name} ADD PARTITION(id=3);
-ALTER TABLE {table_name} ADD PARTITION(id=4);
-ALTER TABLE {table_name} ADD PARTITION(id=5);
-ALTER TABLE {table_name} ADD PARTITION(id=6);
-ALTER TABLE {table_name} ADD PARTITION(id=7);
-ALTER TABLE {table_name} ADD PARTITION(id=8);
-ALTER TABLE {table_name} ADD PARTITION(id=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=0);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=1);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=2);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=3);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=4);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=5);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=6);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=7);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=8);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=9);
 ----  DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (id)
 select bool_col,id FROM {db_name}.alltypesagg where id < 10;
@@ -987,7 +980,7 @@ functional
 nullinsert
 ---- CREATE
 -- Must not be external
-CREATE TABLE {db_name}{db_suffix}.{table_name} (
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   str_col1 string,
   str_col2 string,
   str_col3 string,
@@ -996,14 +989,14 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
 )
 row format delimited fields terminated by ','  escaped by '\\'
 stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_alt;
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name}_alt(
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_alt(
   whole_row string
 )
 row format delimited fields terminated by '|'
 stored as {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 ====
 ---- DATASET
 functional
@@ -1026,11 +1019,11 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077
 functional
 ---- BASE_TABLE_NAME
 unsupported_types
----- CREATE
+---- CREATE_HIVE
 -- Create a table that mixes supported and unsupported scalar types.
 -- We should be able to read the column values of supported types and
 -- fail queries that reference  columns of unsupported types.
-CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   int_col INT,
   dec_col DECIMAL,
   str_col STRING,
@@ -1038,7 +1031,7 @@ CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
   bigint_col BIGINT)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS {file_format}
-LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
+LOCATION '{hdfs_location}';
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -1078,24 +1071,15 @@ LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_seq_snap/bad_file' OVE
 functional
 ---- BASE_TABLE_NAME
 map_table
----- CREATE
+---- CREATE_HIVE
 -- For structured-type testing
-DROP TABLE IF EXISTS map_table;
-CREATE TABLE {db_name}{db_suffix}.{table_name} (map_col map<int, string>);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (map_col map<int, string>);
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 array_table
----- CREATE
+---- CREATE_HIVE
 -- For structured-type testing
-CREATE TABLE {db_name}{db_suffix}.{table_name} (array_col array<int>);
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-array_table
----- CREATE
--- For structured-type testing
-CREATE TABLE {db_name}{db_suffix}.{table_name} (array_col array<int>);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (array_col array<int>);
 ====

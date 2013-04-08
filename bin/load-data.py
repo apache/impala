@@ -179,9 +179,10 @@ if __name__ == "__main__":
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
 
-    generated_file = 'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_file):
-      exec_hive_query_from_file(os.path.join(dataset_dir, generated_file))
+    generated_impala_file = \
+        'load-%s-%s-impala-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_impala_file):
+      exec_impala_query_from_file(os.path.join(dataset_dir, generated_impala_file))
 
     generated_avro_file = \
         'load-%s-%s-avro-generated.sql' % (workload, options.exploration_strategy)
@@ -193,15 +194,10 @@ if __name__ == "__main__":
       copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
       exec_hive_query_from_file(os.path.join(dataset_dir, generated_avro_file))
 
-    generated_parquet_file = \
-        'load-%s-%s-parquet-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_parquet_file):
-      if workload == 'functional-query':
-        # TODO This needs IMPALA-156
-        print "Functional query is not yet working with parquet.  Skipping"
-        continue
-      # For parquet, the data loading is run through impala instead of hive
-      exec_impala_query_from_file(os.path.join(dataset_dir, generated_parquet_file))
+    generated_hive_file =\
+        'load-%s-%s-hive-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_hive_file):
+      exec_hive_query_from_file(os.path.join(dataset_dir, generated_hive_file))
 
     loading_time_map[workload] = time.time() - start_time
 

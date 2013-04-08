@@ -7,6 +7,8 @@ table_name:hbasealltypesagg, constraint:restrict_to, table_format:text/none/none
 table_name:hbasealltypeserror, constraint:restrict_to, table_format:text/none/none
 table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:text/none/none
 table_name:hbasestringids, constraint:restrict_to, table_format:text/none/none
+table_name:hbaseinsertalltypesagg, constraint:restrict_to, table_format:text/none/none
+
 table_name:old_rcfile_table, constraint:restrict_to, table_format:rc/none/none
 table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block

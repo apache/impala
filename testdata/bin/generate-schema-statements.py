@@ -134,16 +134,17 @@ KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
                            file_format, compression, hdfs_location):
-  create_statement = 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
-  create_statement += 'CREATE DATABASE IF NOT EXISTS %s%s;\n' % (db_name, db_suffix)
+  create_stmt = 'CREATE DATABASE IF NOT EXISTS %s%s;\n' % (db_name, db_suffix)
+  if (options.force_reload):
+    create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
   if compression == 'lzo':
     file_format = '%s_%s' % (file_format, compression)
-  create_statement += table_template.format(db_name=db_name,
-                                            db_suffix=db_suffix,
-                                            table_name=table_name,
-                                            file_format=FILE_FORMAT_MAP[file_format],
-                                            hdfs_location=hdfs_location)
-  return create_statement
+  create_stmt += table_template.format(db_name=db_name,
+                                       db_suffix=db_suffix,
+                                       table_name=table_name,
+                                       file_format=FILE_FORMAT_MAP[file_format],
+                                       hdfs_location=hdfs_location)
+  return create_stmt
 
 def build_table_template(file_format, columns, partition_columns, row_format,
                          avro_schema_dir):
@@ -168,18 +169,17 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)
   stmt = """
-CREATE EXTERNAL TABLE {{db_name}}{{db_suffix}}.{{table_name}} (
+CREATE EXTERNAL TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
 {columns})
 {partitioned_by}
 {row_format}
 STORED AS {{file_format}}
-LOCATION '{hive_warehouse_dir}/{{hdfs_location}}'
+LOCATION '{{hdfs_location}}'
 {tblproperties}
 """.format(
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
     partitioned_by=partitioned_by,
-    hive_warehouse_dir=options.hive_warehouse_dir,
     tblproperties=tblproperties
     ).strip()
 
@@ -307,8 +307,8 @@ def generate_statements(output_name, test_vectors, sections,
   # See https://issues.apache.org/jira/browse/HIVE-4195.
   avro_output = Statements()
   # Parquet statements to be executed separately by Impala
-  parquet_output = Statements()
-  default_output = Statements()
+  impala_output = Statements()
+  hive_output = Statements()
 
   table_names = None
   if options.table_names:
@@ -318,15 +318,13 @@ def generate_statements(output_name, test_vectors, sections,
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
-    output = default_output
-    if file_format == 'avro':
-      output = avro_output
-    elif file_format == 'parquet':
-      output = parquet_output
 
     for section in sections:
       alter = section.get('ALTER')
       create = section['CREATE']
+      create_hive = section['CREATE_HIVE']
+      if create_hive:
+        create = create_hive
       insert = section['DEPENDENT_LOAD']
       load_local = section['LOAD']
       base_table_name = section['BASE_TABLE_NAME']
@@ -372,6 +370,14 @@ def generate_statements(output_name, test_vectors, sections,
         print 'Skipping \'%s.%s\' due to exclude constraint match' % (db, table_name)
         continue
 
+      output = impala_output
+      if create_hive:
+        output = hive_output
+      if file_format == 'avro':
+        output = avro_output
+      elif codec == 'lzo':
+        output = hive_output
+
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
       # must be provided (and optionally PARTITION_COLUMNS and ROW_FORMAT
       # sections), which is used to generate the create table statement.
@@ -393,7 +399,7 @@ def generate_statements(output_name, test_vectors, sections,
           f.write(avro_schema(columns))
 
       output.create.append(build_create_statement(table_template, table_name, db_name,
-          db_suffix, create_file_format, create_codec, hdfs_location))
+          db_suffix, create_file_format, create_codec, data_path))
 
       # The ALTER statement in hive does not accept fully qualified table names.
       # We need the use statement.
@@ -410,35 +416,32 @@ def generate_statements(output_name, test_vectors, sections,
         print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
         if not db_suffix:
           if load_local:
-            output.load_base.append(build_load_statement(load_local, db_name,
-                                                         db_suffix, table_name))
+            hive_output.load_base.append(build_load_statement(load_local, db_name,
+                                                              db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
         elif file_format == 'parquet':
           if insert:
-            # In most cases the same load logic can be used for the parquet and
-            # non-parquet case, but sometimes it needs to be special cased.
-            insert = insert if 'LOAD_PARQUET' not in section else section['LOAD_PARQUET']
-            parquet_output.load.append(build_insert_into_statement(
+            impala_output.load.append(build_insert_into_statement(
                 insert, db_name, db_suffix, table_name, 'parquet', for_impala=True))
           else:
             print \
                 'Empty parquet load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
-            output.load.append(build_insert(insert, db_name, db_suffix, file_format,
+            hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
                                             codec, compression_type, table_name))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
   avro_output.write_to_file('load-' + output_name + '-avro-generated.sql')
-  parquet_output.write_to_file('load-' + output_name + '-parquet-generated.sql')
-  default_output.write_to_file('load-' + output_name + '-generated.sql')
+  impala_output.write_to_file('load-' + output_name + '-impala-generated.sql')
+  hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
-                         'ROW_FORMAT', 'CREATE', 'DEPENDENT_LOAD', 'LOAD', 'ALTER',
-                         'LOAD_PARQUET']
+                         'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'DEPENDENT_LOAD', 'LOAD',
+                         'ALTER']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
