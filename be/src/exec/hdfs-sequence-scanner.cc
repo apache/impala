@@ -567,8 +567,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   return Status::OK;
 }
 
-void HdfsSequenceScanner::LogRowParseError(stringstream* ss, int row_idx) {
-  DCHECK(state_->LogHasSpace());
+void HdfsSequenceScanner::LogRowParseError(int row_idx, stringstream* ss) {
   DCHECK_LT(row_idx, record_locations_.size());
   *ss << string(reinterpret_cast<const char*>(record_locations_[row_idx].record), 
                   record_locations_[row_idx].len);

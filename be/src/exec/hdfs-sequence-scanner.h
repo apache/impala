@@ -217,7 +217,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   
   // Appends the current file and line to the RuntimeState's error log.
   // row_idx is 0-based (in current batch) where the parse error occurred.
-  virtual void LogRowParseError(std::stringstream*, int row_idx);
+  virtual void LogRowParseError(int row_idx, std::stringstream*);
   
   // Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;

@@ -483,19 +483,19 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
   if (state_->LogHasSpace()) {
     stringstream ss;
     ss << "file: " << stream_->filename() << endl << "record: ";
-    LogRowParseError(&ss, row_idx);
+    LogRowParseError(row_idx, &ss);
     state_->LogError(ss.str());
   }
   
   ++num_errors_in_file_;
   if (state_->abort_on_error()) {
     state_->ReportFileErrors(stream_->filename(), 1);
-    parse_status_ = Status(state_->ErrorLog());
+    DCHECK(!parse_status_.ok());
   }
   return parse_status_.ok();
 }
 
-void HdfsScanner::LogRowParseError(stringstream* ss, int row_idx) {
+void HdfsScanner::LogRowParseError(int row_idx, stringstream* ss) {
   // This is only called for text and seq files which should override this function.
   DCHECK(false);
 }
@@ -506,13 +506,14 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
   // about that here and can just output the raw string.
   if (len < 0) len = -len;
 
-  if (state_->LogHasSpace()) {
+  if (state_->LogHasSpace() || state_->abort_on_error()) {
     stringstream ss;
     ss << "Error converting column: " 
        << desc->col_pos() - scan_node_->num_partition_keys()
        << " TO " << TypeToString(desc->type()) 
        << " (Data is: " << string(data,len) << ")";
-    state_->LogError(ss.str());
+    if (state_->LogHasSpace()) state_->LogError(ss.str());
+    if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());
   }
 }
 

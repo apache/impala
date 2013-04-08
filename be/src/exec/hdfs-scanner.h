@@ -242,7 +242,7 @@ class HdfsScanner {
   // row_idx is the index of the row in the current batch.  Subclasses should override
   // this function (i.e. text needs to join boundary rows).  Since this is only in the
   // error path, vtable overhead is acceptable.
-  virtual void LogRowParseError(std::stringstream*, int row_idx);
+  virtual void LogRowParseError(int row_idx, std::stringstream*);
 
   // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
   // to the start of the tuple (e.g. fields[0] maps to slots[0]).
@@ -276,7 +276,8 @@ class HdfsScanner {
   static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*, 
       llvm::Function* write_tuple_fn);
   
-  // Report parse error for column @ desc
+  // Report parse error for column @ desc.   If abort_on_error is true, sets
+  // parse_status_ to the error message.
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
   
   // Utility function to issue all splits for 'filename' as a single range per split.

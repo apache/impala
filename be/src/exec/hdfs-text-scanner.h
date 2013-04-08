@@ -115,7 +115,7 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Appends the current file and line to the RuntimeState's error log.
   // row_idx is 0-based (in current batch) where the parse error occured.
-  virtual void LogRowParseError(std::stringstream*, int row_idx);
+  virtual void LogRowParseError(int row_idx, std::stringstream*);
 
   // Memory pool for allocations into the boundary row / column
   boost::scoped_ptr<MemPool> boundary_mem_pool_;

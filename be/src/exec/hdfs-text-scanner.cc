@@ -345,7 +345,7 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
   return Status::OK;
 }
 
-void HdfsTextScanner::LogRowParseError(stringstream* ss, int row_idx) {
+void HdfsTextScanner::LogRowParseError(int row_idx, stringstream* ss) {
   DCHECK_LT(row_idx, row_end_locations_.size());
   char* row_end = row_end_locations_[row_idx];
   char* row_start;
@@ -400,7 +400,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
         if (state_->LogHasSpace()) {
           stringstream ss;
           ss << "file: " << stream_->filename() << endl << "record: ";
-          LogRowParseError(&ss, 0);
+          LogRowParseError(0, &ss);
           state_->LogError(ss.str());
         }
         if (state_->abort_on_error()) parse_status_ = Status(state_->ErrorLog());
