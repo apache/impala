@@ -68,7 +68,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk, int nu
   srand(rand_seed);
 
   io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init();
+  Status status = io_mgr_->Init(NULL);
   CHECK(status.ok());
   
   // Initialize some data files.  It doesn't really matter how many there are.

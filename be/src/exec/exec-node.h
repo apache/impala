@@ -194,7 +194,7 @@ class ExecNode {
 #define RETURN_IF_LIMIT_EXCEEDED(state) \
   do { \
     if (UNLIKELY(MemLimit::LimitExceeded(*(state)->mem_limits()))) { \
-      return Status(TStatusCode::MEM_LIMIT_EXCEEDED); \
+      return Status::MEM_LIMIT_EXCEEDED; \
     } \
   } while (false)
 

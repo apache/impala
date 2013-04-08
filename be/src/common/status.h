@@ -48,6 +48,7 @@ class Status {
 
   static const Status OK;
   static const Status CANCELLED;
+  static const Status MEM_LIMIT_EXCEEDED;
 
   // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status)
@@ -100,6 +101,11 @@ class Status {
   bool IsCancelled() const {
     return error_detail_ != NULL
         && error_detail_->error_code == TStatusCode::CANCELLED;
+  }
+
+  bool IsMemLimitExceeded() const {
+    return error_detail_ != NULL
+        && error_detail_->error_code == TStatusCode::MEM_LIMIT_EXCEEDED;
   }
 
   // Add an error message and set the code if no code has been set yet.

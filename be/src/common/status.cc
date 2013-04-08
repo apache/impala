@@ -28,6 +28,8 @@ namespace impala {
 // TODO: is there a more controlled way to do this.
 const Status Status::OK;
 const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled", true);
+const Status Status::MEM_LIMIT_EXCEEDED(
+    TStatusCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded", true);
 
 Status::ErrorDetail::ErrorDetail(const TStatus& status)
   : error_code(status.status_code),

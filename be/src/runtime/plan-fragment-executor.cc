@@ -95,7 +95,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     // we have a per-query limit
     int64_t bytes_limit = request.query_options.mem_limit;
     mem_limit_.reset(new MemLimit(bytes_limit));
-    runtime_state_->mem_limits()->push_back(mem_limit_.get());
+    runtime_state_->SetFragmentMemLimit(mem_limit_.get());
     if (bytes_limit > MemInfo::physical_mem()) {
       LOG(WARNING) << "Memory limit "
                    << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)

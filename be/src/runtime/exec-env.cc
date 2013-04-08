@@ -88,6 +88,7 @@ ExecEnv::ExecEnv()
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   }
+  
   Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
 
@@ -127,6 +128,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   }
+  
   Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
 
@@ -161,6 +163,8 @@ Status ExecEnv::StartServices() {
   }
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+  
+  disk_io_mgr_->SetProcessMemLimit(mem_limit_.get());
 
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {

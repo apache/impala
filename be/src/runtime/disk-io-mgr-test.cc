@@ -19,12 +19,14 @@
 #include "codegen/llvm-codegen.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-stress.h"
+#include "runtime/mem-limit.h"
 #include "util/cpu-info.h"
 
 using namespace std;
 using namespace boost;
 
 const int BUFFER_SIZE = 1024;
+const int LARGE_MEM_LIMIT = 1024 * 1024 * 1024;
 
 namespace impala {
 
@@ -84,6 +86,7 @@ class DiskIoMgrTest : public testing::Test {
 // Basic test with a single reader, testing multiple threads, disks and a different
 // number of buffers.
 TEST_F(DiskIoMgrTest, SingleReader) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghjijklm";
   CreateTempFile(tmp_file, data);
@@ -98,7 +101,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init();
+        Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
         status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
@@ -119,10 +122,12 @@ TEST_F(DiskIoMgrTest, SingleReader) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // Tests a single reader cancelling half way through scan ranges.  
 TEST_F(DiskIoMgrTest, SingleReaderCancel) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghjijklm";
   CreateTempFile(tmp_file, data);
@@ -137,7 +142,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         DiskIoMgr::ReaderContext* reader;
-        Status status = io_mgr.Init();
+        Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
         ASSERT_TRUE(status.ok());
@@ -169,10 +174,12 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // This test issues adding additional scan ranges while there are some still in flight.
 TEST_F(DiskIoMgrTest, AddScanRangeTest) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghijklm";
   CreateTempFile(tmp_file, data);
@@ -188,7 +195,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init();
+        Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
         status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
@@ -245,12 +252,14 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // Test to make sure that sync reads and async reads work together
 // Note: this test is constructed so the number of buffers is greater than the
 // number of scan ranges.
 TEST_F(DiskIoMgrTest, SyncReadTest) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcde";
   CreateTempFile(tmp_file, data);
@@ -264,7 +273,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init();
+        Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
         status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
@@ -331,10 +340,12 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // This test will test multiple concurrent reads each reading a different file.
 TEST_F(DiskIoMgrTest, MultipleReader) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   const int NUM_THREADS = 5;
   const int DATA_LEN = 50;
   const int ITERATIONS = 25;
@@ -373,7 +384,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-          Status status = io_mgr.Init();
+          Status status = io_mgr.Init(&mem_limit);
           ASSERT_TRUE(status.ok());
 
           for (int i = 0; i < NUM_THREADS; ++i) {
@@ -403,11 +414,13 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // This test is going to dynamically adjust the number of buffers assigned to
 // a reader.
 TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   int MAX_BUFFERS = 7;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghijklmnopqrstuvwxyz";
@@ -422,7 +435,7 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
         if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-        Status status = io_mgr.Init();
+        Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         
         // Start with one buffer and work our way up or the max buffers and go down.
@@ -470,10 +483,12 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // This tests exercises the grouped scan range functionality.
 TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
+  MemLimit mem_limit(LARGE_MEM_LIMIT);
   int64_t return_buffer_idx = 0;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghijklmnopqrstuvwxyz";
@@ -499,7 +514,7 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
 
           memset(result, 0, strlen(data));
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-          Status status = io_mgr.Init();
+          Status status = io_mgr.Init(&mem_limit);
           ASSERT_TRUE(status.ok());
 
           DiskIoMgr::ReaderContext* reader;
@@ -595,6 +610,68 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
       }
     }
   }
+  EXPECT_EQ(mem_limit.consumption(), 0);
+}
+
+TEST_F(DiskIoMgrTest, MemLimits) {
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghijklmnopqrstuvwxyz";
+  CreateTempFile(tmp_file, data);
+
+  const int num_buffers = 25;
+  // Give the reader more buffers than the limit
+  const int mem_limit_num_buffers = 10;
+  MemLimit mem_limit(mem_limit_num_buffers * BUFFER_SIZE);
+  
+  {
+    DiskIoMgr io_mgr(1, 1, BUFFER_SIZE);
+    Status status = io_mgr.Init(&mem_limit);
+    ASSERT_TRUE(status.ok());
+
+    DiskIoMgr::ReaderContext* reader;
+    status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+    ASSERT_TRUE(status.ok());
+          
+    vector<DiskIoMgr::ScanRange*> ranges;
+    for (int i = 0; i < strlen(data); ++i) {
+      ranges.push_back(InitRange(tmp_file, i, 1, 0));
+    }
+    status = io_mgr.AddScanRanges(reader, ranges);
+    ASSERT_TRUE(status.ok());
+
+    // Keep reading without returning buffers.  This causes the io mgr to have
+    // to allocate more buffers and should hit the limit.
+    list<DiskIoMgr::BufferDescriptor*> buffers;
+    for (int i = 0; i <= mem_limit_num_buffers; ++i) {
+      // The first 'mem_limit_num_buffers' should succeed
+      DiskIoMgr::BufferDescriptor* buffer;
+      bool eos = true;
+      status = io_mgr.GetNext(reader, &buffer, &eos);
+      ASSERT_TRUE(status.ok());
+      EXPECT_FALSE(eos);
+      EXPECT_TRUE(buffer->buffer() != NULL);
+      EXPECT_TRUE(buffer->eosr());
+      buffers.push_back(buffer);
+    }
+
+    // Read the rest, these should all fail with limit exceeded
+    for (int i = mem_limit_num_buffers + 1; i < num_buffers; ++i) {
+      DiskIoMgr::BufferDescriptor* buffer;
+      bool eos = true;
+      status = io_mgr.GetNext(reader, &buffer, &eos);
+      ASSERT_TRUE(!status.ok());
+      ASSERT_TRUE(status.IsMemLimitExceeded());
+      ASSERT_TRUE(buffer == NULL);
+    }
+
+    for (list<DiskIoMgr::BufferDescriptor*>::iterator it = buffers.begin(); 
+        it != buffers.end(); ++it) {
+      (*it)->Return();
+    }
+
+    io_mgr.UnregisterReader(reader);
+  }
+  EXPECT_EQ(mem_limit.consumption(), 0);
 }
 
 // Stress test for multiple clients with cancellation

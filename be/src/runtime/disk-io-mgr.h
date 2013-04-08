@@ -31,6 +31,8 @@
 
 namespace impala {
 
+class MemLimit;
+
 // Manager object that schedules IO for all queries on all disks.  Each query maps
 // to one or more readers, each of which has its own queue of scan ranges.  The
 // API splits up requesting scan ranges (non-blocking) and reading the data (blocking).
@@ -219,8 +221,12 @@ class DiskIoMgr {
   // for impalad, this object is never destroyed.
   ~DiskIoMgr();
 
-  // Initialize the IoMgr.  Must be called once before any of the other APIs
-  Status Init();
+  // Initialize the IoMgr.  Must be called once before any of the other APIs.
+  Status Init(MemLimit* process_mem_limit = NULL);
+
+  // Sets the process wide mem limit for.  If this is exceeded, io requests will 
+  // fail until we are under the limit again.
+  void SetProcessMemLimit(MemLimit* process_mem_limit);
 
   // Allocates tracking structure for this reader. Register a new reader which is
   // returned in *reader.
@@ -234,11 +240,15 @@ class DiskIoMgr {
   // max_parallel_ranges: The maximum number of scan ranges that should be read in
   //    parallel for this reader.  If it's 0, a default will be used. This controls
   //    how many scan ranges can be processed in parallel. 
+  // reader_mem_limit: If non-null, the memory limit for this reader.  IO buffers
+  //    used for this reader will count against this limit.  If the limit is exceeded
+  //    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
+  //    GetNext().
   // If max_parallel_ranges is less than max_io_buffers, multiple buffers will 
   // potentially be queued per range.  If max_parallel_ranges is greater, some ranges
   // will be started without any buffers queued for it.  
   Status RegisterReader(hdfsFS hdfs, int max_io_buffers, int max_parallel_ranges,
-      ReaderContext** reader);
+      ReaderContext** reader, MemLimit* reader_mem_limit = NULL);
 
   // Unregisters reader from the disk io mgr.  This must be called for every 
   // RegisterReader() regardless of cancellation and must be called in the
@@ -353,6 +363,9 @@ class DiskIoMgr {
   // Pool to allocate BufferDescriptors
   ObjectPool pool_;
 
+  // Process memory limit that tracks io buffers.
+  MemLimit* process_mem_limit_;
+
   // Number of worker(read) threads per disk.  Also the max depth of queued
   // work to the disk.
   int num_threads_per_disk_;
@@ -416,10 +429,17 @@ class DiskIoMgr {
   // Returns a buffer to read into that is the size of max_read_size_.  If there is a
   // free buffer in the 'free_buffers_', that is returned, otherwise a new one is 
   // allocated.
-  char* GetFreeBuffer();
+  // Updates mem limits for reader
+  char* GetFreeBuffer(ReaderContext* reader);
 
-  // Returns a buffer to the free list.  
-  void ReturnFreeBuffer(char* buffer);
+  // Garbage collect all unused io buffers.  This is currently only triggered when the
+  // process wide limit is hit.  This is not good enough.  While it is sufficient for
+  // the io mgr, other components do not trigger this GC.  
+  // TODO: make this run periodically?
+  void GcIoBuffers();
+
+  // Returns a buffer to the free list and updates mem usage for 'reader' 
+  void ReturnFreeBuffer(ReaderContext* reader, char* buffer);
 
   // Disk worker thread loop.  This function reads the next range from the 
   // disk queue if there are available buffers and places the read buffer into 
@@ -456,6 +476,9 @@ class DiskIoMgr {
   // Updates disk queue and reader state after a read is complete.  The read result
   // is captured in the buffer descriptor.
   void HandleReadFinished(DiskQueue*, ReaderContext*, BufferDescriptor*);
+
+  // Cancels the reader with status code 'status'.  GetNext will return 'status'.
+  void CancelReaderInternal(ReaderContext* reader, Status status);
 };
 
 }

@@ -99,6 +99,7 @@ class RuntimeState {
   ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   std::vector<MemLimit*>* mem_limits() { return &mem_limits_; }
+  MemLimit* fragment_mem_limit() { return fragment_mem_limit_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
@@ -108,6 +109,13 @@ class RuntimeState {
 
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
+
+  // Sets the fragment memory limit and adds it to mem_limits_
+  void SetFragmentMemLimit(MemLimit* limit) {
+    DCHECK(fragment_mem_limit_ == NULL);
+    fragment_mem_limit_ = limit;
+    mem_limits_.push_back(limit);
+  }
 
   // Appends error to the error_log_ if there is space
   void LogError(const std::string& error);
@@ -181,6 +189,9 @@ class RuntimeState {
 
   // all mem limits that apply to this query
   std::vector<MemLimit*> mem_limits_;
+
+  // Fragment memory limit.  Also contained in mem_limits_
+  MemLimit* fragment_mem_limit_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

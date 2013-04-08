@@ -20,6 +20,7 @@
 #include <boost/thread/locks.hpp>
 
 #include "common/logging.h"
+#include "runtime/mem-limit.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -133,6 +134,13 @@ struct DiskIoMgr::ReaderContext {
   // Current state of the reader
   State state_;
   
+  // Status of this reader.  Set to non-ok if cancelled.
+  Status status_;
+
+  // Memory limit for this reader.  This is unowned by this object.  If NULL,
+  // this reader does not have a (per-reader) limit.
+  MemLimit* mem_limit_;
+
   // The number of disks with scan ranges remaining (always equal to the sum of
   // non-empty ranges in per disk states).
   int num_disks_with_ranges_;
@@ -286,8 +294,9 @@ struct DiskIoMgr::ReaderContext {
   bool GetScanRange(int disk_id, ScanRange** range, char** buffer);
 
   // Resets this object for a new reader
-  void Reset(hdfsFS hdfs_connection) {
+  void Reset(hdfsFS hdfs_connection, MemLimit* limit) {
     DCHECK_EQ(state_, Inactive);
+    status_ = Status::OK;
 
     bytes_read_counter_ = NULL;
     read_timer_ = NULL;
@@ -297,6 +306,7 @@ struct DiskIoMgr::ReaderContext {
     state_ = Active;
     sync_reader_ = false;
     hdfs_connection_ = hdfs_connection;
+    mem_limit_ = limit;
 
     min_num_buffers_ = 1;
     num_buffers_quota_ = 0;
@@ -549,17 +559,16 @@ DiskIoMgr::~DiskIoMgr() {
   
   // Delete all allocated buffers
   DCHECK_EQ(num_allocated_buffers_, free_buffers_.size());
-  for (list<char*>::iterator iter = free_buffers_.begin();
-      iter != free_buffers_.end(); ++iter) {
-    delete *iter;
-  }
+  GcIoBuffers();
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     delete disk_queues_[i];
   }
 }
 
-Status DiskIoMgr::Init() {
+Status DiskIoMgr::Init(MemLimit* process_mem_limit) {
+  process_mem_limit_ = process_mem_limit;
+
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
     for (int j = 0; j < num_threads_per_disk_; ++j) {
@@ -571,11 +580,15 @@ Status DiskIoMgr::Init() {
   return Status::OK;
 }
 
+void DiskIoMgr::SetProcessMemLimit(MemLimit* process_mem_limit) {
+  process_mem_limit_ = process_mem_limit;
+}
+
 Status DiskIoMgr::RegisterReader(hdfsFS hdfs, int max_io_buffers, 
-    int max_parallel_ranges, ReaderContext** reader) {
+    int max_parallel_ranges, ReaderContext** reader, MemLimit* mem_limit) {
   DCHECK(reader_cache_.get() != NULL) << "Must call Init() first.";
   *reader = reader_cache_->GetNewReader();
-  (*reader)->Reset(hdfs);
+  (*reader)->Reset(hdfs, mem_limit);
   if (max_parallel_ranges > 0) {
     (*reader)->max_parallel_scan_ranges_ = max_parallel_ranges;
   } else {
@@ -636,6 +649,12 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
 // outstanding reference to the reader decrements the number of disk queues the reader 
 // is on.  
 void DiskIoMgr::CancelReader(ReaderContext* reader) {
+  CancelReaderInternal(reader, Status::CANCELLED);
+}
+
+void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
+  DCHECK(!status.ok());
+
   // copy of ready but unreturned buffers that need to be cleaned up.
   list<BufferDescriptor*> ready_buffers_copy;
   {
@@ -646,6 +665,8 @@ void DiskIoMgr::CancelReader(ReaderContext* reader) {
     if (reader->state_ == ReaderContext::Cancelled) {
       return;
     }
+    DCHECK(reader->status_.ok());
+    reader->status_ = status;
     
     // The reader will be put into a cancelled state until call cleanup is complete.
     reader->state_ = ReaderContext::Cancelled;
@@ -783,7 +804,10 @@ Status DiskIoMgr::AddScanRangesInternal(ReaderContext* reader,
     unique_lock<mutex> lock(reader->lock_);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
     
-    if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
+    if (reader->state_ == ReaderContext::Cancelled) {
+      DCHECK(!reader->status_.ok());
+      return reader->status_;
+    }
 
     // Add each range to the queue of the disk the range is on
     for (int i = 0; i < ranges.size(); ++i) {
@@ -846,7 +870,10 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   *buffer = NULL;
   *eos = true;
 
-  if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
+  if (reader->state_ == ReaderContext::Cancelled) {
+    DCHECK(!reader->status_.ok());
+    return reader->status_;
+  }
 
   VLOG_FILE << "GetNext(): reader=" << reader->DebugString();
 
@@ -858,7 +885,10 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   }
   
   DCHECK(reader->Validate()) << endl << reader->DebugString();
-  if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
+  if (reader->state_ == ReaderContext::Cancelled) {
+    DCHECK(!reader->status_.ok());
+    return reader->status_;
+  }
 
   // Remove the first read block from the queue and return it
   DCHECK(!reader->ready_buffers_.empty());
@@ -913,7 +943,10 @@ Status DiskIoMgr::TryGetNext(ReaderContext* reader,
   {
     unique_lock<mutex> lock(reader->lock_);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
+    if (reader->state_ == ReaderContext::Cancelled) {
+      DCHECK(!reader->status_.ok());
+      return reader->status_;
+    }
     
     if (reader->num_used_buffers_ >= reader->num_buffers_quota_
         && reader->ready_buffers_.empty() && reader->num_buffers_in_disk_threads_ == 0) {
@@ -942,18 +975,17 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
     return;
   }
 
-  ReturnFreeBuffer(buffer_desc->buffer_);
-  buffer_desc->buffer_ = NULL;
-  
   ReaderContext* reader = buffer_desc->reader_;
+
+  ReturnFreeBuffer(reader, buffer_desc->buffer_);
+  buffer_desc->buffer_ = NULL;
   ReturnBufferDesc(buffer_desc);
 
   __sync_add_and_fetch(&num_buffers_in_readers_, -1);
-  if (reader == NULL) {
-    // Null reader indicates this was a synchronous reader.  There is no more work
-    // to be done for this reader.
-    return;
-  }
+  
+  // Null reader indicates this was a synchronous reader.  There is no more work
+  // to be done for this reader.
+  if (reader == NULL) return;
 
   {
     unique_lock<mutex> reader_lock(reader->lock_);
@@ -984,23 +1016,42 @@ DiskIoMgr::BufferDescriptor* DiskIoMgr::GetBufferDesc(
   return buffer_desc;
 }
 
-char* DiskIoMgr::GetFreeBuffer() {
+char* DiskIoMgr::GetFreeBuffer(ReaderContext* reader) {
   unique_lock<mutex> lock(free_buffers_lock_);
+  char* buffer = NULL;
   if (free_buffers_.empty()) {
     ++num_allocated_buffers_;
     if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
       ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(1L);
     }
-    return new char[max_read_size_];
+    // Update the process mem usage.  This is checked the next time we start
+    // a read for the next reader (DiskIoMgr::GetNextScanRange)
+    if (process_mem_limit_ != NULL) process_mem_limit_->Consume(max_read_size_);
+    buffer = new char[max_read_size_];
   } else {
-    char* buffer = free_buffers_.front();
+    buffer = free_buffers_.front();
     free_buffers_.pop_front();
-    return buffer;
   }
+  DCHECK(buffer != NULL);
+  if (reader->mem_limit_ != NULL) reader->mem_limit_->Consume(max_read_size_);
+  return buffer;
 }
 
-void DiskIoMgr::ReturnFreeBuffer(char* buffer) {
+void DiskIoMgr::GcIoBuffers() {
+  unique_lock<mutex> lock(free_buffers_lock_);
+  for (list<char*>::iterator iter = free_buffers_.begin();
+      iter != free_buffers_.end(); ++iter) {
+    if (process_mem_limit_ != NULL) process_mem_limit_->Release(max_read_size_);
+    delete *iter;
+  }
+  free_buffers_.clear();
+}
+
+void DiskIoMgr::ReturnFreeBuffer(ReaderContext* reader, char* buffer) {
   DCHECK(buffer != NULL);
+  if (reader != NULL && reader->mem_limit_ != NULL) {
+    reader->mem_limit_->Release(max_read_size_);
+  }
   unique_lock<mutex> lock(free_buffers_lock_);
   free_buffers_.push_back(buffer);
 }
@@ -1118,6 +1169,7 @@ string DiskIoMgr::ReaderContext::DebugString() const {
   if (state_ == ReaderContext::Active) ss << "Active";
   if (state_ != ReaderContext::Inactive) {
     ss << " sync_reader=" << (sync_reader_ ? "true" : "false")
+       << " status_ = " << status_.GetErrorMsg()
        << " max_parallel_scan_ranges=" << max_parallel_scan_ranges_
        << " num_in_flight_ranges=" << num_in_flight_ranges_
        << " buffer_quota=" << num_buffers_quota_
@@ -1369,7 +1421,7 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
 
   // Get a free buffer from the disk io mgr.  It's a global pool for all readers but
   // they are lazily allocated.  Each reader is guaranteed its share.
-  *buffer = parent_->GetFreeBuffer();
+  *buffer = parent_->GetFreeBuffer(this);
   DCHECK(*buffer != NULL);
   ++num_used_buffers_;
   ++num_buffers_in_disk_threads_;
@@ -1428,6 +1480,25 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
     // There are some invariants here.  Only one disk thread can have the
     // same reader here (the reader is removed from the queue).  There can be
     // other disk threads operating on this reader in other functions though.
+
+    // We just picked a reader, check the mem limits.
+    // TODO: we can do a lot better here.  The reader can likely make progress
+    // with fewer io buffers.
+    bool process_limit_exceeded = 
+        (process_mem_limit_ != NULL) && process_mem_limit_->LimitExceeded();
+    bool reader_limit_exceeded = 
+        ((*reader)->mem_limit_ != NULL) && (*reader)->mem_limit_->LimitExceeded();
+
+    if (process_limit_exceeded && !reader_limit_exceeded) {
+      // We hit the process limit but not the reader one.  See if we can reclaim
+      // some memory by removing previously allocated (but unused) io buffers.
+      GcIoBuffers();
+      process_limit_exceeded = process_mem_limit_->LimitExceeded();
+    }
+
+    if (process_limit_exceeded || reader_limit_exceeded) {
+      CancelReaderInternal(*reader, Status::MEM_LIMIT_EXCEEDED);
+    }
 
     unique_lock<mutex> reader_lock((*reader)->lock_);
     VLOG_FILE << "Disk (id=" << disk_id << ") reading for " << (*reader)->DebugString();
@@ -1491,7 +1562,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
 
     if (reader->state_ == ReaderContext::Cancelled) {
       CloseScanRange(reader->hdfs_connection_, buffer->scan_range_);
-      ReturnFreeBuffer(buffer->buffer_);
+      ReturnFreeBuffer(reader, buffer->buffer_);
       buffer->buffer_ = NULL;
       ReturnBufferDesc(buffer);
       --reader->num_used_buffers_;
@@ -1519,7 +1590,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
       CloseScanRange(reader->hdfs_connection_, buffer->scan_range_);
       --reader->num_used_buffers_;
       --buffer->scan_range_->num_io_buffers_;
-      ReturnFreeBuffer(buffer->buffer_);
+      ReturnFreeBuffer(reader, buffer->buffer_);
       buffer->buffer_ = NULL;
       buffer->eosr_ = true;
       --state.num_remaining_scan_ranges;

@@ -48,6 +48,7 @@ RuntimeState::RuntimeState(
   : obj_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_id)),
+    fragment_mem_limit_(NULL),
     is_cancelled_(false) {
   Status status = Init(fragment_id, query_options, now, exec_env);
   DCHECK(status.ok());
@@ -56,7 +57,8 @@ RuntimeState::RuntimeState(
 RuntimeState::RuntimeState(const std::string& now)
   : obj_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    profile_(obj_pool_.get(), "<unnamed>") {
+    profile_(obj_pool_.get(), "<unnamed>"),
+    fragment_mem_limit_(NULL) {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
   now_.reset(new TimestampValue(now.c_str(), now.size()));
 }
