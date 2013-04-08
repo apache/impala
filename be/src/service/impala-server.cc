@@ -655,6 +655,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/query_profile_encoded",
       profile_encoded_callback, false, false);
+  
+  Webserver::PathHandlerCallback inflight_query_ids_callback =
+      bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsPathHandler), this, _1, _2);
+  exec_env->webserver()->RegisterPathHandler("/inflight_query_ids",
+      inflight_query_ids_callback, false, false);
 
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics());
@@ -769,6 +774,14 @@ void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& 
     (*output) << status.GetErrorMsg();
   }
   (*output) << "</pre>";
+}
+
+void ImpalaServer::InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
+  lock_guard<mutex> l(query_exec_state_map_lock_);
+  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+    *output << exec_state.second->query_id() << "\n";
+  }
 }
 
 Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,

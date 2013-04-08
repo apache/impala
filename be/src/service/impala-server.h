@@ -518,6 +518,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback.  Prints the query profile as a base64 encoded object.
   void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
+  
+  // Webserver callback.  Prints the inflight query ids.
+  void InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
+      std::stringstream* output);
 
   // Webserver callback that prints a table of active sessions.
   void SessionPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
