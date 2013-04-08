@@ -17,16 +17,17 @@
 # Impala's shell
 import cmd
 import csv
+import getpass
 import prettytable
-import time
-import sys
 import os
 import signal
 import socket
+import sqlparse
+import sys
 import threading
+import time
 from optparse import OptionParser
 from Queue import Queue, Empty
-import getpass
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -859,33 +860,15 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 (Build version: %s)""" % VERSION_STRING
 
 def parse_query_text(query_text):
-  """Parse query file text and filter out the queries.
+  """Parse query file text and filter comments """
+  queries = sqlparse.split(query_text)
+  return map(strip_comments_from_query, queries)
 
-  This method filters comments. Comments can be of 3 types:
-  (a) select foo --comment
-      from bar;
-  (b) select foo
-      from bar --comment;
-  (c) --comment
-  The semi-colon takes precedence over everything else. As such,
-  it's not permitted within a comment, and cannot be escaped.
-  """
-  # queries are split by a semi-colon.
-  raw_queries = query_text.split(';')
-  queries = []
-  for raw_query in raw_queries:
-    query = []
-    for line in raw_query.split('\n'):
-      line = line.split(COMMENT_TOKEN)[0].strip()
-      if len(line) > 0:
-        # anything before the comment is legal.
-        query.append(line)
-    queries.append('\n'.join(query))
-  # The last query need not be demilited by a semi-colon.
-  # If it is, get rid of the last element.
-  if len(queries[-1]) == 0:
-    queries = queries[:-1]
-  return queries
+def strip_comments_from_query(query):
+  """Strip comments from an individual query """
+  #TODO: Make query format configurable by the user.
+  return sqlparse.format(query, strip_comments=True,
+                         reindent=True, indent_tabs=True)
 
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
