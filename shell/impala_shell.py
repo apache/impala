@@ -98,6 +98,8 @@ class OutputWriter(object):
 #     of the shell should handle this return paramter.
 class ImpalaShell(cmd.Cmd):
   DISCONNECTED_PROMPT = "[Not connected] > "
+  # Commands are terminated with the following delimiter.
+  CMD_DELIM = ';'
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
@@ -119,6 +121,8 @@ class ImpalaShell(cmd.Cmd):
     self.default_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
     self.show_profiles = options.show_profiles
+    # Stores the state of user input until a delimiter is seen.
+    self.partial_cmd = str()
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
     self.output_writer = None
@@ -183,12 +187,64 @@ class ImpalaShell(cmd.Cmd):
       return 'quit'
     else:
       tokens[0] = tokens[0].lower()
-    return ' '.join(tokens).rstrip(';')
+    args = self.__check_for_command_completion(' '.join(tokens).strip())
+    return args.rstrip(ImpalaShell.CMD_DELIM)
+
+  def __check_for_command_completion(self, cmd):
+    """Check for a delimiter at the end of user input.
+
+    The end of the user input is scanned for a legal delimiter.
+    If a delimiter is not found:
+      - Input is not send to onecmd()
+        - onecmd() is a method in Cmd which routes the user input to the
+          appropriate method. An empty string results in a no-op.
+      - Input is removed from history.
+      - Input is appended to partial_cmd
+    If a delimiter is found:
+      - The contents of partial_cmd are put in history, as they represent
+        a completed command.
+      - The contents are passed to the appropriate method for execution.
+      - partial_cmd is reset to an empty string.
+    """
+    if self.readline:
+      current_history_len = self.readline.get_current_history_length()
+    # Input is incomplete, store the contents and do nothing.
+    if not cmd.endswith(ImpalaShell.CMD_DELIM):
+      # partial_cmd is already populated, add the current input after a newline.
+      if self.partial_cmd and cmd:
+        self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+      else:
+        # If the input string is empty or partial_cmd is empty.
+        self.partial_cmd = "%s%s" % (self.partial_cmd, cmd)
+      # Remove the most recent item from history if:
+      #   -- The current state of user input in incomplete.
+      #   -- The most recent user input is not an empty string
+      if self.readline and current_history_len > 0 and cmd:
+        self.readline.remove_history_item(current_history_len - 1)
+      # An empty string results in a no-op. Look at emptyline()
+      return str()
+    elif self.partial_cmd: # input ends with a delimiter and partial_cmd is not empty
+      if cmd != ImpalaShell.CMD_DELIM:
+        completed_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+      else:
+        completed_cmd = "%s%s" % (self.partial_cmd, cmd)
+      # Reset partial_cmd to an empty string
+      self.partial_cmd = str()
+      # Replace the most recent history item with the completed command.
+      # In order for it to be read from the history file, the \n has
+      # to be escaped.
+      if self.readline and current_history_len > 0:
+        self.readline.replace_history_item(current_history_len - 1,
+                                           completed_cmd.encode('string-escape'))
+    else: # Input has a delimiter and partial_cmd is empty
+      completed_cmd = cmd
+    return completed_cmd
 
   def __signal_handler(self, signal, frame):
     self.is_interrupted.set()
 
   def precmd(self, args):
+    # TODO: Add support for multiple commands on the same line.
     self.is_interrupted.clear()
     return self.sanitise_input(args)
 
@@ -294,6 +350,9 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('use %s' % self.default_db)
       self.__build_default_query_options_dict()
     self.last_query_handle = None
+    # In the case that we lost connection while a command was being entered,
+    # we may have a dangling command, clear partial_cmd
+    self.partial_cmd = str()
     # Check if any of query options set by the user are inconsistent
     # with the impalad being connected to
     for set_option in self.set_query_options.keys():
@@ -680,7 +739,15 @@ class ImpalaShell(cmd.Cmd):
     # readline returns 1 as the history length and stores 'None' at index 0.
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
-        print '[%d]: %s' % (index, self.readline.get_history_item(index))
+        # Each entry in history has to be decoded in order to display it properly
+        cmd = self.readline.get_history_item(index).decode('string-escape')
+        # Display sugar to ensure proper indentation.
+        enum_prefix = '[%d]: ' % index
+        for i,line in enumerate(cmd.split('\n')):
+          if i == 0:
+            print enum_prefix + line
+          else:
+            print line.rjust(len(enum_prefix) + len(line))
     else:
       print 'readline module not found, history is not supported.'
     return True
