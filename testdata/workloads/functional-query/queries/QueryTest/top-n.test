@@ -670,3 +670,12 @@ int,int,int,int
 1,1,61,1
 1,1,71,1
 ====
+---- QUERY
+# Test limit 0 from sub query
+select sum(a.int_col) from 
+  (select int_col from functional.alltypes order by int_col limit 0) a
+---- TYPES
+bigint
+---- RESULTS
+NULL
+====

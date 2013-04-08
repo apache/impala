@@ -106,21 +106,23 @@ Status TopNNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(child(0)->Open(state));
 
-  RowBatch batch(child(0)->row_desc(), state->batch_size());
-  bool eos;
-  do {
-    RETURN_IF_CANCELLED(state);
-    batch.Reset();
-    RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
-    if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
-      return Status("DEFAULT_ORDER_BY_LIMIT has been exceeded.");
-    }
-    for (int i = 0; i < batch.num_rows(); ++i) {
-      InsertTupleRow(batch.GetRow(i));
-    }
-    RETURN_IF_LIMIT_EXCEEDED(state);
-  } while (!eos);
-  
+  // Limit of 0, no need to fetch anything from children.
+  if (limit_ != 0) {
+    RowBatch batch(child(0)->row_desc(), state->batch_size());
+    bool eos;
+    do {
+      RETURN_IF_CANCELLED(state);
+      batch.Reset();
+      RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
+      if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
+        return Status("DEFAULT_ORDER_BY_LIMIT has been exceeded.");
+      }
+      for (int i = 0; i < batch.num_rows(); ++i) {
+        InsertTupleRow(batch.GetRow(i));
+      }
+      RETURN_IF_LIMIT_EXCEEDED(state);
+    } while (!eos);
+  }
   DCHECK_LE(priority_queue_.size(), limit_);
   PrepareForOutput();
   return Status::OK;
@@ -158,6 +160,7 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
   if (priority_queue_.size() < limit_) {
     insert_tuple_row = input_row->DeepCopy(tuple_descs_, tuple_pool_.get());
   } else {
+    DCHECK(!priority_queue_.empty());
     TupleRow* top_tuple_row = priority_queue_.top();
     if (tuple_row_less_than_(input_row, top_tuple_row)) {
       // TODO: DeepCopy will allocate new buffers for the string data.  This needs
