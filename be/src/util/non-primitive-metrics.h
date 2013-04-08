@@ -163,11 +163,11 @@ class StatsMetric : public Metrics::Metric<T> {
   }
 
   virtual void PrintValueJson(std::stringstream* out) {
-    (*out) << "{ last: " << this->value_
-           << ", min: " << boost::accumulators::min(this->acc_)
-           << ", max: " << boost::accumulators::max(this->acc_)
-           << ", mean: " << boost::accumulators::mean(this->acc_)
-           << ", stddev:" << sqrt(boost::accumulators::variance(this->acc_))
+    (*out) << "{ \"last\": " << this->value_
+           << ", \"min\": " << boost::accumulators::min(this->acc_)
+           << ", \"max\": " << boost::accumulators::max(this->acc_)
+           << ", \"mean\": " << boost::accumulators::mean(this->acc_)
+           << ", \"stddev\":" << sqrt(boost::accumulators::variance(this->acc_))
            << " }";
   }
 
