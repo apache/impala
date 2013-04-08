@@ -544,6 +544,9 @@ class ImpalaShell(cmd.Cmd):
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
+  def do_desc(self, args):
+    return self.do_describe(args)
+
   def do_insert(self, args):
     """Executes an INSERT query"""
     query = self.__create_beeswax_query_handle()
