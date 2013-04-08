@@ -38,6 +38,8 @@ class Status;
 class TNetworkAddress;
 class ThriftServer;
 
+typedef ClientCache<StateStoreServiceClient> StateStoreClientCache;
+
 // A StateStoreSubscriber communicates with a state-store periodically
 // through the exchange of heartbeat messages. These messages contain
 // updates from the state-store to a list of 'topics' that the
@@ -162,8 +164,8 @@ class StateStoreSubscriber {
   // disconnection.
   std::map<StateStore::TopicId, bool> topic_registrations_;
 
-  // Client to use to connect to the StateStore.
-  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient> > client_;
+  // State-store client cache - only one client is ever used.
+  boost::scoped_ptr<StateStoreClientCache> client_cache_;
 
   // Metric to indicate if we are successfully registered with the statestore
   Metrics::BooleanMetric* connected_to_statestore_metric_;

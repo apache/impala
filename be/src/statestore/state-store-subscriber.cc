@@ -46,6 +46,8 @@ const string STATE_STORE_ID = "STATESTORE";
 // state-store after a failure.
 const int32_t SLEEP_INTERVAL_MS = 5000;
 
+typedef ClientConnection<StateStoreServiceClient> StateStoreConnection;
+
 // Proxy class for the subscriber heartbeat thrift API, which
 // translates RPCs into method calls on the local subscriber object.
 class StateStoreSubscriberThriftIf : public StateStoreSubscriberIf {
@@ -71,9 +73,8 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
       failure_detector_(new TimeoutFailureDetector(
           seconds(FLAGS_statestore_subscriber_timeout_seconds),
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
-      is_registered_(false) {
-  client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_address_.hostname,
-                                                          state_store_address_.port));
+      is_registered_(false),
+      client_cache_(new StateStoreClientCache()) {
   connected_to_statestore_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric("statestore-subscriber.connected", false);
   last_recovery_time_metric_ =
@@ -82,6 +83,7 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
   heartbeat_interval_metric_ =
       metrics->RegisterMetric(
           new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time", 0.0));
+  client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
 Status StateStoreSubscriber::AddTopic(const StateStore::TopicId& topic_id,
@@ -94,9 +96,9 @@ Status StateStoreSubscriber::AddTopic(const StateStore::TopicId& topic_id,
 }
 
 Status StateStoreSubscriber::Register() {
-  client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_address_.hostname,
-                                                           state_store_address_.port));
-  RETURN_IF_ERROR(client_->OpenWithRetry(5, 1000));
+  Status client_status;
+  StateStoreConnection client(client_cache_.get(), state_store_address_, &client_status);
+  RETURN_IF_ERROR(client_status);
 
   TRegisterSubscriberRequest request;
   request.topic_registrations.reserve(update_callbacks_.size());
@@ -110,7 +112,7 @@ Status StateStoreSubscriber::Register() {
   request.subscriber_location = heartbeat_address_;
   request.subscriber_id = subscriber_id_;
   TRegisterSubscriberResponse response;
-  client_->iface()->RegisterSubscriber(response, request);
+  client->RegisterSubscriber(response, request);
   Status status = Status(response.status);
   if (status.ok()) connected_to_statestore_metric_->Update(true);
   heartbeat_interval_timer_.Start();
