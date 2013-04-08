@@ -16,6 +16,7 @@
 #
 # Impala's shell
 import cmd
+import csv
 import prettytable
 import time
 import sys
@@ -53,6 +54,33 @@ class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
   OK = 0
   ERROR = 1
+
+
+class OutputWriter(object):
+  """Helper class for saving result set output to a file"""
+  def __init__(self, file_name, field_delim):
+    # The default csv field size limit is too small to write large result sets. Set it to
+    # an artibrarily large value.
+    csv.field_size_limit(sys.maxint)
+    self.file_name = file_name
+
+    if not field_delim:
+      raise ValueError, 'A field delimiter is required to output results to a file'
+    self.field_delim = field_delim.decode('string-escape')
+    if len(self.field_delim) != 1:
+      raise ValueError, 'Field delimiter must be a 1-character string'
+
+  def write_rows(self, rows, mode='ab'):
+    output_file = None
+    try:
+      output_file = open(self.file_name, mode)
+      writer =\
+          csv.writer(output_file, delimiter=self.field_delim, quoting=csv.QUOTE_MINIMAL)
+      writer.writerows(rows)
+    finally:
+      if output_file:
+        output_file.close()
+
 
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
@@ -92,6 +120,10 @@ class ImpalaShell(cmd.Cmd):
     self.show_profiles = options.show_profiles
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
+    self.output_writer = None
+    if options.output_file:
+      self.output_writer =\
+          OutputWriter(options.output_file, options.output_file_field_delim)
     try:
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
@@ -400,8 +432,9 @@ class ImpalaShell(cmd.Cmd):
       num_rows_fetched += len(results.data)
       result_rows.extend(results.data)
       if len(result_rows) >= self.fetch_batch_size or not results.has_more:
+        rows = [r.split('\t') for r in result_rows]
         try:
-          map(table.add_row, [r.split('\t') for r in result_rows])
+          map(table.add_row, rows)
           # Clear the rows that have been added. The goal is is to stream the table
           # in batch_size quantums.
           print table
@@ -413,6 +446,12 @@ class ImpalaShell(cmd.Cmd):
           # Reference:  https://issues.cloudera.org/browse/IMPALA-116
           print ('\n').join(result_rows)
         result_rows = []
+        if self.output_writer:
+          # Writing to output files is also impacted by the beeswax bug mentioned
+          # above. This means that if a string column has a tab, it will break the row
+          # split causing the wrong number of fields to be written to the output file.
+          # Reference:  https://issues.cloudera.org/browse/IMPALA-116
+          self.output_writer.write_rows(rows)
         if not results.has_more:
           break
     # Don't include the time to get the runtime profile in the query execution time
@@ -749,6 +788,12 @@ if __name__ == "__main__":
                     help="Execute the queries in the query file, delimited by ;")
   parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
                     action="store_true", help="Connect to a kerberized impalad")
+  parser.add_option("-o", "--output_file", dest="output_file", default=None,
+                    help="If set, query results will be saved to the given file as well "\
+                    "as output to the console. Results from multiple queries will be "\
+                    "be append to the same file")
+  parser.add_option("--output_file_field_delim", dest="output_file_field_delim",
+                    default=',', help="Field delimiter to use in the output file")
   parser.add_option("-s", "--kerberos_service_name",
                     dest="kerberos_service_name", default=None,
                     help="Service name of a kerberized impalad, default is 'impala'")
@@ -789,6 +834,15 @@ if __name__ == "__main__":
     print "Using service name '%s' for kerberos" % options.kerberos_service_name
   elif options.kerberos_service_name:
     print 'Kerberos not enabled, ignoring service name'
+
+  if options.output_file:
+    try:
+      # Make sure the given file can be opened for writing. This will also clear the file
+      # if successful.
+      open(options.output_file, 'wb')
+    except IOError, e:
+      print 'Error opening output file for writing: %s' % e
+      sys.exit(1)
 
   if options.query or options.query_file:
     execute_queries_non_interactive_mode(options)
