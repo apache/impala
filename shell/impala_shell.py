@@ -22,6 +22,7 @@ import time
 import sys
 import os
 import signal
+import socket
 import threading
 from optparse import OptionParser
 import getpass
@@ -783,7 +784,7 @@ def execute_queries_non_interactive_mode(options):
 
 if __name__ == "__main__":
   parser = OptionParser()
-  parser.add_option("-i", "--impalad", dest="impalad", default=None,
+  parser.add_option("-i", "--impalad", dest="impalad", default=socket.getfqdn(),
                     help="<host:port> of impalad to connect to")
   parser.add_option("-q", "--query", dest="query", default=None,
                     help="Execute a query without the shell")
