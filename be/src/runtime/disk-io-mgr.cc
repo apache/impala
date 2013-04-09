@@ -604,13 +604,14 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
   CancelReader(reader);
   
   unique_lock<mutex> lock(reader->lock_);
-  DCHECK_EQ(reader->num_buffers_in_reader_, 0) << endl << reader->DebugString();
   DCHECK(reader->Validate()) << endl << reader->DebugString();
   DCHECK(reader->ready_buffers_.empty()) << endl << reader->DebugString();
   while (reader->num_disks_with_ranges_ > 0) {
     reader->disks_complete_cond_var_.wait(lock);
   }
   
+  // All the disks are done with clean, validate nothing is leaking.
+  DCHECK_EQ(reader->num_buffers_in_reader_, 0) << endl << reader->DebugString();
   DCHECK_EQ(reader->num_used_buffers_, 0) << endl << reader->DebugString();
 
   for (int i = 0; i < reader->disk_states_.size(); ++i) {

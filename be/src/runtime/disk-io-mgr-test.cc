@@ -623,7 +623,10 @@ TEST_F(DiskIoMgrTest, MemLimits) {
   const int mem_limit_num_buffers = 10;
   MemLimit mem_limit(mem_limit_num_buffers * BUFFER_SIZE);
   
+  int64_t iters = 0;
   {
+    if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
+
     DiskIoMgr io_mgr(1, 1, BUFFER_SIZE);
     Status status = io_mgr.Init(&mem_limit);
     ASSERT_TRUE(status.ok());
@@ -641,28 +644,29 @@ TEST_F(DiskIoMgrTest, MemLimits) {
 
     // Keep reading without returning buffers.  This causes the io mgr to have
     // to allocate more buffers and should hit the limit.
+    // We can't know exactly when the mem limits will be hit since they are 
+    // allocated asynchronously in the io mgr.  
     list<DiskIoMgr::BufferDescriptor*> buffers;
-    for (int i = 0; i <= mem_limit_num_buffers; ++i) {
-      // The first 'mem_limit_num_buffers' should succeed
+    Status last_status = Status::OK;
+    for (int i = 0; i < num_buffers; ++i) {
       DiskIoMgr::BufferDescriptor* buffer;
       bool eos = true;
       status = io_mgr.GetNext(reader, &buffer, &eos);
-      ASSERT_TRUE(status.ok());
-      EXPECT_FALSE(eos);
-      EXPECT_TRUE(buffer->buffer() != NULL);
-      EXPECT_TRUE(buffer->eosr());
-      buffers.push_back(buffer);
+      if (!last_status.ok()) {
+        EXPECT_TRUE(!status.ok());
+      }
+      last_status = status;
+      if (status.ok()) {
+        EXPECT_FALSE(eos);
+        EXPECT_TRUE(buffer->buffer() != NULL);
+        EXPECT_TRUE(buffer->eosr());
+      } else {
+        EXPECT_TRUE(status.IsMemLimitExceeded());
+        EXPECT_TRUE(buffer == NULL);
+      }
+      if (buffer != NULL) buffers.push_back(buffer);
     }
-
-    // Read the rest, these should all fail with limit exceeded
-    for (int i = mem_limit_num_buffers + 1; i < num_buffers; ++i) {
-      DiskIoMgr::BufferDescriptor* buffer;
-      bool eos = true;
-      status = io_mgr.GetNext(reader, &buffer, &eos);
-      ASSERT_TRUE(!status.ok());
-      ASSERT_TRUE(status.IsMemLimitExceeded());
-      ASSERT_TRUE(buffer == NULL);
-    }
+    EXPECT_TRUE(!last_status.ok());
 
     for (list<DiskIoMgr::BufferDescriptor*>::iterator it = buffers.begin(); 
         it != buffers.end(); ++it) {
