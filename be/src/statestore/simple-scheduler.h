@@ -114,6 +114,9 @@ class SimpleScheduler : public Scheduler {
   // Initialisation metric
   Metrics::BooleanMetric* initialised_;
 
+  // Counts the number of UpdateMembership invocations, to help throttle the logging.
+  uint32_t update_count_;
+
   // Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& service_state,
       std::vector<TTopicUpdate>* topic_updates);

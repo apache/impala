@@ -51,7 +51,8 @@ SimpleScheduler::SimpleScheduler(StateStoreSubscriber* subscriber,
     thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
-    initialised_(NULL) {
+    initialised_(NULL),
+    update_count_(0) {
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
@@ -62,7 +63,8 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
-    initialised_(NULL) {
+    initialised_(NULL),
+    update_count_(0) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
     vector<string> ipaddrs;
@@ -114,6 +116,7 @@ impala::Status SimpleScheduler::Init() {
 void SimpleScheduler::UpdateMembership(
     const StateStoreSubscriber::TopicDeltaMap& service_state,
     vector<TTopicUpdate>* topic_updates) {
+  ++update_count_;
   // TODO: Work on a copy if possible, or at least do resolution as a separate step
   // First look to see if the topic(s) we're interested in have an update
   StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
@@ -157,7 +160,9 @@ void SimpleScheduler::UpdateMembership(
       if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
         // Someone *might* be running this on localhost with no
         // external interface (for debugging); keep going.
-        VLOG(2) << "Only localhost addresses found for " << backend_address.hostname;
+        VLOG_IF(3, (update_count_ % 100 == 0))
+            << "Only localhost addresses found for "
+            << backend_address.hostname << " (log count: " << google::COUNTER << ")";
       }
 
       host_map_copy[ipaddr].push_back(backend_address);
