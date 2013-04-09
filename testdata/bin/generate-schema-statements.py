@@ -218,10 +218,11 @@ def build_codec_enabled_statement(codec):
   return COMPRESSION_ENABLED % compression_enabled
 
 def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_format,
-                                for_impala=False):
+                                hdfs_path, for_impala=False):
   insert_statement = insert.format(db_name=db_name,
                                    db_suffix=db_suffix,
-                                   table_name=table_name)
+                                   table_name=table_name,
+                                   hdfs_location=hdfs_path)
   if for_impala:
     return insert_statement
 
@@ -237,11 +238,11 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
   return statement + insert_statement
 
 def build_insert(insert, db_name, db_suffix, file_format,
-                 codec, compression_type, table_name):
+                 codec, compression_type, table_name, hdfs_path):
   output = build_codec_enabled_statement(codec) + "\n"
   output += build_compression_codec_statement(codec, compression_type, file_format) + "\n"
   output += build_insert_into_statement(insert, db_name, db_suffix,
-                                        table_name, file_format) + "\n"
+                                        table_name, file_format, hdfs_path) + "\n"
   return output
 
 def build_load_statement(load_template, db_name, db_suffix, table_name):
@@ -308,6 +309,7 @@ def generate_statements(output_name, test_vectors, sections,
   avro_output = Statements()
   # Parquet statements to be executed separately by Impala
   impala_output = Statements()
+  impala_load = Statements()
   hive_output = Statements()
 
   table_names = None
@@ -422,20 +424,21 @@ def generate_statements(output_name, test_vectors, sections,
             print 'Empty base table load for %s. Skipping load generation' % table_name
         elif file_format == 'parquet':
           if insert:
-            impala_output.load.append(build_insert_into_statement(
-                insert, db_name, db_suffix, table_name, 'parquet', for_impala=True))
+            impala_load.load.append(build_insert_into_statement(insert, db_name,
+                db_suffix, table_name, 'parquet', data_path, for_impala=True))
           else:
             print \
                 'Empty parquet load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
             hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
-                                            codec, compression_type, table_name))
+                                        codec, compression_type, table_name, data_path))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
   avro_output.write_to_file('load-' + output_name + '-avro-generated.sql')
   impala_output.write_to_file('load-' + output_name + '-impala-generated.sql')
+  impala_load.write_to_file('load-' + output_name + '-impala-load-generated.sql')
   hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')
 
 def parse_schema_template_file(file_name):

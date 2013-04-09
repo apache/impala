@@ -249,38 +249,18 @@ ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
 STORED AS {file_format}
 LOCATION '{hdfs_location}';
----- DEPENDENT_LOAD
--- Create a temp table in text format that interprets the data as strings
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}.{table_name}_tmp (
-  id STRING,
-  bool_col STRING,
-  tinyint_col STRING,
-  smallint_col STRING,
-  int_col STRING,
-  bigint_col STRING,
-  float_col STRING,
-  double_col STRING,
-  date_string_col STRING,
-  string_col STRING,
-  timestamp_col STRING)
-PARTITIONED BY (year INT, month INT)
-ROW FORMAT DELIMITED
-  FIELDS TERMINATED BY ','
-STORED AS TEXTFILE
-LOCATION '{table_name}';
--- Make metastore aware of the partition directories
--- ALTER table does not take a fully qualified table name.
-USE {db_name};
+
+-- Make metastore aware of the partition directories for the temp table
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
-
+---- DEPENDENT_LOAD
+USE {db_name}{db_suffix};
 -- Step 4: Stream the data from tmp text table to desired format tmp table
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}_tmp PARTITION (year, month)
 SELECT * FROM {db_name}.{table_name}_tmp;
 
--- Cleanup the temp tables
-DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
+-- Cleanup the temp table
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
@@ -335,39 +315,19 @@ ROW FORMAT DELIMITED
   ESCAPED BY '\\'
 STORED AS {file_format}
 LOCATION '{hdfs_location}';
----- DEPENDENT_LOAD
--- Create a temp table in text format that interprets the data as strings
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}.{table_name}_tmp (
-  id STRING,
-  bool_col STRING,
-  tinyint_col STRING,
-  smallint_col STRING,
-  int_col STRING,
-  bigint_col STRING,
-  float_col STRING,
-  double_col STRING,
-  date_string_col STRING,
-  string_col STRING,
-  timestamp_col STRING)
-PARTITIONED BY (year INT, month INT)
-ROW FORMAT DELIMITED
-  FIELDS TERMINATED BY ','
-  ESCAPED BY '\\'
-STORED AS TEXTFILE
-LOCATION 'alltypeserrornonulls';
 
 -- Make metastore aware of the partition directories
-USE {db_name};
+USE {db_name}{db_suffix};
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
-
+---- DEPENDENT_LOAD
+USE {db_name}{db_suffix};
 -- Step 4: Stream the data from tmp text table to desired format tmp table
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}_tmp PARTITION (year, month)
 SELECT * FROM {db_name}.{table_name}_tmp;
 
--- Cleanup the temp tables
-DROP TABLE IF EXISTS {db_name}.{table_name}_tmp;
+-- Cleanup the temp table
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);

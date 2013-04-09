@@ -199,6 +199,11 @@ if __name__ == "__main__":
     if os.path.exists(generated_hive_file):
       exec_hive_query_from_file(os.path.join(dataset_dir, generated_hive_file))
 
+    generated_impala_file = \
+        'load-%s-%s-impala-load-generated.sql' % (workload, options.exploration_strategy)
+    if os.path.exists(generated_impala_file):
+      exec_impala_query_from_file(os.path.join(dataset_dir, generated_impala_file))
+
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0
