@@ -291,7 +291,8 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
     profile_(NULL),
     serialize_batch_timer_(NULL),
     thrift_transmit_timer_(NULL),
-    bytes_sent_counter_(NULL) {
+    bytes_sent_counter_(NULL),
+    dest_node_id_(sink.dest_node_id) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
       || sink.output_partition.type == TPartitionType::HASH_PARTITIONED);
@@ -323,7 +324,9 @@ DataStreamSender::~DataStreamSender() {
 
 Status DataStreamSender::Init(RuntimeState* state) {
   DCHECK(state != NULL);
-  profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
+  stringstream title;
+  title << "DataStreamSender (dst_id=" << dest_node_id_ << ")";
+  profile_ = pool_->Add(new RuntimeProfile(pool_, title.str()));
   SCOPED_TIMER(profile_->total_time_counter());
 
   for (int i = 0; i < channels_.size(); ++i) {

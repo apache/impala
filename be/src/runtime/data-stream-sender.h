@@ -20,6 +20,7 @@
 #include <string>
 
 #include "exec/data-sink.h"
+#include "common/global-types.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "util/runtime-profile.h"
@@ -96,6 +97,9 @@ class DataStreamSender : public DataSink {
   RuntimeProfile::Counter* thrift_transmit_timer_;
   RuntimeProfile::Counter* bytes_sent_counter_;
   RuntimeProfile::Counter* uncompressed_bytes_counter_;
+
+  // Identifier of the destination plan node.
+  PlanNodeId dest_node_id_;
 };
 
 }
