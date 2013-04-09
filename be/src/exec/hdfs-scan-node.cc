@@ -195,10 +195,12 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
       desc = desc_it->second;
     }
       
-    if (scan_range_params[i].volume_id == -1 && !unknown_disk_id_warned_) {
-      LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
-                   << " Check your hdfs settings to enable block location metadata.";
-      unknown_disk_id_warned_ = true;
+    if (scan_range_params[i].volume_id == -1) {
+      if (!unknown_disk_id_warned_) {
+        LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
+                     << " Check your hdfs settings to enable block location metadata.";
+        unknown_disk_id_warned_ = true;
+      }
       ++num_ranges_missing_volume_id;
     }
 
