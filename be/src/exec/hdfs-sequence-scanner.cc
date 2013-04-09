@@ -300,12 +300,12 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (write_tuples_fn_ != NULL) {
     // last argument: seq always starts at record_location[0]
     tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
-                                       context_->row_byte_size(), &field_locations_[0], num_to_commit, 
-                                       max_added_tuples, scan_node_->materialized_slots().size(), 0); 
+        context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+        max_added_tuples, scan_node_->materialized_slots().size(), 0); 
   } else {
     tuples_returned = WriteAlignedTuples(pool, tuple_row, 
-                                         context_->row_byte_size(), &field_locations_[0], num_to_commit, 
-                                         max_added_tuples, scan_node_->materialized_slots().size(), 0);
+        context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+        max_added_tuples, scan_node_->materialized_slots().size(), 0);
   }
 
   if (tuples_returned == -1) return parse_status_;
@@ -328,14 +328,13 @@ Status HdfsSequenceScanner::ProcessRange() {
   
   bool eosr = false;
   while (!eosr) {
-    // Current record to process and its length.
-    uint8_t* record = NULL;
-    int64_t record_len = 0;
+    DCHECK_GT(record_locations_.size(), 0);
     // Get the next compressed or uncompressed record.
-    RETURN_IF_ERROR(GetRecord(&record, &record_len, &eosr));
+    RETURN_IF_ERROR(
+        GetRecord(&record_locations_[0].record, &record_locations_[0].len, &eosr));
 
     if (eosr) {
-      DCHECK(record == NULL);
+      DCHECK(record_locations_[0].record == NULL);
       break;
     }
 
@@ -350,15 +349,15 @@ Status HdfsSequenceScanner::ProcessRange() {
     // Parse the current record.
     if (scan_node_->materialized_slots().size() != 0) {
       char* col_start;
-      uint8_t* record_start = record;
+      uint8_t* record_start = record_locations_[0].record;
       int num_tuples = 0;
       int num_fields = 0;
       char* row_end_loc;
       uint8_t error_in_row = false;
 
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
-          1, record_len, reinterpret_cast<char**>(&record), &row_end_loc,
-          &field_locations_[0], &num_tuples, &num_fields, &col_start));
+          1, record_locations_[0].len, reinterpret_cast<char**>(&record_start), 
+          &row_end_loc, &field_locations_[0], &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
       
       uint8_t errors[num_fields];
@@ -368,25 +367,8 @@ Status HdfsSequenceScanner::ProcessRange() {
           template_tuple_, &errors[0], &error_in_row);
 
       if (UNLIKELY(error_in_row)) {
-        for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-          if (errors[i]) {
-            const SlotDescriptor* desc = scan_node_->materialized_slots()[i];
-            ReportColumnParseError(
-                desc, field_locations_[i].start, field_locations_[i].len);
-          }
-        }
-        // Report all the fields that have errors.
-        ++num_errors_in_file_;
-        if (state_->LogHasSpace()) {
-          stringstream ss;
-          ss << "file: " << stream_->filename() << endl
-             << "record: " << string(reinterpret_cast<char*>(record_start), record_len);
-          state_->LogError(ss.str());
-        }
-        if (state_->abort_on_error()) {
-          state_->ReportFileErrors(stream_->filename(), 1);
-          return Status(state_->ErrorLog());
-        }
+        ReportTupleParseError(&field_locations_[0], errors, 0);
+        RETURN_IF_ERROR(parse_status_);
       }
     } else {
       add_row = WriteEmptyTuples(context_, tuple_row_mem, 1);

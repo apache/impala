@@ -236,8 +236,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   };
 
   // Records are processed in batches.  This vector stores batches of record locations
-  // that are being processed.  Currently this is only used for block compression.
-  // TODO: no reason we can't do this for record compressed/uncompressed.  
+  // that are being processed.  
   // TODO: better perf not to use vector?
   std::vector<RecordLocation> record_locations_;
 
