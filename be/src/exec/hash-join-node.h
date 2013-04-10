@@ -124,6 +124,7 @@ class HashJoinNode : public ExecNode {
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
   RuntimeProfile::Counter* probe_row_counter_;   // num probe rows
   RuntimeProfile::Counter* build_buckets_counter_;   // num buckets in hash table
+  RuntimeProfile::Counter* hash_tbl_load_factor_counter_;
 
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);

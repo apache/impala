@@ -90,6 +90,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
   probe_row_counter_ =
       ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
+  hash_tbl_load_factor_counter_ =
+      ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
@@ -174,11 +176,12 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
     }
     VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
 
+    COUNTER_SET(build_row_counter_, hash_tbl_->size());
+    COUNTER_SET(build_buckets_counter_, hash_tbl_->num_buckets());
+    COUNTER_SET(hash_tbl_load_factor_counter_, hash_tbl_->load_factor());
     build_batch.Reset();
     if (eos) break;
   }
-  COUNTER_UPDATE(build_row_counter_, hash_tbl_->size());
-  COUNTER_UPDATE(build_buckets_counter_, hash_tbl_->num_buckets());
   return Status::OK;
 }
 

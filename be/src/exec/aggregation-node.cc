@@ -110,6 +110,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ = 
       ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
+  hash_table_load_factor_counter_ = 
+      ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
 
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   
@@ -198,6 +200,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
     COUNTER_SET(memory_used_counter(), 
         tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
+    COUNTER_SET(hash_table_load_factor_counter_, hash_tbl_->load_factor());
     num_agg_rows += (hash_tbl_->size() - agg_rows_before);
     num_input_rows += batch.num_rows();
 

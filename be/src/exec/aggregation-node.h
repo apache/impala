@@ -102,6 +102,8 @@ class AggregationNode : public ExecNode {
   RuntimeProfile::Counter* get_results_timer_;
   // Num buckets in hash table
   RuntimeProfile::Counter* hash_table_buckets_counter_;   
+  // Load factor in hash table
+  RuntimeProfile::Counter* hash_table_load_factor_counter_;   
 
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
