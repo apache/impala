@@ -51,7 +51,6 @@ import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HdfsTableSink;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
@@ -76,6 +75,8 @@ import com.google.common.collect.Sets;
 public class HdfsTable extends Table {
   // Hive uses this string for NULL partition keys. Set in load().
   private String nullPartitionKeyValue;
+
+  private static boolean hasLoggedDiskIdFormatWarning = false;
 
   /**
    * Block metadata used for scheduling.
@@ -280,7 +281,7 @@ public class HdfsTable extends Table {
     // Initialize the diskId as -1 to indicate it is unknown
     int diskId = -1;
 
-    if (hdfsVolumeId.isValid()) {
+    if (hdfsVolumeId != null && hdfsVolumeId.isValid()) {
       // TODO: this is a hack and we'll have to address this by getting the
       // public API.  Also, we need to be very mindful of this when we change
       // the version of HDFS.
@@ -290,6 +291,9 @@ public class HdfsTable extends Table {
       byte[] volumeIdBytes = Base64.decodeBase64(volumeIdString);
       if (volumeIdBytes.length == 4) {
         diskId = Bytes.toInt(volumeIdBytes);
+      } else if (!hasLoggedDiskIdFormatWarning) {
+        LOG.warn("wrong disk id format: " + volumeIdString);
+        hasLoggedDiskIdFormatWarning = true;
       }
     }
     return diskId;
@@ -301,10 +305,10 @@ public class HdfsTable extends Table {
   private void loadPartitionBlockMd() throws RuntimeException {
     LOG.info("load partition block md for " + name);
     // Block locations for all the files in all the partitions.
-    List<BlockLocation> blocks = Lists.newArrayList();
+    List<BlockLocation> blockLocations = Lists.newArrayList();
 
-    List<Pair<PartitionBlockMetadata, Integer>> numBlocksPerPartition =
-        Lists.newArrayList();
+    // Partition block metadata for all the partitions
+    List<PartitionBlockMetadata> partitionBlockMdList = Lists.newArrayList();
 
     for (HdfsPartition partition: partitions) {
       PartitionBlockMetadata partitionBlockMd = new PartitionBlockMetadata(partition);
@@ -349,21 +353,19 @@ public class HdfsTable extends Table {
             locations = DFS.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
           }
           if (locations != null) {
-            blocks.addAll(Arrays.asList(locations));
+            blockLocations.addAll(Arrays.asList(locations));
             for (int i = 0; i < locations.length; ++i) {
               partitionBlockMd.addBlock(fileDescriptor.getFilePath(),
                   fileDescriptor.getFileLength(), locations[i],
                   partition.getTable().uniqueHostPorts);
             }
-            numBlocksPerPartition.add(new Pair(partitionBlockMd, locations.length));
-          } else {
-            numBlocksPerPartition.add(new Pair(partitionBlockMd, 0));
           }
         } catch (IOException e) {
           throw new RuntimeException("couldn't determine block locations for path '"
               + p + "':\n" + e.getMessage(), e);
         }
       }
+      partitionBlockMdList.add(partitionBlockMd);
       LOG.info("loaded partition " + partitionBlockMd.toString());
     }
 
@@ -371,10 +373,12 @@ public class HdfsTable extends Table {
       return;
     }
 
+    // BlockStorageLocations for all the blocks
+    // block described by blockMetadataList[i] is located at locations[i]
     BlockStorageLocation[] locations = null;
     try {
       // Get the BlockStorageLocations for all the blocks
-      locations = DFS.getFileBlockStorageLocations(blocks);
+      locations = DFS.getFileBlockStorageLocations(blockLocations);
     } catch (IOException e) {
       LOG.error("Couldn't determine block storage locations:\n" + e.getMessage());
       return;
@@ -385,43 +389,37 @@ public class HdfsTable extends Table {
       return;
     }
 
-    if (locations.length != blocks.size()) {
+    if (locations.length != blockLocations.size()) {
       // blocks and locations don't match up
       LOG.error("Number of block locations not equal to number of blocks: "
           + "#locations=" + Long.toString(locations.length)
-          + " #blocks=" + Long.toString(blocks.size()));
+          + " #blocks=" + Long.toString(blockLocations.size()));
       return;
     }
 
     int locationsIdx = 0;
-    for (Pair<PartitionBlockMetadata, Integer> pair: numBlocksPerPartition) {
-      // Convert block locations to 0 based ids.  The block location ids returned
-      // from HDFS are unique but opaque (only defining comparison operators).  We need
-      // to turn them into indices.
-      // TODO: the diskId should be eventually retrievable from Hdfs when
-      // the community agrees this API is useful.
-      for (int i = 0; i < pair.second; ++i, ++locationsIdx) {
-        VolumeId[] volumeIds = locations[locationsIdx].getVolumeIds();
-        // For each block replica, the disk id for the block on that host
+    int unknownDiskIdCount = 0;
+    for (PartitionBlockMetadata partitionBlockMd: partitionBlockMdList) {
+      for (BlockMetadata blockMd: partitionBlockMd.getBlockMetadata()) {
+        VolumeId[] volumeIds = locations[locationsIdx++].getVolumeIds();
+        // Convert opaque VolumeId to 0 based ids.
+        // TODO: the diskId should be eventually retrievable from Hdfs when
+        // the community agrees this API is useful.
         int[] diskIds = new int[volumeIds.length];
-
-        boolean found_null = false;
-        for (int j = 0; j < volumeIds.length; ++j) {
-          if (volumeIds[j] == null) {
-            found_null = true;
-            break;
+        for (int i = 0; i < volumeIds.length; ++i) {
+          diskIds[i] = getDiskId(volumeIds[i]);
+          if (diskIds[i] < 0) {
+            ++unknownDiskIdCount;
           }
-          diskIds[j] = getDiskId(volumeIds[j]);
         }
-
-        if (found_null) {
-          break;
-        }
-        pair.first.setBlockDiskIds(i, diskIds);
+        blockMd.setDiskIds(diskIds);
       }
     }
     LOG.info("loaded disk ids for table " + getFullName());
     LOG.info(Integer.toString(getNumNodes()));
+    if (unknownDiskIdCount > 0) {
+      LOG.warn("unknown disk id count " + unknownDiskIdCount);
+    }
   }
 
   /**
