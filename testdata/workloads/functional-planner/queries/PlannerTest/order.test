@@ -28,10 +28,11 @@ order by 2,3 desc
 not implemented
 ====
 # Test correct identification of the implicit aliasing of int_col in the select
-# list to t1.int_col
+# list to t1.int_col;
+# t2.int_col is not null references enough cols of t2 to prevent a broadcast join
 select t1.int_col
 from functional.alltypessmall t1, functional.alltypessmall t2
-where t1.id = t2.id 
+where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 2
 ---- PLAN
@@ -49,6 +50,7 @@ Plan Fragment 0
         SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
           TUPLE IDS: 0 
         SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
+          PREDICATES: t2.int_col IS NOT NULL
           TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -87,6 +89,7 @@ Plan Fragment 2
     HASH_PARTITIONED: t2.id
 
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
+    PREDICATES: t2.int_col IS NOT NULL
     TUPLE IDS: 1 
 
 Plan Fragment 3

@@ -55,13 +55,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (9)
+  EXCHANGE (7)
     TUPLE IDS: 0 1N 2N 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 7
     UNPARTITIONED
 
   HASH JOIN
@@ -71,58 +71,40 @@ Plan Fragment 1
     OTHER JOIN PREDICATES: t2.id = 15, t1.id - t2.id = 0
     OTHER PREDICATES: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
     TUPLE IDS: 0 1N 2N 
-      EXCHANGE (7)
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t1.zip = 94611
+        OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
         TUPLE IDS: 0 1N 
-      EXCHANGE (8)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+            PREDICATES: t1.id > 0
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
         TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: t3.id
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: t3.zip = 94720
     TUPLE IDS: 2 
 
 Plan Fragment 3
-  HASH_PARTITIONED: t1.id - 1
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: t1.id
-
-  HASH JOIN
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      t1.id - 1 = t2.id + 1
-    OTHER JOIN PREDICATES: t1.zip = 94611
-    OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
-    TUPLE IDS: 0 1N 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: t2.id + 1
+    EXCHANGE ID: 5
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: t2.zip = 94104
     TUPLE IDS: 1 
-
-Plan Fragment 5
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: t1.id - 1
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.id > 0
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -165,13 +147,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (9)
+  EXCHANGE (7)
     TUPLE IDS: 0 2N 4N 
 
 Plan Fragment 1
-  HASH_PARTITIONED: a1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 7
     UNPARTITIONED
 
   HASH JOIN
@@ -181,58 +163,40 @@ Plan Fragment 1
     OTHER JOIN PREDICATES: a2.id = 15, a1.id - a2.id = 0
     OTHER PREDICATES: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
     TUPLE IDS: 0 2N 4N 
-      EXCHANGE (7)
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a1.zip = 94611
+        OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
         TUPLE IDS: 0 2N 
-      EXCHANGE (8)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+            PREDICATES: a1.id > 0
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 2 
+      EXCHANGE (6)
         TUPLE IDS: 4 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: a3.id
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: a3.zip = 94720
     TUPLE IDS: 4 
 
 Plan Fragment 3
-  HASH_PARTITIONED: a1.id - 1
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: a1.id
-
-  HASH JOIN
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      a1.id - 1 = a2.id + 1
-    OTHER JOIN PREDICATES: a1.zip = 94611
-    OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
-    TUPLE IDS: 0 2N 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 2 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: a2.id + 1
+    EXCHANGE ID: 5
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: a2.zip = 94104
     TUPLE IDS: 2 
-
-Plan Fragment 5
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: a1.id - 1
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: a1.id > 0
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -295,13 +259,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (9)
+  EXCHANGE (7)
     TUPLE IDS: 0N 1N 2 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 7
     UNPARTITIONED
 
   HASH JOIN
@@ -311,57 +275,39 @@ Plan Fragment 1
     OTHER JOIN PREDICATES: t1.id - t2.id = 0, t3.zip = 94720
     OTHER PREDICATES: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
     TUPLE IDS: 0N 1N 2 
-      EXCHANGE (7)
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t2.zip = 94104
         TUPLE IDS: 0N 1 
-      EXCHANGE (8)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+            PREDICATES: t1.zip = 94611
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
         TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: t3.id
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: t3.id IS NOT NULL
     TUPLE IDS: 2 
 
 Plan Fragment 3
-  HASH_PARTITIONED: t1.id - 1
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: t1.id
-
-  HASH JOIN
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      t1.id - 1 = t2.id + 1
-    OTHER JOIN PREDICATES: t2.zip = 94104
-    TUPLE IDS: 0N 1 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: t2.id + 1
+    EXCHANGE ID: 5
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: t2.id = 15
     TUPLE IDS: 1 
-
-Plan Fragment 5
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: t1.id - 1
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.zip = 94611
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -403,13 +349,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (9)
+  EXCHANGE (7)
     TUPLE IDS: 0N 2N 4 
 
 Plan Fragment 1
-  HASH_PARTITIONED: a1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 7
     UNPARTITIONED
 
   HASH JOIN
@@ -419,57 +365,39 @@ Plan Fragment 1
     OTHER JOIN PREDICATES: a1.id - a2.id = 0, a3.zip = 94720
     OTHER PREDICATES: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
     TUPLE IDS: 0N 2N 4 
-      EXCHANGE (7)
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a2.zip = 94104
         TUPLE IDS: 0N 2 
-      EXCHANGE (8)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+            PREDICATES: a1.zip = 94611
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 2 
+      EXCHANGE (6)
         TUPLE IDS: 4 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: a3.id
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: a3.id IS NOT NULL
     TUPLE IDS: 4 
 
 Plan Fragment 3
-  HASH_PARTITIONED: a1.id - 1
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: a1.id
-
-  HASH JOIN
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a1.id - 1 = a2.id + 1
-    OTHER JOIN PREDICATES: a2.zip = 94104
-    TUPLE IDS: 0N 2 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 2 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: a2.id + 1
+    EXCHANGE ID: 5
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: a2.id = 15
     TUPLE IDS: 2 
-
-Plan Fragment 5
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: a1.id - 1
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: a1.zip = 94611
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:

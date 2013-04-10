@@ -332,7 +332,9 @@ public class Planner {
         + Float.toString(rhsTree.getAvgRowSize()));
     LOG.info(rhsTree.getExplainString());
 
-    if (broadcastCost < partitionCost) {
+    // do a "<=" comparison so that we default to broadcast joins if we're unable
+    // to estimate the cost
+    if (broadcastCost <= partitionCost) {
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
       // the join; the build input is provided by an ExchangeNode, which is the
       // destination of the rightChildFragment's output

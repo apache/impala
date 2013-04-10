@@ -17,13 +17,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (5)
+  EXCHANGE (4)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
+    EXCHANGE ID: 4
     UNPARTITIONED
 
   HASH JOIN
@@ -31,29 +31,20 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      EXCHANGE (3)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+        PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      EXCHANGE (4)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t2.id
+    EXCHANGE ID: 3
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: t1.id
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.zip = 94611
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -79,13 +70,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (5)
+  EXCHANGE (4)
     TUPLE IDS: 0 1N 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.id - 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
+    EXCHANGE ID: 4
     UNPARTITIONED
 
   HASH JOIN
@@ -93,29 +84,20 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
     TUPLE IDS: 0 1N 
-      EXCHANGE (3)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+        PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      EXCHANGE (4)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t2.id + 1
+    EXCHANGE ID: 3
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: t1.id - 1
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.zip = 94611
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:

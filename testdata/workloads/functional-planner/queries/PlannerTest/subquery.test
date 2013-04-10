@@ -144,13 +144,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (5)
+  EXCHANGE (4)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
+    EXCHANGE ID: 4
     UNPARTITIONED
 
   HASH JOIN
@@ -158,29 +158,20 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      EXCHANGE (3)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
+        PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      EXCHANGE (4)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t2.id
+    EXCHANGE ID: 3
+    UNPARTITIONED
 
   SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: t1.id
-
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.zip = 94611
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -1485,26 +1476,26 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (14)
+  EXCHANGE (13)
     TUPLE IDS: 6 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 35>
   STREAM DATA SINK
-    EXCHANGE ID: 14
+    EXCHANGE ID: 13
     UNPARTITIONED
 
   AGGREGATE
   OUTPUT: SUM(<slot 36>)
   GROUP BY: <slot 35>
   TUPLE IDS: 6 
-    EXCHANGE (12)
+    EXCHANGE (11)
       TUPLE IDS: 6 
 
 Plan Fragment 2
-  HASH_PARTITIONED: c.id
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 12
+    EXCHANGE ID: 11
     HASH_PARTITIONED: <slot 35>
 
   AGGREGATE
@@ -1516,16 +1507,16 @@ Plan Fragment 2
       HASH PREDICATES:
         c.id = <slot 30>
       TUPLE IDS: 0 4 
-        EXCHANGE (10)
+        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
           TUPLE IDS: 0 
-        EXCHANGE (11)
+        EXCHANGE (10)
           TUPLE IDS: 4 
 
 Plan Fragment 3
   HASH_PARTITIONED: <slot 30>
   STREAM DATA SINK
-    EXCHANGE ID: 11
-    HASH_PARTITIONED: <slot 30>
+    EXCHANGE ID: 10
+    UNPARTITIONED
 
   AGGREGATE
   OUTPUT: SUM(<slot 31>)
@@ -1562,15 +1553,6 @@ Plan Fragment 5
 
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (2) compact
     TUPLE IDS: 3 
-
-Plan Fragment 6
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    HASH_PARTITIONED: c.id
-
-  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610

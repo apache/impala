@@ -312,13 +312,13 @@ Plan Fragment 0
   ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   LIMIT: 100
   TUPLE IDS: 0 1 
-    EXCHANGE (6)
+    EXCHANGE (5)
       TUPLE IDS: 0 1 
 
 Plan Fragment 1
-  HASH_PARTITIONED: t1.p_partkey, t1.ps_supplycost
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
+    EXCHANGE ID: 5
     UNPARTITIONED
 
   TOP-N
@@ -331,28 +331,19 @@ Plan Fragment 1
         t1.p_partkey = t2.p_partkey
         t1.ps_supplycost = t2.ps_min_supplycost
       TUPLE IDS: 0 1 
-        EXCHANGE (4)
+        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
           TUPLE IDS: 0 
-        EXCHANGE (5)
+        EXCHANGE (4)
           TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: t2.p_partkey, t2.ps_min_supplycost
+    EXCHANGE ID: 4
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB (1) compact
     TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t1.p_partkey, t1.ps_supplycost
-
-  SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB (0)
-    TUPLE IDS: 0 
 ====
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
@@ -2398,13 +2389,13 @@ Plan Fragment 0
   ORDER BY: s_suppkey ASC
   LIMIT: 100
   TUPLE IDS: 0 1 2 
-    EXCHANGE (10)
+    EXCHANGE (8)
       TUPLE IDS: 0 1 2 
 
 Plan Fragment 1
-  HASH_PARTITIONED: r.total_revenue
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 10
+    EXCHANGE ID: 8
     UNPARTITIONED
 
   TOP-N
@@ -2416,53 +2407,35 @@ Plan Fragment 1
       HASH PREDICATES:
         r.total_revenue = m.max_revenue
       TUPLE IDS: 0 1 2 
-        EXCHANGE (8)
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            s.s_suppkey = r.supplier_no
           TUPLE IDS: 0 1 
-        EXCHANGE (9)
+            SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
+              TUPLE IDS: 0 
+            EXCHANGE (6)
+              TUPLE IDS: 1 
+        EXCHANGE (7)
           TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: m.max_revenue
+    EXCHANGE ID: 7
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.max_revenue #partitions=1 size=10B (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
-  HASH_PARTITIONED: s.s_suppkey
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: r.total_revenue
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      s.s_suppkey = r.supplier_no
-    TUPLE IDS: 0 1 
-      EXCHANGE (6)
-        TUPLE IDS: 0 
-      EXCHANGE (7)
-        TUPLE IDS: 1 
-
-Plan Fragment 4
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: r.supplier_no
-
-  SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
-    TUPLE IDS: 1 
-
-Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
-    HASH_PARTITIONED: s.s_suppkey
+    UNPARTITIONED
 
-  SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
-    TUPLE IDS: 0 
+  SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
+    TUPLE IDS: 1 
 ====
 # Q16 - Parts/Supplier Relation Query
 insert overwrite table tpch.supplier_tmp
@@ -2519,7 +2492,7 @@ Plan Fragment 0
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  HASH_PARTITIONED: ps.ps_suppkey
+  RANDOM
   WRITE TO HDFS table=tpch.q16_tmp
     OVERWRITE=true
   HASH JOIN
@@ -2527,37 +2500,28 @@ Plan Fragment 0
     HASH PREDICATES:
       ps.ps_suppkey = s.s_suppkey
     TUPLE IDS: 0 1 2 
-      EXCHANGE (6)
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          ps.ps_partkey = p.p_partkey
         TUPLE IDS: 0 1 
-      EXCHANGE (7)
+          SCAN HDFS table=tpch.partsupp #partitions=1 size=112.71MB (0)
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
         TUPLE IDS: 2 
 
 Plan Fragment 1
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: s.s_suppkey
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.supplier_tmp #partitions=1 size=47.73KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 2
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: ps.ps_suppkey
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      ps.ps_partkey = p.p_partkey
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=tpch.partsupp #partitions=1 size=112.71MB (0)
-        TUPLE IDS: 0 
-      EXCHANGE (5)
-        TUPLE IDS: 1 
-
-Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
@@ -2727,13 +2691,13 @@ Plan Fragment 0
   OUTPUT: SUM(<slot 8>)
   GROUP BY: 
   TUPLE IDS: 3 
-    EXCHANGE (9)
+    EXCHANGE (8)
       TUPLE IDS: 3 
 
 Plan Fragment 1
-  HASH_PARTITIONED: p.p_partkey
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 8
     UNPARTITIONED
 
   AGGREGATE
@@ -2746,37 +2710,28 @@ Plan Fragment 1
         p.p_partkey = lt.t_partkey
       OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
       TUPLE IDS: 0 1 2 
-        EXCHANGE (7)
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            l.l_partkey = p.p_partkey
           TUPLE IDS: 0 1 
-        EXCHANGE (8)
+            SCAN HDFS table=tpch.lineitem #partitions=1 size=718.94MB (0)
+              TUPLE IDS: 0 
+            EXCHANGE (6)
+              TUPLE IDS: 1 
+        EXCHANGE (7)
           TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: lt.t_partkey
+    EXCHANGE ID: 7
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.16MB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: p.p_partkey
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      l.l_partkey = p.p_partkey
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=tpch.lineitem #partitions=1 size=718.94MB (0)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
@@ -2895,13 +2850,13 @@ Plan Fragment 0
   ORDER BY: <slot 14> ASC, <slot 13> ASC
   LIMIT: 100
   TUPLE IDS: 4 
-    EXCHANGE (16)
+    EXCHANGE (15)
       TUPLE IDS: 4 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
   STREAM DATA SINK
-    EXCHANGE ID: 16
+    EXCHANGE ID: 15
     UNPARTITIONED
 
   TOP-N
@@ -2912,13 +2867,13 @@ Plan Fragment 1
     OUTPUT: SUM(<slot 15>)
     GROUP BY: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
     TUPLE IDS: 4 
-      EXCHANGE (14)
+      EXCHANGE (13)
         TUPLE IDS: 4 
 
 Plan Fragment 2
-  HASH_PARTITIONED: o.o_orderkey
+  HASH_PARTITIONED: l.l_orderkey
   STREAM DATA SINK
-    EXCHANGE ID: 14
+    EXCHANGE ID: 13
     HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
 
   AGGREGATE
@@ -2930,45 +2885,36 @@ Plan Fragment 2
       HASH PREDICATES:
         o.o_orderkey = t.l_orderkey
       TUPLE IDS: 0 1 2 3 
-        EXCHANGE (12)
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            o.o_custkey = c.c_custkey
           TUPLE IDS: 0 1 2 
-        EXCHANGE (13)
+            HASH JOIN
+              JOIN OP: INNER JOIN
+              HASH PREDICATES:
+                l.l_orderkey = o.o_orderkey
+              TUPLE IDS: 0 1 
+                EXCHANGE (9)
+                  TUPLE IDS: 0 
+                EXCHANGE (10)
+                  TUPLE IDS: 1 
+            EXCHANGE (11)
+              TUPLE IDS: 2 
+        EXCHANGE (12)
           TUPLE IDS: 3 
 
 Plan Fragment 3
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 13
-    HASH_PARTITIONED: t.l_orderkey
+    EXCHANGE ID: 12
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.q18_tmp #partitions=1 size=16.13MB (5) compact
     PREDICATES: t.t_sum_quantity > 300.0
     TUPLE IDS: 3 
 
 Plan Fragment 4
-  HASH_PARTITIONED: l.l_orderkey
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    HASH_PARTITIONED: o.o_orderkey
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      o.o_custkey = c.c_custkey
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          l.l_orderkey = o.o_orderkey
-        TUPLE IDS: 0 1 
-          EXCHANGE (9)
-            TUPLE IDS: 0 
-          EXCHANGE (10)
-            TUPLE IDS: 1 
-      EXCHANGE (11)
-        TUPLE IDS: 2 
-
-Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
@@ -2977,7 +2923,7 @@ Plan Fragment 5
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 6
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
@@ -2986,7 +2932,7 @@ Plan Fragment 6
   SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (1) compact
     TUPLE IDS: 1 
 
-Plan Fragment 7
+Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
@@ -3244,7 +3190,7 @@ Plan Fragment 0
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  HASH_PARTITIONED: ps.ps_partkey
+  RANDOM
   WRITE TO HDFS table=tpch.q20_tmp3
     OVERWRITE=true
   HASH JOIN
@@ -3252,54 +3198,36 @@ Plan Fragment 0
     HASH PREDICATES:
       ps.ps_partkey = t1.p_partkey
     TUPLE IDS: 0 1 2 
-      EXCHANGE (7)
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          ps.ps_partkey = t2.l_partkey
+          ps.ps_suppkey = t2.l_suppkey
         TUPLE IDS: 0 1 
-      EXCHANGE (8)
+          SCAN HDFS table=tpch.partsupp #partitions=1 size=112.71MB (0)
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
         TUPLE IDS: 2 
 
 Plan Fragment 1
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: t1.p_partkey
+    EXCHANGE ID: 6
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.q20_tmp1 #partitions=1 size=13.42KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 2
-  HASH_PARTITIONED: ps.ps_partkey, ps.ps_suppkey
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: ps.ps_partkey
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      ps.ps_partkey = t2.l_partkey
-      ps.ps_suppkey = t2.l_suppkey
-    TUPLE IDS: 0 1 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
-
-Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: t2.l_partkey, t2.l_suppkey
-
-  SCAN HDFS table=tpch.q20_tmp2 #partitions=1 size=7.83MB (1) compact
-    TUPLE IDS: 1 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: ps.ps_partkey, ps.ps_suppkey
+    UNPARTITIONED
 
-  SCAN HDFS table=tpch.partsupp #partitions=1 size=112.71MB (0)
-    TUPLE IDS: 0 
+  SCAN HDFS table=tpch.q20_tmp2 #partitions=1 size=7.83MB (1) compact
+    TUPLE IDS: 1 
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
@@ -3391,13 +3319,13 @@ Plan Fragment 0
   ORDER BY: s_name ASC
   LIMIT: 100
   TUPLE IDS: 0 1 2 
-    EXCHANGE (9)
+    EXCHANGE (8)
       TUPLE IDS: 0 1 2 
 
 Plan Fragment 1
-  HASH_PARTITIONED: s.s_suppkey
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 8
     UNPARTITIONED
 
   TOP-N
@@ -3409,37 +3337,28 @@ Plan Fragment 1
       HASH PREDICATES:
         s.s_suppkey = t4.ps_suppkey
       TUPLE IDS: 0 1 2 
-        EXCHANGE (7)
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            s.s_nationkey = n.n_nationkey
           TUPLE IDS: 0 1 
-        EXCHANGE (8)
+            SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
+              TUPLE IDS: 0 
+            EXCHANGE (6)
+              TUPLE IDS: 1 
+        EXCHANGE (7)
           TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: t4.ps_suppkey
+    EXCHANGE ID: 7
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.q20_tmp4 #partitions=1 size=20.98KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: s.s_suppkey
-
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      s.s_nationkey = n.n_nationkey
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
-
-Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
@@ -3787,13 +3706,13 @@ Plan Fragment 0
   ORDER BY: <slot 7> ASC
   LIMIT: 100
   TUPLE IDS: 3 
-    EXCHANGE (13)
+    EXCHANGE (12)
       TUPLE IDS: 3 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 7>
   STREAM DATA SINK
-    EXCHANGE ID: 13
+    EXCHANGE ID: 12
     UNPARTITIONED
 
   TOP-N
@@ -3804,13 +3723,13 @@ Plan Fragment 1
     OUTPUT: SUM(<slot 8>), SUM(<slot 9>)
     GROUP BY: <slot 7>
     TUPLE IDS: 3 
-      EXCHANGE (11)
+      EXCHANGE (10)
         TUPLE IDS: 3 
 
 Plan Fragment 2
   HASH_PARTITIONED: c.c_custkey
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 10
     HASH_PARTITIONED: <slot 7>
 
   AGGREGATE
@@ -3823,24 +3742,24 @@ Plan Fragment 2
         c.c_custkey = o.o_custkey
       OTHER PREDICATES: o_custkey IS NULL
       TUPLE IDS: 0 1 2N 
-        EXCHANGE (9)
+        EXCHANGE (8)
           TUPLE IDS: 0 1 
-        EXCHANGE (10)
+        EXCHANGE (9)
           TUPLE IDS: 2 
 
 Plan Fragment 3
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 10
+    EXCHANGE ID: 9
     HASH_PARTITIONED: o.o_custkey
 
   SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 4
-  HASH_PARTITIONED: substr(c.c_name, 1, 1)
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 8
     HASH_PARTITIONED: c.c_custkey
 
   HASH JOIN
@@ -3849,27 +3768,18 @@ Plan Fragment 4
       substr(c.c_name, 1, 1) = ct.cust_name_char
     OTHER PREDICATES: c.c_acctbal > ct.avg_acctbal
     TUPLE IDS: 0 1 
-      EXCHANGE (7)
+      SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (0)
+        PREDICATES: substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
         TUPLE IDS: 0 
-      EXCHANGE (8)
+      EXCHANGE (7)
         TUPLE IDS: 1 
 
 Plan Fragment 5
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: ct.cust_name_char
+    EXCHANGE ID: 7
+    UNPARTITIONED
 
   SCAN HDFS table=tpch.q22_customer_tmp1 #partitions=1 size=9B (1) compact
     TUPLE IDS: 1 
-
-Plan Fragment 6
-  RANDOM
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: substr(c.c_name, 1, 1)
-
-  SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (0)
-    PREDICATES: substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
-    TUPLE IDS: 0 
 ====
