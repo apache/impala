@@ -77,8 +77,9 @@ class HashTable {
   //  - num_buckets: number of buckets that the hash table should be initialized to
   //  - mem_limits: if non-empty, all memory allocation for nodes and for buckets is
   //    tracked against those limits; the limits must be valid until the d'tor is called
+  //  - initial_seed: Initial seed value to use when computing hashes for rows
   HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
-      int num_build_tuples, bool stores_nulls,
+      int num_build_tuples, bool stores_nulls, int32_t initial_seed,
       const std::vector<MemLimit*>& mem_limits = std::vector<MemLimit*>(),
       int64_t num_buckets = 1024);
 
@@ -290,7 +291,7 @@ class HashTable {
     if (var_result_begin_ == -1) {
       // This handles NULLs implicitly since a constant seed value was put
       // into results buffer for nulls.
-      return HashUtil::Hash(expr_values_buffer_, results_buffer_size_, 0);
+      return HashUtil::Hash(expr_values_buffer_, results_buffer_size_, initial_seed_);
     } else {
       return HashVariableLenRow();
     }
@@ -318,6 +319,8 @@ class HashTable {
   // Number of Tuple* in the build tuple row
   const int num_build_tuples_;
   const bool stores_nulls_;
+
+  const int32_t initial_seed_;
 
   // Size of hash table nodes.  This includes a fixed size header and the Tuple*'s that
   // follow.

@@ -114,9 +114,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   build_pool_->set_limits(*state->mem_limits());
 
   // TODO: default buckets
-  hash_tbl_.reset(
-      new HashTable(
-        build_exprs_, probe_exprs_, build_tuple_size_, false, *state->mem_limits()));
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_, 
+      false, id(), *state->mem_limits()));
 
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
 

@@ -331,7 +331,7 @@ class DataStreamTest : public testing::Test {
           // hash-partitioned streams send values to the right partition
           int64_t value = *j;
           EXPECT_EQ(
-              RawValue::GetHashValue(&value, TYPE_BIGINT, 0) % receiver_info_.size(),
+              RawValue::GetHashValueFvn(&value, TYPE_BIGINT, 0) % receiver_info_.size(),
               info.receiver_num);
         }
       }

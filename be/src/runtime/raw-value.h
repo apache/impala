@@ -55,6 +55,13 @@ class RawValue {
   // is combined with the seed value.
   static uint32_t GetHashValue(const void* value, PrimitiveType type, uint32_t seed = 0);
 
+  // Get the hash value using the fvn hash function.  Using different seeds with FVN
+  // results in different hash functions.  GetHashValue() does not have this property
+  // and cannot be safely used as the first step in data repartitioning.
+  // However, GetHashValue() can be significantly faster.
+  // TODO: fix GetHashValue
+  static uint32_t GetHashValueFvn(const void* value, PrimitiveType type, uint32_t seed);
+
   // Compares both values.
   // Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.
   static int Compare(const void* v1, const void* v2, PrimitiveType type);
@@ -147,6 +154,42 @@ inline uint32_t RawValue::GetHashValue(const void* v, PrimitiveType type, uint32
       return HashUtil::Hash(v, 8, seed);
     case TYPE_TIMESTAMP:
       return HashUtil::Hash(v, 12, seed);
+    default:
+      DCHECK(false) << "invalid type: " << TypeToString(type);
+      return 0;
+  }
+}
+
+inline uint32_t RawValue::GetHashValueFvn(const void* v, PrimitiveType type, 
+    uint32_t seed) {
+  // Hash_combine with v = 0
+  if (v == NULL) {
+    uint32_t value = 0x9e3779b9;
+    return seed ^ (value + (seed << 6) + (seed >> 2));
+  }
+  switch (type) {
+    case TYPE_STRING: {
+      const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
+      return HashUtil::FvnHash(string_value->ptr, string_value->len, seed);
+    }
+    case TYPE_BOOLEAN: {
+      uint32_t value = *reinterpret_cast<const bool*>(v) + 0x9e3779b9;
+      return seed ^ (value + (seed << 6) + (seed >> 2));
+    }
+    case TYPE_TINYINT:
+      return HashUtil::FvnHash(v, 1, seed);
+    case TYPE_SMALLINT:
+      return HashUtil::FvnHash(v, 2, seed);
+    case TYPE_INT:
+      return HashUtil::FvnHash(v, 4, seed);
+    case TYPE_BIGINT:
+      return HashUtil::FvnHash(v, 8, seed);
+    case TYPE_FLOAT:
+      return HashUtil::FvnHash(v, 4, seed);
+    case TYPE_DOUBLE:
+      return HashUtil::FvnHash(v, 8, seed);
+    case TYPE_TIMESTAMP:
+      return HashUtil::FvnHash(v, 12, seed);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;

@@ -38,6 +38,8 @@ class HashUtil {
   // the current hash/seed value.
   // This should only be called if SSE is supported.
   // This is ~4x faster than Fvn/Boost Hash.
+  // TODO: crc32 hashes with different seeds do not result in different hash functions.  The
+  // resulting hashes are correlated.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
     uint32_t words = bytes / sizeof(uint32_t);
@@ -80,15 +82,17 @@ class HashUtil {
 
   // Computes the hash value for data.  Will call either CrcHash or FvnHash
   // depending on hardware capabilities.
-  static uint32_t Hash(const void* data, int32_t bytes, uint32_t hash) {
+  // Seed values for different steps of the query execution should use different seeds
+  // to prevent accidental key collisions. (See IMPALA-219 for more details).
+  static uint32_t Hash(const void* data, int32_t bytes, uint32_t seed) {
 #ifdef __SSE4_2__
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-      return CrcHash(data, bytes, hash);
+      return CrcHash(data, bytes, seed);
     } else {
-      return FvnHash(data, bytes, hash);
+      return FvnHash(data, bytes, seed);
     }
 #else
-    return FvnHash(data, bytes, hash);
+    return FvnHash(data, bytes, seed);
 #endif
   }
 

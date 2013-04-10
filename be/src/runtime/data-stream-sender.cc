@@ -381,8 +381,12 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       for (vector<Expr*>::iterator expr = partition_exprs_.begin();
            expr != partition_exprs_.end(); ++expr) {
         void* partition_val = (*expr)->GetValue(row);
+        // We can't use the crc hash function here because it does not result 
+        // in uncorrelated hashes with different seeds.  Instead we must use
+        // fvn hash.
+        // TODO: fix crc hash/GetHashValue()
         hash_val =
-            RawValue::GetHashValue(partition_val, (*expr)->type(), hash_val);
+            RawValue::GetHashValueFvn(partition_val, (*expr)->type(), hash_val);
       }
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }

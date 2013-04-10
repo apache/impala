@@ -131,8 +131,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   tuple_pool_->set_limits(*state->mem_limits());
 
   // TODO: how many buckets?
-  hash_tbl_.reset(
-      new HashTable(build_exprs_, probe_exprs_, 1, true, *state->mem_limits()));
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, 
+      id(), *state->mem_limits()));
   
   // Determine the number of string slots in the output
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();

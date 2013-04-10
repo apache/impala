@@ -29,12 +29,13 @@ const char* HashTable::LLVM_CLASS_NAME = "class.impala::HashTable";
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& probe_exprs,
-    int num_build_tuples, bool stores_nulls, const vector<MemLimit*>& mem_limits,
-    int64_t num_buckets)
+    int num_build_tuples, bool stores_nulls, int32_t initial_seed,
+    const vector<MemLimit*>& mem_limits, int64_t num_buckets)
   : build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
+    initial_seed_(initial_seed),
     node_byte_size_(sizeof(Node) + sizeof(Tuple*) * num_build_tuples_),
     num_filled_buckets_(0),
     nodes_(NULL),
@@ -269,9 +270,9 @@ Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
 
 
 uint32_t HashTable::HashVariableLenRow() {
-  uint32_t hash = 0;
+  uint32_t hash = initial_seed_;
   // Hash the non-var length portions
-  hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, 0);
+  hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
   for (int i = 0; i < build_exprs_.size(); ++i) {
     // non-string and null slots are already part of expr_values_buffer
     if (build_exprs_[i]->type() != TYPE_STRING) continue;
@@ -338,7 +339,7 @@ Function* HashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
   Value* this_arg;
   Function* fn = prototype.GeneratePrototype(&builder, &this_arg);
 
-  Value* hash_result = codegen->GetIntConstant(TYPE_INT, 0);
+  Value* hash_result = codegen->GetIntConstant(TYPE_INT, initial_seed_);
   Value* data = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), expr_values_buffer_);
   if (var_result_begin_ == -1) {
     // No variable length slots, just hash what is in 'expr_values_buffer_'
