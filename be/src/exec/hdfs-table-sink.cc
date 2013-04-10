@@ -316,7 +316,7 @@ void HdfsTableSink::GetHashTblKey(const vector<Expr*>& exprs, string* key) {
   stringstream hash_table_key;
   for (int i = 0; i < dynamic_partition_key_exprs_.size(); ++i) {
     RawValue::PrintValueAsBytes(exprs[i]->GetValue(current_row_),
-                                exprs[0]->type(), &hash_table_key);
+                                exprs[i]->type(), &hash_table_key);
     // Additionally append "/" to avoid accidental key collisions.
     hash_table_key << "/";
   }
