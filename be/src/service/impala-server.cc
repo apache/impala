@@ -204,9 +204,6 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
 Status ImpalaServer::QueryExecState::Wait() {
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
-    // Need to set eos_ so that the subsequent Close(...) call doesn't cancel the query.
-    // INSERT statements (i.e. DML) are always complete after Wait() returns.
-    if (stmt_type() == TStmtType::DML) eos_ = true;
     RETURN_IF_ERROR(UpdateMetastore());
   }
 
@@ -1435,6 +1432,7 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid or unknown query handle");
+
   lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
   // TODO: can we call Coordinator::Cancel() here while holding lock?
   exec_state->Cancel();
