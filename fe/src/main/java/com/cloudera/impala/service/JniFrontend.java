@@ -426,54 +426,27 @@ public class JniFrontend {
   /**
    * Returns an error string describing all configuration issues. If no config issues are
    * found, returns an empty string.
-   * If user does not provide a CDH version, use our best guess to guess the version.
-   * If user provides a CDH version, runs check again that version. If the user provided
-   * version does not match our guess, considered that as an error.
+   * Checks are run only if Impala can determine that it is running on CDH.
    */
-  public String checkHadoopConfig(String userSpecifiedCdhVersionStr) {
+  public String checkHadoopConfig() {
     CdhVersion guessedCdhVersion = guessCdhVersionFromNnWebUi();
-    CdhVersion checkedCdhVersion;
     CdhVersion cdh41 = new CdhVersion("4.1");
+    CdhVersion cdh42 = new CdhVersion("4.2");
 
-    StringBuilder output = new StringBuilder();
-    if (userSpecifiedCdhVersionStr.isEmpty()) {
-      if (guessedCdhVersion == null) {
-        // Can't guess a version. We need one from the user.
-        output.append("Impala can't determine CDH version. Please specify the installed" +
-            "CDH version using -cdh_version flag.\n");
-        return output.toString();
-      }
-      // No CDH version from the user, use our best guess
-      checkedCdhVersion = guessedCdhVersion;
-    } else {
-      CdhVersion userSpecifiedCdhVersion;
-      try {
-        userSpecifiedCdhVersion = new CdhVersion(userSpecifiedCdhVersionStr);
-      } catch (Exception e) {
-        output.append("Illegal -cdh_version specified (\"")
-            .append(userSpecifiedCdhVersionStr)
-            .append("\"). -cdh_version must be <major>.<minor>.");
-        return output.toString();
-      }
-      if (guessedCdhVersion != null) {
-        // Return a warning if the user specified version does not match our best guess.
-        if (userSpecifiedCdhVersion.compareTo(guessedCdhVersion) != 0) {
-          output.append("The installed CDH version seems to be ")
-              .append(guessedCdhVersion)
-              .append(" but -cdh_version indicated that it is ")
-              .append(userSpecifiedCdhVersionStr)
-              .append(". Please confirm the CDH version and if there are no " +
-                  "more configuration errors, please start impala with" +
-                  " abort_on_config_error=false.\n");
-        }
-      }
-      checkedCdhVersion = userSpecifiedCdhVersion;
+    if (guessedCdhVersion == null) {
+      // Do not run any check because we cannot determine the CDH version
+      LOG.warn("Cannot detect CDH version. Skipping Hadoop configuration checks");
+      return "";
     }
 
-    if (checkedCdhVersion.compareTo(cdh41) == 0) {
+    StringBuilder output = new StringBuilder();
+    if (guessedCdhVersion.compareTo(cdh41) == 0) {
       output.append(checkShortCircuitReadCdh41(CONF));
-    } else {
+    } if (guessedCdhVersion.compareTo(cdh42) >= 0) {
       output.append(checkShortCircuitRead(CONF));
+    } else {
+      output.append(guessedCdhVersion)
+        .append(" is detected but Impala requires CDH 4.1 or above.");
     }
     output.append(checkBlockLocationTracking(CONF));
 
@@ -621,6 +594,25 @@ public class JniFrontend {
     // Server side checks
     // Check data node server side configuration by reading the CONF from the data node
     // web UI
+    // TODO: disabled for now
+    //cdh41ShortCircuitReadDatanodeCheck(errorCause, prefix);
+
+    if (errorCause.length() > 0) {
+      output.append(errorMessage);
+      output.append(errorCause);
+    }
+
+    return output.toString();
+  }
+
+  /**
+   *  Checks the data node's server side configuration by reading the CONF from the data
+   *  node.
+   *  This appends error messages to errorCause prefixed by prefix if data node
+   *  configuration is not properly set.
+   */
+  private void cdh41ShortCircuitReadDatanodeCheck(StringBuilder errorCause,
+      String prefix) {
     String dnWebUiAddr = CONF.get(DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY,
         DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_DEFAULT);
     URL dnWebUiUrl = null;
@@ -658,13 +650,6 @@ public class JniFrontend {
       errorCause.append(System.getProperty("user.name"));
       errorCause.append("\n");
     }
-
-    if (errorCause.length() > 0) {
-      output.append(errorMessage);
-      output.append(errorCause);
-    }
-
-    return output.toString();
   }
 
   /**

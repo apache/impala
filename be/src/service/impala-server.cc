@@ -99,8 +99,6 @@ DEFINE_string(default_query_options, "", "key=value pair of default query option
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
                                  "the query log has unbounded size.");
 DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
-DEFINE_string(cdh_version, "", "The CDH version installed: 4.1, 4.2 or empty"
-    " (system will try to determine the version)");
 
 // TODO: this logging should go into a per query log.
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
@@ -592,7 +590,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
           "(Ljava/lang/String;)Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
     check_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "checkHadoopConfig",
-       "(Ljava/lang/String;)Ljava/lang/String;");
+       "()Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
     update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
     EXIT_IF_EXC(jni_env);
@@ -1761,10 +1759,8 @@ Status ImpalaServer::ValidateSettings() {
   // TODO: check OS setting
   stringstream ss;
   JNIEnv* jni_env = getJNIEnv();
-  jstring cdh_version = jni_env->NewStringUTF(FLAGS_cdh_version.c_str());
   jstring error_string =
-      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_,
-          cdh_version));
+      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_));
   RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
   jboolean is_copy;
   const char *str = jni_env->GetStringUTFChars(error_string, &is_copy);

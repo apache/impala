@@ -41,5 +41,4 @@ do
   esac
 done
 
-$IMPALA_HOME/be/build/${BUILD_TYPE}/service/impalad -cdh_version=$IMPALA_CDH_VERSION \
-  ${IMPALAD_ARGS}
+$IMPALA_HOME/be/build/${BUILD_TYPE}/service/impalad ${IMPALAD_ARGS}
