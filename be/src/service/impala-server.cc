@@ -1897,8 +1897,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   id = exec_state.query_id();
   const TExecRequest& request = exec_state.exec_request();
 
-  stmt = (request.stmt_type != TStmtType::DDL && request.__isset.sql_stmt) ?
-      request.sql_stmt : "N/A";
+  stmt = request.__isset.sql_stmt ? request.sql_stmt : "N/A";
   stmt_type = request.stmt_type;
   user = exec_state.user();
   default_db = exec_state.default_db();

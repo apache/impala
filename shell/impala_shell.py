@@ -377,7 +377,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __expect_result_metadata(self, query_str):
     """ Given a query string, return True if impalad expects result metadata"""
-    excluded_query_types = ['use']
+    excluded_query_types = ['use', 'alter', 'create', 'drop']
     if True in set(map(query_str.startswith, excluded_query_types)):
       return False
     return True
@@ -486,25 +486,19 @@ class ImpalaShell(cmd.Cmd):
     query = BeeswaxService.Query()
     query.query = "alter %s" % (args,)
     query.configuration = self.__options_to_string_list()
-
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
-    return status == RpcStatus.OK
+    return self.__query_with_results(query)
 
   def do_create(self, args):
     query = self.__create_beeswax_query_handle()
     query.query = "create %s" % (args,)
     query.configuration = self.__options_to_string_list()
-
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
-    return status == RpcStatus.OK
+    return self.__query_with_results(query)
 
   def do_drop(self, args):
     query = self.__create_beeswax_query_handle()
     query.query = "drop %s" % (args,)
     query.configuration = self.__options_to_string_list()
-
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
-    return status == RpcStatus.OK
+    return self.__query_with_results(query)
 
   def do_profile(self, args):
     """Prints the runtime profile of the last INSERT or SELECT query executed."""
