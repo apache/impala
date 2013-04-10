@@ -26,8 +26,12 @@ class TupleRow;
 class ConditionalFunctions {
  public:
   static void* IfBool(Expr* e, TupleRow* row);
+  static void* IfSmallint(Expr* e, TupleRow* row);
+  static void* IfTinyint(Expr* e, TupleRow* row);
   static void* IfInt(Expr* e, TupleRow* row);
+  static void* IfBigint(Expr* e, TupleRow* row);
   static void* IfFloat(Expr* e, TupleRow* row);
+  static void* IfDouble(Expr* e, TupleRow* row);
   static void* IfString(Expr* e, TupleRow* row);
   static void* IfTimestamp(Expr* e, TupleRow* row);
   static void* CoalesceBool(Expr* e, TupleRow* row);

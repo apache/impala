@@ -2222,8 +2222,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
   // false or NULL should return the third.
   TestValue("if(TRUE, FALSE, TRUE)", TYPE_BOOLEAN, false);
   TestValue("if(FALSE, FALSE, TRUE)", TYPE_BOOLEAN, true);
-  TestValue("if(TRUE, 10, 20)", TYPE_BIGINT, 10);
-  TestValue("if(FALSE, 10, 20)", TYPE_BIGINT, 20);
+  TestValue("if(TRUE, 10, 20)", TYPE_TINYINT, 10);
+  TestValue("if(FALSE, 10, 20)", TYPE_TINYINT, 20);
   TestValue("if(TRUE, 5.5, 8.8)", TYPE_DOUBLE, 5.5);
   TestValue("if(FALSE, 5.5, 8.8)", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");

@@ -199,10 +199,18 @@ functions = [
 # Conditional Functions
   ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'], \
         'ConditionalFunctions::IfBool', ['if']],
-  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], \
+  ['Conditional_If', 'TINYINT', ['BOOLEAN', 'TINYINT', 'TINYINT'], \
+        'ConditionalFunctions::IfTinyint', ['if']],
+  ['Conditional_If', 'SMALLINT', ['BOOLEAN', 'SMALLINT', 'SMALLINT'], \
+        'ConditionalFunctions::IfSmallint', ['if']],
+  ['Conditional_If', 'INT', ['BOOLEAN', 'INT', 'INT'], \
         'ConditionalFunctions::IfInt', ['if']],
-  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], \
+  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], \
+        'ConditionalFunctions::IfBigint', ['if']],
+  ['Conditional_If', 'FLOAT', ['BOOLEAN', 'FLOAT', 'FLOAT'], \
         'ConditionalFunctions::IfFloat', ['if']],
+  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], \
+        'ConditionalFunctions::IfDouble', ['if']],
   ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'], \
         'ConditionalFunctions::IfString', ['if']],
   ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], \

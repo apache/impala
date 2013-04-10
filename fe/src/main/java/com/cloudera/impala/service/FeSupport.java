@@ -16,8 +16,18 @@ package com.cloudera.impala.service;
 
 import java.io.File;
 
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TQueryGlobals;
+import com.google.common.base.Preconditions;
 
 /**
  * This class provides the Impala executor functionality to the FE.
@@ -35,7 +45,21 @@ public class FeSupport {
   public native static boolean NativeEvalPredicate(byte[] thriftPredicate,
       byte[] thriftQueryGlobals);
 
-  public static boolean EvalPredicate(byte[] thriftPredicate, byte[] thriftQueryGlobals) {
+  public static boolean EvalPredicate(Expr pred, TQueryGlobals queryGlobals)
+      throws InternalException {
+    Preconditions.checkState(pred.getType() == PrimitiveType.BOOLEAN);
+    TExpr thriftPred = pred.treeToThrift();
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    try {
+      return FeSupport.EvalPredicate(serializer.serialize(thriftPred),
+          serializer.serialize(queryGlobals));
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("couldn't execute predicate " + pred.toSql(), e);
+    }
+  }
+
+  private static boolean EvalPredicate(byte[] thriftPredicate, byte[] thriftQueryGlobals) {
     try {
       return NativeEvalPredicate(thriftPredicate, thriftQueryGlobals);
     } catch (UnsatisfiedLinkError e) {

@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.FeSupport;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -46,6 +47,8 @@ public class InlineViewRef extends TableRef {
   // maps of all enclosed inlined views; in other words, all SlotRefs
   // contained in rhs exprs reference base tables, not contained inline views
   // (and therefore can be evaluated at runtime).
+  // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
+  // makeOutputNullable() if this inline view is a nullable side of an outer join.
   private final Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
 
   /**
@@ -84,18 +87,80 @@ public class InlineViewRef extends TableRef {
       materializedTupleIds.add(desc.getId());
     }
 
-    // Now do the remaining join analysis
-    analyzeJoin(analyzer);
-
     // create sMap
     for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
       String colName = queryStmt.getColLabels().get(i);
       SlotDescriptor slotD = analyzer.registerColumnRef(getAliasAsName(), colName);
       Expr colExpr = queryStmt.getResultExprs().get(i);
-      sMap.lhs.add(new SlotRef(slotD));
+      SlotRef slotRef = new SlotRef(slotD);
+      sMap.lhs.add(slotRef);
       sMap.rhs.add(colExpr);
     }
     LOG.debug("inline view smap: " + sMap.debugString());
+
+    // Now do the remaining join analysis
+    analyzeJoin(analyzer);
+  }
+
+  /**
+   * Makes each rhs expr in sMap nullable if necessary by wrapping as follows:
+   * IF(TupleIsNull(), NULL, rhs expr)
+   * Should be called only if this inline view is a nullable side of an outer join.
+   *
+   * We need to make an rhs exprs nullable if it evaluates to a non-NULL value
+   * when all of its contained SlotRefs evaluate to NULL.
+   * For example, constant exprs need to be wrapped or an expr such as
+   * 'case slotref is null then 1 else 2 end'
+   */
+  protected void makeOutputNullable(Analyzer analyzer)
+      throws AnalysisException, InternalException {
+    // Gather all unique rhs SlotRefs into rhsSlotRefs
+    List<SlotRef> rhsSlotRefs = Lists.newArrayList();
+    Expr.collectList(sMap.rhs, SlotRef.class, rhsSlotRefs);
+    // Map for substituting SlotRefs with NullLiterals.
+    Expr.SubstitutionMap nullSMap = new Expr.SubstitutionMap();
+    for (SlotRef rhsSlotRef: rhsSlotRefs) {
+      nullSMap.lhs.add(rhsSlotRef.clone());
+      nullSMap.rhs.add(new NullLiteral());
+    }
+
+    // Make rhs exprs nullable if necessary.
+    for (int i = 0; i < sMap.rhs.size(); ++i) {
+      List<Expr> params = Lists.newArrayList();
+      if (!requiresNullWrapping(analyzer, sMap.rhs.get(i), nullSMap)) continue;
+      params.add(new TupleIsNullPredicate(materializedTupleIds));
+      params.add(new NullLiteral());
+      params.add(sMap.rhs.get(i));
+      Expr ifExpr = new FunctionCallExpr("if", params);
+      ifExpr.analyze(analyzer);
+      sMap.rhs.set(i, ifExpr);
+    }
+  }
+
+  /**
+   * Replaces all SloRefs in expr with a NullLiteral using nullSMap, and evaluates the
+   * resulting constant expr. Returns true if the constant expr yields a non-NULL value,
+   * false otherwise.
+   */
+  private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
+      Expr.SubstitutionMap nullSMap) throws InternalException {
+    // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
+    // then do not try to execute it.
+    if (expr.contains(TupleIsNullPredicate.class)) return true;
+
+    // Replace all SlotRefs in expr with NullLiterals, and wrap the result
+    // into an IS NOT NULL predicate.
+    Expr isNotNullLiteralPred = new IsNullPredicate(expr.clone(nullSMap), true);
+    Preconditions.checkState(isNotNullLiteralPred.isConstant());
+    // analyze to insert casts, etc.
+    try {
+      isNotNullLiteralPred.analyze(analyzer);
+    } catch (AnalysisException e) {
+      // this should never happen
+      throw new InternalException(
+          "couldn't analyze predicate " + isNotNullLiteralPred.toSql(), e);
+    }
+    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryGlobals());
   }
 
   @Override
@@ -114,7 +179,7 @@ public class InlineViewRef extends TableRef {
     return inlineViewAnalyzer;
   }
 
-  public Expr.SubstitutionMap getSelectListExprSMap() {
+  public Expr.SubstitutionMap getExprSMap() {
     Preconditions.checkState(isAnalyzed);
     return sMap;
   }

@@ -37,6 +37,7 @@ enum TExprNodeType {
   NULL_LITERAL,
   SLOT_REF,
   STRING_LITERAL,
+  TUPLE_IS_NULL_PRED
 }
 
 enum TAggregationOp {
@@ -95,6 +96,10 @@ struct TLiteralPredicate {
   2: required bool is_null
 }
 
+struct TTupleIsNullPredicate {
+  1: required list<Types.TTupleId> tuple_ids
+}
+
 struct TSlotRef {
   1: required Types.TSlotId slot_id
 }
@@ -122,6 +127,7 @@ struct TExprNode {
   14: optional TLiteralPredicate literal_pred
   15: optional TSlotRef slot_ref
   16: optional TStringLiteral string_literal
+  17: optional TTupleIsNullPredicate tuple_is_null_pred
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

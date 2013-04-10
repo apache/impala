@@ -455,6 +455,71 @@ string
 '1'
 ====
 ---- QUERY
+# test nullable expressions from inline views in left outer join
+select x.id, y.a, y.b, y.id from alltypestiny x left outer join
+(select 10 as a, case when id is null then 11 else 12 end as b, id from alltypestiny)
+y on x.id = (y.id % 2)
+order by x.id, y.id limit 100
+---- TYPES
+int, tinyint, tinyint, int
+---- RESULTS
+0,10,12,0
+0,10,12,2
+0,10,12,4
+0,10,12,6
+1,10,12,1
+1,10,12,3
+1,10,12,5
+1,10,12,7
+2,NULL,NULL,NULL
+3,NULL,NULL,NULL
+4,NULL,NULL,NULL
+5,NULL,NULL,NULL
+6,NULL,NULL,NULL
+7,NULL,NULL,NULL
+====
+---- QUERY
+# test nullable expressions from inline views in full outer join
+select x.a, x.b, x.id, y.a, y.b, y.id from
+(select 10 as a, case when id is null then 11 else 12 end as b, id from alltypestiny) x
+full outer join
+(select 20 as a, case when id is null then 21 else 22 end as b, id from alltypestiny) y on x.id = (y.id + 4)
+order by x.id, y.id limit 100
+---- TYPES
+tinyint, tinyint, int, tinyint, tinyint, int
+---- RESULTS
+10,12,0,NULL,NULL,NULL
+10,12,1,NULL,NULL,NULL
+10,12,2,NULL,NULL,NULL
+10,12,3,NULL,NULL,NULL
+10,12,4,20,22,0
+10,12,5,20,22,1
+10,12,6,20,22,2
+10,12,7,20,22,3
+NULL,NULL,NULL,20,22,4
+NULL,NULL,NULL,20,22,5
+NULL,NULL,NULL,20,22,6
+NULL,NULL,NULL,20,22,7
+====
+---- QUERY
+# test nullable expressions wrapped multiple times
+select z.xa, z.xid, z.ya, z.yid, k.a, k.id from
+(select x.a as xa, x.id as xid, y.a as ya, y.id as yid from
+ (select 10 as a, id from alltypestiny where id = 1) x
+ full outer join
+ (select 20 as a, id from alltypestiny where id = 1) y on x.id = (y.id + 2)
+) z
+full outer join 
+(select 30 as a, id from alltypestiny where id = 1) k on z.xid = (k.id + 3)
+order by z.xid, z.yid, k.id limit 100
+---- TYPES
+tinyint, int, tinyint, int, tinyint, int
+---- RESULTS
+10,1,NULL,NULL,NULL,NULL
+NULL,NULL,20,1,NULL,NULL
+NULL,NULL,NULL,NULL,30,1
+====
+---- QUERY
 # right outer join requires the join op to be partitioned, otherwise non-matches cause
 # duplicates
 select count(*)

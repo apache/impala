@@ -175,7 +175,7 @@ public class SelectStmt extends QueryStmt {
     for (TableRef tblRef: tableRefs) {
       if (tblRef instanceof InlineViewRef) {
         InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
-        sMap = Expr.SubstitutionMap.combine(sMap, inlineViewRef.getSelectListExprSMap());
+        sMap = Expr.SubstitutionMap.combine(sMap, inlineViewRef.getExprSMap());
       }
     }
 

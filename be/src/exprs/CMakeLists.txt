@@ -37,7 +37,7 @@ add_library(Exprs
   is-null-predicate.cc
   like-predicate.cc
   math-functions.cc
-  null-literal.cc
+  null-literal.cc  
   opcode-registry.cc
   slot-ref.cc
   string-literal.cc
@@ -45,6 +45,7 @@ add_library(Exprs
   timestamp-functions.cc
   timestamp-literal.cc
   timezone_db.cc
+  tuple-is-null-predicate.cc
   utility-functions.cc
 )
 

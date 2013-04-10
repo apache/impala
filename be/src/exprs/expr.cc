@@ -36,6 +36,7 @@
 #include "exprs/opcode-registry.h"
 #include "exprs/string-literal.h"
 #include "exprs/timestamp-literal.h"
+#include "exprs/tuple-is-null-predicate.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Data_types.h"
 #include "runtime/runtime-state.h"
@@ -348,6 +349,10 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
         return Status("String literal not set in thrift node");
       }
       *expr = pool->Add(new StringLiteral(texpr_node));
+      return Status::OK;
+    }
+    case TExprNodeType::TUPLE_IS_NULL_PRED: {
+      *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
     }
     default:

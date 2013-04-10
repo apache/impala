@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 
 /**
@@ -47,7 +48,7 @@ public class BaseTableRef extends TableRef {
    * Register this table ref and then analyze the Join clause.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     desc = analyzer.registerBaseTableRef(this);
     isAnalyzed = true;  // true that we have assigned desc
     analyzeJoin(analyzer);

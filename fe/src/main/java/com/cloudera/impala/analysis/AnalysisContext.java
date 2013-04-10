@@ -15,8 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
@@ -42,7 +40,7 @@ public class AnalysisContext {
     this.catalog = catalog;
     this.defaultDatabase = defaultDb;
     this.user = user;
-    this.queryGlobals = createQueryGlobals();
+    this.queryGlobals = Analyzer.createQueryGlobals();
   }
 
   static public class AnalysisResult {
@@ -205,18 +203,5 @@ public class AnalysisContext {
   }
 
   public TQueryGlobals getQueryGlobals() { return queryGlobals; }
-
-  /**
-   * Create query global parameters to be set in each TPlanExecRequest.
-   */
-  private TQueryGlobals createQueryGlobals() {
-    SimpleDateFormat formatter =
-        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-    TQueryGlobals queryGlobals = new TQueryGlobals();
-    Calendar currentDate = Calendar.getInstance();
-    String nowStr = formatter.format(currentDate.getTime());
-    queryGlobals.setNow_string(nowStr);
-    return queryGlobals;
-  }
 
 }

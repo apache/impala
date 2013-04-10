@@ -16,9 +16,6 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +26,6 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -81,17 +77,8 @@ public class SingleColumnFilter {
       }
 
       // call backend
-      TExpr thriftExpr = literalConjunct.treeToThrift();
-      TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
-      try {
-        if (!FeSupport.EvalPredicate(serializer.serialize(thriftExpr),
-                serializer.serialize(analyzer.getQueryGlobals()))) {
-          return false;
-        }
-      } catch (TException e) {
-        // this should never happen
-        throw new InternalException(
-            "couldn't execute predicate " + literalConjunct.toSql(), e);
+      if (!FeSupport.EvalPredicate(literalConjunct, analyzer.getQueryGlobals())) {
+        return false;
       }
     }
 

@@ -14,9 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +25,6 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 
 /**
@@ -104,17 +100,7 @@ public class ValueRange {
     }
 
     // call backend
-    TExpr thriftExpr = p.treeToThrift();
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
-    try {
-      boolean result = FeSupport.EvalPredicate(serializer.serialize(thriftExpr),
-          serializer.serialize(analyzer.getQueryGlobals()));
-      return result;
-    } catch (TException e) {
-      // this should never happen
-      throw new InternalException(
-          "couldn't execute predicate " + p.toSql() + "\n" + e.toString());
-    }
+    return FeSupport.EvalPredicate(p, analyzer.getQueryGlobals());
   }
 
 }

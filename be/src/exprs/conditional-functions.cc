@@ -36,7 +36,52 @@ void* ConditionalFunctions::IfBool(Expr* e, TupleRow* row) {
   return &e->result_.bool_val;
 }
 
+void* ConditionalFunctions::IfTinyint(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
+  if (cond == NULL || !*cond) {
+    int8_t* else_val = reinterpret_cast<int8_t*>(e->children()[2]->GetValue(row));
+    if (else_val == NULL) return NULL;
+    e->result_.tinyint_val = *else_val;
+  } else {
+    int8_t* then_val = reinterpret_cast<int8_t*>(e->children()[1]->GetValue(row));
+    if (then_val == NULL) return NULL;
+    e->result_.tinyint_val = *then_val;
+  }
+  return &e->result_.tinyint_val;
+}
+
+void* ConditionalFunctions::IfSmallint(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
+  if (cond == NULL || !*cond) {
+    int16_t* else_val = reinterpret_cast<int16_t*>(e->children()[2]->GetValue(row));
+    if (else_val == NULL) return NULL;
+    e->result_.smallint_val = *else_val;
+  } else {
+    int16_t* then_val = reinterpret_cast<int16_t*>(e->children()[1]->GetValue(row));
+    if (then_val == NULL) return NULL;
+    e->result_.smallint_val = *then_val;
+  }
+  return &e->result_.smallint_val;
+}
+
 void* ConditionalFunctions::IfInt(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
+  if (cond == NULL || !*cond) {
+    int32_t* else_val = reinterpret_cast<int32_t*>(e->children()[2]->GetValue(row));
+    if (else_val == NULL) return NULL;
+    e->result_.int_val = *else_val;
+  } else {
+    int32_t* then_val = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
+    if (then_val == NULL) return NULL;
+    e->result_.int_val = *then_val;
+  }
+  return &e->result_.int_val;
+}
+
+void* ConditionalFunctions::IfBigint(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
   if (cond == NULL || !*cond) {
@@ -52,6 +97,21 @@ void* ConditionalFunctions::IfInt(Expr* e, TupleRow* row) {
 }
 
 void* ConditionalFunctions::IfFloat(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
+  if (cond == NULL || !*cond) {
+    float* else_val = reinterpret_cast<float*>(e->children()[2]->GetValue(row));
+    if (else_val == NULL) return NULL;
+    e->result_.float_val = *else_val;
+  } else {
+    float* then_val = reinterpret_cast<float*>(e->children()[1]->GetValue(row));
+    if (then_val == NULL) return NULL;
+    e->result_.float_val = *then_val;
+  }
+  return &e->result_.float_val;
+}
+
+void* ConditionalFunctions::IfDouble(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
   if (cond == NULL || !*cond) {

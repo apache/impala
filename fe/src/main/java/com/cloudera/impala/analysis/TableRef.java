@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -145,7 +146,8 @@ public abstract class TableRef extends ParseNodeBase {
    * The join clause can only be analyzed after the left table has been analyzed
    * and the TupleDescriptor (desc) of this table has been created.
    */
-  public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
+  public void analyzeJoin(Analyzer analyzer)
+      throws AnalysisException, InternalException {
     Preconditions.checkState(desc != null);
     analyzeJoinHints();
 
@@ -219,6 +221,13 @@ public abstract class TableRef extends ParseNodeBase {
       throw new AnalysisException(joinOpToSql() + " requires an ON or USING clause.");
     }
 
+    // Make constant expressions from inline view refs nullable in its substitution map.
+    if (lhsIsNullable && leftTblRef instanceof InlineViewRef) {
+      ((InlineViewRef) leftTblRef).makeOutputNullable(analyzer);
+    }
+    if (rhsIsNullable && this instanceof InlineViewRef) {
+      ((InlineViewRef) this).makeOutputNullable(analyzer);
+    }
   }
 
   private String joinOpToSql() {
