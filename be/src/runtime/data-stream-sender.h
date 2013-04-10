@@ -98,6 +98,12 @@ class DataStreamSender : public DataSink {
   RuntimeProfile::Counter* bytes_sent_counter_;
   RuntimeProfile::Counter* uncompressed_bytes_counter_;
 
+  // Throughput per time spent in TransmitData
+  RuntimeProfile::Counter* network_throughput_;
+
+  // Throughput per total time spent in sender
+  RuntimeProfile::Counter* overall_throughput_;
+
   // Identifier of the destination plan node.
   PlanNodeId dest_node_id_;
 };
