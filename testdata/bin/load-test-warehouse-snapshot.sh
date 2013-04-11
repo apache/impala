@@ -66,10 +66,9 @@ tar -C ${SNAPSHOT_STAGING_DIR} -xzf ${SNAPSHOT_FILE}
 echo "Copying data to HDFS"
 hadoop fs -put ${SNAPSHOT_STAGING_DIR}/test-warehouse/* ${TEST_WAREHOUSE_HDFS_DIR}
 
-echo "Generating HBase data and forcing reload"
+echo "Cleaning up external hbase tables"
 ${IMPALA_HOME}/bin/create_testdata.sh
-${IMPALA_HOME}/testdata/bin/create-hbase.sh
-hadoop fs -rm -r -f ${TEST_WAREHOUSE_HDFS_DIR}/functional.db/hbase*
+hadoop fs -rm -r -f ${TEST_WAREHOUSE_HDFS_DIR}/functional_hbase.db
 
 echo "Cleaning up workspace"
 rm -rf ${SNAPSHOT_STAGING_DIR}

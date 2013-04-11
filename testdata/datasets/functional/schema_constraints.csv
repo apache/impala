@@ -2,13 +2,21 @@
 # Allows for defining constraints on which file formats to generate for an individual
 # table. The table name should match the base table name defined in the schema template
 # file.
-table_name:hbasealltypessmall, constraint:restrict_to, table_format:text/none/none
-table_name:hbasealltypesagg, constraint:restrict_to, table_format:text/none/none
-table_name:hbasealltypeserror, constraint:restrict_to, table_format:text/none/none
-table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:text/none/none
-table_name:hbasestringids, constraint:restrict_to, table_format:text/none/none
-table_name:hbaseinsertalltypesagg, constraint:restrict_to, table_format:text/none/none
+table_name:stringids, constraint:restrict_to, table_format:hbase/none/none
+table_name:insertalltypesagg, constraint:restrict_to, table_format:hbase/none/none
+table_name:alltypessmallbinary, constraint:restrict_to, table_format:hbase/none/none
+table_name:insertalltypesaggbinary, constraint:restrict_to, table_format:hbase/none/none
+table_name:hbasealltypeserror, constraint:restrict_to, table_format:hbase/none/none
+table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:hbase/none/none
 
+table_name:alltypesinsert, constraint:restrict_to, table_format:text/none/none
+table_name:alltypesnopart_insert, constraint:restrict_to, table_format:text/none/none
+table_name:insert_overwrite_nopart, constraint:restrict_to, table_format:text/none/none
+table_name:insert_overwrite_partitioned, constraint:restrict_to, table_format:text/none/none
+table_name:insert_string_partitioned, constraint:restrict_to, table_format:text/none/none
+
+table_name:alltypesinsert, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypesnopart_insert, constraint:restrict_to, table_format:parquet/none/none
 
 table_name:alltypesinsert, constraint:restrict_to, table_format:text/none/none
 table_name:alltypesnopart_insert, constraint:restrict_to, table_format:text/none/none
@@ -40,6 +48,7 @@ table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/n
 # the text_ tables are for testing test delimiters and escape chars in text files
 table_name:text_comma_backslash_newline, constraint:restrict_to, table_format:text/none/none
 table_name:text_dollar_hash_pipe, constraint:restrict_to, table_format:text/none/none
+
 table_name:bad_serde, constraint:restrict_to, table_format:text/none/none
 table_name:unsupported_partition_types, constraint:restrict_to, table_format:text/none/none
 table_name:nullformat_custom, constraint:exclude, table_format:parquet/none/none
@@ -53,3 +62,23 @@ table_name:complex_view, constraint:restrict_to, table_format:text/none/none
 table_name:complex_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:view_view, constraint:restrict_to, table_format:text/none/none
 table_name:view_view, constraint:restrict_to, table_format:seq/snap/block
+
+# liketbl and tblwithraggedcolumns all have 
+# NULLs in primary key columns. hbase does not support
+# writing NULLs to primary key columns.
+table_name:liketbl, constraint:exclude, table_format:hbase/none/none
+table_name:tblwithraggedcolumns, constraint:exclude, table_format:hbase/none/none
+
+# Tables with only one column are not supported in hbase.
+table_name:greptiny, constraint:exclude, table_format:hbase/none/none
+table_name:tinyinttable, constraint:exclude, table_format:hbase/none/none
+
+# overflow has a bigint that's too big. hbase may lose precision, hence this
+# table cannot be loaded.
+table_name:overflow, constraint:exclude, table_format:hbase/none/none
+
+# nullformat_custom is used in null-insert tests, which user insert overwrite, 
+# which is not supported in hbase. The schema is also specified in HIVE_CREATE 
+# with no corresponding LOAD statement.
+table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
+table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none

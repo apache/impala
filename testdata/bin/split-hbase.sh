@@ -10,4 +10,4 @@ mvn clean package
 . ${IMPALA_HOME}/bin/set-classpath.sh
 export CLASSPATH=$IMPALA_HOME/testdata/target/impala-testdata-0.1-SNAPSHOT.jar:$CLASSPATH
 
-java com.cloudera.impala.datagenerator.HBaseTestDataRegionAssigment hbasealltypesagg hbasealltypessmall
+java com.cloudera.impala.datagenerator.HBaseTestDataRegionAssigment functional_hbase.alltypesagg functional_hbase.alltypessmall

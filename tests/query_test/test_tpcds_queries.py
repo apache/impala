@@ -17,7 +17,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
     super(TestTpcdsQuery, cls).add_test_dimensions()
     # Cut down on the execution time for these tests
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format != 'rc' and\
+        v.get_value('table_format').file_format not in ['rc', 'hbase'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
     cls.TestMatrix.add_constraint(lambda v:\

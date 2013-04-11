@@ -343,7 +343,7 @@ public class AnalyzerTest {
 
   @Test
   public void TestBinaryHBaseTable() {
-    AnalyzesOk("select * from functional.hbasealltypessmallbinary");
+    AnalyzesOk("select * from functional_hbase.alltypessmallbinary");
   }
 
   @Test
@@ -384,7 +384,7 @@ public class AnalyzerTest {
 
     // Analysis error from explain query
     AnalysisError("explain " +
-        "select id from (select id+2 from functional.hbasealltypessmall) a",
+        "select id from (select id+2 from functional_hbase.alltypessmall) a",
         "couldn't resolve column reference: 'id'");
 
     // Positive test for explain query

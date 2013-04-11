@@ -73,13 +73,21 @@ def validate_workloads(all_workloads, workloads):
       print 'Available workloads: ' + ', '.join(all_workloads)
       sys.exit(1)
 
+def exec_cmd(cmd, error_msg, expect_success=True):
+  ret_val = subprocess.call(cmd, shell=True)
+  if expect_success and ret_val != 0:
+    print error_msg
+    sys.exit(ret_val)
+  return ret_val
+
 def exec_hive_query_from_file(file_name):
   hive_cmd = "%s %s -f %s" % (HIVE_CMD, HIVE_ARGS, file_name)
   print 'Executing Hive Command: ' + hive_cmd
-  ret_val = subprocess.call(hive_cmd, shell = True)
-  if ret_val != 0:
-    print 'Error executing file from Hive: ' + file_name
-    sys.exit(ret_val)
+  exec_cmd(hive_cmd,  'Error executing file from Hive: ' + file_name)
+
+def exec_hbase_query_from_file(file_name):
+  hbase_cmd = "hbase shell %s" % file_name
+  exec_cmd(hbase_cmd, 'Error executing hbase create commands')
 
 def exec_impala_query_from_file(file_name):
   impala_refresh_cmd = "%s --impalad=%s -q 'invalidate metadata'" %\
@@ -87,27 +95,15 @@ def exec_impala_query_from_file(file_name):
   impala_cmd = "%s --impalad=%s -f %s" %\
       (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
   # Refresh catalog before and after
-  ret_val = subprocess.call(impala_refresh_cmd, shell = True)
-  if ret_val != 0:
-    print 'Error executing refresh from Impala.'
-    sys.exit(ret_val)
+  exec_cmd(impala_refresh_cmd, 'Error executing refresh from Impala.')
   print 'Executing Impala Command: ' + impala_cmd
-  ret_val = subprocess.call(impala_cmd, shell = True)
-  if ret_val != 0:
-    print 'Error executing file from Impala: ' + file_name
-    sys.exit(ret_val)
-  ret_val = subprocess.call(impala_refresh_cmd, shell = True)
-  if ret_val != 0:
-    print 'Error executing refresh from Impala.'
-    sys.exit(ret_val)
+  exec_cmd(impala_cmd, 'Error executing file from Impala: ' + file_name)
+  exec_cmd(impala_refresh_cmd, 'Error executing refresh from Impala.')
 
 def exec_bash_script(file_name):
   bash_cmd = "bash %s" % file_name
   print 'Executing Bash Command: ' + bash_cmd
-  ret_val = subprocess.call(bash_cmd, shell = True)
-  if ret_val != 0:
-    print 'Error bash script: ' + file_name
-    sys.exit(ret_val)
+  exec_cmd(bash_cmd, 'Error bash script: ' + file_name)
 
 def generate_schema_statements(workload):
   generate_cmd = GENERATE_SCHEMA_CMD % (options.exploration_strategy, workload,
@@ -123,10 +119,9 @@ def generate_schema_statements(workload):
   if options.hdfs_namenode is not None:
     generate_cmd += " --hdfs_namenode=%s" % options.hdfs_namenode
   print 'Executing Generate Schema Command: ' + generate_cmd
-  ret_val = subprocess.call(os.path.join(TESTDATA_BIN_DIR, generate_cmd), shell = True)
-  if ret_val != 0:
-    print 'Error generating schema statements for workload: ' + workload
-    sys.exit(ret_val)
+  schema_cmd = os.path.join(TESTDATA_BIN_DIR, generate_cmd)
+  error_msg = 'Error generating schema statements for workload: ' + workload
+  exec_cmd(schema_cmd, error_msg)
 
 def get_dataset_for_workload(workload):
   dimension_file_name = os.path.join(WORKLOAD_DIR, workload,
@@ -156,11 +151,8 @@ def copy_avro_schemas_to_hdfs(schemas_dir):
 def exec_hadoop_fs_cmd(args, expect_success=True):
   cmd = "%s fs %s" % (HADOOP_CMD, args)
   print "Executing Hadoop command: " + cmd
-  ret_val = subprocess.call(cmd, shell=True)
-  if expect_success and ret_val != 0:
-    print "Error executing Hadoop command, exiting"
-    sys.exit(ret_val)
-  return ret_val
+  exec_cmd(cmd, "Error executing Hadoop command, exiting",
+      expect_success=expect_success)
 
 if __name__ == "__main__":
   all_workloads = available_workloads(WORKLOAD_DIR)
@@ -185,6 +177,11 @@ if __name__ == "__main__":
     dataset_dir = os.path.join(DATASET_DIR, dataset)
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
+
+    generated_hbase_file = 'load-%s-%s-hbase.create' % (workload,
+                                                        options.exploration_strategy)
+    if os.path.exists(generated_hbase_file):
+      exec_hbase_query_from_file(os.path.join(dataset_dir, generated_hbase_file))
 
     generated_impala_file = \
         'load-%s-%s-impala-generated.sql' % (workload, options.exploration_strategy)

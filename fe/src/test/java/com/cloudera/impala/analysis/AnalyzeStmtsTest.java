@@ -108,21 +108,21 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestSubquery() throws AnalysisException {
-    AnalyzesOk("select y x from (select id y from functional.hbasealltypessmall) a");
-    AnalyzesOk("select id from (select id from functional.hbasealltypessmall) a");
-    AnalyzesOk("select * from (select id+2 from functional.hbasealltypessmall) a");
+    AnalyzesOk("select y x from (select id y from functional_hbase.alltypessmall) a");
+    AnalyzesOk("select id from (select id from functional_hbase.alltypessmall) a");
+    AnalyzesOk("select * from (select id+2 from functional_hbase.alltypessmall) a");
     AnalyzesOk("select t1 c from " +
-        "(select c t1 from (select id c from functional.hbasealltypessmall) t1) a");
-    AnalysisError("select id from (select id+2 from functional.hbasealltypessmall) a",
+        "(select c t1 from (select id c from functional_hbase.alltypessmall) t1) a");
+    AnalysisError("select id from (select id+2 from functional_hbase.alltypessmall) a",
         "couldn't resolve column reference: 'id'");
-    AnalyzesOk("select a.* from (select id+2 from functional.hbasealltypessmall) a");
+    AnalyzesOk("select a.* from (select id+2 from functional_hbase.alltypessmall) a");
 
     // join test
-    AnalyzesOk("select * from (select id+2 id from functional.hbasealltypessmall) a " +
+    AnalyzesOk("select * from (select id+2 id from functional_hbase.alltypessmall) a " +
         "join (select * from functional.AllTypes where true) b");
     AnalyzesOk("select a.x from (select count(id) x from functional.AllTypes) a");
     AnalyzesOk("select a.* from (select count(id) from functional.AllTypes) a");
-    AnalysisError("select a.id from (select id y from functional.hbasealltypessmall) a",
+    AnalysisError("select a.id from (select id y from functional_hbase.alltypessmall) a",
         "unknown column 'id' (table alias 'a')");
     AnalyzesOk("select * from (select * from functional.AllTypes) a where year = 2009");
     AnalyzesOk("select * from (select * from functional.alltypesagg) a right outer join" +
@@ -134,7 +134,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "         using (id, int_col)) x " +
         "         where x.c1 > 100");
     AnalyzesOk("select a.* from" +
-        " (select * from (select id+2 from functional.hbasealltypessmall) b) a");
+        " (select * from (select id+2 from functional_hbase.alltypessmall) b) a");
     AnalysisError("select * from " +
         "(select * from functional.alltypes a join " +
         "functional.alltypes b on (a.int_col = b.int_col)) x",
@@ -153,7 +153,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select count(*) from (select count(id) from " +
                "functional.AllTypes group by id) a");
     AnalyzesOk("select count(a.x) from (select id+2 x " +
-               "from functional.hbasealltypessmall) a");
+               "from functional_hbase.alltypessmall) a");
     AnalyzesOk("select * from (select id, zip " +
         "       from (select * from functional.testtbl) x " +
         "       group by zip, id having count(*) > 0) x");
@@ -1202,9 +1202,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
       // Cannot load into non-HDFS tables.
       AnalysisError(String.format("load data inpath '%s' %s into table " +
-          "functional.hbasealltypessmall",
+          "functional_hbase.alltypessmall",
           "/test-warehouse/tpch.lineitem/", overwrite),
-          "LOAD DATA only supported for HDFS tables: functional.hbasealltypessmall");
+          "LOAD DATA only supported for HDFS tables: functional_hbase.alltypessmall");
 
       // Load into partitioned table without specifying a partition spec.
       AnalysisError(String.format("load data inpath '%s' %s into table " +
@@ -1385,9 +1385,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Wrong number of columns.
     if (!qualifier.contains("OVERWRITE")) {
-      AnalysisError("INSERT " + qualifier + " TABLE functional.hbasealltypesagg " +
+      AnalysisError("INSERT " + qualifier + " TABLE functional_hbase.alltypes " +
           "SELECT * FROM functional.alltypesagg",
-          "Target table 'functional.hbasealltypesagg' has fewer columns (11) than the " +
+          "Target table 'functional_hbase.alltypes' has fewer columns (13) than the " +
           "SELECT / VALUES clause returns (14)");
     }
     // Unpartitioned table without partition clause.
@@ -1402,9 +1402,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes");
 
     String hbaseQuery =  "INSERT " + qualifier + " TABLE " +
-        "functional.hbaseinsertalltypesagg select id, bigint_col, bool_col, " +
-        "date_string_col, double_col, float_col, int_col, smallint_col, " +
-        "string_col, timestamp_col, tinyint_col from functional.alltypesagg";
+        "functional_hbase.insertalltypesagg select id, bigint_col, bool_col, " +
+        "date_string_col, day, double_col, float_col, int_col, month, smallint_col, " +
+        "string_col, timestamp_col, tinyint_col, year from functional.alltypesagg";
 
     // HBase doesn't support OVERWRITE so error out if the query is
     // trying to do that.
@@ -1557,10 +1557,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "in 'month=int_col'.");
 
     if (qualifier.contains("OVERWRITE")) {
-      AnalysisError("insert " + qualifier + " table functional.hbasealltypessmall " +
+      AnalysisError("insert " + qualifier + " table functional_hbase.alltypessmall " +
           "partition(year, month) select * from functional.alltypessmall",
           "PARTITION clause is not valid for INSERT into HBase tables. " +
-          "'functional.hbasealltypessmall' is an HBase table");
+          "'functional_hbase.alltypessmall' is an HBase table");
     }
   }
 
@@ -1688,19 +1688,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     if (!qualifier.contains("OVERWRITE")) {
       // Simple permutation
-      AnalyzesOk("insert " + qualifier + " table functional.hbasealltypesagg" +
+      AnalyzesOk("insert " + qualifier + " table functional_hbase.alltypesagg" +
           "(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
           "float_col, double_col, date_string_col, string_col, timestamp_col) " +
           "select * from functional.alltypesnopart");
       // Too few columns in permutation
-      AnalysisError("insert " + qualifier + " table functional.hbasealltypesagg" +
+      AnalysisError("insert " + qualifier + " table functional_hbase.alltypesagg" +
           "(id, tinyint_col, smallint_col, int_col, bigint_col, " +
           "float_col, double_col, date_string_col, string_col) " +
           "select * from functional.alltypesnopart",
           "Column permutation mentions fewer columns (9) than the SELECT /" +
           " VALUES clause returns (11)");
       // Omitting the row-key column is an error
-      AnalysisError("insert " + qualifier + " table functional.hbasealltypesagg" +
+      AnalysisError("insert " + qualifier + " table functional_hbase.alltypesagg" +
           "(bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
           "float_col, double_col, date_string_col, string_col, timestamp_col) " +
           "select bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +

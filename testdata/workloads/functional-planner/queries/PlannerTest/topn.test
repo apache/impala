@@ -120,7 +120,7 @@ PLAN FRAGMENT 2
 NODE 0:
 ====
 select int_col, sum(float_col) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 where id < 5
 group by 1
 order by 2
@@ -140,7 +140,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -188,7 +188,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -198,7 +198,7 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select int_col, sum(float_col), min(float_col) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 group by 1
 order by 2,3 desc
 limit 0
@@ -217,7 +217,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -264,7 +264,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

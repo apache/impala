@@ -55,16 +55,16 @@ public class CsvToHBaseConverter {
       throw new IOException("Line does not have 11 columns: " + csvLine);
     }        
     
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "bools:bool_col", parts[1]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "ints:tinyint_col", parts[2]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "ints:smallint_col", parts[3]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "ints:int_col", parts[4]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "ints:bigint_col", parts[5]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "floats:float_col", parts[6]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "floats:double_col", parts[7]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:date_string_col", parts[8]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:string_col", parts[9]);
-    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:timestamp_col", parts[10]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:bigint_col", parts[5]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:bool_col", parts[1]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:date_string_col", parts[8]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:double_col", parts[7]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:float_col", parts[6]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:int_col", parts[4]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:smallint_col", parts[3]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:string_col", parts[9]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:timestamp_col", parts[10]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "d:tinyint_col", parts[2]);
   }
   
   
@@ -77,8 +77,9 @@ public class CsvToHBaseConverter {
    *           something bad happened
    */
   public static void main(String args[]) throws Exception {
-    convertAllTypesTable("AllTypesError", "HBaseAllTypesError", "hbasealltypeserror");
-    convertAllTypesTable("AllTypesErrorNoNulls", "HBaseAllTypesErrorNoNulls", "hbasealltypeserrornonulls");
+    convertAllTypesTable("AllTypesError", "HBaseAllTypesError", "functional_hbase.hbasealltypeserror");
+    convertAllTypesTable("AllTypesErrorNoNulls", "HBaseAllTypesErrorNoNulls", 
+        "functional_hbase.hbasealltypeserrornonulls");
     System.exit(0);
   }
 }

@@ -3,7 +3,9 @@
 
 # This script generates the "CREATE TABLE", "INSERT", and "LOAD" statements for loading
 # test data and writes them to create-*-generated.sql and
-# load-*-generated.sql.
+# load-*-generated.sql. These files are then executed by hive or impala, depending
+# on their contents. Additionally, for hbase, the file is of the form
+# create-*hbase*-generated.create.
 #
 # The statements that are generated are based on an input test vector
 # (read from a file) that describes the coverage desired. For example, currently
@@ -71,6 +73,7 @@ if options.workload is None:
 WORKLOAD_DIR = os.environ['IMPALA_HOME'] + '/testdata/workloads'
 DATASET_DIR = os.environ['IMPALA_HOME'] + '/testdata/datasets'
 AVRO_SCHEMA_DIR = "avro_schemas"
+IMPALA_SUPPORTED_INSERT_FORMATS = ['parquet', 'hbase', 'text']
 
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
 COMPRESSION_ENABLED = "SET hive.exec.compress.output=%s;"
@@ -80,6 +83,7 @@ SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
                         "SET hive.input.format=org.apache.hadoop.hive.ql.io.%s;\n"
+SET_HIVE_HBASE_BULK_LOAD = "SET hive.hbase.bulk = true"
 FILE_FORMAT_IDX = 0
 DATASET_IDX = 1
 CODEC_IDX = 2
@@ -109,7 +113,8 @@ FILE_FORMAT_MAP = {
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
   'avro':
     "\nINPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'" +
-    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'"
+    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'",
+  'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'"
   }
 
 HIVE_TO_AVRO_TYPE_MAP = {
@@ -130,6 +135,15 @@ HIVE_TO_AVRO_TYPE_MAP = {
 
 PARQUET_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
      SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
+
+HBASE_CREATE_STATEMENT = """
+CREATE EXTERNAL TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
+{columns})
+STORED BY {{file_format}}
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  "{hbase_column_mapping}")
+{tbl_properties}{{hdfs_location}}"""
 KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
@@ -139,6 +153,9 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
     create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
   if compression == 'lzo':
     file_format = '%s_%s' % (file_format, compression)
+  # hbase tables are external, and not read from hdfs. We don't need an hdfs_location.
+  if file_format == 'hbase':
+    hdfs_location = str()
   create_stmt += table_template.format(db_name=db_name,
                                        db_suffix=db_suffix,
                                        table_name=table_name,
@@ -147,7 +164,10 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
   return create_stmt
 
 def build_table_template(file_format, columns, partition_columns, row_format,
-                         avro_schema_dir):
+                         avro_schema_dir, table_name):
+  if file_format == 'hbase':
+    return build_hbase_create_stmt_in_hive(columns, partition_columns, table_name)
+
   partitioned_by = str()
   if partition_columns:
     partitioned_by = 'PARTITIONED BY (%s)' % ', '.join(partition_columns.split('\n'))
@@ -188,6 +208,33 @@ LOCATION '{{hdfs_location}}'
   stmt = os.linesep.join([s for s in stmt.splitlines() if s])
   stmt += ';'
   return stmt
+
+def build_hbase_create_stmt_in_hive(columns, partition_columns, table_name):
+  # The hbase create statement differs sufficiently from the generic create to justify a
+  # separate method. Specifically, STORED AS becomes STORED BY. There is section called
+  # serdeproperties, the partition colmns have to be appended to columns in the schema.
+  columns = columns.split('\n')
+  # partition columns have to be appended to the columns in the schema.
+  # PARTITIONED BY is not supported and does not make sense for HBase.
+  if partition_columns:
+    columns.extend(partition_columns.split('\n'))
+  # stringid is a special case. It still points to functional_hbase.alltypesagg
+  if 'stringid' not in table_name:
+    tbl_properties = ('TBLPROPERTIES("hbase.table.name" = '
+                      '"{db_name}{db_suffix}.{table_name}")')
+  else:
+    tbl_properties = ('TBLPROPERTIES("hbase.table.name" = '
+                      '"{db_name}{db_suffix}.alltypesagg")')
+  # build hbase column mapping, the first column is implicitly the primary key
+  # which has a diffrerent representation [:key]
+  hbase_column_mapping = ["d:%s" % c.split(' ')[0] for c in columns[1:]]
+  hbase_column_mapping = ":key," + ','.join(hbase_column_mapping)
+  stmt = HBASE_CREATE_STATEMENT.format(
+    columns=',\n'.join(columns),
+    hbase_column_mapping=hbase_column_mapping,
+    tbl_properties=tbl_properties,
+    ).strip()
+  return stmt + ';'
 
 def avro_schema(columns):
   record = {
@@ -239,8 +286,19 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
   return statement + insert_statement
 
+def build_hbase_insert(db_name, db_suffix, table_name):
+  hbase_insert = SET_HIVE_HBASE_BULK_LOAD + ';\n'
+  hbase_insert += ("INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}"
+                   " SELECT * FROM {db_name}.{table_name};").\
+                   format(db_name=db_name, db_suffix=db_suffix,table_name=table_name)
+  return hbase_insert
+
 def build_insert(insert, db_name, db_suffix, file_format,
-                 codec, compression_type, table_name, hdfs_path):
+                 codec, compression_type, table_name, hdfs_path, create_hive=False):
+  # HBASE inserts don't need the hive options to be set, and don't require and HDFS
+  # file location, so they're handled separately.
+  if file_format == 'hbase' and not create_hive:
+    return build_hbase_insert(db_name, db_suffix, table_name)
   output = build_codec_enabled_statement(codec) + "\n"
   output += build_compression_codec_statement(codec, compression_type, file_format) + "\n"
   output += build_insert_into_statement(insert, db_name, db_suffix,
@@ -259,6 +317,15 @@ def build_load_statement(load_template, db_name, db_suffix, table_name):
                                          db_suffix=db_suffix,
                                          impala_home = os.environ['IMPALA_HOME'])
   return load_template
+
+def build_hbase_create_stmt(db_name, table_name):
+  hbase_table_name = "{db_name}_hbase.{table_name}".format(db_name=db_name,
+                                                           table_name=table_name)
+  create_stmt = list()
+  create_stmt.append("disable '%s'" % hbase_table_name)
+  create_stmt.append("drop '%s'" % hbase_table_name)
+  create_stmt.append("create '%s', 'd'" % hbase_table_name)
+  return create_stmt
 
 def build_db_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none' and codec != 'lzo':
@@ -303,6 +370,9 @@ class Statements(object):
 
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
+  # TODO: This method has become very unwieldy. It has to be re-factored sooner than
+  # later.
+
   # The Avro SerDe causes strange problems with other unrelated tables (e.g.,
   # Avro files will be written to LZO-compressed text tables). We generate
   # separate schema statement files for Avro tables so we can invoke Hive
@@ -313,6 +383,7 @@ def generate_statements(output_name, test_vectors, sections,
   impala_output = Statements()
   impala_load = Statements()
   hive_output = Statements()
+  hbase_output = Statements()
 
   table_names = None
   if options.table_names:
@@ -322,13 +393,10 @@ def generate_statements(output_name, test_vectors, sections,
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
-
     for section in sections:
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
-      if create_hive:
-        create = create_hive
       insert = section['DEPENDENT_LOAD']
       load = section['LOAD']
       # For some datasets we may want to use a different load strategy when running local
@@ -367,13 +435,15 @@ def generate_statements(output_name, test_vectors, sections,
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       # Empty tables (tables with no "LOAD" sections) are assumed to be used for insert
-      # testing. Since Impala currently only supports inserting into TEXT and PARQUET we
-      # need to create these tables with a supported insert format.
+      # testing. Since Impala currently only supports inserting into TEXT, PARQUET and
+      # HBASE we need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
       if not load and not insert:
         create_codec = 'none'
-        create_file_format = 'text' if file_format != 'parquet' else 'parquet'
+        create_file_format = file_format
+        if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:
+          create_file_format = 'text'
 
       if table_names and (table_name.lower() not in table_names):
         print 'Skipping table: %s.%s' % (db, table_name)
@@ -390,7 +460,7 @@ def generate_statements(output_name, test_vectors, sections,
         continue
 
       output = impala_output
-      if create_hive:
+      if create_hive or file_format == 'hbase':
         output = hive_output
       if file_format == 'avro':
         output = avro_output
@@ -400,29 +470,44 @@ def generate_statements(output_name, test_vectors, sections,
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
       # must be provided (and optionally PARTITION_COLUMNS and ROW_FORMAT
       # sections), which is used to generate the create table statement.
-      if create:
-        table_template = create
+      if create_hive:
+        table_template = create_hive
         if file_format == 'avro':
-          # We don't know how to generalize CREATE sections to Avro.
-          print "CREATE section not supported with Avro, skipping: '%s'" % table_name
+          print 'CREATE section not supported'
+          continue
+      elif create:
+        table_template = create
+        if file_format in ['avro', 'hbase']:
+          # We don't know how to generalize CREATE sections to Avro and hbase.
+          print ("CREATE section not supported with %s, "
+                 "skipping: '%s'" % (file_format, table_name))
           continue
       else:
         assert columns, "No CREATE or COLUMNS section defined for table " + table_name
         avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
+        temp_table_name = table_name
         table_template = build_table_template(
-          create_file_format, columns, partition_columns, row_format, avro_schema_dir)
+          create_file_format, columns, partition_columns,
+          row_format, avro_schema_dir, table_name)
         # Write Avro schema to local file
-        if not os.path.exists(avro_schema_dir):
-          os.makedirs(avro_schema_dir)
-        with open("%s/%s.json" % (avro_schema_dir, table_name),"w") as f:
-          f.write(avro_schema(columns))
+        if file_format == 'avro':
+          if not os.path.exists(avro_schema_dir):
+            os.makedirs(avro_schema_dir)
+          with open("%s/%s.json" % (avro_schema_dir, table_name),"w") as f:
+            f.write(avro_schema(columns))
 
       output.create.append(build_create_statement(table_template, table_name, db_name,
           db_suffix, create_file_format, create_codec, data_path))
+      # HBASE create table
+      if file_format == 'hbase':
+        hbase_output.create.extend(build_hbase_create_stmt(db_name, table_name))
 
-      # The ALTER statement in hive does not accept fully qualified table names.
-      # We need the use statement.
-      if alter:
+      # The ALTER statement in hive does not accept fully qualified table names so
+      # insert a use statement. The ALTER statement is skipped for HBASE as it's
+      # used for adding partitions.
+      # TODO: Consider splitting the ALTER subsection into specific components. At the
+      # moment, it assumes we're only using ALTER for partitioning the table.
+      if alter and file_format != "hbase":
         use_table = 'USE {db_name};\n'.format(db_name=db)
         output.create.append(use_table + alter.format(table_name=table_name))
 
@@ -449,7 +534,8 @@ def generate_statements(output_name, test_vectors, sections,
         else:
           if insert:
             hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
-                                        codec, compression_type, table_name, data_path))
+                                        codec, compression_type, table_name, data_path,
+                                        create_hive=create_hive))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
@@ -457,6 +543,8 @@ def generate_statements(output_name, test_vectors, sections,
   impala_output.write_to_file('load-' + output_name + '-impala-generated.sql')
   impala_load.write_to_file('load-' + output_name + '-impala-load-generated.sql')
   hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')
+  hbase_output.create.append("exit")
+  hbase_output.write_to_file('load-' + output_name + '-hbase.create')
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',

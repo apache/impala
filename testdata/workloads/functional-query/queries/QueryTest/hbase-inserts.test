@@ -1,84 +1,84 @@
 ====
 ---- QUERY
-insert into table hbaseinsertalltypesagg
-select id, bigint_col, bool_col, date_string_col, double_col, float_col, 
-int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+insert into table insertalltypesagg 
+select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
+int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
+---- SETUP
+RELOAD insertalltypesagg
 ---- RESULTS
 : 10000
----- SETUP
-RELOAD hbaseinsertalltypesagg
 ====
 ---- QUERY
-select id, bool_col from hbaseinsertalltypesagg 
+select id, bool_col from insertalltypesagg 
 WHERE id > 300 
 ORDER BY id 
 LIMIT 2
----- TYPES
-int, boolean
 ---- RESULTS
 301,false
 302,true
+---- TYPES
+INT, BOOLEAN
 ====
 ---- QUERY
-insert into table hbaseinsertalltypesagg
-select 9999999, bigint_col, false, date_string_col, double_col, float_col, 
-int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+insert into table insertalltypesagg
+select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
+int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
+---- SETUP
+RELOAD insertalltypesagg
 ---- RESULTS
 : 10000
----- SETUP
-RELOAD hbaseinsertalltypesagg
 ====
 ---- QUERY
-select id, bool_col from hbaseinsertalltypesagg 
+select id, bool_col from insertalltypesagg 
 WHERE id = 9999999 
 ORDER BY id 
 LIMIT 2
----- TYPES
-int, boolean
 ---- RESULTS
 9999999,false
+---- TYPES
+INT, BOOLEAN
 ====
 ---- QUERY
 # test insert into ... select *
 # using limit 1 to reduce execution time
-insert into table hbaseinsertalltypesagg
-select * from hbaseinsertalltypesagg limit 1
+insert into table insertalltypesagg
+select * from insertalltypesagg limit 1
+---- SETUP
+RELOAD insertalltypesagg
 ---- RESULTS
 : 1
----- SETUP
-RELOAD hbaseinsertalltypesagg
 ====
 ---- QUERY
 # test inserting Hive's default text representation of NULL '\N' 
 # and make sure a scan returns the string and not NULL
-insert into table hbaseinsertalltypesagg
-select 9999999, bigint_col, false, "\\N", double_col, float_col, 
-int_col, smallint_col, "\\N", timestamp_col, tinyint_col from alltypesagg limit 1
+insert into table insertalltypesagg
+select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
+int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
+---- SETUP
+RELOAD insertalltypesagg
 ---- RESULTS
 : 1
----- SETUP
-RELOAD hbaseinsertalltypesagg
 ====
 ---- QUERY
-select id, date_string_col, string_col from hbaseinsertalltypesagg 
+select id, date_string_col, string_col from insertalltypesagg 
 where id = 9999999
----- TYPES
-int, string, string
 ---- RESULTS
 9999999,'\N','\N'
+---- TYPES
+INT, STRING, STRING
 ====
 ---- QUERY
-insert into table hbaseinsertalltypesaggbinary
-select id, bigint_col, bool_col, date_string_col, double_col, float_col, 
-int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+insert into table insertalltypesaggbinary
+select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
+int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
+---- SETUP
+RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 10000
----- SETUP
-RELOAD hbaseinsertalltypesaggbinary
 ====
 ---- QUERY
 select count(*) from (
-  select hb.* from hbaseinsertalltypesaggbinary hb, alltypesagg a
+  select hb.* from insertalltypesaggbinary hb, functional.alltypesagg a
   where hb.id = a.id
     and (hb.bigint_col = a.bigint_col or
          (hb.bigint_col is null and a.bigint_col is null))
@@ -101,67 +101,67 @@ select count(*) from (
     and (hb.timestamp_col = a.timestamp_col or
          (hb.timestamp_col is null and a.timestamp_col is null))
   ) x
----- TYPES
-bigint
 ---- RESULTS
 10000
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select id, bool_col from hbaseinsertalltypesaggbinary 
+select id, bool_col from insertalltypesaggbinary 
 WHERE id > 300 
 ORDER BY id 
 LIMIT 2
----- TYPES
-int, boolean
 ---- RESULTS
 301,false
 302,true
+---- TYPES
+INT, BOOLEAN
 ====
 ---- QUERY
-insert into table hbaseinsertalltypesaggbinary
-select 9999999, bigint_col, false, date_string_col, double_col, float_col, 
-int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+insert into table insertalltypesaggbinary
+select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
+int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
+---- SETUP
+RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 10000
----- SETUP
-RELOAD hbaseinsertalltypesaggbinary
 ====
 ---- QUERY
-select id, bool_col from hbaseinsertalltypesaggbinary 
+select id, bool_col from insertalltypesaggbinary 
 WHERE id = 9999999 
 ORDER BY id 
 LIMIT 2
----- TYPES
-int, boolean
 ---- RESULTS
 9999999,false
+---- TYPES
+INT, BOOLEAN
 ====
 ---- QUERY
 # test insert into ... select *
 # using limit 1 to reduce execution time
-insert into table hbaseinsertalltypesaggbinary
-select * from hbaseinsertalltypesaggbinary limit 1
+insert into table insertalltypesaggbinary
+select * from insertalltypesaggbinary limit 1
+---- SETUP
+RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 1
----- SETUP
-RELOAD hbaseinsertalltypesaggbinary
 ====
 ---- QUERY
 # test inserting Hive's default text representation of NULL '\N' 
 # and make sure a scan returns the string and not NULL
-insert into table hbaseinsertalltypesaggbinary
-select 9999999, bigint_col, false, "\\N", double_col, float_col, 
-int_col, smallint_col, "\\N", timestamp_col, tinyint_col from alltypesagg limit 1
+insert into table insertalltypesaggbinary
+select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
+int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
+---- SETUP
+RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 1
----- SETUP
-RELOAD hbaseinsertalltypesaggbinary
 ====
 ---- QUERY
-select id, date_string_col, string_col from hbaseinsertalltypesaggbinary 
+select id, date_string_col, string_col from insertalltypesaggbinary 
 where id = 9999999
----- TYPES
-int, string, string
 ---- RESULTS
 9999999,'\N','\N'
+---- TYPES
+INT, STRING, STRING
 ====

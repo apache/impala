@@ -16,7 +16,7 @@ class TestHBaseQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestHBaseQueries, cls).add_test_dimensions()
     cls.TestMatrix.add_constraint(\
-        lambda v: v.get_value('table_format').file_format == 'text')
+        lambda v: v.get_value('table_format').file_format == 'hbase')
 
   def test_hbase_scan_node(self, vector):
     self.run_test_case('QueryTest/hbase-scan-node', vector)
@@ -29,3 +29,6 @@ class TestHBaseQueries(ImpalaTestSuite):
 
   def test_hbase_inserts(self, vector):
     self.run_test_case('QueryTest/hbase-inserts', vector)
+
+  def test_hbase_subquery(self, vector):
+    self.run_test_case('QueryTest/hbase-subquery', vector)

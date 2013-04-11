@@ -277,6 +277,30 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesError/0903.txt' OVERWRITE
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+hbasealltypeserror
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col"
+)
+TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasealltypeserror");
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypeserrornonulls
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS  {db_name}{db_suffix}.{table_name} (
@@ -340,6 +364,30 @@ DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hbasealltypeserrornonulls
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col"
+)
+TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasealltypeserrornonulls");
 ====
 ---- DATASET
 functional
@@ -501,7 +549,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/LikeTbl/data.csv' OVERWRITE INTO 
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-hbasealltypessmall
+alltypessmallbinary
 ---- CREATE_HIVE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
@@ -514,71 +562,36 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   double_col double,
   date_string_col string,
   string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,
-bools:bool_col,
-ints:tinyint_col,
-	ints:smallint_col,
-ints:int_col,
-    ints:bigint_col,
-floats:float_col,
-floats:double_col,
-strings:date_string_col,
-strings:string_col,
-strings:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
----- LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypessmall;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-hbasealltypessmallbinary
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
+  timestamp_col timestamp,
+  year int,
+  month int)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
   ":key#-,
-   bools:bool_col#-,
-   ints:tinyint_col#-,
-   ints:smallint_col#-,
-   ints:int_col#-,
-   ints:bigint_col#-,
-   floats:float_col#-,
-   floats:double_col#-,
-   strings:date_string_col#-,
-   strings:string_col#-,
-   strings:timestamp_col#s"
+   d:bool_col#-,
+   d:tinyint_col#-,
+   d:smallint_col#-,
+   d:int_col#-,
+   d:bigint_col#-,
+   d:float_col#-,
+   d:double_col#-,
+   d:date_string_col#-,
+   d:string_col#-,
+   d:timestamp_col#s,
+   d:year#-,
+   d:month#-"
 )
-TBLPROPERTIES ("hbase.table.name" = "hbasealltypessmallbinary",
+TBLPROPERTIES ("hbase.table.name" = "functional_hbase.alltypessmallbinary",
                "hbase.table.default.storage.type" = "binary");
----- LOAD
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypessmall;
+SELECT * FROM functional.alltypessmall;
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-hbaseinsertalltypesaggbinary
+insertalltypesaggbinary
 ---- CREATE_HIVE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
@@ -591,137 +604,58 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   double_col double,
   date_string_col string,
   string_col string,
-  timestamp_col timestamp)
+  timestamp_col timestamp,
+  year int,
+  month int,
+  day int)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key#b,d:bool_col#b,d:tinyint_col#b,d:smallint_col#b,d:int_col#b,d:bigint_col#b,d:float_col#b,d:double_col#b,d:date_string_col,d:string_col,d:timestamp_col"
+  ":key#b,d:bool_col#b,d:tinyint_col#b,d:smallint_col#b,d:int_col#b,d:bigint_col#b,d:float_col#b,d:double_col#b,d:date_string_col,d:string_col,d:timestamp_col,d:year#b,d:month#b,d:day#b"
 )
-TBLPROPERTIES("hbase.table.name" = "hbaseinsertalltypesaggbinary");
+TBLPROPERTIES("hbase.table.name" = "functional_hbase.insertalltypesaggbinary");
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-hbasealltypeserror
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
+insertalltypesagg
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-hbasealltypeserrornonulls
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-hbasealltypesagg
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
----- LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypesagg;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-hbaseinsertalltypesagg
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbaseinsertalltypesagg");
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-hbasestringids
----- CREATE_HIVE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  id string,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES (
-  "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
-)
-TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
+stringids
+---- PARTITION_COLUMNS
+year int
+month int
+day int
+---- COLUMNS
+id string
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
 ====
 ---- DATASET
 functional

@@ -115,13 +115,13 @@ NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
 ====
 # simple full scan subquery
-select * from (select y x from (select id y from functional.hbasealltypessmall) a) b
+select * from (select y x from (select id y from functional_hbase.alltypessmall) a) b
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -138,7 +138,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -308,14 +308,14 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
 # predicate pushdown
-select * from (select * from functional.hbasealltypessmall) a where id < 5
+select * from (select * from functional_hbase.alltypessmall) a where id < 5
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     predicates: functional.hbasealltypessmall.id < 5
+     table:alltypessmall
+     predicates: functional_hbase.alltypessmall.id < 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -332,8 +332,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     predicates: functional.hbasealltypessmall.id < 5
+     table:alltypessmall
+     predicates: functional_hbase.alltypessmall.id < 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -807,7 +807,7 @@ from (
   select c1, c2, c3
   from (
     select int_col c1, sum(float_col) c2, min(float_col) c3 
-    from functional.hbasealltypessmall
+    from functional_hbase.alltypessmall
     group by 1
   ) x
   order by 2,3 desc
@@ -828,7 +828,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -875,7 +875,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -890,7 +890,7 @@ from (
     select c1, c2, c3
     from (
       select int_col c1, tinyint_col c2, min(float_col) c3 
-      from functional.hbasealltypessmall
+      from functional_hbase.alltypessmall
       group by 1, 2
       order by 1,2
       limit 1
@@ -925,7 +925,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -982,7 +982,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

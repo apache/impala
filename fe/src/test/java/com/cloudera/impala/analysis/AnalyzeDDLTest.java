@@ -25,8 +25,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
       // Can't add/drop partitions to/from unpartitioned tables
       AnalysisError("alter table functional.alltypesnopart " + kw + " partition (i=1)",
           "Table is not partitioned: functional.alltypesnopart");
-      AnalysisError("alter table functional.hbasealltypesagg " + kw +
-          " partition (i=1)", "Table is not partitioned: functional.hbasealltypesagg");
+      AnalysisError("alter table functional_hbase.alltypesagg " + kw +
+          " partition (i=1)", "Table is not partitioned: functional_hbase.alltypesagg");
 
       // Duplicate partition key name
       AnalysisError("alter table functional.alltypes " + kw +
@@ -352,9 +352,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter view functional.alltypes as " +
         "select * from functional.alltypesagg",
         "ALTER VIEW not allowed on a table: functional.alltypes");
-    AnalysisError("alter view functional.hbasealltypesagg as " +
+    AnalysisError("alter view functional_hbase.alltypesagg as " +
         "select * from functional.alltypesagg",
-        "ALTER VIEW not allowed on a table: functional.hbasealltypesagg");
+        "ALTER VIEW not allowed on a table: functional_hbase.alltypesagg");
     // Target database does not exist.
     AnalysisError("alter view baddb.alltypes_view as " +
         "select * from functional.alltypesagg",
@@ -593,7 +593,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create view foo as select trim('abc'), 17 * 7");
 
     // Creating a view on an HBase table is ok.
-    AnalyzesOk("create view foo as select * from functional.hbasealltypesagg");
+    AnalyzesOk("create view foo as select * from functional_hbase.alltypesagg");
 
     // Complex view definition with joins and aggregates.
     AnalyzesOk("create view foo (cnt) as " +

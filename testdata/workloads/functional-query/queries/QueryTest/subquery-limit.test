@@ -9,8 +9,8 @@ BIGINT
 # order by/limit in subquery, followed by addititional selection predicate;
 # predicate is not applied in subquery
 ---- QUERY
-select *
-from (select * from alltypessmall order by id limit 10) a
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+from (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypessmall order by id limit 10) a
 where bool_col = true
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
@@ -24,7 +24,7 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 # order by/limit in subquery, followed by addititional selection predicate;
 # variant w/ join
 ---- QUERY
-select *
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from (
     select a.* from alltypessmall a join alltypessmall using (id)
     order by a.id limit 10

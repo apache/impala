@@ -83,12 +83,15 @@ public class CatalogTest {
   @Test
   public void TestColSchema() throws TableLoadingException {
     Db defaultDb = getDb(catalog, "functional");
+    Db hbaseDb = getDb(catalog, "functional_hbase");
     Db testDb = getDb(catalog, "functional_seq");
 
     assertNotNull(defaultDb);
     assertEquals(defaultDb.getName(), "functional");
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "functional_seq");
+    assertNotNull(hbaseDb);
+    assertEquals(hbaseDb.getName(), "functional_hbase");
 
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypes_view"));
@@ -105,15 +108,15 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("dimtbl"));
     assertNotNull(defaultDb.getTable("jointbl"));
     assertNotNull(defaultDb.getTable("liketbl"));
-    assertNotNull(defaultDb.getTable("hbasealltypessmall"));
-    assertNotNull(defaultDb.getTable("hbasealltypeserror"));
-    assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
-    assertNotNull(defaultDb.getTable("hbasealltypesagg"));
-    assertNotNull(defaultDb.getTable("hbasestringids"));
     assertNotNull(defaultDb.getTable("greptiny"));
     assertNotNull(defaultDb.getTable("rankingssmall"));
     assertNotNull(defaultDb.getTable("uservisitssmall"));
     assertNotNull(defaultDb.getTable("view_view"));
+    assertNotNull(hbaseDb.getTable("alltypessmall"));
+    assertNotNull(hbaseDb.getTable("hbasealltypeserror"));
+    assertNotNull(hbaseDb.getTable("hbasealltypeserrornonulls"));
+    assertNotNull(hbaseDb.getTable("alltypesagg"));
+    assertNotNull(hbaseDb.getTable("stringids"));
 
     // IMP-163 - table with string partition column does not load if there are partitions
     assertNotNull(defaultDb.getTable("StringPartitionKey"));
@@ -161,85 +164,91 @@ public class CatalogTest {
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT,
            PrimitiveType.INT});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
+    checkHBaseTableCols(hbaseDb, "alltypessmall", "functional_hbase.alltypessmall",
         new String[]
-          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {"id", "bigint_col", "bool_col", "date_string_col", "double_col", "float_col", 
+           "int_col", "month", "smallint_col", "string_col", "timestamp_col",
+           "tinyint_col", "year"},
         new String[]
-          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings", "strings"},
+          {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col", 
+           "int_col", "month", "smallint_col", "string_col", "timestamp_col",
+           "tinyint_col", "year"},
         new PrimitiveType[]
-          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
+          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
+           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT, 
+           PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.SMALLINT,
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.TINYINT, PrimitiveType.INT});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypeserror", "hbasealltypeserror",
+    checkHBaseTableCols(hbaseDb, "hbasealltypeserror", 
+        "functional_hbase.hbasealltypeserror",
         new String[]
-          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {"id", "bigint_col", "bool_col","date_string_col", "double_col", "float_col", 
+           "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new String[]
-          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings", "strings"},
+          {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {null, "bigint_col", "bool_col","date_string_col", "double_col", "float_col", 
+           "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new PrimitiveType[]
-          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
+          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
+           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
+           PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.STRING,
+           PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypeserrornonulls", "hbasealltypeserrornonulls",
+    checkHBaseTableCols(hbaseDb, "hbasealltypeserrornonulls",
+        "functional_hbase.hbasealltypeserrornonulls",
         new String[]
-          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {"id", "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
+           "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new String[]
-          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings", "strings"},
+          {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
+           "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new PrimitiveType[]
-          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
+          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
+           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
+           PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.STRING,
+           PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT});
+    
+    checkHBaseTableCols(hbaseDb, "alltypesagg", "functional_hbase.alltypesagg",
+        new String[]
+          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+           "float_col", "int_col", "month", "smallint_col", "string_col",
+           "timestamp_col", "tinyint_col", "year"},
+        new String[]
+          {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
+        new String[]
+          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+           "float_col", "int_col", "month", "smallint_col", "string_col",
+           "timestamp_col", "tinyint_col", "year"},
+        new PrimitiveType[]
+          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
+           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE, 
+           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT, 
+           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.TINYINT, PrimitiveType.INT});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypesagg", "hbasealltypesagg",
+    checkHBaseTableCols(hbaseDb, "stringids", "functional_hbase.alltypesagg",
         new String[]
-          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+           "float_col", "int_col", "month", "smallint_col", "string_col",
+           "timestamp_col", "tinyint_col", "year"},
         new String[]
-          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings", "strings"},
+          {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
+          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+           "float_col", "int_col", "month", "smallint_col", "string_col",
+           "timestamp_col", "tinyint_col", "year"},
         new PrimitiveType[]
-          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
-
-    checkHBaseTableCols(defaultDb, "hbasestringids", "hbasealltypesagg",
-        new String[]
-          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
-        new String[]
-          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings", "strings"},
-        new String[]
-          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
-        new PrimitiveType[]
-          {PrimitiveType.STRING,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
+          {PrimitiveType.STRING, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
+           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE, 
+           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT, 
+           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.TINYINT, PrimitiveType.INT});
 
     checkTableCols(defaultDb, "greptiny", 0,
         new String[]
@@ -371,9 +380,9 @@ public class CatalogTest {
   @Test
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
-    HBaseTable table =
-        (HBaseTable)getDb(catalog, "functional").getTable("internal_hbase_table");
-    assertNotNull("internal_hbase_table was not found", table);
+   HBaseTable table = 
+        (HBaseTable)getDb(catalog, "functional_hbase").getTable("internal_hbase_table");
+    assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
 
   @Test(expected = TableLoadingException.class)
@@ -456,13 +465,18 @@ public class CatalogTest {
   public void TestReload() throws CatalogException {
     // Exercise the internal logic of reloading a partitioned table, an unpartitioned
     // table and an HBase table.
-    String[] tableNames = {"alltypes", "alltypesnopart", "hbasealltypessmall"};
+    String[] tableNames = {"alltypes", "alltypesnopart"};
     for (String tableName: tableNames) {
       Table table = getDb(catalog, "functional").getTable(tableName);
       table = Table.load(catalog.getNextTableId(),
           catalog.getMetaStoreClient().getHiveClient(),
           getDb(catalog, "functional"), tableName, table);
     }
+    // Test HBase table
+    Table table = getDb(catalog, "functional_hbase").getTable("alltypessmall");
+    table = Table.load(catalog.getNextTableId(),
+        catalog.getMetaStoreClient().getHiveClient(),
+        getDb(catalog, "functional_hbase"), "alltypessmall", table);
   }
 
   @Test

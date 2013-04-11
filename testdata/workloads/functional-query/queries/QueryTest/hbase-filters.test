@@ -1,44 +1,42 @@
 ====
 ---- QUERY
 # Reference the string row key but do not create a predicate on the key.
-select distinct id from functional.hbasestringids where int_col = 1
----- TYPES
-string
+select distinct id from stringids where int_col = 1
 ---- RESULTS
-'5001'
 '2001'
-'8001'
-'6001'
-'1001'
-'3001'
 '9001'
-'1'
 '4001'
+'8001'
+'5001'
+'3001'
+'1'
+'1001'
 '7001'
+'6001'
+---- TYPES
+STRING
 ====
 ---- QUERY
-select * from functional.hbasealltypessmall where string_col = '4'
----- TYPES
-int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+select * from alltypessmall where string_col = '4'
 ---- RESULTS
-14,true,40.4,4.400000095367432,40,4,4,4,'01/02/09','4',2009-01-02 00:14:00.510000000
-24,true,40.4,4.400000095367432,40,4,4,4,'01/03/09','4',2009-01-03 00:24:00.960000000
-29,false,40.4,4.400000095367432,40,4,4,4,'02/01/09','4',2009-02-01 00:04:00.600000000
-39,false,40.4,4.400000095367432,40,4,4,4,'02/02/09','4',2009-02-02 00:14:00.510000000
-4,true,40.4,4.400000095367432,40,4,4,4,'01/01/09','4',2009-01-01 00:04:00.600000000
-49,false,40.4,4.400000095367432,40,4,4,4,'02/03/09','4',2009-02-03 00:24:00.960000000
-54,true,40.4,4.400000095367432,40,4,4,4,'03/01/09','4',2009-03-01 00:04:00.600000000
-64,true,40.4,4.400000095367432,40,4,4,4,'03/02/09','4',2009-03-02 00:14:00.510000000
-74,true,40.4,4.400000095367432,40,4,4,4,'03/03/09','4',2009-03-03 00:24:00.960000000
-79,false,40.4,4.400000095367432,40,4,4,4,'04/01/09','4',2009-04-01 00:04:00.600000000
-89,false,40.4,4.400000095367432,40,4,4,4,'04/02/09','4',2009-04-02 00:14:00.510000000
-99,false,40.4,4.400000095367432,40,4,4,4,'04/03/09','4',2009-04-03 00:24:00.960000000
+14,40,true,'01/02/09',40.4,4.400000095367432,4,1,4,'4',2009-01-02 00:14:00.510000000,4,2009
+24,40,true,'01/03/09',40.4,4.400000095367432,4,1,4,'4',2009-01-03 00:24:00.960000000,4,2009
+29,40,false,'02/01/09',40.4,4.400000095367432,4,2,4,'4',2009-02-01 00:04:00.600000000,4,2009
+39,40,false,'02/02/09',40.4,4.400000095367432,4,2,4,'4',2009-02-02 00:14:00.510000000,4,2009
+4,40,true,'01/01/09',40.4,4.400000095367432,4,1,4,'4',2009-01-01 00:04:00.600000000,4,2009
+49,40,false,'02/03/09',40.4,4.400000095367432,4,2,4,'4',2009-02-03 00:24:00.960000000,4,2009
+54,40,true,'03/01/09',40.4,4.400000095367432,4,3,4,'4',2009-03-01 00:04:00.600000000,4,2009
+64,40,true,'03/02/09',40.4,4.400000095367432,4,3,4,'4',2009-03-02 00:14:00.510000000,4,2009
+74,40,true,'03/03/09',40.4,4.400000095367432,4,3,4,'4',2009-03-03 00:24:00.960000000,4,2009
+79,40,false,'04/01/09',40.4,4.400000095367432,4,4,4,'4',2009-04-01 00:04:00.600000000,4,2009
+89,40,false,'04/02/09',40.4,4.400000095367432,4,4,4,'4',2009-04-02 00:14:00.510000000,4,2009
+99,40,false,'04/03/09',40.4,4.400000095367432,4,4,4,'4',2009-04-03 00:24:00.960000000,4,2009
+---- TYPES
+INT, BIGINT, BOOLEAN, STRING, DOUBLE, FLOAT, INT, INT, SMALLINT, STRING, TIMESTAMP, TINYINT, INT
 ====
 ---- QUERY
 # make sure this works even when not requesting the col family w/ the predicate
-select tinyint_col from functional.hbasealltypessmall where string_col = '4'
----- TYPES
-tinyint
+select tinyint_col from alltypessmall where string_col = '4'
 ---- RESULTS
 4
 4
@@ -52,114 +50,116 @@ tinyint
 4
 4
 4
+---- TYPES
+TINYINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col = '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col = '4'
 ---- RESULTS
 12
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col != '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col != '4'
 ---- RESULTS
 88
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col < '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col < '4'
 ---- RESULTS
 48
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col > '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col > '4'
 ---- RESULTS
 40
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col <= '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col <= '4'
 ---- RESULTS
 60
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select count(*) from functional.hbasealltypessmall where string_col >= '4'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col >= '4'
 ---- RESULTS
 52
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # empty result
-select count(*) from functional.hbasealltypessmall where string_col = '100'
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col = '100'
 ---- RESULTS
 0
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # multiple filters
-select * from functional.hbasealltypessmall where string_col = '4' and date_string_col = '01/01/09'
----- TYPES
-int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+select * from alltypessmall where string_col = '4' and date_string_col = '01/01/09'
 ---- RESULTS
-4,true,40.4,4.400000095367432,40,4,4,4,'01/01/09','4',2009-01-01 00:04:00.600000000
+4,40,true,'01/01/09',40.4,4.400000095367432,4,1,4,'4',2009-01-01 00:04:00.600000000,4,2009
+---- TYPES
+INT, BIGINT, BOOLEAN, STRING, DOUBLE, FLOAT, INT, INT, SMALLINT, STRING, TIMESTAMP, TINYINT, INT
 ====
 ---- QUERY
 # hbase filter with regular predicate
-select * from functional.hbasealltypessmall where string_col <= '4' and int_col >= 4
----- TYPES
-int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+select * from alltypessmall where string_col <= '4' and int_col >= 4
 ---- RESULTS
-14,true,40.4,4.400000095367432,40,4,4,4,'01/02/09','4',2009-01-02 00:14:00.510000000
-24,true,40.4,4.400000095367432,40,4,4,4,'01/03/09','4',2009-01-03 00:24:00.960000000
-29,false,40.4,4.400000095367432,40,4,4,4,'02/01/09','4',2009-02-01 00:04:00.600000000
-39,false,40.4,4.400000095367432,40,4,4,4,'02/02/09','4',2009-02-02 00:14:00.510000000
-4,true,40.4,4.400000095367432,40,4,4,4,'01/01/09','4',2009-01-01 00:04:00.600000000
-49,false,40.4,4.400000095367432,40,4,4,4,'02/03/09','4',2009-02-03 00:24:00.960000000
-54,true,40.4,4.400000095367432,40,4,4,4,'03/01/09','4',2009-03-01 00:04:00.600000000
-64,true,40.4,4.400000095367432,40,4,4,4,'03/02/09','4',2009-03-02 00:14:00.510000000
-74,true,40.4,4.400000095367432,40,4,4,4,'03/03/09','4',2009-03-03 00:24:00.960000000
-79,false,40.4,4.400000095367432,40,4,4,4,'04/01/09','4',2009-04-01 00:04:00.600000000
-89,false,40.4,4.400000095367432,40,4,4,4,'04/02/09','4',2009-04-02 00:14:00.510000000
-99,false,40.4,4.400000095367432,40,4,4,4,'04/03/09','4',2009-04-03 00:24:00.960000000
+14,40,true,'01/02/09',40.4,4.400000095367432,4,1,4,'4',2009-01-02 00:14:00.510000000,4,2009
+24,40,true,'01/03/09',40.4,4.400000095367432,4,1,4,'4',2009-01-03 00:24:00.960000000,4,2009
+29,40,false,'02/01/09',40.4,4.400000095367432,4,2,4,'4',2009-02-01 00:04:00.600000000,4,2009
+39,40,false,'02/02/09',40.4,4.400000095367432,4,2,4,'4',2009-02-02 00:14:00.510000000,4,2009
+4,40,true,'01/01/09',40.4,4.400000095367432,4,1,4,'4',2009-01-01 00:04:00.600000000,4,2009
+49,40,false,'02/03/09',40.4,4.400000095367432,4,2,4,'4',2009-02-03 00:24:00.960000000,4,2009
+54,40,true,'03/01/09',40.4,4.400000095367432,4,3,4,'4',2009-03-01 00:04:00.600000000,4,2009
+64,40,true,'03/02/09',40.4,4.400000095367432,4,3,4,'4',2009-03-02 00:14:00.510000000,4,2009
+74,40,true,'03/03/09',40.4,4.400000095367432,4,3,4,'4',2009-03-03 00:24:00.960000000,4,2009
+79,40,false,'04/01/09',40.4,4.400000095367432,4,4,4,'4',2009-04-01 00:04:00.600000000,4,2009
+89,40,false,'04/02/09',40.4,4.400000095367432,4,4,4,'4',2009-04-02 00:14:00.510000000,4,2009
+99,40,false,'04/03/09',40.4,4.400000095367432,4,4,4,'4',2009-04-03 00:24:00.960000000,4,2009
+---- TYPES
+INT, BIGINT, BOOLEAN, STRING, DOUBLE, FLOAT, INT, INT, SMALLINT, STRING, TIMESTAMP, TINYINT, INT
 ====
 ---- QUERY
 # hbase filter with regular predicate and start/stop keys
-select * from functional.hbasestringids where string_col <= '4' and int_col >= 4 and id > '390' and id < '400'
----- TYPES
-string, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+select * from stringids where string_col <= '4' and int_col >= 4 and id > '390' and id < '400'
 ---- RESULTS
-'391',false,3949.1,430.1000061035156,3910,391,91,1,'01/01/10','391',2010-01-01 06:43:42.450000000
-'392',true,3959.2,431.2000122070312,3920,392,92,2,'01/01/10','392',2010-01-01 06:44:46.360000000
-'393',false,3969.3,432.2999877929688,3930,393,93,3,'01/01/10','393',2010-01-01 06:45:50.280000000
-'394',true,3979.4,433.3999938964844,3940,394,94,4,'01/01/10','394',2010-01-01 06:46:54.210000000
-'395',false,3989.5,434.5,3950,395,95,5,'01/01/10','395',2010-01-01 06:47:58.150000000
-'396',true,3999.6,435.6000061035156,3960,396,96,6,'01/01/10','396',2010-01-01 06:49:02.100000000
-'397',false,4009.7,436.7000122070312,3970,397,97,7,'01/01/10','397',2010-01-01 06:50:06.600000000
-'398',true,4019.8,437.7999877929688,3980,398,98,8,'01/01/10','398',2010-01-01 06:51:10.300000000
-'399',false,4029.9,438.8999938964844,3990,399,99,9,'01/01/10','399',2010-01-01 06:52:14.100000000
-'4',true,40.4,4.400000095367432,40,4,4,4,'01/01/10','4',2010-01-01 00:04:00.600000000
+'391',3910,false,'01/01/10',1,3949.1,430.1000061035156,391,1,91,'391',2010-01-01 06:43:42.450000000,1,2010
+'392',3920,true,'01/01/10',1,3959.2,431.2000122070312,392,1,92,'392',2010-01-01 06:44:46.360000000,2,2010
+'393',3930,false,'01/01/10',1,3969.3,432.2999877929688,393,1,93,'393',2010-01-01 06:45:50.280000000,3,2010
+'394',3940,true,'01/01/10',1,3979.4,433.3999938964844,394,1,94,'394',2010-01-01 06:46:54.210000000,4,2010
+'395',3950,false,'01/01/10',1,3989.5,434.5,395,1,95,'395',2010-01-01 06:47:58.150000000,5,2010
+'396',3960,true,'01/01/10',1,3999.6,435.6000061035156,396,1,96,'396',2010-01-01 06:49:02.100000000,6,2010
+'397',3970,false,'01/01/10',1,4009.7,436.7000122070312,397,1,97,'397',2010-01-01 06:50:06.600000000,7,2010
+'398',3980,true,'01/01/10',1,4019.8,437.7999877929688,398,1,98,'398',2010-01-01 06:51:10.300000000,8,2010
+'399',3990,false,'01/01/10',1,4029.9,438.8999938964844,399,1,99,'399',2010-01-01 06:52:14.100000000,9,2010
+'4',40,true,'01/01/10',1,40.4,4.400000095367432,4,1,4,'4',2010-01-01 00:04:00.600000000,4,2010
+---- TYPES
+STRING, BIGINT, BOOLEAN, STRING, INT, DOUBLE, FLOAT, INT, INT, SMALLINT, STRING, TIMESTAMP, TINYINT, INT
 ====
 ---- QUERY
 # TODO: fix this, this shouldn't match every row
 # comparison w/ cast doesn't turn into a predicate
-#select count(*) from functional.hbasealltypessmall where string_col >= 4
+#select count(*) from alltypessmall where string_col >= 4
 #-----
 #bigint
 #-----
 #12
 #=====
 # non-const comparison doesn't turn into a predicate
-select count(*) from functional.hbasealltypessmall where string_col != date_string_col
----- TYPES
-bigint
+select count(*) from alltypessmall where string_col != date_string_col
 ---- RESULTS
 100
+---- TYPES
+BIGINT
 ====

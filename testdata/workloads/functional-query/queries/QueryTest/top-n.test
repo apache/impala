@@ -2,7 +2,7 @@
 ---- QUERY
 # Based on Aggregation Queries
 select int_col, sum(float_col) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 where id < 5
 group by 1
 order by 2

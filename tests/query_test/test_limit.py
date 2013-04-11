@@ -35,7 +35,9 @@ class TestLimit(ImpalaTestSuite):
     # network traffic and makes the machine run very slowly.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('limit_value') < 100 or v.get_value('exec_option')['batch_size'] == 0)
-    
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format != "hbase")
+
   def test_limit(self, vector):
     # We can't validate the rows that are returned since that is non-deterministic.
     # This is why this is a python test rather than a .test.
@@ -61,7 +63,7 @@ class TestLimitBase(ImpalaTestSuite):
       if (expected_error not in str(e)):
         print str(e)
       assert expected_error in str(e)
-      
+
 # Validates the default order by limit query option functionality
 class TestDefaultOrderByLimitValue(TestLimitBase):
   # Interesting default limit values. TODO: What about value of -2?
@@ -89,7 +91,7 @@ class TestDefaultOrderByLimitValue(TestLimitBase):
       exec_options['default_order_by_limit'] = limit_value
 
     expected_error = 'ORDER BY without LIMIT currently not supported'
-    
+
     # Unless the default order by limit is -1 or None (not specified) we expect SELECT
     # ORDER BY without any limit specified to work properly.
     no_limit_should_succeed = limit_value not in [None, -1]
@@ -166,4 +168,4 @@ class TestAbortOnDefaultLimitExceeded(TestLimitBase):
 
     self.exec_query_validate(query, exec_options, not should_fail, expected_rows,
                              expected_error)
-    
+

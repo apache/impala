@@ -429,7 +429,8 @@ int
 99
 ====
 ---- QUERY
-select * from alltypessmall
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col, timestamp_col, year, month from alltypessmall
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS

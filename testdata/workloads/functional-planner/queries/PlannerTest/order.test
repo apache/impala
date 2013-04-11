@@ -13,7 +13,7 @@ order by 2 desc
 not implemented: ORDER BY without LIMIT currently not supported
 ====
 select int_col, sum(float_col) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 where id < 5
 group by 1
 order by 2
@@ -21,7 +21,7 @@ order by 2
 not implemented: ORDER BY without LIMIT currently not supported
 ====
 select int_col, sum(float_col), min(float_col) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 group by 1
 order by 2,3 desc
 ---- PLAN

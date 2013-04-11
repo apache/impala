@@ -86,6 +86,10 @@ class TestUnmatchedSchema(ImpalaTestSuite):
 
   def test_unmatched_schema(self, vector):
     table_format = vector.get_value('table_format')
+    # jointbl has no columns with unique values. When loaded in hbase, the table looks
+    # different, as hbase collapses duplicates.
+    if table_format.file_format == 'hbase':
+      pytest.skip()
     self.__create_test_table(vector)
     self.run_test_case('QueryTest/test-unmatched-schema', vector)
     self.__drop_test_table(vector)

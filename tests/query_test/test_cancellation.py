@@ -46,6 +46,10 @@ class TestCancellation(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['text', 'parquet'] and\
         v.get_value('table_format').compression_codec == 'none'))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    # tpch tables are not generated for hbase as the data loading takes a very long time.
+    # TODO: Add cancellation tests for hbase.
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format != 'hbase')
     if cls.exploration_strategy() != 'core':
       NUM_CANCELATION_ITERATIONS = 3
 

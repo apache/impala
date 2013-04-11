@@ -58,7 +58,7 @@ bigint, string, int, int, bigint, string, int
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
 select a.tinyint_col, b.id, a.string_col, a.tinyint_col + b.tinyint_col
-from alltypesagg a join functional.hbasealltypessmall b
+from alltypesagg a join functional_hbase.alltypessmall b
      on (a.tinyint_col = b.id and a.tinyint_col + b.tinyint_col < 5)
 where a.month=1
 and a.day=1
@@ -86,7 +86,7 @@ tinyint, int, string, bigint
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg a join functional.hbasealltypessmall b on (a.tinyint_col = b.id)
+from alltypesagg a join functional_hbase.alltypessmall b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5

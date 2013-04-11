@@ -54,7 +54,7 @@ ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=3)
 -- correctly (IMP-581) 
 -- Note that the usual 'hbase.table.name' property is not specified to avoid
 -- creating tables in HBase as a side-effect.
-USE functional;
+USE functional_hbase;
 CREATE TABLE internal_hbase_table(key int, value string)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,cf1:val");

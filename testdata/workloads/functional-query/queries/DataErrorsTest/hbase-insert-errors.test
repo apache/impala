@@ -1,14 +1,13 @@
 ====
 ---- QUERY
-insert into functional.hbasealltypessmall values(NULL, true, 90.0, 5.5, 0, 1, 2, 3, "04/02/09", '2',
-  "2009-04-03 00:23:00.930000000")
+insert into functional_hbase.alltypessmall
+values (NULL,80,false,"02/01/09",80.8,8.800000190734863,8,2,8,"8","2009-02-01 00:08:00.280000000",8,2009)
 ---- ERRORS
 Cannot insert into HBase with a null row key.
 ====
 ---- QUERY
-insert into functional.hbasealltypessmall
-select case when id >= 0 then NULL else 999 end, true, 90.0, 5.5, 0, 1, 2, 3, "04/02/09",
-  '2', "2009-04-03 00:23:00.930000000"
+insert into functional_hbase.alltypessmall
+select case when id >= 0 then NULL else 999 end,80,false,"02/01/09",80.8,8.800000190734863,8,2,8,"8","2009-02-01 00:08:00.280000000",8,2009
 from functional.alltypessmall
 ---- ERRORS
 Cannot insert into HBase with a null row key.

@@ -1,11 +1,11 @@
 # full scan of string typed row-key
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -22,7 +22,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -31,13 +31,13 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # full scan
-select * from functional.hbasealltypessmall
+select * from functional_hbase.alltypessmall
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -54,7 +54,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -64,14 +64,14 @@ NODE 0:
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
-select * from functional.hbasealltypessmall
+select * from functional_hbase.alltypessmall
 where id < 5
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -89,7 +89,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -99,7 +99,7 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # if the row key is mapped as a string col, range predicates are applied to the scan
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id = '5'
 and tinyint_col = 5
 ---- PLAN
@@ -107,7 +107,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -127,7 +127,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -136,7 +136,7 @@ PLAN FRAGMENT 1
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id > '5'
 and tinyint_col = 5
 ---- PLAN
@@ -144,7 +144,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -163,7 +163,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -172,7 +172,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 5\0:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id >= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -180,7 +180,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -199,7 +199,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 5
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -208,7 +208,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 5:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -216,7 +216,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      stop key: 5
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -235,7 +235,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      stop key: 5
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -244,7 +244,7 @@ NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -252,7 +252,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -271,7 +271,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
      tuple ids: 0 
@@ -280,7 +280,7 @@ NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5\0
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id > '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -288,7 +288,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
@@ -308,7 +308,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
@@ -317,7 +317,7 @@ PLAN FRAGMENT 1
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id >= '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -325,7 +325,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
@@ -345,7 +345,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
@@ -354,7 +354,7 @@ PLAN FRAGMENT 1
 NODE 0:
   HBASE KEYRANGE port=60202 4:5
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -362,7 +362,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -382,7 +382,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -391,7 +391,7 @@ PLAN FRAGMENT 1
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5\0
 ====
-select * from functional.hbasestringids
+select * from functional_hbase.stringids
 where id >= '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -399,7 +399,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -419,7 +419,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
@@ -430,7 +430,7 @@ NODE 0:
 ====
 # with aggregation
 select int_col, count(*) 
-from functional.hbasealltypessmall
+from functional_hbase.alltypessmall
 where id < 5
 group by 1
 ---- PLAN
@@ -443,7 +443,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -481,7 +481,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 1 
   |  
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: id < 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -491,14 +491,14 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # predicates on string columns against a constant string are converted to HBase filters
-select * from functional.hbasealltypessmall where string_col = '4'
+select * from functional_hbase.alltypessmall where string_col = '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col EQUAL '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -515,8 +515,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col EQUAL '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -525,14 +525,14 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # test all comparison ops
-select * from functional.hbasealltypessmall where string_col != '4'
+select * from functional_hbase.alltypessmall where string_col != '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col NOT_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col NOT_EQUAL '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -549,8 +549,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col NOT_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col NOT_EQUAL '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -558,14 +558,14 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasealltypessmall where string_col < '4'
+select * from functional_hbase.alltypessmall where string_col < '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col LESS '4'
+     table:alltypessmall
+     hbase filters: d:string_col LESS '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -582,8 +582,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col LESS '4'
+     table:alltypessmall
+     hbase filters: d:string_col LESS '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -591,14 +591,14 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasealltypessmall where string_col > '4'
+select * from functional_hbase.alltypessmall where string_col > '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col GREATER '4'
+     table:alltypessmall
+     hbase filters: d:string_col GREATER '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -615,8 +615,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col GREATER '4'
+     table:alltypessmall
+     hbase filters: d:string_col GREATER '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -624,14 +624,14 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasealltypessmall where string_col <= '4'
+select * from functional_hbase.alltypessmall where string_col <= '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col LESS_OR_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col LESS_OR_EQUAL '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -648,8 +648,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col LESS_OR_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col LESS_OR_EQUAL '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -657,14 +657,14 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-select * from functional.hbasealltypessmall where string_col >= '4'
+select * from functional_hbase.alltypessmall where string_col >= '4'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col GREATER_OR_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col GREATER_OR_EQUAL '4'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -681,8 +681,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col GREATER_OR_EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col GREATER_OR_EQUAL '4'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -691,18 +691,18 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # test multiple filters
-select * from functional.hbasealltypessmall
+select * from functional_hbase.alltypessmall
 where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      hbase filters: 
-  strings:date_string_col EQUAL '04/03/09'
-  strings:string_col GREATER_OR_EQUAL '4'
-  strings:string_col NOT_EQUAL '2'
+  d:date_string_col EQUAL '04/03/09'
+  d:string_col GREATER_OR_EQUAL '4'
+  d:string_col NOT_EQUAL '2'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -719,11 +719,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      hbase filters: 
-  strings:date_string_col EQUAL '04/03/09'
-  strings:string_col GREATER_OR_EQUAL '4'
-  strings:string_col NOT_EQUAL '2'
+  d:date_string_col EQUAL '04/03/09'
+  d:string_col GREATER_OR_EQUAL '4'
+  d:string_col NOT_EQUAL '2'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -731,15 +731,15 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-# mix of predicates and functional.hbase filters
-select * from functional.hbasealltypessmall where string_col = '4' and tinyint_col = 5
+# mix of predicates and functional_hbase. filters
+select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -757,8 +757,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
-     hbase filters: strings:string_col EQUAL '4'
+     table:alltypessmall
+     hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -767,18 +767,18 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-# mix of predicates, functional.hbase filters and start/stop keys
-select * from functional.hbasestringids 
+# mix of predicates, functional_hbase. filters and start/stop keys
+select * from functional_hbase.stringids 
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5\0
-     hbase filters: strings:string_col EQUAL '4'
+     hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -796,10 +796,10 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasestringids
+     table:stringids
      start key: 4
      stop key: 5\0
-     hbase filters: strings:string_col EQUAL '4'
+     hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -807,13 +807,13 @@ NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
-select * from functional.hbasealltypessmall where cast(string_col as int) >= 4
+select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -831,7 +831,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
@@ -841,13 +841,13 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # non-const comparisons cannot be turned into filters
-select * from functional.hbasealltypessmall where string_col >= date_string_col
+select * from functional_hbase.alltypessmall where string_col >= date_string_col
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: string_col >= date_string_col
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
@@ -865,7 +865,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HBASE
-     table:hbasealltypessmall
+     table:alltypessmall
      predicates: string_col >= date_string_col
      tuple ids: 0 
 ---- SCANRANGELOCATIONS

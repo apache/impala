@@ -2,7 +2,7 @@
 ---- QUERY
 # predicate on row key col is applied to scan if row key is mapped as string col
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id = '5'
 ---- TYPES
 bigint
@@ -13,7 +13,7 @@ bigint
 # predicate on row key col is not applied to scan if row key is mapped as non-string col
 # but the result is still correct
 select count(*)
-from functional.hbasealltypesagg
+from functional_hbase.alltypesagg
 where id = 5
 ---- TYPES
 bigint
@@ -24,7 +24,7 @@ bigint
 # ids are stored in ascii and ordered lexicographically
 # exclusive upper bound
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id < '5'
 ---- TYPES
 bigint
@@ -34,7 +34,7 @@ bigint
 ---- QUERY
 # inclusive upper bound
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id <= '5'
 ---- TYPES
 bigint
@@ -44,7 +44,7 @@ bigint
 ---- QUERY
 # inclusive lower bound
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id >= '6'
 ---- TYPES
 bigint
@@ -54,7 +54,7 @@ bigint
 ---- QUERY
 # exclusive lower bound
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id > '6'
 ---- TYPES
 bigint
@@ -64,7 +64,7 @@ bigint
 ---- QUERY
 # combinations
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id > '5'
 and id < '6'
 ---- TYPES
@@ -74,7 +74,7 @@ bigint
 ====
 ---- QUERY
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id >= '5'
 and id < '6'
 ---- TYPES
@@ -84,7 +84,7 @@ bigint
 ====
 ---- QUERY
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id > '5'
 and id <= '6'
 ---- TYPES
@@ -94,7 +94,7 @@ bigint
 ====
 ---- QUERY
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id >= '5'
 and id <= '6'
 ---- TYPES
@@ -106,7 +106,7 @@ bigint
 # predicates on non-key cols are evaluated in the executor
 # and non-string comparisons work
 select count(*)
-from functional.hbasestringids
+from functional_hbase.stringids
 where id < '5'
 and smallint_col < 5
 ---- TYPES

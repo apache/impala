@@ -46,10 +46,6 @@ class TestTpchQuery(ImpalaTestSuite):
   def test_tpch_q6(self, vector):
     self.run_test_case('tpch-q6', vector)
 
-  # TODO: This TPCH query is not yet supported.
-  #  def test_tpch_q7(self, vector):
-  #    self.run_test_case('tpch-q7', vector)
-
   def test_tpch_q8(self, vector):
     self.run_test_case('tpch-q8', vector)
 
