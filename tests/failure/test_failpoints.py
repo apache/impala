@@ -71,8 +71,6 @@ class TestFailpoints(ImpalaTestSuite):
     # can re reenabled.
     if action == 'CANCEL' and location in ['PREPARE', 'CLOSE']:
       pytest.xfail(reason='IMPALA-56 - Hangs on async query execution')
-    elif node_type == 'HDFS_SCAN_NODE' and action == 'FAIL' and location == 'OPEN':
-      pytest.xfail(reason='IMPALA-54 - Fails DCHECK')
 
     for node_id in node_ids:
       debug_action = '%d:%s:%s' % (node_id, location,
