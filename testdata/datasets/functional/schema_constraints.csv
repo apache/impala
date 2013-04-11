@@ -16,7 +16,10 @@ table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:map_table, constraint:restrict_to, table_format:text/none/none
 table_name:array_table, constraint:restrict_to, table_format:text/none/none
 
-table_name:escapechartesttable, constraint:exclude, table_format:parquet
-table_name:nulltable, constraint:exclude, table_format:parquet
-table_name:nullescapedtable, constraint:exclude, table_format:parquet
-table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet
+table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
+table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
+table_name:unsupported_types, constraint:exclude, table_format:parquet/none/none
+table_name:escapechartesttable, constraint:exclude, table_format:parquet/none/none
+table_name:nulltable, constraint:exclude, table_format:parquet/none/none
+table_name:nullescapedtable, constraint:exclude, table_format:parquet/none/none
+table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/none

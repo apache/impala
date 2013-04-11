@@ -81,8 +81,7 @@ def is_valid_combination(vector):
         (vector[COMPRESSION_IDX] == 'none' and vector[COMPRESSION_TYPE_IDX] != 'none') or
         (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or
         (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or
-        (vector[FILE_FORMAT_IDX] == 'parquet' and
-        (vector[COMPRESSION_IDX] == 'gzip' or vector[COMPRESSION_IDX] == 'bzip')) or
+        (vector[FILE_FORMAT_IDX] == 'parquet' and vector[COMPRESSION_IDX] != 'none') or
         (vector[FILE_FORMAT_IDX] == 'avro' and
          vector[COMPRESSION_IDX] not in ['none', 'snap', 'def']))
 
