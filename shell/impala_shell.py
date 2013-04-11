@@ -175,7 +175,7 @@ class ImpalaShell(cmd.Cmd):
       print 'Error running command : %s' % e
     return True
 
-  def sanitise_input(self, args):
+  def sanitise_input(self, args, interactive=True):
     """Convert the command to lower case, so it's recognized"""
     # A command terminated by a semi-colon is legal. Check for the trailing
     # semi-colons and strip them from the end of the command.
@@ -187,8 +187,14 @@ class ImpalaShell(cmd.Cmd):
       return 'quit'
     else:
       tokens[0] = tokens[0].lower()
-    args = self.__check_for_command_completion(' '.join(tokens).strip())
-    return args.rstrip(ImpalaShell.CMD_DELIM)
+    if interactive:
+      args = self.__check_for_command_completion(' '.join(tokens).strip())
+      # We escape \n in multiline commands to enable history to be read properly.
+      # As such, some commands will have \n escaped, this takes care of un-escaping them.
+      args = args.rstrip(ImpalaShell.CMD_DELIM).decode('string-escape')
+    else:
+      args = ' '.join(tokens)
+    return args
 
   def __check_for_command_completion(self, cmd):
     """Check for a delimiter at the end of user input.
@@ -837,8 +843,10 @@ def execute_queries_non_interactive_mode(options):
     sys.exit(1)
   queries = shell.cmdqueue + queries
   # Deal with case.
-  queries = map(shell.sanitise_input, queries)
+  sanitized_queries = []
   for query in queries:
+    sanitized_queries.append(shell.sanitise_input(query, interactive=False))
+  for query in sanitized_queries:
     if not shell.onecmd(query):
       print 'Could not execute command: %s' % query
       if not options.ignore_query_failure:
