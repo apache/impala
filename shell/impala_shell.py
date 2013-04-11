@@ -414,6 +414,7 @@ class ImpalaShell(cmd.Cmd):
 
     # impalad does not support the fetching of metadata for certain types of queries.
     if not self.__expect_result_metadata(query.query):
+      self.__close_query_handle(handle)
       return True
     table = self.__construct_table_header(handle)
     # Results are ready, fetch them till they're done.
