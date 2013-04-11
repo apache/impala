@@ -33,6 +33,10 @@ class TestCompressedFormats(ImpalaTestSuite):
         TestDimension('file_format', *['rc', 'seq', 'text']))
     cls.TestMatrix.add_dimension(\
         TestDimension('compression_format', *compression_formats))
+    if cls.exploration_strategy() == 'core':
+      # Don't run on core.  This test is very slow and we are unlikely
+      # to regress here.
+      cls.TestMatrix.add_constraint(lambda v: False);
 
   @pytest.mark.execute_serially
   def test_compressed_formats(self, vector):
