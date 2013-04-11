@@ -168,7 +168,7 @@ public class Analyzer {
         ref.getName().getDb() == null ? getDefaultDb() : ref.getName().getDb();
     Db db = catalog.getDb(dbName);
     if (db == null) {
-      throw new AnalysisException("unknown db: '" + ref.getName().getDb() + "'");
+      throw new AnalysisException("Unknown db: '" + ref.getName().getDb() + "'.");
     }
 
     Table tbl = null;

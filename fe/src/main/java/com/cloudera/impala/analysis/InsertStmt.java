@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -74,6 +75,10 @@ public class InsertStmt extends ParseNodeBase {
     }
 
     try {
+      Db db = catalog.getDb(targetTableName.getDb());
+      if (db == null) {
+        throw new AnalysisException("Unknown db: '" + targetTableName.getDb() + "'.");
+      }
       table = catalog.getDb(targetTableName.getDb()).getTable(targetTableName.getTbl());
     } catch (TableLoadingException e) {
       throw new AnalysisException("Failed to load metadata for table: "

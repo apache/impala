@@ -1819,7 +1819,7 @@ public class AnalyzerTest {
   @Test
   public void TestAlterTableAddDropPartition() throws AnalysisException {
     String[] addDrop = {"add if not exists", "drop if exists"};
-    for (String kw: addDrop) { 
+    for (String kw: addDrop) {
       // Add different partitions for different column types
       AnalyzesOk("alter table functional.alltypes " + kw +
           " partition(year=2050, month=10)");
@@ -2286,6 +2286,10 @@ public class AnalyzerTest {
         " TABLE functional.alltypesnopart PARTITION(year=2009) " +
         "SELECT * FROM functional.alltypes", "PARTITION clause is only valid for INSERT" +
         " into partitioned table. 'alltypesnopart' is not partitioned");
+
+    // Unknown target DB
+    AnalysisError("INSERT " + qualifier +
+       " table UNKNOWNDB.alltypesnopart SELECT * from functional.alltypesnopart");
   }
 
   /**
