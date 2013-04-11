@@ -156,6 +156,10 @@ class ImpalaBeeswaxClient(object):
     result.time_taken = time.time() - start
     # Don't include the time it takes to get the runtime profile in the execution time
     result.runtime_profile = self.get_runtime_profile(handle)
+    # Closing INSERT queries is done as part of fetching the results so don't close
+    # the handle twice.
+    if self.__get_query_type(query_string) != 'insert':
+      self.__do_rpc(lambda: self.imp_service.close(handle))
     return result
 
   def get_runtime_profile(self, handle):
@@ -231,7 +235,6 @@ class ImpalaBeeswaxClient(object):
       if not results.has_more:
         break
 
-    self.__do_rpc(lambda: self.imp_service.close(handle))
     # The query executed successfully and all the data was fetched.
     exec_result = QueryResult(success=True, data=result_rows, schema=schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
