@@ -14,33 +14,38 @@
 
 #include "util/impalad-metrics.h"
 
+#include "util/debug-util.h"
+
 using namespace std;
 
 namespace impala {
 
 // Naming convention: Components should be separated by '.' and words should
 // be separated by '-'.
-const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME = 
+const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME =
     "impala-server.start-time";
+const char* ImpaladMetricKeys::IMPALA_SERVER_VERSION =
+    "impala-server.version";
 const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
     "impala-server.ready";
-const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES = 
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
     "impala-server.num-queries";
-const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS = 
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
     "impala-server.num-fragments";
-const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED = 
+const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED =
     "impala-server.scan-ranges.total";
-const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID = 
+const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID =
     "impala-server.scan-ranges.num-missing-volume-id";
-const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES = 
+const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES =
     "impala-server.mem-pool.total-bytes";
-const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES = 
+const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
-const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS = 
+const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
     "impala-server.io-mgr.num-buffers";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
+Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
 Metrics::BooleanMetric* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
@@ -54,6 +59,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
   IMPALA_SERVER_START_TIME = m->CreateAndRegisterPrimitiveMetric<string>(
       ImpaladMetricKeys::IMPALA_SERVER_START_TIME, "");
+  IMPALA_SERVER_VERSION = m->CreateAndRegisterPrimitiveMetric<string>(
+      ImpaladMetricKeys::IMPALA_SERVER_VERSION, GetVersionString());
   IMPALA_SERVER_READY = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_READY, false);
   IMPALA_SERVER_NUM_QUERIES = m->CreateAndRegisterPrimitiveMetric(

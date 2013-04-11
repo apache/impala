@@ -26,6 +26,9 @@ class ImpaladMetricKeys {
   // Local time that the server started
   static const char* IMPALA_SERVER_START_TIME;
 
+  // Full version string of the Impala server
+  static const char* IMPALA_SERVER_VERSION;
+
   // True if Impala has finished initialisation
   static const char* IMPALA_SERVER_READY;
 
@@ -60,6 +63,7 @@ class ImpaladMetricKeys {
 class ImpaladMetrics {
  public:
   static Metrics::StringMetric* IMPALA_SERVER_START_TIME;
+  static Metrics::StringMetric* IMPALA_SERVER_VERSION;
   static Metrics::BooleanMetric* IMPALA_SERVER_READY;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;

@@ -23,6 +23,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "statestore/state-store.h"
+#include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
@@ -59,6 +60,10 @@ int main(int argc, char** argv) {
 
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
+  // TODO: Add a 'common metrics' method to add standard metrics to
+  // both statestored and impalad
+  metrics->CreateAndRegisterPrimitiveMetric<string>(
+      "statestore.version", GetVersionString());
 
   StateStore state_store(metrics.get());
   state_store.RegisterWebpages(webserver.get());
