@@ -252,11 +252,11 @@ NODE 3:
 // Only UNION ALL, mixed selects with and without from clauses, no nested unions
 select * from functional.alltypestiny where year=2009 and month=1
 union all
-select 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
+select 0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1
 union all
 select * from functional.alltypestiny where year=2009 and month=1
 union all
-select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
+select 1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -317,11 +317,11 @@ NODE 2:
 // Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
 select * from functional.alltypestiny where year=2009 and month=1
 union distinct
-select 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
+select 0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1
 union distinct
 select * from functional.alltypestiny where year=2009 and month=1
 union distinct
-select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
+select 1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -3164,7 +3164,7 @@ Plan Fragment 0
   UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 2 
-    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    PREDICATES: <slot 30> < 5, <slot 27> = FALSE
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
       TUPLE IDS: 0 
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
@@ -3183,7 +3183,7 @@ Plan Fragment 1
 
   MERGE (5)
     TUPLE IDS: 2 
-    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    PREDICATES: <slot 30> < 5, <slot 27> = FALSE
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
       TUPLE IDS: 1 
 
@@ -3195,7 +3195,7 @@ Plan Fragment 2
 
   MERGE (4)
     TUPLE IDS: 2 
-    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    PREDICATES: <slot 30> < 5, <slot 27> = FALSE
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -3221,7 +3221,7 @@ Plan Fragment 0
   TUPLE IDS: 2 
     MERGE (0)
       TUPLE IDS: 2 
-      PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+      PREDICATES: <slot 30> < 5, <slot 27> = FALSE
       SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
         TUPLE IDS: 0 
       SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
@@ -3244,7 +3244,7 @@ Plan Fragment 1
 
   MERGE (6)
     TUPLE IDS: 2 
-    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    PREDICATES: <slot 30> < 5, <slot 27> = FALSE
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (2)
       TUPLE IDS: 1 
 
@@ -3256,7 +3256,7 @@ Plan Fragment 2
 
   MERGE (5)
     TUPLE IDS: 2 
-    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    PREDICATES: <slot 30> < 5, <slot 27> = FALSE
     SCAN HDFS table=functional.alltypestiny #partitions=1 size=115B (1)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS

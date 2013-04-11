@@ -411,6 +411,26 @@ bigint
 100
 ====
 ---- QUERY
+# test insert into ... select *
+insert into alltypesinsert partition(year, month) select * from alltypessmall
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
+====
+---- QUERY
+# check size of alltypesinsert to ensure previous insert worked
+select count(*) from alltypesinsert
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
 # static partition insert into string-partitioned table with special characters in partition key
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2="/\%.") SELECT "value" FROM alltypessmall LIMIT 1;
 ---- SETUP
@@ -424,7 +444,7 @@ SELECT * FROM insert_string_partitioned;
 ---- TYPES
 string, string
 ---- RESULTS
-'/\%.','value'
+'value','/\%.'
 ====
 ---- QUERY
 # select with unencoded partition key as column predicate
@@ -432,5 +452,5 @@ SELECT * FROM insert_string_partitioned WHERE s2 = "/\%.";
 ---- TYPES
 string, string
 ---- RESULTS
-'/\%.','value'
+'value','/\%.'
 ====

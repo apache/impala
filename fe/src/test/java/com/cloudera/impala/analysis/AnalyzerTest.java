@@ -235,11 +235,11 @@ public class AnalyzerTest {
     checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
     checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
     checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
-    checkLayoutParams("functional.alltypes.year", 4, 8, 0, 3);
-    checkLayoutParams("functional.alltypes.month", 4, 12, 0, 4);
-    checkLayoutParams("functional.alltypes.id", 4, 16, 0, 5);
-    checkLayoutParams("functional.alltypes.int_col", 4, 20, 0, 6);
-    checkLayoutParams("functional.alltypes.float_col", 4, 24, 0, 7);
+    checkLayoutParams("functional.alltypes.id", 4, 8, 0, 3);
+    checkLayoutParams("functional.alltypes.int_col", 4, 12, 0, 4);
+    checkLayoutParams("functional.alltypes.float_col", 4, 16, 0, 5);
+    checkLayoutParams("functional.alltypes.year", 4, 20, 0, 6);
+    checkLayoutParams("functional.alltypes.month", 4, 24, 0, 7);
     checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 1, 0);
     checkLayoutParams("functional.alltypes.double_col", 8, 40, 1, 1);
     int strSlotSize = PrimitiveType.STRING.getSlotSize();
@@ -331,7 +331,7 @@ public class AnalyzerTest {
     AnalysisError("select * from " +
         "(select * from functional.alltypes a join " +
         "functional.alltypes b on (a.int_col = b.int_col)) x",
-        "duplicated inline view column alias: 'year' in inline view 'x'");
+        "duplicated inline view column alias: 'id' in inline view 'x'");
 
     // subquery on the rhs of the join
     AnalyzesOk("select x.float_col " +
@@ -2217,6 +2217,10 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+    // Select '*' includes partitioning columns at the end.
+    AnalyzesOk("insert " + qualifier +
+        " table functional.alltypessmall partition (year, month)" +
+        "select * from functional.alltypes");
     // No corresponding select list items of fully dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month)" +
@@ -2251,15 +2255,6 @@ public class AnalyzerTest {
         "Target table 'alltypessmall' and result of select statement are not union " +
             "compatible.\n" +
             "Target table expects 11 columns but the select statement returns 13.");
-    // Select '*' includes partitioning columns
-    // but they don't appear at the end of the select list.
-    AnalysisError("insert " + qualifier +
-        " table functional.alltypessmall partition (year, month)" +
-        "select * from functional.alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union " +
-            "compatible.\n" +
-            "Incompatible types 'INT' and 'STRING' in column " +
-            "'functional.alltypes.string_col'.");
   }
 
   /**

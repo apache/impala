@@ -333,6 +333,14 @@ public class HBaseTable extends Table {
     return (long) ((isCompressed ? 2 : 1) * (hdfsSize / bytesPerRow));
   }
 
+  /**
+   * Hive returns the columns in order of their declaration for HBase tables. 
+   */
+  @Override
+  public ArrayList<Column> getColumnsInHiveOrder() {
+    return colsByPos;
+  }
+  
   @Override
   public TTableDescriptor toThrift() {
     THBaseTable tHbaseTable = new THBaseTable();

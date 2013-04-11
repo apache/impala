@@ -38,3 +38,12 @@ int, boolean
 ---- RESULTS
 9999999,false
 ====
+---- QUERY
+# test insert into ... select *
+insert into table hbaseinsertalltypesagg
+select * from hbaseinsertalltypesagg
+---- RESULTS
+: 10001
+---- SETUP
+RELOAD hbaseinsertalltypesagg
+====

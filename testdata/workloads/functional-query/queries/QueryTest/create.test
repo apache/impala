@@ -115,18 +115,18 @@ id=2/: 2
 ---- QUERY
 select * from ddl_test_db.testtbl_part
 ---- RESULTS
-1,10,'Ten'
-2,20,'Twenty'
-2,20,'Twenty'
+10,'Ten',1
+20,'Twenty',2
+20,'Twenty',2
 ---- TYPES
-int, int, string
+int, string, int
 ====
 ---- QUERY
 select * from ddl_test_db.testtbl_part where id = 1
 ---- RESULTS
-1,10,'Ten'
+10,'Ten',1
 ---- TYPES
-int, int, string
+int, string, int
 ====
 ---- QUERY
 use ddl_test_db

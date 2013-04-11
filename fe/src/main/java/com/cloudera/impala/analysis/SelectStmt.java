@@ -243,12 +243,10 @@ public class SelectStmt extends QueryStmt {
    * @param desc
    * @throws AnalysisException
    */
-  private void expandStar(Analyzer analyzer, String alias,
-                          TupleDescriptor desc)
+  private void expandStar(Analyzer analyzer, String alias, TupleDescriptor desc)
       throws AnalysisException {
-    for (Column col: desc.getTable().getColumns()) {
-      resultExprs.add(
-          new SlotRef(new TableName(null, alias), col.getName()));
+    for (Column col: desc.getTable().getColumnsInHiveOrder()) {
+      resultExprs.add(new SlotRef(new TableName(null, alias), col.getName()));
       colLabels.add(col.getName().toLowerCase());
     }
   }
