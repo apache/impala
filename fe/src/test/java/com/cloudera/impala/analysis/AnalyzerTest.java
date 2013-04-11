@@ -2332,7 +2332,8 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
-    // Union compatibility requires cast of select list expr in column 5 (int_col -> bigint).
+    // Union compatibility requires cast of select list expr in column 5
+    // (int_col -> bigint).
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
@@ -2397,6 +2398,13 @@ public class AnalyzerTest {
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
         "Target table expects 11 columns but the select statement returns 13.");
+
+    // Partition columns should be type-checked
+    AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=\"should be an int\", month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
   }
 
   @Test

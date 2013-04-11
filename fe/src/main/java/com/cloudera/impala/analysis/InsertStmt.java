@@ -209,23 +209,22 @@ public class InsertStmt extends ParseNodeBase {
     List<Expr> tmpPartitionKeyExprs = new ArrayList<Expr>();
     List<String> tmpPartitionKeyNames = new ArrayList<String>();
     for (PartitionKeyValue pkv : partitionKeyValues) {
+      Expr partitionColValue;
       if (pkv.isStatic()) {
-        tmpPartitionKeyExprs.add(pkv.getValue());
-        tmpPartitionKeyNames.add(pkv.getColName());
-        continue;
-      }
-      if (exprMatchPos >= selectListExprs.size()) {
-        throw new AnalysisException("No matching select list item found for "
-            + "dynamic partition '" + pkv.getColName() + "'.\n"
-            + "The select list items corresponding to dynamic partition "
-            + "keys must be at the end of the select list.");
+        partitionColValue = pkv.getValue();
+      } else {
+        if (exprMatchPos >= selectListExprs.size()) {
+          throw new AnalysisException("No matching select list item found for "
+              + "dynamic partition '" + pkv.getColName() + "'.\n"
+              + "The select list items corresponding to dynamic partition "
+              + "keys must be at the end of the select list.");
+        }
+        partitionColValue = selectListExprs.get(exprMatchPos++);
       }
       Column tableColumn = table.getColumn(pkv.getColName());
-      Expr expr = selectListExprs.get(exprMatchPos);
-      Expr compatibleExpr = checkTypeCompatibility(tableColumn, expr);
+      Expr compatibleExpr = checkTypeCompatibility(tableColumn, partitionColValue);
       tmpPartitionKeyExprs.add(compatibleExpr);
       tmpPartitionKeyNames.add(pkv.getColName());
-      ++exprMatchPos;
     }
     // Reorder the partition key exprs and names to be consistent
     // with the target table declaration.
