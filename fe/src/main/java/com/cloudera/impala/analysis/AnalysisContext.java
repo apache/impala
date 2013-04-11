@@ -109,7 +109,7 @@ public class AnalysisContext {
 
     public AlterTableStmt getAlterTableStmt() {
       Preconditions.checkState(isAlterTableStmt());
-      return (AlterTableStmt) stmt; 
+      return (AlterTableStmt) stmt;
     }
 
     public CreateTableLikeStmt getCreateTableLikeStmt() {
@@ -198,7 +198,7 @@ public class AnalysisContext {
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
-      throw new AnalysisException("Analysis exception (in " + stmt + ")", e);
+      throw e;
     } catch (Exception e) {
       throw new AnalysisException(parser.getErrorMsg(stmt), e);
     }

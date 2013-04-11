@@ -374,7 +374,8 @@ public class Frontend {
     try {
       analysisResult = analysisCtxt.analyze(request.stmt);
     } catch (AnalysisException e) {
-      LOG.info(e.getMessage());
+      // Write the entire stack trace of e to the log (first param is an empty message).
+      LOG.info("", e);
       throw e;
     }
     Preconditions.checkNotNull(analysisResult.getStmt());

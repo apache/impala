@@ -14,9 +14,9 @@
 
 package com.cloudera.impala.common;
 
-import java.io.Writer;
+import java.io.IOException;
 import java.io.StringWriter;
-import java.io.PrintWriter;
+import java.io.Writer;
 
 /**
  * Utility class with methods intended for JNI clients
@@ -24,12 +24,25 @@ import java.io.PrintWriter;
 public class JniUtil {
 
   /**
-   * Returns a throwable's exception message and full stack trace (which toString() does 
-   * not)
+   * Returns a formatted string containing the simple exception name and the
+   * exception message without the full stack trace. Includes the
+   * the chain of causes each in a separate line.
+   * Writes the full stack trace to the log.
    */
   public static String throwableToString(Throwable t) {
     Writer output = new StringWriter();
-    t.printStackTrace(new PrintWriter(output));
+    try {
+      output.write(String.format("%s: %s", t.getClass().getSimpleName(),
+          t.getMessage()));
+      // Follow the chain of exception causes and print them as well.
+      Throwable cause = t;
+      while ((cause = cause.getCause()) != null) {
+        output.write(String.format("CAUSED BY: %s: %s", cause.getClass().getSimpleName(),
+            cause.getMessage()));
+      }
+    } catch (IOException e) {
+      throw new Error(e);
+    }
     return output.toString();
   }
 
