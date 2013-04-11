@@ -92,6 +92,7 @@ Status GzipCompressor::ProcessBlock(int input_length, uint8_t* input,
       DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
       buffer_length_ = len;
       out_buffer_ = memory_pool_->Allocate(buffer_length_);
+      *output_length = buffer_length_;
     }
   }
 
@@ -234,6 +235,7 @@ Status SnappyCompressor::ProcessBlock(int input_length, uint8_t* input,
     buffer_length_ = max_compressed_len;
     out_buffer_ = memory_pool_->Allocate(buffer_length_);
     *output = out_buffer_;
+    *output_length = max_compressed_len;
   }
 
   return Compress(input_length, input, output_length, out_buffer_);

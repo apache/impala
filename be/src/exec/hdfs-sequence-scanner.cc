@@ -72,8 +72,6 @@ Status HdfsSequenceScanner::InitNewRange() {
   
   num_buffered_records_in_compressed_block_ = 0;
 
-  template_tuple_ = context_->template_tuple();
-
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
   if (seq_header->is_compressed) {
     // For record-compressed data we always want to copy since they tend to be
@@ -364,7 +362,7 @@ Status HdfsSequenceScanner::ProcessRange() {
       memset(errors, 0, sizeof(errors));
 
       add_row = WriteCompleteTuple(pool, &field_locations_[0], tuple_, tuple_row_mem,
-          template_tuple_, &errors[0], &error_in_row);
+          context_->template_tuple(), &errors[0], &error_in_row);
 
       if (UNLIKELY(error_in_row)) {
         ReportTupleParseError(&field_locations_[0], errors, 0);

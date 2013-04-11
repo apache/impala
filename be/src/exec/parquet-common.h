@@ -36,7 +36,7 @@ const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::INT64,
   parquet::Type::FLOAT,
   parquet::Type::DOUBLE,
-  parquet::Type::INT96,
+  parquet::Type::INT96,       // Timestamp
   parquet::Type::BYTE_ARRAY,
 };
 

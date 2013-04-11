@@ -133,6 +133,9 @@ class HdfsParquetScanner::ColumnReader {
   // Pointer to start of next value in data page
   uint8_t* data_;
 
+  // Decoder for bool values.  Only valid if type is TYPE_BOOLEAN
+  BitReader bool_values_;
+
   // Decoder for definition.  Only one of these is valid at a time, depending on
   // the data page metadata.
   RleDecoder rle_def_levels_;
@@ -178,6 +181,9 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
   // now complete, pass along the memory allocated for it.
   parent_->context_->AcquirePool(decompressed_data_pool_.get());
 
+  // Read the next data page, skipping page types we don't care about.
+  // We break out of this loop on the non-error case (either eosr or
+  // a data page was found).
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
     RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &num_bytes, &eos));
@@ -240,6 +246,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
           reinterpret_cast<char*>(decompressed_buffer));
       if (!success) return Status("Corrupt data page");
       data_ = decompressed_buffer;
+      data_size = current_page_header_.uncompressed_page_size;
     } else {
       // TODO: handle the other codecs.
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
@@ -249,8 +256,9 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     int32_t num_definition_bytes = 0;
     switch (current_page_header_.data_page_header.definition_level_encoding) {
       case parquet::Encoding::RLE:
-        num_definition_bytes = *reinterpret_cast<int32_t*>(data_);
-        data_ += sizeof(int32_t);
+        if (!ReadWriteUtil::Read(&data_, &data_size, &num_definition_bytes, &status)) {
+          return status;
+        }
         rle_def_levels_ = RleDecoder(data_, num_definition_bytes);
         break;
       case parquet::Encoding::BIT_PACKED:
@@ -266,10 +274,17 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     }
     DCHECK_GT(num_definition_bytes, 0);
     data_ += num_definition_bytes;
+    data_size -= num_definition_bytes;
+
+    if (desc_->type() == TYPE_BOOLEAN) {
+      // Initialize bool decoder
+      bool_values_ = BitReader(data_, data_size);
+    }
+
     break;
   }
     
-  return status;
+  return Status::OK;
 }
   
 // TODO More codegen here as well.
@@ -315,6 +330,15 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
 
   void* slot = tuple->GetSlot(desc_->tuple_offset());
   switch (desc_->type()) {
+    case TYPE_BOOLEAN: {
+      bool valid;
+      valid = bool_values_.GetBool(reinterpret_cast<bool*>(slot));
+      if (!valid) {
+        parent_->parse_status_ = Status("Invalid bool column");
+        return false;
+      }
+      break;
+    }
     case TYPE_TINYINT:
       *reinterpret_cast<int8_t*>(slot) = *reinterpret_cast<int32_t*>(data_);
       data_ += 4;
@@ -352,6 +376,11 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
       data_ += sv->len;
       break;
     }
+    case TYPE_TIMESTAMP: 
+      // timestamp type is a 12 byte value.
+      memcpy(slot, data_, 12);
+      data_ += 12;
+      break;
     default:
       DCHECK(false);
   }
@@ -389,7 +418,7 @@ Status HdfsParquetScanner::AssembleRows() {
     int num_to_commit = 0;
 
     for (int i = 0; i < num_rows; ++i) {
-      InitTuple(template_tuple_, tuple);
+      InitTuple(context_->template_tuple(), tuple);
       for (int c = 0; c < column_readers_.size(); ++c) {
         if (!column_readers_[c]->ReadValue(pool, tuple)) {
           assemble_rows_timer_.Stop();

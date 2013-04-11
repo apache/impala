@@ -261,7 +261,6 @@ Status HdfsAvroScanner::InitNewRange() {
   DCHECK(header_ != NULL);
   only_parsing_header_ = false;
   avro_header_ = reinterpret_cast<AvroFileHeader*>(header_);
-  template_tuple_ = context_->template_tuple();
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         data_buffer_pool_.get(), stream_->compact_data(),
@@ -343,7 +342,7 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
   for (int i = 0; i < n; ++i) {
     // Initialize tuple from the partition key template tuple before writing the
     // slots
-    InitTuple(template_tuple_, tuple);
+    InitTuple(context_->template_tuple(), tuple);
 
     // Decode record
     for (int j = 0; j < slot_descs_.size(); ++j) {

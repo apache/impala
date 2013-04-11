@@ -355,7 +355,13 @@ class ScannerContext {
 
   HdfsPartitionDescriptor* partition_desc_;
 
-  // Template tuple for this scan range
+  // A partially materialized tuple with only partition key slots set.
+  // The non-partition key slots are set to NULL.  The template tuple
+  // must be copied into tuple_ before any of the other slots are
+  // materialized.
+  // Pointer is NULL if there are no partition key slots.
+  // This template tuple is computed once for each file and valid for
+  // the duration of that file.
   Tuple* template_tuple_;
 
   // Current row batch that tuples are being written to.

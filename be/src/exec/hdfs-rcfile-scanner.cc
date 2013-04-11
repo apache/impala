@@ -80,7 +80,6 @@ Status HdfsRCFileScanner::InitNewRange() {
   only_parsing_header_ = false;
   
   row_group_buffer_size_ = 0;
-  template_tuple_ = context_->template_tuple();
 
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
@@ -482,7 +481,7 @@ Status HdfsRCFileScanner::ProcessRange() {
 
       // Initialize tuple from the partition key template tuple before writing the
       // slots
-      InitTuple(template_tuple_, tuple);
+      InitTuple(context_->template_tuple(), tuple);
 
       for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
         const SlotDescriptor* slot_desc = *it;

@@ -124,7 +124,6 @@ void HdfsTextScanner::ResetScanner() {
   boundary_row_.Clear();
   delimited_text_parser_->ParserReset();
 
-  template_tuple_ = context_->template_tuple();
   partial_tuple_empty_ = true;
   byte_buffer_ptr_ = byte_buffer_end_ = NULL;
 

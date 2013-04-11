@@ -57,7 +57,6 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
       num_errors_in_file_(0),
-      template_tuple_(NULL),
       has_noncompact_strings_(!scan_node->compact_data() &&
                               !scan_node->tuple_desc()->string_slots().empty()),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
@@ -114,7 +113,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
   }
   DCHECK_GT(num_tuples, 0);
 
-  if (template_tuple_ == NULL) {
+  if (context_->template_tuple() == NULL) {
     // No slots from partitions keys or slots.  This is count(*).  Just add the
     // number of rows to the batch.
     row_batch->AddRows(num_tuples);
@@ -124,7 +123,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
     int row_idx = row_batch->AddRow();
     
     TupleRow* current_row = row_batch->GetRow(row_idx);
-    current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+    current_row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
     if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
       return 0;
     }
@@ -139,7 +138,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
       row_idx = row_batch->AddRow();
       DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
       TupleRow* current_row = row_batch->GetRow(row_idx);
-      current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+      current_row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
       row_batch->CommitLastRow();
     }
   } 
@@ -160,15 +159,15 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
   }
   if (num_tuples == 0) return 0;
 
-  if (template_tuple_ == NULL) {
+  if (context_->template_tuple() == NULL) {
     return num_tuples;
   } else {
-    row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+    row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
     if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
     row = context->next_row(row);
 
     for (int n = 1; n < num_tuples; ++n) {
-      row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+      row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
       row = context->next_row(row);
     }
   } 

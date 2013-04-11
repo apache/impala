@@ -182,6 +182,7 @@ class HdfsScanNode : public ScanNode {
 
   // Allocates and initialises template_tuple_ with any values from
   // the partition columns for the current scan range
+  // Returns NULL if there are no materialized partition keys.
   // TODO: cache the tuple template in the partition object.
   Tuple* InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
 
