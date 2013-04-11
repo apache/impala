@@ -419,6 +419,7 @@ public class Frontend {
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
     explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
+    queryExecRequest.setQuery_plan(explainString.toString());
     if (fragments.get(0).getPlanRoot() != null) {
       // a SELECT without FROM clause will only have a single fragment, which won't
       // have a plan tree

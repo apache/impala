@@ -27,6 +27,7 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
@@ -1107,6 +1108,8 @@ void Coordinator::ReportQuerySummary() {
           "completion times", times_label.str());
       fragment_profiles_[i].averaged_profile->AddInfoString(
           "execution rates", rates_label.str());
+      fragment_profiles_[i].averaged_profile->AddInfoString(
+          "num instances", lexical_cast<string>(fragment_profiles_[i].num_instances));
     }
   }
 
@@ -1298,7 +1301,7 @@ Status Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_req
   }
 
   scan_range_assignment_.resize(exec_request.fragments.size());
-  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator  entry;
+  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry;
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
     int fragment_idx = per_node_fragment_idx[entry->first];

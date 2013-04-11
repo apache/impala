@@ -421,6 +421,9 @@ struct TQueryExecRequest {
   6: optional TFinalizeParams finalize_params
 
   7: required ImpalaInternalService.TQueryGlobals query_globals
+
+  // The same as the output of 'explain <query>'
+  8: optional string query_plan
 }
 
 enum TDdlType {

@@ -167,7 +167,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
       }
-      // TODO: it would be good to have the plan here as well.
+
       profile_.AddChild(&summary_info_);
       summary_info_.AddInfoString("Sql Statement", exec_request->sql_stmt);
       summary_info_.AddInfoString("Start Time", start_time().DebugString());
@@ -176,6 +176,15 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       summary_info_.AddInfoString("Impala Version", GetVersionString());
       summary_info_.AddInfoString("User", user());
       summary_info_.AddInfoString("Default Db", default_db());
+      if (query_exec_request.__isset.query_plan) {
+        stringstream plan_ss;
+        // Add some delimiters to make it clearer where the plan
+        // begins and the profile ends
+        plan_ss << "\n----------------\n"
+                << query_exec_request.query_plan
+                << "----------------";
+        summary_info_.AddInfoString("Plan", plan_ss.str());
+      }
       profile_.AddChild(coord_->query_profile());
     }
   } else {
