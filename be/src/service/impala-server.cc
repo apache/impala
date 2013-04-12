@@ -782,12 +782,10 @@ void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& 
     return;
   }
 
-  (*output) << "<pre>";
   Status status = GetRuntimeProfileStr(unique_id, true, output);
   if (!status.ok()) {
     (*output) << status.GetErrorMsg();
   }
-  (*output) << "</pre>";
 }
 
 void ImpalaServer::InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
