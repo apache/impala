@@ -58,12 +58,13 @@ std::string PrintQueryState(const beeswax::QueryState::type& type);
 // Returns true if parse succeeded.
 bool ParseId(const std::string& s, TUniqueId* id);
 
-// Returns a string "<product version number> (build <build hash>)\nBuilt on <build time>"
+// Returns a string "<product version number> (build <build hash>)"
+// If compact == false, this string is appended: "\nBuilt on <build time>"
 // This is used to set gflags build version
-std::string GetBuildVersion();
+std::string GetBuildVersion(bool compact = false);
 
-// Returns "<program short name> version <GetBuildVersion()>"
-std::string GetVersionString();
+// Returns "<program short name> version <GetBuildVersion(compact)>"
+std::string GetVersionString(bool compact = false);
 
 // Returns the stack trace as a string from the current location.
 // Note: there is a libc bug that causes this not to work on 64 bit machines

@@ -311,7 +311,7 @@ string PrintBatch(RowBatch* batch) {
   return out.str();
 }
 
-string GetBuildVersion() {
+string GetBuildVersion(bool compact) {
   stringstream ss;
   ss << Version::BUILD_VERSION
 #ifdef NDEBUG
@@ -320,15 +320,17 @@ string GetBuildVersion() {
      << " DEBUG"
 #endif
      << " (build " << Version::BUILD_HASH
-     << ")" << endl
-     << "Built on " << Version::BUILD_TIME;
+     << ")";
+  if (!compact) {
+    ss << endl << "Built on " << Version::BUILD_TIME;
+  }
   return ss.str();
 }
 
-string GetVersionString() {
+string GetVersionString(bool compact) {
   stringstream ss;
   ss << google::ProgramInvocationShortName()
-     << " version " << google::VersionString();
+     << " version " << GetBuildVersion(compact);
   return ss.str();
 }
 

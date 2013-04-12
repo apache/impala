@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad
   metrics->CreateAndRegisterPrimitiveMetric<string>(
-      "statestore.version", GetVersionString());
+      "statestore.version", GetVersionString(true));
 
   StateStore state_store(metrics.get());
   state_store.RegisterWebpages(webserver.get());

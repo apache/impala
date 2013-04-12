@@ -63,7 +63,7 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
   IMPALA_SERVER_START_TIME = m->CreateAndRegisterPrimitiveMetric<string>(
       ImpaladMetricKeys::IMPALA_SERVER_START_TIME, "");
   IMPALA_SERVER_VERSION = m->CreateAndRegisterPrimitiveMetric<string>(
-      ImpaladMetricKeys::IMPALA_SERVER_VERSION, GetVersionString());
+      ImpaladMetricKeys::IMPALA_SERVER_VERSION, GetVersionString(true));
   IMPALA_SERVER_READY = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_READY, false);
   IMPALA_SERVER_LAST_REFRESH_TIME = m->CreateAndRegisterPrimitiveMetric<string>(
