@@ -390,9 +390,10 @@ void* StringFunctions::RegexpExtract(Expr* e, TupleRow* row) {
   DCHECK(func_expr->GetRegex() != NULL);
   cmatch matches;
   // cast's are necessary to make boost understand which function we want.
+  // use match_posix to return the leftmost maximal match (and not the first match)
   bool success = regex_search(const_cast<const char*>(str->ptr),
       const_cast<const char*>(str->ptr) + str->len,
-      matches, *func_expr->GetRegex(), regex_constants::match_any);
+      matches, *func_expr->GetRegex(), regex_constants::match_posix);
   if (!success) {
     e->result_.SetStringVal("");
     return &e->result_.string_val;

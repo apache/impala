@@ -1369,6 +1369,9 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_extract('', '', 0)", "");
   TestStringValue("regexp_extract('abxcy1234a', '', 0)", "");
   TestStringValue("regexp_extract('', 'abx', 0)", "");
+  // Test finding of leftmost maximal match.
+  TestStringValue("regexp_extract('I001=-200,I003=-210,I007=0', 'I001=-?[0-9]+', 0)",
+      "I001=-200");
   // Invalid regex patter, unmatched parenthesis.
   TestIsNull("regexp_extract('abxcy1234a', '(/.', 0)", TYPE_STRING);
   // NULL arguments.
