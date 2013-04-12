@@ -37,8 +37,8 @@ public class JniUtil {
       // Follow the chain of exception causes and print them as well.
       Throwable cause = t;
       while ((cause = cause.getCause()) != null) {
-        output.write(String.format("CAUSED BY: %s: %s", cause.getClass().getSimpleName(),
-            cause.getMessage()));
+        output.write(String.format("\nCAUSED BY: %s: %s",
+            cause.getClass().getSimpleName(), cause.getMessage()));
       }
     } catch (IOException e) {
       throw new Error(e);
