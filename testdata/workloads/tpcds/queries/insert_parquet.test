@@ -3,54 +3,54 @@
 ---- QUERY
 insert overwrite table customer
 select * from tpcds.customer
----- PARTITIONS
+---- RESULTS
 : 100000
 ====
 ---- QUERY
 insert overwrite table customer_address
 select * from tpcds.customer_address
----- PARTITIONS
+---- RESULTS
 : 50000
 ====
 ---- QUERY
 insert overwrite table customer_demographics
 select * from tpcds.customer_demographics
----- PARTITIONS
+---- RESULTS
 : 1920800
 ====
 ---- QUERY
 insert overwrite table date_dim
 select * from tpcds.date_dim
----- PARTITIONS
+---- RESULTS
 : 73049
 ====
 ---- QUERY
 insert overwrite table household_demographics
 select * from tpcds.household_demographics
----- PARTITIONS
+---- RESULTS
 : 7200
 ====
 ---- QUERY
 insert overwrite table item
 select * from tpcds.item
----- PARTITIONS
+---- RESULTS
 : 18000
 ====
 ---- QUERY
 insert overwrite table promotion
 select * from tpcds.promotion
----- PARTITIONS
+---- RESULTS
 : 300
 ====
 ---- QUERY
 insert overwrite table store
 select * from tpcds.store
----- PARTITIONS
+---- RESULTS
 : 12
 ====
 ---- QUERY
 insert overwrite table time_dim
 select * from tpcds.time_dim
----- PARTITIONS
+---- RESULTS
 : 86400
 ====

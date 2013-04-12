@@ -3,60 +3,60 @@
 ---- QUERY
 insert overwrite table customer
 select * from tpch.customer
----- PARTITIONS
+---- RESULTS
 : 150000
 ====
 ---- QUERY
 insert overwrite table lineitem
 select * from tpch.lineitem
----- PARTITIONS
+---- RESULTS
 : 6001215
 ====
 ---- QUERY
 insert overwrite table max_revenue
 select * from tpch.max_revenue
----- PARTITIONS
+---- RESULTS
 : 1
 ====
 ---- QUERY
 insert overwrite table nation
 select * from tpch.nation
----- PARTITIONS
+---- RESULTS
 : 25
 ====
 ---- QUERY
 insert overwrite table orders
 select * from tpch.orders
----- PARTITIONS
+---- RESULTS
 : 1500000
 ====
 ---- QUERY
 insert overwrite table part
 select * from tpch.part
----- PARTITIONS
+---- RESULTS
 : 200000
 ====
 ---- QUERY
 insert overwrite table partsupp
 select * from tpch.partsupp
----- PARTITIONS
+---- RESULTS
 : 800000
 ====
 ---- QUERY
 insert overwrite table region
 select * from tpch.region
----- PARTITIONS
+---- RESULTS
 : 5
 ====
 ---- QUERY
 insert overwrite table revenue
 select * from tpch.revenue
----- PARTITIONS
+---- RESULTS
 : 10000
 ====
 ---- QUERY
 insert overwrite table supplier
 select * from tpch.supplier
----- PARTITIONS
+---- RESULTS
 : 10000
 ====
