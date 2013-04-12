@@ -55,9 +55,14 @@ class TestQueries(ImpalaTestSuite):
 
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
-
     # TODO: Skip these vector combinations due to IMP-624, IMP-503
     if table_format.file_format in ['parquet', 'rc'] or\
        (table_format.file_format == 'seq' and table_format.compression_codec == 'none'):
-      return
+      pytest.skip()
     self.run_test_case('QueryTest/misc', vector)
+
+  def test_overflow(self, vector):
+    table_format = vector.get_value('table_format')
+    if table_format.file_format != 'text' or table_format.compression_codec != 'none':
+      pytest.skip()
+    self.run_test_case('QueryTest/overflow', vector)

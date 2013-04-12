@@ -2,7 +2,7 @@
 ---- QUERY
 # insert overwrite unpartitioned table
 insert overwrite table alltypesnopart_insert
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04

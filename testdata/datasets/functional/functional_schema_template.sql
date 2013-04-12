@@ -173,35 +173,42 @@ functional
 ---- BASE_TABLE_NAME
 alltypesinsert
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} LIKE {db_name}.alltypes;
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} LIKE {db_name}.alltypes
+STORED AS {file_format};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypesnopart_insert
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} like {db_name}.alltypesnopart;
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} like {db_name}.alltypesnopart
+STORED AS {file_format};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_overwrite_nopart
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int)
+STORED AS {file_format};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_overwrite_partitioned
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int) PARTITIONED BY (col2 int);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col1 int)
+PARTITIONED BY (col2 int)
+STORED AS {file_format};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 insert_string_partitioned
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (s1 string) PARTITIONED BY (s2 string);
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (s1 string)
+PARTITIONED BY (s2 string)
+STORED AS {file_format};
 ====
 ---- DATASET
 functional
