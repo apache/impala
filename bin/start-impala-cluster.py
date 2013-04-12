@@ -63,9 +63,9 @@ REDIRECT_STR = "> %(file_name)s 2>&1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 120
 
 def kill_all():
-  os.system("killall mini-impala-cluster")
-  os.system("killall impalad")
-  os.system("killall statestored")
+  os.system("killall -9 mini-impala-cluster")
+  os.system("killall -9 impalad")
+  os.system("killall -9 statestored")
   sleep(1)
 
 def start_statestore():
