@@ -36,7 +36,7 @@ public class BetweenPredicate extends Predicate {
 
   // Children of the BetweenPredicate, since this.children should hold the children
   // of the rewritten predicate to make sure toThrift() picks up the right ones.
-  private final List<Expr> originalChildren = Lists.newArrayList();
+  private List<Expr> originalChildren = Lists.newArrayList();
 
   // First child is the comparison expr which should be in [lowerBound, upperBound].
   public BetweenPredicate(Expr compareExpr, Expr lowerBound, Expr upperBound,
@@ -100,5 +100,15 @@ public class BetweenPredicate extends Predicate {
     String notStr = (isNotBetween) ? "NOT " : "";
     return originalChildren.get(0).toSql() + " " + notStr + "BETWEEN " +
         originalChildren.get(1).toSql() + " AND " + originalChildren.get(2).toSql();
+  }
+
+  /**
+   * Also substitute the exprs in originalChildren when cloning.
+   */
+  @Override
+  public Expr clone(SubstitutionMap sMap) {
+    BetweenPredicate clone = (BetweenPredicate) super.clone(sMap);
+    clone.originalChildren = Expr.cloneList(originalChildren, sMap);
+    return clone;
   }
 }
