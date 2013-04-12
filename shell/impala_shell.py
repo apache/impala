@@ -123,6 +123,8 @@ class ImpalaShell(cmd.Cmd):
     self.show_profiles = options.show_profiles
     # Stores the state of user input until a delimiter is seen.
     self.partial_cmd = str()
+    # Stores the old prompt while the user input is incomplete.
+    self.cached_prompt = str()
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
     self.output_writer = None
@@ -216,6 +218,10 @@ class ImpalaShell(cmd.Cmd):
       current_history_len = self.readline.get_current_history_length()
     # Input is incomplete, store the contents and do nothing.
     if not cmd.endswith(ImpalaShell.CMD_DELIM):
+      # The user input is incomplete, change the prompt to reflect this.
+      if not self.partial_cmd and cmd:
+        self.cached_prompt = self.prompt
+        self.prompt = '> '.rjust(len(self.cached_prompt))
       # partial_cmd is already populated, add the current input after a newline.
       if self.partial_cmd and cmd:
         self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
@@ -242,6 +248,8 @@ class ImpalaShell(cmd.Cmd):
       if self.readline and current_history_len > 0:
         self.readline.replace_history_item(current_history_len - 1,
                                            completed_cmd.encode('string-escape'))
+      # Revert the prompt to its earlier state
+      self.prompt = self.cached_prompt
     else: # Input has a delimiter and partial_cmd is empty
       completed_cmd = cmd
     return completed_cmd
@@ -389,6 +397,9 @@ class ImpalaShell(cmd.Cmd):
         raise
     except Exception, e:
       print "Error connecting: %s, %s" % (type(e),e)
+      # If a connection to another impalad failed while already connected
+      # reset the prompt to disconnected.
+      self.prompt = self.DISCONNECTED_PROMPT
 
     return self.connected
 
