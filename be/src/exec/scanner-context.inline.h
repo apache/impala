@@ -25,7 +25,7 @@ using namespace impala;
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
 // Handle the fast common path where all the bytes are in the first buffer.  This
-// is the path used by sequence/rc/trevni file formats to read a very small number
+// is the path used by sequence/rc/parquet file formats to read a very small number
 // (i.e. single int) of bytes.
 inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
     int* out_len, bool* eos, Status* status) {

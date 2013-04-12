@@ -2,7 +2,8 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This script is used to load the proper datasets for the specified workloads. It loads
-# all data via Hive except for Trevni data which needs to be loaded via Impala.
+# all data via Hive except for parquet data which needs to be loaded via Impala.
+# Most ddl commands are executed by Impala.
 import collections
 import os
 import re

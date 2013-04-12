@@ -54,7 +54,7 @@ enum THdfsCompression {
   SNAPPY_BLOCKED // Used by sequence and rc files but not stored in the metadata.
 }
 
-// Mapping from names defined by Trevni to the enum.
+// Mapping from names defined by Avro to the enum.
 // We permit gzip and bzip2 in addition.
 const map<string, THdfsCompression> COMPRESSION_MAP = {
   "": THdfsCompression.NONE,

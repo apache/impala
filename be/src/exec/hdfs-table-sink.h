@@ -130,7 +130,7 @@ class HdfsTableSink : public DataSink {
 
   // Get the block size of the current file opened for this partition.
   // This is a utility routine that can be called by specific table
-  // writers.  Currently used by the Trevni writer.
+  // writers.  Currently used by the parquet writer.
   static Status GetFileBlockSize(OutputPartition* output_partition, int64_t* size);
 
   virtual RuntimeProfile* profile() { return runtime_profile_; }

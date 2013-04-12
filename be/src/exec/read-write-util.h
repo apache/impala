@@ -25,7 +25,7 @@ namespace impala {
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
-// Class for reading and writing various data types supported by Trevni and Avro.
+// Class for reading and writing various data types.
 class ReadWriteUtil {
  public:
   // Maximum length for Writeable VInt

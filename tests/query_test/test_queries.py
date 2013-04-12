@@ -57,7 +57,7 @@ class TestQueries(ImpalaTestSuite):
     table_format = vector.get_value('table_format')
 
     # TODO: Skip these vector combinations due to IMP-624, IMP-503
-    if table_format.file_format in ['trevni', 'rc'] or\
+    if table_format.file_format in ['parquet', 'rc'] or\
        (table_format.file_format == 'seq' and table_format.compression_codec == 'none'):
       return
     self.run_test_case('QueryTest/misc', vector)
