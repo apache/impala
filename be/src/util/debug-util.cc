@@ -90,6 +90,27 @@ string PrintId(const TUniqueId& id) {
   return out.str();
 }
 
+bool ParseId(const string& s, TUniqueId* id) {
+  DCHECK(id != NULL);
+  if (s.size() != 33) return false;
+
+  const char* hi_part = s.c_str();
+  char* colon = const_cast<char*>(hi_part) + 16;
+  const char* lo_part = colon + 1;
+
+  if (*colon != ':') return false;
+  *colon = '\0';
+
+  char* error_hi = NULL;
+  char* error_lo = NULL;
+  id->hi = strtoul(hi_part, &error_hi, 16);
+  id->lo = strtoul(lo_part, &error_lo, 16);
+
+  bool valid = *error_hi == '\0' && *error_lo == '\0';
+  *colon = ':';
+  return valid;
+}
+
 string PrintPlanNodeType(const TPlanNodeType::type& type) {
   map<int, const char*>::const_iterator i;
   i = _TPlanNodeType_VALUES_TO_NAMES.find(type);

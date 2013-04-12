@@ -53,6 +53,11 @@ std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);
 
+// Parse 's' into a TUniqueId object.  The format of s needs to be the output format
+// from PrintId.  (<hi_part>:<low_part>)
+// Returns true if parse succeeded.
+bool ParseId(const std::string& s, TUniqueId* id);
+
 // Returns a string "<product version number> (build <build hash>)\nBuilt on <build time>"
 // This is used to set gflags build version
 std::string GetBuildVersion();

@@ -33,6 +33,23 @@ TEST(DebugUtil, StackDump) {
   cout << "Stack Recursion: " << endl << RecursionStack(5) << endl;
 }
 
+TEST(DebugUtil, QueryIdParsing) {
+  TUniqueId id;
+  EXPECT_FALSE(ParseId("abcd", &id));
+  EXPECT_FALSE(ParseId("abcdabcdabcdabcdabcdabcdabcdabcda", &id));
+  EXPECT_FALSE(ParseId("zbcdabcdabcdabcd:abcdabcdabcdabcd", &id));
+  EXPECT_FALSE(ParseId("~bcdabcdabcdabcd:abcdabcdabcdabcd", &id));
+  EXPECT_FALSE(ParseId("abcdabcdabcdabcd:!bcdabcdabcdabcd", &id));
+
+  EXPECT_TRUE(ParseId("abcdabcdabcdabcd:abcdabcdabcdabcd", &id));
+  EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0xabcdabcdabcdabcd);
+  
+  EXPECT_TRUE(ParseId("abcdabcdabcdabcd:1234abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+}
+
 }
 
 int main(int argc, char **argv) {

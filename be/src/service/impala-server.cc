@@ -725,37 +725,15 @@ Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
   return Status::OK;
 }
 
-// We expect the query id to be passed as two parameters, 'hi' and 'lo'. If
-// either are absent, we cannot proceed.
+// We expect the query id to be passed as one parameter, 'query_id'.
 // Returns true if the query id was present and valid; false otherwise.
 static bool ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
-  int64_t hi, lo;
-  Webserver::ArgumentMap::const_iterator it = args.find("hi");
+  Webserver::ArgumentMap::const_iterator it = args.find("query_id");
   if (it == args.end()) {
     return false;
   } else {
-    StringParser::ParseResult parse_result;
-    hi = StringParser::StringToInt<int64_t>(it->second.c_str(), it->second.length(),
-             &parse_result);
-    if (parse_result != StringParser::PARSE_SUCCESS) {
-      return false;
-    }
+    return ParseId(it->second, id);
   }
-
-  it = args.find("lo");
-  if (it == args.end()) {
-    return false;
-  } else {
-    StringParser::ParseResult parse_result;
-    lo = StringParser::StringToInt<int64_t>(it->second.c_str(), it->second.length(),
-             &parse_result);
-    if (parse_result != StringParser::PARSE_SUCCESS) {
-      return false;
-    }
-  }
-  id->hi = hi;
-  id->lo = lo;
-  return true;
 }
 
 void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
@@ -869,8 +847,8 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
             << "</td><td>" << record.num_rows_fetched << "</td>";
 
   // Output profile
-  (*output) << "<td><a href='/query_profile?hi=" << record.id.hi << "&lo="
-            << record.id.lo << "'>Profile</a></td>";
+  (*output) << "<td><a href='/query_profile?query_id=" << record.id
+            << "'>Profile</a></td>";
   (*output) << "</tr>" << endl;
 }
 
