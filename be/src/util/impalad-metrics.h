@@ -32,6 +32,10 @@ class ImpaladMetricKeys {
   // True if Impala has finished initialisation
   static const char* IMPALA_SERVER_READY;
 
+  // The last last time someone issued 'refresh' or an insert query was run from
+  // this node.
+  static const char* IMPALA_SERVER_LAST_REFRESH_TIME;
+
   // Number of queries executed by this server, including failed and cancelled
   // queries
   static const char* IMPALA_SERVER_NUM_QUERIES;
@@ -65,6 +69,7 @@ class ImpaladMetrics {
   static Metrics::StringMetric* IMPALA_SERVER_START_TIME;
   static Metrics::StringMetric* IMPALA_SERVER_VERSION;
   static Metrics::BooleanMetric* IMPALA_SERVER_READY;
+  static Metrics::StringMetric* IMPALA_SERVER_LAST_REFRESH_TIME;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;
   static Metrics::IntMetric* NUM_RANGES_PROCESSED;

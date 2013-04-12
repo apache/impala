@@ -1448,6 +1448,9 @@ Status ImpalaServer::ResetCatalogInternal() {
       return Status(msg.str());
     }
   }
+  
+  ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME->Update(
+      TimestampValue::local_time().DebugString());
 
   return Status::OK;
 }

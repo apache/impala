@@ -28,6 +28,8 @@ const char* ImpaladMetricKeys::IMPALA_SERVER_VERSION =
     "impala-server.version";
 const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
     "impala-server.ready";
+const char* ImpaladMetricKeys::IMPALA_SERVER_LAST_REFRESH_TIME = 
+    "impala-server.last-refresh-time";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
     "impala-server.num-queries";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
@@ -47,6 +49,7 @@ const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
 Metrics::BooleanMetric* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
+Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
@@ -63,6 +66,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IMPALA_SERVER_VERSION, GetVersionString());
   IMPALA_SERVER_READY = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_READY, false);
+  IMPALA_SERVER_LAST_REFRESH_TIME = m->CreateAndRegisterPrimitiveMetric<string>(
+      ImpaladMetricKeys::IMPALA_SERVER_LAST_REFRESH_TIME, "n/a");
   IMPALA_SERVER_NUM_QUERIES = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0L);
   IMPALA_SERVER_NUM_FRAGMENTS = m->CreateAndRegisterPrimitiveMetric(
