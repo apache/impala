@@ -180,7 +180,7 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
   KW_INTERVAL;
 
-terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
+terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
@@ -238,6 +238,7 @@ nonterminal BaseTableRef base_table_ref;
 nonterminal InlineViewRef inline_view_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
+nonterminal ArrayList<String> opt_join_hints;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
@@ -854,24 +855,27 @@ table_ref_list ::=
     list.add(t);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op table_ref:t
+  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
   {:
     t.setJoinOp((JoinOperator) op);
+    t.setJoinHints(h);
     list.add(t);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op table_ref:t
+  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
     KW_ON predicate_or_null:p
   {:
     t.setJoinOp((JoinOperator) op);
+    t.setJoinHints(h);
     t.setOnClause(p);
     list.add(t);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op table_ref:t
+  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
     KW_USING LPAREN ident_list:colNames RPAREN
   {:
     t.setJoinOp((JoinOperator) op);
+    t.setJoinHints(h);
     t.setUsingClause(colNames);
     list.add(t);
     RESULT = list;
@@ -918,6 +922,13 @@ opt_inner ::=
 opt_outer ::=
   KW_OUTER
   |
+  ;
+
+opt_join_hints ::=
+  LBRACKET ident_list:l RBRACKET
+  {: RESULT = l; :}
+  |
+  {: RESULT = null; :}
   ;
 
 ident_list ::=

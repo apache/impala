@@ -173,6 +173,8 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.BITNOT), "~");
     tokenIdMap.put(new Integer(SqlParserSymbols.LPAREN), "(");
     tokenIdMap.put(new Integer(SqlParserSymbols.RPAREN), ")");
+    tokenIdMap.put(new Integer(SqlParserSymbols.LBRACKET), "[");
+    tokenIdMap.put(new Integer(SqlParserSymbols.RBRACKET), "]");
     tokenIdMap.put(new Integer(SqlParserSymbols.FLOATINGPOINT_LITERAL),
         "FLOATING POINT LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.INTEGER_LITERAL), "INTEGER LITERAL");
@@ -236,6 +238,8 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "*" { return newToken(SqlParserSymbols.STAR, null); }
 "(" { return newToken(SqlParserSymbols.LPAREN, null); }
 ")" { return newToken(SqlParserSymbols.RPAREN, null); }
+"[" { return newToken(SqlParserSymbols.LBRACKET, null); }
+"]" { return newToken(SqlParserSymbols.RBRACKET, null); }
 "/" { return newToken(SqlParserSymbols.DIVIDE, null); }
 "%" { return newToken(SqlParserSymbols.MOD, null); }
 "+" { return newToken(SqlParserSymbols.ADD, null); }

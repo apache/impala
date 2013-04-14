@@ -26,6 +26,7 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
+import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.Pair;
@@ -46,6 +47,7 @@ import com.google.common.base.Preconditions;
 public class HashJoinNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
 
+  private final TableRef innerRef;
   private final JoinOperator joinOp;
   // conjuncts of the form "<lhs> = <rhs>", recorded as Pair(<lhs>, <rhs>)
   private final List<Pair<Expr, Expr> > eqJoinConjuncts;
@@ -54,14 +56,15 @@ public class HashJoinNode extends PlanNode {
   private final List<Predicate> otherJoinConjuncts;
 
   public HashJoinNode(
-      PlanNodeId id, PlanNode outer, PlanNode inner, JoinOperator joinOp,
+      PlanNodeId id, PlanNode outer, PlanNode inner, TableRef innerRef,
       List<Pair<Expr, Expr> > eqJoinConjuncts, List<Predicate> otherJoinConjuncts) {
     super(id);
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
     tupleIds.addAll(outer.getTupleIds());
     tupleIds.addAll(inner.getTupleIds());
-    this.joinOp = joinOp;
+    this.innerRef = innerRef;
+    this.joinOp = innerRef.getJoinOp();
     this.eqJoinConjuncts = eqJoinConjuncts;
     this.otherJoinConjuncts = otherJoinConjuncts;
     children.add(outer);
@@ -82,6 +85,8 @@ public class HashJoinNode extends PlanNode {
   }
 
   public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts; }
+  public JoinOperator getJoinOp() { return joinOp; }
+  public TableRef getInnerRef() { return innerRef; }
 
   @Override
   public void computeStats(Analyzer analyzer) {

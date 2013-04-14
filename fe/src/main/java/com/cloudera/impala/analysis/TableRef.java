@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
@@ -32,8 +33,13 @@ public abstract class TableRef extends ParseNodeBase {
   protected final String alias;
 
   protected JoinOperator joinOp;
+  private ArrayList<String> joinHints;
   protected Predicate onClause;
   protected List<String> usingColNames;
+
+  // set after analyzeJoinHints(); true if explicitly set via hints
+  private boolean isBroadcastJoin;
+  private boolean isPartitionJoin;
 
   // the ref to the left of us, if we're part of a JOIN clause
   protected TableRef leftTblRef;
@@ -101,32 +107,37 @@ public abstract class TableRef extends ParseNodeBase {
     }
   }
 
-  public String getExplicitAlias() {
-    return alias;
-  }
+  public String getExplicitAlias() { return alias; }
+  public Table getTable() { return desc.getTable(); }
+  public void setJoinOp(JoinOperator op) { this.joinOp = op; }
+  public void setOnClause(Predicate pred) { this.onClause = pred; }
+  public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }
+  public TableRef getLeftTblRef() { return leftTblRef; }
+  public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef = leftTblRef; }
+  public void setJoinHints(ArrayList<String> hints) { this.joinHints = hints; }
+  public boolean isBroadcastJoin() { return isBroadcastJoin; }
+  public boolean isPartitionJoin() { return isPartitionJoin; }
 
-  public Table getTable() {
-    return desc.getTable();
-  }
-
-  public void setJoinOp(JoinOperator op) {
-    this.joinOp = op;
-  }
-
-  public void setOnClause(Predicate pred) {
-    this.onClause = pred;
-  }
-
-  public void setUsingClause(List<String> colNames) {
-    this.usingColNames = colNames;
-  }
-
-  public TableRef getLeftTblRef() {
-    return leftTblRef;
-  }
-
-  public void setLeftTblRef(TableRef leftTblRef) {
-    this.leftTblRef = leftTblRef;
+  /**
+   * Parse hints.
+   */
+  private void analyzeJoinHints() throws AnalysisException {
+    if (joinHints == null) return;
+    for (String hint: joinHints) {
+      if (hint.toUpperCase().equals("BROADCAST")) {
+        if (isPartitionJoin) {
+          throw new AnalysisException("Conflicting JOIN hint: " + hint);
+        }
+        isBroadcastJoin = true;
+      } else if (hint.toUpperCase().equals("SHUFFLE")) {
+        if (isBroadcastJoin) {
+          throw new AnalysisException("Conflicting JOIN hint: " + hint);
+        }
+        isPartitionJoin = true;
+      } else {
+        throw new AnalysisException("JOIN hint not recognized: " + hint);
+      }
+    }
   }
 
   /**
@@ -136,6 +147,7 @@ public abstract class TableRef extends ParseNodeBase {
    */
   public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(desc != null);
+    analyzeJoinHints();
 
     if (usingColNames != null) {
       // Turn USING clause into equivalent ON clause.

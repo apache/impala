@@ -637,6 +637,22 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestJoinHints() throws AnalysisException {
+    AnalyzesOk("select * from functional.alltypes a join [broadcast] " +
+        "functional.alltypes b using (int_col)");
+    AnalyzesOk("select * from functional.alltypes a join [shuffle] " +
+        "functional.alltypes b using (int_col)");
+    AnalysisError(
+        "select * from functional.alltypes a join [broadcast,shuffle] " +
+         "functional.alltypes b using (int_col)",
+        "Conflicting JOIN hint: shuffle");
+    AnalysisError(
+        "select * from functional.alltypes a join [bla] " +
+         "functional.alltypes b using (int_col)",
+        "JOIN hint not recognized: bla");
+  }
+
+  @Test
   public void TestWhereClause() throws AnalysisException {
     AnalyzesOk("select zip, name from functional.testtbl where id > 15");
     AnalysisError("select zip, name from functional.testtbl where badcol > 15",

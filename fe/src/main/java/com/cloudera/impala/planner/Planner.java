@@ -332,9 +332,19 @@ public class Planner {
         + Float.toString(rhsTree.getAvgRowSize()));
     LOG.info(rhsTree.getExplainString());
 
-    // do a "<=" comparison so that we default to broadcast joins if we're unable
-    // to estimate the cost
-    if (broadcastCost <= partitionCost) {
+    boolean doBroadcast;
+    // we do a broadcast join if we're explicitly told to do so or if it's cheaper 
+    // and we weren't explicitly told to do a partitioned join;
+    // we do a "<=" comparison of the costs so that we default to broadcast joins if
+    // we're unable to estimate the cost
+    if (node.getInnerRef().isBroadcastJoin() 
+        || (!node.getInnerRef().isPartitionJoin() && broadcastCost <= partitionCost)) {
+      doBroadcast = true;
+    } else {
+      doBroadcast = false;
+    }
+
+    if (doBroadcast) {
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
       // the join; the build input is provided by an ExchangeNode, which is the
       // destination of the rightChildFragment's output
@@ -1092,7 +1102,7 @@ public class Planner {
 
     HashJoinNode result =
         new HashJoinNode(
-            new PlanNodeId(nodeIdGenerator), outer, inner, innerRef.getJoinOp(),
+            new PlanNodeId(nodeIdGenerator), outer, inner, innerRef,
             eqJoinConjuncts, ojConjuncts);
     return result;
   }

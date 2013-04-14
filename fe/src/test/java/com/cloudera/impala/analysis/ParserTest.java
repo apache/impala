@@ -128,6 +128,17 @@ public class ParserTest {
     ParserError("select * from tbl where f(tbl.*) = 5");
   }
 
+  @Test public void TestJoinHints() {
+    ParsesOk("select * from functional.alltypes a join [broadcast] " +
+        "functional.alltypes b using (int_col)");
+    ParsesOk("select * from functional.alltypes a join [bla,bla] " +
+        "functional.alltypes b using (int_col)");
+    ParserError("select * from functional.alltypes a join [bla bla] " +
+        "functional.alltypes b using (int_col)");
+    ParserError("select * from functional.alltypes a join [1 + 2] " +
+        "functional.alltypes b using (int_col)");
+  }
+
   @Test public void TestFromClause() {
     ParsesOk("select * from src src1 " +
         "left outer join src src2 on " +
