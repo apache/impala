@@ -669,7 +669,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status FetchInternal(const TUniqueId& query_id, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results);
 
-  // Populate insert_result and clean up exec state
+  // Populate insert_result and clean up exec state. If the query
+  // status is an error, insert_result is not populated and the status is returned.
   Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result);
 
   // HiveServer2 private methods (implemented in impala-hs2-server.cc)

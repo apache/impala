@@ -631,21 +631,20 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK:
       return False
 
+    query_successful = True
     while True:
       query_state = self.__get_query_state(handle)
       if query_state == self.query_state["FINISHED"]:
         break
       elif query_state == self.query_state["EXCEPTION"]:
-        print 'Remote error'
+        print 'Query failed'
         if self.connected:
           # Retrieve error message (if any) from log.
           log, status = self._ImpalaShell__do_rpc(
             lambda: self.imp_service.get_log(handle.log_context))
           print log,
-          # It's ok to close an INSERT that's failed rather than do the full
-          # CloseInsert. The latter builds an InsertResult which is meaningless
-          # here.
-          return self.__close_query_handle(handle)
+          query_successful = False
+          break
         else:
           return False
       elif self.is_interrupted.isSet():
@@ -657,11 +656,12 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK or self.is_interrupted.isSet():
       return False
 
-    self.__print_runtime_profile_if_enabled(handle)
-    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
-    self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
-    self.last_query_handle = handle
-    return True
+    if query_successful:
+      self.__print_runtime_profile_if_enabled(handle)
+      num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+      self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
+      self.last_query_handle = handle
+    return query_successful
 
   def __cancel_query(self, handle):
     """Cancel a query on a keyboard interrupt from the shell."""

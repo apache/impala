@@ -563,15 +563,18 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     TInsertResult* insert_result) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid query handle");
-
+  Status query_status;
   {
     lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-    // Coord may be NULL for a SELECT with LIMIT 0.
-    // Note that when IMP-231 is fixed (INSERT without WHERE clause) we might
-    // need to revisit this, since that might lead us to insert a row without a
-    // coordinator, depending on how we choose to drive the table sink.
-    if (exec_state->coord() != NULL) {
-      insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
+    query_status = exec_state->query_status();
+    if (query_status.ok()) {
+      // Coord may be NULL for a SELECT with LIMIT 0.
+      // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
+      // need to revisit this, since that might lead us to insert a row without a
+      // coordinator, depending on how we choose to drive the table sink.
+      if (exec_state->coord() != NULL) {
+        insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
+      }
     }
   }
 
@@ -580,7 +583,7 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     ss << "Failed to unregister query ID '" << ThriftDebugString(query_id) << "'";
     return Status(ss.str());
   }
-  return Status::OK;
+  return query_status;
 }
 
 }
