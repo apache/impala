@@ -25,14 +25,14 @@ namespace impala {
 
 // Tests encoding/decoding of input.  If expected_encoded is non-empty, the
 // encoded string is validated against it.
-void TestUrl(const string& input, const string& expected_encoded) {
+void TestUrl(const string& input, const string& expected_encoded, bool hive_compat) {
   string intermediate;
-  UrlEncode(input, &intermediate);
+  UrlEncode(input, &intermediate, hive_compat);
   string output;
   if (!expected_encoded.empty()) {
     EXPECT_EQ(intermediate, expected_encoded);
   }
-  EXPECT_TRUE(UrlDecode(intermediate, &output));
+  EXPECT_TRUE(UrlDecode(intermediate, &output, hive_compat));
   EXPECT_EQ(input, output);
 
   // Convert string to vector and try that also
@@ -40,7 +40,7 @@ void TestUrl(const string& input, const string& expected_encoded) {
   input_vector.resize(input.size());
   memcpy(&input_vector[0], input.c_str(), input.size());
   string intermediate2;
-  UrlEncode(input_vector, &intermediate2);
+  UrlEncode(input_vector, &intermediate2, hive_compat);
   EXPECT_EQ(intermediate, intermediate2);
 }
 
@@ -67,15 +67,22 @@ void TestBase64(const string& input, const string& expected_encoded) {
 // same that come out.
 TEST(UrlCodingTest, Basic) {
   string input = "ABCDEFGHIJKLMNOPQRSTUWXYZ1234567890~!@#$%^&*()<>?,./:\";'{}|[]\\_+-=";
-  TestUrl(input, "");
+  TestUrl(input, "", false);
+  TestUrl(input, "", true);
+}
+
+TEST(UrlCodingTest, HiveExceptions) {
+  TestUrl(" +", " +", true);
 }
 
 TEST(UrlCodingTest, BlankString) {
-  TestUrl("", "");
+  TestUrl("", "", false);
+  TestUrl("", "", true);
 }
 
 TEST(UrlCodingTest, PathSeparators) {
-  TestUrl("/home/impala/directory/", "%2Fhome%2Fimpala%2Fdirectory%2F");
+  TestUrl("/home/impala/directory/", "%2Fhome%2Fimpala%2Fdirectory%2F", false);
+  TestUrl("/home/impala/directory/", "%2Fhome%2Fimpala%2Fdirectory%2F", true);
 }
 
 TEST(Base64Test, Basic) {

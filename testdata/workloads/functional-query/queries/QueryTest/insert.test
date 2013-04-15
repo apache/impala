@@ -454,3 +454,21 @@ string, string
 ---- RESULTS
 'value','/\%.'
 ====
+---- QUERY
+# static partition insert into string-partitioned table with non-escaped special characters
+# (Hive chooses not to escape + and ' ')
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2="_.~ +")
+SELECT "value" FROM alltypessmall LIMIT 1;
+---- SETUP
+DROP PARTITIONS insert_string_partitioned
+---- RESULTS
+s2=_.~ +/: 1
+====
+---- QUERY
+# select with unencoded partition key
+SELECT * FROM insert_string_partitioned;
+---- TYPES
+string, string
+---- RESULTS
+'value','_.~ +'
+====

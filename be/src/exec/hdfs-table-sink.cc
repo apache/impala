@@ -223,7 +223,9 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
       // with 'show partitions <tbl>' in Hive, followed by a select
       // from a decoded partition key value.
       string encoded_str;
-      UrlEncode(value_str, &encoded_str);
+      // The final parameter forces compatibility with Hive, which
+      // doesn't URL-encode every character.
+      UrlEncode(value_str, &encoded_str, true);
       common_suffix << encoded_str;
     }
     common_suffix << "/";

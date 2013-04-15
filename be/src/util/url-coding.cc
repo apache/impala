@@ -31,38 +31,53 @@ using namespace boost::archive::iterators;
 
 namespace impala {
 
-static inline void UrlEncode(const char* in, int in_len, string* out) {
+// Hive selectively encodes characters. This is the whitelist of
+// characters it will encode.
+// See common/src/java/org/apache/hadoop/hive/common/FileUtils.java
+// in the Hive source code for the source of this list.
+static function<bool (char)> HiveShouldEscape = is_any_of("\"#%\\*/:=?\u00FF");
+
+// It is more convenient to maintain the complement of the set of
+// characters to escape when not in Hive-compat mode.
+static function<bool (char)> ShouldNotEscape = is_any_of("-_.~");
+
+static inline void UrlEncode(const char* in, int in_len, string* out, bool hive_compat) {
   (*out).reserve(in_len);
   stringstream ss;
   for (int i = 0; i < in_len; ++i) {
     const char ch = in[i];
-    if (isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
-      ss << ch;
-    } else {
+    // Escape the character iff a) we are in Hive-compat mode and the
+    // character is in the Hive whitelist or b) we are not in
+    // Hive-compat mode, and the character is not alphanumeric or one
+    // of the four commonly excluded characters.
+    if ((hive_compat && HiveShouldEscape(ch)) ||
+        (!hive_compat && !(isalnum(ch) || ShouldNotEscape(ch)))) {
       ss << '%' << uppercase << hex << static_cast<uint32_t>(ch);
+    } else {
+      ss << ch;
     }
   }
 
   (*out) = ss.str();
 }
 
-void UrlEncode(const vector<uint8_t>& in, string* out) {
+void UrlEncode(const vector<uint8_t>& in, string* out, bool hive_compat) {
   if (in.empty()) {
     *out = "";
   } else {
-    UrlEncode(reinterpret_cast<const char*>(&in[0]), in.size(), out);
+    UrlEncode(reinterpret_cast<const char*>(&in[0]), in.size(), out, hive_compat);
   }
 }
 
-void UrlEncode(const string& in, string* out) {
-  UrlEncode(in.c_str(), in.size(), out);
+void UrlEncode(const string& in, string* out, bool hive_compat) {
+  UrlEncode(in.c_str(), in.size(), out, hive_compat);
 }
 
 // Adapted from
 // http://www.boost.org/doc/libs/1_40_0/doc/html/boost_asio/
 //   example/http/server3/request_handler.cpp
 // See http://www.boost.org/LICENSE_1_0.txt for license for this method.
-bool UrlDecode(const string& in, string* out) {
+bool UrlDecode(const string& in, string* out, bool hive_compat) {
   out->clear();
   out->reserve(in.size());
   for (size_t i = 0; i < in.size(); ++i) {
@@ -79,7 +94,7 @@ bool UrlDecode(const string& in, string* out) {
       } else {
         return false;
       }
-    } else if (in[i] == '+') {
+    } else if (!hive_compat && in[i] == '+') { // Hive does not encode ' ' as '+'
       (*out) += ' ';
     } else {
       (*out) += in[i];
@@ -95,7 +110,7 @@ static inline void Base64Encode(const char* in, int in_len, stringstream* out) {
   copy(base64_encode(in), base64_encode(in + in_len), ostream_iterator<char>(*out));
   int bytes_written = out->tellp() - len_before;
   // Pad with = to make it valid base64 encoded string
-  int num_pad = bytes_written % 4; 
+  int num_pad = bytes_written % 4;
   if (num_pad != 0) {
     num_pad = 4 - num_pad;
     for (int i = 0; i < num_pad; ++i) {
@@ -138,7 +153,7 @@ bool Base64Decode(const string& in, string* out) {
       binary_from_base64<string::const_iterator> , 8, 6> base64_decode;
   string tmp = in;
   // Replace padding with base64 encoded NULL
-  replace(tmp.begin(), tmp.end(), '=', 'A'); 
+  replace(tmp.begin(), tmp.end(), '=', 'A');
   try {
     *out = string(base64_decode(tmp.begin()), base64_decode(tmp.end()));
   } catch(std::exception& e) {
