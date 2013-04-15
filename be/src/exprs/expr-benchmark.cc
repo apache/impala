@@ -430,7 +430,7 @@ Benchmark* BenchmarkMathFunctions() {
 //                           year                73.4              1.077X
 //                          month               72.53              1.064X
 //                   day of month               71.98              1.056X
-//                            day               56.67             0.8312X
+//                    day of year               56.67             0.8312X
 //                   week of year               50.68             0.7433X
 //                           hour               100.1              1.468X
 //                         minute               97.18              1.425X
@@ -473,7 +473,7 @@ Benchmark* BenchmarkTimestampFunctions() {
   BENCHMARK("year", "year(cast('2011-12-22' as timestamp))");
   BENCHMARK("month", "month(cast('2011-12-22' as timestamp))");
   BENCHMARK("day of month", "dayofmonth(cast('2011-12-22' as timestamp))");
-  BENCHMARK("day", "day(cast('2011-12-22' as timestamp))");
+  BENCHMARK("day of year", "dayofyear(cast('2011-12-22' as timestamp))");
   BENCHMARK("week of year", "weekofyear(cast('2011-12-22' as timestamp))");
   BENCHMARK("hour", "hour(cast('09:10:11.000000' as timestamp))");
   BENCHMARK("minute", "minute(cast('09:10:11.000000' as timestamp))");

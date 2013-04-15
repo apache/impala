@@ -135,9 +135,10 @@ functions = [
         'TimestampFunctions::FromUnix', ['from_unixtime']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
-  ['Timestamp_day', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Day', ['day']],
   ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], \
-        'TimestampFunctions::DayOfMonth', ['dayofmonth']],
+        'TimestampFunctions::DayOfMonth', ['day', 'dayofmonth']],
+  ['Timestamp_dayofyear', 'INT', ['TIMESTAMP'],
+        'TimestampFunctions::DayOfYear', ['dayofyear']],
   ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], \
         'TimestampFunctions::WeekOfYear', ['weekofyear']],
   ['Timestamp_hour', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Hour', ['hour']],

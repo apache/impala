@@ -44,8 +44,8 @@ class TimestampFunctions {
   // Functions to extract parts of the timestamp, return integers.
   static void* Year(Expr* e, TupleRow* row);
   static void* Month(Expr* e, TupleRow* row);
-  static void* Day(Expr* e, TupleRow* row);
   static void* DayOfMonth(Expr* e, TupleRow* row);
+  static void* DayOfYear(Expr* e, TupleRow* row);
   static void* WeekOfYear(Expr* e, TupleRow* row);
   static void* Hour(Expr* e, TupleRow* row);
   static void* Minute(Expr* e, TupleRow* row);

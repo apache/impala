@@ -161,17 +161,6 @@ void* TimestampFunctions::Month(Expr* e, TupleRow* row) {
   return &e->result_.int_val;
 }
 
-void* TimestampFunctions::Day(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().day_of_year();
-  return &e->result_.int_val;
-}
-
 void* TimestampFunctions::DayOfMonth(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   Expr* op = e->children()[0];
@@ -180,6 +169,17 @@ void* TimestampFunctions::DayOfMonth(Expr* e, TupleRow* row) {
 
   if (tv->date().is_special()) return NULL;
   e->result_.int_val = tv->date().day();
+  return &e->result_.int_val;
+}
+
+void* TimestampFunctions::DayOfYear(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* op = e->children()[0];
+  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
+  if (tv == NULL) return NULL;
+
+  if (tv->date().is_special()) return NULL;
+  e->result_.int_val = tv->date().day_of_year();
   return &e->result_.int_val;
 }
 
