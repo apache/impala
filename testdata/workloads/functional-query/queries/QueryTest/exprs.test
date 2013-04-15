@@ -501,7 +501,7 @@ bigint
 ====
 ---- QUERY
 select timestamp_col, to_date(timestamp_col), year(timestamp_col), month(timestamp_col),
-dayofmonth(timestamp_col), day(timestamp_col), weekofyear(timestamp_col),
+dayofmonth(timestamp_col), dayofyear(timestamp_col), weekofyear(timestamp_col),
 hour(timestamp_col), minute(timestamp_col), second(timestamp_col)
 from alltypessmall
 ---- TYPES
