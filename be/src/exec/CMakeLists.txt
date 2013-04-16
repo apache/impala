@@ -33,6 +33,8 @@ add_library(Exec STATIC
   hash-join-node.cc
   hash-join-node-ir.cc
   hash-table.cc
+  hbase-table-sink.cc
+  hbase-table-writer.cc
   hdfs-scan-node.cc
   hdfs-scanner.cc
   hdfs-scanner-ir.cc
@@ -44,14 +46,11 @@ add_library(Exec STATIC
   hdfs-text-scanner.cc
   hdfs-lzo-text-scanner.cc
   hdfs-text-table-writer.cc
-  merge-node.cc
   hdfs-parquet-scanner.cc
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   merge-node.cc
-  hbase-table-sink.cc
-  hbase-table-writer.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
