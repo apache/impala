@@ -628,6 +628,8 @@ void HdfsScanNode::DiskThread() {
     {
       unique_lock<mutex> lock(disk_thread_resource_lock_);
       DCHECK_LE(num_blocked_scanners_, active_contexts_.size());
+      // Wait if the number of buffers is at the max limit (to generate back pressure
+      // on the io mgr) AND at least one scanner can make progress.
       while (num_blocked_scanners_ < active_contexts_.size() &&
              num_queued_io_buffers_ >= max_queued_io_buffers_ &&
              !done_) {
@@ -738,6 +740,10 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) 
   {
     unique_lock<mutex> l(disk_thread_resource_lock_);
     active_contexts_.erase(context);
+    if (num_blocked_scanners_ == active_contexts_.size()) {
+      // The last unblocked scanner just finished, wake up the disk thread.
+      disk_thread_resource_cv_.notify_one();
+    }
   }
   ScannerContext::Stream* stream = context->GetStream();
   DCHECK(stream != NULL);
