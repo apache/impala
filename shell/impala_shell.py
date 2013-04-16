@@ -187,12 +187,17 @@ class ImpalaShell(cmd.Cmd):
     # semi-colons and strip them from the end of the command.
     args = args.strip()
     tokens = args.split(' ')
-    # The first token should be the command
-    # If it's EOF, call do_quit()
-    if tokens[0] == 'EOF':
-      return 'quit'
-    else:
-      tokens[0] = tokens[0].lower()
+    # The first token is converted into lower case to route it to the
+    # appropriate command handler. This only applies to the first line of user input.
+    # Modifying tokens in subsequent lines may change the semantics of the command,
+    # so do not modify the text.
+    if not self.partial_cmd:
+      # The first token is the command.
+      # If it's EOF, call do_quit()
+      if tokens[0] == 'EOF':
+        return 'quit'
+      else:
+        tokens[0] = tokens[0].lower()
     if interactive:
       args = self.__check_for_command_completion(' '.join(tokens).strip())
       args = args.rstrip(ImpalaShell.CMD_DELIM)
