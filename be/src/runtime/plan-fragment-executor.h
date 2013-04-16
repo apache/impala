@@ -108,6 +108,10 @@ class PlanFragmentExecutor {
   // will have been stopped.
   Status GetNext(RowBatch** batch);
 
+  // Closes the underlying plan fragment and frees up all resources allocated
+  // in Open()/GetNext().
+  void Close();
+
   // Initiate cancellation. Must not be called until after Prepare() returned.
   void Cancel();
 
@@ -147,6 +151,9 @@ class PlanFragmentExecutor {
   // true if Prepare() returned OK
   bool prepared_;
 
+  // true if Close() has been called
+  bool closed_;
+
   // Overall execution status. Either ok() or set to the first error status that
   // was encountered.
   Status status_;
@@ -182,8 +189,6 @@ class PlanFragmentExecutor {
   // status isn't CANCELLED. Sets 'done' to true in the callback invocation if
   // done == true or we have an error status.
   void SendReport(bool done);
-
-  void Close();
 
   // If status_.ok(), sets status_ to status.
   // If we're transitioning to an error status, stops report thread and

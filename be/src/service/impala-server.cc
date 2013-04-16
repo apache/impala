@@ -468,6 +468,7 @@ Status ImpalaServer::FragmentExecState::Prepare(
 void ImpalaServer::FragmentExecState::Exec() {
   // Open() does the full execution, because all plan fragments have sinks
   executor_.Open();
+  executor_.Close();
 }
 
 // There can only be one of these callbacks in-flight at any moment, because

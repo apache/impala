@@ -54,12 +54,14 @@ class TestFailpoints(ImpalaTestSuite):
         TestDimension('action', *FAILPOINT_ACTION))
     cls.TestMatrix.add_dimension(create_exec_option_dimension([0], [False], [0]))
 
-    # This is an invalid test case. It causes Impala to crash, this will never happen.
-    # For more info see IMPALA-55
+    # These are invalid test cases.
+    # For more info see IMPALA-55 and IMPALA-56.
     cls.TestMatrix.add_constraint(lambda v: not (\
         v.get_value('action') == 'FAIL' and\
         v.get_value('location') in ['CLOSE'] and\
-        v.get_value('target_node')[0] == 'HASH_JOIN_NODE'))
+        v.get_value('target_node')[0] == 'HASH_JOIN_NODE') and\
+        not (v.get_value('location') in ['PREPARE'] and \
+             v.get_value('action') == 'CANCEL'))
 
   def test_failpoints(self, vector):
     query = QUERY
@@ -67,10 +69,6 @@ class TestFailpoints(ImpalaTestSuite):
     action = vector.get_value('action')
     location = vector.get_value('location')
 
-    # TODO: These vectors fail due to product bugs. Once the bugs are fixed the tests
-    # can re reenabled.
-    if action == 'CANCEL' and location in ['PREPARE', 'CLOSE']:
-      pytest.xfail(reason='IMPALA-56 - Hangs on async query execution')
 
     for node_id in node_ids:
       debug_action = '%d:%s:%s' % (node_id, location,

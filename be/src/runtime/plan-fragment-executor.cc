@@ -57,21 +57,12 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     report_status_cb_(report_status_cb),
     report_thread_active_(false),
     done_(false),
-    prepared_(false) {
+    prepared_(false),
+    closed_(false) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
-  // delete row batch and free up resources, otherwise DiskIoMgr will complain
-  // if we try to Close() an HdfsScanNode while still holding
-  // DiskIoMgr::BufferDescriptors
-  row_batch_.reset(NULL);
-  // Prepare may not have been called, which sets runtime_state_
-  if (runtime_state_.get() != NULL) {
-    plan_->Close(runtime_state_.get());
-    if (sink_.get() != NULL) {
-      sink_->Close(runtime_state());
-    }
-  }
+  Close();
   // at this point, the report thread should have been stopped
   DCHECK(!report_thread_active_);
 }
@@ -413,6 +404,19 @@ RuntimeProfile* PlanFragmentExecutor::profile() {
 
 bool PlanFragmentExecutor::ReachedLimit() {
   return plan_->ReachedLimit();
+}
+
+void PlanFragmentExecutor::Close() {
+  if (closed_) return;
+  row_batch_.reset(NULL);
+  // Prepare may not have been called, which sets runtime_state_
+  if (runtime_state_.get() != NULL) {
+    plan_->Close(runtime_state_.get());
+    if (sink_.get() != NULL) {
+      sink_->Close(runtime_state());
+    }
+  }
+  closed_ = true;
 }
 
 }
