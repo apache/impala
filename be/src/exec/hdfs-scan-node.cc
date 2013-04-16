@@ -600,6 +600,7 @@ void HdfsScanNode::StartNewScannerThread(DiskIoMgr::BufferDescriptor* buffer) {
       reinterpret_cast<ScanRangeMetadata*>(buffer->scan_range()->meta_data());
   int64_t partition_id = metadata->partition_id;
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
+  DCHECK(partition != NULL);
 
   ScannerContext* context = runtime_state_->obj_pool()->Add(
       new ScannerContext(runtime_state_, this, partition, buffer));

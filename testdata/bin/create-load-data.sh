@@ -95,4 +95,7 @@ ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
 
 hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 
+# Remove an index file so we test an un-indexed LZO file
+hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.index
+
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh

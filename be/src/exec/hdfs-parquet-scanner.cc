@@ -44,13 +44,12 @@ using namespace impala;
 void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   for (int i = 0; i < files.size(); ++i) {
-    // Set to true if this scanner is assigned the first split (hdfs block) in the file,
-    // i.e. the split with offset 0. Since Parquet scanners always read entire files, we
-    // only read a file if we're assigned the first split to avoid reading multi-block
-    // files with multiple scanners.
-    bool assigned_first_split = false;
     for (int j = 0; j < files[i]->splits.size(); ++j) {
       DiskIoMgr::ScanRange* split = files[i]->splits[j];
+
+      // Since Parquet scanners always read entire files, only read a file if we're
+      // assigned the first split to avoid reading multi-block files with multiple
+      // scanners.
       if (split->offset() != 0) {
         // We are expecting each file to be one hdfs block (so all the scan range offsets
         // should be 0).  This is not incorrect but we will issue a warning.
@@ -59,22 +58,20 @@ void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
         // We assign the entire file to one scan range, so mark all but one split
         // (i.e. the first split) as complete
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
-      } else {
-        assigned_first_split = true;
+        continue;
       }
+
+      // Compute the offset of the file footer
+      DCHECK_GT(files[i]->file_length, 0);
+      int64_t footer_start = max(0L, files[i]->file_length - FOOTER_SIZE);
+
+      ScanRangeMetadata* metadata =
+          reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
+      DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
+          files[i]->filename.c_str(), FOOTER_SIZE,
+          footer_start, metadata->partition_id, files[i]->splits[0]->disk_id());
+      scan_node->AddDiskIoRange(footer_range);
     }
-    if (!assigned_first_split) continue;
-
-    // Compute the offset of the file footer
-    DCHECK_GT(files[i]->file_length, 0);
-    int64_t footer_start = max(0L, files[i]->file_length - FOOTER_SIZE);
-
-    ScanRangeMetadata* metadata = 
-        reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
-    DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
-        files[i]->filename.c_str(), FOOTER_SIZE, 
-        footer_start, metadata->partition_id, files[i]->splits[0]->disk_id());
-    scan_node->AddDiskIoRange(footer_range);
   }
 }
 
