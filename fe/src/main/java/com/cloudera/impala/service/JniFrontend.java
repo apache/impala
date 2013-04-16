@@ -442,7 +442,7 @@ public class JniFrontend {
     StringBuilder output = new StringBuilder();
     if (guessedCdhVersion.compareTo(cdh41) == 0) {
       output.append(checkShortCircuitReadCdh41(CONF));
-    } if (guessedCdhVersion.compareTo(cdh42) >= 0) {
+    } else if (guessedCdhVersion.compareTo(cdh42) >= 0) {
       output.append(checkShortCircuitRead(CONF));
     } else {
       output.append(guessedCdhVersion)
