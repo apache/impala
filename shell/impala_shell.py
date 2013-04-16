@@ -195,7 +195,8 @@ class ImpalaShell(cmd.Cmd):
       # As such, some commands will have \n escaped, this takes care of un-escaping them.
       args = args.rstrip(ImpalaShell.CMD_DELIM).decode('string-escape')
     else:
-      args = ' '.join(tokens)
+      # Strip all the non-interactive commands of the delimiter.
+      args = ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
     return args
 
   def __check_for_command_completion(self, cmd):
@@ -359,9 +360,9 @@ class ImpalaShell(cmd.Cmd):
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
-        self.cmdqueue.append('refresh')
+        self.cmdqueue.append('refresh' + ImpalaShell.CMD_DELIM)
       if self.default_db:
-        self.cmdqueue.append('use %s' % self.default_db)
+        self.cmdqueue.append('use %s' % self.default_db + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
     self.last_query_handle = None
     # In the case that we lost connection while a command was being entered,
