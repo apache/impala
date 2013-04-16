@@ -33,25 +33,17 @@ class SimpleSchedulerTest : public testing::Test {
     // we need a set of resolvable hostnames, so here we use IP
     // addresses which are always resolvable (to themselves!).
 
-    // Setup localhost_scheduler
-    num_backends_ = 3;
+    // Setup hostname_scheduler_
+    num_backends_ = 2;
     base_port_ = 1000;
     vector<TNetworkAddress> backends;
     backends.resize(num_backends_);
-    for (int i = 0; i < num_backends_; ++i) {
-      backends.at(i).hostname = "127.0.0.0";
-      backends.at(i).port = base_port_ + i;
-    }
-    localhost_scheduler_.reset(new SimpleScheduler(backends, NULL));
+    backends.at(0).hostname = "127.0.0.0";
+    backends.at(0).port = base_port_;
+    backends.at(1).hostname = "localhost";
+    backends.at(1).port = base_port_;
 
-    // Setup remote_scheduler
-    for (int i = 0; i < num_backends_; ++i) {
-      stringstream ss;
-      ss << "127.0.0." << i;
-      backends.at(i).hostname = ss.str();
-      backends.at(i).port = base_port_ + i;
-    }
-    remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
+    hostname_scheduler_.reset(new SimpleScheduler(backends, NULL));
 
     // Setup local_remote_scheduler_
     backends.resize(4);
@@ -71,11 +63,8 @@ class SimpleSchedulerTest : public testing::Test {
   int base_port_;
   int num_backends_;
 
-  // This scheduler has 3 backends, all on localhost but have 3 different ports.
-  boost::scoped_ptr<SimpleScheduler> localhost_scheduler_;
-
-  // This scheduler has 3 backends on different ipaddresses and has 3 different ports.
-  boost::scoped_ptr<SimpleScheduler> remote_scheduler_;
+  // This 2 backends: localhost and 127.0.0.0
+  boost::scoped_ptr<SimpleScheduler> hostname_scheduler_;
 
   // This scheduler has 4 backends; 2 on each ipaddresses and has 4 different ports.
   boost::scoped_ptr<SimpleScheduler> local_remote_scheduler_;
@@ -99,6 +88,28 @@ TEST_F(SimpleSchedulerTest, LocalMatches) {
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(hostports.at(i).hostname, "127.0.0.1");
     EXPECT_EQ(hostports.at(i).port, base_port_ + i % 2);
+  }
+}
+
+TEST_F(SimpleSchedulerTest, HostnameTest) {
+  // This test tests hostname resolution.
+  // Both localhost and 127.0.0.1 should match backend 127.0.0.1 only.
+  vector<TNetworkAddress> data_locations;
+  data_locations.resize(2);
+  data_locations.at(0).hostname = "localhost";
+  data_locations.at(0).port = 0;
+  data_locations.at(1).hostname = "127.0.0.1";
+  data_locations.at(1).port = 0;
+
+  SimpleScheduler::HostList hostports;
+
+  hostname_scheduler_->GetHosts(data_locations, &hostports);
+
+  // Expect 2 round robin hostports
+  EXPECT_EQ(2, hostports.size());
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(hostports.at(i).hostname, "127.0.0.1");
+    EXPECT_EQ(hostports.at(i).port, base_port_);
   }
 }
 

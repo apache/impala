@@ -78,7 +78,7 @@ class SimpleScheduler : public Scheduler {
   virtual impala::Status Init();
 
  private:
-  // Protects access to host_map_, which might otherwise be updated
+  // Protects access to host_map_ and host_ip_map_, which might otherwise be updated
   // asynchronously with respect to reads. Also protects the locality
   // counters, which are updated in GetHosts.
   boost::mutex host_map_lock_;
@@ -86,6 +86,11 @@ class SimpleScheduler : public Scheduler {
   // Map from a datanode's IP address to a list of backend addresses running on that node.
   typedef boost::unordered_map<std::string, std::list<TNetworkAddress> > HostMap;
   HostMap host_map_;
+
+  // Map from a datanode's hostname to its IP address to support both hostname based
+  // lookup.
+  typedef boost::unordered_map<std::string, std::string> HostIpAddressMap;
+  HostIpAddressMap host_ip_map_;
 
   // Metrics subsystem access
   impala::Metrics* metrics_;

@@ -86,6 +86,7 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     if (it == host_map_.end()) {
       it = host_map_.insert(
           make_pair(ipaddr, list<TNetworkAddress>())).first;
+      host_ip_map_[backends[i].hostname] = ipaddr;
     }
 
     TNetworkAddress backend_address = MakeNetworkAddress(ipaddr, backends[i].port);
@@ -124,6 +125,7 @@ void SimpleScheduler::UpdateMembership(
 
   // Copy to work on without holding the map lock
   HostMap host_map_copy;
+  HostIpAddressMap host_ip_map_copy;
   bool found_self = false;
   if (topic != service_state.end()) {
     const TTopicDelta& delta = topic->second;
@@ -166,6 +168,7 @@ void SimpleScheduler::UpdateMembership(
       }
 
       host_map_copy[ipaddr].push_back(backend_address);
+      host_ip_map_copy[backend_address.hostname] = ipaddr;
     }
   }
 
@@ -192,6 +195,7 @@ void SimpleScheduler::UpdateMembership(
   {
     lock_guard<mutex> lock(host_map_lock_);
     host_map_.swap(host_map_copy);
+    host_ip_map_.swap(host_ip_map_copy);
     next_nonlocal_host_entry_ = host_map_.begin();
   }
 }
@@ -216,6 +220,16 @@ Status SimpleScheduler::GetHost(const TNetworkAddress& data_location,
   }
   bool local_assignment = false;
   HostMap::iterator entry = host_map_.find(data_location.hostname);
+
+  if (entry == host_map_.end()) {
+    // host_map_ map ip address to backend but data_location.hostname might be a hostname.
+    // Find the ip address of the data_location from host_ip_map_.
+    HostIpAddressMap::const_iterator itr = host_ip_map_.find(data_location.hostname);
+    if (itr != host_ip_map_.end()) {
+      entry = host_map_.find(itr->second);
+    }
+  }
+
   if (entry == host_map_.end()) {
     // round robin the ipaddress
     entry = next_nonlocal_host_entry_;
