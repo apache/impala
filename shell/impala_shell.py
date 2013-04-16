@@ -748,7 +748,7 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK:
       return False
 
-    print "Successfully refreshed catalog"
+    self.__print_if_verbose("Successfully refreshed catalog")
     return True
 
   def do_history(self, args):
