@@ -169,14 +169,14 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
       }
 
-      profile_.AddChild(&summary_info_);
-      summary_info_.AddInfoString("Sql Statement", exec_request->sql_stmt);
-      summary_info_.AddInfoString("Start Time", start_time().DebugString());
-      summary_info_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
-      summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
-      summary_info_.AddInfoString("Impala Version", GetVersionString());
-      summary_info_.AddInfoString("User", user());
-      summary_info_.AddInfoString("Default Db", default_db());
+      summary_profile_.AddInfoString("Start Time", start_time().DebugString());
+      summary_profile_.AddInfoString("End Time", "");
+      summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
+      summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+      summary_profile_.AddInfoString("Impala Version", GetVersionString());
+      summary_profile_.AddInfoString("User", user());
+      summary_profile_.AddInfoString("Default Db", default_db());
+      summary_profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
       if (query_exec_request.__isset.query_plan) {
         stringstream plan_ss;
         // Add some delimiters to make it clearer where the plan
@@ -184,7 +184,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         plan_ss << "\n----------------\n"
                 << query_exec_request.query_plan
                 << "----------------";
-        summary_info_.AddInfoString("Plan", plan_ss.str());
+        summary_profile_.AddInfoString("Plan", plan_ss.str());
       }
       profile_.AddChild(coord_->query_profile());
     }
@@ -198,8 +198,9 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
 
 void ImpalaServer::QueryExecState::Done() {
   end_time_ = TimestampValue::local_time();
-  summary_info_.AddInfoString("End Time", end_time().DebugString());
-  summary_info_.AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_.AddInfoString("End Time", end_time().DebugString());
+  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+  query_events_->MarkEvent("Unregister query");
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
@@ -273,17 +274,20 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       }
       if (current_batch_ == NULL) return Status::OK;
 
-      // Convert the available rows, limited by max_rows
-      int available = current_batch_->num_rows() - current_batch_row_;
-      int fetched_count = available;
-      // max_rows <= 0 means no limit
-      if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
-      for (int i = 0; i < fetched_count; ++i) {
-        TupleRow* row = current_batch_->GetRow(current_batch_row_);
-        RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
-        RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
-        ++num_rows_fetched_;
-        ++current_batch_row_;
+      {
+        SCOPED_TIMER(row_materialization_timer_);
+        // Convert the available rows, limited by max_rows
+        int available = current_batch_->num_rows() - current_batch_row_;
+        int fetched_count = available;
+        // max_rows <= 0 means no limit
+        if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
+        for (int i = 0; i < fetched_count; ++i) {
+          TupleRow* row = current_batch_->GetRow(current_batch_row_);
+          RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
+          RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
+          ++num_rows_fetched_;
+          ++current_batch_row_;
+        }
       }
     } else {
       DCHECK(ddl_executor_.get());
@@ -1095,12 +1099,13 @@ Status ImpalaServer::ExecuteInternal(
 
   exec_state->reset(
       new QueryExecState(exec_env_, this, session_state, query_session_state));
+  (*exec_state)->query_events()->MarkEvent("Start execution");
   *registered_exec_state = false;
 
   TExecRequest result;
   {
-    SCOPED_TIMER((*exec_state)->planner_timer());
     RETURN_IF_ERROR(GetExecRequest(request, &result));
+    (*exec_state)->query_events()->MarkEvent("Planning finished");
   }
 
   if (result.stmt_type == TStmtType::DDL &&
@@ -1215,6 +1220,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
 void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   // block until results are ready
   Status status = exec_state->Wait();
+  exec_state->query_events()->MarkEvent("Rows available");
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
   } else {

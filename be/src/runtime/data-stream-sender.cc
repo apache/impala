@@ -345,9 +345,9 @@ Status DataStreamSender::Init(RuntimeState* state) {
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TCounterType::BYTES);
   serialize_batch_timer_ =
       ADD_TIMER(profile(), "SerializeBatchTime");
-  thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime");
+  thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime(*)");
   network_throughput_ =
-      profile()->AddDerivedCounter("NetworkThroughput", TCounterType::BYTES_PER_SECOND,
+      profile()->AddDerivedCounter("NetworkThroughput(*)", TCounterType::BYTES_PER_SECOND,
           bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
                         thrift_transmit_timer_));
   overall_throughput_ =
@@ -386,7 +386,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       for (vector<Expr*>::iterator expr = partition_exprs_.begin();
            expr != partition_exprs_.end(); ++expr) {
         void* partition_val = (*expr)->GetValue(row);
-        // We can't use the crc hash function here because it does not result 
+        // We can't use the crc hash function here because it does not result
         // in uncorrelated hashes with different seeds.  Instead we must use
         // fvn hash.
         // TODO: fix crc hash/GetHashValue()

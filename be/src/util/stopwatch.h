@@ -102,7 +102,7 @@ class MonotonicStopWatch {
   }
 
   // Returns time in nanosecond.
-  uint64_t ElapsedTime() {
+  uint64_t ElapsedTime() const {
     if (!running_) return total_time_;
     timespec end;
     clock_gettime(CLOCK_MONOTONIC, &end);

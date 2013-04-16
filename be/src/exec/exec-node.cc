@@ -76,7 +76,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_, 
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
         runtime_profile()->total_time_counter()));
 
   RETURN_IF_ERROR(PrepareConjuncts(state));
@@ -261,21 +261,21 @@ bool ExecNode::EvalConjuncts(Expr* const* exprs, int num_exprs, TupleRow* row) {
 
 // Codegen for EvalConjuncts.  The generated signature is
 // For a node with two conjunct predicates
-// define i1 @EvalConjuncts(%"class.impala::Expr"** %exprs, i32 %num_exprs, 
+// define i1 @EvalConjuncts(%"class.impala::Expr"** %exprs, i32 %num_exprs,
 //                          %"class.impala::TupleRow"* %row) {
 // entry:
 //   %null_ptr = alloca i1
 //   %0 = bitcast %"class.impala::TupleRow"* %row to i8**
 //   %eval = call i1 @BinaryPredicate(i8** %0, i8* null, i1* %null_ptr)
 //   br i1 %eval, label %continue, label %false
-// 
+//
 // continue:                                         ; preds = %entry
 //   %eval2 = call i1 @BinaryPredicate3(i8** %0, i8* null, i1* %null_ptr)
 //   br i1 %eval2, label %continue1, label %false
-// 
+//
 // continue1:                                        ; preds = %continue
 //   ret i1 true
-// 
+//
 // false:                                            ; preds = %continue, %entry
 //   ret i1 false
 // }
@@ -296,7 +296,7 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
 
   DCHECK(tuple_row_type != NULL);
   DCHECK(expr_type != NULL);
-  
+
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
   PointerType* expr_ptr_type = PointerType::get(expr_type, 0);
 
@@ -307,11 +307,11 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("num_exprs", codegen->GetType(TYPE_INT)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
-  
+
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, args);
-  // Other args are unused. 
+  // Other args are unused.
   Value* tuple_row_arg = args[2];
 
   if (conjuncts.size() > 0) {
@@ -322,7 +322,7 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
     Type* tuple_row_llvm_type = PointerType::get(codegen->ptr_type(), 0);
     tuple_row_arg = builder.CreateBitCast(tuple_row_arg, tuple_row_llvm_type);
     BasicBlock* false_block = BasicBlock::Create(context, "false", fn);
-  
+
     LlvmCodeGen::NamedVariable null_var("null_ptr", codegen->boolean_type());
     Value* is_null_ptr = codegen->CreateEntryBlockAlloca(fn, null_var);
 

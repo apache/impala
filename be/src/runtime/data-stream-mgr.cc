@@ -50,8 +50,8 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
   deserialize_row_batch_timer_ =
       ADD_TIMER(profile, "DeserializeRowBatchTimer");
-  buffer_full_wall_timer_ = ADD_TIMER(profile, "SendersBlockedWallTimer");
-  buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer");
+  buffer_full_wall_timer_ = ADD_TIMER(profile, "SendersBlockedTimer");
+  buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer(*)");
   data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
   first_batch_wait_timer_ = ADD_TIMER(profile, "FirstBatchArrivalWaitTime");
 }

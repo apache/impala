@@ -23,9 +23,9 @@ namespace impala {
 
 const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
 const string ScanNode::ROWS_READ_COUNTER = "RowsRead";
-const string ScanNode::TOTAL_READ_TIMER = "TotalRawHdfsReadTime";
+const string ScanNode::TOTAL_READ_TIMER = "TotalRawHdfsReadTime(*)";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
-const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime";
+const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime(*)";
 const string ScanNode::PER_READ_THREAD_THROUGHPUT_COUNTER =
     "PerReadThreadRawHdfsThroughput";
 const string ScanNode::NUM_DISKS_ACCESSED_COUNTER = "NumDisksAccessed";
@@ -70,4 +70,3 @@ Status ScanNode::Prepare(RuntimeState* state) {
 }
 
 }
-

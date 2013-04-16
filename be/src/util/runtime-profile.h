@@ -150,6 +150,47 @@ class RuntimeProfile {
     Counter* involuntary_context_switches_;
   };
 
+  // An EventSequence captures a sequence of events (each added by
+  // calling MarkEvent). Each event has a text label, and a time
+  // (measured relative to the moment Start() was called as t=0). It is
+  // useful for tracking the evolution of some serial process, such as
+  // the query lifecycle.
+  // Not thread-safe.
+  class EventSequence {
+   public:
+    EventSequence() { }
+
+    // Starts the timer without resetting it.
+    void Start() { sw_.Start(); }
+
+    // Stops (or effectively pauses) the timer.
+    void Stop() { sw_.Stop(); }
+
+    // Stores an event in sequence with the given label and the
+    // current time (relative to the first time Start() was called) as
+    // the timestamp.
+    void MarkEvent(const std::string& label) {
+      events_.push_back(make_pair(label, sw_.ElapsedTime()));
+    }
+
+    int64_t ElapsedTime() { return sw_.ElapsedTime(); }
+
+    // An Event is a <label, timestamp> pair
+    typedef std::pair<std::string, int64_t> Event;
+
+    // An EventList is a sequence of Events, in increasing timestamp order
+    typedef std::vector<Event> EventList;
+
+    const EventList& events() const { return events_; }
+
+   private:
+    // Stored in increasing time order
+    EventList events_;
+
+    // Timer which allows events to be timestamped when they are recorded.
+    MonotonicStopWatch sw_;
+  };
+
   // Create a runtime profile object with 'name'.  Counters and merged profile are
   // allocated from pool.
   RuntimeProfile(ObjectPool* pool, const std::string& name);
@@ -167,6 +208,14 @@ class RuntimeProfile {
   // already be added to the profile.
   void AddChild(RuntimeProfile* child,
       bool indent = true, RuntimeProfile* location = NULL);
+
+  // Sorts all children according to a custom comparator. Does not
+  // invalidate pointers to profiles.
+  template <class Compare>
+  void SortChildren(const Compare& cmp) {
+    boost::lock_guard<boost::mutex> l(children_lock_);
+    std::sort(children_.begin(), children_.end(), cmp);
+  }
 
   // Merges the src profile into this one, combining counters that have an identical
   // path. Info strings from profiles are not merged. 'src' would be a const if it
@@ -194,7 +243,7 @@ class RuntimeProfile {
   // If parent_counter_name is a non-empty string, the counter is added as a child of
   // parent_counter_name.
   // Returns NULL if the counter already exists.
-  DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type, 
+  DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type,
       const DerivedCounterFunction& counter_fn,
       const std::string& parent_counter_name = "");
 
@@ -214,6 +263,12 @@ class RuntimeProfile {
   // the value will be updated.
   void AddInfoString(const std::string& key, const std::string& value);
 
+  // Creates and returns a new EventSequence (owned by the runtime
+  // profile) - unless a timer with the same 'key' already exists, in
+  // which case it is returned.
+  // TODO: EventSequences are not merged by Merge()
+  EventSequence* AddEventSequence(const std::string& key);
+
   // Returns a pointer to the info string value for 'key'.  Returns NULL if
   // the key does not exist.
   const std::string* GetInfoString(const std::string& key);
@@ -230,9 +285,9 @@ class RuntimeProfile {
   void ToThrift(TRuntimeProfileTree* tree);
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes);
 
-  // Serializes the runtime profile to a string.  This first serializes the 
-  // object using thrift compact binary format, then gzip compresses it and 
-  // finally encodes it as base64.  This is not a lightweight operation and 
+  // Serializes the runtime profile to a string.  This first serializes the
+  // object using thrift compact binary format, then gzip compresses it and
+  // finally encodes it as base64.  This is not a lightweight operation and
   // should not be in the hot path.
   std::string SerializeToArchiveString() const;
   void SerializeToArchiveString(std::stringstream* out) const;
@@ -273,7 +328,7 @@ class RuntimeProfile {
   // The rate counter is updated periodically based on the src counter.
   // The rate counter has units in src_counter unit per second.
   Counter* AddRateCounter(const std::string& name, Counter* src_counter);
-  
+
   // Same as 'AddRateCounter' above except values are taken by calling fn.
   // The resulting counter will be of 'type'.
   Counter* AddRateCounter(const std::string& name, SampleFn fn, TCounterType::type type);
@@ -293,7 +348,7 @@ class RuntimeProfile {
       const std::string& parent_counter_name, Counter* src_counter,
       int max_buckets, std::vector<Counter*>* buckets);
 
-  // Stops updating the value of 'rate_counter'. Rate counters are updated 
+  // Stops updating the value of 'rate_counter'. Rate counters are updated
   // periodically so should be removed as soon as the underlying counter is
   // no longer going to change.
   void StopRateCounterUpdates(Counter* rate_counter);
@@ -356,7 +411,17 @@ class RuntimeProfile {
 
   typedef std::map<std::string, std::string> InfoStrings;
   InfoStrings info_strings_;
+
+  // Keeps track of the order in which InfoStrings are displayed when printed
+  typedef std::vector<std::string> InfoStringsDisplayOrder;
+  InfoStringsDisplayOrder info_strings_display_order_;
+
+  // Protects info_strings_ and info_strings_display_order_
   mutable boost::mutex info_strings_lock_;
+
+  typedef std::map<std::string, EventSequence*> EventSequenceMap;
+  EventSequenceMap event_sequence_map_;
+  mutable boost::mutex event_sequences_lock_;
 
   Counter counter_total_time_;
   // Time spent in just in this profile (i.e. not the children) as a fraction
@@ -421,7 +486,7 @@ class RuntimeProfile {
   // Singleton object that keeps track of all rate counters and the thread
   // for updating them.
   static PeriodicCounterUpdateState periodic_counter_update_state_;
-  
+
   // Create a subtree of runtime profiles from nodes, starting at *node_idx.
   // On return, *node_idx is the index one past the end of this subtree
   static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
@@ -443,7 +508,7 @@ class RuntimeProfile {
   // dst_counter/sample fn is assumed to be compatible types with src_counter.
   static void RegisterPeriodicCounter(Counter* src_counter, SampleFn sample_fn,
       Counter* dst_counter, PeriodicCounterType type);
-  
+
   // Loop for periodic counter update thread.  This thread wakes up once in a while
   // and updates all the added rate counters and sampling counters.
   static void PeriodicCounterUpdateLoop();
@@ -482,7 +547,7 @@ class ScopedCounter {
 
 // Utility class to update time elapsed when the object goes out of scope.
 // 'T' must implement the StopWatch "interface" (Start,Stop,ElapsedTime) but
-// we use templates not to not for virtual function overhead.
+// we use templates not to pay for virtual function overhead.
 template<class T>
 class ScopedTimer {
  public:

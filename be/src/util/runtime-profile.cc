@@ -32,7 +32,7 @@ using namespace boost;
 using namespace std;
 
 namespace impala {
-  
+
 // Period to update rate counters and sampling counters in ms.
 DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate counters and"
     " sampling counters in ms");
@@ -97,6 +97,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   }
   profile->child_counter_map_ = node.child_counters_map;
   profile->info_strings_ = node.info_strings;
+  profile->info_strings_display_order_ = node.info_strings_display_order;
 
   ++*idx;
   for (int i = 0; i < node.num_children; ++i) {
@@ -209,9 +210,20 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
   {
     lock_guard<mutex> l(info_strings_lock_);
     const InfoStrings& info_strings = node.info_strings;
-    for (InfoStrings::const_iterator it = info_strings.begin();
-        it != info_strings.end(); ++it) {
-      info_strings_[it->first] = it->second;
+    BOOST_FOREACH(const string& key, node.info_strings_display_order) {
+      // Look for existing info strings and update in place. If there
+      // are new strings, add them to the end of the display order.
+      // TODO: Is nodes.info_strings always a superset of
+      // info_strings_? If so, can just copy the display order.
+      InfoStrings::const_iterator it = info_strings.find(key);
+      DCHECK(it != info_strings.end());
+      InfoStrings::iterator existing = info_strings_.find(key);
+      if (existing == info_strings_.end()) {
+        info_strings_.insert(make_pair(key, it->second));
+      } else {
+        info_strings_[key] = it->second;
+        info_strings_display_order_.push_back(key);
+      }
     }
   }
 
@@ -318,7 +330,13 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
 
 void RuntimeProfile::AddInfoString(const string& key, const string& value) {
   lock_guard<mutex> l(info_strings_lock_);
-  info_strings_[key] = value;
+  InfoStrings::iterator it = info_strings_.find(key);
+  if (it == info_strings_.end()) {
+    info_strings_.insert(make_pair(key, value));
+    info_strings_display_order_.push_back(key);
+  } else {
+    it->second = value;
+  }
 }
 
 const string* RuntimeProfile::GetInfoString(const string& key) {
@@ -415,19 +433,47 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   stream.flags(ios::fixed);
   stream << prefix << name_ << ":";
   if (total_time->second->value() != 0) {
-    stream << "("
+    stream << "(Active: "
            << PrettyPrinter::Print(total_time->second->value(),
                total_time->second->type())
-           << " " << setprecision(2) << local_time_percent_
+           << ", % non-child: "
+           << setprecision(2) << local_time_percent_
            << "%)";
   }
   stream << endl;
 
   {
     lock_guard<mutex> l(info_strings_lock_);
-    for (InfoStrings::const_iterator it = info_strings_.begin();
-        it != info_strings_.end(); ++it) {
-      stream << prefix << "  " << it->first << ": " << it->second << endl;
+    BOOST_FOREACH(const string& key, info_strings_display_order_) {
+      stream << prefix << "  " << key << ": " << info_strings_.find(key)->second << endl;
+    }
+  }
+
+  {
+    // Print all the event timers as the following:
+    // <EventKey> Timeline: 2s719ms
+    //     - Event 1: 6.522us (6.522us)
+    //     - Event 2: 2s288ms (2s288ms)
+    //     - Event 3: 2s410ms (121.138ms)
+    // The times in parentheses are the time elapsed since the last event.
+    lock_guard<mutex> l(event_sequences_lock_);
+    BOOST_FOREACH(
+        const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
+      stream << prefix << "  " << event_sequence.first << ": "
+             << PrettyPrinter::Print(
+                 event_sequence.second->ElapsedTime(), TCounterType::TIME_NS)
+             << endl;
+
+      int64_t last = 0L;
+      BOOST_FOREACH(const EventSequence::Event& event, event_sequence.second->events()) {
+        stream << prefix << "     - " << event.first << ": "
+               << PrettyPrinter::Print(
+                   event.second, TCounterType::TIME_NS) << " ("
+               << PrettyPrinter::Print(
+                   event.second - last, TCounterType::TIME_NS) << ")"
+               << endl;
+        last = event.second;
+      }
     }
   }
 
@@ -462,7 +508,7 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   Status status = serializer.Serialize(&thrift_object, &serialized_buffer);
   if (!status.ok()) return;
 
-  // Compress the serialized thrift string.  This uses string keys and is very 
+  // Compress the serialized thrift string.  This uses string keys and is very
   // easy to compress.
   GzipCompressor compressor(GzipCompressor::ZLIB);
   vector<uint8_t> compressed_buffer;
@@ -509,6 +555,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
   {
     lock_guard<mutex> l(info_strings_lock_);
     node.info_strings = info_strings_;
+    node.info_strings_display_order = info_strings_display_order_;
   }
 
   ChildVector children;
@@ -609,7 +656,17 @@ void RuntimeProfile::AddBucketingCounters(const string& name,
   info.num_sampled = 0;
   periodic_counter_update_state_.bucketing_counters[buckets] = info;
 }
-  
+
+RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& name) {
+  lock_guard<mutex> l(event_sequences_lock_);
+  EventSequenceMap::iterator timer_it = event_sequence_map_.find(name);
+  if (timer_it != event_sequence_map_.end()) return timer_it->second;
+
+  EventSequence* timer = pool_->Add(new EventSequence());
+  event_sequence_map_[name] = timer;
+  return timer;
+}
+
 void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, SampleFn sample_fn,
     Counter* dst_counter, PeriodicCounterType type) {
   DCHECK(src_counter == NULL || sample_fn == NULL);
@@ -695,7 +752,7 @@ void RuntimeProfile::PeriodicCounterUpdateLoop() {
     int elapsed_ms = elapsed.total_milliseconds();
 
     lock_guard<mutex> l(periodic_counter_update_state_.lock);
-    for (PeriodicCounterUpdateState::RateCounterMap::iterator it = 
+    for (PeriodicCounterUpdateState::RateCounterMap::iterator it =
         periodic_counter_update_state_.rate_counters.begin();
         it != periodic_counter_update_state_.rate_counters.end(); ++it) {
       it->second.elapsed_ms += elapsed_ms;

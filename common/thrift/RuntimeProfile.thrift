@@ -49,9 +49,12 @@ struct TRuntimeProfileNode {
   // map of key,value info strings that capture any kind of additional information 
   // about the profiled object
   6: required map<string, string> info_strings
+
+  // Auxilliary structure to capture the info strings display order when printed
+  7: required list<string> info_strings_display_order
   
   // map from parent counter name to child counter name
-  7: required map<string, set<string>> child_counters_map
+  8: required map<string, set<string>> child_counters_map
 }
 
 // A flattened tree of runtime profiles, obtained by an

@@ -86,7 +86,7 @@ class ScanNode : public ExecNode {
   // Set up counters
   virtual Status Prepare(RuntimeState* state);
 
-  // Convert scan_ranges into node-specific scan restrictions.  This should be 
+  // Convert scan_ranges into node-specific scan restrictions.  This should be
   // called after Prepare()
   virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges) = 0;
 
@@ -95,14 +95,14 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
-  RuntimeProfile::Counter* total_throughput_counter() const { 
-    return total_throughput_counter_; 
+  RuntimeProfile::Counter* total_throughput_counter() const {
+    return total_throughput_counter_;
   }
   RuntimeProfile::Counter* per_read_thread_throughput_counter() const {
     return per_read_thread_throughput_counter_;
   }
-  RuntimeProfile::Counter* materialize_tuple_timer() const { 
-    return materialize_tuple_timer_; 
+  RuntimeProfile::Counter* materialize_tuple_timer() const {
+    return materialize_tuple_timer_;
   }
   RuntimeProfile::Counter* scan_ranges_complete_counter() const {
     return scan_ranges_complete_counter_;
@@ -148,14 +148,14 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* scan_ranges_complete_counter_;
   // Aggregated scanner thread counters
   RuntimeProfile::ThreadCounters* scanner_thread_counters_;
-  
+
   // The number of active scanner threads that are not blocked by IO.
   RuntimeProfile::Counter active_scanner_thread_counter_;
-  
+
   // Average number of active scanner threads
   // This should be created in Open and stopped when all the scanner threads are done.
   RuntimeProfile::Counter* average_scanner_thread_concurrency_;
-  
+
   // The number of active hdfs reading threads reading for this node.
   RuntimeProfile::Counter active_hdfs_read_thread_counter_;
 

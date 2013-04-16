@@ -101,7 +101,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
 Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(pool, ""));
-
+  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
   SCOPED_TIMER((*codegen)->load_module_timer_);
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
@@ -140,6 +140,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
+  SCOPED_TIMER(codegen->profile_.total_time_counter());
   SCOPED_TIMER(codegen->load_module_timer_);
 
   // Get type for StringValue
@@ -343,8 +344,8 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
   return loaded_functions_[function];
 }
 
-// There is an llvm bug (#10957) that causes the first step of the verifier to always 
-// abort the process if it runs into an issue and ignores ReturnStatusAction.  This 
+// There is an llvm bug (#10957) that causes the first step of the verifier to always
+// abort the process if it runs into an issue and ignores ReturnStatusAction.  This
 // would cause impalad to go down if one query has a problem.
 // To work around this, we will copy that step here and not abort on error.
 // TODO: doesn't seem there is much traction in getting this fixed but we'll see
@@ -358,7 +359,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
       break;
     }
   }
-  
+
   if (!is_corrupt_) is_corrupt_ = llvm::verifyFunction(*fn, ReturnStatusAction);
 
   if (is_corrupt_) {
@@ -505,9 +506,10 @@ Status LlvmCodeGen::OptimizeModule() {
   is_compiled_ = true;
 
   if (is_corrupt_) return Status("Module is corrupt.");
+  SCOPED_TIMER(profile_.total_time_counter());
   SCOPED_TIMER(compile_timer_);
   if (!optimizations_enabled_) return Status::OK;
-  
+
   // This pass manager will construct optimizations passes that are "typical" for
   // c/c++ programs.  We're relying on llvm to pick the best passes for us.
   // TODO: we can likely muck with this to get better compile speeds or write
@@ -683,7 +685,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   return fn;
 }
 
-Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2, 
+Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
     PrimitiveType type) {
   if (type == TYPE_TIMESTAMP) {
     DCHECK(false) << "Timestamp codegen NYI";
@@ -712,7 +714,7 @@ Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
 }
 
 // Intrinsics are loaded one by one.  Some are overloaded (e.g. memcpy) and the types must
-// be specified.  
+// be specified.
 // TODO: is there a better way to do this?
 Status LlvmCodeGen::LoadIntrinsics() {
   // Load memcpy
@@ -735,7 +737,7 @@ Status LlvmCodeGen::LoadIntrinsics() {
     { Intrinsic::x86_sse42_crc32_32_32, "sse4.2 crc32_u32" },
     { Intrinsic::x86_sse42_crc32_64_64, "sse4.2 crc32_u64" },
   };
-  const int num_intrinsics = 
+  const int num_intrinsics =
       sizeof(non_overloaded_intrinsics) / sizeof(non_overloaded_intrinsics[0]);
 
   for (int i = 0; i < num_intrinsics; ++i) {
@@ -759,7 +761,7 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, in
   dst = builder->CreateBitCast(dst, ptr_type());
   src = builder->CreateBitCast(src, ptr_type());
 
-  // Get intrinsic function.  
+  // Get intrinsic function.
   Function* memcpy_fn = llvm_intrinsics_[Intrinsic::memcpy];
   DCHECK(memcpy_fn != NULL);
 
@@ -768,13 +770,13 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, in
   // TODO: We should try to take advantage of this since our tuples are well aligned.
   Value* args[] = {
     dst, src, GetIntConstant(TYPE_INT, size),
-    GetIntConstant(TYPE_INT, 0),       
+    GetIntConstant(TYPE_INT, 0),
     false_value()                       // is_volatile.
   };
   builder->CreateCall(memcpy_fn, args);
 }
 
-void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder, 
+void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
     Value* dst, Value* src, PrimitiveType type) {
   switch (type) {
     case TYPE_STRING:  {
@@ -798,7 +800,7 @@ void LlvmCodeGen::ClearHashFns() {
 // process.  For the case where num_bytes == 11, we'd do this by calling
 //   1. crc64 (for first 8 bytes)
 //   2. crc16 (for bytes 9, 10)
-//   3. crc8 (for byte 11)  
+//   3. crc8 (for byte 11)
 // The resulting IR looks like:
 // define i32 @CrcHash11(i8* %data, i32 %len, i32 %seed) {
 // entry:
@@ -824,7 +826,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       // hash fn.
       return GetFunction(IRFunction::HASH_CRC);
     }
-    
+
     map<int, Function*>::iterator cached_fn = hash_fns_.find(num_bytes);
     if (cached_fn != hash_fns_.end()) {
       return cached_fn->second;
@@ -837,7 +839,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     prototype.AddArgument(LlvmCodeGen::NamedVariable("data", ptr_type()));
     prototype.AddArgument(LlvmCodeGen::NamedVariable("len", GetType(TYPE_INT)));
     prototype.AddArgument(LlvmCodeGen::NamedVariable("seed", GetType(TYPE_INT)));
-  
+
     Value* args[3];
     LlvmBuilder builder(context());
     Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
@@ -865,7 +867,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       // Update data to past the 8-byte chunks
       data = builder.CreateGEP(data, index);
     }
-    
+
     if (num_bytes >= 4) {
       DCHECK_LT(num_bytes, 8);
       Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_INT));
@@ -875,7 +877,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       data = builder.CreateGEP(data, index);
       num_bytes -= 4;
     }
-    
+
     if (num_bytes >= 2) {
       DCHECK_LT(num_bytes, 4);
       Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_SMALLINT));
@@ -885,7 +887,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       data = builder.CreateGEP(data, index);
       num_bytes -= 2;
     }
-    
+
     if (num_bytes > 0) {
       DCHECK_EQ(num_bytes, 1);
       Value* d = builder.CreateLoad(data);

@@ -284,7 +284,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
         query_session_state_(query_session_state),
         coord_(NULL),
         profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
-        summary_info_(&profile_pool_, "Summary"),
+        server_profile_(&profile_pool_, "ImpalaServer"),
+        summary_profile_(&profile_pool_, "Summary"),
         eos_(false),
         query_state_(beeswax::QueryState::CREATED),
         current_batch_(NULL),
@@ -292,7 +293,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
         num_rows_fetched_(0),
         impala_server_(server),
         start_time_(TimestampValue::local_time()) {
-      planner_timer_ = ADD_TIMER(&profile_, "PlanningTime");
+      row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
+      query_events_ = summary_profile_.AddEventSequence("Query Timeline");
+      query_events_->Start();
+      profile_.AddChild(&summary_profile_);
+      profile_.AddChild(&server_profile_);
     }
 
     ~QueryExecState() {
@@ -345,11 +350,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     const beeswax::QueryState::type query_state() const { return query_state_; }
     void set_query_state(beeswax::QueryState::type state) { query_state_ = state; }
     const Status& query_status() const { return query_status_; }
-    RuntimeProfile::Counter* planner_timer() { return planner_timer_; }
     void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
     const RuntimeProfile& profile() const { return profile_; }
     const TimestampValue& start_time() const { return start_time_; }
     const TimestampValue& end_time() const { return end_time_; }
+
+    RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
    private:
     TUniqueId query_id_;
@@ -371,9 +377,24 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // local runtime_state_ in case we don't have a coord_
     boost::scoped_ptr<RuntimeState> local_runtime_state_;
     ObjectPool profile_pool_;
+
+    // The QueryExecState builds three separate profiles.
+    // * profile_ is the top-level profile which houses the other
+    //   profiles, plus the query timeline
+    // * summary_profile_ contains mostly static information about the
+    //   query, including the query statement, the plan and the user who submitted it.
+    // * server_profile_ tracks time spent inside the ImpalaServer,
+    //   but not inside fragment execution, i.e. the time taken to
+    //   register and set-up the query and for rows to be fetched.
+    //
+    // There's a fourth profile which is not built here (but is a
+    // child of profile_); the execution profile which tracks the
+    // actual fragment execution.
     RuntimeProfile profile_;
-    RuntimeProfile summary_info_;
-    RuntimeProfile::Counter* planner_timer_;
+    RuntimeProfile server_profile_;
+    RuntimeProfile summary_profile_;
+    RuntimeProfile::Counter* row_materialization_timer_;
+    RuntimeProfile::EventSequence* query_events_;
     vector<Expr*> output_exprs_;
     bool eos_;  // if true, there are no more rows to return
     beeswax::QueryState::type query_state_;
@@ -536,7 +557,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback.  Prints the query profile as a base64 encoded object.
   void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
-  
+
   // Webserver callback.  Prints the inflight query ids.
   void InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
@@ -662,7 +683,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),
     // otherwise leave this.profile empty.
-    // If encoded_str is non-empty, it is the base64 encoded string for 
+    // If encoded_str is non-empty, it is the base64 encoded string for
     // exec_state->profile.
     QueryStateRecord(const QueryExecState& exec_state, bool copy_profile = false,
         const std::string& encoded_str = "");
@@ -772,7 +793,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
   ExecEnv* exec_env_;  // not owned
-  
+
   // If true, codegen exprs for queries without from clause
   bool select_exprs_codegen_enabled_;
 

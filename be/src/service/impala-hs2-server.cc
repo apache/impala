@@ -187,6 +187,10 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
     return exec_state->query_status();
   }
 
+  if (exec_state->num_rows_fetched() == 0) {
+    exec_state->query_events()->MarkEvent("First row fetched");
+  }
+
   fetch_results->results.__set_startRowOffset(exec_state->num_rows_fetched());
   TRowQueryResultSet result_set(*(exec_state->result_metadata()),
       &(fetch_results->results));
@@ -312,7 +316,7 @@ void ImpalaServer::ExecuteStatement(
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
-  shared_ptr<SessionState> session; 
+  shared_ptr<SessionState> session;
   GetSessionState(request.sessionHandle.sessionId.guid, &session);
   if (session == NULL) {
     HS2_RETURN_IF_ERROR(

@@ -26,7 +26,7 @@ using namespace boost;
 
 namespace impala {
 
-TEST(CountersTest, Basic) { 
+TEST(CountersTest, Basic) {
   ObjectPool pool;
   RuntimeProfile profile_a(&pool, "ProfileA");
   RuntimeProfile profile_a1(&pool, "ProfileA1");
@@ -45,7 +45,7 @@ TEST(CountersTest, Basic) {
   RuntimeProfile::Counter* counter_a;
   RuntimeProfile::Counter* counter_b;
   RuntimeProfile::Counter* counter_merged;
-  
+
   // Updating/setting counter
   counter_a = profile_a.AddCounter("A", TCounterType::UNIT);
   EXPECT_TRUE(counter_a != NULL);
@@ -54,7 +54,7 @@ TEST(CountersTest, Basic) {
   EXPECT_EQ(counter_a->value(), 5);
   counter_a->Set(1L);
   EXPECT_EQ(counter_a->value(), 1);
-  
+
   counter_b = profile_a2.AddCounter("B", TCounterType::BYTES);
   EXPECT_TRUE(counter_b != NULL);
 
@@ -105,7 +105,7 @@ TEST(CountersTest, MergeAndUpdate) {
   RuntimeProfile p1_child2(&pool, "Child2");
   profile1.AddChild(&p1_child1);
   profile1.AddChild(&p1_child2);
-  
+
   RuntimeProfile profile2(&pool, "Parent2");
   RuntimeProfile p2_child1(&pool, "Child1");
   RuntimeProfile p2_child3(&pool, "Child3");
@@ -113,13 +113,13 @@ TEST(CountersTest, MergeAndUpdate) {
   profile2.AddChild(&p2_child3);
 
   // Create parent level counters
-  RuntimeProfile::Counter* parent1_shared = 
+  RuntimeProfile::Counter* parent1_shared =
       profile1.AddCounter("Parent Shared", TCounterType::UNIT);
-  RuntimeProfile::Counter* parent2_shared = 
+  RuntimeProfile::Counter* parent2_shared =
       profile2.AddCounter("Parent Shared", TCounterType::UNIT);
-  RuntimeProfile::Counter* parent1_only = 
+  RuntimeProfile::Counter* parent1_only =
       profile1.AddCounter("Parent 1 Only", TCounterType::UNIT);
-  RuntimeProfile::Counter* parent2_only = 
+  RuntimeProfile::Counter* parent2_only =
       profile2.AddCounter("Parent 2 Only", TCounterType::UNIT);
   parent1_shared->Update(1);
   parent2_shared->Update(3);
@@ -151,7 +151,7 @@ TEST(CountersTest, MergeAndUpdate) {
   profile1.ToThrift(&tprofile1);
   RuntimeProfile* merged_profile = RuntimeProfile::CreateFromThrift(&pool, tprofile1);
   merged_profile->Merge(&profile2);
-  EXPECT_EQ(merged_profile->num_counters(), 4);
+  EXPECT_EQ(5, merged_profile->num_counters());
   ValidateCounter(merged_profile, "Parent Shared", 4);
   ValidateCounter(merged_profile, "Parent 1 Only", 2);
   ValidateCounter(merged_profile, "Parent 2 Only", 5);
@@ -163,15 +163,15 @@ TEST(CountersTest, MergeAndUpdate) {
   for (int i = 0; i < 3; ++i) {
     RuntimeProfile* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
-      EXPECT_EQ(profile->num_counters(), 4);
+      EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 30);
       ValidateCounter(profile, "Child1 Parent 1 Only", 50);
       ValidateCounter(profile, "Child1 Parent 2 Only", 100);
     } else if (profile->name().compare("Child2") == 0) {
-      EXPECT_EQ(profile->num_counters(), 2);
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child2", 40);
     } else if (profile->name().compare("Child3") == 0) {
-      EXPECT_EQ(profile->num_counters(), 2);
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
       EXPECT_TRUE(false);
@@ -184,7 +184,7 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Update profile2 w/ profile1 and validate
   profile2.Update(tprofile1);
-  EXPECT_EQ(profile2.num_counters(), 4);
+  EXPECT_EQ(5, profile2.num_counters());
   ValidateCounter(&profile2, "Parent Shared", 1);
   ValidateCounter(&profile2, "Parent 1 Only", 2);
   ValidateCounter(&profile2, "Parent 2 Only", 5);
@@ -195,15 +195,15 @@ TEST(CountersTest, MergeAndUpdate) {
   for (int i = 0; i < 3; ++i) {
     RuntimeProfile* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
-      EXPECT_EQ(profile->num_counters(), 4);
+      EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 10);
       ValidateCounter(profile, "Child1 Parent 1 Only", 50);
       ValidateCounter(profile, "Child1 Parent 2 Only", 100);
     } else if (profile->name().compare("Child2") == 0) {
-      EXPECT_EQ(profile->num_counters(), 2);
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child2", 40);
     } else if (profile->name().compare("Child3") == 0) {
-      EXPECT_EQ(profile->num_counters(), 2);
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
       EXPECT_TRUE(false);
@@ -245,7 +245,7 @@ TEST(CountersTest, InfoStringTest) {
   const string* value = profile.GetInfoString("Key");
   EXPECT_TRUE(value != NULL);
   EXPECT_EQ(*value, "Value");
-  
+
   // Convert it to thrift
   TRuntimeProfileTree tprofile;
   profile.ToThrift(&tprofile);
@@ -280,7 +280,7 @@ TEST(CountersTest, InfoStringTest) {
 TEST(CountersTest, RateCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");
-  
+
   RuntimeProfile::Counter* bytes_counter =
       profile.AddCounter("bytes", TCounterType::BYTES);
 
@@ -292,7 +292,7 @@ TEST(CountersTest, RateCounters) {
   // set to 100MB.  Use bigger units to avoid truncating to 0 after divides.
   bytes_counter->Set(100L * 1024L * 1024L);
 
-  // Wait one second.  
+  // Wait one second.
   sleep(1);
 
   int64_t rate = rate_counter->value();
@@ -308,7 +308,7 @@ TEST(CountersTest, RateCounters) {
   // Wait another second.  The counter has been removed. So the value should not be
   // changed (much).
   sleep(2);
-  
+
   rate = rate_counter->value();
   EXPECT_GT(rate, 66 * 1024 * 1024);
   EXPECT_LE(rate, 200 * 1024 * 1024);
@@ -338,9 +338,8 @@ TEST(CountersTest, BucketCounters) {
   // The value of buckets[0] should be zero and buckets[1] should be 1.
   double val0 = buckets[0]->double_value();
   double val1 = buckets[1]->double_value();
-
-  EXPECT_EQ(val0, 0);
-  EXPECT_EQ(val1, 100);
+  EXPECT_EQ(0, val0);
+  EXPECT_EQ(100, val1);
 
   // Wait another second.  The counter has been removed. So the value should not be
   // changed (much).
@@ -355,4 +354,3 @@ int main(int argc, char **argv) {
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
-

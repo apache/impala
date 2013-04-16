@@ -305,9 +305,6 @@ class Coordinator {
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
 
-  // Profile for aggregate counters; allocated in obj_pool().
-  RuntimeProfile* aggregate_profile_;
-
   // Per fragment profile information
   struct PerFragmentProfileData {
     // Averaged profile for this fragment.  Stored in obj_pool.

@@ -290,7 +290,8 @@ Status Coordinator::Exec(
   query_globals_ = request->query_globals;
   query_options_ = query_options;
 
-  query_profile_.reset(new RuntimeProfile(obj_pool(), "Query " + PrintId(query_id_)));
+  query_profile_.reset(
+      new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
   SCOPED_TIMER(query_profile_->total_time_counter());
 
   RETURN_IF_ERROR(ComputeScanRangeAssignment(*request));
@@ -325,11 +326,8 @@ Status Coordinator::Exec(
 
   // register coordinator's fragment profile now, before those of the backends,
   // so it shows up at the top
-  aggregate_profile_ = obj_pool()->Add(
-      new RuntimeProfile(obj_pool(), "Aggregate Profile"));
-  finalization_timer_ = ADD_TIMER(aggregate_profile_, "FinalizationTimer");
+  finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
 
-  query_profile_->AddChild(aggregate_profile_);
   if (executor_.get() != NULL) {
     query_profile_->AddChild(executor_->profile());
     executor_->profile()->set_name("Coordinator Fragment");
@@ -356,15 +354,14 @@ Status Coordinator::Exec(
     if (executor_.get() != NULL) {
       query_profile_->AddChild(
           fragment_profiles_[i].averaged_profile, true, executor_->profile());
-    } else {
-      query_profile_->AddChild(
-          fragment_profiles_[i].averaged_profile, true, aggregate_profile_);
     }
 
     ss.str("");
     ss << "Fragment " << i;
     fragment_profiles_[i].root_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+    // Note: we don't start the wall timer here for the fragment
+    // profile; it's uninteresting and misleading.
     query_profile_->AddChild(fragment_profiles_[i].root_profile);
   }
 
@@ -740,13 +737,13 @@ void Coordinator::CreateAggregateCounters(
       stringstream s;
       s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Throughput";
-      aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
+      query_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
                         this, node.node_id));
       s.str("");
       s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Completed scan ranges";
-      aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::UNIT,
+      query_profile_->AddDerivedCounter(s.str(), TCounterType::UNIT,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalScanRangesComplete),
                         this, node.node_id));
     }
@@ -1049,6 +1046,16 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
   return catalog_update->created_partitions.size() != 0;
 }
 
+// Comparator to order fragments by descending total time
+typedef struct {
+  typedef pair<RuntimeProfile*, bool> Profile;
+  bool operator()(const Profile& a, const Profile& b) const {
+    // Reverse ordering: we want the longest first
+    return
+        a.first->total_time_counter()->value() > b.first->total_time_counter()->value();
+  }
+} InstanceComparator;
+
 // This function appends summary information to the query_profile_ before
 // outputting it to VLOG.  It adds:
 //   1. Averaged remote fragment profiles (TODO: add outliers)
@@ -1083,8 +1090,10 @@ void Coordinator::ReportQuerySummary() {
       data.root_profile->AddChild(backend_exec_states_[i]->profile);
     }
 
+    InstanceComparator comparator;
     // Per fragment instances have been collected, output summaries
     for (int i = (executor_.get() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
+      fragment_profiles_[i].root_profile->SortChildren(comparator);
       RuntimeProfile* profile = fragment_profiles_[i].averaged_profile;
       profile->Divide(fragment_profiles_[i].num_instances);
 
