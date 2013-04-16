@@ -2,12 +2,12 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # Utility for computing table statistics of tables in the Hive Metastore
+import sys
 from hive_metastore import ThriftHiveMetastore
 from hive_service import ThriftHive
 from hive_service.ttypes import HiveServerException
 from optparse import OptionParser
 from subprocess import call
-from sys import exit
 from thrift.transport import TTransport
 from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
@@ -24,7 +24,8 @@ COMPUTE_COLUMN_STATS_STATEMENT =\
 
 HIVE_ARGS = "-hiveconf hive.root.logger=ERROR,console"
 
-def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None):
+def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None,
+                  continue_on_error=False, hive_cmd='hive'):
   """
   Queries the Hive Metastore and runs compute stats over all tables
 
@@ -62,8 +63,9 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
       # client no longer works (it did work at one point in Hive v0.9). No errors are
       # thrown, but tables are set to have 0 rows. It seems to work fine when run via
       # the Hive CLI, so just use that for now.
-      exit_code = call(["hive " + HIVE_ARGS + " -e \"" + statement + ";\""], shell=True)
-      if exit_code != 0:
+      exit_code =\
+          call([hive_cmd + " " + HIVE_ARGS + " -e \"" + statement + ";\""], shell=True)
+      if exit_code != 0 and not continue_on_error:
         sys.exit(exit_code)
   hive_transport.close()
 
@@ -84,6 +86,11 @@ def __build_compute_stat_statement(metastore_client, db_name, table_name):
 
 if __name__ == "__main__":
   parser = OptionParser()
+  parser.add_option("--continue_on_error", dest="continue_on_error",
+                    action="store_true", default=False, help="If True, continue "\
+                    "if there is an error computing the table or column stats.")
+  parser.add_option("--hive_cmd", dest="hive_cmd", default='hive',
+                    help="The command to use for executing hive.")
   parser.add_option("--hive_server", dest="hive_server", default='localhost:10000',
                     help="<host:port> of hive server to connect to")
   parser.add_option("--db_names", dest="db_names", default=None,
@@ -104,5 +111,6 @@ if __name__ == "__main__":
   if options.db_names is not None:
     db_names = [name.lower().strip() for name in options.db_names.split(',')]
 
-  compute_stats(*options.hive_server.split(':'),
-      db_names=db_names, table_names=table_names)
+  compute_stats(*options.hive_server.split(':'), db_names=db_names,
+      table_names=table_names, continue_on_error=options.continue_on_error,
+      hive_cmd=options.hive_cmd)
