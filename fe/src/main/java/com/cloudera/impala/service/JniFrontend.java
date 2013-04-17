@@ -686,6 +686,10 @@ public class JniFrontend {
     return output.toString();
   }
 
+  public void resetTable(String dbName, String tableName) throws ImpalaException {
+    frontend.resetTable(dbName, tableName);
+  }
+
   public void resetCatalog() {
     frontend.resetCatalog();
   }

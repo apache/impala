@@ -30,7 +30,7 @@ import getpass
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
-from ImpalaService.ImpalaService import TImpalaQueryOptions
+from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
@@ -100,6 +100,7 @@ class ImpalaShell(cmd.Cmd):
   DISCONNECTED_PROMPT = "[Not connected] > "
   # Commands are terminated with the following delimiter.
   CMD_DELIM = ';'
+  DEFAULT_DB = 'default'
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
@@ -118,7 +119,7 @@ class ImpalaShell(cmd.Cmd):
     self.set_query_options = {}
     self.query_state = QueryState._NAMES_TO_VALUES
     self.refresh_after_connect = options.refresh_after_connect
-    self.default_db = options.default_db
+    self.current_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
     self.show_profiles = options.show_profiles
     # Stores the state of user input until a delimiter is seen.
@@ -356,8 +357,8 @@ class ImpalaShell(cmd.Cmd):
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
         self.cmdqueue.append('refresh' + ImpalaShell.CMD_DELIM)
-      if self.default_db:
-        self.cmdqueue.append('use %s' % self.default_db + ImpalaShell.CMD_DELIM)
+      if self.current_db:
+        self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
     self.last_query_handle = None
     # In the case that we lost connection while a command was being entered,
@@ -555,6 +556,29 @@ class ImpalaShell(cmd.Cmd):
     if self.verbose:
       print message
 
+  def __parse_table_name_arg(self, arg):
+    """ Parses an argument string and returns the result as a db name, table name combo.
+
+    If the table name was not fully qualified, the current database is returned as the db.
+    Otherwise, the table is split into db/table name parts and returned.
+    If an invalid format is provide, None is returned.
+    """
+    if not arg:
+      return None
+
+    # If a multi-line argument, the name might be split across lines
+    arg = arg.replace('\n','')
+    # Get the database and table name, using the current database if the table name
+    # wasn't fully qualified.
+    db_name, tbl_name = self.current_db, arg
+    if db_name is None:
+      db_name = ImpalaShell.DEFAULT_DB
+    db_table_name = arg.split('.')
+    if len(db_table_name) == 1:
+      return db_name, db_table_name[0]
+    if len(db_table_name) == 2:
+      return db_table_name
+
   def do_alter(self, args):
     query = BeeswaxService.Query()
     query.query = "alter %s" % (args,)
@@ -596,7 +620,10 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "use %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    result = self.__query_with_results(query)
+    if result:
+      self.current_db = args
+    return result
 
   def do_show(self, args):
     """Executes a SHOW... query, fetching all rows"""
@@ -739,12 +766,22 @@ class ImpalaShell(cmd.Cmd):
 
   def do_refresh(self, args):
     """Reload the Impalad catalog"""
-    (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
-    if status != RpcStatus.OK:
-      return False
-
-    self.__print_if_verbose("Successfully refreshed catalog")
-    return True
+    status = RpcStatus.ERROR
+    if not args:
+      (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
+      if status == RpcStatus.OK:
+        self.__print_if_verbose("Successfully refreshed catalog")
+    else:
+      db_table_name = self.__parse_table_name_arg(args)
+      if db_table_name is None:
+        print 'Usage: refresh [databaseName.][tableName]'
+        return False
+      (_, status) = self.__do_rpc(
+          lambda: self.imp_service.ResetTable(TResetTableReq(*db_table_name)))
+      if status == RpcStatus.OK:
+        self.__print_if_verbose(
+            "Successfully refreshed table: %s" % '.'.join(db_table_name))
+    return status == RpcStatus.OK
 
   def do_history(self, args):
     """Display command history"""

@@ -96,11 +96,31 @@ public class Frontend {
   }
 
   /**
-   * Invalidates catalog metadata, forcing a reload.
+   * Invalidates all catalog metadata, forcing a reload.
    */
   public void resetCatalog() {
     this.catalog.close();
     this.catalog = new Catalog(lazyCatalog, true);
+  }
+
+  /**
+   * Invalidates a specific table's metadata, forcing the metadata to be reloaded on
+   * the next access.
+   * @throws DatabaseNotFoundException - If the specified database does not exist.
+   * @throws TableNotFoundException - If the specified table does not exist.
+   */
+  public void resetTable(String dbName, String tableName)
+      throws Catalog.DatabaseNotFoundException, Catalog.TableNotFoundException {
+    Db db = catalog.getDb(dbName);
+    if (db == null) {
+      throw new Catalog.DatabaseNotFoundException("Database not found: " + dbName);
+    }
+    if (!db.containsTable(tableName)) {
+      throw new Catalog.TableNotFoundException(
+          "Table not found: " + dbName + "." + tableName);
+    }
+    LOG.info("Invalidating table metadata: " + dbName + "." + tableName);
+    db.invalidateTable(tableName, true);
   }
 
   public void close() {
@@ -551,5 +571,8 @@ public class Frontend {
         msClient.release();
       }
     }
+    // Mark the table metadata as invalid so it will be reloaded on the next access.
+    LOG.info("Invalidating table metadata: " + dbName + "." + tblName);
+    catalog.invalidateTable(dbName, tblName, true);
   }
 }

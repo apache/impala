@@ -439,6 +439,14 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
 void ImpalaServer::PingImpalaService() {
 }
 
+void ImpalaServer::ResetCatalog(impala::TStatus& status) {
+  ResetCatalogInternal().ToThrift(&status);
+}
+
+void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& request) {
+  ResetTableInternal(request.db_name, request.table_name).ToThrift(&status);
+}
+
 void ImpalaServer::SessionStart(const ThriftServer::SessionKey& session_key) {
   // Currently Kerberos uses only one session id, so there can be dups.
   // TODO: Re-enable this check once IMP-391 is resolved

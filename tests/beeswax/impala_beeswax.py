@@ -21,7 +21,7 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService import ImpalaService
-from ImpalaService.ImpalaService import TImpalaQueryOptions
+from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from tests.util.thrift_util import create_transport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
@@ -206,6 +206,11 @@ class ImpalaBeeswaxClient(object):
   def refresh(self):
     """Reload the Impalad catalog"""
     return self.__do_rpc(lambda: self.imp_service.ResetCatalog()) == 0
+
+  def refresh_table(self, db_name, table_name):
+    """Reload a specific table from the catalog"""
+    return self.__do_rpc(lambda:\
+        self.imp_service.ResetTable(TResetTableReq(db_name, table_name))) == 0
 
   def fetch_results(self, query_string, query_handle):
     """Fetches query results given a handle and query type (insert, use, other)"""

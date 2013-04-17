@@ -367,9 +367,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
     catalog_update.db_name = finalize_params.table_db;
     RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
   }
-
-  // TODO: Reset only the updated table
-  return impala_server_->ResetCatalogInternal();
+  return Status::OK;
 }
 
 Status ImpalaServer::QueryExecState::FetchNextBatch() {
@@ -587,6 +585,9 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         jni_env->GetMethodID(fe_class, "getExplainPlan", "([B)Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
     reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
+    EXIT_IF_EXC(jni_env);
+    reset_table_id_ = jni_env->GetMethodID(fe_class, "resetTable",
+        "(Ljava/lang/String;Ljava/lang/String;)V");
     EXIT_IF_EXC(jni_env);
     get_hadoop_config_id_ =
         jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml", "()Ljava/lang/String;");
@@ -1448,8 +1449,17 @@ Status ImpalaServer::ResetCatalogInternal() {
   return Status::OK;
 }
 
-void ImpalaServer::ResetCatalog(impala::TStatus& status) {
-  ResetCatalogInternal().ToThrift(&status);
+Status ImpalaServer::ResetTableInternal(const string& db_name, const string& table_name) {
+  if (FLAGS_use_planservice) {
+    return Status("ResetTable not supported with external planservice");
+  }
+  LOG(INFO) << "Resetting table: " << db_name << "." << table_name;
+  JNIEnv* jni_env = getJNIEnv();
+  jstring db_name_arg = jni_env->NewStringUTF(db_name.c_str());
+  jstring table_name_arg = jni_env->NewStringUTF(table_name.c_str());
+  jni_env->CallObjectMethod(fe_, reset_table_id_, db_name_arg, table_name_arg);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  return Status::OK;
 }
 
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {

@@ -117,6 +117,25 @@ struct TInsertResult {
   1: required map<string, i64> rows_appended
 }
 
+// Parameters for a ResetTable request which will invalidate a table's metadata.
+struct TResetTableReq {
+  // Name of the table's parent database.
+  1: required string db_name
+
+  // Name of the table.
+  2: required string table_name
+}
+
+// Response from call to ResetCatalog
+struct TResetCatalogResp {
+  1: required Status.TStatus status
+}
+
+// Response from call to ResetTable
+struct TResetTableResp {
+  1: required Status.TStatus status
+}
+
 // For all rpc that return a TStatus as part of their result type,
 // if the status_code field is set to anything other than OK, the contents
 // of the remainder of the result type is undefined (typically not set)
@@ -133,6 +152,9 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Invalidates all catalog metadata, forcing a reload
   Status.TStatus ResetCatalog();
 
+  // Invalidates a specific table's catalog metadata, forcing a reload on the next access
+  Status.TStatus ResetTable(1:TResetTableReq request)
+
   // Returns the runtime profile string for the given query handle.
   string GetRuntimeProfile(1:beeswax.QueryHandle query_id)
       throws(1:beeswax.BeeswaxException error);
@@ -148,6 +170,8 @@ service ImpalaService extends beeswax.BeeswaxService {
 // Impala HiveServer2 service
 service ImpalaHiveServer2Service extends cli_service.TCLIService {
   // Invalidates all catalog metadata, forcing a reload
-  Status.TStatus ResetCatalog(); 
-}
+  TResetCatalogResp ResetCatalog();
 
+  // Invalidates a specific table's catalog metadata, forcing a reload on the next access
+  TResetTableResp ResetTable(1:TResetTableReq request);
+}

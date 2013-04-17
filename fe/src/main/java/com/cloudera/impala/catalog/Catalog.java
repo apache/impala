@@ -1065,7 +1065,7 @@ public class Catalog {
    * Marks the table as invalid so the next access will trigger a metadata load. If
    * the database does not exist no error is returned (there is nothing to invalidate).
    */
-  private void invalidateTable(String dbName, String tableName, boolean ifExists) {
+  public void invalidateTable(String dbName, String tableName, boolean ifExists) {
     Db db = getDb(dbName);
     if (db != null) {
       db.invalidateTable(tableName, ifExists);

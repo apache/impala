@@ -125,7 +125,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void GetRuntimeProfile(std::string& profile_output,
       const beeswax::QueryHandle& query_id);
 
+  // Performs a full catalog metadata reset, invalidating all table and database metadata.
+  virtual void ResetCatalog(impala::TStatus& status);
+
+  // Resets the specified table's catalog metadata, forcing a reload on the next access.
+  // Returns an error if the table or database was not found in the catalog.
+  virtual void ResetTable(impala::TStatus& status, const TResetTableReq& request);
+
   // ImpalaHiveServer2Service rpcs: HiveServer2 API (implemented in impala-hs2-server.cc)
+  // TODO: Migrate existing extra ImpalaServer RPCs to ImpalaHiveServer2Service.
   virtual void OpenSession(
       apache::hive::service::cli::thrift::TOpenSessionResp& return_val,
       const apache::hive::service::cli::thrift::TOpenSessionReq& request);
@@ -174,10 +182,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void FetchResults(
       apache::hive::service::cli::thrift::TFetchResultsResp& return_val,
       const apache::hive::service::cli::thrift::TFetchResultsReq& request);
+  virtual void ResetCatalog(TResetCatalogResp& return_val);
+  virtual void ResetTable(TResetTableResp& return_val, const TResetTableReq& request);
 
   // ImpalaService common extensions (implemented in impala-server.cc)
-  virtual void ResetCatalog(impala::TStatus& status);
-
   // ImpalaInternalService rpcs
   virtual void ExecPlanFragment(
       TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params);
@@ -489,6 +497,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
+  // Non-thrift callable version of ResetTable
+  Status ResetTableInternal(const std::string& db_name, const std::string& table_name);
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
   // Caller should not hold any locks when calling this function.
@@ -746,6 +756,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
   jmethodID check_hadoop_config_id_; // JniFrontend.checkHadoopConfig()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
+  jmethodID reset_table_id_; // JniFrontend.resetTable
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable

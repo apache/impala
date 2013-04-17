@@ -632,6 +632,19 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
 
+void ImpalaServer::ResetCatalog(TResetCatalogResp& return_val) {
+  VLOG_RPC << "ResetCatalog()";
+  ResetCatalogInternal().ToThrift(&return_val.status);
+  VLOG_RPC << "ResetCatalog(): return_val=" << ThriftDebugString(return_val);
+}
+
+void ImpalaServer::ResetTable(TResetTableResp& return_val,
+    const TResetTableReq& request) {
+  VLOG_RPC << "ResetTable(): request=" << ThriftDebugString(request);
+  ResetTableInternal(request.db_name, request.table_name).ToThrift(&return_val.status);
+  VLOG_RPC << "ResetTable(): return_val=" << ThriftDebugString(return_val);
+}
+
 inline void ImpalaServer::THandleIdentifierToTUniqueId(
     const apache::hive::service::cli::thrift::THandleIdentifier &handle,
     TUniqueId* unique_id, TUniqueId* secret) {
