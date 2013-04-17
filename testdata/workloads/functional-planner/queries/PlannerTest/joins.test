@@ -344,6 +344,15 @@ where t1.zip < t2.zip
 ---- PLAN
 not implemented
 ====
+# equi join with constants in the on clause are not supported
+select a.id, b.id from 
+(select 1 as x, id from functional.alltypessmall) a
+inner join
+(select 1 as x, id from functional.alltypessmall) b
+on a.x = b.x
+---- PLAN
+not implemented
+====
 # hbas-hdfs join
 select *
 from functional.alltypesagg join functional.hbasealltypessmall using (id, int_col)

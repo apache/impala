@@ -1069,6 +1069,11 @@ public class Planner {
     }
 
     for (Predicate p: candidates) {
+      // Ignore predicate if one of its children is a constant.
+      if (p.getChild(0).isConstant() || p.getChild(1).isConstant()) {
+        continue;
+      }
+
       Expr rhsExpr = null;
       if (p.getChild(0).isBound(rhsIds)) {
         rhsExpr = p.getChild(0);
