@@ -54,33 +54,32 @@ class DataStreamMgr {
  public:
   DataStreamMgr() {}
 
-  // Create a receiver for a specific fragment_id/node_id destination; desc_tbl
+  // Create a receiver for a specific fragment_instance_id/node_id destination; desc_tbl
   // is the query's descriptor table and is needed to decode incoming TRowBatches.
   // The caller is responsible for deleting the returned DataStreamRecvr.
-  // TODO: create receivers in someone's pool
   DataStreamRecvr* CreateRecvr(
-      const RowDescriptor& row_desc, const TUniqueId& fragment_id,
+      const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int num_senders, int buffer_size,
       RuntimeProfile* profile);
 
-  // Adds a row batch to the stream identified by fragment_id/dest_node_id if the stream
-  // has not been cancelled.
+  // Adds a row batch to the stream identified by fragment_instance_id/dest_node_id
+  // if the stream has not been cancelled.
   // The call blocks if this ends up pushing the stream over its buffering limit;
   // it unblocks when the stream consumer removed enough data to make space for
   // row_batch.
   // TODO: enforce per-sender quotas (something like 200% of buffer_size/#senders),
   // so that a single sender can't flood the buffer and stall everybody else.
   // Returns OK if successful, error status otherwise.
-  Status AddData(const TUniqueId& fragment_id, PlanNodeId dest_node_id,
+  Status AddData(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
                  const TRowBatch& thrift_batch);
 
   // Decreases the #remaining_senders count for the stream identified by
-  // fragment_id/dest_node_id.
+  // fragment_instance_id/dest_node_id.
   // Returns OK if successful, error status otherwise.
-  Status CloseSender(const TUniqueId& fragment_id, PlanNodeId dest_node_id);
+  Status CloseSender(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id);
 
-  // Closes all streams registered for fragment_id immediately.
-  void Cancel(const TUniqueId& fragment_id);
+  // Closes all streams registered for fragment_instance_id immediately.
+  void Cancel(const TUniqueId& fragment_instance_id);
 
  private:
   friend class DataStreamRecvr;
@@ -88,7 +87,7 @@ class DataStreamMgr {
   class StreamControlBlock {
    public:
     StreamControlBlock(
-        const RowDescriptor& row_desc, const TUniqueId& fragment_id,
+        const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
         PlanNodeId dest_node_id, int num_senders, int buffer_size,
         RuntimeProfile* profile);
 
@@ -121,11 +120,11 @@ class DataStreamMgr {
     // incoming batches will be dropped.
     void CancelStream();
 
-    const TUniqueId& fragment_id() const { return fragment_id_; }
+    const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
     PlanNodeId dest_node_id() const { return dest_node_id_; }
 
    private:
-    TUniqueId fragment_id_;
+    TUniqueId fragment_instance_id_;
     PlanNodeId dest_node_id_;
     const RowDescriptor& row_desc_;
 
@@ -187,12 +186,10 @@ class DataStreamMgr {
     RuntimeProfile::Counter* data_arrival_timer_;
   };
 
-  ObjectPool pool_;  // holds control blocks
-
   // protects all fields below
   boost::mutex lock_;
 
-  // map from hash value of fragment id/node id pair to control blocks;
+  // map from hash value of fragment instance id/node id pair to control blocks;
   // we don't want to create a map<pair<TUniqueId, PlanNodeId>, StreamControlBlock*>,
   // because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<uint32_t,
@@ -216,20 +213,21 @@ class DataStreamMgr {
     }
   };
 
-  // ordered set of registered streams' fragment id/node id
+  // ordered set of registered streams' fragment instance id/node id
   typedef std::set<std::pair<TUniqueId, PlanNodeId>, ComparisonOp > FragmentStreamSet;
   FragmentStreamSet fragment_stream_set_;
 
-  // Return the StreamControlBlock for given fragment_id/node_id, or NULL if not found.
-  // If 'acquire_lock' is false, assumes lock_ is already being held and won't try to
-  // acquire it.
-  boost::shared_ptr<StreamControlBlock> FindControlBlock(const TUniqueId& fragment_id,
-      PlanNodeId node_id, bool acquire_lock = true);
+  // Return the StreamControlBlock for given fragment_instance_id/node_id,
+  // or NULL if not found. If 'acquire_lock' is false, assumes lock_ is already being
+  // held and won't try to acquire it.
+  boost::shared_ptr<StreamControlBlock> FindControlBlock(
+      const TUniqueId& fragment_instance_id, PlanNodeId node_id,
+      bool acquire_lock = true);
 
-  // Remove control block for fragment_id/node_id.
-  Status DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id);
+  // Remove control block for fragment_instance_id/node_id.
+  Status DeregisterRecvr(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
-  inline uint32_t GetHashValue(const TUniqueId& fragment_id, PlanNodeId node_id);
+  inline uint32_t GetHashValue(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 };
 
 }

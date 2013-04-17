@@ -31,7 +31,7 @@ class DataStreamRecvr {
   // deregister from mgr_
   ~DataStreamRecvr() {
     // TODO: log error msg
-    mgr_->DeregisterRecvr(cb_->fragment_id(), cb_->dest_node_id());
+    mgr_->DeregisterRecvr(cb_->fragment_instance_id(), cb_->dest_node_id());
   }
 
   // Returns next row batch in data stream; blocks if there aren't any.

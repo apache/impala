@@ -36,10 +36,10 @@ using namespace apache::thrift::transport;
 namespace impala {
 
 DataStreamMgr::StreamControlBlock::StreamControlBlock(
-    const RowDescriptor& row_desc, const TUniqueId& fragment_id,
+    const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size,
     RuntimeProfile* profile)
-  : fragment_id_(fragment_id),
+  : fragment_instance_id_(fragment_instance_id),
     dest_node_id_(dest_node_id),
     row_desc_(row_desc),
     is_cancelled_(false),
@@ -60,7 +60,8 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   unique_lock<mutex> l(lock_);
   // wait until something shows up or we know we're done
   while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
-    VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
+    VLOG_ROW << "wait arrival fragment_instance_id=" << fragment_instance_id_
+             << " node=" << dest_node_id_;
     SCOPED_TIMER(data_arrival_timer_);
     SCOPED_TIMER(received_first_batch_ ? NULL : first_batch_wait_timer_);
     data_arrival_.wait(l);
@@ -155,7 +156,7 @@ void DataStreamMgr::StreamControlBlock::DecrementSenders() {
   lock_guard<mutex> l(lock_);
   DCHECK_GT(num_remaining_senders_, 0);
   num_remaining_senders_ = max(0, num_remaining_senders_ - 1);
-  VLOG_FILE << "decremented senders: fragment_id=" << fragment_id_
+  VLOG_FILE << "decremented senders: fragment_instance_id=" << fragment_instance_id_
             << " node_id=" << dest_node_id_
             << " #senders=" << num_remaining_senders_;
   if (num_remaining_senders_ == 0) data_arrival_.notify_one();
@@ -164,8 +165,9 @@ void DataStreamMgr::StreamControlBlock::DecrementSenders() {
 void DataStreamMgr::StreamControlBlock::CancelStream() {
   {
     lock_guard<mutex> l(lock_);
+    if (is_cancelled_) return;
     is_cancelled_ = true;
-    VLOG_QUERY << "cancelled stream: fragment_id=" << fragment_id_
+    VLOG_QUERY << "cancelled stream: fragment_instance_id_=" << fragment_instance_id_
               << " node_id=" << dest_node_id_;
   }
   // Wake up all threads waiting to produce/consume batches.  They will all
@@ -181,39 +183,41 @@ void DataStreamMgr::StreamControlBlock::CancelStream() {
 }
 
 inline uint32_t DataStreamMgr::GetHashValue(
-    const TUniqueId& fragment_id, PlanNodeId node_id) {
-  uint32_t value = RawValue::GetHashValue(&fragment_id.lo, TYPE_BIGINT, 0);
-  value = RawValue::GetHashValue(&fragment_id.hi, TYPE_BIGINT, value);
+    const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
+  uint32_t value = RawValue::GetHashValue(&fragment_instance_id.lo, TYPE_BIGINT, 0);
+  value = RawValue::GetHashValue(&fragment_instance_id.hi, TYPE_BIGINT, value);
   value = RawValue::GetHashValue(&node_id, TYPE_INT, value);
   return value;
 }
 
 DataStreamRecvr* DataStreamMgr::CreateRecvr(
-    const RowDescriptor& row_desc, const TUniqueId& fragment_id, PlanNodeId dest_node_id,
-    int num_senders, int buffer_size, RuntimeProfile* profile) {
+    const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
+    PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile) {
   DCHECK(profile != NULL);
   VLOG_FILE << "creating receiver for fragment="
-            << fragment_id << ", node=" << dest_node_id;
+            << fragment_instance_id << ", node=" << dest_node_id;
   shared_ptr<StreamControlBlock> cb(
-      new StreamControlBlock(row_desc, fragment_id, dest_node_id, num_senders,
+      new StreamControlBlock(row_desc, fragment_instance_id, dest_node_id, num_senders,
                              buffer_size, profile));
-  size_t hash_value = GetHashValue(fragment_id, dest_node_id);
+  size_t hash_value = GetHashValue(fragment_instance_id, dest_node_id);
   lock_guard<mutex> l(lock_);
-  fragment_stream_set_.insert(make_pair(fragment_id, dest_node_id));
+  fragment_stream_set_.insert(make_pair(fragment_instance_id, dest_node_id));
   stream_map_.insert(make_pair(hash_value, cb));
   return new DataStreamRecvr(this, cb);
 }
 
 shared_ptr<DataStreamMgr::StreamControlBlock> DataStreamMgr::FindControlBlock(
-    const TUniqueId& fragment_id, PlanNodeId node_id, bool acquire_lock) {
-  VLOG_ROW << "looking up fragment_id=" << fragment_id << ", node=" << node_id;
-  size_t hash_value = GetHashValue(fragment_id, node_id);
+    const TUniqueId& fragment_instance_id, PlanNodeId node_id, bool acquire_lock) {
+  VLOG_ROW << "looking up fragment_instance_id=" << fragment_instance_id
+           << ", node=" << node_id;
+  size_t hash_value = GetHashValue(fragment_instance_id, node_id);
   if (acquire_lock) lock_.lock();
   pair<StreamMap::iterator, StreamMap::iterator> range =
       stream_map_.equal_range(hash_value);
   while (range.first != range.second) {
     shared_ptr<StreamControlBlock> cb = range.first->second;
-    if (cb->fragment_id() == fragment_id && cb->dest_node_id() == node_id) {
+    if (cb->fragment_instance_id() == fragment_instance_id
+        && cb->dest_node_id() == node_id) {
       if (acquire_lock) lock_.unlock();
       return cb;
     }
@@ -224,45 +228,63 @@ shared_ptr<DataStreamMgr::StreamControlBlock> DataStreamMgr::FindControlBlock(
 }
 
 Status DataStreamMgr::AddData(
-    const TUniqueId& fragment_id, PlanNodeId dest_node_id,
+    const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
     const TRowBatch& thrift_batch) {
-  VLOG_ROW << "AddData(): fragment_id=" << fragment_id << " node=" << dest_node_id
-          << " size=" << RowBatch::GetBatchSize(thrift_batch);
-  shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
+  VLOG_ROW << "AddData(): fragment_instance_id=" << fragment_instance_id
+           << " node=" << dest_node_id
+           << " size=" << RowBatch::GetBatchSize(thrift_batch);
+  shared_ptr<StreamControlBlock> cb =
+      FindControlBlock(fragment_instance_id, dest_node_id);
   if (cb == NULL) {
-    stringstream err;
-    err << "unknown row batch destination: fragment_id=" << fragment_id
-        << " node_id=" << dest_node_id;
-    LOG(ERROR) << err.str();
-    return Status(err.str());
+    // The receiver may tear down its StreamControlBlock via DeregisterRecvr()
+    // at any time without considering the remaining number of senders.
+    // As a consequence, FindControlBlock() may return an innocuous NULL if a thread
+    // calling DeregisterRecvr() beat the thread calling FindControlBlock()
+    // in acquiring lock_.
+    // TODO: Rethink the lifecycle of StreamControlBlock to distinguish
+    // errors from receiver-initiated teardowns.
+    return Status::OK;
   }
   cb->AddBatch(thrift_batch);
   return Status::OK;
 }
 
 Status DataStreamMgr::CloseSender(
-    const TUniqueId& fragment_id, PlanNodeId dest_node_id) {
-  VLOG_FILE << "CloseSender(): fragment_id=" << fragment_id << ", node=" << dest_node_id;
-  shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
+    const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id) {
+  VLOG_FILE << "CloseSender(): fragment_instance_id=" << fragment_instance_id
+            << ", node=" << dest_node_id;
+  shared_ptr<StreamControlBlock> cb =
+      FindControlBlock(fragment_instance_id, dest_node_id);
   if (cb == NULL) {
-    // TODO: it is possible that the control block has been torn down by another
-    // thread so this is innocuous.  How can we determine if this is a real issue?
+    // The receiver may tear down its StreamControlBlock via DeregisterRecvr()
+    // at any time without considering the remaining number of senders.
+    // As a consequence, FindControlBlock() may return an innocuous NULL if a thread
+    // calling DeregisterRecvr() beat the thread calling FindControlBlock()
+    // in acquiring lock_.
+    // TODO: Rethink the lifecycle of StreamControlBlock to distinguish
+    // errors from receiver-initiated teardowns.
     return Status::OK;
   }
   cb->DecrementSenders();
   return Status::OK;
 }
 
-Status DataStreamMgr::DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id) {
-  VLOG_QUERY << "DeregisterRecvr(): fragment_id=" << fragment_id << ", node=" << node_id;
-  size_t hash_value = GetHashValue(fragment_id, node_id);
+Status DataStreamMgr::DeregisterRecvr(
+    const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
+  VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << fragment_instance_id
+             << ", node=" << node_id;
+  size_t hash_value = GetHashValue(fragment_instance_id, node_id);
   lock_guard<mutex> l(lock_);
   pair<StreamMap::iterator, StreamMap::iterator> range =
       stream_map_.equal_range(hash_value);
   while (range.first != range.second) {
     const shared_ptr<StreamControlBlock>& cb = range.first->second;
-    if (cb->fragment_id() == fragment_id && cb->dest_node_id() == node_id) {
-      fragment_stream_set_.erase(make_pair(cb->fragment_id(), cb->dest_node_id()));
+    if (cb->fragment_instance_id() == fragment_instance_id
+        && cb->dest_node_id() == node_id) {
+      // Notify concurrent AddData() requests that the stream has been terminated.
+      cb->CancelStream();
+      fragment_stream_set_.erase(make_pair(cb->fragment_instance_id(),
+          cb->dest_node_id()));
       stream_map_.erase(range.first);
       return Status::OK;
     }
@@ -270,18 +292,18 @@ Status DataStreamMgr::DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId n
   }
 
   stringstream err;
-  err << "unknown row receiver id: fragment_id=" << fragment_id
+  err << "unknown row receiver id: fragment_instance_id=" << fragment_instance_id
       << " node_id=" << node_id;
   LOG(ERROR) << err.str();
   return Status(err.str());
 }
 
-void DataStreamMgr::Cancel(const TUniqueId& fragment_id) {
-  VLOG_QUERY << "cancelling all streams for fragment=" << fragment_id;
+void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
+  VLOG_QUERY << "cancelling all streams for fragment=" << fragment_instance_id;
   lock_guard<mutex> l(lock_);
   FragmentStreamSet::iterator i =
-      fragment_stream_set_.lower_bound(make_pair(fragment_id, 0));
-  while (i != fragment_stream_set_.end() && i->first == fragment_id) {
+      fragment_stream_set_.lower_bound(make_pair(fragment_instance_id, 0));
+  while (i != fragment_stream_set_.end() && i->first == fragment_instance_id) {
     shared_ptr<StreamControlBlock> cb = FindControlBlock(i->first, i->second, false);
     if (cb == NULL) {
       // keep going but at least log it

@@ -28,6 +28,7 @@
 #include <sstream>
 
 #include "runtime/exec-env.h"
+#include "runtime/descriptors.h"  // for PlanNodeId
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
 #include "util/runtime-profile.h"
@@ -43,6 +44,7 @@ class Expr;
 class LlvmCodeGen;
 class TimestampValue;
 class MemLimit;
+class DataStreamRecvr;
 
 // Counts how many rows an INSERT query has added to a particular partition
 // (partitions are identified by their partition keys: k1=v1/k2=v2
@@ -110,6 +112,12 @@ class RuntimeState {
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
 
+  // Create and return a stream receiver for fragment_instance_id_
+  // from the data stream manager. The receiver is added to data_stream_recvrs_pool_.
+  DataStreamRecvr* CreateRecvr(
+      const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
+      int buffer_size, RuntimeProfile* profile);
+
   // Sets the fragment memory limit and adds it to mem_limits_
   void SetFragmentMemLimit(MemLimit* limit) {
     DCHECK(fragment_mem_limit_ == NULL);
@@ -153,6 +161,16 @@ class RuntimeState {
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
+
+  // Protects data_stream_recvrs_pool_
+  boost::mutex data_stream_recvrs_lock_;
+
+  // Data stream receivers created by a plan fragment are gathered here to make sure
+  // they are destroyed before obj_pool_ (class members are destroyed in reverse order).
+  // Receivers depend on the descriptor table and we need to guarantee that their control
+  // blocks are removed from the data stream manager before the objects in the
+  // descriptor table are destroyed.
+  boost::scoped_ptr<ObjectPool> data_stream_recvrs_pool_;
 
   // Lock protecting error_log_ and unreported_error_idx_
   boost::mutex error_log_lock_;

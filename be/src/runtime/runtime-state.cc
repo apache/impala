@@ -25,6 +25,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/data-stream-recvr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -43,19 +44,21 @@ using namespace boost::algorithm;
 namespace impala {
 
 RuntimeState::RuntimeState(
-    const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
-    ExecEnv* exec_env)
+    const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
+    const string& now, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
+    data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_id)),
+    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     fragment_mem_limit_(NULL),
     is_cancelled_(false) {
-  Status status = Init(fragment_id, query_options, now, exec_env);
+  Status status = Init(fragment_instance_id, query_options, now, exec_env);
   DCHECK(status.ok());
 }
 
 RuntimeState::RuntimeState(const std::string& now)
   : obj_pool_(new ObjectPool()),
+    data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "<unnamed>"),
     fragment_mem_limit_(NULL) {
@@ -94,6 +97,16 @@ Status RuntimeState::Init(
   DCHECK_GT(query_options_.max_io_buffers, 0);
   DCHECK_GE(query_options_.num_scanner_threads, 0);
   return Status::OK;
+}
+
+DataStreamRecvr* RuntimeState::CreateRecvr(
+    const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
+    int buffer_size, RuntimeProfile* profile) {
+  DataStreamRecvr* recvr = exec_env_->stream_mgr()->CreateRecvr(row_desc,
+      fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile);
+  lock_guard<mutex> l(data_stream_recvrs_lock_);
+  data_stream_recvrs_pool_->Add(recvr);
+  return recvr;
 }
 
 void RuntimeState::set_now(const TimestampValue* now) {

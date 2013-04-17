@@ -37,6 +37,8 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Descriptors_types.h"
 
+#include <iostream>
+
 using namespace std;
 using namespace tr1;
 using namespace boost;
@@ -431,25 +433,28 @@ class DataStreamTest : public testing::Test {
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
-  // starting a sender w/o a corresponding receiver should result in an error
-  // on the sending side
-  // case 1: entire query result fits in single buffer, close() returns error status
+
+
+  // starting a sender w/o a corresponding receiver does not result in an error because
+  // we cannot distinguish whether a receiver was never created or the receiver
+  // willingly tore down the stream
+  // case 1: entire query result fits in single buffer, close() returns ok
   TUniqueId dummy_id;
   GetNextInstanceId(&dummy_id);
   StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
-  EXPECT_FALSE(sender_info_[0].status.ok());
-  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
+  EXPECT_TRUE(sender_info_[0].status.ok());
+  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_F(DataStreamTest, UnknownSenderLargeResult) {
-  // case 2: query result requires multiple buffers, send() returns error status
+  // case 2: query result requires multiple buffers, send() returns ok
   TUniqueId dummy_id;
   GetNextInstanceId(&dummy_id);
   StartSender();
   JoinSenders();
-  EXPECT_FALSE(sender_info_[0].status.ok());
-  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
+  EXPECT_TRUE(sender_info_[0].status.ok());
+  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_F(DataStreamTest, Cancel) {

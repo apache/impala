@@ -17,6 +17,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "runtime/data-stream-mgr.h"
+#include "runtime/data-stream-recvr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "util/debug-util.h"
@@ -51,9 +52,8 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 
   // TODO: figure out appropriate buffer size
   DCHECK_GT(num_senders_, 0);
-  stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
-    FLAGS_exchg_node_buffer_size_bytes, runtime_profile()));
+  stream_recvr_ = state->CreateRecvr(input_row_desc_, id_, num_senders_,
+      FLAGS_exchg_node_buffer_size_bytes, runtime_profile());
   return Status::OK;
 }
 

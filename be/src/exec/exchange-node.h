@@ -18,11 +18,11 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "exec/exec-node.h"
-#include "runtime/data-stream-recvr.h"
 
 namespace impala {
 
 class RowBatch;
+class DataStreamRecvr;
 
 // Receiver node for data streams. This simply feeds row batches received from the
 // data stream into the execution tree.
@@ -44,7 +44,9 @@ class ExchangeNode : public ExecNode {
 
  private:
   int num_senders_;  // needed for stream_recvr_ construction
-  boost::scoped_ptr<DataStreamRecvr> stream_recvr_;
+
+  // created in Prepare() and owned by the RuntimeState
+  DataStreamRecvr* stream_recvr_;
 
   // our input rows are a prefix of the rows we produce
   RowDescriptor input_row_desc_;
