@@ -40,10 +40,11 @@ int, boolean
 ====
 ---- QUERY
 # test insert into ... select *
+# using limit 1 to reduce execution time
 insert into table hbaseinsertalltypesagg
-select * from hbaseinsertalltypesagg
+select * from hbaseinsertalltypesagg limit 1
 ---- RESULTS
-: 10001
+: 1
 ---- SETUP
 RELOAD hbaseinsertalltypesagg
 ====

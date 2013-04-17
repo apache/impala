@@ -416,6 +416,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   {
     SCOPED_TIMER(scan_node_->read_timer());
     while (true) {
+      if (result_ != NULL) env->DeleteLocalRef(result_);
       // result_ = resultscanner_.next();
       result_ = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
 
@@ -436,6 +437,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     return Status::OK;
   }
 
+  if (keyvalues_ != NULL) env->DeleteLocalRef(keyvalues_);
   // keyvalues_ = result_.raw();
   keyvalues_ =
       reinterpret_cast<jobjectArray>(env->CallObjectMethod(result_, result_raw_id_));
@@ -456,9 +458,10 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     all_keyvalues_present_ = false;
   }
   keyvalue_index_ = 0;
-  // All KeyValues are backed by the same buffer. Place it into the C byffer_.
+  // All KeyValues are backed by the same buffer. Place it into the C buffer_.
   jobject immutable_bytes_writable =
       env->CallObjectMethod(result_, result_get_bytes_id_);
+  if (byte_array_ != NULL) env->DeleteLocalRef(byte_array_);
   byte_array_ = (jbyteArray)
       env->CallObjectMethod(immutable_bytes_writable, immutable_bytes_writable_get_id_);
 
@@ -467,6 +470,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   result_bytes_offset_ = env->CallIntMethod(immutable_bytes_writable,
       immutable_bytes_writable_get_offset_id_);
   COUNTER_UPDATE(scan_node_->bytes_read_counter(), bytes_array_length);
+  env->DeleteLocalRef(immutable_bytes_writable);
 
   // Copy the data from the java byte array to our buffer_.
   // Re-allocate buffer_ if necessary.
@@ -484,6 +488,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
 }
 
 void HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
+  if (keyvalue_ != NULL) env->DeleteLocalRef(keyvalue_);
   keyvalue_ = env->GetObjectArrayElement(keyvalues_, 0);
   *key_length = env->CallShortMethod(keyvalue_, keyvalue_get_row_length_id_);
   int key_offset =
@@ -565,4 +570,10 @@ void HBaseTableScanner::Close(JNIEnv* env) {
   if (htable_.get() != NULL) {
     htable_->Close();
   }
+
+  // Delete all local references
+  if (result_ != NULL) env->DeleteLocalRef(result_);
+  if (keyvalues_ != NULL) env->DeleteLocalRef(keyvalues_);
+  if (keyvalue_ != NULL) env->DeleteLocalRef(keyvalue_);
+  if (byte_array_ != NULL) env->DeleteLocalRef(byte_array_);
 }
