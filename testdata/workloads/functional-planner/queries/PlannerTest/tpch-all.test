@@ -2076,13 +2076,13 @@ Plan Fragment 0
   ORDER BY: <slot 9> DESC, <slot 8> DESC
   LIMIT: 100
   TUPLE IDS: 4 
-    EXCHANGE (11)
+    EXCHANGE (12)
       TUPLE IDS: 4 
 
 Plan Fragment 1
   HASH_PARTITIONED: <slot 8>
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 12
     UNPARTITIONED
 
   TOP-N
@@ -2093,13 +2093,13 @@ Plan Fragment 1
     OUTPUT: SUM(<slot 9>)
     GROUP BY: <slot 8>
     TUPLE IDS: 4 
-      EXCHANGE (9)
+      EXCHANGE (10)
         TUPLE IDS: 4 
 
 Plan Fragment 2
   HASH_PARTITIONED: <slot 4>
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 10
     HASH_PARTITIONED: <slot 8>
 
   AGGREGATE
@@ -2110,13 +2110,13 @@ Plan Fragment 2
     OUTPUT: SUM(<slot 5>)
     GROUP BY: <slot 4>
     TUPLE IDS: 2 
-      EXCHANGE (7)
+      EXCHANGE (8)
         TUPLE IDS: 2 
 
 Plan Fragment 3
-  RANDOM
+  HASH_PARTITIONED: o.o_custkey
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 8
     HASH_PARTITIONED: <slot 4>
 
   AGGREGATE
@@ -2128,20 +2128,29 @@ Plan Fragment 3
       HASH PREDICATES:
         o.o_custkey = c.c_custkey
       TUPLE IDS: 0N 1 
-        SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (0)
-          PREDICATES: NOT o.o_comment LIKE '%special%requests%'
-          TUPLE IDS: 0 
         EXCHANGE (6)
+          TUPLE IDS: 0 
+        EXCHANGE (7)
           TUPLE IDS: 1 
 
 Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c.c_custkey
 
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (1) compact
     TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: o.o_custkey
+
+  SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (0)
+    PREDICATES: NOT o.o_comment LIKE '%special%requests%'
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864

@@ -130,13 +130,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (4)
+  EXCHANGE (5)
     TUPLE IDS: 0N 1 
 
 Plan Fragment 1
-  RANDOM
+  HASH_PARTITIONED: a.id, a.int_col
   STREAM DATA SINK
-    EXCHANGE ID: 4
+    EXCHANGE ID: 5
     UNPARTITIONED
 
   HASH JOIN
@@ -146,20 +146,29 @@ Plan Fragment 1
       a.int_col = b.int_col
     OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
-      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-        TUPLE IDS: 0 
       EXCHANGE (3)
+        TUPLE IDS: 0 
+      EXCHANGE (4)
         TUPLE IDS: 1 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: b.id, b.int_col
 
   SCAN HDFS table=functional.alltypessmall #partitions=2 size=3.17KB (1) compact
     PREDICATES: b.string_col = '15'
     TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    HASH_PARTITIONED: a.id, a.int_col
+
+  SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -227,13 +236,13 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (7)
+  EXCHANGE (9)
     TUPLE IDS: 0N 1N 2 
 
 Plan Fragment 1
-  RANDOM
+  HASH_PARTITIONED: a.id, b.string_col
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 9
     UNPARTITIONED
 
   HASH JOIN
@@ -243,36 +252,54 @@ Plan Fragment 1
       b.string_col = c.string_col
     OTHER PREDICATES: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
     TUPLE IDS: 0N 1N 2 
-      HASH JOIN
-        JOIN OP: FULL OUTER JOIN
-        HASH PREDICATES:
-          a.id = b.id
-          a.int_col = b.int_col
+      EXCHANGE (7)
         TUPLE IDS: 0N 1N 
-          SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-            TUPLE IDS: 0 
-          EXCHANGE (5)
-            TUPLE IDS: 1 
-      EXCHANGE (6)
+      EXCHANGE (8)
         TUPLE IDS: 2 
 
 Plan Fragment 2
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: c.id, c.string_col
 
   SCAN HDFS table=functional.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
+  HASH_PARTITIONED: a.id, a.int_col
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: a.id, b.string_col
+
+  HASH JOIN
+    JOIN OP: FULL OUTER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    TUPLE IDS: 0N 1N 
+      EXCHANGE (5)
+        TUPLE IDS: 0 
+      EXCHANGE (6)
+        TUPLE IDS: 1 
+
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: b.id, b.int_col
 
   SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: a.id, a.int_col
+
+  SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153

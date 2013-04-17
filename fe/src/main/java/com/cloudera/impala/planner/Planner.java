@@ -31,6 +31,7 @@ import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
+import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
@@ -333,12 +334,18 @@ public class Planner {
     LOG.info(rhsTree.getExplainString());
 
     boolean doBroadcast;
-    // we do a broadcast join if we're explicitly told to do so or if it's cheaper 
-    // and we weren't explicitly told to do a partitioned join;
+    // we do a broadcast join if
+    // - we're explicitly told to do so
+    // - or if it's cheaper and we weren't explicitly told to do a partitioned join
+    // - and we're not doing a full or right outer join (those require the left-hand
+    //   side to be partitioned for correctness)
     // we do a "<=" comparison of the costs so that we default to broadcast joins if
     // we're unable to estimate the cost
-    if (node.getInnerRef().isBroadcastJoin() 
-        || (!node.getInnerRef().isPartitionJoin() && broadcastCost <= partitionCost)) {
+    if (node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
+        && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
+        && (node.getInnerRef().isBroadcastJoin()
+            || (!node.getInnerRef().isPartitionJoin()
+                && broadcastCost <= partitionCost))) {
       doBroadcast = true;
     } else {
       doBroadcast = false;

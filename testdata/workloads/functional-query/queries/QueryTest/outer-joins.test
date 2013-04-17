@@ -454,3 +454,26 @@ string
 ---- RESULTS
 '1'
 ====
+---- QUERY
+# right outer join requires the join op to be partitioned, otherwise non-matches cause
+# duplicates
+select count(*)
+from functional.alltypesagg a
+right outer join functional.alltypestiny b on (a.tinyint_col = b.id)
+where a.tinyint_col is null
+---- TYPES
+bigint
+---- RESULTS
+1
+====
+---- QUERY
+# same for full outer joins
+select count(*)
+from functional.alltypesagg a
+full outer join functional.alltypestiny b on (a.tinyint_col = b.id)
+where a.tinyint_col is null
+---- TYPES
+bigint
+---- RESULTS
+1001
+====
