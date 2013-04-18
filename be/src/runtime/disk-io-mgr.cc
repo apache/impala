@@ -506,6 +506,15 @@ void DiskIoMgr::BufferDescriptor::Return() {
   io_mgr_->ReturnBuffer(this);
 }
 
+static void CheckSseSupport() {
+  if (!CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+    LOG(WARNING) << "This machine does not support sse4_2.  The default IO system "
+                    "configurations are suboptimal for this hardware.  Consider "
+                    "increasing the number of threads per disk by restarting impalad "
+                    "using the --num_threads_per_disk flag with a higher value";
+  }
+}
+
 DiskIoMgr::DiskIoMgr() :
     num_threads_per_disk_(FLAGS_num_threads_per_disk),
     max_read_size_(FLAGS_read_size),
@@ -517,6 +526,7 @@ DiskIoMgr::DiskIoMgr() :
   int num_disks = FLAGS_num_disks;
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
+  CheckSseSupport();
 }
 
 DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
@@ -529,6 +539,7 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
     num_buffers_in_readers_(0) {
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
+  CheckSseSupport();
 }
 
 DiskIoMgr::~DiskIoMgr() {
