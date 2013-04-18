@@ -915,6 +915,11 @@ TEST_F(ExprTest, CastExprs) {
   TestCast("'0'", "0");
   TestCast("'5'", "5");
   TestCast("'-5'", "-5");
+  TestStringValue("cast(\"abc\" as string)", "abc");
+
+  // From Timestamp to Timestamp
+  TestStringValue("cast(cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as"
+      " timestamp) as string)", "2012-01-01 09:10:11.123456789");
 
 #if 0
   // Test overflow.  TODO: Hive casting rules are very weird here also.  It seems for

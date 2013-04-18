@@ -1075,6 +1075,9 @@ public class AnalyzerTest {
     // Cast never raise analysis exception
     AnalyzesOk("select * from functional.alltypes where " +
         "tinyint_col = cast('--1' as tinyint)");
+
+    // Cast string literal to string
+    AnalyzesOk("select cast('abc' as string)");
   }
 
   /**

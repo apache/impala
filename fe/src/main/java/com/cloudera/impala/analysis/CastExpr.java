@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
+import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
@@ -26,6 +27,9 @@ public class CastExpr extends Expr {
   private final PrimitiveType targetType;
   /** true if this is a "pre-analyzed" implicit cast */
   private final boolean isImplicit;
+
+  // True if this cast does not change the type.
+  private boolean noOp = false;
 
   public CastExpr(PrimitiveType targetType, Expr e, boolean isImplicit) {
     super();
@@ -53,6 +57,15 @@ public class CastExpr extends Expr {
   }
 
   @Override
+  protected void treeToThriftHelper(TExpr container) {
+    if (noOp) {
+      getChild(0).treeToThriftHelper(container);
+      return;
+    }
+    super.treeToThriftHelper(container);
+  }
+
+  @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CAST_EXPR;
     msg.setOpcode(opcode);
@@ -75,6 +88,12 @@ public class CastExpr extends Expr {
 
     // this cast may result in loss of precision, but the user requested it
     this.type = targetType;
+
+    if (childType.equals(targetType)) {
+      noOp = true;
+      return;
+    }
+
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
         FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type);
     if (match == null) {

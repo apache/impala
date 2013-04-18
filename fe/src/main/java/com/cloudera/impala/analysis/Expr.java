@@ -145,7 +145,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   // Append a flattened version of this expr, including all children, to 'container'.
-  private void treeToThriftHelper(TExpr container) {
+  protected void treeToThriftHelper(TExpr container) {
     TExprNode msg = new TExprNode();
     msg.type = type.toThrift();
     msg.num_children = children.size();
