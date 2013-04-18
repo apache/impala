@@ -1689,7 +1689,7 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestValue("degrees(0)", TYPE_DOUBLE, 0.0);
   TestValue("degrees(pi())", TYPE_DOUBLE, 180.0);
 
-  // NULL artuments.
+  // NULL arguments.
   TestIsNull("sin(NULL)", TYPE_DOUBLE);
   TestIsNull("asin(NULL)", TYPE_DOUBLE);
   TestIsNull("cos(NULL)", TYPE_DOUBLE);
@@ -2497,14 +2497,17 @@ int main(int argc, char **argv) {
   executor_ = new ImpaladQueryExecutor();
   EXIT_IF_ERROR(executor_->Setup());
 
-  cout << "Running with Jit" << endl;
-
-  int ret = RUN_ALL_TESTS();
-  if (ret != 0) return ret;
-
   vector<string> options;
   options.push_back("DISABLE_CODEGEN=1");
   executor_->setExecOptions(options);
-  cout << endl << "Running without Jit" << endl;
+
+  cout << "Running without codegen" << endl;
+  int ret = RUN_ALL_TESTS();
+  if (ret != 0) return ret;
+  
+  options.push_back("DISABLE_CODEGEN=0");
+  executor_->setExecOptions(options);
+  impala_server->impala_server()->EnableCodegenForSelectExprs();
+  cout << endl << "Running with codegen" << endl;
   return RUN_ALL_TESTS();
 }

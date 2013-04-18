@@ -56,6 +56,8 @@ class InProcessImpalaServer {
   // there was an error joining.
   Status Join();
 
+  ImpalaServer* impala_server() { return impala_server_.get(); }
+
  private:
   // Hostname for this server, usually FLAGS_hostname
   const std::string hostname_;

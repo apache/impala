@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Includes source files for cross compiling to IR.  By having all of the code in
-// one .cc file, clang will be able to compile all of code into one module.
-// All cross compiled code needs to be added to this file.
-// All files here must be added explicitly to the codegen/CMakeLists.txt dependency list
+#include "exprs/expr.h"
 
 #ifdef IR_COMPILE
-#include "exec/aggregation-node-ir.cc"
-#include "exec/hash-join-node-ir.cc"
-#include "exec/hdfs-scanner-ir.cc"
-#include "exprs/expr-ir.cc"
-#include "runtime/string-value-ir.cc"
-#include "util/hash-util-ir.cc"
+
+// Generate a llvm loadable function for calling GetValue on an Expr.  This is
+// used as an adapter for Expr's that do not have an IR implementation.
+extern "C"
+void* IrExprGetValue(Expr* expr, TupleRow* row) {
+  return expr->GetValue(row);
+}
+
 #else
-#error "This file should only be used for cross compiling to IR."
+#error "This file should only be compiled by clang."
 #endif
 

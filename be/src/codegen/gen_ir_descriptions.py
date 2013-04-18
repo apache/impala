@@ -30,6 +30,7 @@ import os
 ir_functions = [
   ["AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING", "ProcessRowBatchWithGrouping"],
   ["AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING", "ProcessRowBatchNoGrouping"],
+  ["EXPR_GET_VALUE", "IrExprGetValue"],
   ["HASH_CRC", "IrCrcHash"],
   ["HASH_FVN", "IrFvnHash"],
   ["HASH_JOIN_PROCESS_BUILD_BATCH", "ProcessBuildBatch"],

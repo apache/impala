@@ -225,6 +225,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Returns Status::OK unless there is a JNI error.
   Status GetHadoopConfigValue(const std::string& key, std::string* output);
 
+  // Enables codegen for queries with no from clause.  This is normally disabled
+  // since evaluating a expr tree once is cheaper than doing codegen.
+  // This is only exposed for debugging purposes.
+  void EnableCodegenForSelectExprs();
+
  private:
   class FragmentExecState;
 
@@ -753,6 +758,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
   ExecEnv* exec_env_;  // not owned
+  
+  // If true, codegen exprs for queries without from clause
+  bool select_exprs_codegen_enabled_;
 
   // plan service-related - impalad optionally uses a standalone
   // plan service (see FLAGS_use_planservice etc)

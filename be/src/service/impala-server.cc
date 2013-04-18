@@ -323,11 +323,14 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(runtime_state->obj_pool(), exprs, &output_exprs_));
   for (int i = 0; i < output_exprs_.size(); ++i) {
-    // Don't codegen these, they are unused anyway.
-    // TODO: codegen this and the write values path
-    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc, true));
+    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc, 
+        !impala_server_->select_exprs_codegen_enabled_));
   }
   return Status::OK;
+}
+
+void ImpalaServer::EnableCodegenForSelectExprs() {
+  select_exprs_codegen_enabled_ = true;
 }
 
 Status ImpalaServer::QueryExecState::UpdateMetastore() {
@@ -559,7 +562,8 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env) {
+    : exec_env_(exec_env),
+      select_exprs_codegen_enabled_(false) {
   // Initialize default config
   InitializeConfigVariables();
 

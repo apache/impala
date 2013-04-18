@@ -314,13 +314,13 @@ class Expr {
   // Codegen the expr tree rooted at this node.  This does a post order traversal
   // of the expr tree and codegen's each node.  Returns NULL if the subtree cannot
   // be codegen'd.
-  // Subclasses should override this function if it supports jitting.
-  // This function needs to set scratch_buffer_size_.
+  // Subclasses should override this function if it supports expr specific codegen, 
+  // otherwise it will just wrap the interpreted ComputeFn.  All exprs under this
+  // one will also in turn be interpreted but codegen using this expr will be able
+  // to continue.
   // All expr codegen'd functions have this signature:
   // <expr ret type> ComputeFn(int8_t** tuple_row, int8_t* scratch_buffer, bool* is_null) 
-  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen) {
-    return NULL;
-  }
+  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
 
   // Returns whether the subtree at this node is jittable.  This is temporary
   // until more expr types are supported.

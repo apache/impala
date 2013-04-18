@@ -28,9 +28,6 @@ class TExprNode;
 class RuntimeState;
 
 class FunctionCall: public Expr {
- public:
-  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
-
  protected:
   friend class Expr;
   friend class StringFunctions;

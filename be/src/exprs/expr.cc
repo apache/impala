@@ -767,3 +767,96 @@ Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
   SCOPED_TIMER(codegen->codegen_timer());
   return this->Codegen(codegen);
 }
+
+// Codegen an adapter IR function that just calls the underlying GetValue
+// define double @ExprFn(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   %0 = bitcast i8** %row to %"class.impala::TupleRow"*
+//   %1 = call i8* @IrExprGetValue(%"class.impala::Expr"* 
+//      inttoptr (i64 194529872 to %"class.impala::Expr"*), %"class.impala::TupleRow"* %0)
+//   %2 = icmp eq i8* %1, null
+//   store i1 %2, i1* %is_null
+//   br i1 %2, label %null, label %not_null
+//
+// null:
+//   ret double 0
+//
+// not_null:
+//   %3 = bitcast i8* %1 to double*
+//   %4 = load double* %3
+//   ret double %4
+// }
+Function* Expr::Codegen(LlvmCodeGen* codegen) {
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder builder(context);
+
+  // Get llvm compatible types for Expr and TupleRow
+  Type* expr_type = codegen->GetType(Expr::LLVM_CLASS_NAME);
+  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+  DCHECK(expr_type != NULL);
+  DCHECK(tuple_row_type != NULL);
+
+  PointerType* expr_ptr_type = PointerType::get(expr_type, 0);
+  PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
+
+  Function* interpreted_fn = codegen->GetFunction(IRFunction::EXPR_GET_VALUE);
+  DCHECK(interpreted_fn != NULL);
+
+  Function* function = CreateComputeFnPrototype(codegen, "ExprFn");
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  
+  // Get the llvm input arguments to the codegen'd function
+  Function::arg_iterator args_it = function->arg_begin();
+  Value* args[3] = { args_it++, args_it++, args_it };
+  
+  builder.SetInsertPoint(entry_block);
+
+  // Convert the llvm types to ComputeFn compatible types
+  Value* row = builder.CreateBitCast(args[0], tuple_row_ptr_type);
+  Value* this_llvm = codegen->CastPtrToLlvmPtr(expr_ptr_type, this);
+
+  // Call the underlying function
+  Value* result = builder.CreateCall2(interpreted_fn, this_llvm, row);
+  Value* is_null = builder.CreateIsNull(result);
+  builder.CreateStore(is_null, args[2]);
+  
+  BasicBlock* null_block, *not_null_block;
+  codegen->CreateIfElseBlocks(function, "null", "not_null",
+      &null_block, &not_null_block);
+  builder.CreateCondBr(is_null, null_block, not_null_block);
+
+  builder.SetInsertPoint(null_block);
+  builder.CreateRet(GetNullReturnValue(codegen));
+
+  builder.SetInsertPoint(not_null_block);
+  // Convert the void* ComputeFn return value to the typed llvm version
+  switch (type()) {
+    case TYPE_NULL: 
+      builder.CreateRet(codegen->false_value());
+      break;
+    
+    case TYPE_STRING: {
+      Value* cast_ptr_value = builder.CreateBitCast(result, codegen->GetPtrType(type()));
+      builder.CreateRet(cast_ptr_value);
+      break;
+    }
+
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE: {
+      Value* cast_ptr_value = builder.CreateBitCast(result, codegen->GetPtrType(type()));
+      Value* value = builder.CreateLoad(cast_ptr_value);
+      builder.CreateRet(value);
+      break;
+    }
+
+    default:
+      DCHECK(false);
+  }
+
+  return codegen->FinalizeFunction(function);
+}
