@@ -477,3 +477,23 @@ bigint
 ---- RESULTS
 1001
 ====
+---- QUERY
+# test multiple outer joins with an inline view to check that nullable tuples
+# are properly sent over the network
+select z.xid, z.yid, k.id from 
+(select x.id as xid, y.id as yid from
+ (select id from alltypestiny where id = 1) x
+ full outer join
+ (select id from alltypestiny where id = 1) y on x.id = (y.id + 2)
+) z
+full outer join
+(select id from alltypestiny where id = 1) k on z.xid = (k.id + 3)
+order by z.xid, z.yid, k.id limit 100
+---- TYPES
+int, int, int
+---- RESULTS
+1,NULL,NULL
+# Uncomment results below when IMPALA-287 is fixed
+#NULL,1,NULL
+#NULL,NULL,1
+====

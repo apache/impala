@@ -209,7 +209,12 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
   batch_->CopyRow(row, dest);
   const vector<TupleDescriptor*>& descs = row_desc_.tuple_descriptors();
   for (int i = 0; i < descs.size(); ++i) {
-    dest->SetTuple(i, row->GetTuple(i)->DeepCopy(*descs[i], batch_->tuple_data_pool()));
+    if (UNLIKELY(row->GetTuple(i) == NULL)) {
+      dest->SetTuple(i, NULL);
+    } else {
+      dest->SetTuple(i, row->GetTuple(i)->DeepCopy(*descs[i],
+          batch_->tuple_data_pool()));
+    }
   }
   batch_->CommitLastRow();
   return Status::OK;
