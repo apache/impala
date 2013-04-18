@@ -437,7 +437,10 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
   profile_output = ss.str();
 }
 
-void ImpalaServer::PingImpalaService() {
+void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
+  VLOG_RPC << "PingImpalaService()";
+  return_val.version = GetVersionString(true);
+  VLOG_RPC << "PingImpalaService(): return_val=" << ThriftDebugString(return_val);
 }
 
 void ImpalaServer::ResetCatalog(impala::TStatus& status) {

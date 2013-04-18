@@ -117,6 +117,12 @@ struct TInsertResult {
   1: required map<string, i64> rows_appended
 }
 
+// Response from a call to PingImpalaService
+struct TPingImpalaServiceResp {
+  // The Impala service's version string.
+  1: string version
+}
+
 // Parameters for a ResetTable request which will invalidate a table's metadata.
 struct TResetTableReq {
   // Name of the table's parent database.
@@ -162,9 +168,10 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Closes the query handle and return the result summary of the insert.
   TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
       throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
-      
-  // Client calls this RPC to verify that the server is an ImpalaService.
-  void PingImpalaService();
+
+  // Client calls this RPC to verify that the server is an ImpalaService. Returns the
+  // server version.
+  TPingImpalaServiceResp PingImpalaService();
 }
 
 // Impala HiveServer2 service

@@ -120,7 +120,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
   virtual void CloseInsert(impala::TInsertResult& insert_result,
       const beeswax::QueryHandle& query_handle);
-  virtual void PingImpalaService();
+
+  // Pings the Impala service and gets the server version string.
+  virtual void PingImpalaService(TPingImpalaServiceResp& return_val);
+
   // TODO: Need to implement HiveServer2 version of GetRuntimeProfile
   virtual void GetRuntimeProfile(std::string& profile_output,
       const beeswax::QueryHandle& query_id);

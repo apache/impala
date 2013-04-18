@@ -33,13 +33,14 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
+from ImpalaService.ImpalaService import TPingImpalaServiceResp
 from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-VERSION_FORMAT = "Impala v%(version)s (%(git_hash)s) built on %(build_date)s"
+VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 COMMENT_TOKEN = '--'
 VERSION_STRING = "build version not available"
 HISTORY_LENGTH = 100
@@ -99,6 +100,8 @@ class OutputWriter(object):
 #     of the shell should handle this return paramter.
 class ImpalaShell(cmd.Cmd):
   DISCONNECTED_PROMPT = "[Not connected] > "
+  # If not connected to an impalad, the server version is unknown.
+  UNKNOWN_SERVER_VERSION = "Not Connected"
   # Commands are terminated with the following delimiter.
   CMD_DELIM = ';'
   DEFAULT_DB = 'default'
@@ -122,6 +125,7 @@ class ImpalaShell(cmd.Cmd):
     self.refresh_after_connect = options.refresh_after_connect
     self.current_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
+    self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
     self.show_profiles = options.show_profiles
     # Stores the state of user input until a delimiter is seen.
     self.partial_cmd = str()
@@ -362,6 +366,7 @@ class ImpalaShell(cmd.Cmd):
 
     if self.__connect():
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
+      self.__print_if_verbose('Server version: %s' % self.server_version)
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
         self.cmdqueue.append('refresh' + ImpalaShell.CMD_DELIM)
@@ -387,13 +392,15 @@ class ImpalaShell(cmd.Cmd):
       self.transport = None
 
     self.connected = False
+    self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
     try:
       self.transport = self.__get_transport()
       self.transport.open()
       protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
       try:
-        self.imp_service.PingImpalaService()
+        result = self.imp_service.PingImpalaService()
+        self.server_version = result.version
         self.connected = True
       except Exception, e:
         print ("Error: Unable to communicate with impalad service. This service may not "
@@ -854,7 +861,8 @@ class ImpalaShell(cmd.Cmd):
 
   def do_version(self, args):
     """Prints the Impala build version"""
-    print "Build version: %s" % VERSION_STRING
+    print "Shell version: %s" % VERSION_STRING
+    print "Server version: %s" % self.server_version
     return True
 
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
@@ -862,7 +870,7 @@ available commands.
 
 Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-(Build version: %s)""" % VERSION_STRING
+(Shell build version: %s)""" % VERSION_STRING
 
 def parse_query_text(query_text):
   """Parse query file text and filter comments """
