@@ -3,6 +3,7 @@
 #include <hdfs.h>
 #include <dlfcn.h>
 #include <boost/algorithm/string.hpp>
+#include "common/version.h"
 #include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/read-write-util.h"
@@ -24,8 +25,11 @@ bool HdfsLzoTextScanner::library_load_attempted_;
 
 mutex HdfsLzoTextScanner::lzo_load_lock_;
 
+const char* (*GetImpalaBuildVersion)();
+
 HdfsScanner* (*HdfsLzoTextScanner::CreateLzoTextScanner)(
     HdfsScanNode* scan_node, RuntimeState* state);
+
 void (*HdfsLzoTextScanner::LzoIssueInitialRanges)(
     HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
 
@@ -48,9 +52,20 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
       void* handle;
       RETURN_IF_ERROR(DynamicOpen(state, LIB_IMPALA_LZO, RTLD_NOW, &handle));
       RETURN_IF_ERROR(DynamicLookup(state, handle,
+          "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
+
+      if (strcmp((*GetImpalaBuildVersion)(), IMPALA_BUILD_VERSION) != 0) {
+        stringstream ss;
+        ss << "Impala LZO library was built against Impala version "
+           << (*GetImpalaBuildVersion)() << ", but the running Impala version is "
+           << IMPALA_BUILD_VERSION << ". Make sure both packages are up to date.";
+        return Status(ss.str());
+      }
+
+      RETURN_IF_ERROR(DynamicLookup(state, handle,
           "CreateLzoTextScanner", reinterpret_cast<void**>(&CreateLzoTextScanner)));
       RETURN_IF_ERROR(DynamicLookup(state, handle,
-          "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges))); 
+          "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges)));
       LOG(INFO) << "Loaded impala-lzo library: " << LIB_IMPALA_LZO;
     }
   }

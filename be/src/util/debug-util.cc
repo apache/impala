@@ -313,16 +313,16 @@ string PrintBatch(RowBatch* batch) {
 
 string GetBuildVersion(bool compact) {
   stringstream ss;
-  ss << Version::BUILD_VERSION
+  ss << IMPALA_BUILD_VERSION
 #ifdef NDEBUG
      << " RELEASE"
 #else
      << " DEBUG"
 #endif
-     << " (build " << Version::BUILD_HASH
+     << " (build " << IMPALA_BUILD_HASH
      << ")";
   if (!compact) {
-    ss << endl << "Built on " << Version::BUILD_TIME;
+    ss << endl << "Built on " << IMPALA_BUILD_TIME;
   }
   return ss.str();
 }

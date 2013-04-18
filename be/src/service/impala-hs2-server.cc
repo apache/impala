@@ -292,7 +292,7 @@ void ImpalaServer::GetInfo(
       return_val.infoValue.__set_stringValue("Impala");
       break;
     case TGetInfoType::CLI_DBMS_VER:
-      return_val.infoValue.__set_stringValue(Version::BUILD_VERSION);
+      return_val.infoValue.__set_stringValue(IMPALA_BUILD_VERSION);
       break;
     default:
       HS2_RETURN_ERROR(return_val, "Unsupported operation",
