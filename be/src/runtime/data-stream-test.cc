@@ -224,7 +224,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_slotType(TPrimitiveType::BIGINT);
     slot_desc.__set_columnPos(0);
     slot_desc.__set_byteOffset(0);
-    slot_desc.__set_nullIndicatorByte(-1);
+    slot_desc.__set_nullIndicatorByte(0);
     slot_desc.__set_nullIndicatorBit(-1);
     slot_desc.__set_slotIdx(0);
     slot_desc.__set_isMaterialized(true);
