@@ -94,6 +94,13 @@ TEST(Base64Test, Basic) {
   TestBase64("abcdef", "YWJjZGVm");
 }
 
+TEST(HtmlEscapingTest, Basic) {
+  string before = "<html><body>&amp";
+  stringstream after;
+  EscapeForHtml(before, &after);
+  EXPECT_EQ(after.str(), "&lt;html&gt;&lt;body&gt;&amp;amp");
+}
+
 }
 
 int main(int argc, char **argv) {

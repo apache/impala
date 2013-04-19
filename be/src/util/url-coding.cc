@@ -171,4 +171,19 @@ bool Base64Decode(const string& in, string* out) {
   return true;
 }
 
+void EscapeForHtml(const string& in, stringstream* out) {
+  DCHECK(out != NULL);
+  BOOST_FOREACH(const char& c, in) {
+    switch (c) {
+      case '<': (*out) << "&lt;";
+                break;
+      case '>': (*out) << "&gt;";
+                break;
+      case '&': (*out) << "&amp;";
+                break;
+      default: (*out) << c;
+    }
+  }
+}
+
 }

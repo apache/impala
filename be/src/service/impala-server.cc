@@ -56,6 +56,7 @@
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
+#include "util/url-coding.h"
 #include "util/webserver.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -668,7 +669,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/query_profile_encoded",
       profile_encoded_callback, false, false);
-  
+
   Webserver::PathHandlerCallback inflight_query_ids_callback =
       bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/inflight_query_ids",
@@ -743,12 +744,22 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
     return;
   }
 
-  (*output) << "<pre>";
-  Status status = GetRuntimeProfileStr(unique_id, false, output);
-  if (!status.ok()) {
-    (*output) << status.GetErrorMsg();
+  if (args.find("raw") == args.end()) {
+    stringstream ss;
+    Status status = GetRuntimeProfileStr(unique_id, false, &ss);
+    if (!status.ok()) {
+      (*output) << status.GetErrorMsg();
+    } else {
+      EscapeForHtml(ss.str(), output);
+    }
+  } else {
+    (*output) << "<pre>";
+    Status status = GetRuntimeProfileStr(unique_id, false, output);
+    if (!status.ok()) {
+      (*output) << status.GetErrorMsg();
+    }
+    (*output) << "</pre>";
   }
-  (*output) << "</pre>";
 }
 
 void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
@@ -1425,7 +1436,7 @@ Status ImpalaServer::ResetCatalogInternal() {
       return Status(msg.str());
     }
   }
-  
+
   ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME->Update(
       TimestampValue::local_time().DebugString());
 

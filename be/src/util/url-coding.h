@@ -50,6 +50,13 @@ void Base64Encode(const std::string& in, std::stringstream* out);
 // Returns true unless the string could not be correctly decoded.
 bool Base64Decode(const std::string& in, std::string* out);
 
+// Replaces &, < and > with &amp;, &lt; and &gt; respectively. This is
+// not the full set of required encodings, but one that should be
+// added to on a case-by-case basis. Slow, since it necessarily
+// inspects each character in turn, and copies them all to *out; use
+// judiciously.
+void EscapeForHtml(const std::string& in, std::stringstream* out);
+
 }
 
 #endif
