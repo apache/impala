@@ -25,6 +25,7 @@ import signal
 import socket
 import threading
 from optparse import OptionParser
+from Queue import Queue, Empty
 import getpass
 
 from beeswaxd import BeeswaxService
@@ -92,7 +93,6 @@ class OutputWriter(object):
 # Status tells the caller that the command completed successfully.
 # TODO: (amongst others)
 #   - Column headers / metadata support
-#   - Report profiles
 #   - A lot of rpcs return a verbose TStatus from thrift/Status.thrift
 #     This will be useful for better error handling. The next iteration
 #     of the shell should handle this return paramter.
@@ -141,7 +141,9 @@ class ImpalaShell(cmd.Cmd):
       self.do_connect(options.impalad)
 
     # We handle Ctrl-C ourselves, using an Event object to signal cancellation
-    # requests between the handler and the main shell thread
+    # requests between the handler and the main shell thread. Ctrl-C is explicitly
+    # not intercepted during an rpc, as it may interrupt system calls leaving
+    # the underlying socket unusable.
     self.is_interrupted = threading.Event()
     signal.signal(signal.SIGINT, self.__signal_handler)
 
@@ -462,7 +464,7 @@ class ImpalaShell(cmd.Cmd):
 
     if self.is_interrupted.isSet():
       if status == RpcStatus.OK:
-        self.__close_query_handle(handle)
+        self.__cancel_query(handle)
       return False
     if status != RpcStatus.OK:
       return False
@@ -709,17 +711,42 @@ class ImpalaShell(cmd.Cmd):
       return profile
 
   def __do_rpc(self, rpc):
-    """Executes the RPC lambda provided with some error checking. Returns
-       (rpc_result, RpcStatus.OK) if request was successful,
-       (None, RpcStatus.ERROR) otherwise.
+    """Creates a child thread which executes the provided callable.
 
-       If an exception occurs that cannot be recovered from, the connection will
-       be closed and self.connected will be set to False.
+    Blocks until the child thread terminates. Reads its results, if any,
+    from a Queue object. The child thread puts its results in the Queue object
+    upon completion.
+
+    """
+    # The queue  is responsible for passing the rpc results from __do_rpc_thread
+    # to __do_rpc.
+    # TODO: Investigate whether this can be done without using a Queue object.
+    rpc_results = Queue()
+    rpc_thread = threading.Thread(target=self.__do_rpc_thread, args=[rpc, rpc_results])
+    rpc_thread.start()
+    rpc_thread.join()
+    # The results should be in the queue. If they're not, return (None, RpcStatus.ERROR)
+    try:
+      results = rpc_results.get_nowait()
+    except Empty:
+      # Unexpected exception in __do_rpc_thread.
+      print 'Unexpected exception, no results returned.'
+      results = (None, RpcStatus.ERROR)
+    return results
+
+  def __do_rpc_thread(self, rpc, rpc_results):
+    """Executes the RPC lambda provided with some error checking.
+
+       Puts the result tuple in the result queue. The result tuple is
+       (rpc_result, RpcStatus.OK) if the rpc succeeded, (None, RpcStatus.ERROR)
+       if it failed. If an exception occurs that cannot be recovered from,
+       the connection will be closed and self.connected will be set to False.
+       (None, RpcStatus.ERROR) will be put in the queue.
 
     """
     if not self.connected:
       print "Not connected (use CONNECT to establish a connection)"
-      return (None, RpcStatus.ERROR)
+      rpc_results.put((None, RpcStatus.ERROR))
     try:
       ret = rpc()
       status = RpcStatus.OK
@@ -731,7 +758,7 @@ class ImpalaShell(cmd.Cmd):
           if ret.error_msgs:
             print 'RPC Error: %s' % '\n'.join(ret.error_msgs)
           status = RpcStatus.ERROR
-      return (ret, status)
+      rpc_results.put((ret, status))
     except BeeswaxService.QueryNotFoundException, q:
       print 'Error: Stale query handle'
     # beeswaxException prints out the entire object, printing
@@ -748,7 +775,7 @@ class ImpalaShell(cmd.Cmd):
       print 'Unknown Exception : %s' % (u,)
       self.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
-    return (None, RpcStatus.ERROR)
+    rpc_results.put((None, RpcStatus.ERROR))
 
   def do_explain(self, args):
     """Explain the query execution plan"""
