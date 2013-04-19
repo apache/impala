@@ -243,6 +243,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
     probe_batch_pos_ = 0;
     if (probe_batch_->num_rows() == 0) {
       if (probe_eos_) {
+        hash_tbl_iterator_ = hash_tbl_->Begin();
         eos_ = true;
         break;
       }

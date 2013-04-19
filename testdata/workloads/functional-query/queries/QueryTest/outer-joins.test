@@ -493,7 +493,6 @@ order by z.xid, z.yid, k.id limit 100
 int, int, int
 ---- RESULTS
 1,NULL,NULL
-# Uncomment results below when IMPALA-287 is fixed
-#NULL,1,NULL
-#NULL,NULL,1
+NULL,1,NULL
+NULL,NULL,1
 ====
