@@ -23,6 +23,9 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
+#include "util/cpu-info.h"
+#include "util/disk-info.h"
+#include "util/mem-info.h"
 #include "util/url-coding.h"
 #include "util/webserver.h"
 #include "util/logging.h"
@@ -89,6 +92,13 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* ou
   // path_handler_lock_ already held by MongooseCallback
   (*output) << "<h2>Version</h2>";
   (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
+  (*output) << "<h2>Hardware Info</h2>";
+  (*output) << "<pre>";
+  (*output) << CpuInfo::DebugString();
+  (*output) << MemInfo::DebugString();
+  (*output) << DiskInfo::DebugString();
+  (*output) << "</pre>";
+
   (*output) << "<h2>Status Pages</h2>";
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
     if (handler.second.is_on_nav_bar()) {
