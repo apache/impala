@@ -37,12 +37,13 @@
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/disk-info.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile.h"
-#include "util/disk-info.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -846,7 +847,7 @@ void HdfsScanNode::UpdateCounters() {
 
   // Convert disk access bitmap to num of disk accessed
   uint64_t num_disk_bitmap = disks_accessed_bitmap_.value();
-  int64_t num_disk_accessed = __builtin_popcountl(num_disk_bitmap);
+  int64_t num_disk_accessed = BitUtil::Popcount(num_disk_bitmap);
   num_disks_accessed_counter_->Set(num_disk_accessed);
 
   // output completed file types and counts to info string

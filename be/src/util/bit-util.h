@@ -16,6 +16,9 @@
 #ifndef IMPALA_BIT_UTIL_H
 #define IMPALA_BIT_UTIL_H
 
+#include "common/compiler-util.h"
+#include "util/cpu-info.h"
+
 namespace impala {
 
 // Utility class to do standard bit tricks
@@ -25,6 +28,24 @@ class BitUtil {
   // Returns the ceil of value/divisor
   static inline int Ceil(int value, int divisor) {
     return value / divisor + (value % divisor != 0);
+  }
+
+  // Non hw accelerated pop count.
+  // TODO: we don't use this in any perf sensitive code paths currently.  There
+  // might be a much faster way to implement this.
+  static inline int PopcountNoHw(uint64_t x) {
+    int count = 0;
+    for (; x != 0; ++count) x &= x-1;
+    return count;
+  }
+
+  // Returns the number of set bits in x
+  static inline int Popcount(uint64_t x) {
+    if (LIKELY(CpuInfo::IsSupported(CpuInfo::POPCNT))) {
+      return __builtin_popcountl(x);
+    } else {
+      return PopcountNoHw(x);
+    }
   }
 };
 

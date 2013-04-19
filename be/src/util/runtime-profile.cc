@@ -705,7 +705,6 @@ void RuntimeProfile::PeriodicCounterUpdateLoop() {
       it->first->at(val)->Update(1);
       ++it->second.num_sampled;
     }
-
   }
 }
 

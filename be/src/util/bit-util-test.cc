@@ -16,14 +16,16 @@
 #include <stdio.h>
 #include <iostream>
 
+#include <boost/utility.hpp>
 #include <gtest/gtest.h>
 #include "util/bit-util.h"
+#include "util/cpu-info.h"
 
 using namespace std;
 
 namespace impala {
 
-TEST(BitUtil, Test) { 
+TEST(BitUtil, Ceil) { 
   EXPECT_EQ(BitUtil::Ceil(0, 1), 0);
   EXPECT_EQ(BitUtil::Ceil(1, 1), 1);
   EXPECT_EQ(BitUtil::Ceil(1, 2), 1);
@@ -33,10 +35,22 @@ TEST(BitUtil, Test) {
   EXPECT_EQ(BitUtil::Ceil(9, 8), 2);
 }
 
+TEST(BitUtil, Popcount) {
+  EXPECT_EQ(BitUtil::Popcount(BOOST_BINARY(0 1 0 1 0 1 0 1)), 4);
+  EXPECT_EQ(BitUtil::PopcountNoHw(BOOST_BINARY(0 1 0 1 0 1 0 1)), 4);
+  EXPECT_EQ(BitUtil::Popcount(BOOST_BINARY(1 1 1 1 0 1 0 1)), 6);
+  EXPECT_EQ(BitUtil::PopcountNoHw(BOOST_BINARY(1 1 1 1 0 1 0 1)), 6);
+  EXPECT_EQ(BitUtil::Popcount(BOOST_BINARY(1 1 1 1 1 1 1 1)), 8);
+  EXPECT_EQ(BitUtil::PopcountNoHw(BOOST_BINARY(1 1 1 1 1 1 1 1)), 8);
+  EXPECT_EQ(BitUtil::Popcount(0), 0);
+  EXPECT_EQ(BitUtil::PopcountNoHw(0), 0);
+}
+
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
 
