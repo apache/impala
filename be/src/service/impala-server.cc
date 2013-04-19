@@ -745,6 +745,7 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
   }
 
   if (args.find("raw") == args.end()) {
+    (*output) << "<pre>";
     stringstream ss;
     Status status = GetRuntimeProfileStr(unique_id, false, &ss);
     if (!status.ok()) {
@@ -752,13 +753,12 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
     } else {
       EscapeForHtml(ss.str(), output);
     }
+    (*output) << "</pre>";
   } else {
-    (*output) << "<pre>";
     Status status = GetRuntimeProfileStr(unique_id, false, output);
     if (!status.ok()) {
       (*output) << status.GetErrorMsg();
     }
-    (*output) << "</pre>";
   }
 }
 

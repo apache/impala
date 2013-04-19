@@ -110,6 +110,7 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
     if (!UrlDecode(key_value[0], &key)) continue;
     string value;
     if (!UrlDecode((key_value.size() >= 2 ? key_value[1] : ""), &value)) continue;
+    to_lower(key);
     (*output)[key] = value;
   }
 }
@@ -219,10 +220,18 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
     if (use_style) BootstrapPageFooter(&output);
 
     string str = output.str();
-    mg_printf(connection, "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n", (int)str.length());
+    // Without styling, render the page as plain text
+    if (arguments.find("raw") != arguments.end()) {
+      mg_printf(connection, "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: %d\r\n"
+                "\r\n", (int)str.length());
+    } else {
+      mg_printf(connection, "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n"
+                "Content-Length: %d\r\n"
+                "\r\n", (int)str.length());
+    }
 
     // Make sure to use mg_write for printing the body; mg_printf truncates at 8kb
     mg_write(connection, str.c_str(), str.length());
