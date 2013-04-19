@@ -412,3 +412,10 @@ tinyint, bigint
 ---- RESULTS
 NULL,990
 ====
+---- QUERY
+# test that conjuncts are evaluated even if no columns are referenced
+select 1 from alltypestiny where 3 > 4
+---- TYPES
+tinyint
+---- RESULTS
+====

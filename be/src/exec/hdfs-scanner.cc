@@ -159,11 +159,11 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
   }
   if (num_tuples == 0) return 0;
 
+  if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
   if (context_->template_tuple() == NULL) {
     return num_tuples;
   } else {
     row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
-    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
     row = context->next_row(row);
 
     for (int n = 1; n < num_tuples; ++n) {

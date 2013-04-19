@@ -667,6 +667,13 @@ int, int, int, string
 9,1,2010,'0'
 ====
 ---- QUERY
+# test that conjuncts are evaluated even if no columns are referenced
+select 1 from alltypestiny where 3 > 4
+---- TYPES
+tinyint
+---- RESULTS
+====
+---- QUERY
 # Tests escape characters
 select * from functional.EscapeNoQuotes
 ---- TYPES
