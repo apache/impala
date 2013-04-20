@@ -57,8 +57,13 @@ public class HdfsStorageDescriptor {
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
   final static List<String> DELIMITER_KEYS =
       ImmutableList.of(serdeConstants.LINE_DELIM, serdeConstants.FIELD_DELIM,
-        serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM, 
+        serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
         serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
+
+  final static List<String> COMPATIBLE_SERDES = ImmutableList.of(
+      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", // (seq / text / parquet)
+      "org.apache.hadoop.hive.serde2.avro.AvroSerDe", // (avro)
+      "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe"); // (rc)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
@@ -181,13 +186,16 @@ public class HdfsStorageDescriptor {
    * metastore.
    *
    * @throws InvalidStorageDescriptorException - if the storage descriptor has invalid
-   * delimiters, or an unknown file format.
+   * delimiters, an unsupported SerDe, or an unknown file format.
    */
   public static HdfsStorageDescriptor fromStorageDescriptor(String tblName,
       StorageDescriptor sd)
       throws InvalidStorageDescriptorException {
     Map<String, Character> delimMap = extractDelimiters(sd.getSerdeInfo());
-
+    if (!COMPATIBLE_SERDES.contains(sd.getSerdeInfo().getSerializationLib())) {
+      throw new InvalidStorageDescriptorException(
+          "Unsupported SerDe: " + sd.getSerdeInfo().getSerializationLib());
+    }
     // Extract the blocksize and compression specification from the SerDe parameters,
     // if present.
     Map<String, String> parameters = sd.getSerdeInfo().getParameters();
@@ -209,11 +217,11 @@ public class HdfsStorageDescriptor {
     try {
       return new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(sd.getInputFormat()),
-          delimMap.get(serdeConstants.LINE_DELIM), 
+          delimMap.get(serdeConstants.LINE_DELIM),
           delimMap.get(serdeConstants.FIELD_DELIM),
-          delimMap.get(serdeConstants.COLLECTION_DELIM), 
+          delimMap.get(serdeConstants.COLLECTION_DELIM),
           delimMap.get(serdeConstants.MAPKEY_DELIM),
-          delimMap.get(serdeConstants.ESCAPE_CHAR), 
+          delimMap.get(serdeConstants.ESCAPE_CHAR),
           delimMap.get(serdeConstants.QUOTE_CHAR),
           blockSize, compression);
     } catch (IllegalArgumentException ex) {

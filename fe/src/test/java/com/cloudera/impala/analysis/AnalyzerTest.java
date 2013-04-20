@@ -2455,6 +2455,12 @@ public class AnalyzerTest {
         "Unsupported type 'DECIMAL' in 'dec_col'.");
   }
 
+  @Test
+  public void TestUnsupportedSerde() {
+    AnalysisError("select * from functional.bad_serde",
+                  "Failed to load metadata for table: bad_serde");
+  }
+
   /**
    * Check that:
    * - we don't cast literals (we should have simply converted the literal

@@ -1050,3 +1050,11 @@ array_table
 -- For structured-type testing
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (array_col array<int>);
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_serde
+---- CREATE_HIVE
+-- For incompatible SerDe testing
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col int) ROW FORMAT serde "org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe";
+====
