@@ -15,23 +15,17 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
-import java.util.Set;
-import java.util.ArrayList;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Represents an ALTER TABLE ADD PARTITION statement.
@@ -42,7 +36,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
 
   public AlterTableAddPartitionStmt(TableName tableName,
       List<PartitionKeyValue> partitionSpec, String location, boolean ifNotExists) {
-    super(tableName, partitionSpec); 
+    super(tableName, partitionSpec);
     Preconditions.checkState(partitionSpec != null && partitionSpec.size() > 0);
     this.location = location;
     this.ifNotExists = ifNotExists;
@@ -56,10 +50,12 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     return location;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" ADD ");
@@ -72,7 +68,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     }
     sb.append(String.format(" PARTITION (%s) ",
           Joiner.on(", ").join(partitionSpecStr)));
-    if (location != null) { 
+    if (location != null) {
       sb.append(String.format("LOCATION '%s'", location));
     }
     return sb.toString();
@@ -84,8 +80,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     params.setAlter_type(TAlterTableType.ADD_PARTITION);
     TAlterTableAddPartitionParams addPartParams = new TAlterTableAddPartitionParams();
     for (PartitionKeyValue kv: partitionSpec) {
-      String value =
-          PartitionKeyValue.getPartitionKeyValueString(kv, getNullPartitionKeyValue());
+      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
       addPartParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
     }
     addPartParams.setLocation(getLocation());
@@ -101,7 +96,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     Preconditions.checkState(targetTable != null && targetTable instanceof HdfsTable);
     HdfsTable hdfsTable = (HdfsTable) targetTable;
     if (!ifNotExists && hdfsTable.getPartition(partitionSpec) != null) {
-      throw new AnalysisException("Partition spec already exists: (" + 
+      throw new AnalysisException("Partition spec already exists: (" +
           Joiner.on(", ").join(partitionSpec) + ").");
     }
   }

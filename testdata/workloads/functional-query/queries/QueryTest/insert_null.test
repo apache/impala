@@ -104,7 +104,7 @@ bigint
 25
 ====
 ---- QUERY
-# Test NULL partition keys using static partition insert. Month partition key is NULL.
+# Test NULL partition keys using dynamic partition insert. Month partition key is NULL.
 insert overwrite table alltypesinsert
 partition(year=2008, month=NULL)
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 

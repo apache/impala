@@ -21,10 +21,10 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -120,6 +120,11 @@ public class InsertStmt extends ParseNodeBase {
         // Unpartitioned table, but INSERT has PARTITION clause
         throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
             "partitioned table. '" + targetTableName.getTbl() + "' is not partitioned");
+      }
+
+      // Make sure static partition key values only contain const exprs.
+      for (PartitionKeyValue kv: partitionKeyValues) {
+        kv.analyze(analyzer);
       }
 
       // Check that the partition clause mentions all the table's partitioning

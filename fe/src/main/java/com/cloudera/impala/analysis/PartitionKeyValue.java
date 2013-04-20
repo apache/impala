@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 /**
@@ -24,18 +25,31 @@ public class PartitionKeyValue {
   // Name of partitioning column.
   private final String colName;
   // Value of partitioning column. Set to null for dynamic inserts.
-  private final LiteralExpr value;
+  private final Expr value;
+  // Evaluation of value for static partition keys, null otherwise. Set in analyze().
+  private LiteralExpr literalValue;
 
-  public PartitionKeyValue(String colName, LiteralExpr value) {
+  public PartitionKeyValue(String colName, Expr value) {
     this.colName = colName.toLowerCase();
     this.value = value;
+  }
+
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isStatic() && !value.isConstant()) {
+      throw new AnalysisException(
+          String.format("Non-constant expressions are not supported " +
+              "as static partition-key values in '%s'.", toString()));
+    }
+    if (value == null) return;
+    value.analyze(analyzer);
+    literalValue = LiteralExpr.create(value, analyzer.getQueryGlobals());
   }
 
   public String getColName() {
     return colName;
   }
 
-  public LiteralExpr getValue() {
+  public Expr getValue() {
     return value;
   }
 
@@ -47,21 +61,22 @@ public class PartitionKeyValue {
     return !isDynamic();
   }
 
+  @Override
   public String toString() {
     return isStatic() ? colName + "=" + value.toSql() : colName;
   }
 
-  /*
+  /**
    * Utility method that returns the string value for the given partition key. For
-   * NULL values (a NullLiteral type) this will return the given value for the null
-   * partition key.
+   * NULL values (a NullLiteral type) or empty strings this will return the
+   * null partition key value.
    */
-  public static String getPartitionKeyValueString(PartitionKeyValue partitionKeyValue, 
-      String nullPartitionKeyValue) {
-    Preconditions.checkNotNull(partitionKeyValue);
-    if (partitionKeyValue.getValue() instanceof NullLiteral) {
+  public String getPartitionKeyValueString(String nullPartitionKeyValue) {
+    Preconditions.checkNotNull(literalValue);
+    if (literalValue instanceof NullLiteral
+        || literalValue.getStringValue().isEmpty()) {
       return nullPartitionKeyValue;
     }
-    return partitionKeyValue.getValue().getStringValue();
+    return literalValue.getStringValue();
   }
 }

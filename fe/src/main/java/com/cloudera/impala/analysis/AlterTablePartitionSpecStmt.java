@@ -16,17 +16,14 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 import java.util.Set;
-import java.util.ArrayList;
-
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.PrimitiveType;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.google.common.base.Joiner;
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -43,7 +40,7 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
 
   public AlterTablePartitionSpecStmt(TableName tableName,
       List<PartitionKeyValue> partitionSpec) {
-    super(tableName); 
+    super(tableName);
     Preconditions.checkState(partitionSpec != null && partitionSpec.size() > 0);
     this.partitionSpec = Lists.newArrayList(partitionSpec);
   }
@@ -70,6 +67,11 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
       throw new AnalysisException("Table is not partitioned: " + tableName);
     }
 
+    // Make sure static partition key values only contain constant exprs.
+    for (PartitionKeyValue kv: partitionSpec) {
+      kv.analyze(analyzer);
+    }
+
     // Get all keys in the target table.
     Set<String> targetPartitionKeys = Sets.newHashSet();
     for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
@@ -91,7 +93,7 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
       if (!keyNames.add(pk.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate partition key name: " + pk.getColName());
       }
-  
+
       Column c = table.getColumn(pk.getColName());
       if (c == null) {
         throw new AnalysisException(String.format(
@@ -111,7 +113,7 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
           PrimitiveType.getAssignmentCompatibleType(colType, literalType);
       if (!compatibleType.isValid()) {
         throw new AnalysisException(String.format("Target table not compatible.\n" +
-            "Incompatible types '%s' and '%s' in column '%s'", colType.toString(), 
+            "Incompatible types '%s' and '%s' in column '%s'", colType.toString(),
             literalType.toString(), pk.getColName()));
       }
       // Check for loss of precision with the partition value

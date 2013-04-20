@@ -186,11 +186,15 @@ class JniUtil {
   // Global reference to java JniUtil class
   static jclass jni_util_class() { return jni_util_cl_; }
 
+  // Global reference to InternalException class.
+  static jclass internal_exc_class() { return internal_exc_cl_; }
+
   // Delete all global references: class members, and those stored in global_refs_.
   static Status Cleanup();
 
  private:
   static jclass jni_util_cl_;
+  static jclass internal_exc_cl_;
   static jmethodID throwable_to_string_id_;
   // List of global references created with GetGlobalClassRef() or LocalToGlobalRef.
   // All global references are deleted in Cleanup().

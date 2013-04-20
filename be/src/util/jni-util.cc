@@ -21,6 +21,7 @@ using namespace std;
 namespace impala {
 
 jclass JniUtil::jni_util_cl_ = NULL;
+jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 vector<jobject> JniUtil::global_refs_;
 
@@ -49,7 +50,7 @@ Status JniUtil::Init() {
     return Status("Failed to get/create JVM");
   }
 
-  // Throwable
+  // Find JniUtil class and create a global ref.
   jclass local_jni_util_cl = env->FindClass("com/cloudera/impala/common/JniUtil");
   if (local_jni_util_cl == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
@@ -61,6 +62,23 @@ Status JniUtil::Init() {
     return Status("Failed to create global reference to JniUtil class.");
   }
   env->DeleteLocalRef(local_jni_util_cl);
+  if (env->ExceptionOccurred()) {
+    return Status("Failed to delete local reference to JniUtil class.");
+  }
+
+  // Find InternalException class and create a global ref.
+  jclass local_internal_exc_cl =
+      env->FindClass("com/cloudera/impala/common/InternalException");
+  if (local_internal_exc_cl == NULL) {
+    if (env->ExceptionOccurred()) env->ExceptionDescribe();
+    return Status("Failed to find JniUtil class.");
+  }
+  internal_exc_cl_ = reinterpret_cast<jclass>(env->NewGlobalRef(local_internal_exc_cl));
+  if (internal_exc_cl_ == NULL) {
+    if (env->ExceptionOccurred()) env->ExceptionDescribe();
+    return Status("Failed to create global reference to JniUtil class.");
+  }
+  env->DeleteLocalRef(local_internal_exc_cl);
   if (env->ExceptionOccurred()) {
     return Status("Failed to delete local reference to JniUtil class.");
   }

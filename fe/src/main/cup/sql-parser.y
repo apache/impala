@@ -599,8 +599,8 @@ partition_key_value ::=
 
 static_partition_key_value ::=
   // Static partition key values.
-  IDENT:column EQUAL literal:l
-  {: RESULT = new PartitionKeyValue(column, l); :}
+  IDENT:column EQUAL expr:e
+  {: RESULT = new PartitionKeyValue(column, e); :}
   ;
 
 // Our parsing of UNION is slightly different from MySQL's:

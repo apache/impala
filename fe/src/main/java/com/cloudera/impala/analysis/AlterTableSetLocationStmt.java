@@ -16,18 +16,16 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET LOCATION statement.
@@ -69,8 +67,7 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     TAlterTableSetLocationParams locationParams =
         new TAlterTableSetLocationParams(location);
     for (PartitionKeyValue kv: partitionSpec) {
-      String value =
-          PartitionKeyValue.getPartitionKeyValueString(kv, getNullPartitionKeyValue());
+      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
       locationParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
     }
     params.setSet_location_params(locationParams);
@@ -93,11 +90,16 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
       throw new AnalysisException("Table is not partitioned: " + tableName);
     }
 
+    // Make sure static partition key values only contain constant exprs.
+    for (PartitionKeyValue kv: partitionSpec) {
+      kv.analyze(analyzer);
+    }
+
     // If the table is partitioned it should be an HdfsTable
     Preconditions.checkState(table instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable) table;   
+    HdfsTable hdfsTable = (HdfsTable) table;
     if (hdfsTable.getPartition(partitionSpec) == null) {
-      throw new AnalysisException("No matching partition spec found: (" + 
+      throw new AnalysisException("No matching partition spec found: (" +
           Joiner.on(", ").join(partitionSpec) + ")");
     }
     nullPartitionKeyValue = hdfsTable.getNullPartitionKeyValue();

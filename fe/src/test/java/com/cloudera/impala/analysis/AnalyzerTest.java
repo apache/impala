@@ -510,7 +510,7 @@ public class AnalyzerTest {
     AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
     AnalyzesOk("select -1, 1 - 1, 10 - -1, 1 - - - 1");
     AnalyzesOk("select -1.0, 1.0 - 1.0, 10.0 - -1.0, 1.0 - - - 1.0");
-    AnalysisError("select a + 1");
+    AnalysisError("select a + 1", "couldn't resolve column reference: 'a'");
     // Test predicates in select list.
     AnalyzesOk("select true");
     AnalyzesOk("select false");
@@ -1565,9 +1565,14 @@ public class AnalyzerTest {
         "which is incompatible with expected type 'INT'.");
 
     // No implicit cast from STRING to INT
-    AnalysisError("select timestamp_col + interval '10' years from functional.alltypes");
+    AnalysisError("select timestamp_col + interval '10' years from functional.alltypes",
+                  "Operand ''10'' of timestamp arithmetic expression 'timestamp_col + " +
+                  "INTERVAL '10' years' returns type 'STRING' which is incompatible " +
+                  "with expected type 'INT'.");
     AnalysisError("select date_add(timestamp_col, interval '10' years) " +
-        "from functional.alltypes");
+                  "from functional.alltypes", "Operand ''10'' of timestamp arithmetic " +
+                  "expression 'date_add(timestamp_col, INTERVAL '10' years)' returns " +
+                  "type 'STRING' which is incompatible with expected type 'INT'.");
 
     // Cast from STRING to INT.
     AnalyzesOk("select timestamp_col + interval cast('10' as int) years " +
@@ -1644,8 +1649,10 @@ public class AnalyzerTest {
     AnalyzesOk("select coalesce('a')");
     AnalyzesOk("select coalesce('a', 'b', 'c')");
     // Need at least one argument.
-    AnalysisError("select concat()");
-    AnalysisError("select coalesce()");
+    AnalysisError("select concat()",
+                  "No matching function with those arguments: concat ()");
+    AnalysisError("select coalesce()",
+                  "No matching function with those arguments: coalesce ()");
   }
 
   /**
@@ -1916,11 +1923,29 @@ public class AnalyzerTest {
           " partition(year=2050, int_col=1)",
           "Column 'int_col' is not a partition column in table: functional.alltypes");
 
-      // Null partition values
-      AnalyzesOk(
-          "alter table functional.alltypes " + kw + " partition(year=NULL, month=1)");
-      AnalyzesOk(
-          "alter table functional.alltypes " + kw + " partition(year=NULL, month=NULL)");
+      // NULL partition keys
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=NULL, month=1)");
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=NULL, month=NULL)");
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=ascii(null), month=ascii(NULL))");
+      // Empty string partition keys
+      AnalyzesOk("alter table functional.insert_string_partitioned " + kw +
+          " partition(s2='')");
+      // Arbitrary exprs as partition key values. Constant exprs are ok.
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=-1, month=cast((10+5*4) as INT))");
+
+      // Arbitrary exprs as partition key values. Non-constant exprs should fail.
+      AnalysisError("alter table functional.alltypes " + kw +
+          " partition(year=2050, month=int_col)",
+          "Non-constant expressions are not supported as static partition-key values " +
+          "in 'month=int_col'.");
+      AnalysisError("alter table functional.alltypes " + kw +
+          " partition(year=cast(int_col as int), month=12)",
+          "Non-constant expressions are not supported as static partition-key values " +
+          "in 'year=CAST(int_col AS INT)'.");
 
       // Not a valid column
       AnalysisError("alter table functional.alltypes " + kw +
@@ -2063,6 +2088,22 @@ public class AnalyzerTest {
                "(string_col='partition1') set fileformat parquetfile");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='PaRtiTion1') set location '/a/b/c'");
+    // Arbitrary exprs as partition key values. Constant exprs are ok.
+    AnalyzesOk("alter table functional.alltypes PARTITION " +
+               "(year=cast(100*20+10 as INT), month=cast(2+9 as INT)) " +
+               "set fileformat sequencefile");
+    AnalyzesOk("alter table functional.alltypes PARTITION " +
+               "(year=cast(100*20+10 as INT), month=cast(2+9 as INT)) " +
+               "set location '/a/b'");
+    // Arbitrary exprs as partition key values. Non-constant exprs should fail.
+    AnalysisError("alter table functional.alltypes PARTITION " +
+                  "(Year=2050, month=int_col) set fileformat sequencefile",
+                  "Non-constant expressions are not supported as static partition-key " +
+                  "values in 'month=int_col'.");
+    AnalysisError("alter table functional.alltypes PARTITION " +
+                  "(Year=2050, month=int_col) set location '/a/b'",
+                  "Non-constant expressions are not supported as static partition-key " +
+                  "values in 'month=int_col'.");
 
     // Partition spec does not exist
     AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
@@ -2086,6 +2127,16 @@ public class AnalyzerTest {
     AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set fileformat sequencefile",
                   "No matching partition spec found: (string_col='partition2')");
+    AnalysisError("alter table functional.alltypes PARTITION " +
+                 "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
+                  "set location '/a/b'",
+                  "No matching partition spec found: " +
+                  "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
+    AnalysisError("alter table functional.alltypes PARTITION " +
+                  "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
+                  "set fileformat sequencefile",
+                  "No matching partition spec found: " +
+                  "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes set fileformat sequencefile",
@@ -2283,6 +2334,7 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+
     // Select '*' includes partitioning columns at the end.
     AnalyzesOk("insert " + qualifier +
         " table functional.alltypessmall partition (year, month)" +
@@ -2379,13 +2431,14 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
-    // Static partition with NULL partition keys.
+
+    // Static partition with NULL partition keys
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=NULL, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
-    // Static partition with NULL column values.
+    // Static partition with NULL column values
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=NULL, month=NULL)" +
         "select NULL, NULL, NULL, NULL, NULL, NULL, " +
@@ -2409,6 +2462,13 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+    // Arbitrary exprs as partition key values. Constant exprs are ok.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=-1, month=cast(100*20+10 as INT))" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
+
     // Union compatibility requires cast of select list expr in column 5
     // (int_col -> bigint).
     AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
@@ -2482,6 +2542,14 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+    // Arbitrary exprs as partition key values. Non-constant exprs should fail.
+    AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=-1, month=int_col)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes",
+        "Non-constant expressions are not supported as static partition-key values " +
+        "in 'month=int_col'.");
   }
 
   @Test

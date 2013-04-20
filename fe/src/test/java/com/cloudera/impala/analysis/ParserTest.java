@@ -825,6 +825,11 @@ public class ParserTest {
     // Static partition with boolean partitioning keys.
     ParsesOk("insert " + qualifier + " t partition (pk1=false, pk2=true) " +
         "select a from src where b > 5");
+    // Static partition with arbitrary exprs as partitioning keys.
+    ParsesOk("insert " + qualifier + " t partition (pk1=abc, pk2=(5*8+10)) " +
+        "select a from src where b > 5");
+    ParsesOk("insert " + qualifier + " t partition (pk1=f(a), pk2=!true and false) " +
+        "select a from src where b > 5");
   }
 
   @Test
@@ -966,6 +971,7 @@ public class ParserTest {
     ParsesOk("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION '/a/b'");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (i=NULL)");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (i=NULL, j=2, k=NULL)");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (i=abc, j=(5*8+10), k=!true and false)");
 
     // Cannot use dynamic partition syntax
     ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (partcol)");
@@ -1008,6 +1014,7 @@ public class ParserTest {
     ParsesOk("ALTER TABLE TestDb.Foo DROP IF EXISTS PARTITION (i=1, s='Hello')");
     ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL)");
     ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL, j=2, k=NULL)");
+    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=abc, j=(5*8+10), k=!true and false)");
 
     // Cannot use dynamic partition syntax
     ParserError("ALTER TABLE Foo DROP PARTITION (partcol)");

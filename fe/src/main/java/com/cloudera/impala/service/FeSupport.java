@@ -16,6 +16,7 @@ package com.cloudera.impala.service;
 
 import java.io.File;
 
+import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Preconditions;
@@ -42,30 +44,45 @@ public class FeSupport {
 
   private static boolean loaded = false;
 
-  public native static boolean NativeEvalPredicate(byte[] thriftPredicate,
+  // Returns a serialized TColumnValue.
+  public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
       byte[] thriftQueryGlobals);
+
+  public static TColumnValue EvalConstExpr(Expr expr, TQueryGlobals queryGlobals)
+      throws InternalException {
+    Preconditions.checkState(expr.isConstant());
+    TExpr thriftExpr = expr.treeToThrift();
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    byte[] result;
+    try {
+      result = EvalConstExpr(serializer.serialize(thriftExpr),
+          serializer.serialize(queryGlobals));
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TColumnValue val = new TColumnValue();
+      deserializer.deserialize(val, result);
+      return val;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("couldn't execute expr " + expr.toSql(), e);
+    }
+  }
+
+  private static byte[] EvalConstExpr(byte[] thriftExpr, byte[] thriftQueryGlobals) {
+    try {
+      return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
+  }
 
   public static boolean EvalPredicate(Expr pred, TQueryGlobals queryGlobals)
       throws InternalException {
     Preconditions.checkState(pred.getType() == PrimitiveType.BOOLEAN);
-    TExpr thriftPred = pred.treeToThrift();
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
-    try {
-      return FeSupport.EvalPredicate(serializer.serialize(thriftPred),
-          serializer.serialize(queryGlobals));
-    } catch (TException e) {
-      // this should never happen
-      throw new InternalException("couldn't execute predicate " + pred.toSql(), e);
-    }
-  }
-
-  private static boolean EvalPredicate(byte[] thriftPredicate, byte[] thriftQueryGlobals) {
-    try {
-      return NativeEvalPredicate(thriftPredicate, thriftQueryGlobals);
-    } catch (UnsatisfiedLinkError e) {
-      loadLibrary();
-    }
-    return NativeEvalPredicate(thriftPredicate, thriftQueryGlobals);
+    TColumnValue val = EvalConstExpr(pred, queryGlobals);
+    // Return false if pred evaluated to false or NULL. True otherwise.
+    return val.isSetBoolVal() && val.boolVal;
   }
 
   /**

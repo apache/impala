@@ -472,3 +472,64 @@ string, string
 ---- RESULTS
 'value','_.~ +'
 ====
+---- QUERY
+# static partition insert into string-partitioned table with empty partition key
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2='')
+SELECT "value1" FROM alltypessmall LIMIT 1;
+---- SETUP
+DROP PARTITIONS insert_string_partitioned
+---- RESULTS
+s2=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# dynamic partition insert into string-partitioned table with empty partition key
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2)
+SELECT "value2","" FROM alltypessmall LIMIT 1;
+---- RESULTS
+s2=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# static partition insert into string-partitioned table with NULL partition key
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2=NULL)
+SELECT "value3" FROM alltypessmall LIMIT 1;
+---- RESULTS
+s2=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# dynamic partition insert into string-partitioned table with NULL partition key
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2)
+SELECT "value4",NULL FROM alltypessmall LIMIT 1;
+---- RESULTS
+s2=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# select with empty partition key as predicate should return nothing, because "" is 
+# mapped to NULL
+SELECT * FROM insert_string_partitioned WHERE s2 = "";
+---- TYPES
+string, string
+---- RESULTS
+====
+---- QUERY
+# select with NULL partition key as predicate should return rows
+SELECT s1, s2 FROM insert_string_partitioned where s2 is NULL
+order by s1 limit 10
+---- TYPES
+string, string
+---- RESULTS
+'value1','NULL'
+'value2','NULL'
+'value3','NULL'
+'value4','NULL'
+====
+---- QUERY
+# static partition insert with constant exprs as partition-key values
+insert into alltypesinsert partition(year=cast(100*20+10 as int), month=cast(2*2 as int))
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col, timestamp_col from alltypessmall where month = 4
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2010/month=4/: 25
+====

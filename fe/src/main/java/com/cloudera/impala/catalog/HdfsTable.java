@@ -32,9 +32,9 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -457,8 +457,7 @@ public class HdfsTable extends Table {
   public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
-      String value = kv.getValue() instanceof NullLiteral ?
-          getNullPartitionKeyValue() : kv.getValue().getStringValue();
+      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
       partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
     }
     return getPartitionFromThriftPartitionSpec(partitionKeyValues);
@@ -502,8 +501,17 @@ public class HdfsTable extends Table {
       Preconditions.checkState(partitionValues.size() == targetValues.size());
       boolean matchFound = true;
       for (int i = 0; i < targetValues.size(); ++i) {
-        String value = partitionValues.get(i) instanceof NullLiteral ?
-            getNullPartitionKeyValue() : partitionValues.get(i).getStringValue();
+        String value;
+        if (partitionValues.get(i) instanceof NullLiteral) {
+          value = getNullPartitionKeyValue();
+        } else {
+          value = partitionValues.get(i).getStringValue();
+          Preconditions.checkNotNull(value);
+          // See IMPALA-252: we deliberately map empty strings on to
+          // NULL when they're in partition columns. This is for
+          // backwards compatibility with Hive, and is clearly broken.
+          if (value.isEmpty()) value = getNullPartitionKeyValue();
+        }
         if (!targetValues.get(i).equals(value.toLowerCase())) {
           matchFound = false;
           break;

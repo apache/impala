@@ -48,9 +48,10 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::server;
 
+// Requires JniUtil::Init() to have been called.
 extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate(
+JNIEXPORT jbyteArray JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes,
     jbyteArray thrift_query_globals_bytes) {
   ObjectPool obj_pool;
@@ -59,34 +60,20 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate(
   TQueryGlobals query_globals;
   DeserializeThriftMsg(env, thrift_query_globals_bytes, &query_globals);
   RuntimeState state(query_globals.now_string);
+  jbyteArray result_bytes;
+
   Expr* e;
-  Status status = Expr::CreateExprTree(&obj_pool, thrift_predicate, &e);
-  if (status.ok()) {
-    // TODO: codegen this as well.
-    status = Expr::Prepare(e, &state, RowDescriptor(), true);
-  }
-  if (!status.ok()) {
-    string error_msg;
-    status.GetErrorMsg(&error_msg);
-    jclass internal_exc_cl =
-        env->FindClass("com/cloudera/impala/common/InternalException");
-    if (internal_exc_cl == NULL) {
-      if (env->ExceptionOccurred()) env->ExceptionDescribe();
-      return false;
-    }
-    env->ThrowNew(internal_exc_cl, error_msg.c_str());
-    return false;
-  }
+  THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor(), true), env,
+                     JniUtil::internal_exc_class(), result_bytes);
 
-  void* value = e->GetValue(NULL);
-  // This can happen if a table has partitions with NULL key values.
-  if (value == NULL) {
-    return false;
-  }
-  bool* v = static_cast<bool*>(value);
-  return *v;
+  TColumnValue val;
+  e->GetValue(NULL, false, &val);
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &val, &result_bytes), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
 }
-
 
 namespace impala {
 
@@ -94,10 +81,10 @@ void InitFeSupport() {
   JNIEnv* env = getJNIEnv();
   JNINativeMethod nm;
   jclass native_backend_cl = env->FindClass("com/cloudera/impala/service/FeSupport");
-  nm.name = const_cast<char*>("NativeEvalPredicate");
-  nm.signature = const_cast<char*>("([B[B)Z");
+  nm.name = const_cast<char*>("NativeEvalConstExpr");
+  nm.signature = const_cast<char*>("([B[B)[B");
   nm.fnPtr = reinterpret_cast<void*>(
-      ::Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate);
+      ::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr);
   env->RegisterNatives(native_backend_cl, &nm, 1);
 }
 

@@ -215,7 +215,7 @@ location '/test-warehouse/t_part_tmp'
 ---- RESULTS
 ====
 ---- QUERY
-alter table t_part add partition (j=1, s='2012')
+alter table t_part add partition (j=cast(2-1 as int), s='2012')
 ---- RESULTS
 ====
 ---- QUERY
@@ -223,7 +223,7 @@ alter table t_part add if not exists partition (j=1, s='2012')
 ---- RESULTS
 ====
 ---- QUERY
-alter table t_part add partition (j=1, s='2013')
+alter table t_part add partition (j=1, s=substring('foo2013bar', 4, 8))
 ---- RESULTS
 ====
 ---- QUERY
@@ -325,7 +325,7 @@ select i, j, s from t_part
 int,int,string
 ====
 ---- QUERY
-alter table t_part drop partition (j=NULL, s='2013')
+alter table t_part drop partition (j=NULL, s=trim('  2013  '))
 ---- RESULTS
 ====
 ---- QUERY
@@ -348,6 +348,43 @@ select i, j, s from t_part
 ---- RESULTS
 2,1,'2012'
 2,1,'2012'
+---- TYPES
+int,int,string
+====
+---- QUERY
+# Test that empty string as partition column maps onto NULL
+# using static partition insert
+insert into table t_part partition(j=2, s='')
+select 1 from functional.alltypes limit 1
+---- RESULTS
+j=2/s=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# Test that empty string as partition column maps onto NULL
+# using dynamic partition insert
+insert into table t_part partition(j=2, s)
+select 10, '' from functional.alltypes limit 1
+---- RESULTS
+j=2/s=__HIVE_DEFAULT_PARTITION__/: 1
+====
+---- QUERY
+# Validate the previous inserts
+select i, j, s from t_part where s is NULL
+---- RESULTS
+1,2,'NULL'
+10,2,'NULL'
+---- TYPES
+int,int,string
+====
+---- QUERY
+# Drop default partition using empty string as key
+alter table t_part drop partition (j=2, s='')
+---- RESULTS
+====
+---- QUERY
+# Validate previous partition drop
+select i, j, s from t_part where s is NULL
+---- RESULTS
 ---- TYPES
 int,int,string
 ====
@@ -430,12 +467,12 @@ int,bigint
 ---- QUERY
 # Point the other partition at some more data. This time in a different
 # file format.
-alter table alltypes_test partition(month=5, year=2009)
+alter table alltypes_test partition(month=cast(1+4 as int), year=cast(100*20+9 as int))
 set location '/test-warehouse/alltypes_rc/year=2009/month=5'
 ---- RESULTS
 ====
 ---- QUERY
-alter table alltypes_test partition(month=5, year=2009)
+alter table alltypes_test partition(month=cast(2+3 as int), year=2009)
 set fileformat rcfile
 ---- RESULTS
 ====
