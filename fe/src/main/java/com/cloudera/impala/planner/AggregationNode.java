@@ -24,13 +24,11 @@ import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 
 /**
  * Aggregation computation.
@@ -50,7 +48,7 @@ public class AggregationNode extends PlanNode {
    */
   public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo,
       boolean isIntermediate) {
-    super(id, aggInfo.getAggTupleId().asList());
+    super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
     this.aggInfo = aggInfo;
     this.children.add(input);
     needsFinalize = false;
@@ -139,19 +137,20 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
-    StringBuilder output = new StringBuilder()
-        .append(prefix + "AGGREGATE\n")
-        .append(prefix + "OUTPUT: ")
-        .append(getExplainString(aggInfo.getAggregateExprs()) + "\n")
-        .append(prefix + "GROUP BY: ")
-        .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
+  protected String getNodeExplainString(String detailPrefix,
+      TExplainLevel detailLevel) {
+    StringBuilder output = new StringBuilder();
+    if (aggInfo.getAggregateExprs() != null && aggInfo.getAggregateExprs().size() > 0) {
+      output.append(detailPrefix + "output: ")
+        .append(getExplainString(aggInfo.getAggregateExprs()) + "\n");
+    }
+    // TODO: group by can be very long. Break it into multiple lines
+    output.append(detailPrefix + "group by: ")
+      .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "HAVING: ")
+      output.append(detailPrefix + "having: ")
           .append(getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix, detailLevel))
-        .append(getChild(0).getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 

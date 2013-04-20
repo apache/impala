@@ -25,7 +25,6 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TMergeNode;
@@ -57,13 +56,13 @@ public class MergeNode extends PlanNode {
   protected final TupleId tupleId;
 
   protected MergeNode(PlanNodeId id, TupleId tupleId) {
-    super(id, Lists.newArrayList(tupleId));
+    super(id, Lists.newArrayList(tupleId), "MERGE");
     this.rowTupleIds.add(tupleId);
     this.tupleId = tupleId;
   }
 
   protected MergeNode(PlanNodeId id, MergeNode node) {
-    super(id, node);
+    super(id, node, "MERGE");
     this.tupleId = node.tupleId;
   }
 
@@ -120,20 +119,16 @@ public class MergeNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String prefix,
+      TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "MERGE (" + id + ")\n");
-    output.append(super.getExplainString(prefix + "  ", detailLevel));
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates referring to the inline view.
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
+      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
-    for (int i = 0; i < constExprLists.size(); ++i) {
-      output.append(prefix + "  SELECT CONSTANT\n");
-    }
-    for (PlanNode child : children) {
-      output.append(child.getExplainString(prefix + "  ", detailLevel));
+    if (constExprLists.size() > 0) {
+      output.append(prefix + "merging " + constExprLists.size() + " SELECT CONSTANT\n");
     }
     return output.toString();
   }

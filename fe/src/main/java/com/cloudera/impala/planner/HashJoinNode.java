@@ -60,6 +60,7 @@ public class HashJoinNode extends PlanNode {
       this.description = descr;
     }
 
+    @Override
     public String toString() { return description; }
   }
 
@@ -74,7 +75,7 @@ public class HashJoinNode extends PlanNode {
   public HashJoinNode(
       PlanNodeId id, PlanNode outer, PlanNode inner, TableRef innerRef,
       List<Pair<Expr, Expr> > eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
-    super(id);
+    super(id, "HASH JOIN");
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
     tupleIds.addAll(outer.getTupleIds());
@@ -220,30 +221,26 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
-    StringBuilder output = new StringBuilder().append(prefix + "HASH JOIN");
-    if (distrMode != DistributionMode.NONE) {
-      output.append(" (" + distrMode.toString() + ")");
-    }
-    output.append("\n");
-    output.append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")
-        .append(prefix + "  HASH PREDICATES:");
+
+  protected String getNodeExplainString(String detailPrefix,
+      TExplainLevel detailLevel) {
+    String distrModeStr = (distrMode != DistributionMode.NONE) ?
+        (" (" + distrMode.toString() + ")") : "";
+    StringBuilder output = new StringBuilder()
+      .append(detailPrefix + "join op: " + joinOp.toString() + distrModeStr + "\n")
+      .append(detailPrefix + "hash predicates:\n");
     for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
-      output.append(
-          "\n" + prefix + "    " + entry.first.toSql() + " = " + entry.second.toSql());
+      output.append(detailPrefix + "  " +
+          entry.first.toSql() + " = " + entry.second.toSql() + "\n");
     }
-    output.append("\n");
     if (!otherJoinConjuncts.isEmpty()) {
-      output.append(prefix + "  OTHER JOIN PREDICATES: ")
+      output.append(detailPrefix + "other join predicates: ")
           .append(getExplainString(otherJoinConjuncts) + "\n");
     }
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  OTHER PREDICATES: ")
+      output.append(detailPrefix + "other predicates: ")
           .append(getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix + "  ", detailLevel))
-        .append(getChild(0).getExplainString(prefix + "    ", detailLevel))
-        .append(getChild(1).getExplainString(prefix + "    ", detailLevel));
     return output.toString();
   }
 }

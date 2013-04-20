@@ -20,7 +20,6 @@ import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 
 /**
  * Representation of the common elements of all scan nodes.
@@ -28,8 +27,8 @@ import com.google.common.base.Preconditions;
 abstract public class ScanNode extends PlanNode {
   protected final TupleDescriptor desc;
 
-  public ScanNode(PlanNodeId id, TupleDescriptor desc) {
-    super(id, desc.getId().asList());
+  public ScanNode(PlanNodeId id, TupleDescriptor desc, String planNodeName) {
+    super(id, desc.getId().asList(), planNodeName);
     this.desc = desc;
   }
 

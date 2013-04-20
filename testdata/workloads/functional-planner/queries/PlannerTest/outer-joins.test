@@ -27,84 +27,103 @@ and t1.zip + t2.zip = 10
 # join predicate between t1, t2 and t3 applied after last join
 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      t1.id = t3.id
-    OTHER JOIN PREDICATES: t2.id = 15, t1.id - t2.id = 0
-    OTHER PREDICATES: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
-    TUPLE IDS: 0 1N 2N 
-      HASH JOIN
-        JOIN OP: LEFT OUTER JOIN
-        HASH PREDICATES:
-          t1.id - 1 = t2.id + 1
-        OTHER JOIN PREDICATES: t1.zip = 94611
-        OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
-        TUPLE IDS: 0 1N 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: t1.id > 0
-            TUPLE IDS: 0 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-            PREDICATES: t2.zip = 94104
-            TUPLE IDS: 1 
-      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-        PREDICATES: t3.zip = 94720
-        TUPLE IDS: 2 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (7)
-    TUPLE IDS: 0 1N 2N 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  RANDOM
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  other join predicates: t2.id = 15, t1.id - t2.id = 0
+  |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
+  |  tuple ids: 0 1N 2N 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: t3.zip = 94720
+  |       tuple ids: 2 
+  |    
+  2:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    t1.id - 1 = t2.id + 1
+  |  other join predicates: t1.zip = 94611
+  |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
+  |  tuple ids: 0 1N 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: t2.zip = 94104
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: t1.id > 0
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+     tuple ids: 0 1N 2N 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  HASH JOIN (BROADCAST)
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      t1.id = t3.id
-    OTHER JOIN PREDICATES: t2.id = 15, t1.id - t2.id = 0
-    OTHER PREDICATES: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
-    TUPLE IDS: 0 1N 2N 
-      HASH JOIN (BROADCAST)
-        JOIN OP: LEFT OUTER JOIN
-        HASH PREDICATES:
-          t1.id - 1 = t2.id + 1
-        OTHER JOIN PREDICATES: t1.zip = 94611
-        OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
-        TUPLE IDS: 0 1N 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: t1.id > 0
-            TUPLE IDS: 0 
-          EXCHANGE (5)
-            TUPLE IDS: 1 
-      EXCHANGE (6)
-        TUPLE IDS: 2 
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN (BROADCAST)
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  other join predicates: t2.id = 15, t1.id - t2.id = 0
+  |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
+  |  tuple ids: 0 1N 2N 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  2:HASH JOIN
+  |  join op: LEFT OUTER JOIN (BROADCAST)
+  |  hash predicates:
+  |    t1.id - 1 = t2.id + 1
+  |  other join predicates: t1.zip = 94611
+  |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
+  |  tuple ids: 0 1N 
+  |  
+  |----5:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: t1.id > 0
+     tuple ids: 0 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-    PREDICATES: t3.zip = 94720
-    TUPLE IDS: 2 
+  3:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: t3.zip = 94720
+     tuple ids: 2 
 
-Plan Fragment 3
-  RANDOM
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-    PREDICATES: t2.zip = 94104
-    TUPLE IDS: 1 
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: t2.zip = 94104
+     tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -119,84 +138,103 @@ from (select * from functional.testtbl a1) t1 left outer join (select * from fun
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      a1.id = a3.id
-    OTHER JOIN PREDICATES: a2.id = 15, a1.id - a2.id = 0
-    OTHER PREDICATES: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
-    TUPLE IDS: 0 2N 4N 
-      HASH JOIN
-        JOIN OP: LEFT OUTER JOIN
-        HASH PREDICATES:
-          a1.id - 1 = a2.id + 1
-        OTHER JOIN PREDICATES: a1.zip = 94611
-        OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
-        TUPLE IDS: 0 2N 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: a1.id > 0
-            TUPLE IDS: 0 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-            PREDICATES: a2.zip = 94104
-            TUPLE IDS: 2 
-      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-        PREDICATES: a3.zip = 94720
-        TUPLE IDS: 4 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (7)
-    TUPLE IDS: 0 2N 4N 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  RANDOM
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    a1.id = a3.id
+  |  other join predicates: a2.id = 15, a1.id - a2.id = 0
+  |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
+  |  tuple ids: 0 2N 4N 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: a3.zip = 94720
+  |       tuple ids: 4 
+  |    
+  2:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    a1.id - 1 = a2.id + 1
+  |  other join predicates: a1.zip = 94611
+  |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
+  |  tuple ids: 0 2N 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: a2.zip = 94104
+  |       tuple ids: 2 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: a1.id > 0
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+     tuple ids: 0 2N 4N 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  HASH JOIN (BROADCAST)
-    JOIN OP: LEFT OUTER JOIN
-    HASH PREDICATES:
-      a1.id = a3.id
-    OTHER JOIN PREDICATES: a2.id = 15, a1.id - a2.id = 0
-    OTHER PREDICATES: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
-    TUPLE IDS: 0 2N 4N 
-      HASH JOIN (BROADCAST)
-        JOIN OP: LEFT OUTER JOIN
-        HASH PREDICATES:
-          a1.id - 1 = a2.id + 1
-        OTHER JOIN PREDICATES: a1.zip = 94611
-        OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
-        TUPLE IDS: 0 2N 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: a1.id > 0
-            TUPLE IDS: 0 
-          EXCHANGE (5)
-            TUPLE IDS: 2 
-      EXCHANGE (6)
-        TUPLE IDS: 4 
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN (BROADCAST)
+  |  hash predicates:
+  |    a1.id = a3.id
+  |  other join predicates: a2.id = 15, a1.id - a2.id = 0
+  |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
+  |  tuple ids: 0 2N 4N 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 4 
+  |    
+  2:HASH JOIN
+  |  join op: LEFT OUTER JOIN (BROADCAST)
+  |  hash predicates:
+  |    a1.id - 1 = a2.id + 1
+  |  other join predicates: a1.zip = 94611
+  |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
+  |  tuple ids: 0 2N 
+  |  
+  |----5:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: a1.id > 0
+     tuple ids: 0 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-    PREDICATES: a3.zip = 94720
-    TUPLE IDS: 4 
+  3:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: a3.zip = 94720
+     tuple ids: 4 
 
-Plan Fragment 3
-  RANDOM
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-    PREDICATES: a2.zip = 94104
-    TUPLE IDS: 2 
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: a2.zip = 94104
+     tuple ids: 2 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -232,100 +270,121 @@ and t1.zip + t2.zip = 10
 # join predicate between t1, t2 and t3 applied after last join
 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      t1.id = t3.id
-    OTHER JOIN PREDICATES: t1.id - t2.id = 0, t3.zip = 94720
-    OTHER PREDICATES: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
-    TUPLE IDS: 0N 1N 2 
-      HASH JOIN
-        JOIN OP: RIGHT OUTER JOIN
-        HASH PREDICATES:
-          t1.id - 1 = t2.id + 1
-        OTHER JOIN PREDICATES: t2.zip = 94104
-        TUPLE IDS: 0N 1 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: t1.zip = 94611
-            TUPLE IDS: 0 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-            PREDICATES: t2.id = 15
-            TUPLE IDS: 1 
-      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-        PREDICATES: t3.id IS NOT NULL
-        TUPLE IDS: 2 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (9)
-    TUPLE IDS: 0N 1N 2 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  4:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  other join predicates: t1.id - t2.id = 0, t3.zip = 94720
+  |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
+  |  tuple ids: 0N 1N 2 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: t3.id IS NOT NULL
+  |       tuple ids: 2 
+  |    
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    t1.id - 1 = t2.id + 1
+  |  other join predicates: t2.zip = 94104
+  |  tuple ids: 0N 1 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: t2.id = 15
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: t1.zip = 94611
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  9:EXCHANGE
+     tuple ids: 0N 1N 2 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: t1.id
+
   STREAM DATA SINK
     EXCHANGE ID: 9
     UNPARTITIONED
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      t1.id = t3.id
-    OTHER JOIN PREDICATES: t1.id - t2.id = 0, t3.zip = 94720
-    OTHER PREDICATES: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
-    TUPLE IDS: 0N 1N 2 
-      EXCHANGE (7)
-        TUPLE IDS: 0N 1 
-      EXCHANGE (8)
-        TUPLE IDS: 2 
+  4:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  other join predicates: t1.id - t2.id = 0, t3.zip = 94720
+  |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
+  |  tuple ids: 0N 1N 2 
+  |  
+  |----8:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  7:EXCHANGE
+     tuple ids: 0N 1 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 8
     HASH_PARTITIONED: t3.id
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-    PREDICATES: t3.id IS NOT NULL
-    TUPLE IDS: 2 
+  3:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: t3.id IS NOT NULL
+     tuple ids: 2 
 
-Plan Fragment 3
-  HASH_PARTITIONED: t1.id - 1
+PLAN FRAGMENT 3
+  PARTITION: HASH_PARTITIONED: t1.id - 1
+
   STREAM DATA SINK
     EXCHANGE ID: 7
     HASH_PARTITIONED: t1.id
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      t1.id - 1 = t2.id + 1
-    OTHER JOIN PREDICATES: t2.zip = 94104
-    TUPLE IDS: 0N 1 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 1 
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    t1.id - 1 = t2.id + 1
+  |  other join predicates: t2.zip = 94104
+  |  tuple ids: 0N 1 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  5:EXCHANGE
+     tuple ids: 0 
 
-Plan Fragment 4
-  RANDOM
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 6
     HASH_PARTITIONED: t2.id + 1
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-    PREDICATES: t2.id = 15
-    TUPLE IDS: 1 
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: t2.id = 15
+     tuple ids: 1 
 
-Plan Fragment 5
-  RANDOM
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     HASH_PARTITIONED: t1.id - 1
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: t1.zip = 94611
-    TUPLE IDS: 0 
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: t1.zip = 94611
+     tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -340,100 +399,121 @@ from (select * from functional.testtbl a1) t1 right outer join (select * from fu
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a1.id = a3.id
-    OTHER JOIN PREDICATES: a1.id - a2.id = 0, a3.zip = 94720
-    OTHER PREDICATES: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
-    TUPLE IDS: 0N 2N 4 
-      HASH JOIN
-        JOIN OP: RIGHT OUTER JOIN
-        HASH PREDICATES:
-          a1.id - 1 = a2.id + 1
-        OTHER JOIN PREDICATES: a2.zip = 94104
-        TUPLE IDS: 0N 2 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-            PREDICATES: a1.zip = 94611
-            TUPLE IDS: 0 
-          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-            PREDICATES: a2.id = 15
-            TUPLE IDS: 2 
-      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-        PREDICATES: a3.id IS NOT NULL
-        TUPLE IDS: 4 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (9)
-    TUPLE IDS: 0N 2N 4 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  HASH_PARTITIONED: a1.id
+  4:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    a1.id = a3.id
+  |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
+  |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+  |  tuple ids: 0N 2N 4 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: a3.id IS NOT NULL
+  |       tuple ids: 4 
+  |    
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    a1.id - 1 = a2.id + 1
+  |  other join predicates: a2.zip = 94104
+  |  tuple ids: 0N 2 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       predicates: a2.id = 15
+  |       tuple ids: 2 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: a1.zip = 94611
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  9:EXCHANGE
+     tuple ids: 0N 2N 4 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: a1.id
+
   STREAM DATA SINK
     EXCHANGE ID: 9
     UNPARTITIONED
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a1.id = a3.id
-    OTHER JOIN PREDICATES: a1.id - a2.id = 0, a3.zip = 94720
-    OTHER PREDICATES: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
-    TUPLE IDS: 0N 2N 4 
-      EXCHANGE (7)
-        TUPLE IDS: 0N 2 
-      EXCHANGE (8)
-        TUPLE IDS: 4 
+  4:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a1.id = a3.id
+  |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
+  |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+  |  tuple ids: 0N 2N 4 
+  |  
+  |----8:EXCHANGE
+  |       tuple ids: 4 
+  |    
+  7:EXCHANGE
+     tuple ids: 0N 2 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 8
     HASH_PARTITIONED: a3.id
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
-    PREDICATES: a3.id IS NOT NULL
-    TUPLE IDS: 4 
+  3:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: a3.id IS NOT NULL
+     tuple ids: 4 
 
-Plan Fragment 3
-  HASH_PARTITIONED: a1.id - 1
+PLAN FRAGMENT 3
+  PARTITION: HASH_PARTITIONED: a1.id - 1
+
   STREAM DATA SINK
     EXCHANGE ID: 7
     HASH_PARTITIONED: a1.id
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a1.id - 1 = a2.id + 1
-    OTHER JOIN PREDICATES: a2.zip = 94104
-    TUPLE IDS: 0N 2 
-      EXCHANGE (5)
-        TUPLE IDS: 0 
-      EXCHANGE (6)
-        TUPLE IDS: 2 
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a1.id - 1 = a2.id + 1
+  |  other join predicates: a2.zip = 94104
+  |  tuple ids: 0N 2 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  5:EXCHANGE
+     tuple ids: 0 
 
-Plan Fragment 4
-  RANDOM
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 6
     HASH_PARTITIONED: a2.id + 1
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
-    PREDICATES: a2.id = 15
-    TUPLE IDS: 2 
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     predicates: a2.id = 15
+     tuple ids: 2 
 
-Plan Fragment 5
-  RANDOM
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     HASH_PARTITIONED: a1.id - 1
 
-  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
-    PREDICATES: a1.zip = 94611
-    TUPLE IDS: 0 
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     predicates: a1.zip = 94611
+     tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -446,58 +526,71 @@ from functional.alltypesagg a
 right outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a.tinyint_col = b.id
-    OTHER PREDICATES: a.tinyint_col IS NULL
-    TUPLE IDS: 0N 1 
-      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-        TUPLE IDS: 0 
-      SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1) compact
-        TUPLE IDS: 1 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (5)
-    TUPLE IDS: 0N 1 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  HASH_PARTITIONED: a.tinyint_col
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    a.tinyint_col = b.id
+  |  other predicates: a.tinyint_col IS NULL
+  |  tuple ids: 0N 1 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10 size=743.67KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:EXCHANGE
+     tuple ids: 0N 1 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: a.tinyint_col
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: RIGHT OUTER JOIN
-    HASH PREDICATES:
-      a.tinyint_col = b.id
-    OTHER PREDICATES: a.tinyint_col IS NULL
-    TUPLE IDS: 0N 1 
-      EXCHANGE (3)
-        TUPLE IDS: 0 
-      EXCHANGE (4)
-        TUPLE IDS: 1 
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.tinyint_col = b.id
+  |  other predicates: a.tinyint_col IS NULL
+  |  tuple ids: 0N 1 
+  |  
+  |----4:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  3:EXCHANGE
+     tuple ids: 0 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 4
     HASH_PARTITIONED: b.id
 
-  SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1) compact
-    TUPLE IDS: 1 
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B compact
+     tuple ids: 1 
 
-Plan Fragment 3
-  RANDOM
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 3
     HASH_PARTITIONED: a.tinyint_col
 
-  SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-    TUPLE IDS: 0 
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10 size=743.67KB
+     tuple ids: 0 
 ====
 # same for full outer joins
 select a.tinyint_col, b.id
@@ -505,56 +598,69 @@ from functional.alltypesagg a
 full outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  HASH JOIN
-    JOIN OP: FULL OUTER JOIN
-    HASH PREDICATES:
-      a.tinyint_col = b.id
-    OTHER PREDICATES: a.tinyint_col IS NULL
-    TUPLE IDS: 0N 1N 
-      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-        TUPLE IDS: 0 
-      SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1) compact
-        TUPLE IDS: 1 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  EXCHANGE (5)
-    TUPLE IDS: 0N 1N 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  HASH_PARTITIONED: a.tinyint_col
+  2:HASH JOIN
+  |  join op: FULL OUTER JOIN
+  |  hash predicates:
+  |    a.tinyint_col = b.id
+  |  other predicates: a.tinyint_col IS NULL
+  |  tuple ids: 0N 1N 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10 size=743.67KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:EXCHANGE
+     tuple ids: 0N 1N 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: a.tinyint_col
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN (PARTITIONED)
-    JOIN OP: FULL OUTER JOIN
-    HASH PREDICATES:
-      a.tinyint_col = b.id
-    OTHER PREDICATES: a.tinyint_col IS NULL
-    TUPLE IDS: 0N 1N 
-      EXCHANGE (3)
-        TUPLE IDS: 0 
-      EXCHANGE (4)
-        TUPLE IDS: 1 
+  2:HASH JOIN
+  |  join op: FULL OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.tinyint_col = b.id
+  |  other predicates: a.tinyint_col IS NULL
+  |  tuple ids: 0N 1N 
+  |  
+  |----4:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  3:EXCHANGE
+     tuple ids: 0 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 4
     HASH_PARTITIONED: b.id
 
-  SCAN HDFS table=functional.alltypestiny #partitions=4 size=460B (1) compact
-    TUPLE IDS: 1 
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B compact
+     tuple ids: 1 
 
-Plan Fragment 3
-  RANDOM
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 3
     HASH_PARTITIONED: a.tinyint_col
 
-  SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
-    TUPLE IDS: 0 
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10 size=743.67KB
+     tuple ids: 0 
 ====

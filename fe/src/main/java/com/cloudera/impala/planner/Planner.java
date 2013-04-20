@@ -204,7 +204,7 @@ public class Planner {
         // a blank line between plan fragments
         str.append("\n");
       }
-      str.append("Plan Fragment " + i + "\n");
+      str.append("PLAN FRAGMENT " + i + "\n");
       str.append(fragment.getExplainString(explainLevel));
     }
     return str.toString();

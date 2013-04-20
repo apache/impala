@@ -17,10 +17,8 @@ package com.cloudera.impala.planner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TExchangeNode;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
@@ -47,7 +45,7 @@ public class ExchangeNode extends PlanNode {
    * need to compute the cardinality here.
    */
   public ExchangeNode(PlanNodeId id, PlanNode inputNode, boolean copyConjuncts) {
-    super(id, inputNode);
+    super(id, inputNode, "EXCHANGE");
     if (!copyConjuncts) {
       this.conjuncts = Lists.newArrayList();
     }
@@ -65,15 +63,6 @@ public class ExchangeNode extends PlanNode {
     for (TupleId tid: tupleIds) {
       msg.exchange_node.addToInput_row_tuples(tid.asInt());
     }
-  }
-
-  @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
-    StringBuilder output = new StringBuilder();
-    output.append(prefix + "EXCHANGE (" + id.toString() + ")");
-    output.append("\n");
-    output.append(super.getExplainString(prefix + "  ", detailLevel));
-    return output.toString();
   }
 
   @Override

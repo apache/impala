@@ -16,8 +16,8 @@ package com.cloudera.impala.planner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -30,7 +30,7 @@ public class SelectNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SelectNode.class);
 
   protected SelectNode(PlanNodeId id, PlanNode child) {
-    super(id, child.getTupleIds());
+    super(id, child.getTupleIds(), "SELECT");
     addChild(child);
     this.rowTupleIds = child.rowTupleIds;
     this.nullableTupleIds = child.nullableTupleIds;
@@ -54,15 +54,11 @@ public class SelectNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String prefix,
+      TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "SELECT (" + id + ")\n");
-    output.append(super.getExplainString(prefix + "  ", detailLevel));
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
-    }
-    for (PlanNode child : children) {
-      output.append(child.getExplainString(prefix + "  ", detailLevel));
+      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
     return output.toString();
   }

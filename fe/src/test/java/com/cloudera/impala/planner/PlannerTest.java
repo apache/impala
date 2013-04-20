@@ -32,7 +32,6 @@ import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TStmtType;
@@ -90,18 +89,6 @@ public class PlannerTest {
           } else {
             result.append("<unbounded>");
           }
-        }
-        result.append("\n");
-
-        // print locations
-        result.append("  LOCATIONS: ");
-        for (TScanRangeLocation location: locations.locations) {
-          result.append(location.server.hostname + ":"
-              + Integer.toString(location.server.port));
-          if (location.isSetVolume_id()) {
-            result.append("/" + Integer.toString(location.volume_id));
-          }
-          result.append(" ");
         }
         result.append("\n");
       }

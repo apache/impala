@@ -83,7 +83,7 @@ public class HBaseScanNode extends ScanNode {
   private static Configuration hbaseConf = HBaseConfiguration.create();
 
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
-    super(id, desc);
+    super(id, desc, "SCAN HBASE");
     this.desc = desc;
   }
 
@@ -345,18 +345,19 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String prefix,
+      TExplainLevel detailLevel) {
     HBaseTable tbl = (HBaseTable) desc.getTable();
     StringBuilder output = new StringBuilder()
-        .append(prefix + "SCAN HBASE table=" + tbl.getName() + " (" + id + ")\n");
+        .append(prefix + "table:" + tbl.getName() + "\n");
     if (!Bytes.equals(startKey, HConstants.EMPTY_START_ROW)) {
-      output.append(prefix + "  START KEY: " + printKey(startKey) + "\n");
+      output.append(prefix + "start key: " + printKey(startKey) + "\n");
     }
     if (!Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
-      output.append(prefix + "  STOP KEY: " + printKey(stopKey) + "\n");
+      output.append(prefix + "stop key: " + printKey(stopKey) + "\n");
     }
     if (!filters.isEmpty()) {
-      output.append(prefix + "  HBASE FILTERS: ");
+      output.append(prefix + "hbase filters: ");
       if (filters.size() == 1) {
         THBaseFilter filter = filters.get(0);
         output.append(filter.family + ":" + filter.qualifier + " " +
@@ -373,10 +374,8 @@ public class HBaseScanNode extends ScanNode {
       output.append('\n');
     }
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
+      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix + "  ", detailLevel));
-
     return output.toString();
   }
 

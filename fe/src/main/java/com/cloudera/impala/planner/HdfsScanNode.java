@@ -60,7 +60,7 @@ public class HdfsScanNode extends ScanNode {
    * Constructs node to scan given data files of table 'tbl'.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, HdfsTable tbl) {
-    super(id, desc);
+    super(id, desc, "SCAN HDFS");
     this.tbl = tbl;
   }
 
@@ -207,21 +207,19 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName());
+    output.append(prefix + "table=" + desc.getTable().getFullName());
     output.append(" #partitions=" + partitions.size());
     output.append(" size=" + printBytes(totalBytes));
-    output.append(" (" + id + ")");
     if (compactData) {
       output.append(" compact\n");
     } else {
       output.append("\n");
     }
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
+      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 

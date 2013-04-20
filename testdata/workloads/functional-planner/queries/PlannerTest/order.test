@@ -2,7 +2,7 @@ select name, zip
 from functional.testtbl
 order by name
 ---- PLAN
-not implemented
+not implemented: ORDER BY without LIMIT currently not supported
 ====
 select zip, count(*)
 from functional.testtbl
@@ -10,7 +10,7 @@ where name like 'm%'
 group by 1
 order by 2 desc
 ---- PLAN
-not implemented
+not implemented: ORDER BY without LIMIT currently not supported
 ====
 select int_col, sum(float_col) 
 from functional.hbasealltypessmall
@@ -18,14 +18,14 @@ where id < 5
 group by 1
 order by 2
 ---- PLAN
-not implemented
+not implemented: ORDER BY without LIMIT currently not supported
 ====
 select int_col, sum(float_col), min(float_col) 
 from functional.hbasealltypessmall
 group by 1
 order by 2,3 desc
 ---- PLAN
-not implemented
+not implemented: ORDER BY without LIMIT currently not supported
 ====
 # Test correct identification of the implicit aliasing of int_col in the select
 # list to t1.int_col;
@@ -36,175 +36,191 @@ where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 2
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: t1.int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 1 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        t1.id = t2.id
-      TUPLE IDS: 0 1 
-        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-          TUPLE IDS: 0 
-        SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
-          PREDICATES: t2.int_col IS NOT NULL
-          TUPLE IDS: 1 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: t1.int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 1 
-    EXCHANGE (6)
-      TUPLE IDS: 0 1 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  HASH_PARTITIONED: t1.id
+  3:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 1 
+  |  
+  2:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    t1.id = t2.id
+  |  tuple ids: 0 1 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4 size=6.32KB compact
+  |       predicates: t2.int_col IS NOT NULL
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 1 
+  |  
+  6:EXCHANGE
+     tuple ids: 0 1 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: t1.id
+
   STREAM DATA SINK
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  TOP-N
-  ORDER BY: t1.int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 1 
-    HASH JOIN (PARTITIONED)
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        t1.id = t2.id
-      TUPLE IDS: 0 1 
-        EXCHANGE (4)
-          TUPLE IDS: 0 
-        EXCHANGE (5)
-          TUPLE IDS: 1 
+  3:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 1 
+  |  
+  2:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    t1.id = t2.id
+  |  tuple ids: 0 1 
+  |  
+  |----5:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  4:EXCHANGE
+     tuple ids: 0 
 
-Plan Fragment 2
-  RANDOM
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 5
     HASH_PARTITIONED: t2.id
 
-  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
-    PREDICATES: t2.int_col IS NOT NULL
-    TUPLE IDS: 1 
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB compact
+     predicates: t2.int_col IS NOT NULL
+     tuple ids: 1 
 
-Plan Fragment 3
-  RANDOM
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 4
     HASH_PARTITIONED: t1.id
 
-  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-    TUPLE IDS: 0 
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-  LOCATIONS:
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-  LOCATIONS:
 ====
 # Test that the sort is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-      TUPLE IDS: 0 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    EXCHANGE (2)
-      TUPLE IDS: 0 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  RANDOM
+  1:TOP-N
+  |  order by: int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:TOP-N
+  |  order by: int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  2:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  TOP-N
-  ORDER BY: int_col ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-      TUPLE IDS: 0 
+  1:TOP-N
+  |  order by: int_col ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-  LOCATIONS:
 ====
 # Test that the sort is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id limit 2
 ---- PLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: functional.alltypessmall.id ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-      TUPLE IDS: 0 
----- DISTRIBUTEDPLAN
-Plan Fragment 0
-  UNPARTITIONED
-  TOP-N
-  ORDER BY: functional.alltypessmall.id ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    EXCHANGE (2)
-      TUPLE IDS: 0 
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
 
-Plan Fragment 1
-  RANDOM
+  1:TOP-N
+  |  order by: functional.alltypessmall.id ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:TOP-N
+  |  order by: functional.alltypessmall.id ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  2:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
   STREAM DATA SINK
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  TOP-N
-  ORDER BY: functional.alltypessmall.id ASC
-  LIMIT: 2
-  TUPLE IDS: 0 
-    SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
-      TUPLE IDS: 0 
+  1:TOP-N
+  |  order by: functional.alltypessmall.id ASC
+  |  limit: 2
+  |  tuple ids: 0 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-  LOCATIONS:
 ====

@@ -53,6 +53,8 @@ import com.google.common.collect.Sets;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
+  protected final String planNodeName;
+
   protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
   protected PlanFragmentId fragmentId;  // assigned by planner after fragmentation step
   protected long limit; // max. # of rows to be returned; 0: no limit
@@ -88,25 +90,27 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   //  Node should compact data.
   protected boolean compactData;
 
-  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
+  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String planNodeName) {
     this.id = id;
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
     this.cardinality = -1;
+    this.planNodeName = planNodeName;
   }
 
-  protected PlanNode(PlanNodeId id) {
+  protected PlanNode(PlanNodeId id, String planNodeName) {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
     this.cardinality = -1;
+    this.planNodeName = planNodeName;
   }
 
   /**
    * Copy c'tor. Also passes in new id.
    */
-  protected PlanNode(PlanNodeId id, PlanNode node) {
+  protected PlanNode(PlanNodeId id, PlanNode node, String planNodeName) {
     this.id = id;
     this.limit = node.limit;
     this.tupleIds = Lists.newArrayList(node.tupleIds);
@@ -115,6 +119,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.conjuncts = Expr.cloneList(node.conjuncts, null);
     this.cardinality = -1;
     this.compactData = node.compactData;
+    this.planNodeName = planNodeName;
   }
 
   public PlanNodeId getId() {
@@ -196,26 +201,74 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public String getExplainString() {
-    return getExplainString("", TExplainLevel.NORMAL);
+    return getExplainString("", "", TExplainLevel.NORMAL);
   }
 
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
-    String expStr = "";
-    if (limit != -1) {
-      expStr =  prefix + "LIMIT: " + limit + "\n";
+  /**
+   * Generate the explain plan tree. The plan will be in the form of:
+   *
+   * root
+   * |
+   * |----child 2
+   * |      limit:1
+   * |
+   * |----child 3
+   * |      limit:2
+   * |
+   * child 1
+   *
+   * The root node header line will be prefixed by rootPrefix and the remaining plan
+   * output will be prefixed by prefix.
+   */
+  protected final String getExplainString(String rootPrefix, String prefix,
+      TExplainLevel detailLevel) {
+    StringBuilder expBuilder = new StringBuilder();
+    String detailPrefix = prefix;
+    if (children != null && children.size() > 0) {
+      detailPrefix += "|  ";
+    } else {
+      detailPrefix += "   ";
     }
 
+    // Print the current node
+    // The plan node header line will be prefixed by rootPrefix and the remaining details
+    // will be prefixed by detailPrefix.
+    expBuilder.append(rootPrefix + id.asInt() + ":" + planNodeName + "\n");
+    expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
+    if (limit != -1) expBuilder.append(detailPrefix + "limit: " + limit + "\n");
     // Output Tuple Ids only when explain plan level is set to verbose
     if (detailLevel.equals(TExplainLevel.VERBOSE)) {
-      expStr += prefix + "TUPLE IDS: ";
+      expBuilder.append(detailPrefix + "tuple ids: ");
       for (TupleId tupleId: tupleIds) {
         String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";
-        expStr += tupleId.asInt() + nullIndicator + " ";
+        expBuilder.append(tupleId.asInt() + nullIndicator + " ");
       }
-      expStr += "\n";
+      expBuilder.append("\n");
     }
 
-    return expStr;
+    // Print the children
+    if (children != null && children.size() > 0) {
+      expBuilder.append(detailPrefix + "\n");
+      String childHeadlinePrefix = prefix + "|----";
+      String childDetailPrefix = prefix + "|    ";
+      for(int i = 1; i < children.size(); ++i) {
+        expBuilder.append(
+            children.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
+                detailLevel));
+        expBuilder.append(childDetailPrefix + "\n");
+      }
+      expBuilder.append(children.get(0).getExplainString(prefix, prefix, detailLevel));
+    }
+    return expBuilder.toString();
+  }
+
+  /**
+   * Return the node-specific details.
+   * Subclass should override this function.
+   * Each line should be prefix by detailPrefix.
+   */
+  protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
+    return "";
   }
 
   // Convert this plan node, including all children, to its Thrift representation.

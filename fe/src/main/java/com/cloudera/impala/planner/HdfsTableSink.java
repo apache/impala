@@ -47,10 +47,11 @@ public class HdfsTableSink extends TableSink {
   @Override
   public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName() + "\n");
-    output.append(prefix + "  OVERWRITE=" + (overwrite ? "true" : "false") + "\n");
+    output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName()
+        + "\n");
+    output.append(prefix + "  overwrite=" + (overwrite ? "true" : "false") + "\n");
     if (!partitionKeyExprs.isEmpty()) {
-      output.append(prefix + "  PARTITIONS: ");
+      output.append(prefix + "  partitions: ");
       for (Expr expr : partitionKeyExprs) {
         output.append(expr.toSql() + ",");
       }

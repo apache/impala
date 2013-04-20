@@ -24,7 +24,6 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -46,7 +45,7 @@ public class SortNode extends PlanNode {
 
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
       boolean isDefaultLimit) {
-    super(id);
+    super(id, "TOP-N");
     this.info = info;
     this.useTopN = useTopN;
     this.isDefaultLimit = isDefaultLimit;
@@ -61,7 +60,7 @@ public class SortNode extends PlanNode {
    * Clone 'inputSortNode' for distributed Top-N
    */
   public SortNode(PlanNodeId id, SortNode inputSortNode, PlanNode child) {
-    super(id, inputSortNode);
+    super(id, inputSortNode, "TOP-N");
     this.info = inputSortNode.info;
     this.useTopN = inputSortNode.useTopN;
     this.isDefaultLimit = inputSortNode.isDefaultLimit;
@@ -115,14 +114,10 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String detailPrefix,
+      TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    if (useTopN) {
-      output.append(prefix + "TOP-N\n");
-    } else {
-      output.append(prefix + "SORT\n");
-    }
-    output.append(prefix + "ORDER BY: ");
+    output.append(detailPrefix + "order by: ");
     Iterator<Expr> expr = info.getOrderingExprs().iterator();
     Iterator<Boolean> isAsc = info.getIsAscOrder().iterator();
     boolean start = true;
@@ -135,8 +130,7 @@ public class SortNode extends PlanNode {
       output.append(expr.next().toSql() + " ");
       output.append(isAsc.next() ? "ASC" : "DESC");
     }
-    output.append("\n" + super.getExplainString(prefix, detailLevel));
-    output.append(getChild(0).getExplainString(prefix + "  ", detailLevel));
+    output.append("\n");
     return output.toString();
   }
 }

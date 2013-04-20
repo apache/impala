@@ -194,12 +194,12 @@ public class PlanFragment {
   public String getExplainString(TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     Preconditions.checkState(dataPartition != null);
-    str.append("  " + dataPartition.getExplainString(explainLevel));
+    str.append("  PARTITION: " + dataPartition.getExplainString(explainLevel) + "\n");
     if (sink != null) {
       str.append(sink.getExplainString("  ", explainLevel) + "\n");
     }
     if (planRoot != null) {
-      str.append(planRoot.getExplainString("  ", explainLevel));
+      str.append(planRoot.getExplainString("  ", "  ", explainLevel));
     }
     return str.toString();
   }

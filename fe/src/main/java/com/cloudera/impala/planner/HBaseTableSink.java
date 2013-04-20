@@ -21,7 +21,6 @@ import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TTableSink;
 import com.cloudera.impala.thrift.TTableSinkType;
-import com.google.common.base.Objects;
 
 /**
  * Class used to represent a Sink that will transport
@@ -34,8 +33,9 @@ public class HBaseTableSink extends TableSink {
 
   @Override
   public String getExplainString(String prefix, TExplainLevel explainLevel) {
-    return prefix + Objects.toStringHelper(this.getClass())
-                           .add("table", this.targetTable).toString();
+    StringBuilder output = new StringBuilder();
+    output.append(prefix + "WRITE TO HBASE table=" + targetTable.getFullName() + "\n");
+    return output.toString();
   }
 
   @Override
