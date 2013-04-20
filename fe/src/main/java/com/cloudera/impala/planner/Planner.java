@@ -740,8 +740,9 @@ public class Planner {
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createTableRefNode(analyzer, tblRef);
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
+      TableRef outerRef = selectStmt.getTableRefs().get(i - 1);
       TableRef innerRef = selectStmt.getTableRefs().get(i);
-      root = createHashJoinNode(analyzer, root, innerRef);
+      root = createHashJoinNode(analyzer, root, outerRef, innerRef);
       // Have the build side of a join copy data to a compact representation
       // in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
@@ -1103,7 +1104,7 @@ public class Planner {
    * Create HashJoinNode to join outer with inner.
    */
   private PlanNode createHashJoinNode(
-      Analyzer analyzer, PlanNode outer, TableRef innerRef)
+      Analyzer analyzer, PlanNode outer, TableRef outerRef, TableRef innerRef)
       throws NotImplementedException, InternalException {
     // the rows coming from the build node only need to have space for the tuple
     // materialized by that node
@@ -1115,7 +1116,9 @@ public class Planner {
         analyzer, outer.getTupleIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
     if (eqJoinPredicates.isEmpty()) {
       throw new NotImplementedException(
-          "Join requires at least one equality predicate between the two tables.");
+          String.format("Join between '%s' and '%s' requires at least one " +
+                        "conjunctive equality predicate between the two tables",
+                        outerRef.getAliasAsName(), innerRef.getAliasAsName()));
     }
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 

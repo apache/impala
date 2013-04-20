@@ -110,6 +110,44 @@ public class PlannerTest {
   }
 
   /**
+   * Extracts and returns the expected error message from expectedPlan.
+   * Returns null if expectedPlan is empty or its first element is not an error message.
+   * The accepted format for error messages is 'not implemented: expected error message'
+   * Returns the empty string if expectedPlan starts with 'not implemented' but no
+   * expected error message was given.
+   */
+  private String getExpectedErrorMessage(ArrayList<String> expectedPlan) {
+    if (expectedPlan.isEmpty()) return null;
+    if (!expectedPlan.get(0).toLowerCase().startsWith("not implemented")) return null;
+    // Find first ':' and extract string on right hand side as error message.
+    int ix = expectedPlan.get(0).indexOf(":");
+    if (ix + 1 > 0) {
+      return expectedPlan.get(0).substring(ix + 1).trim();
+    } else {
+      return "";
+    }
+  }
+
+  private void handleNotImplException(String query, String expectedErrorMsg,
+      StringBuilder errorLog, StringBuilder actualOutput, Throwable e) {
+    boolean isImplemented = expectedErrorMsg == null;
+    actualOutput.append("not implemented: " + e.getMessage() + "\n");
+    if (isImplemented) {
+      errorLog.append("query:\n" + query + "\nPLAN not implemented: "
+          + e.getMessage() + "\n");
+    } else {
+      // Compare actual and expected error messages.
+      if (expectedErrorMsg != null && !expectedErrorMsg.isEmpty()) {
+        if (!e.getMessage().toLowerCase().equals(expectedErrorMsg.toLowerCase())) {
+          errorLog.append("query:\n" + query + "\nExpected error message: '"
+              + expectedErrorMsg + "'\nActual error message: '"
+              + e.getMessage() + "'.");
+        }
+      }
+    }
+  }
+
+  /**
    * Produces single-node and distributed plans for testCase and compares
    * plan and scan range results.
    * Appends the actual single-node and distributed plan as well as the printed
@@ -124,8 +162,9 @@ public class PlannerTest {
 
     // single-node plan
     ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
-    boolean isImplemented = expectedPlan.size() > 0
-        && !expectedPlan.get(0).toLowerCase().startsWith("not implemented");
+    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+    boolean isImplemented = expectedErrorMsg == null;
+
     options.setNum_nodes(1);
     TSessionState sessionState = new TSessionState("default");
     TClientRequest request = new TClientRequest(query, options, sessionState);
@@ -161,11 +200,7 @@ public class PlannerTest {
       errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
       return;
     } catch (NotImplementedException e) {
-      actualOutput.append("not implemented\n");
-      if (isImplemented) {
-        errorLog.append("query:\n" + query + "\nPLAN not implemented: "
-            + e.getMessage() + "\n");
-      }
+      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
     }
     if (!isImplemented) {
       // nothing else to compare
@@ -173,8 +208,8 @@ public class PlannerTest {
     }
 
     expectedPlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
-    isImplemented = expectedPlan.size() > 0
-        && !expectedPlan.get(0).toLowerCase().startsWith("not implemented");
+    expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+    isImplemented = expectedErrorMsg == null;
     options.setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
     explainBuilder = new StringBuilder();
     actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
@@ -204,11 +239,7 @@ public class PlannerTest {
       errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
       return;
     } catch (NotImplementedException e) {
-      actualOutput.append("not implemented\n");
-      if (isImplemented) {
-        errorLog.append("query:\n" + query + "\nDISTRIBUTEDPLAN not implemented: "
-            + e.getMessage() + "\n");
-      }
+      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
     }
 
 
@@ -217,7 +248,7 @@ public class PlannerTest {
     ArrayList<String> expectedLocations =
         testCase.getSectionContents(Section.SCANRANGELOCATIONS);
 
-    if (expectedLocations.size() > 0) {
+    if (expectedLocations.size() > 0 && locationsStr != null) {
       String result = TestUtils.compareOutput(
           Lists.newArrayList(locationsStr.split("\n")), expectedLocations, true);
       if (!result.isEmpty()) {
