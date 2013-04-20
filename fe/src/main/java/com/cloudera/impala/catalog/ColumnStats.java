@@ -52,53 +52,20 @@ public class ColumnStats {
     }
   }
 
-  public void setAvgSerializedSize(float avgSize) {
-    this.avgSerializedSize = avgSize;
-  }
-
-  public void setMaxSize(long maxSize) {
-    this.maxSize = maxSize;
-  }
-
+  public void setAvgSerializedSize(float avgSize) { this.avgSerializedSize = avgSize; }
+  public void setMaxSize(long maxSize) { this.maxSize = maxSize; }
+  public long getNumDistinctValues() { return numDistinctValues; }
   public void setNumDistinctValues(long numDistinctValues) {
     this.numDistinctValues = numDistinctValues;
   }
-
-  public void setNumNulls(long numNulls) {
-    this.numNulls = numNulls;
-  }
-
-  public float getAvgSerializedSize() {
-    return avgSerializedSize;
-  }
-
-  public long getMaxSize() {
-    return maxSize;
-  }
-
-  public long getNumDistinctValues() {
-    return numDistinctValues;
-  }
-
-  public boolean hasNulls() {
-    return numNulls > 0;
-  }
-
-  public long getNumNulls() {
-    return numNulls;
-  }
-
-  public boolean hasAvgSerializedSize() {
-    return avgSerializedSize >= 0;
-  }
-
-  public boolean hasMaxSize() {
-    return maxSize >= 0;
-  }
-
-  public boolean hasNumDistinctValues() {
-    return numDistinctValues >= 0;
-  }
+  public void setNumNulls(long numNulls) { this.numNulls = numNulls; }
+  public float getAvgSerializedSize() { return avgSerializedSize; }
+  public long getMaxSize() { return maxSize; }
+  public boolean hasNulls() { return numNulls > 0; }
+  public long getNumNulls() { return numNulls; }
+  public boolean hasAvgSerializedSize() { return avgSerializedSize >= 0; }
+  public boolean hasMaxSize() { return maxSize >= 0; }
+  public boolean hasNumDistinctValues() { return numDistinctValues >= 0; }
 
   public void update(PrimitiveType colType, ColumnStatisticsData statsData) {
     switch (colType) {

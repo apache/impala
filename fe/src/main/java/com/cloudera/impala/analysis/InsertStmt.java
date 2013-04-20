@@ -129,6 +129,11 @@ public class InsertStmt extends ParseNodeBase {
 
       // Check that all dynamic partition keys are at the end of the selectListExprs.
       numDynamicPartKeys = fillPartitionKeyExprs();
+
+      // make sure we have stats for partitionKeyExprs
+      for (Expr expr: partitionKeyExprs) {
+        expr.analyze(analyzer);
+      }
     }
 
     // Check union compatibility, ignoring partitioning columns for dynamic partitions.

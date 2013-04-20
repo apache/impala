@@ -15,17 +15,12 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -34,7 +29,6 @@ import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * A PlanFragment is part of a tree of such fragments that together make
@@ -202,7 +196,7 @@ public class PlanFragment {
     Preconditions.checkState(dataPartition != null);
     str.append("  " + dataPartition.getExplainString(explainLevel));
     if (sink != null) {
-      str.append(sink.getExplainString("  ", explainLevel));
+      str.append(sink.getExplainString("  ", explainLevel) + "\n");
     }
     if (planRoot != null) {
       str.append(planRoot.getExplainString("  ", explainLevel));

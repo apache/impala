@@ -31,6 +31,7 @@ import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
+import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
@@ -131,8 +132,14 @@ public class Planner {
 
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
     if (analysisResult.isInsertStmt()) {
+      InsertStmt insertStmt = analysisResult.getInsertStmt();
+      if (queryOptions.num_nodes != 1 && singleNodePlan != null) {
+        // repartition on partition keys
+        rootFragment = repartitionForInsert(
+            rootFragment, insertStmt.getPartitionKeyExprs(), analyzer, fragments);
+      }
       // set up table sink for root fragment
-      rootFragment.setSink(analysisResult.getInsertStmt().createDataSink());
+      rootFragment.setSink(insertStmt.createDataSink());
     }
     rootFragment.setOutputExprs(queryStmt.getResultExprs());
 
@@ -157,9 +164,7 @@ public class Planner {
    */
   private void markRefdSlots(
       Analyzer analyzer, PlanNode planRoot, ArrayList<Expr> outputExprs) {
-    if (planRoot == null) {
-      return;
-    }
+    if (planRoot == null) return;
     List<SlotId> refdIdList = Lists.newArrayList();
     planRoot.getMaterializedIds(analyzer, refdIdList);
 
@@ -267,6 +272,49 @@ public class Planner {
   }
 
   /**
+   * Returns plan fragment that partitions the output of 'inputFragment' on
+   * partitionExprs, unless the expected number of partitions is less than the number
+   * of nodes on which inputFragment runs.
+   * If it ends up creating a new fragment, appends that to 'fragments'.
+   */
+  private PlanFragment repartitionForInsert(
+      PlanFragment inputFragment, List<Expr> partitionExprs, Analyzer analyzer,
+      ArrayList<PlanFragment> fragments) {
+    if (partitionExprs.isEmpty()) return inputFragment;
+
+    // don't repartition if the resulting number of partitions is too low to get good
+    // parallelism
+    long numPartitions = 1;
+    for (Expr expr: partitionExprs) {
+      // TODO: take predicates in query into account
+      numPartitions *= expr.getNumDistinctValues();
+    }
+    // TODO: we want to repartition if the resulting files would otherwise
+    // be very small (less than some reasonable multiple of the recommended block size);
+    // in order to do that, we need to come up with an estimate of the avg row size
+    // in the particular file format of the output table/partition
+    if (numPartitions <= inputFragment.getNumNodes()) return inputFragment;
+
+    // nothing to do if the input fragment is already partitioned on partitionExprs
+    DataPartition inputPartition = inputFragment.getDataPartition();
+    if (Expr.equalLists(partitionExprs, inputPartition.getPartitionExprs())) {
+      return inputFragment;
+    }
+
+    PlanNode exchNode = new ExchangeNode(
+        new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot(), false);
+    exchNode.computeStats(analyzer);
+    Preconditions.checkState(exchNode.hasValidStats());
+    DataPartition partition =
+        new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
+    PlanFragment fragment = new PlanFragment(exchNode, partition);
+    inputFragment.setDestination(fragment, exchNode.getId());
+    inputFragment.setOutputPartition(partition);
+    fragments.add(fragment);
+    return fragment;
+  }
+
+  /**
    * Return unpartitioned fragment that merges the input fragment's output via
    * an ExchangeNode.
    * Requires that input fragment be partitioned.
@@ -316,12 +364,12 @@ public class Planner {
     // the leftChildFragment; the cost across all nodes is proportional to the
     // total amount of data sent
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
-    long broadcastHashTblSize = 0;
+    long rhsDataSize = 0;
     long broadcastCost = 0;
     if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
-      broadcastHashTblSize = Math.round(
+      rhsDataSize = Math.round(
           (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
-      broadcastCost = broadcastHashTblSize * leftChildFragment.getNumNodes();
+      broadcastCost = rhsDataSize * leftChildFragment.getNumNodes();
     }
     LOG.info("broadcast: cost=" + Long.toString(broadcastCost));
     LOG.info("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
@@ -358,7 +406,7 @@ public class Planner {
     if (node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
         && (perNodeMemLimit == 0
-            || Math.round((double) broadcastHashTblSize * HASH_TBL_SPACE_OVERHEAD)
+            || Math.round((double) rhsDataSize * HASH_TBL_SPACE_OVERHEAD)
                 <= perNodeMemLimit)
         && (node.getInnerRef().isBroadcastJoin()
             || (!node.getInnerRef().isPartitionJoin()
@@ -722,9 +770,8 @@ public class Planner {
   private PlanNode addUnassignedConjuncts(Analyzer analyzer, PlanNode root) {
     Preconditions.checkNotNull(root);
     List<Predicate> conjuncts = analyzer.getUnassignedConjuncts(root.getTupleIds());
-    if (conjuncts.isEmpty()) {
-      return root;
-    }
+    if (conjuncts.isEmpty()) return root;
+
     // evaluate conjuncts in SelectNode
     SelectNode selectNode = new SelectNode(new PlanNodeId(nodeIdGenerator), root);
     selectNode.computeStats(analyzer);
@@ -744,10 +791,9 @@ public class Planner {
   private PlanNode createSelectPlan(
       SelectStmt selectStmt, Analyzer analyzer, long defaultOrderByLimit)
       throws NotImplementedException, InternalException {
-    if (selectStmt.getTableRefs().isEmpty()) {
-      // no from clause -> nothing to plan
-      return null;
-    }
+    // no from clause -> nothing to plan
+    if (selectStmt.getTableRefs().isEmpty()) return null;
+
     // collect ids of tuples materialized by the subtree that includes all joins
     // and scans
     ArrayList<TupleId> rowTuples = Lists.newArrayList();
@@ -924,26 +970,18 @@ public class Planner {
     ValueRange result = null;
     while (i.hasNext()) {
       Predicate p = i.next();
-      if (!(p instanceof BinaryPredicate)) {
-        continue;
-      }
+      if (!(p instanceof BinaryPredicate)) continue;
       BinaryPredicate comp = (BinaryPredicate) p;
-      if (comp.getOp() == BinaryPredicate.Operator.NE) {
-        continue;
-      }
+      if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
       Expr slotBinding = comp.getSlotBinding(d.getId());
-      if (slotBinding == null || !slotBinding.isConstant()) {
-        continue;
-      }
+      if (slotBinding == null || !slotBinding.isConstant()) continue;
 
       if (comp.getOp() == BinaryPredicate.Operator.EQ) {
         i.remove();
         return ValueRange.createEqRange(slotBinding);
       }
 
-      if (result == null) {
-        result = new ValueRange();
-      }
+      if (result == null) result = new ValueRange();
 
       // TODO: do we need copies here?
       if (comp.getOp() == BinaryPredicate.Operator.GT

@@ -112,6 +112,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
     OVERWRITE=true
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -149,6 +150,7 @@ Plan Fragment 0
   HASH_PARTITIONED: ps.ps_suppkey
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
     OVERWRITE=true
+
   HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -238,6 +240,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: MIN(ps_supplycost)
   GROUP BY: p_partkey
@@ -249,6 +252,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: MIN(<slot 3>)
   GROUP BY: <slot 2>
@@ -1737,6 +1741,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q11_part_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(ps_supplycost * ps_availqty)
   GROUP BY: ps_partkey
@@ -1763,6 +1768,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 8>
   WRITE TO HDFS table=tpch.q11_part_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 9>)
   GROUP BY: <slot 8>
@@ -1842,6 +1848,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q11_sum_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(part_value)
   GROUP BY: 
@@ -1853,6 +1860,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q11_sum_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 1>)
   GROUP BY: 
@@ -2282,6 +2290,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.revenue
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: l_suppkey
@@ -2294,6 +2303,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 4>
   WRITE TO HDFS table=tpch.revenue
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 5>)
   GROUP BY: <slot 4>
@@ -2323,6 +2333,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.max_revenue
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: MAX(total_revenue)
   GROUP BY: 
@@ -2334,6 +2345,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.max_revenue
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: MAX(<slot 1>)
   GROUP BY: 
@@ -2456,6 +2468,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.supplier_tmp
     OVERWRITE=true
+
   SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
     PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
     TUPLE IDS: 0 
@@ -2464,6 +2477,7 @@ Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=tpch.supplier_tmp
     OVERWRITE=true
+
   SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
     PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
     TUPLE IDS: 0 
@@ -2482,6 +2496,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q16_tmp
     OVERWRITE=true
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -2504,6 +2519,7 @@ Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=tpch.q16_tmp
     OVERWRITE=true
+
   HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -2625,6 +2641,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.lineitem_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(l_quantity), COUNT(l_quantity)
   GROUP BY: l_partkey
@@ -2636,6 +2653,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.lineitem_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 3>), SUM(<slot 4>)
   GROUP BY: <slot 2>
@@ -2760,6 +2778,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q18_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(l_quantity)
   GROUP BY: l_orderkey
@@ -2771,6 +2790,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q18_tmp
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 3>)
   GROUP BY: <slot 2>
@@ -3080,6 +3100,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q20_tmp1
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: p_partkey
@@ -3092,6 +3113,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q20_tmp1
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 2>
@@ -3131,6 +3153,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q20_tmp2
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(l_quantity)
   GROUP BY: l_partkey, l_suppkey
@@ -3143,6 +3166,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 4>, <slot 5>
   WRITE TO HDFS table=tpch.q20_tmp2
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 6>)
   GROUP BY: <slot 4>, <slot 5>
@@ -3180,6 +3204,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q20_tmp3
     OVERWRITE=true
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -3202,6 +3227,7 @@ Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=tpch.q20_tmp3
     OVERWRITE=true
+
   HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -3250,6 +3276,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q20_tmp4
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: ps_suppkey
@@ -3262,6 +3289,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 3>
   WRITE TO HDFS table=tpch.q20_tmp4
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 3>
@@ -3616,6 +3644,7 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(c_acctbal), COUNT(c_acctbal)
   GROUP BY: substr(c_name, 1, 1)
@@ -3628,6 +3657,7 @@ Plan Fragment 0
   HASH_PARTITIONED: <slot 3>
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     OVERWRITE=true
+
   AGGREGATE
   OUTPUT: SUM(<slot 4>), SUM(<slot 5>)
   GROUP BY: <slot 3>

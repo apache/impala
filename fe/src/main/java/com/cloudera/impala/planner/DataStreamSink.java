@@ -42,7 +42,7 @@ public class DataStreamSink extends DataSink {
     strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId + "\n");
     if (outputPartition != null) {
       strBuilder.append(prefix + "  "
-          + outputPartition.getExplainString(explainLevel) + "\n");
+          + outputPartition.getExplainString(explainLevel));
     }
     return strBuilder.toString();
   }

@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,9 +32,9 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -589,13 +590,24 @@ public class HdfsTable extends Table {
       // files in the table's root directory.
       addPartition(msTbl.getSd(), null, new ArrayList<LiteralExpr>());
     } else {
+      // keep track of distinct partition key values and how many nulls there are
+      Set<String>[] uniquePartitionKeys = new HashSet[numClusteringCols];
+      long[] numNullKeys = new long[numClusteringCols];
+      for (int i = 0; i < numClusteringCols; ++i) {
+        uniquePartitionKeys[i] = new HashSet<String>();
+        numNullKeys[i] = 0;
+      }
+
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
         // load key values
         List<LiteralExpr> keyValues = Lists.newArrayList();
+        int i = 0;
         for (String partitionKey: msPartition.getValues()) {
+          uniquePartitionKeys[i].add(partitionKey);
           // Deal with Hive's special NULL partition key.
           if (partitionKey.equals(nullPartitionKeyValue)) {
             keyValues.add(new NullLiteral());
+            ++numNullKeys[i];
           } else {
             PrimitiveType type = colsByPos.get(keyValues.size()).getType();
             try {
@@ -608,6 +620,7 @@ public class HdfsTable extends Table {
               throw new InvalidStorageDescriptorException(ex);
             }
           }
+          ++i;
         }
         HdfsPartition partition =
             addPartition(msPartition.getSd(), msPartition, keyValues);
@@ -616,6 +629,15 @@ public class HdfsTable extends Table {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
           LOG.info("partition #rows=" + Long.toString(partition.getNumRows()));
         }
+      }
+
+      // update col stats for partition key cols
+      for (int i = 0; i < numClusteringCols; ++i) {
+        ColumnStats stats = colsByPos.get(i).getStats();
+        stats.setNumNulls(numNullKeys[i]);
+        stats.setNumDistinctValues(uniquePartitionKeys[i].size());
+        // remove
+        LOG.info("#col=" + Integer.toString(i) + " stats=" + stats.toString());
       }
     }
 

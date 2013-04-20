@@ -638,7 +638,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public String toString() {
     return Objects.toStringHelper(this.getClass())
         .add("id", id)
-        .add("type", type).toString();
+        .add("type", type)
+        .add("sel", selectivity)
+        .add("#distinct", numDistinctValues)
+        .toString();
   }
 
   /**
