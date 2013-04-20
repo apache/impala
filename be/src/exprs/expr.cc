@@ -32,7 +32,6 @@
 #include "exprs/int-literal.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
-#include "exprs/literal-predicate.h"
 #include "exprs/null-literal.h"
 #include "exprs/opcode-registry.h"
 #include "exprs/string-literal.h"
@@ -331,13 +330,6 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
     }
     case TExprNodeType::LIKE_PRED: {
       *expr = pool->Add(new LikePredicate(texpr_node));
-      return Status::OK;
-    }
-    case TExprNodeType::LITERAL_PRED: {
-      if (!texpr_node.__isset.literal_pred) {
-        return Status("Literal predicate not set in thrift node");
-      }
-      *expr = pool->Add(new LiteralPredicate(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::NULL_LITERAL: {

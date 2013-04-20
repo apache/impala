@@ -34,7 +34,7 @@ public abstract class TableRef extends ParseNodeBase {
 
   protected JoinOperator joinOp;
   private ArrayList<String> joinHints;
-  protected Predicate onClause;
+  protected Expr onClause;
   protected List<String> usingColNames;
 
   // set after analyzeJoinHints(); true if explicitly set via hints
@@ -62,7 +62,7 @@ public abstract class TableRef extends ParseNodeBase {
     return (joinOp == null ? JoinOperator.INNER_JOIN : joinOp);
   }
 
-  public Predicate getOnClause() {
+  public Expr getOnClause() {
     return onClause;
   }
 
@@ -110,7 +110,7 @@ public abstract class TableRef extends ParseNodeBase {
   public String getExplicitAlias() { return alias; }
   public Table getTable() { return desc.getTable(); }
   public void setJoinOp(JoinOperator op) { this.joinOp = op; }
-  public void setOnClause(Predicate pred) { this.onClause = pred; }
+  public void setOnClause(Expr e) { this.onClause = e; }
   public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }
   public TableRef getLeftTblRef() { return leftTblRef; }
   public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef = leftTblRef; }
@@ -197,21 +197,22 @@ public abstract class TableRef extends ParseNodeBase {
 
     if (onClause != null) {
       onClause.analyze(analyzer);
-      for (Predicate p: onClause.getConjuncts()) {
+      onClause.checkReturnsBool("ON clause", true);
+      for (Expr e: onClause.getConjuncts()) {
         // Outer join clause conjuncts are registered for this particular table ref
         // (ie, can only be evaluated by the plan node that implements this join).
         // The exception are conjuncts that only pertain to the nullable side
         // of the outer join; those can be evaluated directly when materializing tuples
         // without violating outer join semantics.
         if (getJoinOp().isOuterJoin()) {
-          if (lhsIsNullable && p.isBound(leftTblRef.getId())
-              || rhsIsNullable && p.isBound(getId())) {
-            analyzer.registerConjuncts(p, null, false);
+          if (lhsIsNullable && e.isBound(leftTblRef.getId())
+              || rhsIsNullable && e.isBound(getId())) {
+            analyzer.registerConjuncts(e, null, false);
           } else {
-            analyzer.registerConjuncts(p, this, false);
+            analyzer.registerConjuncts(e, this, false);
           }
         } else {
-          analyzer.registerConjuncts(p, null, false);
+          analyzer.registerConjuncts(e, null, false);
         }
       }
     } else if (getJoinOp().isOuterJoin() || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {

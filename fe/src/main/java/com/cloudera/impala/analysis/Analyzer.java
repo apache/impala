@@ -70,7 +70,7 @@ public class Analyzer {
   private final Map<String, SlotDescriptor> slotRefMap = Maps.newHashMap();
 
   // all registered conjuncts (map from id to Predicate)
-  private final Map<ExprId, Predicate> conjuncts = Maps.newHashMap();
+  private final Map<ExprId, Expr> conjuncts = Maps.newHashMap();
 
   // map from tuple id to list of conjuncts referencing tuple
   private final Map<TupleId, List<ExprId> > tuplePredicates = Maps.newHashMap();
@@ -336,9 +336,9 @@ public class Analyzer {
   /**
    * Register all conjuncts in a list of predicates as Where clause conjuncts.
    */
-  public void registerConjuncts(List<Predicate> l) {
-    for (Predicate p: l) {
-      registerConjuncts(p, null, true);
+  public void registerConjuncts(List<Expr> l) {
+    for (Expr e: l) {
+      registerConjuncts(e, null, true);
     }
   }
 
@@ -348,7 +348,7 @@ public class Analyzer {
    * and the conjuncts of p can only be evaluated by the node implementing that join
    * (p is the On clause).
    */
-  public void registerConjuncts(Predicate p, TableRef rhsRef, boolean fromWhereClause) {
+  public void registerConjuncts(Expr e, TableRef rhsRef, boolean fromWhereClause) {
     List<ExprId> ojConjuncts = null;
     if (rhsRef != null) {
       Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
@@ -358,7 +358,7 @@ public class Analyzer {
         conjunctsByOjClause.put(rhsRef, ojConjuncts);
       }
     }
-    for (Predicate conjunct: p.getConjuncts()) {
+    for (Expr conjunct: e.getConjuncts()) {
       registerConjunct(conjunct);
       if (rhsRef != null) {
         ojClauseByConjunct.put(conjunct.getId(), rhsRef);
@@ -375,27 +375,27 @@ public class Analyzer {
    * Register individual conjunct with all tuple and slot ids it references
    * and with the global conjunct list.
    */
-  private void registerConjunct(Predicate p) {
+  private void registerConjunct(Expr e) {
     // this conjunct would already have an id assigned if it is being re-registered
     // in a subqery analyzer
-    if (p.getId() == null) {
-      p.setId(new ExprId(conjunctIdGenerator));
+    if (e.getId() == null) {
+      e.setId(new ExprId(conjunctIdGenerator));
     }
-    conjuncts.put(p.getId(), p);
+    conjuncts.put(e.getId(), e);
     //LOG.info("registered conjunct " + p.getId().toString() + ": " + p.toSql());
 
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     ArrayList<SlotId> slotIds = Lists.newArrayList();
-    p.getIds(tupleIds, slotIds);
+    e.getIds(tupleIds, slotIds);
 
     // update tuplePredicates
     for (TupleId id : tupleIds) {
       if (!tuplePredicates.containsKey(id)) {
         List<ExprId> conjunctIds = Lists.newArrayList();
-        conjunctIds.add(p.getId());
+        conjunctIds.add(e.getId());
         tuplePredicates.put(id, conjunctIds);
       } else {
-        tuplePredicates.get(id).add(p.getId());
+        tuplePredicates.get(id).add(e.getId());
       }
     }
 
@@ -403,20 +403,20 @@ public class Analyzer {
     for (SlotId id : slotIds) {
       if (!slotPredicates.containsKey(id)) {
         List<ExprId> conjunctIds = Lists.newArrayList();
-        conjunctIds.add(p.getId());
+        conjunctIds.add(e.getId());
         slotPredicates.put(id, conjunctIds);
       } else {
-        slotPredicates.get(id).add(p.getId());
+        slotPredicates.get(id).add(e.getId());
       }
     }
 
     // check whether this is an equi-join predicate, ie, something of the
     // form <expr1> = <expr2> where at least one of the exprs is bound by
     // exactly one tuple id
-    if (!(p instanceof BinaryPredicate)) {
+    if (!(e instanceof BinaryPredicate)) {
       return;
     }
-    BinaryPredicate binaryPred = (BinaryPredicate) p;
+    BinaryPredicate binaryPred = (BinaryPredicate) e;
     if (binaryPred.getOp() != BinaryPredicate.Operator.EQ) {
       return;
     }
@@ -431,10 +431,10 @@ public class Analyzer {
       if (lhsTupleIds.size() == 1) {
         if (!eqJoinConjuncts.containsKey(lhsTupleIds.get(0))) {
           List<ExprId> conjunctIds = Lists.newArrayList();
-          conjunctIds.add(p.getId());
+          conjunctIds.add(e.getId());
           eqJoinConjuncts.put(lhsTupleIds.get(0), conjunctIds);
         } else {
-          eqJoinConjuncts.get(lhsTupleIds.get(0)).add(p.getId());
+          eqJoinConjuncts.get(lhsTupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
       }
@@ -446,15 +446,12 @@ public class Analyzer {
    * list of tuple ids and are not tied to an Outer Join clause.
    * @return possibly empty list of Predicates
    */
-  public List<Predicate> getUnassignedConjuncts(List<TupleId> tupleIds) {
-    //LOG.info("getUnassignedConjuncts()");
-    //LOG.info("ojconjuncts:" + ojClauseByConjunct.toString());
-    List<Predicate> result = Lists.newArrayList();
-    for (Predicate pred: conjuncts.values()) {
-      //LOG.info("check pred: " + pred.toSql());
-      if (pred.isBound(tupleIds) && !assignedConjuncts.contains(pred.getId())
-          && !ojClauseByConjunct.containsKey(pred.getId())) {
-        result.add(pred);
+  public List<Expr> getUnassignedConjuncts(List<TupleId> tupleIds) {
+    List<Expr> result = Lists.newArrayList();
+    for (Expr e: conjuncts.values()) {
+      if (e.isBound(tupleIds) && !assignedConjuncts.contains(e.getId())
+          && !ojClauseByConjunct.containsKey(e.getId())) {
+        result.add(e);
       }
     }
     return result;
@@ -464,20 +461,18 @@ public class Analyzer {
    * Return all unassigned conjuncts of the outer join referenced by right-hand side
    * table ref.
    */
-  public List<Predicate> getUnassignedOjConjuncts(TableRef ref) {
-    //LOG.info("getUnassignedOjConjuncts()");
+  public List<Expr> getUnassignedOjConjuncts(TableRef ref) {
     Preconditions.checkState(ref.getJoinOp().isOuterJoin());
-    List<Predicate> result = Lists.newArrayList();
-    //LOG.info(conjunctsByOjClause.toString());
+    List<Expr> result = Lists.newArrayList();
     List<ExprId> candidates = conjunctsByOjClause.get(ref);
     if (candidates == null) {
       return result;
     }
     for (ExprId conjunctId: candidates) {
       if (!assignedConjuncts.contains(conjunctId)) {
-        Predicate p = conjuncts.get(conjunctId);
-        Preconditions.checkState(p != null);
-        result.add(p);
+        Expr e = conjuncts.get(conjunctId);
+        Preconditions.checkState(e != null);
+        result.add(e);
       }
     }
     return result;
@@ -490,8 +485,8 @@ public class Analyzer {
     return outerJoinedTupleIds.get(id);
   }
 
-  public boolean isWhereClauseConjunct(Predicate p) {
-    return whereClauseConjuncts.contains(p.getId());
+  public boolean isWhereClauseConjunct(Expr e) {
+    return whereClauseConjuncts.contains(e.getId());
   }
 
   /**
@@ -524,26 +519,26 @@ public class Analyzer {
    * assumed to be for an outer join, and only equi-join conjuncts from that outer join's
    * On clause are returned.
    */
-  public List<Predicate> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
+  public List<Expr> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
     List<ExprId> conjunctIds = eqJoinConjuncts.get(id);
     if (conjunctIds == null) {
       return null;
     }
-    List<Predicate> result = Lists.newArrayList();
+    List<Expr> result = Lists.newArrayList();
     List<ExprId> ojClauseConjuncts = null;
     if (rhsRef != null) {
       Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
       ojClauseConjuncts = conjunctsByOjClause.get(rhsRef);
     }
     for (ExprId conjunctId: conjunctIds) {
-      Predicate p = conjuncts.get(conjunctId);
-      Preconditions.checkState(p != null);
+      Expr e = conjuncts.get(conjunctId);
+      Preconditions.checkState(e != null);
       if (ojClauseConjuncts != null) {
         if (ojClauseConjuncts.contains(conjunctId)) {
-          result.add(p);
+          result.add(e);
         }
       } else {
-        result.add(p);
+        result.add(e);
       }
     }
     return result;
@@ -552,14 +547,13 @@ public class Analyzer {
   /**
    * Mark predicates as assigned.
    */
-  public void markConjunctsAssigned(List<Predicate> predicates) {
-    if (predicates == null) {
+  public void markConjunctsAssigned(List<Expr> conjuncts) {
+    if (conjuncts == null) {
       return;
     }
-    for (Predicate p: predicates) {
+    for (Expr p: conjuncts) {
       assignedConjuncts.add(p.getId());
     }
-    //LOG.info("mark assigned: " + assignedConjuncts.toString());
   }
 
   /**
@@ -567,20 +561,13 @@ public class Analyzer {
    */
   public void markConjunctAssigned(Predicate conjunct) {
     assignedConjuncts.add(conjunct.getId());
-    //LOG.info("mark assigned: " + assignedConjuncts.toString());
   }
 
   /**
    * Return true if there's at least one unassigned conjunct.
    */
   public boolean hasUnassignedConjuncts() {
-    //LOG.info("assigned: " + assignedConjuncts.toString());
-    //LOG.info("conjuncts: " + conjuncts.keySet().toString());
-    boolean result = !assignedConjuncts.containsAll(conjuncts.keySet());
-    if (result) {
-      //LOG.info("has unassigned conjuncts");
-    }
-    return result;
+    return !assignedConjuncts.containsAll(conjuncts.keySet());
   }
 
   /**

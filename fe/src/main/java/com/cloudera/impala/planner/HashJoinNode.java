@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
@@ -70,11 +69,11 @@ public class HashJoinNode extends PlanNode {
   private final List<Pair<Expr, Expr> > eqJoinConjuncts;
 
   // join conjuncts from the JOIN clause that aren't equi-join predicates
-  private final List<Predicate> otherJoinConjuncts;
+  private final List<Expr> otherJoinConjuncts;
 
   public HashJoinNode(
       PlanNodeId id, PlanNode outer, PlanNode inner, TableRef innerRef,
-      List<Pair<Expr, Expr> > eqJoinConjuncts, List<Predicate> otherJoinConjuncts) {
+      List<Pair<Expr, Expr> > eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
     super(id);
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
@@ -200,8 +199,8 @@ public class HashJoinNode extends PlanNode {
       p.first.getIds(null, ids);
       p.second.getIds(null, ids);
     }
-    for (Predicate p: otherJoinConjuncts) {
-      p.getIds(null, ids);
+    for (Expr e: otherJoinConjuncts) {
+      e.getIds(null, ids);
     }
   }
 
@@ -215,8 +214,8 @@ public class HashJoinNode extends PlanNode {
           new TEqJoinCondition(entry.first.treeToThrift(), entry.second.treeToThrift());
       msg.hash_join_node.addToEq_join_conjuncts(eqJoinCondition);
     }
-    for (Predicate p: otherJoinConjuncts) {
-      msg.hash_join_node.addToOther_join_conjuncts(p.treeToThrift());
+    for (Expr e: otherJoinConjuncts) {
+      msg.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
     }
   }
 

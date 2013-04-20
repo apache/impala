@@ -33,7 +33,6 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
@@ -769,9 +768,8 @@ public class Planner {
    */
   private PlanNode addUnassignedConjuncts(Analyzer analyzer, PlanNode root) {
     Preconditions.checkNotNull(root);
-    List<Predicate> conjuncts = analyzer.getUnassignedConjuncts(root.getTupleIds());
+    List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root.getTupleIds());
     if (conjuncts.isEmpty()) return root;
-
     // evaluate conjuncts in SelectNode
     SelectNode selectNode = new SelectNode(new PlanNodeId(nodeIdGenerator), root);
     selectNode.computeStats(analyzer);
@@ -882,17 +880,11 @@ public class Planner {
    *   referenced tids the last join to outer-join this tid has been materialized
    */
   private boolean canEvalPredicate(
-      List<TupleId> tupleIds, Predicate pred, Analyzer analyzer) {
-    if (!pred.isBound(tupleIds)) {
-      //LOG.info("canEvalPredicate() is false: pred: " + pred.toSql());
-      return false;
-    }
-    if (!analyzer.isWhereClauseConjunct(pred)) {
-      //LOG.info("canEvalPredicate() is true: pred: " + pred.toSql());
-      return true;
-    }
+      List<TupleId> tupleIds, Expr e, Analyzer analyzer) {
+    if (!e.isBound(tupleIds)) return false;
+    if (!analyzer.isWhereClauseConjunct(e)) return true;
     ArrayList<TupleId> tids = Lists.newArrayList();
-    pred.getIds(tids, null);
+    e.getIds(tids, null);
     for (TupleId tid: tids) {
       TableRef rhsRef = analyzer.getLastOjClause(tid);
       if (rhsRef == null) {
@@ -902,11 +894,9 @@ public class Planner {
       if (!tupleIds.containsAll(rhsRef.getMaterializedTupleIds())
           || !tupleIds.containsAll(rhsRef.getLeftTblRef().getMaterializedTupleIds())) {
         // the last join to outer-join this tid hasn't been materialized yet
-        //LOG.info("canEvalPredicate() is false: pred: " + pred.toSql());
         return false;
       }
     }
-    //LOG.info("canEvalPredicate() is true: pred: " + pred.toSql());
     return true;
   }
 
@@ -916,7 +906,7 @@ public class Planner {
    * by node. Ignores OJ conjuncts.
    */
   private void assignConjuncts(PlanNode node, Analyzer analyzer) {
-    List<Predicate> conjuncts = getUnassignedConjuncts(node, analyzer);
+    List<Expr> conjuncts = getUnassignedConjuncts(node, analyzer);
     node.addConjuncts(conjuncts);
     analyzer.markConjunctsAssigned(conjuncts);
   }
@@ -925,11 +915,11 @@ public class Planner {
    * Return all unassigned conjuncts which can be correctly evaluated by node.
    * Ignores OJ conjuncts.
    */
-  private List<Predicate> getUnassignedConjuncts(PlanNode node, Analyzer analyzer) {
-    List<Predicate> conjuncts = Lists.newArrayList();
-    for (Predicate p: analyzer.getUnassignedConjuncts(node.getTupleIds())) {
-      if (canEvalPredicate(node.getTupleIds(), p, analyzer)) {
-        conjuncts.add(p);
+  private List<Expr> getUnassignedConjuncts(PlanNode node, Analyzer analyzer) {
+    List<Expr> conjuncts = Lists.newArrayList();
+    for (Expr e: analyzer.getUnassignedConjuncts(node.getTupleIds())) {
+      if (canEvalPredicate(node.getTupleIds(), e, analyzer)) {
+        conjuncts.add(e);
       }
     }
     return conjuncts;
@@ -941,16 +931,16 @@ public class Planner {
    * Returns constructed SingleColumnFilter or null if no suitable conjuncts were found.
    */
   private SingleColumnFilter createKeyFilter(
-      SlotDescriptor d, List<Predicate> conjuncts) {
+      SlotDescriptor d, List<Expr> conjuncts) {
     SingleColumnFilter filter = null;
-    ListIterator<Predicate> i = conjuncts.listIterator();
+    ListIterator<Expr> i = conjuncts.listIterator();
     while (i.hasNext()) {
-      Predicate p = i.next();
-      if (p.isBound(d.getId())){
+      Expr e = i.next();
+      if (e.isBound(d.getId())){
         if (filter == null) {
           filter = new SingleColumnFilter(d);
         }
-        filter.addConjunct(p);
+        filter.addConjunct(e);
         i.remove();
       }
     }
@@ -965,13 +955,13 @@ public class Planner {
    * If there are multiple competing comparison predicates that could be used
    * to construct a ValueRange, only the first one from each category is chosen.
    */
-  private ValueRange createScanRange(SlotDescriptor d, List<Predicate> conjuncts) {
-    ListIterator<Predicate> i = conjuncts.listIterator();
+  private ValueRange createScanRange(SlotDescriptor d, List<Expr> conjuncts) {
+    ListIterator<Expr> i = conjuncts.listIterator();
     ValueRange result = null;
     while (i.hasNext()) {
-      Predicate p = i.next();
-      if (!(p instanceof BinaryPredicate)) continue;
-      BinaryPredicate comp = (BinaryPredicate) p;
+      Expr e = i.next();
+      if (!(e instanceof BinaryPredicate)) continue;
+      BinaryPredicate comp = (BinaryPredicate) e;
       if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
       Expr slotBinding = comp.getSlotBinding(d.getId());
       if (slotBinding == null || !slotBinding.isConstant()) continue;
@@ -1011,12 +1001,12 @@ public class Planner {
     // evaluated inside the subquery tree;
     // if it does contain a limit clause, it's not correct to have the view plan
     // evaluate predicates from the enclosing scope.
-    List<Predicate> conjuncts = Lists.newArrayList();
+    List<Expr> conjuncts = Lists.newArrayList();
     if (!inlineViewRef.getViewStmt().hasLimitClause()) {
-      for (Predicate p:
+      for (Expr e:
           analyzer.getUnassignedConjuncts(inlineViewRef.getMaterializedTupleIds())) {
-        if (canEvalPredicate(inlineViewRef.getMaterializedTupleIds(), p, analyzer)) {
-          conjuncts.add(p);
+        if (canEvalPredicate(inlineViewRef.getMaterializedTupleIds(), e, analyzer)) {
+          conjuncts.add(e);
         }
       }
       inlineViewRef.getAnalyzer().registerConjuncts(conjuncts);
@@ -1055,7 +1045,7 @@ public class Planner {
       scanNode = new HBaseScanNode(new PlanNodeId(nodeIdGenerator), tblRef.getDesc());
     }
 
-    List<Predicate> conjuncts = getUnassignedConjuncts(scanNode, analyzer);
+    List<Expr> conjuncts = getUnassignedConjuncts(scanNode, analyzer);
     // mark conjuncts assigned here; they will either end up inside a
     // SingleColumnFilter/ValueRange or will be evaluated directly by the node
     analyzer.markConjunctsAssigned(conjuncts);
@@ -1109,12 +1099,12 @@ public class Planner {
       Analyzer analyzer,
       List<TupleId> lhsIds, TableRef rhs,
       List<Pair<Expr, Expr>> joinConjuncts,
-      List<Predicate> joinPredicates) {
+      List<Expr> joinPredicates) {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId rhsId = rhs.getId();
     List<TupleId> rhsIds = rhs.getMaterializedTupleIds();
-    List<Predicate> candidates;
+    List<Expr> candidates;
     if (rhs.getJoinOp().isOuterJoin()) {
       // TODO: create test for this
       Preconditions.checkState(rhs.getOnClause() != null);
@@ -1126,32 +1116,32 @@ public class Planner {
       return;
     }
 
-    for (Predicate p: candidates) {
+    for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
-      if (p.getChild(0).isConstant() || p.getChild(1).isConstant()) {
+      if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) {
         continue;
       }
 
       Expr rhsExpr = null;
-      if (p.getChild(0).isBound(rhsIds)) {
-        rhsExpr = p.getChild(0);
+      if (e.getChild(0).isBound(rhsIds)) {
+        rhsExpr = e.getChild(0);
       } else {
-        Preconditions.checkState(p.getChild(1).isBound(rhsIds));
-        rhsExpr = p.getChild(1);
+        Preconditions.checkState(e.getChild(1).isBound(rhsIds));
+        rhsExpr = e.getChild(1);
       }
 
       Expr lhsExpr = null;
-      if (p.getChild(1).isBound(lhsIds)) {
-        lhsExpr = p.getChild(1);
-      } else if (p.getChild(0).isBound(lhsIds)) {
-        lhsExpr = p.getChild(0);
+      if (e.getChild(1).isBound(lhsIds)) {
+        lhsExpr = e.getChild(1);
+      } else if (e.getChild(0).isBound(lhsIds)) {
+        lhsExpr = e.getChild(0);
       } else {
         // not an equi-join condition between lhsIds and rhsId
         continue;
       }
 
       Preconditions.checkState(lhsExpr != rhsExpr);
-      joinPredicates.add(p);
+      joinPredicates.add(e);
       Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
       joinConjuncts.add(entry);
     }
@@ -1168,7 +1158,7 @@ public class Planner {
     PlanNode inner = createTableRefNode(analyzer, innerRef);
 
     List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
-    List<Predicate> eqJoinPredicates = Lists.newArrayList();
+    List<Expr> eqJoinPredicates = Lists.newArrayList();
     getHashLookupJoinConjuncts(
         analyzer, outer.getTupleIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
     if (eqJoinPredicates.isEmpty()) {
@@ -1179,7 +1169,7 @@ public class Planner {
     }
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 
-    List<Predicate> ojConjuncts = Lists.newArrayList();
+    List<Expr> ojConjuncts = Lists.newArrayList();
     if (innerRef.getJoinOp().isOuterJoin()) {
       // Also assign conjuncts from On clause. All remaining unassigned conjuncts
       // that can be evaluated by this join are assigned in createSelectPlan().
@@ -1280,7 +1270,7 @@ public class Planner {
 
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates on its columns.
-    List<Predicate> conjuncts =
+    List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList());
     // If the topmost node is an agg node, then set the conjuncts on its first child
     // (which must be a MergeNode), to evaluate the conjuncts as early as possible.

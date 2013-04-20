@@ -36,7 +36,6 @@ add_library(Exprs
   int-literal.cc
   is-null-predicate.cc
   like-predicate.cc
-  literal-predicate.cc
   math-functions.cc
   null-literal.cc
   opcode-registry.cc

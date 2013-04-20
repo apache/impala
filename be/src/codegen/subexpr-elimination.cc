@@ -168,7 +168,6 @@ bool SubExprElimination::Run(Function* fn) {
       // call Fn(row1) and call Fn(row2). (identical fns but different input).
       row_arg = row_cast->getOperand(0);
 
-      DCHECK(LoadInst::classof(instr_iter));
       instr = instr_iter++;
       LoadInst* is_null_result = reinterpret_cast<LoadInst*>(instr);
 

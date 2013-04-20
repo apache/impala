@@ -38,20 +38,20 @@ public class SelectStmt extends QueryStmt {
   private final SelectList selectList;
   private final ArrayList<String> colLabels; // lower case column labels
   private final List<TableRef> tableRefs;
-  private final Predicate whereClause;
+  private final Expr whereClause;
   private final ArrayList<Expr> groupingExprs;
-  private final Predicate havingClause;  // original having clause
+  private final Expr havingClause;  // original having clause
 
   // havingClause with aliases and agg output resolved
-  private Predicate havingPred;
+  private Expr havingPred;
 
   // set if we have any kind of aggregation operation, include SELECT DISTINCT
   private AggregateInfo aggInfo;
 
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
-             Predicate wherePredicate, ArrayList<Expr> groupingExprs,
-             Predicate havingPredicate, ArrayList<OrderByElement> orderByElements,
+             Expr wherePredicate, ArrayList<Expr> groupingExprs,
+             Expr havingPredicate, ArrayList<OrderByElement> orderByElements,
              long limit) {
     super(orderByElements, limit);
     this.selectList = selectList;
@@ -80,7 +80,7 @@ public class SelectStmt extends QueryStmt {
   /**
    * @return the HAVING clause post-analysis and with aliases resolved
    */
-  public Predicate getHavingPred() {
+  public Expr getHavingPred() {
     return havingPred;
   }
 
@@ -88,7 +88,7 @@ public class SelectStmt extends QueryStmt {
     return tableRefs;
   }
 
-  public Predicate getWhereClause() {
+  public Expr getWhereClause() {
     return whereClause;
   }
 
@@ -148,6 +148,7 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException(
             "aggregation function not allowed in WHERE clause");
       }
+      whereClause.checkReturnsBool("WHERE clause", false);
       analyzer.registerConjuncts(whereClause, null, true);
     }
 
@@ -319,8 +320,9 @@ public class SelectStmt extends QueryStmt {
     // analyze having clause
     if (havingClause != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred = (Predicate) havingClause.clone(aliasSMap);
+      havingPred = havingClause.clone(aliasSMap);
       havingPred.analyze(analyzer);
+      havingPred.checkReturnsBool("HAVING clause", true);
       analyzer.registerConjuncts(havingPred, null, false);
     }
 
@@ -352,7 +354,7 @@ public class SelectStmt extends QueryStmt {
     Expr.substituteList(resultExprs, combinedSMap);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs));
     if (havingPred != null) {
-      havingPred = (Predicate) havingPred.substitute(combinedSMap);
+      havingPred = havingPred.substitute(combinedSMap);
       LOG.debug("post-agg havingPred: " + havingPred.debugString());
     }
     Expr.substituteList(orderingExprs, combinedSMap);

@@ -62,9 +62,7 @@ public class SlotRef extends Expr {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed) {
-      return;
-    }
+    if (isAnalyzed) return;
     super.analyze(analyzer);
     desc = analyzer.registerColumnRef(tblName, col);
     type = desc.getType();
@@ -73,6 +71,7 @@ public class SlotRef extends Expr {
           + type.toString() + "' in '" + toSql() + "'.");
     }
     numDistinctValues = desc.getStats().getNumDistinctValues();
+    if (type == PrimitiveType.BOOLEAN) selectivity = defaultSelectivity;
   }
 
   @Override
@@ -146,6 +145,7 @@ public class SlotRef extends Expr {
     return false;
   }
 
+  @Override
   public boolean isBound(SlotId slotId) {
     Preconditions.checkState(isAnalyzed);
     return desc.getId().equals(slotId);

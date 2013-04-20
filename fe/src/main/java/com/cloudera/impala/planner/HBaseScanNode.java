@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -168,22 +167,22 @@ public class HBaseScanNode extends ScanNode {
         continue;
       }
       // List of predicates that cannot be pushed down as an HBase Filter.
-      List<Predicate> remainingPreds = new ArrayList<Predicate>();
-      for (Predicate p: conjuncts) {
-        if (!(p instanceof BinaryPredicate)) {
-          remainingPreds.add(p);
+      List<Expr> remainingPreds = new ArrayList<Expr>();
+      for (Expr e: conjuncts) {
+        if (!(e instanceof BinaryPredicate)) {
+          remainingPreds.add(e);
           continue;
         }
-        BinaryPredicate bp = (BinaryPredicate) p;
+        BinaryPredicate bp = (BinaryPredicate) e;
         Expr bindingExpr = bp.getSlotBinding(slot.getId());
         if (bindingExpr == null || !(bindingExpr instanceof StringLiteral)) {
-          remainingPreds.add(p);
+          remainingPreds.add(e);
           continue;
         }
         CompareFilter.CompareOp hbaseOp = impalaOpToHBaseOp(bp.getOp());
         // Currently unsupported op, leave it as a predicate.
         if (hbaseOp == null) {
-          remainingPreds.add(p);
+          remainingPreds.add(e);
           continue;
         }
         StringLiteral literal = (StringLiteral) bindingExpr;

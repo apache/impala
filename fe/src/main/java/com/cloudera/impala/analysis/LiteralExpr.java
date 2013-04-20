@@ -51,7 +51,7 @@ public abstract class LiteralExpr extends Expr {
   // Returns the string representation of the literal's value. Used when passing
   // literal values to the metastore rather than to Impala backends. This is similar to
   // the toSql() method, but does not perform any formatting of the string values. Neither
-  //  method unescapes string values.
+  // method unescapes string values.
   public abstract String getStringValue();
 
   // Swaps the sign of numeric literals.

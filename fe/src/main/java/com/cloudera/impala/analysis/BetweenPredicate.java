@@ -86,7 +86,7 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public List<Predicate> getConjuncts() {
+  public List<Expr> getConjuncts() {
     return rewrittenPredicate.getConjuncts();
   }
 

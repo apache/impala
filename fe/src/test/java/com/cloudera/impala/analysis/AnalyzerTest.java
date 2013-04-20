@@ -453,7 +453,7 @@ public class AnalyzerTest {
         "where true or false and bool_col = false");
     AnalyzesOk("select * from functional.AllTypes " +
         "where true and false or bool_col = false");
-    // Test predicates in select list.
+    // In select list.
     AnalyzesOk("select bool_col = true from functional.AllTypes");
     AnalyzesOk("select bool_col = false from functional.AllTypes");
     AnalyzesOk("select bool_col = NULL from functional.AllTypes");
@@ -536,9 +536,23 @@ public class AnalyzerTest {
         "(a.int_col = b.int_col and a.string_col = b.string_col)");
     AnalyzesOk(
         "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.bool_col)");
+    AnalyzesOk(
+        "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (NULL)");
     // ON or USING clause not required for inner join
     AnalyzesOk("select a.int_col from functional.alltypes a join functional.alltypes b");
+    // arbitrary expr not returning bool
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (trim(a.string_col))",
+        "ON clause 'trim(a.string_col)' requires return type 'BOOLEAN'. " +
+        "Actual type is 'STRING'.");
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.int_col * b.float_col)",
+        "ON clause 'a.int_col * b.float_col' requires return type 'BOOLEAN'. " +
+        "Actual type is 'DOUBLE'.");
     // unknown column
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
@@ -660,34 +674,24 @@ public class AnalyzerTest {
     AnalyzesOk("select * from functional.testtbl where true");
     AnalysisError("select * from functional.testtbl where count(*) > 0",
         "aggregation function not allowed in WHERE clause");
-    // NULL literal in binary predicate.
-    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
-      AnalyzesOk("select id from functional.testtbl where id " +
-          op.toString() + " NULL");
-    }
-    // bool literal in binary predicate.
+    // NULL and bool literal in binary predicate.
     for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
       AnalyzesOk("select id from functional.testtbl where id " +
           op.toString() + " true");
       AnalyzesOk("select id from functional.testtbl where id " +
           op.toString() + " false");
+      AnalyzesOk("select id from functional.testtbl where id " +
+          op.toString() + " NULL");
     }
-    // NULL literal predicate.
-    AnalyzesOk("select id from functional.testtbl where NULL OR NULL");
-    AnalyzesOk("select id from functional.testtbl where NULL AND NULL");
-    AnalyzesOk("select id from functional.testtbl where NOT NULL");
-    AnalyzesOk("select id from functional.testtbl where NULL");
-    // bool literal predicate
-    AnalyzesOk("select id from functional.testtbl where true");
-    AnalyzesOk("select id from functional.testtbl where false");
-    AnalyzesOk("select id from functional.testtbl where true OR true");
-    AnalyzesOk("select id from functional.testtbl where true OR false");
-    AnalyzesOk("select id from functional.testtbl where false OR false");
-    AnalyzesOk("select id from functional.testtbl where false OR true");
-    AnalyzesOk("select id from functional.testtbl where true AND true");
-    AnalyzesOk("select id from functional.testtbl where true AND false");
-    AnalyzesOk("select id from functional.testtbl where false AND false");
-    AnalyzesOk("select id from functional.testtbl where false AND true");
+    // Where clause is a SlotRef of type bool.
+    AnalyzesOk("select id from functional.alltypes where bool_col");
+    // Arbitrary exprs that do not return bool.
+    AnalysisError("select id from functional.alltypes where int_col",
+        "WHERE clause requires return type 'BOOLEAN'. Actual type is 'INT'.");
+    AnalysisError("select id from functional.alltypes where trim('abc')",
+        "WHERE clause requires return type 'BOOLEAN'. Actual type is 'STRING'.");
+    AnalysisError("select id from functional.alltypes where (int_col + float_col) * 10",
+        "WHERE clause requires return type 'BOOLEAN'. Actual type is 'DOUBLE'.");
   }
 
   @Test
@@ -850,8 +854,19 @@ public class AnalyzerTest {
         "select list expression not produced by aggregation output " +
         "(missing from GROUP BY clause?)");
 
+    // test having clause
     AnalyzesOk("select id, zip from functional.testtbl " +
         "group by zip, id having count(*) > 0");
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by bool_col having bool_col");
+    // arbitrary exprs not returning boolean
+    AnalysisError("select count(*) from functional.alltypes " +
+        "group by bool_col having 5 + 10 * 5.6",
+        "HAVING clause '5.0 + 10.0 * 5.6' requires return type 'BOOLEAN'. " +
+        "Actual type is 'DOUBLE'.");
+    AnalysisError("select count(*) from functional.alltypes " +
+        "group by bool_col having int_col",
+        "HAVING clause 'int_col' requires return type 'BOOLEAN'. Actual type is 'INT'.");
     AnalysisError("select id, zip from functional.testtbl " +
         "group by id having count(*) > 0",
         "select list expression not produced by aggregation output " +
@@ -1138,11 +1153,25 @@ public class AnalyzerTest {
         "or int_col = 5) and string_col > '1'");
     AnalyzesOk("select * from functional.alltypes where not string_col = '5'");
     AnalyzesOk("select * from functional.alltypes where int_col = cast('5' as int)");
-    // test NULLs
-    AnalyzesOk("select * from functional.alltypes where NULL and NULL");
-    AnalyzesOk("select * from functional.alltypes where NULL or NULL");
-    AnalyzesOk("select * from functional.alltypes where not NULL");
-    // arithmetic exprs as operands to compound predicates should fail to analyze
+
+    // Test all combinations of truth values and bool_col with all boolean operators.
+    String[] operands = new String[]{ "true", "false", "NULL", "bool_col" };
+    for (String lop: operands) {
+      for (String rop: operands) {
+        for (CompoundPredicate.Operator op: CompoundPredicate.Operator.values()) {
+          // Unary operator tested elsewhere (below).
+          if (op == CompoundPredicate.Operator.NOT) continue;
+          String expr = String.format("%s %s %s", lop, op, rop);
+          AnalyzesOk(String.format("select %s from functional.alltypes where %s",
+              expr, expr));
+        }
+      }
+      String notExpr = String.format("%s %s", CompoundPredicate.Operator.NOT, lop);
+      AnalyzesOk(String.format("select %s from functional.alltypes where %s",
+          notExpr, notExpr));
+    }
+
+    // arbitrary exprs as operands should fail to analyze
     AnalysisError("select * from functional.alltypes where 1 + 2 and false",
         "Operand '1 + 2' part of predicate '1 + 2 AND FALSE' should return " +
             "type 'BOOLEAN' but returns type 'BIGINT'.");
@@ -1152,6 +1181,15 @@ public class AnalyzerTest {
     AnalysisError("select * from functional.alltypes where not 1 + 2",
         "Operand '1 + 2' part of predicate 'NOT 1 + 2' should return " +
             "type 'BOOLEAN' but returns type 'BIGINT'.");
+    AnalysisError("select * from functional.alltypes where 1 + 2 and true",
+        "Operand '1 + 2' part of predicate '1 + 2 AND TRUE' should return " +
+            "type 'BOOLEAN' but returns type 'BIGINT'.");
+    AnalysisError("select * from functional.alltypes where false and trim('abc')",
+        "Operand 'trim('abc')' part of predicate 'FALSE AND trim('abc')' should " +
+            "return type 'BOOLEAN' but returns type 'STRING'.");
+    AnalysisError("select * from functional.alltypes where bool_col or double_col",
+        "Operand 'double_col' part of predicate 'bool_col OR double_col' should " +
+            "return type 'BOOLEAN' but returns type 'DOUBLE'.");
   }
 
   @Test
@@ -1171,6 +1209,23 @@ public class AnalyzerTest {
         "where 'abc' between string_col and date_string_col");
     AnalyzesOk("select * from functional.alltypes " +
         "where 'abc' not between string_col and date_string_col");
+    // Additional predicates before and/or after between predicate.
+    AnalyzesOk("select * from functional.alltypes " +
+        "where string_col = 'abc' and tinyint_col between 10 and 20");
+    AnalyzesOk("select * from functional.alltypes " +
+        "where tinyint_col between 10 and 20 and string_col = 'abc'");
+    AnalyzesOk("select * from functional.alltypes " +
+        "where bool_col and tinyint_col between 10 and 20 and string_col = 'abc'");
+    // Chaining/nesting of between predicates.
+    AnalyzesOk("select * from functional.alltypes " +
+        "where true between false and true and 'b' between 'a' and 'c'");
+    // true between ('b' between 'a' and 'b') and ('bb' between 'aa' and 'cc)
+    AnalyzesOk("select * from functional.alltypes " +
+        "where true between 'b' between 'a' and 'c' and 'bb' between 'aa' and 'cc'");
+    // Test proper precedence with exprs before between.
+    AnalyzesOk("select 5 + 1 between 4 and 10");
+    AnalyzesOk("select 'abc' like '%a' between true and false");
+    AnalyzesOk("select false between (true and true) and (false and true)");
     // Lower and upper bounds require implicit casts.
     AnalyzesOk("select * from functional.alltypes " +
         "where double_col between smallint_col and int_col");

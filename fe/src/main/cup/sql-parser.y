@@ -211,22 +211,22 @@ nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr ;
-nonterminal Expr value_expr, expr, arithmetic_expr, timestamp_arithmetic_expr;
+nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal ArrayList<Expr> func_arg_list;
 nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal TableName table_name;
-nonterminal Predicate where_clause;
+nonterminal Expr where_clause;
 nonterminal Predicate predicate, between_predicate, comparison_predicate,
   compound_predicate, in_predicate, like_predicate;
-nonterminal Predicate predicate_or_null;
 nonterminal ArrayList<Expr> group_by_clause;
-nonterminal Predicate having_clause;
+nonterminal Expr having_clause;
 nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
 nonterminal OrderByElement order_by_element;
 nonterminal Number limit_clause;
-nonterminal Expr cast_expr, case_else_clause, literal, aggregate_expr;
+nonterminal Expr cast_expr, case_else_clause, aggregate_expr;
+nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal AggregateParamsList aggregate_param_list;
@@ -284,6 +284,7 @@ nonterminal String optional_kw_table;
 precedence left KW_OR;
 precedence left KW_AND;
 precedence left KW_NOT, NOT;
+precedence left KW_BETWEEN, KW_IN, KW_IS;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
 precedence left EQUAL, LESSTHAN, GREATERTHAN;
 precedence left ADD, SUBTRACT;
@@ -291,10 +292,8 @@ precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left RPAREN;
-precedence left KW_IN;
 // Support chaining of timestamp arithmetic exprs.
 precedence left KW_INTERVAL;
-precedence left KW_IS;
 
 start with stmt;
 
@@ -601,18 +600,7 @@ partition_key_value ::=
 static_partition_key_value ::=
   // Static partition key values.
   IDENT:column EQUAL literal:l
-  {:
-    // transform NULL literal predicate into literal expr
-    if (l instanceof LiteralPredicate) {
-      RESULT = new PartitionKeyValue(column, new NullLiteral());
-    } else {
-      RESULT = new PartitionKeyValue(column, (LiteralExpr)l);
-    }
-  :}
-  | IDENT:column EQUAL KW_TRUE
-  {: RESULT = new PartitionKeyValue(column, new BoolLiteral(true)); :}
-  | IDENT:column EQUAL KW_FALSE
-  {: RESULT = new PartitionKeyValue(column, new BoolLiteral(false)); :}
+  {: RESULT = new PartitionKeyValue(column, l); :}
   ;
 
 // Our parsing of UNION is slightly different from MySQL's:
@@ -822,9 +810,7 @@ star_expr ::=
   STAR
   // table_name DOT STAR doesn't work because of a reduce-reduce conflict
   // on IDENT [DOT]
-  {:
-    RESULT = SelectListItem.createStarItem(null);
-  :}
+  {: RESULT = SelectListItem.createStarItem(null); :}
   | IDENT:tbl DOT STAR
   {: RESULT = SelectListItem.createStarItem(new TableName(null, tbl)); :}
   | IDENT:db DOT IDENT:tbl DOT STAR
@@ -863,11 +849,11 @@ table_ref_list ::=
     RESULT = list;
   :}
   | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
-    KW_ON predicate_or_null:p
+    KW_ON expr:e
   {:
     t.setJoinOp((JoinOperator) op);
     t.setJoinHints(h);
-    t.setOnClause(p);
+    t.setOnClause(e);
     list.add(t);
     RESULT = list;
   :}
@@ -960,8 +946,8 @@ expr_list ::=
   ;
 
 where_clause ::=
-  KW_WHERE predicate_or_null:p
-  {: RESULT = p; :}
+  KW_WHERE expr:e
+  {: RESULT = e; :}
   | /* empty */
   {: RESULT = null; :}
   ;
@@ -974,8 +960,8 @@ group_by_clause ::=
   ;
 
 having_clause ::=
-  KW_HAVING predicate_or_null:p
-  {: RESULT = p; :}
+  KW_HAVING expr:e
+  {: RESULT = e; :}
   | /* empty */
   {: RESULT = null; :}
   ;
@@ -1058,7 +1044,7 @@ case_else_clause ::=
   ;
 
 sign_chain_expr ::= 
-  SUBTRACT value_expr:e
+  SUBTRACT expr:e
   {:
     // integrate signs into literals
     if (e.isLiteral() && e.getType().isNumericType()) {
@@ -1068,18 +1054,18 @@ sign_chain_expr ::=
       RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, new IntLiteral((long)-1), e);
     }
   :}
-  | ADD value_expr:e
+  | ADD expr:e
   {: RESULT = e; :}
   ;
 
 expr ::=
-  value_expr:e
+  non_pred_expr:e
   {: RESULT = e; :}
   | predicate:p
   {: RESULT = p; :}
   ;
 
-value_expr ::=
+non_pred_expr ::=
   sign_chain_expr:e
   {: RESULT = e; :}
   | literal:l
@@ -1103,7 +1089,7 @@ value_expr ::=
   {: RESULT = e; :}
   | arithmetic_expr:e
   {: RESULT = e; :}
-  | LPAREN value_expr:e RPAREN
+  | LPAREN non_pred_expr:e RPAREN
   {: RESULT = e; :}
   ;
 
@@ -1121,28 +1107,26 @@ func_arg_list ::=
   :}
   ;
 
-// We use value_expr instead of expr in this production because arithmetic
-// does not make sense on bool values. We also avoid shift/reduce conflicts.
 arithmetic_expr ::=
-  value_expr:e1 STAR value_expr:e2
+  expr:e1 STAR expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, e1, e2); :}
-  | value_expr:e1 DIVIDE value_expr:e2
+  | expr:e1 DIVIDE expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, e1, e2); :}
-  | value_expr:e1 MOD value_expr:e2
+  | expr:e1 MOD expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MOD, e1, e2); :}
-  | value_expr:e1 KW_DIV value_expr:e2
+  | expr:e1 KW_DIV expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.INT_DIVIDE, e1, e2); :}
-  | value_expr:e1 ADD value_expr:e2
+  | expr:e1 ADD expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.ADD, e1, e2); :}
-  | value_expr:e1 SUBTRACT value_expr:e2
+  | expr:e1 SUBTRACT expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, e1, e2); :}
-  | value_expr:e1 BITAND value_expr:e2
+  | expr:e1 BITAND expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITAND, e1, e2); :}
-  | value_expr:e1 BITOR value_expr:e2
+  | expr:e1 BITOR expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITOR, e1, e2); :}
-  | value_expr:e1 BITXOR value_expr:e2
+  | expr:e1 BITXOR expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITXOR, e1, e2); :}
-  | BITNOT value_expr:e
+  | BITNOT expr:e
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITNOT, e, null); :}
   ;
 
@@ -1150,15 +1134,15 @@ arithmetic_expr ::=
 // This way we do not need to change existing uses of IDENT.
 // We chose not to make DATE_ADD and DATE_SUB keywords for the same reason.
 timestamp_arithmetic_expr ::=
-  KW_INTERVAL value_expr:v IDENT:u ADD value_expr:t
+  KW_INTERVAL expr:v IDENT:u ADD expr:t
   {: RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, true); :}
-  | value_expr:t ADD KW_INTERVAL value_expr:v IDENT:u
+  | expr:t ADD KW_INTERVAL expr:v IDENT:u
   {:
     RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, false);
   :}
   // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
   %prec KW_INTERVAL
-  | value_expr:t SUBTRACT KW_INTERVAL value_expr:v IDENT:u
+  | expr:t SUBTRACT KW_INTERVAL expr:v IDENT:u
   {:
     RESULT =
         new TimestampArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, t, v, u, false);
@@ -1169,7 +1153,7 @@ timestamp_arithmetic_expr ::=
   // We use func_arg_list instead of expr to avoid a shift/reduce conflict with
   // func_arg_list on COMMA, and report an error if the list contains more than one expr.
   | IDENT:functionName LPAREN func_arg_list:l COMMA
-    KW_INTERVAL value_expr:v IDENT:u RPAREN
+    KW_INTERVAL expr:v IDENT:u RPAREN
   {:
     if (l.size() > 1) {
       // Report parsing failure on keyword interval.
@@ -1186,9 +1170,13 @@ literal ::=
   {: RESULT = new FloatLiteral(l); :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
-  | KW_NULL:l
-  {: RESULT = LiteralPredicate.Null(); :}
-  | UNMATCHED_STRING_LITERAL:l value_expr:e
+  | KW_TRUE
+  {: RESULT = new BoolLiteral(true); :}
+  | KW_FALSE
+  {: RESULT = new BoolLiteral(false); :}
+  | KW_NULL
+  {: RESULT = new NullLiteral(); :}
+  | UNMATCHED_STRING_LITERAL:l expr:e
   {:
     // we have an unmatched string literal.
     // to correctly report the root cause of this syntax error
@@ -1246,11 +1234,7 @@ aggregate_param_list ::=
   ;
 
 predicate ::=
-  KW_TRUE:l
-  {: RESULT = LiteralPredicate.True(); :}
-  | KW_FALSE:l
-  {: RESULT = LiteralPredicate.False(); :}
-  | expr:e KW_IS KW_NULL
+  expr:e KW_IS KW_NULL
   {: RESULT = new IsNullPredicate(e, false); :}
   | expr:e KW_IS KW_NOT KW_NULL
   {: RESULT = new IsNullPredicate(e, true); :}
@@ -1266,16 +1250,6 @@ predicate ::=
   {: RESULT = p; :}
   | LPAREN predicate:p RPAREN
   {: RESULT = p; :}
-  ;
-
-predicate_or_null ::=
-  predicate:p
-  {: RESULT = p; :}
-  | KW_NULL
-  {: RESULT = LiteralPredicate.Null(); :}
-  // TODO: How can we parse ((NULL))?
-  | LPAREN KW_NULL RPAREN
-  {: RESULT = LiteralPredicate.Null(); :}
   ;
 
 comparison_predicate ::=
@@ -1296,68 +1270,62 @@ comparison_predicate ::=
   ;
 
 like_predicate ::=
-  value_expr:e1 KW_LIKE value_expr:e2
+  expr:e1 KW_LIKE expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.LIKE, e1, e2); :}
-  | value_expr:e1 KW_RLIKE value_expr:e2
+  | expr:e1 KW_RLIKE expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2); :}
-  | value_expr:e1 KW_REGEXP value_expr:e2
+  | expr:e1 KW_REGEXP expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2); :}
-  | value_expr:e1 KW_NOT KW_LIKE value_expr:e2
+  | expr:e1 KW_NOT KW_LIKE expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.LIKE, e1, e2), null); :}
-  | value_expr:e1 KW_NOT KW_RLIKE value_expr:e2
+  | expr:e1 KW_NOT KW_RLIKE expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2), null); :}
-  | value_expr:e1 KW_NOT KW_REGEXP value_expr:e2
+  | expr:e1 KW_NOT KW_REGEXP expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2), null); :}
   ;
 
+// Avoid a reduce/reduce conflict with compound_predicate by explicitly 
+// using non_pred_expr and predicate separately instead of expr.
 between_predicate ::=
-  value_expr:e1 KW_BETWEEN value_expr:e2 KW_AND value_expr:e3
+  expr:e1 KW_BETWEEN non_pred_expr:e2 KW_AND expr:e3
   {: RESULT = new BetweenPredicate(e1, e2, e3, false); :}
-  | value_expr:e1 KW_NOT KW_BETWEEN value_expr:e2 KW_AND value_expr:e3
+  | expr:e1 KW_BETWEEN predicate:e2 KW_AND expr:e3
+  {: RESULT = new BetweenPredicate(e1, e2, e3, false); :}
+  | expr:e1 KW_NOT KW_BETWEEN non_pred_expr:e2 KW_AND expr:e3
+  {: RESULT = new BetweenPredicate(e1, e2, e3, true); :}
+  | expr:e1 KW_NOT KW_BETWEEN predicate:e2 KW_AND expr:e3  
   {: RESULT = new BetweenPredicate(e1, e2, e3, true); :}
   ;
 
-// Do not use expr in this production. Otherwise,
-// the in 'NOT IN()' version will not parse.
 in_predicate ::=
-  value_expr:e KW_IN LPAREN func_arg_list:l RPAREN
+  expr:e KW_IN LPAREN func_arg_list:l RPAREN
   {: RESULT = new InPredicate(e, l, false); :}  
-  | value_expr:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
-  {: RESULT = new InPredicate(e, l, true); :}
-  | predicate:e KW_IN LPAREN func_arg_list:l RPAREN
-  {: RESULT = new InPredicate(e, l, false); :}  
-  | predicate:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
+  | expr:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
   {: RESULT = new InPredicate(e, l, true); :}
   ;
 
 compound_predicate ::=
-  expr:p1 KW_AND expr:p2
-  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.AND, p1, p2); :}
-  | expr:p1 KW_OR expr:p2
-  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.OR, p1, p2); :}
-  | KW_NOT expr:p
-  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
-  | NOT expr:p
-  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
+  expr:e1 KW_AND expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.AND, e1, e2); :}
+  | expr:e1 KW_OR expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.OR, e1, e2); :}
+  | KW_NOT expr:e
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, e, null); :}
+  | NOT expr:e
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, e, null); :}
   ;
 
 column_ref ::=
   IDENT:col
-  {:
-    RESULT = new SlotRef(null, col);
-  :}
+  {: RESULT = new SlotRef(null, col); :}
   // table_name:tblName DOT IDENT:col causes reduce/reduce conflicts
   | IDENT:tbl DOT IDENT:col
-  {:
-    RESULT = new SlotRef(new TableName(null, tbl), col);
-  :}
+  {: RESULT = new SlotRef(new TableName(null, tbl), col); :}
   | IDENT:db DOT IDENT:tbl DOT IDENT:col
-  {:
-    RESULT = new SlotRef(new TableName(db, tbl), col);
-  :}
+  {: RESULT = new SlotRef(new TableName(db, tbl), col); :}
   ;
 
 primitive_type ::=

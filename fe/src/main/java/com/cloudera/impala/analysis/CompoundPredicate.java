@@ -16,6 +16,8 @@ package com.cloudera.impala.analysis;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -99,7 +101,7 @@ public class CompoundPredicate extends Predicate {
 
     // Check that children are predicates.
     for (Expr e : children) {
-      if (!(e instanceof Predicate)) {
+      if (e.getType() != PrimitiveType.BOOLEAN && !e.getType().isNull()) {
         throw new AnalysisException(String.format("Operand '%s' part of predicate " +
             "'%s' should return type 'BOOLEAN' but returns type '%s'.",
             e.toSql(), toSql(), e.getType()));

@@ -31,7 +31,6 @@
 #include "exprs/int-literal.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
-#include "exprs/literal-predicate.h"
 #include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"

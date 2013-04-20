@@ -167,3 +167,20 @@ int, string, bigint
 NULL,'NULL',NULL
 4,'eeee',40
 ====
+---- QUERY
+# where clause is a SlotRef
+SELECT count(*) from functional.alltypes where bool_col
+---- TYPES
+bigint
+---- RESULTS
+3650
+====
+---- QUERY
+# having clause is a SlotRef
+SELECT count(*) from functional.alltypes group by bool_col having bool_col
+---- TYPES
+bigint
+---- RESULTS
+3650
+====
+

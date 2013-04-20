@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
@@ -73,7 +72,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // an outer join, which has nothing to do with the schema.
   protected Set<TupleId> nullableTupleIds = Sets.newHashSet();
 
-  protected List<Predicate> conjuncts = Lists.newArrayList();
+  protected List<Expr> conjuncts = Lists.newArrayList();
 
   // estimate of the output cardinality of this node; set in computeStats();
   // invalid: -1
@@ -180,19 +179,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return nullableTupleIds;
   }
 
-  public List<Predicate> getConjuncts() {
+  public List<Expr> getConjuncts() {
     return conjuncts;
   }
 
-  public void addConjuncts(List<Predicate> conjuncts) {
+  public void addConjuncts(List<Expr> conjuncts) {
     if (conjuncts == null) {
       return;
     }
     this.conjuncts.addAll(conjuncts);
-    //LOG.info("added conjuncts to " + getExplainString());
-    for (Predicate p: conjuncts) {
-      //LOG.info(p.toSql());
-    }
   }
 
   public void transferConjuncts(PlanNode recipient) {
@@ -240,8 +235,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.addToRow_tuples(tid.asInt());
       msg.addToNullable_tuples(nullableTupleIds.contains(tid));
     }
-    for (Predicate p: conjuncts) {
-      msg.addToConjuncts(p.treeToThrift());
+    for (Expr e: conjuncts) {
+      msg.addToConjuncts(e.treeToThrift());
     }
     msg.compact_data = compactData;
     toThrift(msg);
@@ -287,8 +282,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected double computeSelectivity() {
     double prod = 1.0;
-    for (Predicate p: conjuncts) {
-      prod *= p.getSelectivity();
+    for (Expr e: conjuncts) {
+      prod *= e.getSelectivity();
     }
     return prod;
   }

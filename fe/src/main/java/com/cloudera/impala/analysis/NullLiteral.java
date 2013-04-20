@@ -15,11 +15,13 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Preconditions;
 
-// TODO: Decide between keeping only this class or only BoolLiteral and NullLiteral.
 public class NullLiteral extends LiteralExpr {
+
   public NullLiteral() {
     type = PrimitiveType.NULL_TYPE;
   }
@@ -40,6 +42,13 @@ public class NullLiteral extends LiteralExpr {
   @Override
   public String getStringValue() {
     return "NULL";
+  }
+
+  @Override
+  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+    Preconditions.checkState(targetType.isValid());
+    type = targetType;
+    return this;
   }
 
   @Override

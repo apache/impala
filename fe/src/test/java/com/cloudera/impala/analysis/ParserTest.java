@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 
 import org.junit.Test;
 
@@ -14,6 +15,11 @@ import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.FileFormat;
 
 public class ParserTest {
+
+  // Representative operands for testing.
+  private final String[] operands =
+      new String[] {"i", "5", "true", "NULL", "'a'", "(1.5 * 8)" };
+
   /**
    * Asserts in case of parser error.
    * @param stmt
@@ -79,7 +85,8 @@ public class ParserTest {
     ParserError(stmt, null);
   }
 
-  @Test public void TestNoFromClause() {
+  @Test
+  public void TestNoFromClause() {
     ParsesOk("select 1 + 1, 'two', f(3), a + b");
     ParserError("select 1 + 1 'two' f(3) a + b");
     ParserError("select a, 2 where a > 2");
@@ -89,7 +96,8 @@ public class ParserTest {
     ParserError("select a, 2 order by 1 limit 1");
   }
 
-  @Test public void TestSelect() {
+  @Test
+  public void TestSelect() {
     ParsesOk("select a from tbl");
     ParsesOk("select a, b, c, d from tbl");
     ParsesOk("select true, false, NULL from tbl");
@@ -99,7 +107,8 @@ public class ParserTest {
     ParserError("select all from tbl");
   }
 
-  @Test public void TestAlias() {
+  @Test
+  public void TestAlias() {
     ParsesOk("select a b from tbl");
     ParsesOk("select a b, c from tbl");
     ParsesOk("select a as a, b as b, c as c, d as d from tbl");
@@ -113,7 +122,8 @@ public class ParserTest {
     ParsesOk("select a from (select * from tbl b) as b");
   }
 
-  @Test public void TestStar() {
+  @Test
+  public void TestStar() {
     ParsesOk("select * from tbl");
     ParsesOk("select tbl.* from tbl");
     ParsesOk("select db.tbl.* from tbl");
@@ -128,7 +138,8 @@ public class ParserTest {
     ParserError("select * from tbl where f(tbl.*) = 5");
   }
 
-  @Test public void TestJoinHints() {
+  @Test
+  public void TestJoinHints() {
     ParsesOk("select * from functional.alltypes a join [broadcast] " +
         "functional.alltypes b using (int_col)");
     ParsesOk("select * from functional.alltypes a join [bla,bla] " +
@@ -139,7 +150,8 @@ public class ParserTest {
         "functional.alltypes b using (int_col)");
   }
 
-  @Test public void TestFromClause() {
+  @Test
+  public void TestFromClause() {
     ParsesOk("select * from src src1 " +
         "left outer join src src2 on " +
         "  src1.key = src2.key and src1.key < 10 and src2.key > 10 " +
@@ -189,27 +201,34 @@ public class ParserTest {
         "inner join src src3 on (NULL) " +
         "where src2.bla = src3.bla " +
         "order by src1.key, src1.value, src2.key, src2.value, src3.key, src3.value");
+    // Arbitrary exprs in on clause parse ok.
+    ParsesOk("select * from src src1 join src src2 on ('a')");
+    ParsesOk("select * from src src1 join src src2 on (f(a, b))");
     ParserError("select * from src src1 join src src2 using (1)");
-    ParserError("select * from src src1 join src src2 on ('a')");
     ParserError("select * from src src1 " +
         "left outer join src src2 on (src1.key = src2.key and)");
   }
 
-  @Test public void TestWhereClause() {
-    ParsesOk("select a, b, count(c) from test where a > 15");
-    ParsesOk("select a, b, count(c) from test where true");
-    ParsesOk("select a, b, count(c) from test where NULL");
-    ParserError("select a, b, count(c) where a > 15 from test");
-    ParserError("select a, b, count(c) from test where 15");
-    ParserError("select a, b, count(c) from test where a + b");
-    // Does not parse to a predicate although return value is boolean.
-    ParserError("select a, b, count(c) where case a when b then true else false");
-    ParserError("select a, b, count(c) where if (a > b, true, false)");
-    // SlotRef is not a predicate.
-    ParserError("select a, b, count(c) where bool_col");
+  @Test
+  public void TestWhereClause() {
+    ParsesOk("select a, b from t where a > 15");
+    ParsesOk("select a, b from t where true");
+    ParsesOk("select a, b from t where NULL");
+    // Non-predicate exprs that return boolean.
+    ParsesOk("select a, b from t where case a when b then true else false end");
+    ParsesOk("select a, b from t where if (a > b, true, false)");
+    ParsesOk("select a, b from t where bool_col");
+    // Arbitrary non-predicate exprs parse ok but are semantically incorrect.
+    ParsesOk("select a, b from t where 10.5");
+    ParsesOk("select a, b from t where trim('abc')");
+    ParsesOk("select a, b from t where s + 20");
+    ParserError("select a, b from t where a > 15 from test");
+    ParserError("select a, b where a > 15");
+    ParserError("select where a, b from t");
   }
 
-  @Test public void TestGroupBy() {
+  @Test
+  public void TestGroupBy() {
     ParsesOk("select a, b, count(c) from test group by 1, 2");
     ParsesOk("select a, b, count(c) from test group by a, b");
     ParsesOk("select a, b, count(c) from test group by true, false, NULL");
@@ -219,7 +238,8 @@ public class ParserTest {
     ParserError("select a, b, count(c) from test group by order by a");
   }
 
-  @Test public void TestOrderBy() {
+  @Test
+  public void TestOrderBy() {
     ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
              "order by string_col, 15.7 * float_col, int_col + bigint_col");
     ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
@@ -229,20 +249,24 @@ public class ParserTest {
                 "order by by string_col asc desc");
   }
 
-  @Test public void TestHaving() {
+  @Test
+  public void TestHaving() {
     ParsesOk("select a, b, count(c) from test group by a, b having count(*) > 5");
     ParsesOk("select a, b, count(c) from test group by a, b having NULL");
     ParsesOk("select a, b, count(c) from test group by a, b having true");
     ParsesOk("select a, b, count(c) from test group by a, b having false");
-    ParserError("select a, b, count(c) from test group by a, b having 5");
+    // Non-predicate exprs that return boolean.
+    ParsesOk("select count(c) from test group by a having if (a > b, true, false)");
+    ParsesOk("select count(c) from test group by a " +
+        "having case a when b then true else false end");
+    // Arbitrary non-predicate exprs parse ok but are semantically incorrect.
+    ParsesOk("select a, b, count(c) from test group by a, b having 5");
     ParserError("select a, b, count(c) from test group by a, b having order by 5");
     ParserError("select a, b, count(c) from test having count(*) > 5 group by a, b");
-    // Does not parse to a predicate although return value is boolean.
-    ParserError("select count(c) group by a having case a when b then true else false");
-    ParserError("select count(c) group by if (a > b, true, false)");
   }
 
-  @Test public void TestLimit() {
+  @Test
+  public void TestLimit() {
     ParsesOk("select a, b, c from test inner join test2 using(a) limit 10");
     ParserError("select a, b, c from test inner join test2 using(a) limit 'a'");
     ParserError("select a, b, c from test inner join test2 using(a) limit a");
@@ -254,7 +278,8 @@ public class ParserTest {
     ParserError("select a, b, c from test inner join test2 using(a) limit NULL");
   }
 
-  @Test public void TestUnion() {
+  @Test
+  public void TestUnion() {
     // Single union test.
     ParsesOk("select a from test union select a from test");
     ParsesOk("select a from test union all select a from test");
@@ -331,7 +356,8 @@ public class ParserTest {
     ParserError("select a from union");
   }
 
-  @Test public void TestOverflow() {
+  @Test
+  public void TestOverflow() {
     ParsesOk("select " + Long.toString(Long.MAX_VALUE) + " from test");
     // We need to add 1 to MIN_VALUE because there are no negative integer literals.
     // The reason is that whether a minus belongs to an
@@ -348,25 +374,6 @@ public class ParserTest {
     // Since there is no easy, reliable way to detect underflow,
     // we don't consider it an error.
     ParsesOk("select " + Double.toString(Double.MIN_VALUE) + "1 from test");
-  }
-
-  @Test public void TestLiteralPredicates() {
-    // NULL literal predicate.
-    ParsesOk("select a from t where NULL OR NULL");
-    ParsesOk("select a from t where NULL AND NULL");
-    // NULL in select list becomes a literal predicate.
-    ParsesOk("select NULL from t");
-    // bool literal predicate
-    ParsesOk("select a from t where true");
-    ParsesOk("select a from t where false");
-    ParsesOk("select a from t where true OR true");
-    ParsesOk("select a from t where true OR false");
-    ParsesOk("select a from t where false OR false");
-    ParsesOk("select a from t where false OR true");
-    ParsesOk("select a from t where true AND true");
-    ParsesOk("select a from t where true AND false");
-    ParsesOk("select a from t where false AND false");
-    ParsesOk("select a from t where false AND true");
   }
 
   @Test
@@ -402,29 +409,36 @@ public class ParserTest {
     ParserError("select `col` `from` tbl");
   }
 
-
-  @Test public void TestLiteralExprs() {
+  @Test
+  public void TestLiteralExprs() {
     // negative integer literal
-    ParsesOk("select -1 from t");
-    ParsesOk("select - 1 from t");
-    ParsesOk("select a - - 1 from t");
-    ParsesOk("select a - - - 1 from t");
+    ParsesOk("select -1 from t where -1");
+    ParsesOk("select - 1 from t where - 1");
+    ParsesOk("select a - - 1 from t where a - - 1");
+    ParsesOk("select a - - - 1 from t where a - - - 1");
 
     // positive integer literal
-    ParsesOk("select +1 from t");
-    ParsesOk("select + 1 from t");
-    ParsesOk("select a + + 1 from t");
-    ParsesOk("select a + + + 1 from t");
+    ParsesOk("select +1 from t where +1");
+    ParsesOk("select + 1 from t where + 1");
+    ParsesOk("select a + + 1 from t where a + + 1");
+    ParsesOk("select a + + + 1 from t where a + + + 1");
 
     // Float literals
-    ParsesOk("select +1.0 from t");
-    ParsesOk("select +-1.0 from t");
-    ParsesOk("select +1.-0 from t");
+    ParsesOk("select +1.0 from t where +1.0");
+    ParsesOk("select +-1.0 from t where +-1.0");
+    ParsesOk("select +1.-0 from t where +1.-0");
 
     // mixed signs
-    ParsesOk("select -+-1 from t");
-    ParsesOk("select - +- 1 from t");
-    ParsesOk("select 1 + -+ 1 from t");
+    ParsesOk("select -+-1 from t where -+-1");
+    ParsesOk("select - +- 1 from t where - +- 1");
+    ParsesOk("select 1 + -+ 1 from t where 1 + -+ 1");
+
+    // Boolean literals
+    ParsesOk("select true from t where true");
+    ParsesOk("select false from t where false");
+
+    // Null literal
+    ParsesOk("select NULL from t where NULL");
 
     // -- is parsed as a comment starter
     ParserError("select --1");
@@ -438,24 +452,6 @@ public class ParserTest {
     ParserError("select *1 from t");
     ParserError("select &1 from t");
     ParserError("select =1 from t");
-
-    // bool and NULL literals in binary predicate.
-    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
-      ParsesOk("select a from t where a " +  op.toString() + " true");
-      ParsesOk("select a from t where a " +  op.toString() + " false");
-      ParsesOk("select a from t where a " +  op.toString() + " NULL");
-    }
-    // bool and NULL literals in compound predicates with binary ops.
-    for (CompoundPredicate.Operator op : CompoundPredicate.Operator.values()) {
-      if (op == CompoundPredicate.Operator.NOT) {
-        continue;
-      }
-      ParsesOk("select a from t where true " +  op.toString() +
-          " false " + op.toString() + " NULL");
-      // with negation
-      ParsesOk("select a from t where !true " +  op.toString() +
-          " !false " + op.toString() + " !NULL");
-    }
 
     // test string literals with and without quotes in the literal
     ParsesOk("select 5, 'five', 5.0, i + 5 from t");
@@ -494,30 +490,6 @@ public class ParserTest {
     testStringLiteral("\\a\\b\\c\\d\\1\\2\\3\\$\\&\\*");
     // Single backslash is a scanner error.
     ScannerError("select \"\\\" from t");
-
-    // bool and NULL literal in arithmetic expr with binary ops.
-    for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
-      if (op == ArithmeticExpr.Operator.BITNOT) {
-        continue;
-      }
-      // NULL as operand parses ok in select list.
-      ParsesOk("select a " +  op.toString() + " NULL");
-      // Predicates are not allowed as operands to arithmetic exprs.
-      ParserError("select a " +  op.toString() + " true");
-      ParserError("select a " +  op.toString() + " false");
-      // Does not parse in where clause because an arithmetic expr is not a predicate.
-      ParserError("select a from t where a " +  op.toString() + " NULL");
-      ParserError("select a from t where a " +  op.toString() + " true");
-      ParserError("select a from t where a " +  op.toString() + " false");
-    }
-    // NULL as operand parses ok in select list.
-    ParsesOk("select ~NULL");
-    // Predicates are not allowed as operands to arithmetic exprs.
-    ParserError("select ~true, ~false");
-    // Does not parse in where clause because an arithmetic expr is not a predicate.
-    ParserError("select a from t where ~true");
-    ParserError("select a from t where ~false");
-    ParserError("select a from t where ~NULL");
   }
 
   // test string literal s with single and double quotes
@@ -528,18 +500,32 @@ public class ParserTest {
     ParsesOk(doubleQuoteQuery);
   }
 
-  @Test public void TestFunctionCallExprs() {
+  @Test
+  public void TestFunctionCallExprs() {
     ParsesOk("select f1(5), f2('five'), f3(5.0, i + 5) from t");
     ParsesOk("select f1(true), f2(true and false), f3(null) from t");
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }
 
-  @Test public void TestArithmeticExprs() {
-    ParsesOk("select (i + 5) * (i - -5) / (a % 10) from t");
-    ParsesOk("select a & b, a | b, a ^ b, ~a from t");
-    ParsesOk("select 15.7 * f from t");
-    ParsesOk("select +a from t");
+  @Test
+  public void TestArithmeticExprs() {
+    for (String lop: operands) {
+      for (String rop: operands) {
+        for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
+          // Test BITNOT separately.
+          if (op == ArithmeticExpr.Operator.BITNOT) {
+            continue;
+          }
+          String expr = String.format("%s %s %s", lop, op.toString(), rop);
+          ParsesOk(String.format("select %s from t where %s", expr, expr));
+        }
+      }
+      // Test BITNOT.
+      String bitNotExpr = String.format("%s %s",
+          ArithmeticExpr.Operator.BITNOT.toString(), lop);
+      ParsesOk(String.format("select %s from t where %s", bitNotExpr, bitNotExpr));
+    }
     ParserError("select (i + 5)(1 - i) from t");
     ParserError("select %a from t");
     ParserError("select *a from t");
@@ -558,7 +544,8 @@ public class ParserTest {
    * 2. Beginning with an interval (only for '+'), e.g., 'interval b timeunit + a'
    * 3. Function-call like version, e.g., date_add(a, interval b timeunit)
    */
-  @Test public void TestTimestampArithmeticExprs() {
+  @Test
+  public void TestTimestampArithmeticExprs() {
     // Tests all valid time units.
     for (TimeUnit timeUnit : TimeUnit.values()) {
       // Non-function call like versions.
@@ -600,7 +587,8 @@ public class ParserTest {
     ParserError("select date_sub(a, interval b year, c)");
   }
 
-  @Test public void TestCaseExprs() {
+  @Test
+  public void TestCaseExprs() {
     // Test regular exps.
     ParsesOk("select case a when '5' then x when '6' then y else z end from t");
     ParsesOk("select case when 'a' then x when false then y else z end from t");
@@ -620,7 +608,8 @@ public class ParserTest {
     ParserError("select case a when true, false then y else z end from t");
   }
 
-  @Test public void TestCastExprs() {
+  @Test
+  public void TestCastExprs() {
     ParsesOk("select cast(a + 5.0 as string) from t");
     ParsesOk("select cast(NULL as string) from t");
     ParserError("select cast(a + 5.0 as badtype) from t");
@@ -637,7 +626,8 @@ public class ParserTest {
     ParserError("select if()");
   }
 
-  @Test public void TestAggregateExprs() {
+  @Test
+  public void TestAggregateExprs() {
     ParsesOk("select count(*), count(a), count(distinct a, b) from t");
     ParsesOk("select count(NULL), count(TRUE), count(FALSE), " +
              "count(distinct TRUE, FALSE, NULL) from t");
@@ -659,43 +649,49 @@ public class ParserTest {
     ParserError("select distinctpcsa() from t");
   }
 
-  @Test public void TestPredicates() {
-    ParsesOk("select a, b, c from t where i = 5");
-    ParsesOk("select a, b, c from t where i != 5");
-    ParsesOk("select a, b, c from t where i <> 5");
-    ParsesOk("select a, b, c from t where i > 5");
-    ParsesOk("select a, b, c from t where i >= 5");
-    ParsesOk("select a, b, c from t where i < 5");
-    ParsesOk("select a, b, c from t where i <= 5");
-    ParsesOk("select a, b, c from t where i like 'abc%'");
-    ParsesOk("select a, b, c from t where i rlike 'abc.*'");
-    ParsesOk("select a, b, c from t where i regexp 'abc.*'");
-    ParsesOk("select a, b, c from t where NULL like NULL");
-    ParsesOk("select a, b, c from t where NULL rlike NULL");
-    ParsesOk("select a, b, c from t where NULL regexp NULL");
-    ParsesOk("select a, b, c from t where i is null");
-    ParsesOk("select a, b, c from t where i is not null");
-    ParsesOk("select a, b, c from t where i + 5 is not null");
-    ParsesOk("select a, b, c from t where true");
-    ParsesOk("select a, b, c from t where false");
-    ParsesOk("select a, b, c from t where false and true");
+  @Test
+  public void TestPredicates() {
+    ArrayList<String> operations = new ArrayList<String>();
+    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
+      operations.add(op.toString());
+    }
+    operations.add("like");
+    operations.add("rlike");
+    operations.add("regexp");
+
+    for (String lop: operands) {
+      for (String rop: operands) {
+        for (String op : operations) {
+          String expr = String.format("%s %s %s", lop, op.toString(), rop);
+          ParsesOk(String.format("select %s from t where %s", expr, expr));
+        }
+      }
+      String isNullExr = String.format("%s is null", lop);
+      String isNotNullExr = String.format("%s is not null", lop);
+      ParsesOk(String.format("select %s from t where %s", isNullExr, isNullExr));
+      ParsesOk(String.format("select %s from t where %s", isNotNullExr, isNotNullExr));
+    }
   }
 
   private void testCompoundPredicates(String andStr, String orStr, String notStr) {
-    // select a, b, c from t where a = 5 and b = 6
-    ParsesOk("select a, b, c from t where a = 5 " + andStr + " b = 6");
-    // select a, b, c from t where a = 5 or b = 6
-    ParsesOk("select a, b, c from t where a = 5 " + orStr + " b = 6");
-    // select a, b, c from t where (a = 5 or b = 6) and c = 7
-    ParsesOk("select a, b, c from t where (a = 5 " + orStr + " b = 6) " +
+    // select a, b, c from t where a = 5 and f(b)
+    ParsesOk("select a, b, c from t where a = 5 " + andStr + " f(b)");
+    // select a, b, c from t where a = 5 or f(b)
+    ParsesOk("select a, b, c from t where a = 5 " + orStr + " f(b)");
+    // select a, b, c from t where (a = 5 or f(b)) and c = 7
+    ParsesOk("select a, b, c from t where (a = 5 " + orStr + " f(b)) " +
         andStr + " c = 7");
     // select a, b, c from t where not a = 5
     ParsesOk("select a, b, c from t where " + notStr + "a = 5");
-    // select a, b, c from t where (not a = 5 or not b = 6) and not c = 7
+    // select a, b, c from t where not f(a)
+    ParsesOk("select a, b, c from t where " + notStr + "f(a)");
+    // select a, b, c from t where (not a = 5 or not f(b)) and not c = 7
     ParsesOk("select a, b, c from t where (" + notStr + "a = 5 " + orStr + " " +
-        notStr + "b = 6) " + andStr + " " + notStr + "c = 7");
+        notStr + "f(b)) " + andStr + " " + notStr + "c = 7");
     // select a, b, c from t where (!(!a = 5))
     ParsesOk("select a, b, c from t where (" + notStr + "(" + notStr + "a = 5))");
+    // select a, b, c from t where (!(!f(a)))
+    ParsesOk("select a, b, c from t where (" + notStr + "(" + notStr + "f(a)))");
     // semantically incorrect negation, but parses ok
     ParsesOk("select a, b, c from t where a = " + notStr + "5");
     // unbalanced parentheses
@@ -706,7 +702,22 @@ public class ParserTest {
     ParserError("select a, b, c from t where " + notStr + "(a = 5) " + orStr + " " + notStr);
   }
 
-  @Test public void TestCompoundPredicates() {
+  private void testLiteralTruthValues(String andStr, String orStr, String notStr) {
+    String[] truthValues = {"true", "false", "null"};
+    for (String l: truthValues) {
+      for (String r: truthValues) {
+        String andExpr = String.format("%s %s %s", l, andStr, r);
+        String orExpr = String.format("%s %s %s", l, orStr, r);
+        ParsesOk(String.format("select %s from t where %s", andExpr, andExpr));
+        ParsesOk(String.format("select %s from t where %s", orExpr, orExpr));
+      }
+      String notExpr = String.format("%s %s", notStr, l);
+      ParsesOk(String.format("select %s from t where %s", notExpr, notExpr));
+    }
+  }
+
+  @Test
+  public void TestCompoundPredicates() {
     String[] andStrs = { "and", "&&" };
     String[] orStrs = { "or", "||" };
     // Note the trailing space in "not ". We want to test "!" without a space.
@@ -716,14 +727,29 @@ public class ParserTest {
       for (String orStr : orStrs) {
         for (String notStr : notStrs) {
           testCompoundPredicates(andStr, orStr, notStr);
+          testLiteralTruthValues(andStr, orStr, notStr);
         }
       }
     }
   }
 
-  @Test public void TestBetweenPredicate() {
+  @Test
+  public void TestBetweenPredicate() {
     ParsesOk("select a, b, c from t where i between x and y");
     ParsesOk("select a, b, c from t where i not between x and y");
+    ParsesOk("select a, b, c from t where true not between false and NULL");
+    ParsesOk("select a, b, c from t where 'abc' between 'a' like 'a' and 'b' like 'b'");
+    // Additional conditions before and after between predicate.
+    ParsesOk("select a, b, c from t where true and false and i between x and y");
+    ParsesOk("select a, b, c from t where i between x and y and true and false");
+    ParsesOk("select a, b, c from t where i between x and (y and true) and false");
+    ParsesOk("select a, b, c from t where i between x and (y and (true and false))");
+    // Chaining/nesting of between predicates.
+    ParsesOk("select a, b, c from t " +
+        "where true between false and true and 'b' between 'a' and 'c'");
+    // true between ('b' between 'a' and 'b') and ('bb' between 'aa' and 'cc)
+    ParsesOk("select a, b, c from t " +
+        "where true between 'b' between 'a' and 'c' and 'bb' between 'aa' and 'cc'");
     // Missing condition expr.
     ParserError("select a, b, c from t where between 5 and 10");
     // Missing lower bound.
@@ -732,9 +758,12 @@ public class ParserTest {
     ParserError("select a, b, c from t where i between 5 and");
     // Missing exprs after between.
     ParserError("select a, b, c from t where i between");
+    // AND has a higher precedence than OR.
+    ParserError("select a, b, c from t where true between 5 or 10 and 20");
   }
 
-  @Test public void TestInPredicate() {
+  @Test
+  public void TestInPredicate() {
     ParsesOk("select a, b, c from t where i in (x, y, z)");
     ParsesOk("select a, b, c from t where i not in (x, y, z)");
     // Test NULL and boolean literals.
@@ -753,7 +782,8 @@ public class ParserTest {
     ParserError("select a, b, c from t where i in ( )");
   }
 
-  @Test public void TestSlotRef() {
+  @Test
+  public void TestSlotRef() {
     ParsesOk("select a from t where b > 5");
     ParsesOk("select a.b from a where b > 5");
     ParsesOk("select a.b.c from a.b where b > 5");
@@ -797,7 +827,8 @@ public class ParserTest {
         "select a from src where b > 5");
   }
 
-  @Test public void TestInsert() {
+  @Test
+  public void TestInsert() {
     // Positive tests.
     testInsert(true, false);
     testInsert(true, true);
