@@ -251,12 +251,16 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   vector<void*> result_row;
   result_row.resize(output_exprs_.size());
 
+  // List of scales for floating point values in result_row
+  vector<int> scales;
+  scales.resize(result_row.size());
+
   if (coord_ == NULL && ddl_executor_ == NULL) {
     query_state_ = QueryState::FINISHED;  // results will be ready after this call
     // query without FROM clause: we return exactly one row
     eos_ = true;
-    RETURN_IF_ERROR(GetRowValue(NULL, &result_row));
-    return fetched_rows->AddOneRow(result_row);
+    RETURN_IF_ERROR(GetRowValue(NULL, &result_row, &scales));
+    return fetched_rows->AddOneRow(result_row, scales);
   } else {
     if (coord_ != NULL) {
       RETURN_IF_ERROR(coord_->Wait());
@@ -276,8 +280,8 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
       for (int i = 0; i < fetched_count; ++i) {
         TupleRow* row = current_batch_->GetRow(current_batch_row_);
-        RETURN_IF_ERROR(GetRowValue(row, &result_row));
-        RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row));
+        RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
+        RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
         ++num_rows_fetched_;
         ++current_batch_row_;
       }
@@ -299,10 +303,12 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   return Status::OK;
 }
 
-Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* result) {
+Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* result,
+                                                 vector<int>* scales) {
   DCHECK(result->size() >= output_exprs_.size());
   for (int i = 0; i < output_exprs_.size(); ++i) {
     (*result)[i] = output_exprs_[i]->GetValue(row);
+    (*scales)[i] = output_exprs_[i]->output_scale();
   }
   return Status::OK;
 }

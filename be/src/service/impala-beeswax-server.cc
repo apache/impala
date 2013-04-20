@@ -94,7 +94,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
 
   // Convert expr values (col_values) to ASCII using "\t" as column delimiter and store
   // it in this result set.
-  virtual Status AddOneRow(const vector<void*>& col_values) {
+  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
     int num_col = col_values.size();
     DCHECK_EQ(num_col, metadata_.columnDescs.size());
     stringstream out_stream;
@@ -103,7 +103,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
       RawValue::PrintValue(col_values[i],
-          ThriftToType(metadata_.columnDescs[i].columnType), &out_stream);
+          ThriftToType(metadata_.columnDescs[i].columnType), scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
     return Status::OK;

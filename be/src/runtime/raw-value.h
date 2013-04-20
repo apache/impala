@@ -38,14 +38,15 @@ class RawValue {
   // Ascii output precision for double/float
   static const int ASCII_PRECISION;
 
-  // Convert value into ascii and write to 'stream'.
-  // NULL turns into "NULL".
-  static void PrintValue(const void* value, PrimitiveType type,
+  // Convert 'value' into ascii and write to 'stream'. NULL turns into "NULL". 'scale'
+  // determines how many digits after the decimal are printed for floating point numbers,
+  // -1 indicates to use the stream's current formatting.
+  static void PrintValue(const void* value, PrimitiveType type, int scale,
                          std::stringstream* stream);
 
-  // Convert value into ascii and return via 'str'.
-  // NULL turns into "NULL".
-  static void PrintValue(const void* value, PrimitiveType type, std::string* str);
+  // Write ascii value to string instead of stringstream.
+  static void PrintValue(const void* value, PrimitiveType type, int scale,
+                         std::string* str);
 
   // Writes the byte representation of a value to a stringstream character-by-character
   static void PrintValueAsBytes(const void* value, PrimitiveType type,

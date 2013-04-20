@@ -145,9 +145,10 @@ void* MathFunctions::Round(Expr* e, TupleRow* row) {
 void* MathFunctions::RoundUpTo(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   double* d = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
-  int32_t* precision = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
-  if (d == NULL || precision == NULL) return NULL;
-  e->result_.double_val = floor(*d * pow(10.0, *precision) + 0.5) / pow(10.0, *precision);
+  int32_t* scale = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
+  if (d == NULL || scale == NULL) return NULL;
+  e->result_.double_val = floor(*d * pow(10.0, *scale) + 0.5) / pow(10.0, *scale);
+  e->output_scale_ = *scale;
   return &e->result_.double_val;
 }
 

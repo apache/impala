@@ -75,7 +75,7 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
   virtual ~TRowQueryResultSet() {}
 
   // Convert expr value to HS2 TRow and store it in TRowSet.
-  virtual Status AddOneRow(const vector<void*>& col_values) {
+  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
     int num_col = col_values.size();
     DCHECK_EQ(num_col, metadata_.columnDescs.size());
     result_set_->rows.push_back(TRow());
@@ -779,7 +779,7 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
       hs2_col_val->__isset.stringVal = true;
       hs2_col_val->stringVal.__isset.value = not_null;
       if (not_null) {
-        RawValue::PrintValue(value, TYPE_TIMESTAMP, &(hs2_col_val->stringVal.value));
+        RawValue::PrintValue(value, TYPE_TIMESTAMP, -1, &(hs2_col_val->stringVal.value));
       }
       break;
     default:

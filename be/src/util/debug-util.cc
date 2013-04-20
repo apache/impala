@@ -136,7 +136,7 @@ string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
     } else {
       string value_str;
       RawValue::PrintValue(
-          t->GetSlot(slot_d->tuple_offset()), slot_d->type(), &value_str);
+          t->GetSlot(slot_d->tuple_offset()), slot_d->type(), -1, &value_str);
       out << value_str;
     }
   }

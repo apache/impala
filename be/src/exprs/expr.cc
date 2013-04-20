@@ -96,6 +96,7 @@ Expr::Expr(PrimitiveType type, bool is_slotref)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(type),
+      output_scale_(-1),
       codegen_fn_(NULL),
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
@@ -105,6 +106,7 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(ThriftToType(node.type)),
+      output_scale_(-1),
       codegen_fn_(NULL),
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
@@ -432,7 +434,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
 void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {
-    RawValue::PrintValue(value, type(), &col_val->stringVal);
+    RawValue::PrintValue(value, type(), output_scale_, &col_val->stringVal);
     col_val->__isset.stringVal = true;
     return;
   }
@@ -476,7 +478,7 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       col_val->__isset.stringVal = true;
       break;
     case TYPE_TIMESTAMP:
-      RawValue::PrintValue(value, type(), &col_val->stringVal);
+      RawValue::PrintValue(value, type(), output_scale_, &col_val->stringVal);
       col_val->__isset.stringVal = true;
       break;
     default:
@@ -485,19 +487,19 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
 }
 
 void Expr::PrintValue(TupleRow* row, string* str) {
-  RawValue::PrintValue(GetValue(row), type(), str);
+  RawValue::PrintValue(GetValue(row), type(), output_scale_, str);
 }
 
 void Expr::PrintValue(void* value, string* str) {
-  RawValue::PrintValue(value, type(), str);
+  RawValue::PrintValue(value, type(), output_scale_, str);
 }
 
 void Expr::PrintValue(void* value, stringstream* stream) {
-  RawValue::PrintValue(value, type(), stream);
+  RawValue::PrintValue(value, type(), output_scale_, stream);
 }
 
 void Expr::PrintValue(TupleRow* row, stringstream* stream) {
-  RawValue::PrintValue(GetValue(row), type(), stream);
+  RawValue::PrintValue(GetValue(row), type(), output_scale_, stream);
 }
 
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {

@@ -249,9 +249,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     QueryResultSet() {}
     virtual ~QueryResultSet() {}
 
-    // Add the row (list of expr value) from a select query to this result set. When a
-    // row comes from a select query, the row is in the form of expr values (void*).
-    virtual Status AddOneRow(const vector<void*>& row) = 0;
+    // Add the row (list of expr value) from a select query to this result set. When a row
+    // comes from a select query, the row is in the form of expr values (void*). 'scales'
+    // contains the values' scales (# of digits after decimal), with -1 indicating no
+    // scale specified.
+    virtual Status AddOneRow(const vector<void*>& row, const vector<int>& scales) = 0;
 
     // Add the TResultRow to this result set. When a row comes from a DDL/metadata
     // operation, the row in the form of TResultRow.
@@ -396,9 +398,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // called for non-DDL / DML queries.
     Status FetchNextBatch();
 
-    // Evaluates output_exprs_ against row and output the evaluated row in result.
-    // result must have been resized to the number of columns before call.
-    Status GetRowValue(TupleRow* row, vector<void*>* result);
+    // Evaluates 'output_exprs_' against 'row' and output the evaluated row in
+    // 'result'. The values' scales (# of digits after decimal) are stored in 'scales'.
+    // result and scales must have been resized to the number of columns before call.
+    Status GetRowValue(TupleRow* row, vector<void*>* result, vector<int>* scales);
 
     // Set output_exprs_, based on exprs.
     Status PrepareSelectListExprs(RuntimeState* runtime_state,

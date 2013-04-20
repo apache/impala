@@ -233,13 +233,13 @@ class ExprTest : public testing::Test {
         // Converting the float back from a string is inaccurate so convert
         // the expected result to a string.
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
-                             TYPE_FLOAT, &expected_str);
+                             TYPE_FLOAT, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
       }
       case TYPE_DOUBLE: {
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
-                             TYPE_DOUBLE, &expected_str);
+                             TYPE_DOUBLE, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
       }

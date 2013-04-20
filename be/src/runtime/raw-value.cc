@@ -66,10 +66,20 @@ void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
   }
 }
 
-void RawValue::PrintValue(const void* value, PrimitiveType type, stringstream* stream) {
+void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
+                          stringstream* stream) {
   if (value == NULL) {
     *stream << "NULL";
     return;
+  }
+
+  int old_precision = stream->precision();
+  ios_base::fmtflags old_flags = stream->flags();
+  if (scale > -1) {
+    stream->precision(scale);
+    // Setting 'fixed' causes precision to set the number of digits printed after the
+    // decimal (by default it sets the maximum number of digits total).
+    *stream << fixed;
   }
 
   string tmp;
@@ -110,9 +120,13 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, stringstream* s
     default:
       DCHECK(false) << "bad RawValue::PrintValue() type: " << TypeToString(type);
   }
+  stream->precision(old_precision);
+  // Undo setting stream to fixed
+  stream->flags(old_flags);
 }
 
-void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
+void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
+                          string* str) {
   if (value == NULL) {
     *str = "NULL";
     return;
@@ -136,7 +150,7 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
       str->swap(tmp);
       return;
     default:
-      PrintValue(value, type, &out);
+      PrintValue(value, type, scale, &out);
   }
   *str = out.str();
 }

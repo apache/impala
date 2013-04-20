@@ -2327,7 +2327,7 @@ Plan Fragment 0
   OUTPUT: MAX(total_revenue)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (0)
+    SCAN HDFS table=tpch.revenue #partitions=1 size=137.60KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -2351,7 +2351,7 @@ Plan Fragment 1
   OUTPUT: MAX(total_revenue)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (0)
+    SCAN HDFS table=tpch.revenue #partitions=1 size=137.60KB (0)
       TUPLE IDS: 0 
 ====
 # Modifications - Added limit
@@ -2387,7 +2387,7 @@ Plan Fragment 0
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (0)
               TUPLE IDS: 0 
-            SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
+            SCAN HDFS table=tpch.revenue #partitions=1 size=137.60KB (1) compact
               TUPLE IDS: 1 
         SCAN HDFS table=tpch.max_revenue #partitions=1 size=10B (3) compact
           TUPLE IDS: 2 
@@ -2443,7 +2443,7 @@ Plan Fragment 3
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.revenue #partitions=1 size=135.54KB (1) compact
+  SCAN HDFS table=tpch.revenue #partitions=1 size=137.60KB (1) compact
     TUPLE IDS: 1 
 ====
 # Q16 - Parts/Supplier Relation Query
@@ -2691,7 +2691,7 @@ Plan Fragment 0
             SCAN HDFS table=tpch.part #partitions=1 size=22.83MB (1) compact
               PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
               TUPLE IDS: 1 
-        SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.16MB (3) compact
+        SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.18MB (3) compact
           TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -2737,7 +2737,7 @@ Plan Fragment 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.16MB (3) compact
+  SCAN HDFS table=tpch.lineitem_tmp #partitions=1 size=2.18MB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3

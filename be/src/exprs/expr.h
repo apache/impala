@@ -248,6 +248,12 @@ class Expr {
   void PrintValue(TupleRow* value, std::stringstream* stream);
   void PrintValue(void* value, std::stringstream* stream);
 
+  // Get the number of digits after the decimal that should be displayed for this
+  // value. Returns -1 if no scale has been specified (currently the scale is only set for
+  // doubles set by RoundUpTo). GetValue() must have already been called.
+  // TODO: this will be unnecessary once we support the DECIMAL(precision, scale) type
+  int output_scale() const { return output_scale_; }
+
   void AddChild(Expr* expr) { children_.push_back(expr); }
   Expr* GetChild(int i) const { return children_[i]; }
   int GetNumChildren() const { return children_.size(); }
@@ -396,6 +402,7 @@ class Expr {
   const PrimitiveType type_;
   std::vector<Expr*> children_;
   ExprValue result_;
+  int output_scale_;
 
   // Codegened IR function.  Will be NULL if this expr was not codegen'd.
   llvm::Function* codegen_fn_;

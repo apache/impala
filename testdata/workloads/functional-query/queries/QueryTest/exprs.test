@@ -1302,3 +1302,12 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
+# Test rounding (IMPALA-266)
+select round(8.072, 3), round(8, 3), round(8.0719999999,3), round(8.072, 0),
+round(8.072, 4), 8, 8.0;
+---- TYPES
+double, double, double, double, double, tinyint, float
+---- RESULTS
+8.072,8.000,8.072,8,8.0720,8,8
+====
