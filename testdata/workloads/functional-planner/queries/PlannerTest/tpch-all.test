@@ -149,17 +149,17 @@ Plan Fragment 0
   HASH_PARTITIONED: ps.ps_suppkey
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
     OVERWRITE=true
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       n.n_regionkey = r.r_regionkey
     TUPLE IDS: 0 1 2 3 4 
-      HASH JOIN
+      HASH JOIN (BROADCAST)
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           s.s_nationkey = n.n_nationkey
         TUPLE IDS: 0 1 2 3 
-          HASH JOIN
+          HASH JOIN (PARTITIONED)
             JOIN OP: INNER JOIN
             HASH PREDICATES:
               ps.ps_suppkey = s.s_suppkey
@@ -207,7 +207,7 @@ Plan Fragment 4
     EXCHANGE ID: 10
     HASH_PARTITIONED: ps.ps_suppkey
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       ps.ps_partkey = p.p_partkey
@@ -325,7 +325,7 @@ Plan Fragment 1
   ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   LIMIT: 100
   TUPLE IDS: 0 1 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         t1.p_partkey = t2.p_partkey
@@ -435,12 +435,12 @@ Plan Fragment 2
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: l_orderkey, o_orderdate, o_shippriority
   TUPLE IDS: 3 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         o.o_custkey = c.c_custkey
       TUPLE IDS: 0 1 2 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             l.l_orderkey = o.o_orderkey
@@ -595,7 +595,7 @@ Plan Fragment 2
   OUTPUT: 
   GROUP BY: o_orderpriority, l_orderkey
   TUPLE IDS: 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_orderkey = o.o_orderkey
@@ -763,28 +763,28 @@ Plan Fragment 2
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: n_name
   TUPLE IDS: 6 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         n_regionkey = r_regionkey
       TUPLE IDS: 0 1 2 3 4 5 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             s_nationkey = n_nationkey
           TUPLE IDS: 0 1 2 3 4 
-            HASH JOIN
+            HASH JOIN (BROADCAST)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 s_nationkey = c_nationkey
                 o_custkey = c_custkey
               TUPLE IDS: 0 1 2 3 
-                HASH JOIN
+                HASH JOIN (BROADCAST)
                   JOIN OP: INNER JOIN
                   HASH PREDICATES:
                     l_suppkey = s_suppkey
                   TUPLE IDS: 0 1 2 
-                    HASH JOIN
+                    HASH JOIN (BROADCAST)
                       JOIN OP: INNER JOIN
                       HASH PREDICATES:
                         l_orderkey = o_orderkey
@@ -1097,37 +1097,37 @@ Plan Fragment 2
   OUTPUT: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: year(o_orderdate)
   TUPLE IDS: 8 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         s_nationkey = n2.n_nationkey
       TUPLE IDS: 0 1 2 3 4 5 6 7 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             n1.n_regionkey = r_regionkey
           TUPLE IDS: 0 1 2 3 4 5 6 
-            HASH JOIN
+            HASH JOIN (BROADCAST)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 c_nationkey = n1.n_nationkey
               TUPLE IDS: 0 1 2 3 4 5 
-                HASH JOIN
+                HASH JOIN (BROADCAST)
                   JOIN OP: INNER JOIN
                   HASH PREDICATES:
                     o_custkey = c_custkey
                   TUPLE IDS: 0 1 2 3 4 
-                    HASH JOIN
+                    HASH JOIN (BROADCAST)
                       JOIN OP: INNER JOIN
                       HASH PREDICATES:
                         l_suppkey = s_suppkey
                       TUPLE IDS: 0 1 2 3 
-                        HASH JOIN
+                        HASH JOIN (BROADCAST)
                           JOIN OP: INNER JOIN
                           HASH PREDICATES:
                             l_partkey = p_partkey
                           TUPLE IDS: 0 1 2 
-                            HASH JOIN
+                            HASH JOIN (BROADCAST)
                               JOIN OP: INNER JOIN
                               HASH PREDICATES:
                                 l_orderkey = o_orderkey
@@ -1381,23 +1381,23 @@ Plan Fragment 2
   OUTPUT: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
   GROUP BY: n.n_name, year(o.o_orderdate)
   TUPLE IDS: 6 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         s.s_nationkey = n.n_nationkey
       TUPLE IDS: 0 1 2 3 4 5 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             l.l_suppkey = s.s_suppkey
           TUPLE IDS: 0 1 2 3 4 
-            HASH JOIN
+            HASH JOIN (BROADCAST)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 l.l_suppkey = ps.ps_suppkey
                 l.l_partkey = ps.ps_partkey
               TUPLE IDS: 0 1 2 3 
-                HASH JOIN
+                HASH JOIN (PARTITIONED)
                   JOIN OP: INNER JOIN
                   HASH PREDICATES:
                     l.l_orderkey = o.o_orderkey
@@ -1455,7 +1455,7 @@ Plan Fragment 7
     EXCHANGE ID: 14
     HASH_PARTITIONED: l.l_orderkey
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       l.l_partkey = p.p_partkey
@@ -1630,17 +1630,17 @@ Plan Fragment 2
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   TUPLE IDS: 4 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         c.c_nationkey = n.n_nationkey
       TUPLE IDS: 0 1 2 3 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             o.o_custkey = c.c_custkey
           TUPLE IDS: 0 1 2 
-            HASH JOIN
+            HASH JOIN (BROADCAST)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 l.l_orderkey = o.o_orderkey
@@ -1780,7 +1780,7 @@ Plan Fragment 1
   OUTPUT: SUM(ps_supplycost * ps_availqty)
   GROUP BY: ps_partkey
   TUPLE IDS: 3 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         s.s_suppkey = ps.ps_suppkey
@@ -1805,7 +1805,7 @@ Plan Fragment 3
     EXCHANGE ID: 8
     HASH_PARTITIONED: s.s_suppkey
 
-  HASH JOIN
+  HASH JOIN (PARTITIONED)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       n.n_nationkey = s.s_nationkey
@@ -1962,7 +1962,7 @@ Plan Fragment 2
   OUTPUT: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   GROUP BY: l_shipmode
   TUPLE IDS: 2 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_orderkey = o.o_orderkey
@@ -2123,7 +2123,7 @@ Plan Fragment 3
   OUTPUT: COUNT(o_orderkey)
   GROUP BY: c_custkey
   TUPLE IDS: 2 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: RIGHT OUTER JOIN
       HASH PREDICATES:
         o.o_custkey = c.c_custkey
@@ -2211,7 +2211,7 @@ Plan Fragment 1
   OUTPUT: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: 
   TUPLE IDS: 2 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_partkey = p.p_partkey
@@ -2411,12 +2411,12 @@ Plan Fragment 1
   ORDER BY: s_suppkey ASC
   LIMIT: 100
   TUPLE IDS: 0 1 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         r.total_revenue = m.max_revenue
       TUPLE IDS: 0 1 2 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             s.s_suppkey = r.supplier_no
@@ -2504,12 +2504,12 @@ Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=tpch.q16_tmp
     OVERWRITE=true
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       ps.ps_suppkey = s.s_suppkey
     TUPLE IDS: 0 1 2 
-      HASH JOIN
+      HASH JOIN (BROADCAST)
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           ps.ps_partkey = p.p_partkey
@@ -2713,13 +2713,13 @@ Plan Fragment 1
   OUTPUT: SUM(l_extendedprice)
   GROUP BY: 
   TUPLE IDS: 3 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         p.p_partkey = lt.t_partkey
       OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
       TUPLE IDS: 0 1 2 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             l.l_partkey = p.p_partkey
@@ -2889,17 +2889,17 @@ Plan Fragment 2
   OUTPUT: SUM(l_quantity)
   GROUP BY: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
   TUPLE IDS: 4 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         o.o_orderkey = t.l_orderkey
       TUPLE IDS: 0 1 2 3 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             o.o_custkey = c.c_custkey
           TUPLE IDS: 0 1 2 
-            HASH JOIN
+            HASH JOIN (PARTITIONED)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 l.l_orderkey = o.o_orderkey
@@ -3020,7 +3020,7 @@ Plan Fragment 1
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: 
   TUPLE IDS: 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_partkey = p.p_partkey
@@ -3202,12 +3202,12 @@ Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=tpch.q20_tmp3
     OVERWRITE=true
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       ps.ps_partkey = t1.p_partkey
     TUPLE IDS: 0 1 2 
-      HASH JOIN
+      HASH JOIN (BROADCAST)
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           ps.ps_partkey = t2.l_partkey
@@ -3341,12 +3341,12 @@ Plan Fragment 1
   ORDER BY: s_name ASC
   LIMIT: 100
   TUPLE IDS: 0 1 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         s.s_suppkey = t4.ps_suppkey
       TUPLE IDS: 0 1 2 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             s.s_nationkey = n.n_nationkey
@@ -3500,30 +3500,30 @@ Plan Fragment 2
   OUTPUT: COUNT(*)
   GROUP BY: s_name
   TUPLE IDS: 6 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: LEFT OUTER JOIN
       HASH PREDICATES:
         l1.l_orderkey = l3.l_orderkey
       OTHER JOIN PREDICATES: l3.l_suppkey != l1.l_suppkey
       OTHER PREDICATES: l3.l_orderkey IS NULL
       TUPLE IDS: 0 1 2 3 4 5N 
-        HASH JOIN
+        HASH JOIN (BROADCAST)
           JOIN OP: LEFT SEMI JOIN
           HASH PREDICATES:
             l1.l_orderkey = l2.l_orderkey
           OTHER PREDICATES: l2.l_suppkey != l1.l_suppkey
           TUPLE IDS: 0 1 2 3 4 
-            HASH JOIN
+            HASH JOIN (BROADCAST)
               JOIN OP: INNER JOIN
               HASH PREDICATES:
                 s.s_nationkey = n.n_nationkey
               TUPLE IDS: 0 1 2 3 
-                HASH JOIN
+                HASH JOIN (BROADCAST)
                   JOIN OP: INNER JOIN
                   HASH PREDICATES:
                     l1.l_orderkey = o.o_orderkey
                   TUPLE IDS: 0 1 2 
-                    HASH JOIN
+                    HASH JOIN (BROADCAST)
                       JOIN OP: INNER JOIN
                       HASH PREDICATES:
                         l1.l_suppkey = s.s_suppkey
@@ -3745,7 +3745,7 @@ Plan Fragment 2
   OUTPUT: COUNT(*), SUM(c_acctbal)
   GROUP BY: substring(c_phone, 1, 2)
   TUPLE IDS: 3 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: LEFT OUTER JOIN
       HASH PREDICATES:
         c.c_custkey = o.o_custkey
@@ -3771,7 +3771,7 @@ Plan Fragment 4
     EXCHANGE ID: 8
     HASH_PARTITIONED: c.c_custkey
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       substr(c.c_name, 1, 1) = ct.cust_name_char

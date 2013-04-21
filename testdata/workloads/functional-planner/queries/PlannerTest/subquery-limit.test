@@ -143,7 +143,7 @@ Plan Fragment 1
     EXCHANGE ID: 10
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       functional.alltypes.id = <slot 1>
@@ -240,7 +240,7 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.id = functional.alltypessmall.id
@@ -353,7 +353,7 @@ Plan Fragment 1
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.id = functional.alltypessmall.id
@@ -402,7 +402,7 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       functional.alltypes.id = id
@@ -466,7 +466,7 @@ Plan Fragment 1
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       functional.alltypes.id = id
@@ -559,7 +559,7 @@ Plan Fragment 1
   ORDER BY: a.id ASC
   LIMIT: 5
   TUPLE IDS: 0 1 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         functional.alltypes.id = a.id
@@ -587,7 +587,7 @@ Plan Fragment 3
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.id = functional.alltypestiny.id
@@ -667,7 +667,7 @@ Plan Fragment 1
   ORDER BY: a.id ASC
   LIMIT: 5
   TUPLE IDS: 0 1 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         functional.alltypes.id = a.id
@@ -702,7 +702,7 @@ Plan Fragment 3
   ORDER BY: a.int_col ASC
   LIMIT: 10
   TUPLE IDS: 1 2 
-    HASH JOIN
+    HASH JOIN (BROADCAST)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         a.id = functional.alltypestiny.id

@@ -26,7 +26,7 @@ Plan Fragment 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       t1.id = t2.id
@@ -79,7 +79,7 @@ Plan Fragment 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
@@ -139,7 +139,7 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (PARTITIONED)
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
       a.id = b.id
@@ -245,7 +245,7 @@ Plan Fragment 1
     EXCHANGE ID: 9
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (PARTITIONED)
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
       a.id = c.id
@@ -272,7 +272,7 @@ Plan Fragment 3
     EXCHANGE ID: 7
     HASH_PARTITIONED: a.id, b.string_col
 
-  HASH JOIN
+  HASH JOIN (PARTITIONED)
     JOIN OP: FULL OUTER JOIN
     HASH PREDICATES:
       a.id = b.id
@@ -390,7 +390,7 @@ Plan Fragment 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       functional.alltypesagg.id = functional.hbasealltypessmall.id
@@ -475,7 +475,7 @@ Plan Fragment 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (BROADCAST)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.id = CAST(b.id AS INT)
@@ -719,7 +719,7 @@ Plan Fragment 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  HASH JOIN
+  HASH JOIN (PARTITIONED)
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.id = b.id

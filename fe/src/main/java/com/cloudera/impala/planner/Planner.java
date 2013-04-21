@@ -352,6 +352,7 @@ public class Planner {
     }
 
     if (doBroadcast) {
+      node.setDistributionMode(HashJoinNode.DistributionMode.BROADCAST);
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
       // the join; the build input is provided by an ExchangeNode, which is the
       // destination of the rightChildFragment's output
@@ -360,6 +361,7 @@ public class Planner {
       leftChildFragment.setPlanRoot(node);
       return leftChildFragment;
     } else {
+      node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
       // Create a new parent fragment containing a HashJoin node with two
       // ExchangeNodes as inputs; the latter are the destinations of the
       // left- and rightChildFragments, which now partition their output

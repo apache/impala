@@ -72,7 +72,7 @@ Plan Fragment 1
   ORDER BY: t1.int_col ASC
   LIMIT: 2
   TUPLE IDS: 0 1 
-    HASH JOIN
+    HASH JOIN (PARTITIONED)
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         t1.id = t2.id

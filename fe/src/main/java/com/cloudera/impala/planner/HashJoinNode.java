@@ -49,6 +49,23 @@ public class HashJoinNode extends PlanNode {
 
   private final TableRef innerRef;
   private final JoinOperator joinOp;
+
+  enum DistributionMode {
+    NONE("NONE"),
+    BROADCAST("BROADCAST"),
+    PARTITIONED("PARTITIONED");
+
+    private final String description;
+
+    private DistributionMode(String descr) {
+      this.description = descr;
+    }
+
+    public String toString() { return description; }
+  }
+
+  private DistributionMode distrMode;
+
   // conjuncts of the form "<lhs> = <rhs>", recorded as Pair(<lhs>, <rhs>)
   private final List<Pair<Expr, Expr> > eqJoinConjuncts;
 
@@ -65,6 +82,7 @@ public class HashJoinNode extends PlanNode {
     tupleIds.addAll(inner.getTupleIds());
     this.innerRef = innerRef;
     this.joinOp = innerRef.getJoinOp();
+    this.distrMode = DistributionMode.NONE;
     this.eqJoinConjuncts = eqJoinConjuncts;
     this.otherJoinConjuncts = otherJoinConjuncts;
     children.add(outer);
@@ -87,6 +105,10 @@ public class HashJoinNode extends PlanNode {
   public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts; }
   public JoinOperator getJoinOp() { return joinOp; }
   public TableRef getInnerRef() { return innerRef; }
+  public DistributionMode getDistributionMode() { return distrMode; }
+  public void setDistributionMode(DistributionMode distrMode) {
+    this.distrMode = distrMode;
+  }
 
   @Override
   public void computeStats(Analyzer analyzer) {
@@ -200,9 +222,12 @@ public class HashJoinNode extends PlanNode {
 
   @Override
   protected String getExplainString(String prefix, TExplainLevel detailLevel) {
-    StringBuilder output = new StringBuilder()
-        .append(prefix + "HASH JOIN\n")
-        .append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")
+    StringBuilder output = new StringBuilder().append(prefix + "HASH JOIN");
+    if (distrMode != DistributionMode.NONE) {
+      output.append(" (" + distrMode.toString() + ")");
+    }
+    output.append("\n");
+    output.append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")
         .append(prefix + "  HASH PREDICATES:");
     for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
       output.append(
