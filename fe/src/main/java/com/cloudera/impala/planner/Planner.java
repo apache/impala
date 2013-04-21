@@ -67,6 +67,10 @@ import com.google.common.collect.Sets;
 public class Planner {
   private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
 
+  // Estimate of the overhead imposed by storing data in a hash tbl;
+  // used for determining whether a broadcast join is feasible.
+  private final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
+
   // For generating a string of the current time.
   private final SimpleDateFormat formatter =
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
@@ -119,7 +123,10 @@ public class Planner {
           isPartitioned = true;
       }
       LOG.info("create plan fragments");
-      createPlanFragments(singleNodePlan, analyzer, isPartitioned, fragments);
+      long perNodeMemLimit = queryOptions.mem_limit;
+      LOG.info("memlimit=" + Long.toString(perNodeMemLimit));
+      createPlanFragments(
+          singleNodePlan, analyzer, isPartitioned, perNodeMemLimit, fragments);
     }
 
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
@@ -210,7 +217,7 @@ public class Planner {
    */
   private PlanFragment createPlanFragments(
       PlanNode root, Analyzer analyzer, boolean isPartitioned,
-      ArrayList<PlanFragment> fragments)
+      long perNodeMemLimit, ArrayList<PlanFragment> fragments)
       throws InternalException, NotImplementedException {
     ArrayList<PlanFragment> childFragments = Lists.newArrayList();
     for (PlanNode child: root.getChildren()) {
@@ -219,7 +226,8 @@ public class Planner {
       // merge later if needed
       boolean childIsPartitioned = !child.hasLimit();
       childFragments.add(
-          createPlanFragments(child, analyzer, childIsPartitioned, fragments));
+          createPlanFragments(
+            child, analyzer, childIsPartitioned, perNodeMemLimit, fragments));
     }
 
     PlanFragment result = null;
@@ -229,7 +237,8 @@ public class Planner {
     } else if (root instanceof HashJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
       result = createHashJoinFragment(
-          (HashJoinNode) root, childFragments.get(1), childFragments.get(0), fragments);
+          (HashJoinNode) root, childFragments.get(1), childFragments.get(0),
+          perNodeMemLimit, fragments);
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments, analyzer);
     } else if (root instanceof MergeNode) {
@@ -293,22 +302,26 @@ public class Planner {
    * expected cost.
    * If any of the inputs to the cost computation is unknown, it assumes the cost
    * will be 0. Costs being equal, it'll favor partitioned over broadcast joins.
-   * TODO: revisit this
+   * If perNodeMemLimit > 0 and the size of the hash table for a broadcast join is
+   * expected to exceed that mem limit, switches to partitioned join instead.
+   * TODO: revisit the choice of broadcast as the default
    * TODO: don't create a broadcast join if we already anticipate that this will
    * exceed the query's memory budget.
    */
   private PlanFragment createHashJoinFragment(
       HashJoinNode node, PlanFragment rightChildFragment,
-      PlanFragment leftChildFragment, ArrayList<PlanFragment> fragments) {
+      PlanFragment leftChildFragment, long perNodeMemLimit,
+      ArrayList<PlanFragment> fragments) {
     // broadcast: send the rightChildFragment's output to each node executing
     // the leftChildFragment; the cost across all nodes is proportional to the
     // total amount of data sent
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
+    long broadcastHashTblSize = 0;
     long broadcastCost = 0;
     if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
-      broadcastCost = Math.round(
-          (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize()
-          * (double) leftChildFragment.getNumNodes());
+      broadcastHashTblSize = Math.round(
+          (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
+      broadcastCost = broadcastHashTblSize * leftChildFragment.getNumNodes();
     }
     LOG.info("broadcast: cost=" + Long.toString(broadcastCost));
     LOG.info("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
@@ -339,10 +352,14 @@ public class Planner {
     // - or if it's cheaper and we weren't explicitly told to do a partitioned join
     // - and we're not doing a full or right outer join (those require the left-hand
     //   side to be partitioned for correctness)
+    // - and the expected size of the hash tbl doesn't exceed perNodeMemLimit
     // we do a "<=" comparison of the costs so that we default to broadcast joins if
     // we're unable to estimate the cost
     if (node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
+        && (perNodeMemLimit == 0
+            || Math.round((double) broadcastHashTblSize * HASH_TBL_SPACE_OVERHEAD)
+                <= perNodeMemLimit)
         && (node.getInnerRef().isBroadcastJoin()
             || (!node.getInnerRef().isPartitionJoin()
                 && broadcastCost <= partitionCost))) {
