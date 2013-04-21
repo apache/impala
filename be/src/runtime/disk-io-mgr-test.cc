@@ -20,6 +20,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-stress.h"
 #include "runtime/mem-limit.h"
+#include "runtime/thread-resource-mgr.h"
 #include "util/cpu-info.h"
 
 using namespace std;
@@ -40,7 +41,7 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   static void ValidateRead(DiskIoMgr* io_mgr, DiskIoMgr::ReaderContext* reader, 
-      const char* expected) {
+      ThreadResourceMgr::ResourcePool* pool, const char* expected) {
     int len = strlen(expected);
   
     Status status;
@@ -57,13 +58,14 @@ class DiskIoMgrTest : public testing::Test {
       ASSERT_EQ(buffer->len(), 1);
       EXPECT_EQ(buffer->buffer()[0], expected[buffer->scan_range()->offset()]);
       buffer->Return();
+      pool->ReleaseThreadToken(false);
     }
   
     EXPECT_TRUE(eos);
   }
 
-  static void ValidateSyncRead(DiskIoMgr* io_mgr, DiskIoMgr::ReaderContext* reader,
-      DiskIoMgr::ScanRange* range, const char* expected) {
+  static void ValidateSyncRead(DiskIoMgr* io_mgr, DiskIoMgr::ScanRange* range, 
+      const char* expected) {
     DiskIoMgr::BufferDescriptor* buffer;
     Status status = io_mgr->Read(NULL, range, &buffer);
     ASSERT_TRUE(status.ok());
@@ -86,6 +88,7 @@ class DiskIoMgrTest : public testing::Test {
 // Basic test with a single reader, testing multiple threads, disks and a different
 // number of buffers.
 TEST_F(DiskIoMgrTest, SingleReader) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghjijklm";
@@ -101,10 +104,11 @@ TEST_F(DiskIoMgrTest, SingleReader) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init(&mem_limit);
+        Status status = io_mgr.Init(&thread_mgr, &mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+        status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
         ASSERT_TRUE(status.ok());
 
         vector<DiskIoMgr::ScanRange*> ranges;
@@ -116,9 +120,10 @@ TEST_F(DiskIoMgrTest, SingleReader) {
         status = io_mgr.AddScanRanges(reader, ranges);
         ASSERT_TRUE(status.ok());
 
-        ValidateRead(&io_mgr, reader, data);
+        ValidateRead(&io_mgr, reader, pool, data);
 
         io_mgr.UnregisterReader(reader);
+        thread_mgr.UnregisterPool(pool);
       }
     }
   }
@@ -127,6 +132,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
 
 // Tests a single reader cancelling half way through scan ranges.  
 TEST_F(DiskIoMgrTest, SingleReaderCancel) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghjijklm";
@@ -142,9 +148,10 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         DiskIoMgr::ReaderContext* reader;
-        Status status = io_mgr.Init(&mem_limit);
+        Status status = io_mgr.Init(&thread_mgr, &mem_limit);
         ASSERT_TRUE(status.ok());
-        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+        status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
         ASSERT_TRUE(status.ok());
 
         vector<DiskIoMgr::ScanRange*> ranges;
@@ -160,7 +167,9 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         EXPECT_TRUE(status.ok());
         EXPECT_TRUE(buffer != NULL);
         EXPECT_FALSE(eos);
+        EXPECT_TRUE(buffer->eosr());
         buffer->Return();
+        pool->ReleaseThreadToken(false);
 
         // At this point there should be some number of buffers read and multiple
         // scan ranges queued
@@ -170,6 +179,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         EXPECT_TRUE(buffer == NULL);
 
         io_mgr.UnregisterReader(reader);
+        thread_mgr.UnregisterPool(pool);
         // The io_mgr destructor asserts that everything is cleaned up.
       }
     }
@@ -179,6 +189,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
 
 // This test issues adding additional scan ranges while there are some still in flight.
 TEST_F(DiskIoMgrTest, AddScanRangeTest) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghijklm";
@@ -195,10 +206,11 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init(&mem_limit);
+        Status status = io_mgr.Init(&thread_mgr, &mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+        status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
         ASSERT_TRUE(status.ok());
           
         memset(result, 0, strlen(data));
@@ -228,6 +240,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
           result[buffer->scan_range()->offset()] = buffer->buffer()[0];
           EXPECT_EQ(buffer->len(), 1);
           buffer->Return();
+          pool->ReleaseThreadToken(false);
         }
 
         // Issue second half
@@ -249,6 +262,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         EXPECT_TRUE(strncmp(data, result, strlen(data)) == 0);
 
         io_mgr.UnregisterReader(reader);
+        thread_mgr.UnregisterPool(pool);
       }
     }
   }
@@ -259,6 +273,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
 // Note: this test is constructed so the number of buffers is greater than the
 // number of scan ranges.
 TEST_F(DiskIoMgrTest, SyncReadTest) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcde";
@@ -273,17 +288,18 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        Status status = io_mgr.Init(&mem_limit);
+        Status status = io_mgr.Init(&thread_mgr, &mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+        status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
         ASSERT_TRUE(status.ok());
           
         DiskIoMgr::ScanRange* complete_range = InitRange(tmp_file, 0, strlen(data), 0);
 
         // Issue some reads before the async ones are issued
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
 
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < strlen(data); ++i) {
@@ -293,8 +309,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         io_mgr.AddScanRanges(reader, ranges);
 
         // A bunch of scan ranges are added.  Issue sync reads and make sure they complete
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
 
         // Call get next a couple of times 
         char result[strlen(data)];
@@ -312,11 +328,12 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
           result[buffer->scan_range()->offset()] = buffer->buffer()[0];
           EXPECT_EQ(buffer->len(), 1);
           buffer->Return();
+          pool->ReleaseThreadToken(false);
         }
 
         // Issue two more sync read
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
-        ValidateSyncRead(&io_mgr, reader, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
+        ValidateSyncRead(&io_mgr, complete_range, data);
 
         // Finish up the async reads
         for (; bytes_read < strlen(data); ++bytes_read) {
@@ -330,6 +347,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
           result[buffer->scan_range()->offset()] = buffer->buffer()[0];
           EXPECT_EQ(buffer->len(), 1);
           buffer->Return();
+          pool->ReleaseThreadToken(false);
         }
 
         // Validate async read result
@@ -337,6 +355,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
 
         // One additional buffer could have been allocated for the sync read
         io_mgr.UnregisterReader(reader);
+        thread_mgr.UnregisterPool(pool);
       }
     }
   }
@@ -345,6 +364,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
 
 // This test will test multiple concurrent reads each reading a different file.
 TEST_F(DiskIoMgrTest, MultipleReader) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const int NUM_THREADS = 5;
   const int DATA_LEN = 50;
@@ -353,9 +373,11 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
   vector<string> file_names;
   vector<string> data;
   vector<DiskIoMgr::ReaderContext*> readers;
+  vector<ThreadResourceMgr::ResourcePool*> thread_resource_pools;
   file_names.resize(NUM_THREADS);
   readers.resize(NUM_THREADS);
   data.resize(NUM_THREADS);
+  thread_resource_pools.resize(NUM_THREADS);
 
   // Initialize data for each thread.  The data will be 
   // 'abcd...' for thread one, 'bcde...' for thread two (wrapping around at 'z')
@@ -384,11 +406,13 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-          Status status = io_mgr.Init(&mem_limit);
+          Status status = io_mgr.Init(&thread_mgr, &mem_limit);
           ASSERT_TRUE(status.ok());
 
           for (int i = 0; i < NUM_THREADS; ++i) {
-            status = io_mgr.RegisterReader(NULL, num_buffers, 0, &readers[i]);
+            thread_resource_pools[i] = thread_mgr.RegisterPool();
+            status = io_mgr.RegisterReader(
+                NULL, thread_resource_pools[i], &readers[i], NULL, num_buffers);
             ASSERT_TRUE(status.ok());
           
             vector<DiskIoMgr::ScanRange*> ranges;
@@ -403,12 +427,13 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           thread_group threads;
           for (int i = 0; i < NUM_THREADS; ++i) {
             threads.add_thread(new thread(&DiskIoMgrTest::ValidateRead, &io_mgr, 
-                readers[i], data[i].c_str()));
+                readers[i], thread_resource_pools[i], data[i].c_str()));
           }
           threads.join_all();
 
           for (int i = 0; i < NUM_THREADS; ++i) {
             io_mgr.UnregisterReader(readers[i]);
+            thread_mgr.UnregisterPool(thread_resource_pools[i]);
           }
         }
       }
@@ -420,6 +445,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
 // This test is going to dynamically adjust the number of buffers assigned to
 // a reader.
 TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   int MAX_BUFFERS = 7;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
@@ -435,13 +461,14 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
         if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-        Status status = io_mgr.Init(&mem_limit);
+        Status status = io_mgr.Init(&thread_mgr, &mem_limit);
         ASSERT_TRUE(status.ok());
         
         // Start with one buffer and work our way up or the max buffers and go down.
         int num_buffers = adding ? 1 : MAX_BUFFERS;
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+        status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
         ASSERT_TRUE(status.ok());
           
         vector<DiskIoMgr::ScanRange*> ranges;
@@ -466,13 +493,13 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
             ASSERT_EQ(buffer->len(), 1);
             EXPECT_EQ(buffer->buffer()[0], data[buffer->scan_range()->offset()]);
             buffers.push_back(buffer);
+            pool->ReleaseThreadToken(false);
             if (eos) break;
           }
           num_buffers += (adding ? 1 : -1);
           num_buffers = ::min(num_buffers, MAX_BUFFERS);
           num_buffers = ::max(num_buffers, 1);
-          bool ok = io_mgr.SetMaxIoBuffers(reader, num_buffers);
-          EXPECT_TRUE(ok);
+          io_mgr.SetMaxIoBuffers(reader, num_buffers);
 
           for (list<DiskIoMgr::BufferDescriptor*>::iterator it = buffers.begin();
               it != buffers.end(); ++it) {
@@ -480,6 +507,7 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
           }
         }
         io_mgr.UnregisterReader(reader);
+        thread_mgr.UnregisterPool(pool);
       }
     }
   }
@@ -488,6 +516,7 @@ TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
 
 // This tests exercises the grouped scan range functionality.
 TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
+  ThreadResourceMgr thread_mgr;
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   int64_t return_buffer_idx = 0;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
@@ -514,11 +543,12 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
 
           memset(result, 0, strlen(data));
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-          Status status = io_mgr.Init(&mem_limit);
+          Status status = io_mgr.Init(&thread_mgr, &mem_limit);
           ASSERT_TRUE(status.ok());
 
           DiskIoMgr::ReaderContext* reader;
-          status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+          ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+          status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
           ASSERT_TRUE(status.ok());
         
           // Make one range that is the entire file for each group
@@ -606,6 +636,7 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
         
           // End of test case for these configs
           io_mgr.UnregisterReader(reader);
+          thread_mgr.UnregisterPool(pool);
         }
       }
     }
@@ -614,6 +645,7 @@ TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
 }
 
 TEST_F(DiskIoMgrTest, MemLimits) {
+  ThreadResourceMgr thread_mgr;
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   const char* data = "abcdefghijklmnopqrstuvwxyz";
   CreateTempFile(tmp_file, data);
@@ -625,14 +657,15 @@ TEST_F(DiskIoMgrTest, MemLimits) {
   
   int64_t iters = 0;
   {
-    if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
+    if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
     DiskIoMgr io_mgr(1, 1, BUFFER_SIZE);
-    Status status = io_mgr.Init(&mem_limit);
+    Status status = io_mgr.Init(&thread_mgr, &mem_limit);
     ASSERT_TRUE(status.ok());
 
     DiskIoMgr::ReaderContext* reader;
-    status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+    ThreadResourceMgr::ResourcePool* pool = thread_mgr.RegisterPool();
+    status = io_mgr.RegisterReader(NULL, pool, &reader, NULL, num_buffers);
     ASSERT_TRUE(status.ok());
           
     vector<DiskIoMgr::ScanRange*> ranges;
@@ -660,6 +693,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
         EXPECT_FALSE(eos);
         EXPECT_TRUE(buffer->buffer() != NULL);
         EXPECT_TRUE(buffer->eosr());
+        pool->ReleaseThreadToken(false);
       } else {
         EXPECT_TRUE(status.IsMemLimitExceeded());
         EXPECT_TRUE(buffer == NULL);
@@ -674,6 +708,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     }
 
     io_mgr.UnregisterReader(reader);
+    thread_mgr.UnregisterPool(pool);
   }
   EXPECT_EQ(mem_limit.consumption(), 0);
 }

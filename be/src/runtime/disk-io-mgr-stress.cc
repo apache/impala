@@ -51,6 +51,7 @@ string GenerateRandomData() {
 
 struct DiskIoMgrStress::Client {
   boost::mutex lock;
+  ThreadResourceMgr::ResourcePool* resource_pool;
   DiskIoMgr::ReaderContext* reader;
   int file_idx;
   vector<DiskIoMgr::ScanRange*> scan_ranges;
@@ -58,8 +59,8 @@ struct DiskIoMgrStress::Client {
   int files_processed;
 };
 
-DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk, int num_clients, 
-      bool includes_cancellation) :
+DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
+     int num_clients, bool includes_cancellation) :
     num_clients_(num_clients),
     includes_cancellation_(includes_cancellation) {
   
@@ -67,8 +68,9 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk, int nu
   LOG(INFO) << "Running with rand seed: " << rand_seed;
   srand(rand_seed);
 
+  thread_mgr_.reset(new ThreadResourceMgr());
   io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init(NULL);
+  Status status = io_mgr_->Init(thread_mgr_.get());
   CHECK(status.ok());
   
   // Initialize some data files.  It doesn't really matter how many there are.
@@ -123,6 +125,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
       // Copy the bytes from this read into the result buffer.  
       memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
       buffer->Return();
+      if (buffer->eosr()) client->resource_pool->ReleaseThreadToken(false);
       buffer = NULL;
       bytes_read += len;
     }
@@ -142,13 +145,16 @@ void DiskIoMgrStress::ClientThread(int client_id) {
       // Unregister the old client and get a new one
       unique_lock<mutex> lock(client->lock);
       io_mgr_->UnregisterReader(client->reader);
+      thread_mgr_->UnregisterPool(client->resource_pool);
       NewClient(client_id);
       bytes_read = 0;
     }
   }
   unique_lock<mutex> lock(client->lock);
   io_mgr_->UnregisterReader(client->reader);
+  thread_mgr_->UnregisterPool(client->resource_pool);
   client->reader = NULL;
+  client->resource_pool = NULL;
 }
 
 // Cancel a random reader
@@ -223,7 +229,9 @@ void DiskIoMgrStress::NewClient(int i) {
     assigned_len += range_len;
   }
   int num_buffers = (rand() % MAX_BUFFERS) + 1;
-  Status status = io_mgr_->RegisterReader(NULL, num_buffers, 0, &client.reader);
+  client.resource_pool = thread_mgr_->RegisterPool();
+  Status status = io_mgr_->RegisterReader(NULL, client.resource_pool, 
+      &client.reader, NULL, num_buffers);
   CHECK(status.ok());
   status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
   CHECK(status.ok());

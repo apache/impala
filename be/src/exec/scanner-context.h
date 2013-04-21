@@ -200,6 +200,10 @@ class ScannerContext {
     // Condition variable (with parent_->lock_) for waking up the scanner thread in 
     // Read(). This condition variable is signaled from AddBuffer() and Cancel()
     boost::condition_variable read_ready_cv_;
+
+    // If true, this stream is blocked on io.  This means that the scanner thread has
+    // asked for more bytes and the buffer queue is empty.
+    bool is_blocked_;
   
     // Fields below are protected by parent_->lock
     // TODO: we could make this more fine grain and have per stream locks but there's

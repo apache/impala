@@ -58,6 +58,9 @@ class ImpaladMetricKeys {
 
   // Number of IO buffers allocated by the io mgr
   static const char* IO_MGR_NUM_BUFFERS;
+  
+  // Number of IO buffers that are currently unused (and can be GC'ed)
+  static const char* IO_MGR_NUM_UNUSED_BUFFERS;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -77,6 +80,7 @@ class ImpaladMetrics {
   static Metrics::IntMetric* MEM_POOL_TOTAL_BYTES;
   static Metrics::IntMetric* IO_MGR_NUM_OPEN_FILES;
   static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
+  static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(Metrics* m);

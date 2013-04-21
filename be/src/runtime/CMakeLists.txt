@@ -40,6 +40,7 @@ add_library(Runtime STATIC
   row-batch.cc
   runtime-state.cc
   string-value.cc
+  thread-resource-mgr.cc
   timestamp-value.cc
   tuple.cc
   tuple-row.cc
@@ -58,3 +59,4 @@ ADD_BE_TEST(disk-io-mgr-test)
 ADD_BE_TEST(parallel-executor-test)
 ADD_BE_TEST(raw-value-test)
 ADD_BE_TEST(string-value-test)
+ADD_BE_TEST(thread-resource-mgr-test)

@@ -62,6 +62,7 @@ Status HdfsAvroScanner::Prepare() {
     DCHECK_LT(column, slot_descs_.size());
     slot_descs_[column] = slot_desc;
   }
+  scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }
 

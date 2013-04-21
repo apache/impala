@@ -155,7 +155,10 @@ Status HdfsParquetScanner::Prepare() {
   }
   
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
+  num_cols_counter_ = 
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TCounterType::UNIT);
 
+  scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }
 
@@ -164,6 +167,7 @@ Status HdfsParquetScanner::Close() {
   // TODO: this doesn't really work for parquet since the file is 
   // not uniformly compressed.
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
+  assemble_rows_timer_.UpdateCounter();
   return Status::OK;
 }
 
@@ -525,6 +529,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
       return Status::OK;
     }
 
+    // Release the token for the metadata thread.  This thread will be reused to
+    // assemble the cols.
+    scan_node_->runtime_state()->resource_pool()->ReleaseThreadToken(false);
+
     RETURN_IF_ERROR(InitColumns());
     break;
   }
@@ -549,6 +557,8 @@ Status HdfsParquetScanner::InitColumns() {
   // Tell the context the number of streams (aka cols) there will be and initialize
   // column_readers_ to the correct stream objects
   context_->CreateStreams(scan_node_->materialized_slots().size());
+  COUNTER_SET(num_cols_counter_, 
+      static_cast<int64_t>(scan_node_->materialized_slots().size()));
 
   // Walk over the materialized columns
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {

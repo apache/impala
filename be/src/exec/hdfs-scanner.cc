@@ -85,11 +85,15 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
   Function* codegen_fn = scan_node_->GetCodegenFn(type);
   
-  if (codegen_fn == NULL) return Status::OK;
+  if (codegen_fn == NULL) {
+    scan_node_->IncNumScannersCodegenDisabled();
+    return Status::OK;
+  }
   if (!scan_node_->tuple_desc()->string_slots().empty() && 
         ((partition->escape_char() != '\0') || stream_->compact_data())) {
     // Cannot use codegen if there are strings slots and we need to 
     // compact (i.e. copy) the data.
+    scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK;
   }
 
@@ -97,6 +101,7 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
       state_->llvm_codegen()->JitFunction(codegen_fn));
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id() 
           << ") using llvm codegend functions.";
+  scan_node_->IncNumScannersCodegenEnabled();
   return Status::OK;
 }
 
@@ -253,11 +258,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   // TODO: Timestamp is not yet supported
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    if (slot_desc->type() == TYPE_TIMESTAMP) {
-      LOG(WARNING) << "Could not codegen for HdfsTextScanner because timestamp "
-                   << "slots are not supported.";
-      return NULL;
-    }
+    if (slot_desc->type() == TYPE_TIMESTAMP) return NULL;
   }
 
   // TODO: can't codegen yet if strings need to be copied

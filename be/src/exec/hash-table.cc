@@ -181,8 +181,8 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   if (!Expr::IsCodegenAvailable(build_exprs_) || 
       !Expr::IsCodegenAvailable(probe_exprs_)) {
-    LOG(WARNING) << "Could not codegen EvalTupleRow because one of the exprs "
-                 << "could not be codegen'd.";
+    VLOG_QUERY << "Could not codegen EvalTupleRow because one of the exprs "
+               << "could not be codegen'd.";
     return NULL;
   }
 
@@ -320,8 +320,8 @@ uint32_t HashTable::HashVariableLenRow() {
 Function* HashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
   if (!Expr::IsCodegenAvailable(build_exprs_) || 
       !Expr::IsCodegenAvailable(probe_exprs_)) {
-    LOG(WARNING) << "Could not codegen HashCurrentRow because one of the exprs "
-                  << "could not be codegen'd.";
+    VLOG_QUERY << "Could not codegen HashCurrentRow because one of the exprs "
+               << "could not be codegen'd.";
     return NULL;
   }
 
@@ -484,8 +484,8 @@ bool HashTable::Equals(TupleRow* build_row) {
 Function* HashTable::CodegenEquals(LlvmCodeGen* codegen) {
   if (!Expr::IsCodegenAvailable(build_exprs_) || 
       !Expr::IsCodegenAvailable(probe_exprs_)) {
-    LOG(WARNING) << "Could not codegen Equals because one of the exprs "
-                  << "could not be codegen'd.";
+    VLOG_QUERY << "Could not codegen Equals because one of the exprs "
+                << "could not be codegen'd.";
     return NULL;
   }
 

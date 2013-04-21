@@ -20,8 +20,8 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "exprs/timestamp-functions.h"
 #include "common/status.h"
+#include "exprs/timestamp-functions.h"
 #include "runtime/client-cache.h"
 
 namespace impala {
@@ -36,6 +36,7 @@ class TestExecEnv;
 class Webserver;
 class Metrics;
 class MemLimit;
+class ThreadResourceMgr;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -65,6 +66,7 @@ class ExecEnv {
   Webserver* webserver() { return webserver_.get(); }
   Metrics* metrics() { return metrics_.get(); }
   MemLimit* mem_limit() { return mem_limit_.get(); }
+  ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -86,6 +88,7 @@ class ExecEnv {
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<Metrics> metrics_;
   boost::scoped_ptr<MemLimit> mem_limit_;
+  boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
 
   bool enable_webserver_;
 

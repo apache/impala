@@ -559,7 +559,14 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
       return NULL;
   }
   Counter* dst_counter = AddCounter(name, dst_type);
-  RegisterPeriodicCounter(src_counter, dst_counter, RATE_COUNTER);
+  RegisterPeriodicCounter(src_counter, NULL, dst_counter, RATE_COUNTER);
+  return dst_counter;
+}
+
+RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
+    const string& name, SampleFn fn, TCounterType::type dst_type) {
+  Counter* dst_counter = AddCounter(name, dst_type);
+  RegisterPeriodicCounter(NULL, fn, dst_counter, RATE_COUNTER);
   return dst_counter;
 }
 
@@ -567,7 +574,14 @@ RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
     const string& name, Counter* src_counter) {
   DCHECK(src_counter->type() == TCounterType::UNIT);
   Counter* dst_counter = AddCounter(name, TCounterType::DOUBLE_VALUE);
-  RegisterPeriodicCounter(src_counter, dst_counter, SAMPLING_COUNTER);
+  RegisterPeriodicCounter(src_counter, NULL, dst_counter, SAMPLING_COUNTER);
+  return dst_counter;
+}
+
+RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
+    const string& name, SampleFn sample_fn) {
+  Counter* dst_counter = AddCounter(name, TCounterType::DOUBLE_VALUE);
+  RegisterPeriodicCounter(NULL, sample_fn, dst_counter, SAMPLING_COUNTER);
   return dst_counter;
 }
 
@@ -596,8 +610,9 @@ void RuntimeProfile::AddBucketingCounters(const string& name,
   periodic_counter_update_state_.bucketing_counters[buckets] = info;
 }
   
-void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, Counter* dst_counter,
-    PeriodicCounterType type) {
+void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, SampleFn sample_fn,
+    Counter* dst_counter, PeriodicCounterType type) {
+  DCHECK(src_counter == NULL || sample_fn == NULL);
 
   lock_guard<mutex> l(periodic_counter_update_state_.lock);
   if (periodic_counter_update_state_.update_thread.get() == NULL) {
@@ -608,6 +623,7 @@ void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, Counter* dst_
     case RATE_COUNTER: {
       RateCounterInfo counter;
       counter.src_counter = src_counter;
+      counter.sample_fn = sample_fn;
       counter.elapsed_ms = 0;
       periodic_counter_update_state_.rate_counters[dst_counter] = counter;
       break;
@@ -615,6 +631,7 @@ void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, Counter* dst_
     case SAMPLING_COUNTER: {
       SamplingCounterInfo counter;
       counter.src_counter = src_counter;
+      counter.sample_fn = sample_fn;
       counter.num_sampled = 0;
       counter.total_sampled_value = 0;
       periodic_counter_update_state_.sampling_counters[dst_counter] = counter;
@@ -682,7 +699,13 @@ void RuntimeProfile::PeriodicCounterUpdateLoop() {
         periodic_counter_update_state_.rate_counters.begin();
         it != periodic_counter_update_state_.rate_counters.end(); ++it) {
       it->second.elapsed_ms += elapsed_ms;
-      int64_t value = it->second.src_counter->value();
+      int64_t value;
+      if (it->second.src_counter != NULL) {
+        value = it->second.src_counter->value();
+      } else {
+        DCHECK(it->second.sample_fn != NULL);
+        value = it->second.sample_fn();
+      }
       int64_t rate = value * 1000 / (it->second.elapsed_ms);
       it->first->Set(rate);
     }
@@ -691,7 +714,14 @@ void RuntimeProfile::PeriodicCounterUpdateLoop() {
         periodic_counter_update_state_.sampling_counters.begin();
         it != periodic_counter_update_state_.sampling_counters.end(); ++it) {
       ++it->second.num_sampled;
-      it->second.total_sampled_value += it->second.src_counter->value_;
+      int64_t value;
+      if (it->second.src_counter != NULL) {
+        value = it->second.src_counter->value();
+      } else {
+        DCHECK(it->second.sample_fn != NULL);
+        value = it->second.sample_fn();
+      }
+      it->second.total_sampled_value += value;
       double average = static_cast<double>(it->second.total_sampled_value) /
           it->second.num_sampled;
       it->first->Set(average);

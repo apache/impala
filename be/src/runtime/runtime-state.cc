@@ -23,6 +23,7 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/data-stream-recvr.h"
@@ -93,9 +94,18 @@ Status RuntimeState::Init(
     // TODO: how to tune this?
     query_options_.max_io_buffers = 5 * DiskInfo::num_disks();
   }
+  if (query_options_.num_scanner_threads <= 0) {
+    query_options_.num_scanner_threads = DiskIoMgr::default_parallel_scan_ranges();
+  }
+
+  // Register with the thread mgr 
+  if (exec_env != NULL) {
+    resource_pool_ = exec_env->thread_mgr()->RegisterPool();
+    DCHECK(resource_pool_ != NULL);
+  }
   
   DCHECK_GT(query_options_.max_io_buffers, 0);
-  DCHECK_GE(query_options_.num_scanner_threads, 0);
+  DCHECK_GT(query_options_.num_scanner_threads, 0);
   return Status::OK;
 }
 

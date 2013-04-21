@@ -44,6 +44,8 @@ const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
 const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
     "impala-server.io-mgr.num-buffers";
+const char* ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS = 
+    "impala-server.io-mgr.num-unused-buffers";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -57,6 +59,7 @@ Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
 Metrics::IntMetric* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
+Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
@@ -88,6 +91,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0L);
   IO_MGR_NUM_BUFFERS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
+  IO_MGR_NUM_UNUSED_BUFFERS = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
 }
 
 }

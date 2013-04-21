@@ -98,6 +98,17 @@ Status ExecNode::Close(RuntimeState* state) {
   return result;
 }
 
+void ExecNode::AddRuntimeExecOption(const string& str) {
+  lock_guard<mutex> l(exec_options_lock_);
+  if (runtime_exec_options_.empty()) {
+    runtime_exec_options_ = str;
+  } else {
+    runtime_exec_options_.append(", ");
+    runtime_exec_options_.append(str);
+  }
+  runtime_profile()->AddInfoString("ExecOption", runtime_exec_options_);
+}
+
 Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
                             const DescriptorTbl& descs, ExecNode** root) {
   if (plan.nodes.size() == 0) {

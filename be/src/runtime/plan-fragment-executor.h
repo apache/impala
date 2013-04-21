@@ -118,6 +118,9 @@ class PlanFragmentExecutor {
   // Returns true if this query has a limit and it has been reached.
   bool ReachedLimit();
 
+  // Releases the thread token for this fragment executor.
+  void ReleaseThreadToken();
+
   // call these only after Prepare()
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();
@@ -154,6 +157,9 @@ class PlanFragmentExecutor {
   // true if Close() has been called
   bool closed_;
 
+  // true if this fragment has not returned the thread token to the thread resource mgr
+  bool has_thread_token_;
+
   // Overall execution status. Either ok() or set to the first error status that
   // was encountered.
   Status status_;
@@ -174,6 +180,15 @@ class PlanFragmentExecutor {
 
   // Number of rows returned by this fragment
   RuntimeProfile::Counter* rows_produced_counter_;
+
+  // Average number of thread tokens for the duration of the plan fragment execution.
+  // Fragments that do a lot of cpu work (non-coordinator fragment) will have at
+  // least 1 token.  Fragments that contain a hdfs scan node will have 1+ tokens
+  // depending on system load.  Other nodes (e.g. hash join node) can also reserve
+  // additional tokens.
+  // This is a measure of how much CPU resources this fragment used during the course
+  // of the execution.
+  RuntimeProfile::Counter* average_thread_tokens_;
 
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 

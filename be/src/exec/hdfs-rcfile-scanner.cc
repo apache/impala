@@ -71,6 +71,7 @@ Status HdfsRCFileScanner::Prepare() {
     columns_[i].materialize_column =
         scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
   }
+  scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }
 

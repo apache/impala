@@ -29,6 +29,7 @@
 
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "runtime/thread-resource-mgr.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
 #include "util/runtime-profile.h"
@@ -102,6 +103,7 @@ class RuntimeState {
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   std::vector<MemLimit*>* mem_limits() { return &mem_limits_; }
   MemLimit* fragment_mem_limit() { return fragment_mem_limit_; }
+  ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
@@ -195,6 +197,10 @@ class RuntimeState {
   TQueryOptions query_options_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
+
+  // Thread resource management object for this fragment's execution.  The runtime
+  // state is responsible for returning this pool to the thread mgr.
+  ThreadResourceMgr::ResourcePool* resource_pool_;
 
   // Temporary Hdfs files created, and where they should be moved to ultimately.
   // Mapping a filename to a blank destination causes it to be deleted.

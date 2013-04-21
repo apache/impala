@@ -158,6 +158,14 @@ class HdfsScanNode : public ScanNode {
   // possible.
   llvm::Function* GetCodegenFn(THdfsFileFormat::type);
 
+  void IncNumScannersCodegenEnabled() {
+    __sync_fetch_and_add(&num_scanners_codegen_enabled_, 1);
+  }
+  
+  void IncNumScannersCodegenDisabled() {
+    __sync_fetch_and_add(&num_scanners_codegen_disabled_, 1);
+  }
+
   // Adds a materialized row batch for the scan node.  This is called from scanner
   // threads.
   // This function will block if materialized_row_batches_ is full.
@@ -295,10 +303,15 @@ class HdfsScanNode : public ScanNode {
   int num_partition_keys_;
 
   // This is the number of io buffers that are owned by the scan node and the scanners.
-  // This is used just to help debug leaked io buffers to detemine if the leak is
+  // This is used just to help debug leaked io buffers to determine if the leak is
   // happening in the scanners vs other parts of the execution.
   // Updates to this variable should use interlocked operations.
   int num_owned_io_buffers_;
+
+  // Counters which track the number of scanners that have codegen enabled for the
+  // materialize and conjuncts evaluation code paths.
+  int num_scanners_codegen_enabled_;
+  int num_scanners_codegen_disabled_;
 
   // Vector containing indices into materialized_slots_.  The vector is indexed by
   // the slot_desc's col_pos.  Non-materialized slots and partition key slots will 
@@ -358,8 +371,8 @@ class HdfsScanNode : public ScanNode {
   
   // Lock and condition variable for 'num_queued_io_buffers_' and 'num_blocked_scanners_'
   // This condition variable and counters are used to gate when the disk thread reads
-  // from the io mgr.  If we are below the max queued limit or all the scanner threads are
-  // blocked, read from the io mgr.
+  // from the io mgr.  If we are below the max queued limit or any of the scanner threads
+  // are blocked, read from the io mgr.
   // If this lock and 'lock_' need to be taken together, take 'lock_' first.
   boost::mutex disk_thread_resource_lock_;
   boost::condition_variable disk_thread_resource_cv_;
@@ -378,10 +391,10 @@ class HdfsScanNode : public ScanNode {
   // The queue of all ranges that have not been sent to the io mgr.
   std::vector<DiskIoMgr::ScanRange*> queued_ranges_;
 
-  // ScannerContexts that are currently still running.
+  // Scanners that are currently still running.
   // While the scan node is not done (done_ == false), the disk_thread_resource_lock_
   // needs to be taken before updating this.
-  boost::unordered_set<ScannerContext*> active_contexts_;
+  boost::unordered_set<ScannerContext*> active_scanners_;
 
   // Status of failed operations.  This is set asynchronously in DiskThread and
   // ScannerThread.  Returned in GetNext() if an error occurred.  An non-ok
@@ -404,6 +417,12 @@ class HdfsScanNode : public ScanNode {
 
   // Disk accessed bitmap
   RuntimeProfile::Counter disks_accessed_bitmap_;
+  
+  // Average queue capacity in io mgr.
+  RuntimeProfile::Counter* average_io_mgr_queue_capacity_;
+  
+  // Average queue size in io mgr.
+  RuntimeProfile::Counter* average_io_mgr_queue_size_;
   
   // Create a new scanner for this partition type and initialize it.
   // If the scanner cannot be created return NULL.
@@ -444,8 +463,8 @@ class HdfsScanNode : public ScanNode {
     boost::unique_lock<boost::mutex> l(disk_thread_resource_lock_);
     num_blocked_scanners_ += delta;
     DCHECK_GE(num_blocked_scanners_, 0);
-    if (!done_) DCHECK_LE(num_blocked_scanners_, active_contexts_.size());
-    if (num_blocked_scanners_ == active_contexts_.size()) {
+    if (!done_) DCHECK_LE(num_blocked_scanners_, active_scanners_.size());
+    if (num_blocked_scanners_ > 0) {
       disk_thread_resource_cv_.notify_one();
     }
   }

@@ -58,7 +58,8 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     report_thread_active_(false),
     done_(false),
     prepared_(false),
-    closed_(false) {
+    closed_(false),
+    has_thread_token_(false) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
@@ -78,6 +79,15 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
         request.query_globals.now_string, exec_env_));
+
+  // Reserve one main thread from the pool
+  runtime_state_->resource_pool()->AcquireThreadToken();
+  has_thread_token_ = true;
+
+  average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
+      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads), 
+          runtime_state_->resource_pool()));
+
   if (exec_env_->mem_limit() != NULL) {
     // we have a global limit
     runtime_state_->mem_limits()->push_back(exec_env_->mem_limit());
@@ -267,7 +277,9 @@ Status PlanFragmentExecutor::OpenInternal() {
   // Setting to NULL ensures that the d'tor won't double-close the sink.
   sink_.reset(NULL);
   done_ = true;
-
+    
+  ReleaseThreadToken();
+    
   StopReportThread();
   SendReport(true);
 
@@ -350,9 +362,12 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
                << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
+    // Query is done, return the thread token
+    ReleaseThreadToken();
     StopReportThread();
     SendReport(true);
   }
+
   return status;
 }
 
@@ -406,6 +421,14 @@ bool PlanFragmentExecutor::ReachedLimit() {
   return plan_->ReachedLimit();
 }
 
+void PlanFragmentExecutor::ReleaseThreadToken() {
+  if (has_thread_token_) {
+    has_thread_token_ = false;
+    runtime_state_->resource_pool()->ReleaseThreadToken(true);
+    profile()->StopSamplingCounterUpdates(average_thread_tokens_);
+  }
+}
+
 void PlanFragmentExecutor::Close() {
   if (closed_) return;
   row_batch_.reset(NULL);
@@ -415,6 +438,7 @@ void PlanFragmentExecutor::Close() {
     if (sink_.get() != NULL) {
       sink_->Close(runtime_state());
     }
+    exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
   }
   closed_ = true;
 }

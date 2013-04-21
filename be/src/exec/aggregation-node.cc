@@ -160,15 +160,14 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-
+      
   // Update to using codegen'd process row batch.
   if (codegen_process_row_batch_fn_ != NULL) {
     void* jitted_process_row_batch = 
         state->llvm_codegen()->JitFunction(codegen_process_row_batch_fn_);
     process_row_batch_fn_ = 
         reinterpret_cast<ProcessRowBatchFn>(jitted_process_row_batch);
-    LOG(INFO) << "AggregationNode(node_id=" << id() 
-              << ") using llvm codegend functions.";
+    AddRuntimeExecOption("Codegen Enabled");
   }
 
   RETURN_IF_ERROR(children_[0]->Open(state));

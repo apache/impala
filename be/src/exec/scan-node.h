@@ -44,6 +44,15 @@ class TScanRange;
 //
 //   NumDisksAccessed - number of disks accessed.
 //
+//   AverageIoMgrQueueCapcity - the average queue capacity in the io mgr for this node.
+//   AverageIoMgrQueueSize - the average queue size (for ready buffers) in the io mgr
+//     for this node.
+//
+//   AverageScannerThreadConcurrency - the average number of active scanner threads. A
+//     scanner thread is considered active if it is not blocked by IO. This number would
+//     be low (less than 1) for IO-bound queries. For cpu-bound queries, this number
+//     would be close to the max scanner threads allowed.
+//
 //   AverageScannerThreadConcurrency - the average number of active scanner threads. A
 //     scanner thread is considered active if it is not blocked by IO. This number would
 //     be low (less than 1) for IO bounded queries. For cpu bounded queries, this number
@@ -119,7 +128,9 @@ class ScanNode : public ExecNode {
   static const std::string SCAN_RANGES_COMPLETE_COUNTER;
   static const std::string SCANNER_THREAD_COUNTERS_PREFIX;
   static const std::string SCANNER_THREAD_TOTAL_WALLCLOCK_TIME;
-  static const std::string AVERAGE_SCANNER_THREAD_CONCURRENCY;;
+  static const std::string AVERAGE_SCANNER_THREAD_CONCURRENCY;
+  static const std::string AVERAGE_IO_MGR_QUEUE_CAPACITY;
+  static const std::string AVERAGE_IO_MGR_QUEUE_SIZE;
   static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
   static const std::string HDFS_READ_THREAD_CONCURRENCY_BUCKET;
 

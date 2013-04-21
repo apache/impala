@@ -27,6 +27,7 @@
 #include "common/hdfs.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/thread-resource-mgr.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
@@ -67,18 +68,28 @@ class MemLimit;
 // performance.  The resource that can be controlled is the number of io buffers
 // per reader.  If this number is too low, the disks might not be kept busy OR
 // the cores might be idle.  Having this too high causes excessive memory usage,
-// particularly in the multiple query scenario. 
-// There are two per reader knobs to control resource usage.  The first, is the number
-// of io buffers the reader can use.  The second is the number of scan ranges that
-// should be processed in parallel.  Buffers can either all come from different ranges,
-// all from the same range or something in between.  Since we cannot parallelize
-// processing a single range, the number of flight controls the amount of CPU usage
-// in the scanner threads.  Both these settings can be changed dynamically and the io mgr
-// will ramp them down under higher load.
-// TODO: we need to think about this some more.  One way to model this is that the
-// machine has a fixed amount of total io throughput and fixed amount of compute.  The
-// total CPU usage can be limited by have a total max in flight scan ranges (since
-// each scan range maps roughly to one core).
+// particularly in the multiple query scenario. There are two resources that are 
+// controlled by the io mgr.  
+//
+// The first is the number of io buffers.  Excessive queueing of io buffers (faster than 
+// they are drained) leads to poor memory usage and thrashing.  This is adjusted 
+// dynamically (per reader) by trying to match the disk rate with the consume rate.  In 
+// other words, if the disk rate is too fast, it should be throttled down.  If the 
+// reader speeds up (i.e. another query finished so there's more cpu available), we 
+// want to turn up disk rate.
+// This is done by dynamically adjusting the max ready buffer queue capacity for the 
+// reader.  When the queue is full on arrival of a new buffer, it indicates the disk
+// rate is high enough and should be slowed down.  When the queue is empty when the
+// reader fetches another buffer, it indicates the reader could use more io and the
+// disk rate should be turned up.  We model this problem similarly to
+// the tcp congestion control algorithm.  If the queue is empty, the current capacity is
+// doubled.  If the queue is full, the capacity is dropped by 1.
+//
+// The second resource is the number of scanner threads the reader is able to use.
+// This is controlled by the io mgr because ranges are started by the io mgr and pushed
+// to the scan node.  Once a range has started, it requires a dedicated scanner thread
+// to process.  The IoMgr checks with the thread mgr before starting new ranges.
+//
 // TODO: IoMgr should be able to request additional scan ranges from the coordinator
 // to help deal with stragglers.
 // TODO: look into using a lock free queue
@@ -222,7 +233,7 @@ class DiskIoMgr {
   ~DiskIoMgr();
 
   // Initialize the IoMgr.  Must be called once before any of the other APIs.
-  Status Init(MemLimit* process_mem_limit = NULL);
+  Status Init(ThreadResourceMgr* thread_mgr, MemLimit* process_mem_limit = NULL);
 
   // Sets the process wide mem limit for.  If this is exceeded, io requests will 
   // fail until we are under the limit again.
@@ -234,21 +245,19 @@ class DiskIoMgr {
   // each reader.
   // hdfs: is the handle to the hdfs connection.  If NULL, it is assumed all
   //    scan ranges are on the local file system
-  // max_io_buffers: The maximum number of io buffers for this reader.
-  //    Reads will not happen if there are no available io buffers.  This limits
-  //    the memory usage for this reader.
-  // max_parallel_ranges: The maximum number of scan ranges that should be read in
-  //    parallel for this reader.  If it's 0, a default will be used. This controls
-  //    how many scan ranges can be processed in parallel. 
+  // thread_pool: The thread (token) pool for this reader used to control how many
+  //    scan ranges should be started in parallel.
   // reader_mem_limit: If non-null, the memory limit for this reader.  IO buffers
   //    used for this reader will count against this limit.  If the limit is exceeded
   //    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   //    GetNext().
-  // If max_parallel_ranges is less than max_io_buffers, multiple buffers will 
-  // potentially be queued per range.  If max_parallel_ranges is greater, some ranges
-  // will be started without any buffers queued for it.  
-  Status RegisterReader(hdfsFS hdfs, int max_io_buffers, int max_parallel_ranges,
-      ReaderContext** reader, MemLimit* reader_mem_limit = NULL);
+  // max_io_buffers: The maximum number of io buffers for this reader.
+  //    Reads will not happen if there are no available io buffers.  This limits
+  //    the memory usage for this reader.  This is exposed for testing.  Passing
+  //    in 0 allows the io mgr to pick.
+  Status RegisterReader(hdfsFS hdfs, ThreadResourceMgr::ResourcePool* thread_pool,
+      ReaderContext** reader, MemLimit* reader_mem_limit = NULL, 
+      int max_io_buffers = 0);
 
   // Unregisters reader from the disk io mgr.  This must be called for every 
   // RegisterReader() regardless of cancellation and must be called in the
@@ -267,15 +276,11 @@ class DiskIoMgr {
   // Sets the maximum io buffers for this reader.  This can be higher or lower than
   // the current quota.  The update is not instantenously; in flight buffers are not
   // taken back right away.  
-  // A value of 0 will effectively halt the reader.  
-  // If 'max_io_buffers' is non-zero, this will return true if the request is possible 
-  // and false otherwise.  It might be impossible to satisfy this request if the new
-  // quota is lower than the minimum number of buffers required for this reader
-  // (due to grouped scan ranges).
-  // This is mostly used for testing.  The IO mgr will automatically adjust this for
+  // It might be impossible to satisfy this request if the new quota is lower than the
+  // minimum number of buffers required for this reader (due to grouped scan ranges).
+  // This is exposed for testing.  The IO mgr will automatically adjust this for
   // readers.
-  // TODO: this needs some policy.
-  bool SetMaxIoBuffers(ReaderContext* reader, int max_io_buffers);
+  void SetMaxIoBuffers(ReaderContext* reader, int max_io_buffers);
 
   // Adds the scan ranges to the queues. This call is non-blocking.  The caller must
   // not deallocate the scan range pointers before UnregisterReader.
@@ -328,6 +333,9 @@ class DiskIoMgr {
   void set_active_read_thread_counter(ReaderContext*, RuntimeProfile::Counter*);
   void set_disks_access_bitmap(ReaderContext*, RuntimeProfile::Counter*);
 
+  int64_t queue_capacity(ReaderContext* reader) const;
+  int64_t queue_size(ReaderContext* reader) const;
+
   // Returns the read throughput across all readers.    
   // TODO: should this be a sliding window?  This should report metrics for the
   // last minute, hour and since the beginning.
@@ -362,6 +370,9 @@ class DiskIoMgr {
 
   // Pool to allocate BufferDescriptors
   ObjectPool pool_;
+
+  // Thread mgr for the process. Not owned by this object.
+  ThreadResourceMgr* thread_mgr_;
 
   // Process memory limit that tracks io buffers.
   MemLimit* process_mem_limit_;

@@ -83,7 +83,7 @@ void ScannerContext::AddFinalBatch() {
 }
 
 ScannerContext::Stream::Stream(ScannerContext* parent) 
-  : parent_(parent), total_len_(0), 
+  : parent_(parent), is_blocked_(false), total_len_(0), 
     boundary_pool_(new MemPool()),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())) {
   boundary_pool_->set_limits(*parent_->state_->mem_limits());
@@ -153,6 +153,7 @@ void ScannerContext::Stream::AttachCompletedResources(bool done) {
 }
 
 void ScannerContext::Stream::RemoveFirstBuffer() {
+  DCHECK(!is_blocked_);
   DCHECK(current_buffer_ != NULL);
   DCHECK(!buffers_.empty());
   parent_->scan_node_->UpdateNumQueuedBuffers(-1);
@@ -180,9 +181,10 @@ Status ScannerContext::Stream::GetRawBytes(uint8_t** out_buffer, int* len, bool*
     ScopedCounter scoped_counter(&parent_->scan_node_->active_scanner_thread_counter_, 1);
     unique_lock<mutex> l(parent_->lock_);
     while (!parent_->cancelled_ && buffers_.empty()) {
+      DCHECK(!is_blocked_);
+      is_blocked_ = true;
       parent_->scan_node_->UpdateNumBlockedScanners(1);
       read_ready_cv_.wait(l);
-      parent_->scan_node_->UpdateNumBlockedScanners(-1);
     }
 
     if (parent_->cancelled_) {
@@ -235,9 +237,13 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
     unique_lock<mutex> l(parent_->lock_);
    
     while (!parent_->cancelled_ && buffers_.empty() && !eosr()) {
+      // We are about to be blocked on IO.  Notify the scan node's disk
+      // thread so it knows to read more from the io mgr.
+      DCHECK(!is_blocked_);
+      is_blocked_ = true;
       parent_->scan_node_->UpdateNumBlockedScanners(1);
+
       read_ready_cv_.wait(l);
-      parent_->scan_node_->UpdateNumBlockedScanners(-1);
     }
 
     if (parent_->cancelled_) return Status::CANCELLED;
@@ -364,6 +370,13 @@ void ScannerContext::Stream::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
 
     parent_->scan_node_->UpdateNumQueuedBuffers(1);
     buffers_.push_back(buffer);
+    
+    if (is_blocked_) {
+      // We were blocked on IO but just got a buffer, mark this scanner as
+      // unblocked.
+      is_blocked_ = false;
+      parent_->scan_node_->UpdateNumBlockedScanners(-1);
+    }
 
     // These variables are read without a lock in GetBytes.  There is a race in 
     // reading/writing these variables when buffers_ is empty and this function
@@ -395,6 +408,10 @@ void ScannerContext::Close() {
 
   // Set variables to NULL to make sure this object is not being used after Close()
   for (int i = 0; i < streams_.size(); ++i) {
+    if (streams_[i]->is_blocked_) {
+      streams_[i]->is_blocked_ = false;
+      scan_node_->UpdateNumBlockedScanners(-1);
+    }
     streams_[i]->read_eosr_ = false;
     streams_[i]->current_buffer_ = NULL;
     streams_[i]->current_buffer_pos_ = NULL;

@@ -149,6 +149,10 @@ Status HashJoinNode::Close(RuntimeState* state) {
 
 void HashJoinNode::BuildSideThread(RuntimeState* state, promise<Status>* status) {
   status->set_value(ConstructHashTable(state));
+  // Release the thread token as soon as possible (before the main thread joins
+  // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
+  // we'd keep the additional thread busy the whole time.
+  state->resource_pool()->ReleaseThreadToken(false);
 }
 
 Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
@@ -189,30 +193,22 @@ Status HashJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_CANCELLED(state);
 
-  if (codegen_process_build_batch_fn_ == NULL) {
-    LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
-                 << ") was not supported for this query.";
-  } else {
+  if (codegen_process_build_batch_fn_ != NULL) {
     void* jitted_process_build_batch =
         state->llvm_codegen()->JitFunction(codegen_process_build_batch_fn_);
     DCHECK(jitted_process_build_batch != NULL);
     process_build_batch_fn_ =
         reinterpret_cast<ProcessBuildBatchFn>(jitted_process_build_batch);
-    LOG(INFO) << "HashJoinNode(node_id=" << id()
-              << ") using llvm codegend function for building hash table.";
+    AddRuntimeExecOption("Build Side Codegen Enabled");
   }
 
-  if (codegen_process_probe_batch_fn_ == NULL) {
-    LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
-                << ") was not supported for this query.";
-  } else {
+  if (codegen_process_probe_batch_fn_ != NULL) {
     void* jitted_process_probe_batch =
         state->llvm_codegen()->JitFunction(codegen_process_probe_batch_fn_);
     DCHECK(jitted_process_probe_batch != NULL);
     process_probe_batch_fn_ =
         reinterpret_cast<ProcessProbeBatchFn>(jitted_process_probe_batch);
-    LOG(INFO) << "HashJoinNode(node_id=" << id()
-              << ") using llvm codegend function for probing hash table.";
+    AddRuntimeExecOption("Probe Side Codegen Enabled");
   }
 
   eos_ = false;
@@ -220,9 +216,15 @@ Status HashJoinNode::Open(RuntimeState* state) {
   // TODO: fix problems with asynchronous cancellation
   // Kick-off the construction of the build-side table in a separate
   // thread, so that the left child can do any initialisation in parallel.
+  // Only do this if we can get a thread token.  Otherwise, do this in the
+  // main thread
   promise<Status> thread_status;
-  thread build_thread =
-      thread(bind(&HashJoinNode::BuildSideThread, this, state, &thread_status));
+  if (state->resource_pool()->TryAcquireThreadToken()) {
+    AddRuntimeExecOption("Hash Table Built Asynchronously");
+    thread(bind(&HashJoinNode::BuildSideThread, this, state, &thread_status));
+  } else {
+    thread_status.set_value(ConstructHashTable(state));
+  }
 
   // Open the probe-side child so that it may perform any initialisation in parallel.
   // Don't exit even if we see an error, we still need to wait for the build thread
@@ -233,6 +235,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
   // the hash table is fully constructed and we can start the probe
   // phase.
   RETURN_IF_ERROR(thread_status.get_future().get());
+
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
   RETURN_IF_ERROR(open_status);
 

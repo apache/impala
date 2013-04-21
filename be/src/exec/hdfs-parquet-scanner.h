@@ -78,6 +78,9 @@ class HdfsParquetScanner : public HdfsScanner {
   
   // Time spent decompressing bytes
   RuntimeProfile::Counter* decompress_timer_;
+  
+  // Number of cols that need to be read.
+  RuntimeProfile::Counter* num_cols_counter_;
 
   // Reads data from all the columns (in parallel) and assembles rows into the context
   // object.

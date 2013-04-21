@@ -419,6 +419,15 @@ Status Coordinator::Exec(
     }
   }
 
+  // If we have a coordinator fragment and remote fragments (the common case),
+  // release the thread token on the coordinator fragment.  This fragment
+  // spends most of the time waiting and doing very little work.  Holding on to
+  // the token causes underutilization of the machine.  If there are 12 queries
+  // on this node, that's 12 tokens reserved for no reason.
+  if (has_coordinator_fragment && request->fragments.size() > 1) {
+    executor_->ReleaseThreadToken();
+  }
+
   PrintBackendInfo();
 
   stringstream ss;

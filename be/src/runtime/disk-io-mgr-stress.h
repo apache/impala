@@ -24,6 +24,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "runtime/disk-io-mgr.h"
+#include "runtime/thread-resource-mgr.h"
 
 namespace impala {
 
@@ -51,6 +52,8 @@ class DiskIoMgrStress {
   // Files used for testing.  These are created at startup and recycled
   // during the test
   std::vector<File> files_;
+
+  boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
 
   // io manager
   boost::scoped_ptr<DiskIoMgr> io_mgr_;

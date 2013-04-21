@@ -26,6 +26,7 @@
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-limit.h"
+#include "runtime/thread-resource-mgr.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/metrics.h"
@@ -63,6 +64,7 @@ ExecEnv::ExecEnv()
     webserver_(new Webserver()),
     metrics_(new Metrics()),
     mem_limit_(NULL),
+    thread_mgr_(new ThreadResourceMgr),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
@@ -89,7 +91,7 @@ ExecEnv::ExecEnv()
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   }
   
-  Status status = disk_io_mgr_->Init();
+  Status status = disk_io_mgr_->Init(thread_mgr());
   CHECK(status.ok());
 
   client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -97,16 +99,17 @@ ExecEnv::ExecEnv()
 
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
                  int webserver_port, const string& statestore_host, int statestore_port)
-    : stream_mgr_(new DataStreamMgr()),
-      client_cache_(new ImpalaInternalServiceClientCache()),
-      fs_cache_(new HdfsFsCache()),
-      htable_factory_(new HBaseTableFactory()),
-      disk_io_mgr_(new DiskIoMgr()),
-      webserver_(new Webserver(webserver_port)),
-      metrics_(new Metrics()),
-      mem_limit_(NULL),
-      enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-      tz_database_(TimezoneDatabase()) {
+  : stream_mgr_(new DataStreamMgr()),
+    client_cache_(new ImpalaInternalServiceClientCache()),
+    fs_cache_(new HdfsFsCache()),
+    htable_factory_(new HBaseTableFactory()),
+    disk_io_mgr_(new DiskIoMgr()),
+    webserver_(new Webserver(webserver_port)),
+    metrics_(new Metrics()),
+    mem_limit_(NULL),
+    thread_mgr_(new ThreadResourceMgr),
+    enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
+    tz_database_(TimezoneDatabase()) {
   if (FLAGS_use_statestore && statestore_port > 0) {
     TNetworkAddress subscriber_address =
         MakeNetworkAddress(hostname, subscriber_port);
@@ -129,7 +132,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   }
   
-  Status status = disk_io_mgr_->Init();
+  Status status = disk_io_mgr_->Init(thread_mgr());
   CHECK(status.ok());
 
   client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");

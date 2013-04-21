@@ -265,16 +265,27 @@ class RuntimeProfile {
   // Derived counter function: return aggregated value
   static int64_t CounterSum(const std::vector<Counter*>* counters);
 
+  // Function that returns a counter metric.
+  // Note: this function should not block (or take a long time).
+  typedef boost::function<int64_t ()> SampleFn;
+
   // Add a rate counter to the current profile based on src_counter with name.
   // The rate counter is updated periodically based on the src counter.
   // The rate counter has units in src_counter unit per second.
   Counter* AddRateCounter(const std::string& name, Counter* src_counter);
+  
+  // Same as 'AddRateCounter' above except values are taken by calling fn.
+  // The resulting counter will be of 'type'.
+  Counter* AddRateCounter(const std::string& name, SampleFn fn, TCounterType::type type);
 
   // Add a sampling counter to the current profile based on src_counter with name.
   // The sampling counter is updated periodically based on the src counter by averaging
   // the samples taken from the src counter.
   // The sampling counter has the same unit as src_counter unit.
   Counter* AddSamplingCounter(const std::string& name, Counter* src_counter);
+
+  // Same as 'AddSamplingCounter' above except the samples are taken by calling fn.
+  Counter* AddSamplingCounter(const std::string&name, SampleFn fn);
 
   // Add a bucket of counters to store the sampled value of src_counter.
   // The src_counter is sampled periodically and the buckets are updated.
@@ -359,11 +370,13 @@ class RuntimeProfile {
 
   struct RateCounterInfo {
     Counter* src_counter;
+    SampleFn sample_fn;
     int64_t elapsed_ms;
   };
 
   struct SamplingCounterInfo {
     Counter* src_counter; // the counter to be sampled
+    SampleFn sample_fn;
     int64_t total_sampled_value; // sum of all sampled values;
     int64_t num_sampled; // number of samples taken
   };
@@ -403,7 +416,6 @@ class RuntimeProfile {
     // Map from a bucket of counters to the src counter
     typedef std::map<std::vector<Counter*>*, BucketCountersInfo> BucketCountersMap;
     BucketCountersMap bucketing_counters;
-
   };
 
   // Singleton object that keeps track of all rate counters and the thread
@@ -425,9 +437,12 @@ class RuntimeProfile {
   void ComputeTimeInProfile(int64_t total_time);
 
   // Registers a periodic counter to be updated by the update thread.
-  // dst/src is assumed to be of compatible types.
-  static void RegisterPeriodicCounter(Counter* src_counter, Counter* dst_counter,
-      PeriodicCounterType type);
+  // Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
+  // is updated, it either gets the value from the dst_counter or calls the sample
+  // function to get the value.
+  // dst_counter/sample fn is assumed to be compatible types with src_counter.
+  static void RegisterPeriodicCounter(Counter* src_counter, SampleFn sample_fn,
+      Counter* dst_counter, PeriodicCounterType type);
   
   // Loop for periodic counter update thread.  This thread wakes up once in a while
   // and updates all the added rate counters and sampling counters.
@@ -486,12 +501,16 @@ class ScopedTimer {
     sw_.Start();
   }
 
-  // Update counter when object is destroyed
-  ~ScopedTimer() {
+  void UpdateCounter() {
     if (counter_ != NULL) {
-      sw_.Stop();
       counter_->Update(sw_.ElapsedTime());
     }
+  }
+
+  // Update counter when object is destroyed
+  ~ScopedTimer() {
+    sw_.Stop();
+    UpdateCounter();
   }
 
  private:

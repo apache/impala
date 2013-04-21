@@ -119,10 +119,9 @@ inline bool TimestampValue::ParseDate(const char** strp, int* lenp) {
           try {
             this->date_ = boost::gregorian::date(year, month, day);
           } catch (exception e) {
-            LOG(WARNING) << "Invalid date: " << year << "-" << month << "-" << day;
+            VLOG_ROW << "Invalid date: " << year << "-" << month << "-" << day;
             date_set = false;
           }
-
         }
       }
     }

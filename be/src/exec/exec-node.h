@@ -171,6 +171,12 @@ class ExecNode {
   // Account for peak memory used by this node
   RuntimeProfile::Counter* memory_used_counter_;
 
+  // Execution options that are determined at runtime.  This is added to the
+  // runtime profile at Close().  Examples for options logged here would be
+  // "Codegen Enabled"
+  boost::mutex exec_options_lock_;
+  std::string runtime_exec_options_;
+
   ExecNode* child(int i) { return children_[i]; }
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
@@ -189,6 +195,9 @@ class ExecNode {
   // Executes debug_action_ if phase matches debug_phase_.
   // 'phase' must not be INVALID.
   Status ExecDebugAction(TExecNodePhase::type phase);
+
+  // Appends option to 'runtime_exec_options_'
+  void AddRuntimeExecOption(const std::string& option);
 };
 
 #define RETURN_IF_LIMIT_EXCEEDED(state) \
