@@ -901,6 +901,12 @@ if __name__ == "__main__":
                     help="Issue a use database command on startup.")
   options, args = parser.parse_args()
 
+  # Arguments that could not be parsed are stored in args. Print an error and exit.
+  if len(args) > 0:
+    print 'Error, could not parse arguments "%s"' % (' ').join(args)
+    parser.print_help()
+    sys.exit(1)
+
   if options.version:
     print VERSION_STRING
     sys.exit(0)
