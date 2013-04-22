@@ -92,13 +92,11 @@ string PrintId(const TUniqueId& id) {
 
 bool ParseId(const string& s, TUniqueId* id) {
   DCHECK(id != NULL);
-  if (s.size() != 33) return false;
 
   const char* hi_part = s.c_str();
-  char* colon = const_cast<char*>(hi_part) + 16;
+  char* colon = const_cast<char*>(strchr(hi_part, ':'));
+  if (colon == NULL) return false;
   const char* lo_part = colon + 1;
-
-  if (*colon != ':') return false;
   *colon = '\0';
 
   char* error_hi = NULL;

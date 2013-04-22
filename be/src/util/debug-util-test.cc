@@ -48,6 +48,14 @@ TEST(DebugUtil, QueryIdParsing) {
   EXPECT_TRUE(ParseId("abcdabcdabcdabcd:1234abcdabcd5678", &id));
   EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+  
+  EXPECT_TRUE(ParseId("cdabcdabcdabcd:1234abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+  
+  EXPECT_TRUE(ParseId("cdabcdabcdabcd:abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0xabcdabcd5678);
 }
 
 }
