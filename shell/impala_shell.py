@@ -191,9 +191,7 @@ class ImpalaShell(cmd.Cmd):
       tokens[0] = tokens[0].lower()
     if interactive:
       args = self.__check_for_command_completion(' '.join(tokens).strip())
-      # We escape \n in multiline commands to enable history to be read properly.
-      # As such, some commands will have \n escaped, this takes care of un-escaping them.
-      args = args.rstrip(ImpalaShell.CMD_DELIM).decode('string-escape')
+      args = args.rstrip(ImpalaShell.CMD_DELIM)
     else:
       # Strip all the non-interactive commands of the delimiter.
       args = ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
@@ -225,7 +223,7 @@ class ImpalaShell(cmd.Cmd):
         self.prompt = '> '.rjust(len(self.cached_prompt))
       # partial_cmd is already populated, add the current input after a newline.
       if self.partial_cmd and cmd:
-        self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+        self.partial_cmd = "%s %s" % (self.partial_cmd, cmd)
       else:
         # If the input string is empty or partial_cmd is empty.
         self.partial_cmd = "%s%s" % (self.partial_cmd, cmd)
@@ -238,17 +236,14 @@ class ImpalaShell(cmd.Cmd):
       return str()
     elif self.partial_cmd: # input ends with a delimiter and partial_cmd is not empty
       if cmd != ImpalaShell.CMD_DELIM:
-        completed_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+        completed_cmd = "%s %s" % (self.partial_cmd, cmd)
       else:
         completed_cmd = "%s%s" % (self.partial_cmd, cmd)
       # Reset partial_cmd to an empty string
       self.partial_cmd = str()
       # Replace the most recent history item with the completed command.
-      # In order for it to be read from the history file, the \n has
-      # to be escaped.
       if self.readline and current_history_len > 0:
-        self.readline.replace_history_item(current_history_len - 1,
-                                           completed_cmd.encode('string-escape'))
+        self.readline.replace_history_item(current_history_len - 1, completed_cmd)
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else: # Input has a delimiter and partial_cmd is empty
@@ -757,15 +752,8 @@ class ImpalaShell(cmd.Cmd):
     # readline returns 1 as the history length and stores 'None' at index 0.
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
-        # Each entry in history has to be decoded in order to display it properly
-        cmd = self.readline.get_history_item(index).decode('string-escape')
-        # Display sugar to ensure proper indentation.
-        enum_prefix = '[%d]: ' % index
-        for i,line in enumerate(cmd.split('\n')):
-          if i == 0:
-            print enum_prefix + line
-          else:
-            print line.rjust(len(enum_prefix) + len(line))
+        cmd = self.readline.get_history_item(index)
+        print '[%d]: %s' % (index, cmd)
     else:
       print 'readline module not found, history is not supported.'
     return True
