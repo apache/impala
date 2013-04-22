@@ -215,8 +215,9 @@ public class JniFrontend {
     TCreateTableParams params = new TCreateTableParams();
     deserializeThrift(params, thriftCreateTableParams);
     frontend.createTable(TableName.fromThrift(params.getTable_name()),
-        params.getColumns(), params.getPartition_columns(), params.isIs_external(),
-        params.getComment(), RowFormat.fromThrift(params.getRow_format()),
+        params.getColumns(), params.getPartition_columns(), params.getOwner(),
+        params.isIs_external(), params.getComment(),
+        RowFormat.fromThrift(params.getRow_format()),
         FileFormat.fromThrift(params.getFile_format()),
         params.getLocation(), params.isIf_not_exists());
   }
@@ -236,7 +237,7 @@ public class JniFrontend {
       comment = params.getComment();
     }
     frontend.createTableLike(TableName.fromThrift(params.getTable_name()),
-        TableName.fromThrift(params.getSrc_table_name()),
+        TableName.fromThrift(params.getSrc_table_name()), params.getOwner(),
         params.isIs_external(), comment, fileFormat, params.getLocation(),
         params.isIf_not_exists());
   }

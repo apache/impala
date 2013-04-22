@@ -277,24 +277,24 @@ public class Frontend {
    * Creates a new table in the metastore.
    */
   public void createTable(TableName tableName, List<TColumnDef> columns,
-      List<TColumnDef> partitionColumns, boolean isExternal, String comment,
+      List<TColumnDef> partitionColumns, String owner, boolean isExternal, String comment,
       RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
       AlreadyExistsException, InvalidObjectException {
-    catalog.createTable(tableName, columns, partitionColumns, isExternal, comment,
+    catalog.createTable(tableName, columns, partitionColumns, owner, isExternal, comment,
         rowFormat, fileFormat, location, ifNotExists);
   }
 
   /**
    * Creates a new table in the metastore.
    */
-  public void createTableLike(TableName tableName, TableName oldTableName,
+  public void createTableLike(TableName tableName, TableName oldTableName, String owner,
       boolean isExternal, String comment, FileFormat fileFormat, String location,
       boolean ifNotExists) throws MetaException, NoSuchObjectException,
       org.apache.thrift.TException, AlreadyExistsException, InvalidObjectException,
       ImpalaException, TableLoadingException {
-    catalog.createTableLike(tableName, oldTableName, isExternal, comment, fileFormat,
-        location, ifNotExists);
+    catalog.createTableLike(tableName, oldTableName, owner, isExternal, comment,
+        fileFormat, location, ifNotExists);
   }
 
   /**
@@ -387,8 +387,8 @@ public class Frontend {
   public TExecRequest createExecRequest(
       TClientRequest request, StringBuilder explainString)
       throws InternalException, AnalysisException, NotImplementedException {
-    AnalysisContext analysisCtxt =
-        new AnalysisContext(catalog, request.sessionState.database);
+    AnalysisContext analysisCtxt = new AnalysisContext(catalog,
+        request.sessionState.database, request.sessionState.user);
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("analyze query " + request.stmt);
     try {

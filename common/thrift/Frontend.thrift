@@ -263,14 +263,17 @@ struct TCreateTableLikeParams {
   // Do not throw an error if a table of the same name already exists.
   4: required bool if_not_exists
 
+  // Owner of the table
+  5: required string owner
+
   // Optional file format for this table
-  5: optional TFileFormat file_format
+  6: optional TFileFormat file_format
 
   // Optional comment for the table
-  6: optional string comment
+  7: optional string comment
 
   // Optional storage location for the table
-  7: optional string location
+  8: optional string location
 }
 
 // Parameters of CREATE TABLE commands
@@ -287,22 +290,25 @@ struct TCreateTableParams {
   // The file format for this table
   4: required TFileFormat file_format
 
-  // Specifies how rows and columns are interpreted when reading data from the table
-  5: optional TTableRowFormat row_format
-
   // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
   // table data from the file system. If EXTERNAL is not specified, all table data will be
   // removed when the table is dropped.
-  6: required bool is_external
+  5: required bool is_external
 
   // Do not throw an error if a table of the same name already exists.
-  7: required bool if_not_exists
+  6: required bool if_not_exists
+
+  // The owner of the table
+  7: required string owner
+
+  // Specifies how rows and columns are interpreted when reading data from the table
+  8: optional TTableRowFormat row_format
 
   // Optional comment for the table
-  8: optional string comment
+  9: optional string comment
 
   // Optional storage location for the table
-  9: optional string location
+  10: optional string location
 }
 
 // Parameters of DROP DATABASE commands
@@ -327,6 +333,9 @@ struct TDropTableParams {
 struct TSessionState {
   // The default database, changed by USE <database> queries.
   1: required string database
+
+  // The user who this session belongs to.
+  2: required string user
 }
 
 struct TClientRequest {

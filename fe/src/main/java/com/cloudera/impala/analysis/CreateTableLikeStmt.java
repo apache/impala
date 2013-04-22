@@ -45,6 +45,7 @@ public class CreateTableLikeStmt extends ParseNodeBase {
   // Set during analysis
   private String dbName;
   private String srcDbName;
+  private String owner;
 
   /**
    * Builds a CREATE TABLE LIKE statement
@@ -116,6 +117,11 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     return location;
   }
 
+  public String getOwner() {
+    Preconditions.checkNotNull(owner);
+    return owner;
+  }
+
   public String debugString() {
     return toSql();
   }
@@ -153,6 +159,7 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     TCreateTableLikeParams params = new TCreateTableLikeParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
     params.setSrc_table_name(new TTableName(getSrcDb(), getSrcTbl()));
+    params.setOwner(getOwner());
     params.setIs_external(isExternal());
     params.setComment(comment);
     if (fileFormat != null) {
@@ -168,6 +175,7 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
     srcDbName =
         srcTableName.isFullyQualified() ? srcTableName.getDb() : analyzer.getDefaultDb();
+    owner = analyzer.getUser();
 
     if (analyzer.getCatalog().getDb(dbName) == null) {
       throw new AnalysisException("Database does not exist: " + dbName);

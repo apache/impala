@@ -16,6 +16,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -381,6 +382,21 @@ public class CatalogTest {
   public void testDatabaseDoesNotExist() {
     Db nonExistentDb = catalog.getDb("doesnotexist");
     assertNull(nonExistentDb);
+  }
+
+  @Test
+  public void testCreateTableMetadata() throws TableLoadingException {
+    Table table = catalog.getDb("functional").getTable("alltypes");
+    // Tables are created via Impala so the metadata should have been populated properly.
+    // alltypes is an external table.
+    assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
+    assertEquals(TableType.EXTERNAL_TABLE.toString(),
+        table.getMetaStoreTable().getTableType());
+    // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
+    table = catalog.getDb("functional").getTable("alltypesinsert");
+    assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
+    assertEquals(TableType.MANAGED_TABLE.toString(),
+        table.getMetaStoreTable().getTableType());
   }
 
   @Test

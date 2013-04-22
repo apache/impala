@@ -1874,6 +1874,7 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
 void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
   lock_guard<mutex> l(lock);
   state->database = database;
+  state->user = user;
 }
 
 void ImpalaServer::MembershipCallback(

@@ -33,16 +33,16 @@ public class AnalysisContext {
   // The name of the database to use if one is not explicitly specified by a query.
   private final String defaultDatabase;
 
+  // The user who initiated the request.
+  private final String user;
+
   private final TQueryGlobals queryGlobals;
 
-  public AnalysisContext(Catalog catalog, String defaultDb) {
+  public AnalysisContext(Catalog catalog, String defaultDb, String user) {
     this.catalog = catalog;
-    defaultDatabase = defaultDb;
-    queryGlobals = createQueryGlobals();
-  }
-
-  public AnalysisContext(Catalog catalog) {
-    this(catalog, Catalog.DEFAULT_DB);
+    this.defaultDatabase = defaultDb;
+    this.user = user;
+    this.queryGlobals = createQueryGlobals();
   }
 
   static public class AnalysisResult {
@@ -194,7 +194,7 @@ public class AnalysisContext {
       if (result.stmt == null) {
         return null;
       }
-      result.analyzer = new Analyzer(catalog, defaultDatabase, queryGlobals);
+      result.analyzer = new Analyzer(catalog, defaultDatabase, user, queryGlobals);
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {

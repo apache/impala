@@ -725,6 +725,7 @@ public class Catalog {
    * @param tableName - Fully qualified name of the new table.
    * @param column - List of column definitions for the new table.
    * @param partitionColumn - List of partition column definitions for the new table.
+   * @param owner - Owner of this table.
    * @param isExternal
    *    If true, table is created as external which means the data will not be deleted
    *    if dropped. External tables can also be created on top of existing data.
@@ -734,7 +735,7 @@ public class Catalog {
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public void createTable(TableName tableName, List<TColumnDef> columns,
-      List<TColumnDef> partitionColumns, boolean isExternal, String comment,
+      List<TColumnDef> partitionColumns, String owner, boolean isExternal, String comment,
       RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
       InvalidObjectException, org.apache.thrift.TException {
@@ -750,6 +751,7 @@ public class Catalog {
         new org.apache.hadoop.hive.metastore.api.Table();
     tbl.setDbName(tableName.getDb());
     tbl.setTableName(tableName.getTbl());
+    tbl.setOwner(owner);
     tbl.setParameters(new HashMap<String, String>());
 
     if (comment != null) {
@@ -758,6 +760,8 @@ public class Catalog {
     if (isExternal) {
       tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
       tbl.putToParameters("EXTERNAL", "TRUE");
+    } else {
+      tbl.setTableType(TableType.MANAGED_TABLE.toString());
     }
 
     StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(fileFormat, rowFormat);
@@ -785,6 +789,7 @@ public class Catalog {
    *
    * @param tableName - Fully qualified name of the new table.
    * @param srcTableName - Fully qualified name of the old table.
+   * @param owner - Owner of this table.
    * @param isExternal
    *    If true, table is created as external which means the data will not be deleted
    *    if dropped. External tables can also be created on top of existing data.
@@ -796,7 +801,7 @@ public class Catalog {
    *                   default location.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
-  public void createTableLike(TableName tableName, TableName srcTableName,
+  public void createTableLike(TableName tableName, TableName srcTableName, String owner,
       boolean isExternal, String comment, FileFormat fileFormat, String location,
       boolean ifNotExists) throws MetaException, NoSuchObjectException,
       AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException,
@@ -813,6 +818,7 @@ public class Catalog {
         srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tableName.getDb());
     tbl.setTableName(tableName.getTbl());
+    tbl.setOwner(owner);
     if (tbl.getParameters() == null) {
       tbl.setParameters(new HashMap<String, String>());
     }

@@ -52,6 +52,7 @@ public class Analyzer {
   private final DescriptorTable descTbl;
   private final Catalog catalog;
   private final String defaultDb;
+  private final String user;
   private final IdGenerator<ExprId> conjunctIdGenerator;
   private final TQueryGlobals queryGlobals;
 
@@ -110,14 +111,17 @@ public class Analyzer {
    * @param catalog
    */
   public Analyzer(Catalog catalog) {
-    this(catalog, Catalog.DEFAULT_DB, new TQueryGlobals());
+    this(catalog, Catalog.DEFAULT_DB, System.getProperty("user.name"),
+        new TQueryGlobals());
   }
 
-  public Analyzer(Catalog catalog, String defaultDb, TQueryGlobals queryGlobals) {
+  public Analyzer(Catalog catalog, String defaultDb, String user,
+        TQueryGlobals queryGlobals) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
     this.defaultDb = defaultDb;
+    this.user = user;
     this.conjunctIdGenerator = new IdGenerator<ExprId>();
     this.queryGlobals = queryGlobals;
   }
@@ -132,6 +136,7 @@ public class Analyzer {
     this.catalog = parentAnalyzer.catalog;
     this.descTbl = parentAnalyzer.descTbl;
     this.defaultDb = parentAnalyzer.defaultDb;
+    this.user = parentAnalyzer.user;
     // make sure we don't create duplicate ids across entire stmt
     this.conjunctIdGenerator = parentAnalyzer.conjunctIdGenerator;
     this.queryGlobals = parentAnalyzer.queryGlobals;
@@ -634,6 +639,10 @@ public class Analyzer {
 
   public String getDefaultDb() {
     return defaultDb;
+  }
+
+  public String getUser() {
+    return user;
   }
 
   public TQueryGlobals getQueryGlobals() {

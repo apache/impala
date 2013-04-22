@@ -44,6 +44,7 @@ public class CreateTableStmt extends ParseNodeBase {
 
   // Set during analysis
   private String dbName;
+  private String owner;
 
   /**
    * Builds a CREATE TABLE statement
@@ -119,6 +120,11 @@ public class CreateTableStmt extends ParseNodeBase {
     return fileFormat;
   }
 
+  public String getOwner() {
+    Preconditions.checkNotNull(owner);
+    return owner;
+  }
+
   public RowFormat getRowFormat() {
     return rowFormat;
   }
@@ -183,6 +189,7 @@ public class CreateTableStmt extends ParseNodeBase {
     for (ColumnDef col: getPartitionColumnDefs()) {
       params.addToPartition_columns(col.toThrift());
     }
+    params.setOwner(getOwner());
     params.setIs_external(isExternal());
     params.setComment(comment);
     params.setLocation(location);
@@ -196,6 +203,7 @@ public class CreateTableStmt extends ParseNodeBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
+    owner = analyzer.getUser();
 
     if (analyzer.getCatalog().getDb(dbName) == null) {
       throw new AnalysisException("Database does not exist: " + dbName);

@@ -152,6 +152,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
     // something is run.
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;
+    query_request.sessionState.user = session->user;
   }
   status = Execute(query_request, session, query_request.sessionState, &exec_state);
 
