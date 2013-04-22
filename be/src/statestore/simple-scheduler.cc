@@ -112,25 +112,26 @@ Status SimpleScheduler::Init() {
         metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
   }
 
-  // Figure out what our IP address is, so that each subscriber
-  // doesn't have to resolve it on every heartbeat.
-  vector<string> ipaddrs;
-  const string& hostname = backend_descriptor_.address.hostname;
-  Status status = HostnameToIpAddrs(hostname, &ipaddrs);
-  if (!status.ok()) {
-    VLOG(1) << "Failed to resolve " << hostname << ": " << status.GetErrorMsg();
-    return status;
-  }
-  // Find a non-localhost address for this host; if one can't be
-  // found use the first address returned by HostnameToIpAddrs
-  string ipaddr = ipaddrs[0];
-  if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
-    VLOG(3) << "Only localhost addresses found for " << hostname;
-  }
+  if (statestore_subscriber_ != NULL) {
+    // Figure out what our IP address is, so that each subscriber
+    // doesn't have to resolve it on every heartbeat.
+    vector<string> ipaddrs;
+    const string& hostname = backend_descriptor_.address.hostname;
+    Status status = HostnameToIpAddrs(hostname, &ipaddrs);
+    if (!status.ok()) {
+      VLOG(1) << "Failed to resolve " << hostname << ": " << status.GetErrorMsg();
+      return status;
+    }
+    // Find a non-localhost address for this host; if one can't be
+    // found use the first address returned by HostnameToIpAddrs
+    string ipaddr = ipaddrs[0];
+    if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
+      VLOG(3) << "Only localhost addresses found for " << hostname;
+    }
 
-  backend_descriptor_.ip_address = ipaddr;
-  LOG(INFO) << "Simple-scheduler using " << ipaddr << " as IP address";
-
+    backend_descriptor_.ip_address = ipaddr;
+    LOG(INFO) << "Simple-scheduler using " << ipaddr << " as IP address";
+  }
   return Status::OK;
 }
 
