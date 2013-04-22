@@ -83,6 +83,9 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
   heartbeat_interval_metric_ =
       metrics->RegisterMetric(
           new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time", 0.0));
+  heartbeat_duration_metric_ =
+      metrics->RegisterMetric(
+          new StatsMetric<double>("statestore-subscriber.heartbeat-duration", 0.0));
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
@@ -200,12 +203,16 @@ void StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
     // Only record heartbeats received when not in recovery mode
     heartbeat_interval_metric_->Update(
         heartbeat_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
+    MonotonicStopWatch sw;
+    sw.Start();
     BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
       BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
         // TODO: Consider filtering the topics to only send registered topics to callbacks
         callback(topic_deltas, topic_updates);
       }
     }
+    sw.Stop();
+    heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   } else {
     VLOG(1) << "In recovery mode, ignoring update.";
   }

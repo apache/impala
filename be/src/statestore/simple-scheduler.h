@@ -106,9 +106,8 @@ class SimpleScheduler : public Scheduler {
   // Unique - across the cluster - identifier for this impala backend
   const std::string backend_id_;
 
-  // The address that the impala backend running here can be accessed
-  // on by other Impalads.
-  const TNetworkAddress backend_address_;
+  // Describes this backend, including the Impalad service address
+  TBackendDescriptor backend_descriptor_;
 
   ThriftSerializer thrift_serializer_;
 

@@ -323,7 +323,7 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(runtime_state->obj_pool(), exprs, &output_exprs_));
   for (int i = 0; i < output_exprs_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc, 
+    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc,
         !impala_server_->select_exprs_codegen_enabled_));
   }
   return Status::OK;
@@ -1015,6 +1015,7 @@ void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
   Scheduler::HostList backends;
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
   sort(backends.begin(), backends.end(), TNetworkAddressComparator);
+
   (*output) << "<h2>Known Backends "
             << "(" << backends.size() << ")"
             << "</h2>";
@@ -1867,21 +1868,22 @@ void ImpalaServer::MembershipCallback(
     // deltas from the state-store, but expect each topic to contains
     // its entire contents.
     if (delta.is_delta) {
-      VLOG(1) << "Unexpected topic delta from state-store, ignoring.";
+      LOG_EVERY_N(WARNING, 60) << "Unexpected topic delta from state-store, ignoring"
+                               << "(seen " << google::COUNTER << " deltas)";
       return;
     }
     vector<TNetworkAddress> current_membership(delta.topic_entries.size());
 
     BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
       uint32_t len = item.value.size();
-      TNetworkAddress backend_address;
+      TBackendDescriptor backend_descriptor;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &backend_address);
+          item.value.data()), &len, false, &backend_descriptor);
       if (!status.ok()) {
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      current_membership.push_back(backend_address);
+      current_membership.push_back(backend_descriptor.address);
     }
 
     vector<TNetworkAddress> difference;

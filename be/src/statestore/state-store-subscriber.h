@@ -179,6 +179,11 @@ class StateStoreSubscriber {
   // Tracks the time between heartbeats
   MonotonicStopWatch heartbeat_interval_timer_;
 
+  // Accumulated statistics on the time taken to process each
+  // heartbeat from the state-store (that is, to call all
+  // callbacks)
+  StatsMetric<double>* heartbeat_duration_metric_;
+
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StateStoreSubscriberThriftIf;
 

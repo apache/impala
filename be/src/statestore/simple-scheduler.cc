@@ -47,12 +47,12 @@ SimpleScheduler::SimpleScheduler(StateStoreSubscriber* subscriber,
   : metrics_(metrics),
     statestore_subscriber_(subscriber),
     backend_id_(backend_id),
-    backend_address_(backend_address),
     thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0) {
+  backend_descriptor_.address = backend_address;
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
@@ -95,7 +95,7 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
-impala::Status SimpleScheduler::Init() {
+Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
   if (statestore_subscriber_ != NULL) {
     StateStoreSubscriber::UpdateCallback cb =
@@ -111,6 +111,26 @@ impala::Status SimpleScheduler::Init() {
     initialised_ =
         metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
   }
+
+  // Figure out what our IP address is, so that each subscriber
+  // doesn't have to resolve it on every heartbeat.
+  vector<string> ipaddrs;
+  const string& hostname = backend_descriptor_.address.hostname;
+  Status status = HostnameToIpAddrs(hostname, &ipaddrs);
+  if (!status.ok()) {
+    VLOG(1) << "Failed to resolve " << hostname << ": " << status.GetErrorMsg();
+    return status;
+  }
+  // Find a non-localhost address for this host; if one can't be
+  // found use the first address returned by HostnameToIpAddrs
+  string ipaddr = ipaddrs[0];
+  if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
+    VLOG(3) << "Only localhost addresses found for " << hostname;
+  }
+
+  backend_descriptor_.ip_address = ipaddr;
+  LOG(INFO) << "Simple-scheduler using " << ipaddr << " as IP address";
+
   return Status::OK;
 }
 
@@ -127,6 +147,7 @@ void SimpleScheduler::UpdateMembership(
   HostMap host_map_copy;
   HostIpAddressMap host_ip_map_copy;
   bool found_self = false;
+
   if (topic != service_state.end()) {
     const TTopicDelta& delta = topic->second;
     if (delta.is_delta) {
@@ -137,38 +158,34 @@ void SimpleScheduler::UpdateMembership(
     }
 
     BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
-      if (item.key == backend_id_) found_self = true;
-
-      TNetworkAddress backend_address;
+      TBackendDescriptor backend_descriptor;
       // Benchmarks have suggested that this method can deserialize
       // ~10m messages per second, so no immediate need to consider optimisation.
       uint32_t len = item.value.size();
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &backend_address);
+          item.value.data()), &len, false, &backend_descriptor);
       if (!status.ok()) {
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      vector<string> ipaddrs;
-      status = HostnameToIpAddrs(backend_address.hostname, &ipaddrs);
-      if (!status.ok()) {
-        VLOG(1) << "Failed to resolve " << backend_address.hostname << ": "
-                << status.GetErrorMsg();
-        continue;
-      }
-      // Find a non-localhost address for this host; if one can't be
-      // found use the first address returned by HostnameToIpAddrs
-      string ipaddr = ipaddrs[0];
-      if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
-        // Someone *might* be running this on localhost with no
-        // external interface (for debugging); keep going.
-        VLOG_IF(3, (update_count_ % 100 == 0))
-            << "Only localhost addresses found for "
-            << backend_address.hostname << " (log count: " << google::COUNTER << ")";
+
+      if (item.key == backend_id_) {
+        if (backend_descriptor.address == backend_descriptor_.address) {
+          found_self = true;
+        } else {
+          // Someone else has registered this subscriber ID with a
+          // different address. We will try to re-register
+          // (i.e. overwrite their subscription), but there is likely
+          // a configuration problem.
+          LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
+                                   << backend_descriptor.address;
+        }
       }
 
-      host_map_copy[ipaddr].push_back(backend_address);
-      host_ip_map_copy[backend_address.hostname] = ipaddr;
+      host_map_copy[backend_descriptor.ip_address].push_back(
+          backend_descriptor.address);
+      host_ip_map_copy[backend_descriptor.address.hostname] =
+          backend_descriptor.ip_address;
     }
   }
 
@@ -183,8 +200,7 @@ void SimpleScheduler::UpdateMembership(
 
     TTopicItem& item = update.topic_updates.back();
     item.key = backend_id_;
-
-    Status status = thrift_serializer_.Serialize(&backend_address_, &item.value);
+    Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
     if (!status.ok()) {
       LOG(INFO) << "Failed to serialize Impala backend address for state-store topic: "
                 << status.GetErrorMsg();
