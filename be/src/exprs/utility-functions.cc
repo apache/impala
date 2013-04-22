@@ -28,4 +28,13 @@ void* UtilityFunctions::Version(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
+void* UtilityFunctions::Sleep(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  int* milliseconds = reinterpret_cast<int*>(e->children()[0]->GetValue(row));
+  if (milliseconds == NULL) return NULL;
+  usleep(*milliseconds * 1000);
+  e->result_.bool_val = true;
+  return &e->result_.bool_val;
+}
+
 }

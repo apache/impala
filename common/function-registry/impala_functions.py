@@ -120,6 +120,7 @@ functions = [
         'StringFunctions::ParseUrl', ['parse_url']],
   ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'], \
         'StringFunctions::ParseUrlKey', ['parse_url']],
+  ['Utility_Sleep', 'BOOLEAN', ['INT'], 'UtilityFunctions::Sleep', ['sleep']],
   ['Utility_Version', 'STRING', [], 'UtilityFunctions::Version', ['version']],
 
 # Timestamp Functions

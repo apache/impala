@@ -26,6 +26,9 @@ class UtilityFunctions {
  public:
   // Implementation of the version() function. Returns the version string.  
   static void* Version(Expr* e, TupleRow* row);
+
+  // Testing function that sleeps for the specified number of milliseconds. Returns true.
+  static void* Sleep(Expr* e, TupleRow* row);
 };
 
 }

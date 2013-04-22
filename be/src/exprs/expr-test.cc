@@ -1348,6 +1348,8 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("find_in_set(NULL, NULL)", TYPE_INT);
 
   TestStringValue("version()", GetVersionString());
+  TestValue("sleep(100)", TYPE_BOOLEAN, true);
+  TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {
