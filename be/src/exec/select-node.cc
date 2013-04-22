@@ -99,7 +99,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
       if (ReachedLimit()) return true;
     }
   }
-  return output_batch->IsFull();
+  return output_batch->IsFull() || output_batch->AtResourceLimit();
 }
 
  Status SelectNode::Close(RuntimeState* state) {

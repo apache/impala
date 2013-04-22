@@ -111,6 +111,14 @@ class RowBatch {
     return num_rows_ == capacity_;
   }
 
+  // Returns true if the row batch has accumulated enough external memory (in MemPools
+  // and io buffers).  This would be a trigger to compact the row batch or reclaim
+  // the memory in some way.
+  bool AtResourceLimit() {
+    return io_buffers_.size() > MAX_IO_BUFFERS || 
+           tuple_data_pool()->total_allocated_bytes() > MAX_MEM_POOL_SIZE;
+  }
+
   int row_byte_size() {
     return num_tuples_per_row_ * sizeof(Tuple*);
   }
@@ -198,6 +206,11 @@ class RowBatch {
   int capacity() const { return capacity_; }
 
   const RowDescriptor& row_desc() const { return row_desc_; }
+  
+  // Allow the row batch to accumulate 32MBs before it is considered at the limit.
+  // TODO: are these numbers reasonable?
+  static const int MAX_IO_BUFFERS = 4;
+  static const int MAX_MEM_POOL_SIZE = 32 * 1024 * 1024;
 
  private:
   // All members need to be handled in RowBatch::Swap()

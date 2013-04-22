@@ -348,7 +348,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       // pass on resources, out_batch might still need them
       probe_batch_->TransferResourceOwnership(out_batch);
       probe_batch_pos_ = 0;
-      if (out_batch->IsFull()) return Status::OK;
+      if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
       // get new probe batch
       if (!probe_eos_) {
         while (true) {
@@ -363,7 +363,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
               eos_ = true;
               break;
             }
-            if (out_batch->IsFull()) return Status::OK;
+            if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
             continue;
           } else {
             COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
@@ -449,7 +449,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     if (!hash_tbl_iterator_.HasNext() && probe_batch_pos_ == probe_batch_->num_rows()) {
       probe_batch_->TransferResourceOwnership(out_batch);
       probe_batch_pos_ = 0;
-      if (out_batch->IsFull()) break;
+      if (out_batch->IsFull() || out_batch->AtResourceLimit()) break;
       if (probe_eos_) {
         *eos = eos_ = true;
         break;

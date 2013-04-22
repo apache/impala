@@ -80,7 +80,8 @@ class MergeNode : public ExecNode {
   // If const_exprs is true, then the exprs are evaluated exactly once without
   // fetching rows from child_row_batch_.
   // Only commits tuples to row_batch if they are not filtered by conjuncts.
-  // Returns true if row_batch is full or limit has been reached, false otherwise.
+  // Returns true if row_batch should be returned to caller or limit has been
+  // reached, false otherwise.
   bool EvalAndMaterializeExprs(const std::vector<Expr*>& exprs, bool const_exprs,
       Tuple** tuple, RowBatch* row_batch);
 };

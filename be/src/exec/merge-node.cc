@@ -205,7 +205,7 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
       (*tuple)->Init(tuple_desc_->byte_size());
     }
 
-    if (row_batch->IsFull() || ReachedLimit()) {
+    if (row_batch->IsFull() || row_batch->AtResourceLimit() || ReachedLimit()) {
       return true;
     }
   } while (!done);

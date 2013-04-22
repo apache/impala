@@ -344,7 +344,12 @@ void ScannerContext::CommitRows(int num_rows) {
   current_row_batch_->CommitRows(num_rows);
   tuple_mem_ += scan_node_->tuple_desc()->byte_size() * num_rows;
 
-  if (current_row_batch_->IsFull()) {
+  // We need to pass the row batch to the scan node if we accumulate too much
+  // memory (in io buffers and mem pools).  This can happen if the query is very
+  // selective.  
+  // TODO: We could also compact the row batch and at this point to reclaim the
+  // memory that way.
+  if (current_row_batch_->IsFull() || current_row_batch_->AtResourceLimit()) {
     scan_node_->AddMaterializedRowBatch(current_row_batch_);
     current_row_batch_ = NULL;
     NewRowBatch();
