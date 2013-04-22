@@ -241,19 +241,20 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   MemPool* pool;
   TupleRow* tuple_row;
   int64_t max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row);
-  int num_to_commit = min(max_tuples, num_buffered_records_in_compressed_block_);
-  num_buffered_records_in_compressed_block_ -= num_to_commit;
+  int num_to_process = min(max_tuples, num_buffered_records_in_compressed_block_);
+  num_buffered_records_in_compressed_block_ -= num_to_process;
 
   if (scan_node_->materialized_slots().empty()) {
     // Handle case where there are no slots to materialize (e.g. count(*))
-    num_to_commit = WriteEmptyTuples(context_, tuple_row, num_to_commit);
-    if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+    num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
+    if (num_to_process > 0) context_->CommitRows(num_to_process);
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
     return Status::OK;
   }
 
   // Parse record starts and lengths
   int field_location_offset = 0;
-  for (int i = 0; i < num_to_commit; ++i) {
+  for (int i = 0; i < num_to_process; ++i) {
     DCHECK_LT(i, record_locations_.size());
     int bytes_read = ReadWriteUtil::GetVLong(
         next_record_in_compressed_block_, &record_locations_[i].len);
@@ -269,7 +270,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   }
 
   // Parse records to find field locations.
-  for (int i = 0; i < num_to_commit; ++i) {
+  for (int i = 0; i < num_to_process; ++i) {
     int num_fields = 0;
     if (delimited_text_parser_->escape_char() == '\0') {
       delimited_text_parser_->ParseSingleTuple<false>(
@@ -288,7 +289,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   }
 
   int max_added_tuples = (scan_node_->limit() == -1) ?
-                         num_to_commit :
+                         num_to_process :
                          scan_node_->limit() - scan_node_->rows_returned();
 
   // Materialize parsed cols to tuples
@@ -298,15 +299,16 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (write_tuples_fn_ != NULL) {
     // last argument: seq always starts at record_location[0]
     tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
-        context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+        context_->row_byte_size(), &field_locations_[0], num_to_process,
         max_added_tuples, scan_node_->materialized_slots().size(), 0); 
   } else {
     tuples_returned = WriteAlignedTuples(pool, tuple_row, 
-        context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+        context_->row_byte_size(), &field_locations_[0], num_to_process,
         max_added_tuples, scan_node_->materialized_slots().size(), 0);
   }
 
   if (tuples_returned == -1) return parse_status_;
+  COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
   context_->CommitRows(tuples_returned);
   return Status::OK;
 }
@@ -373,6 +375,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     }
 
     if (add_row) context_->CommitRows(1);
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), 1);
     if (scan_node_->ReachedLimit()) break;
     if (context_->cancelled()) return Status::CANCELLED;
   }

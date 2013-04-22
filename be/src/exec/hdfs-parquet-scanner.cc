@@ -426,6 +426,7 @@ Status HdfsParquetScanner::AssembleRows() {
           DCHECK(c == 0 || !parse_status_.ok()) << "c=" << c << " " 
               << parse_status_.GetErrorMsg();;
           context_->CommitRows(num_to_commit);
+          COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
           return parse_status_;
         }
       }
@@ -438,6 +439,7 @@ Status HdfsParquetScanner::AssembleRows() {
       } 
     }
     context_->CommitRows(num_to_commit);
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
   }
 
   assemble_rows_timer_.Stop();
@@ -505,6 +507,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
       // No materialized columns.  We can serve this query from just the metadata.  We
       // don't need to read the column data.
       int64_t num_tuples = file_metadata_.num_rows;
+      COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
 
       while (num_tuples > 0) {
         MemPool* pool;

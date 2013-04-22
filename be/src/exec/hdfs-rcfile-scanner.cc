@@ -472,6 +472,7 @@ Status HdfsRCFileScanner::ProcessRange() {
       row_pos_ += max_tuples;
       int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
       if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+      COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
       continue;
     }
 
@@ -524,6 +525,7 @@ Status HdfsRCFileScanner::ProcessRange() {
       }
     }
     context_->CommitRows(num_to_commit);
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
     if (scan_node_->ReachedLimit()) break;
     if (context_->cancelled()) return Status::CANCELLED;
   }

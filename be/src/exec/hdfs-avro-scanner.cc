@@ -24,6 +24,7 @@
 #include "exec/read-write-util.h"
 #include "exec/scanner-context.inline.h"
 #include "util/codec.h"
+#include "util/runtime-profile.h"
 
 // Note: the Avro C++ library uses exceptions for error handling. Any Avro
 // function that may throw an exception must be placed in a try/catch block.
@@ -317,6 +318,7 @@ Status HdfsAvroScanner::ProcessRange() {
         int num_to_commit = WriteEmptyTuples(context_, tuple_row, n);
         if (num_to_commit > 0) context_->CommitRows(num_to_commit);
         num_records -= n;
+        COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
       } else {
         RETURN_IF_ERROR(DecodeAvroData(max_tuples, &num_records, pool, &data, &size,
                                        tuple, tuple_row));
@@ -372,6 +374,7 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
   }
   context_->CommitRows(num_to_commit);
   (*num_records) -= n;
+  COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
 
   return Status::OK;
 }

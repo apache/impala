@@ -84,6 +84,7 @@ class ScanNode : public ExecNode {
   virtual bool IsScanNode() const { return true; }
 
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
+  RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
   RuntimeProfile::Counter* total_throughput_counter() const { 
     return total_throughput_counter_; 
@@ -109,6 +110,7 @@ class ScanNode : public ExecNode {
 
   // names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
+  static const std::string ROWS_READ_COUNTER;
   static const std::string TOTAL_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
   static const std::string PER_READ_THREAD_THROUGHPUT_COUNTER;
@@ -123,7 +125,9 @@ class ScanNode : public ExecNode {
 
  protected:
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
-  RuntimeProfile::Counter* read_timer_; // total read time 
+  // # rows/tuples read from the scanner (including those discarded by EvalConjucts())
+  RuntimeProfile::Counter* rows_read_counter_;
+  RuntimeProfile::Counter* read_timer_; // total read time
   // Wall based aggregate read throughput [bytes/sec]
   RuntimeProfile::Counter* total_throughput_counter_;
   // Per thread read throughput [bytes/sec]

@@ -171,6 +171,7 @@ Status HdfsTextScanner::FinishScanRange() {
         DCHECK_LE(num_tuples, 1);
         DCHECK_GE(num_tuples, 0);
         context_->CommitRows(num_tuples);
+        COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
       }
       break;
     }
@@ -233,7 +234,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
       num_tuples_materialized = WriteFields(pool, tuple_row_mem, num_fields, *num_tuples);
       DCHECK_GE(num_tuples_materialized, 0);
       RETURN_IF_ERROR(parse_status_);
-      if (num_tuples > 0) {
+      if (*num_tuples > 0) {
         // If we saw any tuple delimiters, clear the boundary_row_.
         boundary_row_.Clear();
       }
@@ -261,6 +262,8 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     if (num_tuples_materialized > 0) {
       context_->CommitRows(num_tuples_materialized);
     }
+
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), *num_tuples);
 
     // Done with this buffer and the scan range
     if ((byte_buffer_ptr_ == byte_buffer_end_ && eosr) || past_scan_range) {
@@ -500,4 +503,3 @@ int HdfsTextScanner::WritePartialTuple(FieldLocation* fields,
   }
   return next_line_offset;
 }
-
