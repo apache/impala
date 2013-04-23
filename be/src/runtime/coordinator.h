@@ -183,6 +183,9 @@ class Coordinator {
   TQueryGlobals query_globals_;
   TQueryOptions query_options_;
 
+  // copied from TQueryExecRequest, governs when to call ReportQuerySummary
+  TStmtType::type stmt_type_;
+
   // map from id of a scan node to a specific counter in the node's profile
   typedef std::map<PlanNodeId, RuntimeProfile::Counter*> CounterMap;
 

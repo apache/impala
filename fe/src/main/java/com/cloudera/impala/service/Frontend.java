@@ -498,6 +498,10 @@ public class Frontend {
       }
     }
 
+    // Copy the statement type into the TQueryExecRequest so that it
+    // is visible to the coordinator.
+    result.query_exec_request.stmt_type = result.stmt_type;
+
     return result;
   }
 

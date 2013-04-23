@@ -284,6 +284,8 @@ Status Coordinator::Exec(
     finalize_params_ = request->finalize_params;
   }
 
+  stmt_type_ = request->stmt_type;
+
   query_id_ = query_id;
   VLOG_QUERY << "Exec() query_id=" << query_id_;
   desc_tbl_ = request->desc_tbl;
@@ -609,7 +611,13 @@ Status Coordinator::Wait() {
 
   // Query finalization is required only for HDFS table sinks
   if (needs_finalization_) {
-    return FinalizeQuery();
+    RETURN_IF_ERROR(FinalizeQuery());
+  }
+
+  if (stmt_type_ == TStmtType::DML) {
+    // For DML queries, when Wait is done, the query is complete.  Report
+    // Aggregate query profiles at this point.
+    ReportQuerySummary();
   }
 
   return Status::OK;

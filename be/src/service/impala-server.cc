@@ -218,6 +218,11 @@ Status ImpalaServer::QueryExecState::Wait() {
     RETURN_IF_ERROR(UpdateMetastore());
   }
 
+  if (exec_request_.stmt_type == TStmtType::DML) {
+    // DML queries are finished by this point
+    eos_ = true;
+  }
+
   return Status::OK;
 }
 

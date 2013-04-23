@@ -433,6 +433,10 @@ struct TQueryExecRequest {
 
   // The same as the output of 'explain <query>'
   8: optional string query_plan
+
+  // The statement type governs when the coordinator can judge a query to be finished.
+  // DML queries are complete after Wait(), SELECTs may not be.
+  9: required Types.TStmtType stmt_type
 }
 
 enum TDdlType {
