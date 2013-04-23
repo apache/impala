@@ -38,3 +38,4 @@ table_name:nullescapedtable, constraint:exclude, table_format:parquet/none/none
 table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/none
 
 table_name:bad_serde, constraint:restrict_to, table_format:text/none/none
+table_name:unsupported_partition_types, constraint:restrict_to, table_format:text/none/none

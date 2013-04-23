@@ -1007,6 +1007,18 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/UnsupportedTypes/data.csv' OVERWR
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+unsupported_partition_types
+---- CREATE_HIVE
+-- Create a table that is partitioned on an unsupported partition-column type
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  int_col INT)
+PARTITIONED BY (t TIMESTAMP);
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 old_rcfile_table
 ---- COLUMNS
 key INT

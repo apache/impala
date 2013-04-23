@@ -530,17 +530,24 @@ public class HdfsTable extends Table {
     for (FieldSchema s : fieldSchemas) {
       // catch currently unsupported hive schema elements
       if (!serdeConstants.PrimitiveTypes.contains(s.getType())) {
-        throw new TableLoadingException("Failed to load metadata for table: " +
-            getName() + " due to unsupported column type " + s.getType() + " in column " +
-            s.getName());
+        throw new TableLoadingException(
+            String.format("Failed to load metadata for table '%s' due to unsupported " +
+                "column type '%s' in column '%s'", getName(), s.getType(), s.getName()));
       }
-      Column col =
-          new Column(s.getName(), getPrimitiveType(s.getType()), s.getComment(), pos);
+      PrimitiveType type = getPrimitiveType(s.getType());
+      // Check if we support partitioning on columns of such a type.
+      if (pos < numClusteringCols && !type.supportsTablePartitioning()) {
+        throw new TableLoadingException(
+            String.format("Failed to load metadata for table '%s' because of " +
+                "unsupported partition-column type '%s' in partition column '%s'",
+                getName(), type.toString(), s.getName()));
+      }
+
+      Column col = new Column(s.getName(), type, s.getComment(), pos);
       colsByPos.add(col);
       colsByName.put(s.getName(), col);
       ++pos;
 
-      // load stats
       ColumnStatistics colStats = null;
       try {
         colStats = client.getTableColumnStatistics(db.getName(), name, s.getName());
@@ -703,10 +710,10 @@ public class HdfsTable extends Table {
           partKeys.size() + tblFields.size());
       fieldSchemas.addAll(partKeys);
       fieldSchemas.addAll(tblFields);
-      loadColumns(fieldSchemas, client);
-
       // The number of clustering columns is the number of partition keys.
       numClusteringCols = partKeys.size();
+      loadColumns(fieldSchemas, client);
+
       loadPartitions(client.listPartitions(db.getName(), name, Short.MAX_VALUE), msTbl);
 
       // load table stats

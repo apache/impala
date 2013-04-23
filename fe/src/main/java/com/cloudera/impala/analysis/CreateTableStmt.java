@@ -14,18 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.ArrayList;
 
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCreateTableParams;
-import com.cloudera.impala.thrift.TFileFormat;
 import com.cloudera.impala.thrift.TTableName;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -126,10 +123,12 @@ public class CreateTableStmt extends ParseNodeBase {
     return rowFormat;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) {
@@ -193,6 +192,7 @@ public class CreateTableStmt extends ParseNodeBase {
     return params;
   }
 
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
@@ -222,6 +222,11 @@ public class CreateTableStmt extends ParseNodeBase {
       }
     }
     for (ColumnDef colDef: partitionColumnDefs) {
+      if (!colDef.getColType().supportsTablePartitioning()) {
+        throw new AnalysisException(
+            String.format("Type '%s' is not supported as partition-column type " +
+                "in column: %s", colDef.getColType().toString(), colDef.getColName()));
+      }
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }

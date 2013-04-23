@@ -124,6 +124,14 @@ public enum PrimitiveType {
     }
   }
 
+  /**
+   * Indicates whether we support partitioning tables on columns of this type.
+   */
+  public boolean supportsTablePartitioning() {
+    if (!isSupported() || this == TIMESTAMP) return false;
+    return true;
+  }
+
   public boolean isFixedLengthType() {
     return this == BOOLEAN || this == TINYINT || this == SMALLINT || this == INT
         || this == BIGINT || this == FLOAT || this == DOUBLE || this == DATE

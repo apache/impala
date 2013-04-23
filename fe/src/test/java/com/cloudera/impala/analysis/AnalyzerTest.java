@@ -2126,6 +2126,14 @@ public class AnalyzerTest {
         "Duplicate column name: i");
     AnalysisError("create table new_table (i int) PARTITIONED BY (C int, c2 int, c int)",
         "Duplicate column name: c");
+
+    // Unsupported partition-column types.
+    AnalysisError("create table new_table (i int) PARTITIONED BY (t timestamp)",
+        "Type 'TIMESTAMP' is not supported as partition-column type in column: t");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (d date)",
+        "Type 'DATE' is not supported as partition-column type in column: d");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
+        "Type 'DATETIME' is not supported as partition-column type in column: d");
   }
 
   @Test
@@ -2427,13 +2435,15 @@ public class AnalyzerTest {
   }
 
   /**
-   * We distinguish between two classes of unsupported types:
+   * We distinguish between three classes of unsupported types:
    * 1. Complex types, e.g., map
    *    For tables with such types we prevent loading the table metadata.
    * 2. Primitive types
    *    For tables with unsupported primitive types (e.g., decimal)
    *    we can run queries as long as the unsupported columns are not referenced.
    *    We fail analysis if a query references an unsupported primitive column.
+   * 3. Partition-column types
+   *    We do not support table partitioning on timestamp columns
    */
   @Test
   public void TestUnsupportedTypes() {
@@ -2453,6 +2463,9 @@ public class AnalyzerTest {
     AnalysisError("select int_col, dec_col, str_col, bin_col " +
         "from functional.unsupported_types",
         "Unsupported type 'DECIMAL' in 'dec_col'.");
+    // Unsupported partition-column type.
+    AnalysisError("select * from functional.unsupported_partition_types",
+        "Failed to load metadata for table: unsupported_partition_types");
   }
 
   @Test
