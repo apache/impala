@@ -329,6 +329,10 @@ class ScannerContext {
   // If true, the scanner is cancelled and the scanner thread should finish up
   bool cancelled() const { return cancelled_; }
 
+  // Returns the number of buffers added to the any of the streams since the last time
+  // CreateStreams was called.
+  int64_t num_buffers_added() const { return buffers_added_; }
+
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
 
   Tuple* next_tuple(Tuple* t) const { 
@@ -385,6 +389,10 @@ class ScannerContext {
 
   // If true, the scan range has been cancelled and the scanner thread should abort
   bool cancelled_;
+
+  // Number of buffers added to the scanner context object.  This is reset if the
+  // child streams are recreated.
+  int64_t buffers_added_;
 
   // Create a new row batch and tuple buffer.
   void NewRowBatch();

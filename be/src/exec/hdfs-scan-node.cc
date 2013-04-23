@@ -742,7 +742,11 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) 
     ScopedCounter scoped_counter(&active_scanner_thread_counter_, -1);
     status = scanner->ProcessSplit(context);
     scanner->Close();
-    runtime_state_->resource_pool()->ReleaseThreadToken(false);
+    if (context->num_buffers_added() != 0) {
+      // This scanner saw at least one io buffer indicating the io mgr reserved
+      // a thread for it.  Release that now.
+      runtime_state_->resource_pool()->ReleaseThreadToken(false);
+    }
   }
 
   // Scanner thread completed. Take a look and update the status 

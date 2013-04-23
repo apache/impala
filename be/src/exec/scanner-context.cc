@@ -34,7 +34,8 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
     tuple_byte_size_(scan_node_->tuple_desc()->byte_size()),
     partition_desc_(partition_desc),
     done_(false),
-    cancelled_(false) {
+    cancelled_(false),
+    buffers_added_(0) {
   template_tuple_ = 
       scan_node_->InitTemplateTuple(state, partition_desc_->partition_key_values());
 
@@ -65,6 +66,7 @@ void ScannerContext::CreateStreams(int num_streams) {
   for (int i = 0; i < streams_.size(); ++i) {
     streams_[i]->ReturnAllBuffers();
   }
+  buffers_added_ = 0;
 
   // Create the new streams
   streams_.clear();
@@ -359,6 +361,7 @@ void ScannerContext::CommitRows(int num_rows) {
 void ScannerContext::Stream::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   {
     unique_lock<mutex> l(parent_->lock_);
+    ++parent_->buffers_added_;
     if (parent_->done_) {
       // The context is done (e.g. limit reached) so this buffer can be just
       // returned.
