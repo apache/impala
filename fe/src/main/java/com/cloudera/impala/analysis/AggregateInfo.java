@@ -355,6 +355,34 @@ public class AggregateInfo {
   }
 
   /**
+   * Creates an IF function call that returns NULL if any of the slots
+   * at indexes [firstIdx, lastIdx] return NULL.
+   * For example, the resulting IF function would like this for 3 slots:
+   * IF(IsNull(slot1), NULL, IF(IsNull(slot2), NULL, slot3))
+   * Returns null if firstIdx is greater than lastIdx.
+   * Returns a SlotRef to the last slot if there is only one slot in range.
+   */
+  private Expr createCountDistinctAggExprParam(int firstIdx, int lastIdx,
+      ArrayList<SlotDescriptor> slots) {
+    if (firstIdx > lastIdx) return null;
+
+    Expr elseExpr = new SlotRef(slots.get(lastIdx));
+    if (firstIdx == lastIdx) return elseExpr;
+
+    for (int i = lastIdx - 1; i >= firstIdx; --i) {
+      ArrayList<Expr> ifArgs = Lists.newArrayList();
+      SlotRef slotRef = new SlotRef(slots.get(i));
+      // Build expr: IF(IsNull(slotRef), NULL, elseExpr)
+      Expr isNullPred = new IsNullPredicate(slotRef, false);
+      ifArgs.add(isNullPred);
+      ifArgs.add(new NullLiteral());
+      ifArgs.add(elseExpr);
+      elseExpr = new FunctionCallExpr("if", ifArgs);
+    }
+    return elseExpr;
+  }
+
+  /**
    * Create the info for an aggregation node that computes the second phase of of
    * DISTINCT aggregate functions.
    * (Refer to createDistinctAggInfo() for an explanation of the phases.)
@@ -382,8 +410,23 @@ public class AggregateInfo {
     for (AggregateExpr inputExpr: distinctAggExprs) {
       AggregateExpr aggExpr = null;
       if (inputExpr.getOp() == AggregateExpr.Operator.COUNT) {
-        // COUNT(DISTINCT ...) -> COUNT(*)
-        aggExpr = new AggregateExpr(AggregateExpr.Operator.COUNT, true, false, null);
+        // COUNT(DISTINCT ...) ->
+        // COUNT(IF(IsNull(<agg slot 1>), NULL, IF(IsNull(<agg slot 2>), NULL, ...)))
+        // We need the nested IF to make sure that we do not count
+        // column-value combinations if any of the distinct columns are NULL.
+        // This behavior is consistent with MySQL.
+        Expr ifExpr = createCountDistinctAggExprParam(origGroupingExprs.size(),
+            origGroupingExprs.size() + inputExpr.getChildren().size() - 1,
+            inputDesc.getSlots());
+        Preconditions.checkNotNull(ifExpr);
+        try {
+          ifExpr.analyze(analyzer);
+        } catch (AnalysisException e) {
+          throw new InternalException("Failed to analyze 'IF' function " +
+              "in second phase count distinct aggregation.", e);
+        }
+        aggExpr = new AggregateExpr(AggregateExpr.Operator.COUNT, false, false,
+            Lists.newArrayList(ifExpr));
       } else {
         // SUM(DISTINCT <expr>) -> SUM(<last grouping slot>);
         // (MIN(DISTINCT ...) and MAX(DISTINCT ...) have their DISTINCT turned

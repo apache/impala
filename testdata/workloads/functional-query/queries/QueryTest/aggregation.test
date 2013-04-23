@@ -839,15 +839,9 @@ bigint, NULL, NULL, NULL, double
 ====
 ---- QUERY
 # Test ignored distinct in MIN and MAX with NULLs
+select min(distinct NULL), max(distinct NULL) from alltypesagg
 ---- TYPES
 NULL, NULL
 ---- RESULTS
 NULL,NULL
----- QUERY
-# TODO: Fix count(distinct null) to return 0 instead of 1
-select count(distinct NULL) from alltypesagg
----- TYPES
-bigint
----- RESULTS
-1
 ====

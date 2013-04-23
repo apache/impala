@@ -540,7 +540,7 @@ Plan Fragment 0
   LIMIT: 10
   TUPLE IDS: 3 
     AGGREGATE
-    OUTPUT: COUNT(*)
+    OUTPUT: COUNT(<slot 7>)
     GROUP BY: <slot 6>
     TUPLE IDS: 3 
       AGGREGATE
@@ -579,7 +579,7 @@ Plan Fragment 1
   LIMIT: 10
   TUPLE IDS: 3 
     AGGREGATE
-    OUTPUT: COUNT(*)
+    OUTPUT: COUNT(<slot 7>)
     GROUP BY: <slot 6>
     TUPLE IDS: 3 
       AGGREGATE
@@ -2576,7 +2576,7 @@ Plan Fragment 0
   LIMIT: 1000
   TUPLE IDS: 3 
     AGGREGATE
-    OUTPUT: COUNT(*)
+    OUTPUT: COUNT(<slot 11>)
     GROUP BY: <slot 8>, <slot 9>, <slot 10>
     TUPLE IDS: 3 
       AGGREGATE
@@ -2607,7 +2607,7 @@ Plan Fragment 1
   LIMIT: 1000
   TUPLE IDS: 3 
     AGGREGATE
-    OUTPUT: COUNT(*)
+    OUTPUT: COUNT(<slot 11>)
     GROUP BY: <slot 8>, <slot 9>, <slot 10>
     TUPLE IDS: 3 
       AGGREGATE

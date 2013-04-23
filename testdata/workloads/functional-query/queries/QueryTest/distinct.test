@@ -6,7 +6,7 @@ from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
-100
+90
 ====
 ---- QUERY
 select count(distinct bool_col)
@@ -22,7 +22,7 @@ from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
-1000
+999
 ====
 ---- QUERY
 select count(distinct float_col)
@@ -30,7 +30,7 @@ from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
-1000
+999
 ====
 ---- QUERY
 select count(distinct double_col)
@@ -38,7 +38,7 @@ from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
-1000
+999
 ====
 ---- QUERY
 select count(distinct string_col)
@@ -49,12 +49,12 @@ bigint
 1000
 ====
 ---- QUERY
-select count(distinct string_col)
+select count(distinct date_string_col)
 from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
-1000
+10
 ====
 ---- QUERY
 select count(distinct timestamp_col)
@@ -80,7 +80,7 @@ tinyint, bigint, bigint
 7,10,1000
 8,10,1000
 9,10,1000
-NULL,10,900
+NULL,9,900
 ====
 ---- QUERY
 # count(distinct) w/ grouping and non-distinct count()
@@ -98,7 +98,7 @@ tinyint, bigint, bigint
 7,100,1000
 8,100,1000
 9,100,1000
-NULL,100,900
+NULL,90,900
 ====
 ---- QUERY
 # count(distinct) and sum(distinct) w/ grouping and non-distinct count()
@@ -117,7 +117,7 @@ tinyint, bigint, bigint, bigint
 7,10,520,1000
 8,10,530,1000
 9,10,540,1000
-NULL,10,450,900
+NULL,9,450,900
 ====
 ---- QUERY
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
@@ -137,7 +137,7 @@ tinyint, bigint, bigint, bigint, int, float
 7,10,520,1000,7,1096.699951171875
 8,10,530,1000,8,1097.800048828125
 9,10,540,1000,9,1098.900024414062
-NULL,10,450,900,10,1089
+NULL,9,450,900,10,1089
 ====
 ---- QUERY
 # count distinct order by the same agg expr
@@ -202,4 +202,73 @@ true,4
 true,6
 true,8
 true,NULL
+====
+---- QUERY
+# test count distinct with nulls w/o groupby
+select count(distinct NULL) from alltypesagg
+---- TYPES
+bigint
+---- RESULTS
+0
+====
+---- QUERY
+# test count distinct with nulls w/o groupby
+select count(distinct int_col, NULL) from alltypesagg
+---- TYPES
+bigint
+---- RESULTS
+0
+====
+---- QUERY
+# test count distinct with nulls and groupby
+select tinyint_col, count(distinct NULL) from alltypesagg group by tinyint_col
+order by tinyint_col limit 10
+---- TYPES
+tinyint, bigint
+---- RESULTS
+1,0
+2,0
+3,0
+4,0
+5,0
+6,0
+7,0
+8,0
+9,0
+NULL,0
+====
+---- QUERY
+select tinyint_col, count(distinct int_col, NULL) from alltypesagg group by tinyint_col
+order by tinyint_col limit 10
+---- TYPES
+tinyint, bigint
+---- RESULTS
+1,0
+2,0
+3,0
+4,0
+5,0
+6,0
+7,0
+8,0
+9,0
+NULL,0
+====
+---- QUERY
+# make sure we still return the NULL group even though NULLs are not added to COUNT
+select tinyint_col, count(distinct tinyint_col, NULL) from alltypesagg group by tinyint_col
+order by tinyint_col limit 10
+---- TYPES
+tinyint, bigint
+---- RESULTS
+1,0
+2,0
+3,0
+4,0
+5,0
+6,0
+7,0
+8,0
+9,0
+NULL,0
 ====

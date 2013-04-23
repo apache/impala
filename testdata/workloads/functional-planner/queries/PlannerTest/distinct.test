@@ -97,7 +97,7 @@ from functional.testtbl
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
-  OUTPUT: COUNT(*)
+  OUTPUT: COUNT(if(<slot 2> IS NULL, NULL, <slot 3>))
   GROUP BY: 
   TUPLE IDS: 2 
     AGGREGATE
@@ -123,7 +123,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   AGGREGATE
-  OUTPUT: COUNT(*)
+  OUTPUT: COUNT(if(<slot 2> IS NULL, NULL, <slot 3>))
   GROUP BY: 
   TUPLE IDS: 2 
     AGGREGATE
@@ -156,7 +156,7 @@ group by 1
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
-  OUTPUT: COUNT(*)
+  OUTPUT: COUNT(if(<slot 4> IS NULL, NULL, <slot 5>))
   GROUP BY: <slot 3>
   TUPLE IDS: 2 
     AGGREGATE
@@ -178,7 +178,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   AGGREGATE
-  OUTPUT: COUNT(*)
+  OUTPUT: COUNT(if(<slot 4> IS NULL, NULL, <slot 5>))
   GROUP BY: <slot 3>
   TUPLE IDS: 2 
     AGGREGATE
@@ -231,7 +231,7 @@ group by 1
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
-  OUTPUT: COUNT(*), SUM(<slot 3>)
+  OUTPUT: COUNT(<slot 3>), SUM(<slot 3>)
   GROUP BY: <slot 2>
   TUPLE IDS: 2 
     AGGREGATE
@@ -253,7 +253,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   AGGREGATE
-  OUTPUT: COUNT(*), SUM(<slot 3>)
+  OUTPUT: COUNT(<slot 3>), SUM(<slot 3>)
   GROUP BY: <slot 2>
   TUPLE IDS: 2 
     AGGREGATE
@@ -307,7 +307,7 @@ from functional.alltypesagg group by 1
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
-  OUTPUT: COUNT(*), MIN(<slot 6>), MAX(<slot 7>)
+  OUTPUT: COUNT(<slot 5>), MIN(<slot 6>), MAX(<slot 7>)
   GROUP BY: <slot 4>
   TUPLE IDS: 2 
     AGGREGATE
@@ -329,7 +329,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   AGGREGATE
-  OUTPUT: COUNT(*), MIN(<slot 6>), MAX(<slot 7>)
+  OUTPUT: COUNT(<slot 5>), MIN(<slot 6>), MAX(<slot 7>)
   GROUP BY: <slot 4>
   TUPLE IDS: 2 
     AGGREGATE
@@ -382,7 +382,7 @@ from functional.alltypesagg group by 1
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
-  OUTPUT: COUNT(*), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
+  OUTPUT: COUNT(<slot 5>), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
   GROUP BY: <slot 4>
   TUPLE IDS: 2 
     AGGREGATE
@@ -404,7 +404,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   AGGREGATE
-  OUTPUT: COUNT(*), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
+  OUTPUT: COUNT(<slot 5>), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
   GROUP BY: <slot 4>
   TUPLE IDS: 2 
     AGGREGATE
