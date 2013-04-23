@@ -356,11 +356,9 @@ class RuntimeProfile {
   // Same as 'AddSamplingCounter' above except the samples are taken by calling fn.
   Counter* AddSamplingCounter(const std::string&name, SampleFn fn);
 
-  // Add a bucket of counters to store the sampled value of src_counter.
+  // Register a bucket of counters to store the sampled value of src_counter.
   // The src_counter is sampled periodically and the buckets are updated.
-  void AddBucketingCounters(const std::string& name,
-      const std::string& parent_counter_name, Counter* src_counter,
-      int max_buckets, std::vector<Counter*>* buckets);
+  void RegisterBucketingCounters(Counter* src_counter, std::vector<Counter*>* buckets);
 
   // Stops updating the value of 'rate_counter'. Rate counters are updated
   // periodically so should be removed as soon as the underlying counter is

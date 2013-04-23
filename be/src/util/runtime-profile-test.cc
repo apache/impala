@@ -327,7 +327,9 @@ TEST(CountersTest, BucketCounters) {
 
   // Create the bucket counters and start sampling
   vector<RuntimeProfile::Counter*> buckets;
-  profile.AddBucketingCounters("BucketCounters", "", unit_counter, 2, &buckets);
+  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
+  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
+  profile.RegisterBucketingCounters(unit_counter, &buckets);
 
   // Wait two seconds.
   sleep(2);

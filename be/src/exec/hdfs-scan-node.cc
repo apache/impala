@@ -475,9 +475,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
   average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
-  runtime_profile()->AddBucketingCounters(HDFS_READ_THREAD_CONCURRENCY_BUCKET,
-      AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_,
-      state->io_mgr()->num_disks() + 1, &hdfs_read_thread_concurrency_bucket_);
+
+  // Create num_disks+1 bucket counters
+  for (int i = 0; i < state->io_mgr()->num_disks() + 1; ++i) {
+    hdfs_read_thread_concurrency_bucket_.push_back(
+        pool_->Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
+  }
+  runtime_profile()->RegisterBucketingCounters(&active_hdfs_read_thread_counter_,
+      &hdfs_read_thread_concurrency_bucket_);
 
   int total_splits = 0;
   // Walk all the files on this node and coalesce all the files with the same
@@ -907,6 +912,14 @@ void HdfsScanNode::UpdateCounters() {
   runtime_profile()->StopBucketingCountersUpdates(&hdfs_read_thread_concurrency_bucket_,
       true);
 
+  // Output hdfs read thread concurrency into info string
+  stringstream ss;
+  for (int i = 0; i < hdfs_read_thread_concurrency_bucket_.size(); ++i) {
+    ss << i << ":" << setprecision(4) 
+       << hdfs_read_thread_concurrency_bucket_[i]->double_value() << "% ";
+  }
+  runtime_profile_->AddInfoString("Hdfs Read Thread Concurrency Bucket", ss.str());
+
   // Convert disk access bitmap to num of disk accessed
   uint64_t num_disk_bitmap = disks_accessed_bitmap_.value();
   int64_t num_disk_accessed = BitUtil::Popcount(num_disk_bitmap);
@@ -925,7 +938,7 @@ void HdfsScanNode::UpdateCounters() {
   }
   
   // Output fraction of scanners with codegen enabled
-  stringstream ss;
+  ss.str(std::string()); 
   ss << "Codegen enabled: " << num_scanners_codegen_enabled_ << " out of "
      << (num_scanners_codegen_enabled_ + num_scanners_codegen_disabled_);
   AddRuntimeExecOption(ss.str());

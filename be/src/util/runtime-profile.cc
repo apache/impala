@@ -666,18 +666,11 @@ RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
   return dst_counter;
 }
 
-void RuntimeProfile::AddBucketingCounters(const string& name,
-    const string& parent_counter_name, Counter* src_counter,
-    int num_buckets, vector<Counter*>* buckets) {
+void RuntimeProfile::RegisterBucketingCounters(Counter* src_counter,
+    vector<Counter*>* buckets) {
   {
     lock_guard<mutex> l(counter_map_lock_);
     bucketing_counters_.insert(buckets);
-  }
-  for (int i = 0; i < num_buckets; ++i) {
-    stringstream counter_name;
-    counter_name << name << "=" << i;
-    buckets->push_back(AddCounter(counter_name.str(), TCounterType::DOUBLE_VALUE,
-        parent_counter_name));
   }
 
   lock_guard<mutex> l(periodic_counter_update_state_.lock);

@@ -41,8 +41,6 @@ const string ScanNode::AVERAGE_IO_MGR_QUEUE_SIZE =
     "AverageIoMgrQueueSize";
 const string ScanNode::AVERAGE_HDFS_READ_THREAD_CONCURRENCY =
     "AverageHdfsReadThreadConcurrency";
-const string ScanNode::HDFS_READ_THREAD_CONCURRENCY_BUCKET =
-    "HdfsReadThreadConcurrencyCountPercentage";
 
 Status ScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
