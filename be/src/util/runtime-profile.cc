@@ -220,9 +220,9 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       InfoStrings::iterator existing = info_strings_.find(key);
       if (existing == info_strings_.end()) {
         info_strings_.insert(make_pair(key, it->second));
+        info_strings_display_order_.push_back(key);
       } else {
         info_strings_[key] = it->second;
-        info_strings_display_order_.push_back(key);
       }
     }
   }
