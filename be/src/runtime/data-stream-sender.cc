@@ -310,6 +310,12 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
                     sink.dest_node_id, per_channel_buffer_size));
   }
 
+  if (broadcast_) {
+    // Randomize the order we open/transmit to channels to avoid thundering herd problems.
+    srand(reinterpret_cast<uint64_t>(this));
+    random_shuffle(channels_.begin(), channels_.end());
+  }
+
   if (sink.output_partition.type == TPartitionType::HASH_PARTITIONED) {
     // TODO: move this to Init()? would need to save 'sink' somewhere
     Status status =
