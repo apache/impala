@@ -880,8 +880,7 @@ def parse_query_text(query_text):
 def strip_comments_from_query(query):
   """Strip comments from an individual query """
   #TODO: Make query format configurable by the user.
-  return sqlparse.format(query, strip_comments=True,
-                         reindent=True, indent_tabs=True)
+  return sqlparse.format(query, strip_comments=True, reindent=True)
 
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
