@@ -19,6 +19,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/mem-limit.h"
 #include "util/debug-util.h"
+#include "util/impalad-metrics.h"
 
 using namespace impala;
 using namespace llvm;
@@ -56,6 +57,7 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
 
   nodes_capacity_ = 1024;
   nodes_ = reinterpret_cast<uint8_t*>(malloc(nodes_capacity_ * node_byte_size_));
+  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(nodes_capacity_ * node_byte_size_);
 
   // update mem_limits_
   MemLimit::UpdateLimits(num_buckets * sizeof(Bucket), &mem_limits_);
@@ -68,6 +70,7 @@ HashTable::~HashTable() {
   delete[] expr_values_buffer_;
   delete[] expr_value_null_bits_;
   free(nodes_);
+  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-nodes_capacity_ * node_byte_size_);
   MemLimit::UpdateLimits(-1 * nodes_capacity_ * node_byte_size_, &mem_limits_);
   MemLimit::UpdateLimits(-1 * buckets_.size() * sizeof(Bucket), &mem_limits_);
 }
@@ -613,6 +616,7 @@ void HashTable::GrowNodeArray() {
   nodes_capacity_ = nodes_capacity_ + nodes_capacity_ / 2;
   int64_t new_size = nodes_capacity_ * node_byte_size_;
   nodes_ = reinterpret_cast<uint8_t*>(realloc(nodes_, new_size));
+  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(new_size - old_size);
   MemLimit::UpdateLimits(new_size - old_size, &mem_limits_);
   exceeded_limit_ = MemLimit::LimitExceeded(mem_limits_);
 }

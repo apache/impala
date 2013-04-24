@@ -91,10 +91,10 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
   unique_lock<mutex> l(lock_);
   if (is_cancelled_) return;
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
-  RowBatch* batch = NULL;
+  auto_ptr<RowBatch> batch;
   {
     SCOPED_TIMER(deserialize_row_batch_timer_);
-    batch = new RowBatch(row_desc_, thrift_batch);
+    batch.reset(new RowBatch(row_desc_, thrift_batch));
   }
   COUNTER_UPDATE(bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
@@ -147,7 +147,7 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
 
   VLOG_ROW << "added #rows=" << batch->num_rows()
            << " batch_size=" << batch_size << "\n";
-  batch_queue_.push_back(make_pair(batch_size, batch));
+  batch_queue_.push_back(make_pair(batch_size, batch.release()));
   num_buffered_bytes_ += batch_size;
   data_arrival_.notify_one();
 }

@@ -20,6 +20,8 @@
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 
+#include "util/impalad-metrics.h"
+
 using namespace impala;
 using namespace std;
 using namespace boost;

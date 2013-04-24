@@ -18,11 +18,14 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <boost/algorithm/string.hpp>
+#include <boost/bind.hpp>
 #include <google/malloc_extension.h>
 
 #include "common/logging.h"
-#include "util/webserver.h"
+#include "runtime/mem-limit.h"
+#include "util/debug-util.h"
 #include "util/logging.h"
+#include "util/webserver.h"
 
 using namespace std;
 using namespace google;
@@ -66,22 +69,35 @@ void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
 }
 
 // Registered to handle "/memz", and prints out memory allocation statistics.
-void MemUsageHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args, 
+    stringstream* output) {
+  if (mem_limit != NULL) {
+    (*output) << "<pre>"
+              << "Mem Limit: " 
+              << PrettyPrinter::Print(mem_limit->limit(), TCounterType::BYTES) 
+              << endl
+              << "Mem Consumption: " 
+              << PrettyPrinter::Print(mem_limit->consumption(), TCounterType::BYTES) 
+              << endl
+              << "</pre>";
+  }
+
+  (*output) << "<pre>";
 #ifdef ADDRESS_SANITIZER
   (*output) << "Memory tracking is not available with address sanitizer builds.";
 #else
-  (*output) << "<pre>";
   char buf[2048];
   MallocExtension::instance()->GetStats(buf, 2048);
   // Replace new lines with <br> for html
   string tmp(buf);
   replace_all(tmp, "\n", "<br>");
-  (*output) << tmp << "</pre>";
 #endif
+  (*output) << tmp << "</pre>";
 }
 
-void impala::AddDefaultPathHandlers(Webserver* webserver) {
+void impala::AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit) {
   webserver->RegisterPathHandler("/logs", LogsHandler);
   webserver->RegisterPathHandler("/varz", FlagsHandler);
-  webserver->RegisterPathHandler("/memz", MemUsageHandler);
+  webserver->RegisterPathHandler("/memz",
+      bind<void>(&MemUsageHandler, process_mem_limit, _1, _2));
 }

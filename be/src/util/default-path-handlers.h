@@ -15,13 +15,16 @@
 #ifndef IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
 #define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
 
+#include <stdio.h>
+
 namespace impala {
 
+class MemLimit;
 class Webserver;
 
 // Adds a set of default path handlers to the webserver to display
 // logs and configuration flags
-void AddDefaultPathHandlers(Webserver* webserver);
+void AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit = NULL);
 }
 
 #endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

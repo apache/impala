@@ -40,6 +40,8 @@ const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID =
     "impala-server.scan-ranges.num-missing-volume-id";
 const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES =
     "impala-server.mem-pool.total-bytes";
+const char* ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES =
+    "impala-server.hash-table.total-bytes";
 const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
 const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
@@ -57,6 +59,7 @@ Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
 Metrics::IntMetric* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
+Metrics::IntMetric* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
@@ -85,6 +88,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize memory usage metrics
   MEM_POOL_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L);
+  HASH_TABLE_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L);
 
   // Initialize IO mgr metrics
   IO_MGR_NUM_OPEN_FILES = m->CreateAndRegisterPrimitiveMetric(
