@@ -26,17 +26,20 @@ using namespace boost;
 using namespace boost::assign;
 using namespace impala;
 
-const char* const Codec::DEFAULT_COMPRESSION =
-     "org.apache.hadoop.io.compress.DefaultCodec";
+const char* const Codec::DEFAULT_COMPRESSION = 
+    "org.apache.hadoop.io.compress.DefaultCodec";
 
 const char* const Codec::GZIP_COMPRESSION =
-     "org.apache.hadoop.io.compress.GzipCodec";
+    "org.apache.hadoop.io.compress.GzipCodec";
 
 const char* const Codec::BZIP2_COMPRESSION =
-     "org.apache.hadoop.io.compress.BZip2Codec";
+    "org.apache.hadoop.io.compress.BZip2Codec";
 
 const char* const Codec::SNAPPY_COMPRESSION =
-     "org.apache.hadoop.io.compress.SnappyCodec";
+    "org.apache.hadoop.io.compress.SnappyCodec";
+
+const char* const UNKNOWN_CODEC_ERROR =
+    "This compression codec is currently unsupported: ";
 
 const Codec::CodecMap Codec::CODEC_MAP = map_list_of
   ("", THdfsCompression::NONE)
@@ -63,7 +66,7 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 
   if (type == CODEC_MAP.end()) {
     stringstream ss;
-    ss << "Unknown Codec: " << codec;
+    ss << UNKNOWN_CODEC_ERROR << codec;
     return Status(ss.str());
   }
   Codec* comp;
@@ -121,7 +124,7 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 
   if (type == CODEC_MAP.end()) {
     stringstream ss;
-    ss << "Unknown Codec: " << codec;
+    ss << UNKNOWN_CODEC_ERROR << codec;
     return Status(ss.str());
   }
   Codec* decom;
