@@ -80,6 +80,10 @@ void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args,
               << PrettyPrinter::Print(mem_limit->consumption(), TCounterType::BYTES) 
               << endl
               << "</pre>";
+  } else {
+    (*output) << "<pre>"
+              << "No process memory limit set."
+              << "</pre>";
   }
 
   (*output) << "<pre>";
