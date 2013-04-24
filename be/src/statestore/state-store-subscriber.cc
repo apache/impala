@@ -115,7 +115,17 @@ Status StateStoreSubscriber::Register() {
   request.subscriber_location = heartbeat_address_;
   request.subscriber_id = subscriber_id_;
   TRegisterSubscriberResponse response;
-  client->RegisterSubscriber(response, request);
+  try {
+    client->RegisterSubscriber(response, request);
+  } catch (apache::thrift::transport::TTransportException& e) {
+    // Client may have been closed due to a failure
+    RETURN_IF_ERROR(client.Reopen());
+    try {
+      client->RegisterSubscriber(response, request);
+    } catch (apache::thrift::transport::TTransportException& e) {
+      return Status(e.what());
+    }
+  }
   Status status = Status(response.status);
   if (status.ok()) connected_to_statestore_metric_->Update(true);
   heartbeat_interval_timer_.Start();
