@@ -64,9 +64,6 @@ class ImpaladMetricKeys {
   
   // Number of IO buffers that are currently unused (and can be GC'ed)
   static const char* IO_MGR_NUM_UNUSED_BUFFERS;
-
-  // Process wide mem limit (static)
-  static const char* PROCESS_MEM_LIMIT;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
