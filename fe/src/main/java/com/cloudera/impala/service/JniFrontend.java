@@ -16,6 +16,7 @@ package com.cloudera.impala.service;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidObjectException;
 import java.net.URL;
@@ -28,6 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -433,14 +435,16 @@ public class JniFrontend {
     CdhVersion guessedCdhVersion = guessCdhVersionFromNnWebUi();
     CdhVersion cdh41 = new CdhVersion("4.1");
     CdhVersion cdh42 = new CdhVersion("4.2");
+    StringBuilder output = new StringBuilder();
+
+    output.append(checkFileSystem(CONF));
 
     if (guessedCdhVersion == null) {
-      // Do not run any check because we cannot determine the CDH version
+      // Do not run any additional checks because we cannot determine the CDH version
       LOG.warn("Cannot detect CDH version. Skipping Hadoop configuration checks");
-      return "";
+      return output.toString();
     }
 
-    StringBuilder output = new StringBuilder();
     if (guessedCdhVersion.compareTo(cdh41) == 0) {
       output.append(checkShortCircuitReadCdh41(CONF));
     } else if (guessedCdhVersion.compareTo(cdh42) >= 0) {
@@ -685,6 +689,27 @@ public class JniFrontend {
     }
 
     return output.toString();
+  }
+
+  /**
+   * Return an empty string if the FileSystem configured in CONF refers to a
+   * DistributedFileSystem (the only one supported by Impala). Otherwise, return an error
+   * string describing the issues.
+   */
+  private String checkFileSystem(Configuration conf) {
+    try {
+      FileSystem fs = FileSystem.get(CONF);
+      if (!(fs instanceof DistributedFileSystem)) {
+        return "Unsupported file system. Impala only supports DistributedFileSystem " +
+        		"but the " + fs.getClass().getSimpleName() + " was found. " +
+            CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
+            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
+            " might be set incorrectly";
+      }
+    } catch (IOException e) {
+      return "couldn't retrieve FileSystem:\n" + e.getMessage();
+    }
+    return "";
   }
 
   public void resetTable(String dbName, String tableName) throws ImpalaException {
