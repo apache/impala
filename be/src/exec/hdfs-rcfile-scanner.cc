@@ -59,35 +59,40 @@ HdfsRCFileScanner::~HdfsRCFileScanner() {
 
 Status HdfsRCFileScanner::Prepare() {
   RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
-
   text_converter_.reset(new TextConverter(0));
-
-  // Allocate the buffers for the key information that is used to read and decode
-  // the column data.
-  num_cols_ = scan_node_->num_cols() - scan_node_->num_partition_keys();
-  columns_.resize(num_cols_);
-  for (int i = 0; i < columns_.size(); ++i) {
-    int col_idx = i + scan_node_->num_partition_keys();
-    columns_[i].materialize_column =
-        scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
-  }
   scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }
 
 Status HdfsRCFileScanner::InitNewRange() {
   DCHECK(header_ != NULL);
-  
+
   only_parsing_header_ = false;
-  
+
   row_group_buffer_size_ = 0;
 
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         data_buffer_pool_.get(), stream_->compact_data(),
         header_->codec, &decompressor_));
-  } 
-  
+  }
+
+  // Allocate the buffers for the key information that is used to read and decode
+  // the column data.
+  columns_.resize(reinterpret_cast<RcFileHeader*>(header_)->num_cols);
+  num_cols_ = columns_.size();
+  int num_table_cols = scan_node_->num_cols() - scan_node_->num_partition_keys();
+  DCHECK_GE(num_cols_, num_table_cols);
+  for (int i = 0; i < num_table_cols; ++i) {
+    int col_idx = i + scan_node_->num_partition_keys();
+    columns_[i].materialize_column =
+        scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
+  }
+  // Treat columns not found in table metadata as extra unmaterialized columns
+  for (int i = num_table_cols; i < num_cols_; ++i) {
+    columns_[i].materialize_column = false;
+  }
+
   // TODO: Initialize codegen fn here
   return Status::OK;
 }
@@ -197,10 +202,14 @@ Status HdfsRCFileScanner::VerifyNumColumnsMetadata() {
         !memcmp(key, HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS, key_len)) {
       string tmp(reinterpret_cast<char*>(value), value_len);
       int file_num_cols = atoi(tmp.c_str());
-      if (file_num_cols != num_cols_) {
+      int table_num_cols = scan_node_->num_cols() - scan_node_->num_partition_keys();
+      if (file_num_cols >= table_num_cols) {
+        RcFileHeader* rc_header = reinterpret_cast<RcFileHeader*>(header_);
+        rc_header->num_cols = file_num_cols;
+      } else {
         stringstream ss;
         ss << "Unexpected hive.io.rcfile.column.number value!"
-           << " Expected: " << num_cols_ << "." << " Read: " << file_num_cols;
+           << " Expected value >= " << table_num_cols << ", got " << file_num_cols;
         return Status(ss.str());
       }
     }

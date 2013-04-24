@@ -336,6 +336,10 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   struct RcFileHeader : public BaseSequenceScanner::FileHeader {
     // RC file version
     Version version;
+
+    // The number of columns in the file (may be more than the number of columns in the
+    // table metadata)
+    int num_cols;
   };
 
   // Struct encapsulating all the state for parsing a single column from a row
