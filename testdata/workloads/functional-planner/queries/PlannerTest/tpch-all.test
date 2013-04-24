@@ -2583,7 +2583,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1 
   |  
   0:SCAN HDFS
-     table=tpch.revenue #partitions=1 size=135.54KB
+     table=tpch.revenue #partitions=1 size=137.60KB
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -2613,7 +2613,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 1 
   |  
   0:SCAN HDFS
-     table=tpch.revenue #partitions=1 size=135.54KB
+     table=tpch.revenue #partitions=1 size=137.60KB
      tuple ids: 0 
 ====
 # Modifications - Added limit
@@ -2656,7 +2656,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 0 1 
   |  
   |----1:SCAN HDFS
-  |       table=tpch.revenue #partitions=1 size=135.54KB compact
+  |       table=tpch.revenue #partitions=1 size=137.60KB compact
   |       tuple ids: 1 
   |    
   0:SCAN HDFS
@@ -2727,7 +2727,7 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.revenue #partitions=1 size=135.54KB compact
+     table=tpch.revenue #partitions=1 size=137.60KB compact
      tuple ids: 1 
 ====
 # Q16 - Parts/Supplier Relation Query
@@ -3016,7 +3016,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 0 1 2 
   |  
   |----3:SCAN HDFS
-  |       table=tpch.lineitem_tmp #partitions=1 size=2.16MB compact
+  |       table=tpch.lineitem_tmp #partitions=1 size=2.18MB compact
   |       tuple ids: 2 
   |    
   2:HASH JOIN
@@ -3088,7 +3088,7 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.lineitem_tmp #partitions=1 size=2.16MB compact
+     table=tpch.lineitem_tmp #partitions=1 size=2.18MB compact
      tuple ids: 2 
 
 PLAN FRAGMENT 3
