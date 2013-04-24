@@ -70,7 +70,7 @@ class Status {
   }
 
   // c'tor for internal error
-  Status(const std::string& error_msg);
+  Status(const std::string& error_msg, bool quiet=false);
 
   ~Status() {
     if (error_detail_ != NULL) delete error_detail_;

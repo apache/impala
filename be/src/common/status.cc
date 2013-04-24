@@ -37,9 +37,9 @@ Status::ErrorDetail::ErrorDetail(const TStatus& status)
   DCHECK_NE(error_code, TStatusCode::OK);
 }
 
-Status::Status(const string& error_msg) 
+Status::Status(const string& error_msg, bool quiet)
   : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
-  VLOG(1) << error_msg << endl << GetStackTrace();
+  if (!quiet) VLOG(1) << error_msg << endl << GetStackTrace();
 }
 
 Status::Status(const TStatus& status)

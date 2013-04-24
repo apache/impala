@@ -67,7 +67,11 @@ inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status*
   bool dummy_eos;
   RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, &dummy_eos, status));
   if (UNLIKELY(length != bytes_read)) {
-    *status = Status("incomplete read");
+    // We currently get many spurious incomplete reads when scanners try to read off the
+    // end of the file. Mark as quiet for now to prevent log spew.
+    // TODO: prevent scanners from reading off the end of the file and set quiet back to
+    // false.
+    *status = Status("incomplete read", /* quiet */ true);
     return false;
   }
   return true;
@@ -81,7 +85,7 @@ inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
   bool dummy_eos;
   RETURN_IF_FALSE(GetBytes(length, &dummy_buf, &bytes_read, &dummy_eos, status));
   if (UNLIKELY(length != bytes_read)) {
-    *status = Status("incomplete read");
+    *status = Status("incomplete read", /* quiet */ true);
     return false;
   }
   return true;
