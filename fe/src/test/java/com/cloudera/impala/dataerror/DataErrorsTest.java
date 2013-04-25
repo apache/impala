@@ -20,9 +20,6 @@ public class DataErrorsTest extends BaseQueryTest {
     List<TableFormat> target_formats = Lists.newArrayList();
     target_formats.addAll(ALL_TABLE_FORMATS);
     target_formats.remove(TableFormat.PARQUET);
-    // TODO: Temporarily disable running this test against RC and SEQ due to IMPALA-315
-    target_formats.remove(TableFormat.RCFILE);
-    target_formats.remove(TableFormat.SEQUENCEFILE);
     runPairTestFile("hdfs-scan-node-errors", true, 10, target_formats,
         ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
 

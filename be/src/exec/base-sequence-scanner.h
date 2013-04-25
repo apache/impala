@@ -48,8 +48,8 @@ class BaseSequenceScanner : public HdfsScanner {
   // Size of the sync hash field.
   const static int SYNC_HASH_SIZE = 16;
 
-  // Data that is shared between scan ranges of the same file.  The subclass is
-  // responsible for filling in all these fields in ReadFileHeader unless otherwise noted.
+  // Data that is shared between scan ranges of the same file.  The subclass is 
+  // responsible for filling in all these fields in ReadFileHeader
   struct FileHeader {
     // The sync hash for this file.
     uint8_t sync[SYNC_HASH_SIZE];
@@ -65,9 +65,6 @@ class BaseSequenceScanner : public HdfsScanner {
 
     // Byte size of header
     int64_t header_size;
-
-    // This file's descriptor. Set by BaseSequenceScanner.
-    HdfsFileDesc* file_desc;
   };
   
   // Subclasses must implement these functions.  The order for calls will be

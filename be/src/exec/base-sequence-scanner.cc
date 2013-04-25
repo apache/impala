@@ -94,7 +94,6 @@ Status BaseSequenceScanner::ProcessSplit(ScannerContext* context) {
       CloseFileRanges(stream_->filename());
       return Status::OK;
     }
-    header_->file_desc = scan_node_->GetFileDesc(stream_->filename());
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
     scan_node_->SetFileMetadata(stream_->filename(), header_);
@@ -136,15 +135,17 @@ Status BaseSequenceScanner::ProcessSplit(ScannerContext* context) {
 
     // Catch errors from file format parsing.  We call some utilities
     // that do not log errors so generate a reasonable message.
-    // TODO: We're ignoring errors at eof since they're likely a spurious "incomplete
-    // read". This is not the right solution.
-    bool eof = stream_->file_offset() == header_->file_desc->file_length;
-    if (!status.ok() && eof) status = Status::OK;
-    if (!status.ok() && state_->LogHasSpace()) {
-      stringstream ss;
-      ss << "Format error in record or block header at offset " << block_start_ << ": "
-         << status.GetErrorMsg();
-      state_->LogError(ss.str());
+    if (!status.ok()) {
+      if (state_->LogHasSpace()) {
+        stringstream ss;
+        ss << "Format error in record or block header ";
+        if (stream_->eosr()) {
+          ss << "at end of file.";
+        } else {
+          ss << "at offset: "  << block_start_;
+        }
+        state_->LogError(ss.str());
+      }
     }
 
     // If no errors or we abort on error then exit loop, otherwise try to recover.
