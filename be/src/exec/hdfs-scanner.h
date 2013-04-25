@@ -138,6 +138,9 @@ class HdfsScanner {
   // be scanning and Exprs are currently not thread safe.
   std::vector<Expr*> conjuncts_mem_;
 
+  // Codegen fn to use.  NULL if codegen is not enabled for this scanner.
+  llvm::Function* codegen_fn_;
+
   // Cache of &conjuncts[0] to avoid using vector functions.
   Expr** conjuncts_;
 
@@ -259,7 +262,8 @@ class HdfsScanner {
 
   // Codegen function to replace WriteCompleteTuple. Should behave identically
   // to WriteCompleteTuple.
-  static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*);
+  static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*,
+      const std::vector<Expr*>& conjuncts);
   
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the

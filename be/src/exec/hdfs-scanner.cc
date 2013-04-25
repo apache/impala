@@ -52,6 +52,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
       context_(NULL),
+      codegen_fn_(NULL),
       conjuncts_(NULL),
       num_conjuncts_(0),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
@@ -64,6 +65,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
 }
 
 HdfsScanner::~HdfsScanner() {
+  DCHECK(codegen_fn_ == NULL);
 }
 
 Status HdfsScanner::Prepare() {
@@ -73,7 +75,8 @@ Status HdfsScanner::Prepare() {
 
 Status HdfsScanner::CreateConjunctsCopy() {
   DCHECK(conjuncts_ == NULL);
-  RETURN_IF_ERROR(scan_node_->CreateConjuncts(&conjuncts_mem_));
+  // This is only used to create copies of exprs when codegen is not available.
+  RETURN_IF_ERROR(scan_node_->CreateConjuncts(&conjuncts_mem_, true));
   if (conjuncts_mem_.size() > 0) {
     conjuncts_ = &conjuncts_mem_[0];
   }
@@ -83,9 +86,9 @@ Status HdfsScanner::CreateConjunctsCopy() {
 
 Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
-  Function* codegen_fn = scan_node_->GetCodegenFn(type);
+  codegen_fn_ = scan_node_->GetCodegenFn(type);
   
-  if (codegen_fn == NULL) {
+  if (codegen_fn_ == NULL) {
     scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK;
   }
@@ -98,7 +101,7 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
   }
 
   write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
-      state_->llvm_codegen()->JitFunction(codegen_fn));
+      state_->llvm_codegen()->JitFunction(codegen_fn_));
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id() 
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();
@@ -253,7 +256,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   ret i1 false
 // }
 Function* HdfsScanner::CodegenWriteCompleteTuple(
-      HdfsScanNode* node, LlvmCodeGen* codegen) {
+      HdfsScanNode* node, LlvmCodeGen* codegen, const vector<Expr*>& conjuncts) {
   SCOPED_TIMER(codegen->codegen_timer());
   // TODO: Timestamp is not yet supported
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
@@ -267,7 +270,6 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   }
 
   // Codegen for eval conjuncts
-  const vector<Expr*>& conjuncts = node->conjuncts();
   for (int i = 0; i < conjuncts.size(); ++i) {
     if (conjuncts[i]->codegen_fn() == NULL) return NULL;
     // TODO: handle cases with scratch buffer.

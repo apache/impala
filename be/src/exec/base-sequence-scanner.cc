@@ -72,6 +72,8 @@ Status BaseSequenceScanner::Close() {
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
+  scan_node_->ReleaseCodegenFn(file_format(), codegen_fn_);
+  codegen_fn_ = NULL;
   // Collect the maximum amount of memory we used to process this file.
   COUNTER_UPDATE(scan_node_->memory_used_counter(),
       data_buffer_pool_->peak_allocated_bytes());

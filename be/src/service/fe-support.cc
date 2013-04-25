@@ -65,7 +65,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   Expr* e;
   THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,
                      JniUtil::internal_exc_class(), result_bytes);
-  THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor(), true), env,
+  THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
                      JniUtil::internal_exc_class(), result_bytes);
 
   TColumnValue val;

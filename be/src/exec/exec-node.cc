@@ -52,6 +52,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
   : id_(tnode.node_id),
     type_(tnode.node_type),
     pool_(pool),
+    codegend_conjuncts_thread_safe_(true),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
     debug_phase_(TExecNodePhase::INVALID),
     debug_action_(TDebugAction::WAIT),
@@ -246,7 +247,8 @@ void ExecNode::DebugString(int indentation_level, stringstream* out) const {
 
 Status ExecNode::PrepareConjuncts(RuntimeState* state) {
   for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(*i, state, row_desc()));
+    RETURN_IF_ERROR(
+        Expr::Prepare(*i, state, row_desc(), false, &codegend_conjuncts_thread_safe_));
   }
   return Status::OK;
 }

@@ -50,10 +50,11 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 // TODO: sequence file scanner needs to be split into a cross compiled ir file,
 // probably just for the block compressed path.  WriteCompleteTuple should be 
 // injected into that function.
-Function* HdfsSequenceScanner::Codegen(HdfsScanNode* node) {
+Function* HdfsSequenceScanner::Codegen(HdfsScanNode* node,
+    const vector<Expr*>& conjuncts) {
   LlvmCodeGen* codegen = node->runtime_state()->llvm_codegen();
   if (codegen == NULL) return NULL;
-  Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen);
+  Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen, conjuncts);
   if (write_complete_tuple_fn == NULL) return NULL;
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
 }

@@ -38,7 +38,7 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
       &output_exprs_));
   // Prepare the exprs to run.
-  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_, true));
+  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_));
   return Status::OK;
 }
 

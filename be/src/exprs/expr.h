@@ -288,12 +288,15 @@ class Expr {
   // in the expr tree.
   // disable_codegen can be set for a particular Prepare() call to disable codegen for
   // a specific expr tree.
+  // if thread_safe != NULL, it will on return, contain whether the resulting codegen
+  // function is thread safe.
   static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc,
-      bool disable_codegen = false);
+      bool disable_codegen = true, bool* thread_safe = false);
 
   // Prepare all exprs.
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
-                        const RowDescriptor& row_desc, bool disable_codegen = false);
+                        const RowDescriptor& row_desc, bool disable_codegen = true,
+                        bool* thread_safe = NULL);
 
   // Create a new literal expr of 'type' with initial 'data'.
   // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)
@@ -407,6 +410,12 @@ class Expr {
   // Codegened IR function.  Will be NULL if this expr was not codegen'd.
   llvm::Function* codegen_fn_;
 
+  // For functions that don't currently have an explicit codegen'd version,
+  // we instead use an adapter, generic codegen fn, around the interpreted
+  // ComputeFn.
+  // Set to true if this expr or any of its children used the adapter fn.
+  bool adapter_fn_used_;
+
   // Size of scratch buffer necessary to call codegen'd compute function.
   // TODO: not implemented, always 0
   int scratch_buffer_size_;
@@ -433,6 +442,9 @@ class Expr {
   llvm::Value* CodegenCallFn(LlvmCodeGen* codegen, llvm::Function* parent,
       llvm::Function* child, llvm::BasicBlock* null_block,
       llvm::BasicBlock* not_null_block);
+
+  // Returns if the codegen function rooted at this node is thread safe.
+  bool codegend_fn_thread_safe() const;
 
  private:
   friend class ExprTest;

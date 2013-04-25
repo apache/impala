@@ -154,6 +154,13 @@ class ExecNode {
   TPlanNodeType::type type_;
   ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
+  
+  // True if the codegen'd function for 'conjuncts_' is thread safe.  If not, copies
+  // of the conjuncts_ need to be made if the conjuncts will be evaluated by multiple
+  // threads.
+  // TODO: we need to make Expr's always thread safe and this can be removed.
+  bool codegend_conjuncts_thread_safe_;
+
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
 

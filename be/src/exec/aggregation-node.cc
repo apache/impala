@@ -116,8 +116,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
-  RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc()));
-  RETURN_IF_ERROR(Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc()));
+  RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc(), false));
+  RETURN_IF_ERROR(Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc(), false));
 
   // Construct build exprs from agg_tuple_desc_
   for (int i = 0; i < probe_exprs_.size(); ++i) {
@@ -126,7 +126,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     state->obj_pool()->Add(expr);
     build_exprs_.push_back(expr);
   }
-  RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc()));
+  RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc(), false));
 
   tuple_pool_->set_limits(*state->mem_limits());
 

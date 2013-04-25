@@ -42,7 +42,7 @@ class HdfsTextScanner : public HdfsScanner {
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
 
   // Codegen writing tuples and evaluating predicates
-  static llvm::Function* Codegen(HdfsScanNode*);
+  static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
 
   static const char* LLVM_CLASS_NAME;
 

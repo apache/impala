@@ -164,14 +164,15 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   return Status::OK;
 }
 
-Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr) {
+Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) {
   // This is only used when codegen is not possible for this node.  We don't want to
   // codegen the copy of the expr.  
   // TODO: we really need to stop having to create copies of exprs
   RETURN_IF_ERROR(Expr::CreateExprTrees(runtime_state_->obj_pool(), 
       thrift_plan_node_->conjuncts, expr));
   for (int i = 0; i < expr->size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare((*expr)[i], runtime_state_, row_desc(), true));
+    RETURN_IF_ERROR(Expr::Prepare((*expr)[i], runtime_state_, row_desc(), 
+        disable_codegen));
   }
   return Status::OK;
 }
@@ -267,7 +268,29 @@ void* HdfsScanNode::GetFileMetadata(const string& filename) {
 Function* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
   CodegendFnMap::iterator it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;
-  return it->second;
+  if (codegend_conjuncts_thread_safe_) {
+    DCHECK_EQ(it->second.size(), 1);
+    return it->second.front();
+  } else {
+    unique_lock<mutex> l(codgend_fn_map_lock_);
+    // If all the codegen'd fn's are used, return NULL.  This disables codegen for
+    // this scanner.
+    if (it->second.empty()) return NULL;
+    Function* fn = it->second.front();
+    it->second.pop_front();
+    DCHECK(fn != NULL);
+    return fn;
+  }
+}
+
+void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, Function* fn) {
+  if (fn == NULL) return;
+  if (codegend_conjuncts_thread_safe_) return;
+  
+  CodegendFnMap::iterator it = codegend_fn_map_.find(type);
+  DCHECK(it != codegend_fn_map_.end());
+  unique_lock<mutex> l(codgend_fn_map_lock_);
+  it->second.push_back(fn);
 }
 
 HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
@@ -367,10 +390,32 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   // Codegen scanner specific functions
   if (state->llvm_codegen() != NULL) {
-    Function* text_fn = HdfsTextScanner::Codegen(this);
-    Function* seq_fn = HdfsSequenceScanner::Codegen(this);
-    if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT] = text_fn;
-    if (seq_fn != NULL) codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE] = seq_fn;
+    // If the codegen'd conjuncts are not thread safe, we will need to make copies of 
+    // the exprs and codegen those as well.
+    if (!codegend_conjuncts_thread_safe_) {
+      int num_copies = state->resource_pool()->num_available_threads();
+      for (int i = 0; i < num_copies; ++i) {
+        vector<Expr*> conjuncts_copy_text;
+        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_text, false));
+        Function* text_fn = HdfsTextScanner::Codegen(this, conjuncts_copy_text);
+        if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT].push_back(text_fn);
+        
+        vector<Expr*> conjuncts_copy_seq;
+        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_seq, false));
+        Function* seq_fn = HdfsSequenceScanner::Codegen(this, conjuncts_copy_seq);
+        if (seq_fn != NULL) {
+          codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
+        }
+      }
+    } else {
+      // Codegen function is thread safe, we can just use a single copy of the conjuncts
+      Function* text_fn = HdfsTextScanner::Codegen(this, conjuncts());
+      Function* seq_fn = HdfsSequenceScanner::Codegen(this, conjuncts());
+      if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT].push_back(text_fn);
+      if (seq_fn != NULL) {
+        codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
+      }
+    }
   }
   
   return Status::OK;

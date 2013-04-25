@@ -98,6 +98,7 @@ Expr::Expr(PrimitiveType type, bool is_slotref)
       type_(type),
       output_scale_(-1),
       codegen_fn_(NULL),
+      adapter_fn_used_(false),
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
 }
@@ -108,6 +109,7 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
       type_(ThriftToType(node.type)),
       output_scale_(-1),
       codegen_fn_(NULL),
+      adapter_fn_used_(false),
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
 }
@@ -508,7 +510,7 @@ Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc)
 }
 
 Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc,
-    bool disable_codegen) {
+    bool disable_codegen, bool* thread_safe) {
   RETURN_IF_ERROR(root->Prepare(state, row_desc));
   LlvmCodeGen* codegen = NULL;
   // state might be NULL when called from Expr-test
@@ -517,8 +519,19 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
   // codegen == NULL means jitting is disabled.
   if (!disable_codegen && codegen != NULL && root->IsJittable(codegen)) {
     root->CodegenExprTree(codegen);
+    if (thread_safe != NULL) {
+      *thread_safe = root->codegend_fn_thread_safe();
+    }
   }
   return Status::OK;
+}
+
+bool Expr::codegend_fn_thread_safe() const {
+  if (adapter_fn_used_) return false;
+  for (int i = 0; i < children_.size(); ++i) {
+    if (!children_[i]->codegend_fn_thread_safe()) return false;
+  }
+  return true;
 }
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
@@ -535,9 +548,10 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 }
 
 Status Expr::Prepare(const vector<Expr*>& exprs, RuntimeState* state,
-                     const RowDescriptor& row_desc, bool disable_codegen) {
+                     const RowDescriptor& row_desc, bool disable_codegen,
+                     bool* thread_safe) {
   for (int i = 0; i < exprs.size(); ++i) {
-    RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc, disable_codegen));
+    RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc, disable_codegen, thread_safe));
   }
   return Status::OK;
 }
@@ -786,8 +800,6 @@ Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
 //   ret double %4
 // }
 Function* Expr::Codegen(LlvmCodeGen* codegen) {
-  return NULL;
-#if 0
   // This results in expr trees that are not thread safe and therefore not
   // usable by the scanner threads (causes them to crash).
   // Disable this for now.
@@ -862,6 +874,6 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
       DCHECK(false);
   }
 
+  adapter_fn_used_ = true;
   return codegen->FinalizeFunction(function);
-#endif
 }

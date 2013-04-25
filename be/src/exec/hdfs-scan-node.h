@@ -119,7 +119,7 @@ class HdfsScanNode : public ScanNode {
   virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
 
   // Methods for the scanners to use
-  Status CreateConjuncts(std::vector<Expr*>* exprs);
+  Status CreateConjuncts(std::vector<Expr*>* exprs, bool disable_codegen);
 
   int limit() const { return limit_; }
 
@@ -154,9 +154,12 @@ class HdfsScanNode : public ScanNode {
     return column_idx_to_materialized_slot_idx_[col_idx];
   }
 
-  // Returns the per format codegen'd function.  Returns NULL if codegen is not
-  // possible.
+  // Returns the per format codegen'd function.  Scanners call this to get the
+  // codegen function to use.  Returns NULL if codegen should not be used.
   llvm::Function* GetCodegenFn(THdfsFileFormat::type);
+
+  // Each call to GetCodegenFn must call ReleaseCodegenFn.
+  void ReleaseCodegenFn(THdfsFileFormat::type type, llvm::Function* fn);
 
   void IncNumScannersCodegenEnabled() {
     __sync_fetch_and_add(&num_scanners_codegen_enabled_, 1);
@@ -289,9 +292,14 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
 
-  // Per scanner type codegen'd fn.  This is written to by the main thread and only
-  // read from scanner threads so does not need locks.
-  typedef std::map<THdfsFileFormat::type, llvm::Function*> CodegendFnMap;
+  // Per scanner type codegen'd fn.  If the scan node only contains conjuncts that are 
+  // thread safe, there is only one entry in the list and the function is shared by all
+  // scanners.  If the codegen'd fn is not thread safe, there is a number of these
+  // functions that are shared by the scanner threads.  The number of entries in the list
+  // is based on the maximum number of parallel scan ranges possible, which is in turn
+  // based on the number of cpu cores.
+  boost::mutex codgend_fn_map_lock_;
+  typedef std::map<THdfsFileFormat::type, std::list<llvm::Function*> > CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
   // Pool for storing allocated scanner objects.  We don't want to use the 

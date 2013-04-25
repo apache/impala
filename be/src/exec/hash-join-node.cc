@@ -95,11 +95,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
-  Expr::Prepare(build_exprs_, state, child(1)->row_desc());
-  Expr::Prepare(probe_exprs_, state, child(0)->row_desc());
+  RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, child(1)->row_desc(), false));
+  RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc(), false));
 
   // other_join_conjuncts_ are evaluated in the context of the rows produced by this node
-  Expr::Prepare(other_join_conjuncts_, state, row_descriptor_);
+  RETURN_IF_ERROR(Expr::Prepare(other_join_conjuncts_, state, row_descriptor_, false));
 
   result_tuple_row_size_ = row_descriptor_.tuple_descriptors().size() * sizeof(Tuple*);
 
