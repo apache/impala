@@ -77,8 +77,8 @@ public abstract class BaseQueryTest {
   protected static final List<CompressionFormat> ALL_COMPRESSION_FORMATS =
       ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.GZIP,
                        CompressionFormat.BZIP, CompressionFormat.SNAPPY);
-  private static final List<CompressionFormat> TREVNI_COMPRESSION_FORMATS =
-      ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.SNAPPY);
+  private static final List<CompressionFormat> PARQUET_COMPRESSION_FORMATS =
+      ImmutableList.of(CompressionFormat.SNAPPY);
   protected static final List<CompressionFormat> LZO_COMPRESSION_ONLY =
       ImmutableList.of(CompressionFormat.LZO);
   protected static final List<CompressionFormat> UNCOMPRESSED_ONLY =
@@ -94,7 +94,7 @@ public abstract class BaseQueryTest {
       ImmutableList.of(TableFormat.SEQUENCEFILE, TableFormat.SEQUENCEFILE_RECORD);
 
   protected static final List<TableFormat> INSERT_FORMATS =
-      ImmutableList.of(TableFormat.TEXT, TableFormat.TREVNI);
+      ImmutableList.of(TableFormat.TEXT, TableFormat.PARQUET);
 
   protected final static TestExecMode EXECUTION_MODE = TestExecMode.valueOf(
       System.getProperty("testExecutionMode", "reduced").toUpperCase());
@@ -129,7 +129,7 @@ public abstract class BaseQueryTest {
     RCFILE("_rc"),
     SEQUENCEFILE("_seq"),
     SEQUENCEFILE_RECORD("_seq_record"),
-    TREVNI("_trevni");
+    PARQUET("_parquet");
 
     private final String dbSuffix;
     private TableFormat(String dbSuffix) { this.dbSuffix = dbSuffix; }
@@ -363,9 +363,9 @@ public abstract class BaseQueryTest {
       return testConfiguration.getCompressionFormat() == CompressionFormat.NONE ||
           testConfiguration.getCompressionFormat() == CompressionFormat.LZO;
     }
-    if (testConfiguration.getTableFormat() == TableFormat.TREVNI){
+    if (testConfiguration.getTableFormat() == TableFormat.PARQUET){
       return testConfiguration.getCompressionFormat() == CompressionFormat.NONE ||
-          TREVNI_COMPRESSION_FORMATS.contains(testConfiguration.getCompressionFormat());
+          PARQUET_COMPRESSION_FORMATS.contains(testConfiguration.getCompressionFormat());
     }
     return true;
   }
@@ -406,8 +406,8 @@ public abstract class BaseQueryTest {
    *   sequence with block compression
    *   rcfile (uncompressed)
    *   rcfile with (block) compression (when supported)
-   *   trevni (uncompressed)
-   *   trevni compressed with either default or snappy.
+   *   parquet (uncompressed)
+   *   parquet compressed (snappy).
    * For each loop over the batch sizes we run the uncompressed case and the
    * block compression case.  Sequence record compression is special cased
    * with a pseudo base tableFormat type so we do not run the uncompressed case.

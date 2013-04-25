@@ -16,21 +16,24 @@ public class DataErrorsTest extends BaseQueryTest {
 
   @Test
   public void TestHdfsScanNodeErrors() {
-    // IMP-259: Trevni has no errors in the data
-    List<TableFormat> all_format_except_trevni = Lists.newArrayList();
-    all_format_except_trevni.addAll(ALL_TABLE_FORMATS);
-    all_format_except_trevni.remove(TableFormat.TREVNI);
-    runPairTestFile("hdfs-scan-node-errors", true, 10, all_format_except_trevni,
+    // IMP-259: Parquet has no errors in the data
+    List<TableFormat> target_formats = Lists.newArrayList();
+    target_formats.addAll(ALL_TABLE_FORMATS);
+    target_formats.remove(TableFormat.PARQUET);
+    // TODO: Temporarily disable running this test against RC and SEQ due to IMPALA-315
+    target_formats.remove(TableFormat.RCFILE);
+    target_formats.remove(TableFormat.SEQUENCEFILE);
+    runPairTestFile("hdfs-scan-node-errors", true, 10, target_formats,
         ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
 
     // IMP-250: can't use num_nodes=2
     // IMP-251: max_errors doesn't really have any effect because we cannot retrieve
     // any conversion error at this moment.
     runPairTestFile("hdfs-scan-node-errors", false, 100,
-        all_format_except_trevni, ALL_COMPRESSION_FORMATS, 
+        target_formats, ALL_COMPRESSION_FORMATS,
         ALL_BATCH_SIZES, ALL_NODES_ONLY);
     runPairTestFile("hdfs-scan-node-errors", false, 5,
-        all_format_except_trevni, ALL_COMPRESSION_FORMATS, 
+        target_formats, ALL_COMPRESSION_FORMATS,
         ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
   }
 
