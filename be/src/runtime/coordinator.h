@@ -436,8 +436,8 @@ class Coordinator {
   // backends are returned.
   Status FinalizeQuery();
 
-  // Outputs aggregate query profile summary.  This is assumed to be called at the
-  // end of a succesfully executed query.
+  // Outputs aggregate query profile summary.  This is assumed to be called at the end of
+  // a query -- remote fragments' profiles must not be updated while this is running.
   void ReportQuerySummary();
 };
 

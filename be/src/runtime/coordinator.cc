@@ -617,6 +617,7 @@ Status Coordinator::Wait() {
   if (stmt_type_ == TStmtType::DML) {
     // For DML queries, when Wait is done, the query is complete.  Report
     // Aggregate query profiles at this point.
+    // TODO: make sure ReportQuerySummary gets called on error
     ReportQuerySummary();
   }
 
@@ -942,7 +943,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   Status status(params.status);
   {
     lock_guard<mutex> l(exec_state->lock);
-    if (!status.ok() || exec_state->status.ok()) {
+    if (!status.ok()) {
       // During query cancellation, exec_state is set to CANCELLED. However, we might
       // process a non-error message from a fragment executor that is sent
       // before query cancellation is invoked. Make sure we don't go from error status to
@@ -950,10 +951,19 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       exec_state->status = status;
     }
     exec_state->done = params.done;
-    RuntimeProfile* p = RuntimeProfile::CreateFromThrift(obj_pool(), cumulative_profile);
-    stringstream str;
-    p->PrettyPrint(&str);
-    exec_state->profile->Update(cumulative_profile);
+    if (exec_state->status.ok()) {
+      // We can't update this backend's profile if ReportQuerySummary() is running,
+      // because it depends on all profiles not changing during its execution (when it
+      // calls SortChildren()). ReportQuerySummary() only gets called after
+      // WaitForAllBackends() returns or at the end of CancelRemoteFragments().
+      // WaitForAllBackends() only returns after all backends have completed (in which
+      // case we wouldn't be in this function), or when there's an error, in which case
+      // CancelRemoteFragments() is called. CancelRemoteFragments sets all exec_state's
+      // statuses to cancelled.
+      // TODO: We're losing this profile information. Call ReportQuerySummary only after
+      // all backends have completed.
+      exec_state->profile->Update(cumulative_profile);
+    }
     if (!exec_state->profile_created) {
       CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
     }
