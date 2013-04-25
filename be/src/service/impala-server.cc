@@ -685,6 +685,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   exec_env->webserver()->
       RegisterPathHandler("/query_profile", profile_callback, true, false);
 
+  Webserver::PathHandlerCallback cancel_callback =
+      bind<void>(mem_fn(&ImpalaServer::CancelQueryPathHandler), this, _1, _2);
+  exec_env->webserver()->
+      RegisterPathHandler("/cancel_query", cancel_callback, true, false);
+
   Webserver::PathHandlerCallback profile_encoded_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/query_profile_encoded",
@@ -753,6 +758,21 @@ static bool ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
     return false;
   } else {
     return ParseId(it->second, id);
+  }
+}
+
+void ImpalaServer::CancelQueryPathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
+  TUniqueId unique_id;
+  if (!ParseQueryId(args, &unique_id)) {
+    (*output) << "Invalid query id";
+    return;
+  }
+  Status status = CancelInternal(unique_id);
+  if (status.ok()) {
+    (*output) << "Query cancellation successful";
+  } else {
+    (*output) << "Error canceling query: " << status.GetErrorMsg();
   }
 }
 
@@ -879,6 +899,8 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
   // Output profile
   (*output) << "<td><a href='/query_profile?query_id=" << record.id
             << "'>Profile</a></td>";
+  (*output) << "<td><a href='/cancel_query?query_id=" << record.id
+            << "'>Cancel</a></td>";
   (*output) << "</tr>" << endl;
 }
 
@@ -899,6 +921,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << "<th>State</th>" << endl
             << "<th># rows fetched</th>" << endl
             << "<th>Profile</th>" << endl
+            << "<th>Action</th>" << endl
             << "</tr>";
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
     QueryStateRecord record(*exec_state.second);
@@ -933,6 +956,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << "<th>State</th>" << endl
             << "<th># rows fetched</th>" << endl
             << "<th>Profile</th>" << endl
+            << "<th>Action</th>" << endl
             << "</tr>";
 
   {

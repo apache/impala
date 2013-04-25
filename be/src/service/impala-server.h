@@ -557,6 +557,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void QueryProfilePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
+  // Webserver callback.  Cancels an in-flight query.
+  void CancelQueryPathHandler(const Webserver::ArgumentMap& args,
+      std::stringstream* output);
+
   // Webserver callback.  Prints the query profile as a base64 encoded object.
   void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
