@@ -200,8 +200,10 @@ public class AggregateExpr extends Expr {
       // intermediate working context, which can fit nicely in a string. Also we need
       // string so intermediate from different nodes are sent as part of the
       // thrift row batch.
-      type = PrimitiveType.STRING;
-      return;
+      // TODO: this is disabled for now.
+      //type = PrimitiveType.STRING;
+      //return;
+      throw new AnalysisException(op.toString() + " is currently not supported.");
     }
 
     if (op == Operator.AVG) {
