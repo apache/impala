@@ -786,6 +786,11 @@ Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
 //   ret double %4
 // }
 Function* Expr::Codegen(LlvmCodeGen* codegen) {
+  return NULL;
+#if 0
+  // This results in expr trees that are not thread safe and therefore not
+  // usable by the scanner threads (causes them to crash).
+  // Disable this for now.
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 
@@ -858,4 +863,5 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
   }
 
   return codegen->FinalizeFunction(function);
+#endif
 }
