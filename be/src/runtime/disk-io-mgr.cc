@@ -184,6 +184,11 @@ struct DiskIoMgr::ReaderContext {
   // will be the total number of buffers allocated for this reader.
   list<BufferDescriptor*> ready_buffers_;
   
+  // this is just ready_buffers_.size() except ready_buffers_.size() is not thread safe
+  // and we want to avoid grabbing the lock for a simple size accessor.
+  // TODO: switch to lock free list.
+  int num_ready_buffers_; 
+  
   // The number of buffers currently owned by the reader.  Only included for debugging
   // and diagnostics
   int num_buffers_in_reader_;
@@ -358,6 +363,7 @@ struct DiskIoMgr::ReaderContext {
     num_buffers_in_disk_threads_ = 0;
     num_finished_ranges_ = 0;
     num_committed_ranges_ = 0;
+    num_ready_buffers_ = 0;
     
     for (int i = 0; i < disk_states_.size(); ++i) {
       disk_states_[i].Reset();
@@ -727,6 +733,7 @@ void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
     reader->state_ = ReaderContext::Cancelled;
     
     ready_buffers_copy.swap(reader->ready_buffers_);
+    reader->num_ready_buffers_ = 0;
     reader->num_buffers_in_reader_ += ready_buffers_copy.size();
     reader->num_used_buffers_ -= ready_buffers_copy.size();
     __sync_add_and_fetch(&num_buffers_in_readers_, ready_buffers_copy.size());
@@ -798,7 +805,7 @@ int64_t DiskIoMgr::queue_capacity(ReaderContext* reader) const {
 }
 
 int64_t DiskIoMgr::queue_size(ReaderContext* reader) const {
-  return reader->ready_buffers_.size();
+  return reader->num_ready_buffers_;
 }
 
 int64_t DiskIoMgr::GetReadThroughput() {
@@ -960,8 +967,10 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
 
   // Remove the first read block from the queue and return it
   DCHECK(!reader->ready_buffers_.empty());
+  DCHECK_GT(reader->num_ready_buffers_, 0);
   *buffer = reader->ready_buffers_.front();
   reader->ready_buffers_.pop_front();
+  --reader->num_ready_buffers_;
 
   RETURN_IF_ERROR((*buffer)->status_);
 
@@ -1146,6 +1155,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   int num_committed = 0;
 
   if (num_remaining_ranges_ == 0 && !ready_buffers_.empty()) return false;
+  if (num_ready_buffers_ != ready_buffers_.size()) return false;
 
   // Set of all groups that are started
   set<ScanRangeGroup*> started_groups;
@@ -1691,6 +1701,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
 
     // Add the result to the reader's queue and notify the reader
     reader->ready_buffers_.push_back(buffer);
+    ++reader->num_ready_buffers_;
     DCHECK(reader->Validate()) << endl << reader->DebugString();
     if (reader->ready_buffers_.size() >= reader->io_buffers_quota_) {
       // We just bumped up against the quota for this reader.  This might indicate
