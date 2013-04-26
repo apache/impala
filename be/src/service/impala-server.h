@@ -785,7 +785,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
-  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
+  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
   jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
   jmethodID check_hadoop_config_id_; // JniFrontend.checkHadoopConfig()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()

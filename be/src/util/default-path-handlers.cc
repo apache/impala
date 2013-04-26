@@ -37,12 +37,36 @@ DECLARE_bool(enable_process_lifetime_heap_profiling);
 DEFINE_int64(web_log_bytes, 1024 * 1024,
     "The maximum number of bytes to display on the debug webserver's log page");
 
+// Html/Text formatting tags
+struct Tags {
+  string pre_tag, end_pre_tag, line_break, header, end_header;
+
+  // If as_text is true, set the html tags to a corresponding raw text representation.
+  Tags(bool as_text) {
+    if (as_text) {
+      pre_tag = "";
+      end_pre_tag = "\n";
+      line_break = "\n";
+      header = "";
+      end_header = "";
+    } else {
+      pre_tag = "<pre>";
+      end_pre_tag = "</pre>";
+      line_break = "<br/>";
+      header = "<h2>";
+      end_header = "</h2>";
+    }
+  }
+};
+
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
 // Note to get best performance, set GLOG_logbuflevel=-1 to prevent log buffering
 void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+  bool as_text = (args.find("raw") != args.end());
+  Tags tags(as_text);
   string logfile;
   impala::GetFullLogFilename(google::INFO, &logfile);
-  (*output) << "<h2>INFO logs</h2>" << endl;
+  (*output) << tags.header <<"INFO logs" << tags.end_header << endl;
   (*output) << "Log path is: " << logfile << endl;
 
   struct stat file_stat;
@@ -55,40 +79,45 @@ void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
     // file is likely to be small, this is unlikely to be an issue in
     // practice.
     log.seekg(seekpos);
-    (*output) << "<br/>Showing last " << FLAGS_web_log_bytes << " bytes of log" << endl;
-    (*output) << "<br/><pre>" << log.rdbuf() << "</pre>";
+    (*output) << tags.line_break <<"Showing last " << FLAGS_web_log_bytes
+              << " bytes of log" << endl;
+    (*output) << tags.line_break << tags.pre_tag << log.rdbuf() << tags.end_pre_tag;
 
   } else {
-    (*output) << "<br/>Couldn't open INFO log file: " << logfile;
+    (*output) << tags.line_break << "Couldn't open INFO log file: " << logfile;
   }
-
 }
 
 // Registered to handle "/flags", and prints out all command-line flags and their values
 void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  (*output) << "<h2>Command-line Flags</h2>";
-  (*output) << "<pre>" << CommandlineFlagsIntoString() << "</pre>";
+  bool as_text = (args.find("raw") != args.end());
+  Tags tags(as_text);
+  (*output) << tags.header << "Command-line Flags" << tags.end_header;
+  (*output) << tags.pre_tag << CommandlineFlagsIntoString() << tags.end_pre_tag;
 }
 
 // Registered to handle "/memz", and prints out memory allocation statistics.
 void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args, 
     stringstream* output) {
+  bool as_text = (args.find("raw") != args.end());
+  Tags tags(as_text);
+
   if (mem_limit != NULL) {
-    (*output) << "<pre>"
+    (*output) << tags.pre_tag
               << "Mem Limit: " 
               << PrettyPrinter::Print(mem_limit->limit(), TCounterType::BYTES) 
               << endl
               << "Mem Consumption: " 
               << PrettyPrinter::Print(mem_limit->consumption(), TCounterType::BYTES) 
               << endl
-              << "</pre>";
+              << tags.end_pre_tag;
   } else {
-    (*output) << "<pre>"
+    (*output) << tags.pre_tag
               << "No process memory limit set."
-              << "</pre>";
+              << tags.end_pre_tag;
   }
 
-  (*output) << "<pre>";
+  (*output) << tags.pre_tag;
 #ifdef ADDRESS_SANITIZER
   (*output) << "Memory tracking is not available with address sanitizer builds.";
 #else
@@ -96,9 +125,9 @@ void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args,
   MallocExtension::instance()->GetStats(buf, 2048);
   // Replace new lines with <br> for html
   string tmp(buf);
-  replace_all(tmp, "\n", "<br>");
+  replace_all(tmp, "\n", tags.line_break);
 #endif
-  (*output) << tmp << "</pre>";
+  (*output) << tmp << tags.end_pre_tag;
 }
 
 void impala::AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit) {

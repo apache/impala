@@ -76,9 +76,13 @@ string Metrics::DebugStringJson() {
 }
 
 void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* output) {
-  (*output) << "<pre>";
-  PrintMetricMap(output);
-  (*output) << "</pre>";
+  if (args.find("raw") == args.end()) {
+    (*output) << "<pre>";
+    PrintMetricMap(output);
+    (*output) << "</pre>";
+  } else {
+    PrintMetricMap(output);
+  }
 }
 
 void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* output) {

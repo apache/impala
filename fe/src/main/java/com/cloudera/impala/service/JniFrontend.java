@@ -372,21 +372,34 @@ public class JniFrontend {
 
   /**
    * Returns a string of all loaded Hadoop configuration parameters as a table of keys
-   * and values.
+   * and values. If asText is true, output in raw text. Otherwise, output in html.
    */
-  public String getHadoopConfigAsHtml() {
+  public String getHadoopConfig(boolean asText) {
     StringBuilder output = new StringBuilder();
-    // Write the set of files that make up the configuration
-    output.append(CONF.toString());
-    output.append("\n\n");
-
-    // Write a table of key, value pairs
-    output.append("<table class='table table-bordered table-hover'>");
-    output.append("<tr><th>Key</th><th>Value</th></tr>");
-    for (Map.Entry<String, String> e : CONF) {
-      output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() + "</td></tr>");
+    if (asText) {
+      output.append("Hadoop Configuration\n");
+      // Write the set of files that make up the configuration
+      output.append(CONF.toString());
+      output.append("\n\n");
+      // Write a table of key, value pairs
+      for (Map.Entry<String, String> e : CONF) {
+        output.append(e.getKey() + "=" + e.getValue() + "\n");
+      }
+      output.append("\n");
+    } else {
+      output.append("<h2>Hadoop Configuration</h2>");
+      // Write the set of files that make up the configuration
+      output.append(CONF.toString());
+      output.append("\n\n");
+      // Write a table of key, value pairs
+      output.append("<table class='table table-bordered table-hover'>");
+      output.append("<tr><th>Key</th><th>Value</th></tr>");
+      for (Map.Entry<String, String> e : CONF) {
+        output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() +
+            "</td></tr>");
+      }
+      output.append("</table>");
     }
-    output.append("</table>");
     return output.toString();
   }
 

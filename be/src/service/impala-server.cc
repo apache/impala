@@ -599,7 +599,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       "(Ljava/lang/String;Ljava/lang/String;)V");
   EXIT_IF_EXC(jni_env);
   get_hadoop_config_id_ =
-      jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml", "()Ljava/lang/String;");
+      jni_env->GetMethodID(fe_class, "getHadoopConfig", "(Z)Ljava/lang/String;");
   EXIT_IF_EXC(jni_env);
   get_hadoop_config_value_id_ = jni_env->GetMethodID(fe_class, "getHadoopConfigValue",
       "(Ljava/lang/String;)Ljava/lang/String;");
@@ -702,16 +702,16 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  (*output) << "<h2>Hadoop Configuration</h2>";
+  jboolean as_text = (args.find("raw") != args.end());
   JNIEnv* jni_env = getJNIEnv();
-  jstring java_html_string =
-      static_cast<jstring>(jni_env->CallObjectMethod(fe_, get_hadoop_config_id_));
+  jstring java_string = static_cast<jstring>(jni_env->CallObjectMethod(fe_,
+      get_hadoop_config_id_, as_text));
   RETURN_IF_EXC(jni_env);
   jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(java_html_string, &is_copy);
+  const char *str = jni_env->GetStringUTFChars(java_string, &is_copy);
   RETURN_IF_EXC(jni_env);
   (*output) << str;
-  jni_env->ReleaseStringUTFChars(java_html_string, str);
+  jni_env->ReleaseStringUTFChars(java_string, str);
   RETURN_IF_EXC(jni_env);
 }
 
@@ -991,43 +991,64 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
 
 void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  (*output) << "<h2>Catalog</h2>" << endl;
   TGetDbsResult get_dbs_result;
   Status status = GetDbNames(NULL, &get_dbs_result);
-  vector<string>& db_names = get_dbs_result.dbs;
-
   if (!status.ok()) {
     (*output) << "Error: " << status.GetErrorMsg();
     return;
   }
+  vector<string>& db_names = get_dbs_result.dbs;
 
-  // Build a navigation string like [ default | tpch | ... ]
-  vector<string> links;
-  BOOST_FOREACH(const string& db, db_names) {
-    stringstream ss;
-    ss << "<a href='#" << db << "'>" << db << "</a>";
-    links.push_back(ss.str());
-  }
-  (*output) << "[ " <<  join(links, " | ") << " ] ";
+  if (args.find("raw") == args.end()) {
+    (*output) << "<h2>Catalog</h2>" << endl;
 
-  BOOST_FOREACH(const string& db, db_names) {
-    (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
-    TGetTablesResult get_table_results;
-    Status status = GetTableNames(db, NULL, &get_table_results);
-    vector<string>& table_names = get_table_results.tables;
-    if (!status.ok()) {
-      (*output) << "Error: " << status.GetErrorMsg();
-      continue;
+    // Build a navigation string like [ default | tpch | ... ]
+    vector<string> links;
+    BOOST_FOREACH(const string& db, db_names) {
+      stringstream ss;
+      ss << "<a href='#" << db << "'>" << db << "</a>";
+      links.push_back(ss.str());
     }
+    (*output) << "[ " <<  join(links, " | ") << " ] ";
 
-    (*output) << "<p>" << db << " contains <b>" << table_names.size()
-              << "</b> tables</p>";
+    BOOST_FOREACH(const string& db, db_names) {
+      (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
+      TGetTablesResult get_table_results;
+      Status status = GetTableNames(db, NULL, &get_table_results);
+      if (!status.ok()) {
+        (*output) << "Error: " << status.GetErrorMsg();
+        continue;
+      }
+      vector<string>& table_names = get_table_results.tables;
+      (*output) << "<p>" << db << " contains <b>" << table_names.size()
+                << "</b> tables</p>";
 
-    (*output) << "<ul>" << endl;
-    BOOST_FOREACH(const string& table, table_names) {
-      (*output) << "<li>" << table << "</li>" << endl;
+      (*output) << "<ul>" << endl;
+      BOOST_FOREACH(const string& table, table_names) {
+        (*output) << "<li>" << table << "</li>" << endl;
+      }
+      (*output) << "</ul>" << endl;
     }
-    (*output) << "</ul>" << endl;
+  } else {
+    (*output) << "Catalog" << endl << endl;
+    (*output) << "List of databases:" << endl;
+    (*output) << join(db_names, "\n") << endl << endl;
+
+    BOOST_FOREACH(const string& db, db_names) {
+      TGetTablesResult get_table_results;
+      Status status = GetTableNames(db, NULL, &get_table_results);
+      if (!status.ok()) {
+        (*output) << "Error: " << status.GetErrorMsg();
+        continue;
+      }
+      vector<string>& table_names = get_table_results.tables;
+      (*output) << db << " contains " << table_names.size()
+                << " tables" << endl;
+      BOOST_FOREACH(const string& table, table_names) {
+        (*output) << "- " << table << endl;
+      }
+      (*output) << endl << endl;
+    }
   }
 }
 
