@@ -682,10 +682,17 @@ void HdfsScanNode::DiskThread() {
       unique_lock<mutex> lock(disk_thread_resource_lock_);
       DCHECK_LE(num_blocked_scanners_, active_scanners_.size());
       // Wait if the number of buffers is at the max limit (to generate back pressure
-      // on the io mgr) AND all scanners can make progress.
+      // on the io mgr) AND all scanners can make progress AND there aren't any ranges
+      // started in the io mgr that don't have a scanner thread processing them.
+      // Thread tokens are acquired in the io mgr (i.e. num_optional_threads()) and then
+      // get queued in the io mgr queue.  Only when this thread reads them, is a scanner
+      // thread (active_scanners_) created.  We don't want to actively be starting new
+      // scanner threads if possible. 
       DCHECK_LE(num_blocked_scanners_, active_scanners_.size());
+      int num_started_ranges = runtime_state_->resource_pool()->num_optional_threads();
       while (num_blocked_scanners_ == 0 &&
              num_queued_io_buffers_ >= max_queued_io_buffers_ &&
+             num_started_ranges == active_scanners_.size() &&
              !done_) {
         disk_thread_resource_cv_.wait(lock);
       }

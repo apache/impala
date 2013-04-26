@@ -291,7 +291,7 @@ class Expr {
   // if thread_safe != NULL, it will on return, contain whether the resulting codegen
   // function is thread safe.
   static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc,
-      bool disable_codegen = true, bool* thread_safe = false);
+      bool disable_codegen = true, bool* thread_safe = NULL);
 
   // Prepare all exprs.
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
