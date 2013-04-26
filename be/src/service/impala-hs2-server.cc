@@ -628,6 +628,37 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
 
+void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
+  if (request.operationHandle.operationId.guid.size() == 0) {
+    // An empty operation handle identifier means no execution and no log for this
+    // query (USE <database>).
+    return_val.status.__set_statusCode(
+        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
+    return;
+  }
+
+  // Convert Operation id to TUniqueId and get the query exec state.
+  TUniqueId query_id;
+  TUniqueId secret;
+  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
+  if (exec_state.get() == NULL) {
+    // No handle was found
+    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+  }
+  if (exec_state->coord() != NULL) {
+    // Report progress and all errors
+    // Hue parses the progress string to do progress indication.
+    stringstream ss;
+    ss << exec_state->coord()->progress().ToString() << "\n";
+    ss << exec_state->coord()->GetErrorLog();
+    return_val.log = ss.str();
+    return_val.status.__set_statusCode(
+        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
+  }
+}
+
 void ImpalaServer::ResetCatalog(TResetCatalogResp& return_val) {
   VLOG_RPC << "ResetCatalog()";
   ResetCatalogInternal().ToThrift(&return_val.status);

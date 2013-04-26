@@ -52,6 +52,9 @@ class ProgressUpdater {
   int64_t total() const { return total_; }
   int64_t num_complete() const { return num_complete_; }
 
+  // Returns a string representation of the current progress
+  std::string ToString() const;
+
  private:
   std::string label_;
   int logging_level_;

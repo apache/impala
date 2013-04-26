@@ -15,6 +15,7 @@
 #include "util/progress-updater.h"
 
 #include "common/logging.h"
+#include <sstream>
 
 using namespace impala;
 using namespace std;
@@ -55,4 +56,18 @@ void ProgressUpdater::Update(int64_t delta) {
     VLOG(logging_level_) << label_ << ": " << new_percentage << "\% Complete ("
                          << num_complete << " out of " << total_ << ")";
   }
+}
+
+string ProgressUpdater::ToString() const {
+  stringstream ss;
+  int64_t num_complete = num_complete_;
+  if (num_complete >= total_) {
+    // Always print the final 100% complete
+    ss << label_ << " 100\% Complete (" << num_complete << " out of " << total_ << ")";
+    return ss.str();
+  }
+  int percentage = (static_cast<double>(num_complete) / total_) * 100;
+  ss << label_ << ": " << percentage << "\% Complete ("
+     << num_complete << " out of " << total_ << ")";
+  return ss.str();
 }

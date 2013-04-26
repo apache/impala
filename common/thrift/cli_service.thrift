@@ -32,9 +32,6 @@
 // * Service names begin with the letter "T", use a capital letter for each
 //   new word (with no underscores), and end with the word "Service".
 
-// This file contains the HiveServer2 definition and is copied from
-// Hive 0.10.0 - src/service/if/TCLIService.thrift.
-
 namespace java org.apache.hive.service.cli.thrift
 namespace cpp apache.hive.service.cli.thrift
 
@@ -59,7 +56,8 @@ enum TTypeId {
   MAP_TYPE,
   STRUCT_TYPE,
   UNION_TYPE,
-  USER_DEFINED_TYPE
+  USER_DEFINED_TYPE,
+  DECIMAL_TYPE
 }
   
 const set<TTypeId> PRIMITIVE_TYPES = [
@@ -72,7 +70,8 @@ const set<TTypeId> PRIMITIVE_TYPES = [
   TTypeId.DOUBLE_TYPE
   TTypeId.STRING_TYPE
   TTypeId.TIMESTAMP_TYPE
-  TTypeId.BINARY_TYPE
+  TTypeId.BINARY_TYPE,
+  TTypeId.DECIMAL_TYPE
 ]
 
 const set<TTypeId> COMPLEX_TYPES = [
@@ -103,6 +102,7 @@ const map<TTypeId,string> TYPE_NAMES = {
   TTypeId.MAP_TYPE: "MAP",
   TTypeId.STRUCT_TYPE: "STRUCT",
   TTypeId.UNION_TYPE: "UNIONTYPE"
+  TTypeId.DECIMAL_TYPE: "DECIMAL"
 }
 
 // Thrift does not support recursively defined types or forward declarations,
@@ -285,7 +285,7 @@ union TColumnValue {
   4: TI32Value    i32Val       // INT
   5: TI64Value    i64Val       // BIGINT, TIMESTAMP
   6: TDoubleValue doubleVal    // FLOAT, DOUBLE
-  7: TStringValue stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, BINARY
+  7: TStringValue stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, BINARY, DECIMAL
 }
 
 // Represents a row in a rowset.
@@ -961,6 +961,21 @@ struct TFetchResultsResp {
   3: optional TRowSet results
 }
 
+// GetLog()
+//
+// Fetch operation log from the server corresponding to
+// a particular OperationHandle.
+struct TGetLogReq {
+  // Operation whose log is requested
+  1: required TOperationHandle operationHandle
+}
+
+struct TGetLogResp {
+  1: required TStatus status
+
+  2: required string log
+}
+
 service TCLIService {
 
   TOpenSessionResp OpenSession(1:TOpenSessionReq req);
@@ -994,4 +1009,6 @@ service TCLIService {
   TGetResultSetMetadataResp GetResultSetMetadata(1:TGetResultSetMetadataReq req);
   
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
+  
+  TGetLogResp GetLog(1:TGetLogReq req);
 }

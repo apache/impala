@@ -184,6 +184,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void FetchResults(
       apache::hive::service::cli::thrift::TFetchResultsResp& return_val,
       const apache::hive::service::cli::thrift::TFetchResultsReq& request);
+  virtual void GetLog(apache::hive::service::cli::thrift::TGetLogResp& return_val,
+      const apache::hive::service::cli::thrift::TGetLogReq& request);
   virtual void ResetCatalog(TResetCatalogResp& return_val);
   virtual void ResetTable(TResetTableResp& return_val, const TResetTableReq& request);
 
