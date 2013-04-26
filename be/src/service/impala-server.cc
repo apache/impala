@@ -860,7 +860,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 }
 
 void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,
-    bool render_end_time, stringstream* output) {
+    bool render_end_time, bool render_cancel, stringstream* output) {
   (*output) << "<tr>"
             << "<td>" << record.user << "</td>"
             << "<td>" << record.default_db << "</td>"
@@ -899,8 +899,10 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
   // Output profile
   (*output) << "<td><a href='/query_profile?query_id=" << record.id
             << "'>Profile</a></td>";
-  (*output) << "<td><a href='/cancel_query?query_id=" << record.id
-            << "'>Cancel</a></td>";
+  if (render_cancel) {
+    (*output) << "<td><a href='/cancel_query?query_id=" << record.id
+              << "'>Cancel</a></td>";
+  }
   (*output) << "</tr>" << endl;
 }
 
@@ -925,7 +927,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << "</tr>";
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
     QueryStateRecord record(*exec_state.second);
-    RenderSingleQueryTableRow(record, false, output);
+    RenderSingleQueryTableRow(record, false, true, output);
   }
 
   (*output) << "</table>";
@@ -956,13 +958,12 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << "<th>State</th>" << endl
             << "<th># rows fetched</th>" << endl
             << "<th>Profile</th>" << endl
-            << "<th>Action</th>" << endl
             << "</tr>";
 
   {
     lock_guard<mutex> l(query_log_lock_);
     BOOST_FOREACH(const QueryStateRecord& log_entry, query_log_) {
-      RenderSingleQueryTableRow(log_entry, true, output);
+      RenderSingleQueryTableRow(log_entry, true, false, output);
     }
   }
 

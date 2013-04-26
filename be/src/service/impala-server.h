@@ -699,7 +699,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Helper method to render a single QueryStateRecord as an HTML table
   // row. Used by QueryStatePathHandler.
   void RenderSingleQueryTableRow(const QueryStateRecord& record, bool render_end_time,
-      std::stringstream* output);
+      bool render_cancel, std::stringstream* output);
 
   // Beeswax private methods
 
