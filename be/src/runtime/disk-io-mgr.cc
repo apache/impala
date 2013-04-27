@@ -332,7 +332,7 @@ struct DiskIoMgr::ReaderContext {
   //  Acquire/Release happen in the same object.
   void ScannerThreadAvailable(ThreadResourceMgr::ResourcePool* pool) {
     unique_lock<mutex> l(lock_);
-    if (pool->thread_available_cb() == NULL) return;
+    if (state_ == Cancelled) return;
     ScheduleNewDisks(pool->num_available_threads());
   }
 
@@ -716,6 +716,11 @@ void DiskIoMgr::CancelReader(ReaderContext* reader) {
 void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
   DCHECK(!status.ok());
 
+  // Unregister the callback from the thread mgr.  The reader is done and doesn't
+  // need the notifications anymore.  This has to be done without holding the
+  // reader lock to avoid deadlock.
+  reader->resource_pool_->SetThreadAvailableCb(NULL);
+
   // copy of ready but unreturned buffers that need to be cleaned up.
   list<BufferDescriptor*> ready_buffers_copy;
   {
@@ -725,7 +730,6 @@ void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
     // Already being cancelled
     if (reader->state_ == ReaderContext::Cancelled) return;
 
-    reader->resource_pool_->SetThreadAvailableCb(NULL);
     DCHECK(reader->status_.ok());
     reader->status_ = status;
     

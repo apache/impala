@@ -111,6 +111,7 @@ class ThreadResourceMgr {
     // each call to AcquireThreadToken and each successful call to TryAcquireThreadToken
     // If the thread token is from AcquireThreadToken, required must be true; false
     // if from TryAcquireThreadToken.
+    // Must not be called from from ThreadAvailableCb.
     void ReleaseThreadToken(bool required);
   
     // Add a callback to be notified when a thread is available.
@@ -120,9 +121,6 @@ class ThreadResourceMgr {
     // the execution that all need threads (e.g. do we use that thread for
     // the scanner or for the join).
     void SetThreadAvailableCb(ThreadAvailableCb fn);
-    ThreadAvailableCb thread_available_cb() const {
-      return stop_call_backs_ ? NULL : thread_available_fn_; 
-    }
 
     // Returns the number of threads that are from AcquireThreadToken.
     int num_required_threads() const { return num_threads_ & 0xFFFFFFFF; }
@@ -172,8 +170,12 @@ class ThreadResourceMgr {
     // 32 bits and the number of optional threads is the upper 32 bits.
     int64_t num_threads_;
     
+    // Lock for the fields below.  This lock is taken when the callback
+    // function is called.
+    // TODO: reconsider this.
+    boost::mutex lock_;
+
     ThreadAvailableCb thread_available_fn_;
-    bool stop_call_backs_;
   };
 
   // Create a thread mgr object.  If threads_quota is non-zero, it will be
@@ -254,8 +256,17 @@ inline void ThreadResourceMgr::ResourcePool::ReleaseThreadToken(bool required) {
     }
   }
 
-  if (num_available_threads() > 0 && !stop_call_backs_ && thread_available_fn_ != NULL) {
-    thread_available_fn_(this);
+  // We need to grab a lock before issuing the callback to prevent the
+  // callback from being removed while it is happening.
+  // Note: this is unlikely to be a big deal for performance currently
+  // since only scanner threads call this with any frequency and that only
+  // happens once when the scanner thread is complete.
+  // TODO: reconsider this.
+  if (num_available_threads() > 0 && thread_available_fn_ != NULL) {
+    boost::unique_lock<boost::mutex> l(lock_);
+    if (num_available_threads() > 0 && thread_available_fn_ != NULL) {
+      thread_available_fn_(this);
+    }
   }
 }
 

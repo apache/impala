@@ -50,7 +50,6 @@ void ThreadResourceMgr::ResourcePool::Reset() {
   num_reserved_optional_threads_ = 0;
   thread_available_fn_ = NULL;
   max_quota_ = INT_MAX;
-  stop_call_backs_ = false;
 }
   
 void ThreadResourceMgr::ResourcePool::ReserveOptionalTokens(int num) {
@@ -88,12 +87,9 @@ void ThreadResourceMgr::UnregisterPool(ResourcePool* pool) {
 }
 
 void ThreadResourceMgr::ResourcePool::SetThreadAvailableCb(ThreadAvailableCb fn) {
+  unique_lock<mutex> l(lock_);
   DCHECK(thread_available_fn_ == NULL || fn == NULL);
-  if (fn == NULL) {
-    stop_call_backs_ = true;
-  } else {
-    thread_available_fn_ = fn;
-  }
+  thread_available_fn_ = fn;
 }
 
 void ThreadResourceMgr::UpdatePoolQuotas(ResourcePool* new_pool) {
@@ -103,8 +99,8 @@ void ThreadResourceMgr::UpdatePoolQuotas(ResourcePool* new_pool) {
   for (Pools::iterator it = pools_.begin(); it != pools_.end(); ++it) {
     ResourcePool* pool = *it;
     if (pool == new_pool) continue;
-    if (pool->num_available_threads() > 0 && !pool->stop_call_backs_ && 
-        pool->thread_available_fn_ != NULL) {
+    unique_lock<mutex> l(pool->lock_);
+    if (pool->num_available_threads() > 0 && pool->thread_available_fn_ != NULL) {
       pool->thread_available_fn_(pool);
     }
   }
