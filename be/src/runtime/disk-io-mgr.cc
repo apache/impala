@@ -1152,14 +1152,26 @@ void DiskIoMgr::ReturnFreeBuffer(ReaderContext* reader, char* buffer) {
 }
   
 bool DiskIoMgr::ReaderContext::Validate() const {
-  if (state_ == ReaderContext::Inactive) return false;
+  if (state_ == ReaderContext::Inactive) {
+    LOG(ERROR) << "state_ == ReaderContext::Inactive";
+    return false;
+  }
 
   int num_disks_with_ranges = 0;
   int num_reading_threads = 0;
   int num_committed = 0;
 
-  if (num_remaining_ranges_ == 0 && !ready_buffers_.empty()) return false;
-  if (num_ready_buffers_ != ready_buffers_.size()) return false;
+  if (num_remaining_ranges_ == 0 && !ready_buffers_.empty()) {
+    LOG(ERROR) << "num_remaining_ranges_ == 0 && !ready_buffers_.empty():"
+               << " ready_buffers_.size=" << ready_buffers_.size();
+    return false;
+  }
+  if (num_ready_buffers_ != ready_buffers_.size()) {
+    LOG(ERROR) << "num_ready_buffers_ != ready_buffers_.size():"
+               << " #ready_buffers_= " << num_ready_buffers_
+               << " size()=" << ready_buffers_.size();
+    return false;
+  }
 
   // Set of all groups that are started
   set<ScanRangeGroup*> started_groups;
@@ -1172,7 +1184,11 @@ bool DiskIoMgr::ReaderContext::Validate() const {
     list<ScanRange*>::const_iterator it = state.committed_ranges.begin();
     for (; it != state.committed_ranges.end(); ++it) {
       // Only grouped ranges should be in this queue
-      if ((*it)->group_ == NULL) return false;
+      if ((*it)->group_ == NULL) {
+        LOG(ERROR) << "non-grouped range in committed_ranges: "
+                   << (*it)->DebugString();
+        return false;
+      }
       started_groups.insert((*it)->group_);
     }
     for (it = state.in_flight_ranges.begin(); it != state.in_flight_ranges.end(); ++it) {
@@ -1180,15 +1196,28 @@ bool DiskIoMgr::ReaderContext::Validate() const {
     }
 
     if (state.num_remaining_ranges > 0) ++num_disks_with_ranges;
-    if (state.num_threads_in_read < 0) return false;
+    if (state.num_threads_in_read < 0) {
+      LOG(ERROR) << "state.num_threads_in_read < 0: #threads="
+                 << state.num_threads_in_read;
+      return false;
+    }
     
     // If there are no more ranges, there should be at most 1 thread working
     // for this reader for the final cleanup
-    if (num_disks_with_ranges_ == 0 && state.num_threads_in_read > 1) return false;
+    if (num_disks_with_ranges_ == 0 && state.num_threads_in_read > 1) {
+      LOG(ERROR) << "num_disks_with_ranges_ == 0 && state.num_threads_in_read > 1: "
+                 << " #threads=" << state.num_threads_in_read;
+      return false;
+    }
 
     if (state_ != ReaderContext::Cancelled) {
       if (state.unscheduled_ranges.size() + state.in_flight_ranges.size() >
           state.num_remaining_ranges) {
+        LOG(ERROR) << "state.unscheduled_ranges.size() + state.in_flight_ranges.size() > "
+                      "state.num_remaining_ranges:"
+                   << " #unscheduled=" << state.unscheduled_ranges.size()
+                   << " #in_flight=" << state.in_flight_ranges.size()
+                   << " #remaining=" << state.num_remaining_ranges;
         return false;
       }
     }
@@ -1206,13 +1235,20 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   for (set<ScanRangeGroup*>::iterator it = started_groups.begin();
       it != started_groups.end(); ++it) {
     ScanRangeGroup* group = *it;
-    if (group->ranges.size() < 2) return false;
+    if (group->ranges.size() < 2) {
+      LOG(ERROR) << "group->ranges.size() < 2: size=" << group->ranges.size();
+      return false;
+    }
     for (int i = 0; i < group->ranges.size(); ++i) {
       ScanRange* range = group->ranges[i];
       const PerDiskState& state = disk_states_[range->disk_id_];
       list<ScanRange*>::const_iterator it = find(
           state.unscheduled_ranges.begin(), state.unscheduled_ranges.end(), range);
-      if (it != state.unscheduled_ranges.end()) return false;
+      if (it != state.unscheduled_ranges.end()) {
+        LOG(ERROR) << "grouped range found in unscheduled_ranges: "
+                   << range->DebugString();
+        return false;
+      }
       if (range->bytes_read_ == range->len_) continue;
 
       // Validate it is not on both queues.
@@ -1222,31 +1258,59 @@ bool DiskIoMgr::ReaderContext::Validate() const {
           state.committed_ranges.begin(), state.committed_ranges.end(), range);
       if (in_flight_it != state.in_flight_ranges.end() &&
           committed_it != state.committed_ranges.end()) {
+        LOG(ERROR) << "range found in in_flight_ranges and committed_ranges: "
+                   << range->DebugString();
         return false;
       }
 
       if (in_flight_it != state.in_flight_ranges.end()) {
         // It must have at least one buffer, otherwise, it should have been in the 
         // committed queue.
-        if (range->num_io_buffers_ == 0) return false;
+        if (range->num_io_buffers_ == 0) {
+          LOG(ERROR) << "in-flight range has no buffers: " << range->DebugString();
+          return false;
+        }
       } 
     }
   }
 
-  if (num_committed_ranges_ < 0) return false;
-  if (num_used_buffers_ < 0) return false;
-  if (num_remaining_ranges_ < 0) return false;
+  if (num_committed_ranges_ < 0) {
+    LOG(ERROR) << "num_committed_ranges_ < 0: #committed=" << num_committed_ranges_;
+    return false;
+  }
+  if (num_used_buffers_ < 0) {
+    LOG(ERROR) << "num_used_buffers_ < 0: #used=" << num_used_buffers_;
+    return false;
+  }
+  if (num_remaining_ranges_ < 0) {
+    LOG(ERROR) << "num_remaining_ranges_ < 0: #remaining=" << num_remaining_ranges_;
+    return false;
+  }
 
   // Buffers either need to be unused (empty) or ready (num_ok_ready_buffers) or
   // being read (num_reading_threads) or owned by the reader 
-  if (num_disks_with_ranges_ == 0 && num_reading_threads > 1) return false;
+  if (num_disks_with_ranges_ == 0 && num_reading_threads > 1) {
+    LOG(ERROR) << "num_disks_with_ranges_ == 0 && num_reading_threads > 1:"
+               << " #reading=" << num_reading_threads;
+    return false;
+  }
   if (!sync_reader_) {
     if (num_buffers_in_disk_threads_ + num_ok_ready_buffers != num_used_buffers_) {
+      LOG(ERROR) << "num_buffers_in_disk_threads_ + num_ok_ready_buffers "
+                    "!= num_used_buffers_ :"
+                 << " #in_disk_threads=" << num_buffers_in_disk_threads_
+                 << " #ok_ready=" << num_ok_ready_buffers
+                 << " #used=" << num_used_buffers_;
       return false;
     }
   }
 
-  if (num_committed_ranges_ != num_committed) return false;
+  if (num_committed_ranges_ != num_committed) {
+    LOG(ERROR) << "num_committed_ranges_ != num_committed:"
+               << " #committed_ranges_=" << num_committed_ranges_
+               << " #committed=" << num_committed;
+    return false;
+  }
 
   return true;
 }
