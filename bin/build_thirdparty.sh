@@ -105,6 +105,10 @@ cd $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
 make install
 
+# Build re2
+cd $IMPALA_HOME/thirdparty/re2
+make -j4
+
 if [ -z "$USE_PIC_LIB_PATH" ]; then
   # Build Sasl
   # Disable everything except those protocols needed -- currently just Kerberos.

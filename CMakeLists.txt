@@ -129,6 +129,16 @@ set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_LIBRARY}")
 message(STATUS ${SNAPPY_INCLUDE_DIR})
 message(STATUS ${SNAPPY_LIBRARY})
 
+# find re2 headers and libs
+find_package(Re2 REQUIRED)
+include_directories(${RE2_INCLUDE_DIR})
+set(LIBS ${LIBS} ${RE2_LIBRARIES})
+add_library(re2 STATIC IMPORTED)
+set_target_properties(re2 PROPERTIES IMPORTED_LOCATION "${RE2_LIBRARY}")
+
+message(STATUS ${RE2_INCLUDE_DIR})
+message(STATUS ${RE2_LIBRARY})
+
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 include_directories(${AVRO_INCLUDE_DIR})

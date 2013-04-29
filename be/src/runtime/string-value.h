@@ -33,6 +33,12 @@ struct StringValue {
   StringValue(char* ptr, int len): ptr(ptr), len(len) {}
   StringValue(): ptr(NULL), len(0) {}
 
+  // Construct a StringValue from 's'.  's' must be valid for as long as
+  // this object is valid.
+  StringValue(const std::string& s) 
+    : ptr(const_cast<char*>(s.c_str())), len(s.size()) {
+  }
+
   // Byte-by-byte comparison. Returns:
   // this < other: -1
   // this == other: 0

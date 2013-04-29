@@ -152,15 +152,16 @@ Benchmark* BenchmarkArithmetic() {
   return suite;
 }
 
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Like:                 Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                         equals               206.8                  1X
-//                     not equals               440.6              2.131X
-//                         strstr               141.8             0.6857X
-//                       strncmp1               300.3              1.452X
-//                       strncmp2               300.4              1.453X
-//                       strncmp3               862.7              3.803X
-//                          regex               6.027            0.02915X
+//                         equals               203.9                  1X
+//                     not equals               426.4              2.091X
+//                         strstr               142.8             0.7001X
+//                       strncmp1               269.7              1.323X
+//                       strncmp2               294.1              1.442X
+//                       strncmp3               775.7              3.804X
+//                          regex                19.7             0.0966X
 Benchmark* BenchmarkLike() {
   Benchmark* suite = new Benchmark("Like");
   BENCHMARK("equals", "'abcdefghijklmnopqrstuvwxyz' = 'abcdefghijklmnopqrstuvwxyz'");

@@ -15,8 +15,10 @@
 #include "exprs/like-predicate.h"
 
 #include <sstream>
-#include <boost/regex.hpp>
 #include <string.h>
+
+#include <re2/re2.h>
+#include <re2/stringpiece.h>
 
 #include "runtime/string-value.inline.h"
 
@@ -29,6 +31,9 @@ LikePredicate::LikePredicate(const TExprNode& node)
   : Predicate(node),
     escape_char_(node.like_pred.escape_char[0]) {
   DCHECK_EQ(node.like_pred.escape_char.size(), 1);
+}
+
+LikePredicate::~LikePredicate() {
 }
 
 void* LikePredicate::ConstantSubstringFn(Expr* e, TupleRow* row) {
@@ -85,8 +90,9 @@ void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   DCHECK_EQ(p->GetNumChildren(), 2);
   StringValue* operand_val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
   if (operand_val == NULL) return NULL;
-  p->result_.bool_val = regex_match(operand_val->ptr,
-      operand_val->ptr + operand_val->len, *p->regex_);
+
+  re2::StringPiece operand_sp(operand_val->ptr, operand_val->len);
+  p->result_.bool_val = RE2::FullMatch(operand_sp, *p->regex_);
   return &p->result_.bool_val;
 }
 
@@ -102,12 +108,12 @@ void* LikePredicate::RegexMatch(Expr* e, TupleRow* row, bool is_like_pattern) {
   } else {
     re_pattern = string(pattern_value->ptr, pattern_value->len);
   }
-  try {
-    regex re(re_pattern, regex_constants::extended);
-    p->result_.bool_val = regex_match(operand_value->ptr,
-        operand_value->ptr + operand_value->len, re);
+  re2::RE2 re(re_pattern);
+  if (re.ok()) {
+    p->result_.bool_val = 
+        RE2::FullMatch(re2::StringPiece(operand_value->ptr, operand_value->len), re);
     return &p->result_.bool_val;
-  } catch (bad_expression& e) {
+  } else {
     // TODO: log error in runtime state
     p->result_.bool_val = false;
     return &p->result_.bool_val;
@@ -148,36 +154,33 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     // - %anything: This maps to a strncmp implementation
     // - anything: This maps to a strncmp implementation
     // Regex marks the "anything" so it can be extracted for the pattern.
-    regex substring_re("(%+)([^%_]*)(%+)", regex::extended);
-    regex ends_with_re("(%+)([^%_]*)", regex::extended);
-    regex starts_with_re("([^%_]*)(%+)", regex::extended);
-    regex equals_re("([^%_]*)", regex::extended);
-    smatch match_res;
+    re2::RE2 substring_re("(%+)([^%_]*)(%+)");
+    re2::RE2 ends_with_re("(%+)([^%_]*)");
+    re2::RE2 starts_with_re("([^%_]*)(%+)");
+    re2::RE2 equals_re("([^%_]*)");
+
+    DCHECK(substring_re.ok());
+    DCHECK(ends_with_re.ok());
+    DCHECK(starts_with_re.ok());
+    DCHECK(equals_re.ok());
+    void* no_arg = NULL;
+
     if (opcode_ == TExprOpcode::LIKE) {
-      if (regex_match(pattern_str, match_res, substring_re)) {
-        // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
-        search_string_ = match_res.str(2);
-        search_string_sv_ =
-            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+      if (RE2::FullMatch(pattern_str, substring_re, no_arg, &search_string_, no_arg)) {
+        search_string_sv_ = StringValue(search_string_);
         substring_pattern_ = StringSearch(&search_string_sv_);
         compute_fn_ = ConstantSubstringFn;
         return Status::OK;
-      } else if (regex_match(pattern_str, match_res, starts_with_re)) {
-        search_string_ = match_res.str(1);
-        search_string_sv_ =
-            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+      } else if (RE2::FullMatch(pattern_str, starts_with_re, &search_string_, no_arg)) {
+        search_string_sv_ = StringValue(search_string_);
         compute_fn_ = ConstantStartsWithFn;
         return Status::OK;
-      } else if (regex_match(pattern_str, match_res, ends_with_re)) {
-        search_string_ = match_res.str(2);
-        search_string_sv_ =
-            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+      } else if (RE2::FullMatch(pattern_str, ends_with_re, no_arg, &search_string_)) {
+        search_string_sv_ = StringValue(search_string_);
         compute_fn_ = ConstantEndsWithFn;
         return Status::OK;
-      } else if (regex_match(pattern_str, match_res, equals_re)) {
-        search_string_ = match_res.str(1);
-        search_string_sv_ =
-            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+      } else if (RE2::FullMatch(pattern_str, equals_re, &search_string_)) {
+        search_string_sv_ = StringValue(search_string_);
         compute_fn_ = ConstantEqualsFn;
         return Status::OK;
       }
@@ -188,11 +191,8 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     } else {
       re_pattern = pattern_str;
     }
-    try {
-      regex_.reset(new regex(re_pattern, regex_constants::extended));
-    } catch (bad_expression& e) {
-      return Status("Invalid regular expression: " + pattern_str);
-    }
+    regex_.reset(new RE2(re_pattern));
+    if (!regex_->ok()) return Status("Invalid regular expression: " + pattern_str);
     compute_fn_ = ConstantRegexFn;
   }
   return Status::OK;

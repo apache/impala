@@ -18,15 +18,21 @@
 
 #include <string>
 #include <boost/scoped_ptr.hpp> 
-#include <boost/regex.hpp> 
 
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/string-search.h"
 
+namespace re2 {
+  class RE2;
+};
+
 namespace impala {
 
 class LikePredicate: public Predicate {
+ public:
+  ~LikePredicate();
+
  protected:
   friend class Expr;
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
@@ -39,7 +45,7 @@ class LikePredicate: public Predicate {
   std::string search_string_;
   StringValue search_string_sv_;
   StringSearch substring_pattern_;
-  boost::scoped_ptr<boost::regex> regex_;
+  boost::scoped_ptr<re2::RE2> regex_;
 
   // Convert a LIKE pattern (with embedded % and _) into the corresponding
   // regular expression pattern. Escaped chars are copied verbatim.
