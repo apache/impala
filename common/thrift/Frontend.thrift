@@ -370,6 +370,12 @@ struct TUseDbParams {
   1: required string db
 }
 
+// Results of an EXPLAIN 
+struct TExplainResult {
+  // each line in the explain plan occupies an entry in the list
+  1: required list<Data.TResultRow> results
+}
+
 struct TResultSetMetadata {
   1: required list<TColumnDesc> columnDescs
 }
@@ -539,4 +545,7 @@ struct TExecRequest {
 
   // Metadata of the query result set (not set for DML)
   5: optional TResultSetMetadata result_set_metadata
+
+  // Result of EXPLAIN. Set iff stmt_type is EXPLAIN
+  6: optional TExplainResult explain_result
 }

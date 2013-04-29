@@ -95,6 +95,12 @@ public class AnalysisContext {
       return stmt instanceof DescribeStmt;
     }
 
+    public boolean isExplainStmt() {
+      if (isQueryStmt()) return ((QueryStmt)stmt).isExplain();
+      if (isInsertStmt()) return ((InsertStmt)stmt).isExplain();
+      return false;
+    }
+
     public boolean isDdlStmt() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateDbStmt() ||

@@ -178,7 +178,7 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
   KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
   KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
-  KW_INTERVAL, KW_VALUES;
+  KW_INTERVAL, KW_VALUES, KW_EXPLAIN;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -246,6 +246,7 @@ nonterminal ArrayList<String> opt_join_hints;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
+nonterminal ParseNodeBase explain_stmt;
 nonterminal ArrayList<PartitionKeyValue> partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
@@ -326,6 +327,21 @@ stmt ::=
   {: RESULT = drop_db; :}
   | drop_tbl_stmt:drop_tbl
   {: RESULT = drop_tbl; :}
+  | explain_stmt: explain
+  {: RESULT = explain; :}
+  ;
+
+explain_stmt ::=
+  KW_EXPLAIN query_stmt:query
+  {: 
+     query.setIsExplain(true);
+     RESULT = query;
+  :}
+  | KW_EXPLAIN insert_stmt:insert
+  {: 
+     insert.setIsExplain(true);
+     RESULT = insert;
+  :}
   ;
 
 insert_stmt ::=

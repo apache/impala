@@ -57,10 +57,12 @@ import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
@@ -68,6 +70,7 @@ import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
@@ -406,7 +409,6 @@ public class Frontend {
     Preconditions.checkState(
         analysisResult.isQueryStmt() || analysisResult.isDmlStmt());
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
-    result.setQuery_exec_request(queryExecRequest);
 
     // create plan
     LOG.info("create plan");
@@ -427,6 +429,14 @@ public class Frontend {
     explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
     queryExecRequest.setQuery_plan(explainString.toString());
     queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
+
+    if (analysisResult.isExplainStmt()) {
+      // Return the EXPLAIN request
+      createExplainRequest(explainString.toString(), result);
+      return result;
+    }
+
+    result.setQuery_exec_request(queryExecRequest);
 
     // set fragment destinations
     for (int i = 1; i < fragments.size(); ++i) {
@@ -484,6 +494,29 @@ public class Frontend {
     result.query_exec_request.stmt_type = result.stmt_type;
 
     return result;
+  }
+
+  /**
+   * Attaches the explain result to the TExecRequest.
+   */
+  private void createExplainRequest(String explainString, TExecRequest result) {
+    // update the metadata - one string column
+    TColumnDesc colDesc = new TColumnDesc("Explain String", TPrimitiveType.STRING);
+    TResultSetMetadata metadata = new TResultSetMetadata(Lists.newArrayList(colDesc));
+    result.setResult_set_metadata(metadata);
+
+    // create the explain result set - split the explain string into one line per row
+    String[] explainStringArray = explainString.toString().split("\n");
+    TExplainResult explainResult = new TExplainResult();
+    explainResult.results = Lists.newArrayList();
+    for (int i = 0; i < explainStringArray.length; ++i) {
+      TColumnValue col = new TColumnValue();
+      col.setStringVal(explainStringArray[i]);
+      TResultRow row = new TResultRow(Lists.newArrayList(col));
+      explainResult.results.add(row);
+    }
+    result.setExplain_result(explainResult);
+    result.stmt_type = TStmtType.EXPLAIN;
   }
 
   /**

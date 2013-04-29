@@ -43,7 +43,8 @@ enum TPrimitiveType {
 enum TStmtType {
   QUERY,
   DDL, // Data definition, e.g. CREATE TABLE (includes read-only functions e.g. SHOW)
-  DML // Data modification e.g. INSERT
+  DML, // Data modification e.g. INSERT
+  EXPLAIN
 }
 
 // level of verboseness for "explain" output

@@ -158,52 +158,66 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   summary_profile_.AddInfoString("Default Db", default_db());
   summary_profile_.AddInfoString("Sql Statement", sql_stmt());
 
-  if (exec_request->stmt_type == TStmtType::QUERY ||
-      exec_request->stmt_type == TStmtType::DML) {
-    DCHECK(exec_request_.__isset.query_exec_request);
-    TQueryExecRequest& query_exec_request = exec_request_.query_exec_request;
-
-    // we always need at least one plan fragment
-    DCHECK_GT(query_exec_request.fragments.size(), 0);
-
-    if (query_exec_request.__isset.query_plan) {
-      stringstream plan_ss;
-      // Add some delimiters to make it clearer where the plan
-      // begins and the profile ends
-      plan_ss << "\n----------------\n"
-              << query_exec_request.query_plan
-              << "----------------";
-      summary_profile_.AddInfoString("Plan", plan_ss.str());
-    }
-
-    // If desc_tbl is not set, query has SELECT with no FROM. In that
-    // case, the query can only have a single fragment, and that fragment needs to be
-    // executed by the coordinator. This check confirms that.
-    // If desc_tbl is set, the query may or may not have a coordinator fragment.
-    bool has_coordinator_fragment =
-        query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
-    DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
-
-    // If the first fragment has a "limit 0", simply set EOS to true and return.
-    // TODO: Remove this check if this is an INSERT. To be compatible with
-    // Hive, OVERWRITE inserts must clear out target tables / static
-    // partitions even if no rows are written.
-    DCHECK(query_exec_request.fragments[0].__isset.plan);
-    if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
-      eos_ = true;
+  switch (exec_request->stmt_type) {
+    case TStmtType::QUERY:
+    case TStmtType::DML:
+      return ExecQueryOrDmlRequest();
+    case TStmtType::EXPLAIN: {
+      explain_result_set_.reset(new vector<TResultRow>(
+          exec_request_.explain_result.results));
       return Status::OK;
     }
+    case TStmtType::DDL: {
+      ddl_executor_.reset(new DdlExecutor(impala_server_));
+      return ddl_executor_->Exec(&exec_request_.ddl_exec_request);
+    }
+    default:
+      stringstream errmsg;
+      errmsg << "Unknown  exec request stmt type: " << exec_request->stmt_type;
+      return Status(errmsg.str());
+  }
+}
 
-    coord_.reset(new Coordinator(exec_env_));
-    RETURN_IF_ERROR(coord_->Exec(
-        query_id_, &query_exec_request, exec_request->query_options, &output_exprs_));
+Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest() {
+  DCHECK(exec_request_.__isset.query_exec_request);
+  TQueryExecRequest& query_exec_request = exec_request_.query_exec_request;
 
-    profile_.AddChild(coord_->query_profile());
-  } else {
-    ddl_executor_.reset(new DdlExecutor(impala_server_));
-    RETURN_IF_ERROR(ddl_executor_->Exec(&exec_request_.ddl_exec_request));
+  // we always need at least one plan fragment
+  DCHECK_GT(query_exec_request.fragments.size(), 0);
+
+  if (query_exec_request.__isset.query_plan) {
+    stringstream plan_ss;
+    // Add some delimiters to make it clearer where the plan
+    // begins and the profile ends
+    plan_ss << "\n----------------\n"
+            << query_exec_request.query_plan
+            << "----------------";
+    summary_profile_.AddInfoString("Plan", plan_ss.str());
   }
 
+  // If desc_tbl is not set, query has SELECT with no FROM. In that
+  // case, the query can only have a single fragment, and that fragment needs to be
+  // executed by the coordinator. This check confirms that.
+  // If desc_tbl is set, the query may or may not have a coordinator fragment.
+  bool has_coordinator_fragment =
+      query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+  DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
+
+  // If the first fragment has a "limit 0", simply set EOS to true and return.
+  // TODO: Remove this check if this is an INSERT. To be compatible with
+  // Hive, OVERWRITE inserts must clear out target tables / static
+  // partitions even if no rows are written.
+  DCHECK(query_exec_request.fragments[0].__isset.plan);
+  if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
+    eos_ = true;
+    return Status::OK;
+  }
+
+  coord_.reset(new Coordinator(exec_env_));
+  RETURN_IF_ERROR(coord_->Exec(
+      query_id_, &query_exec_request, exec_request_.query_options, &output_exprs_));
+
+  profile_.AddChild(coord_->query_profile());
   return Status::OK;
 }
 
@@ -277,6 +291,24 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
   if (eos_) return Status::OK;
 
+  if (ddl_executor_ != NULL || explain_result_set_ != NULL) {
+    // DDL or EXPLAIN
+    DCHECK(ddl_executor_ == NULL || explain_result_set_ == NULL); 
+    query_state_ = QueryState::FINISHED;
+    int num_rows = 0;
+    const vector<TResultRow>& all_rows = (ddl_executor_ != NULL) ?
+        ddl_executor_->result_set() : (*(explain_result_set_.get()));
+    // max_rows <= 0 means no limit
+    while ((num_rows < max_rows || max_rows <= 0)
+        && num_rows_fetched_ < all_rows.size()) {
+      fetched_rows->AddOneRow(all_rows[num_rows_fetched_]);
+      ++num_rows_fetched_;
+      ++num_rows;
+    }
+    eos_ = (num_rows_fetched_ == all_rows.size());
+    return Status::OK;
+  }
+
   // List of expr values to hold evaluated rows from the query
   vector<void*> result_row;
   result_row.resize(output_exprs_.size());
@@ -285,52 +317,36 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   vector<int> scales;
   scales.resize(result_row.size());
 
-  if (coord_ == NULL && ddl_executor_ == NULL) {
-    query_state_ = QueryState::FINISHED;  // results will be ready after this call
+  if (coord_ == NULL) {
     // query without FROM clause: we return exactly one row
+    query_state_ = QueryState::FINISHED;
     eos_ = true;
     RETURN_IF_ERROR(GetRowValue(NULL, &result_row, &scales));
     return fetched_rows->AddOneRow(result_row, scales);
-  } else {
-    if (coord_ != NULL) {
-      RETURN_IF_ERROR(coord_->Wait());
-    }
-    query_state_ = QueryState::FINISHED;  // results will be ready after this call
-    if (coord_ != NULL) {
-      // Fetch the next batch if we've returned the current batch entirely
-      if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
-        RETURN_IF_ERROR(FetchNextBatch());
-      }
-      if (current_batch_ == NULL) return Status::OK;
+  }
 
-      {
-        SCOPED_TIMER(row_materialization_timer_);
-        // Convert the available rows, limited by max_rows
-        int available = current_batch_->num_rows() - current_batch_row_;
-        int fetched_count = available;
-        // max_rows <= 0 means no limit
-        if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
-        for (int i = 0; i < fetched_count; ++i) {
-          TupleRow* row = current_batch_->GetRow(current_batch_row_);
-          RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
-          RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
-          ++num_rows_fetched_;
-          ++current_batch_row_;
-        }
-      }
-    } else {
-      DCHECK(ddl_executor_.get());
-      int num_rows = 0;
-      const vector<TResultRow>& all_rows = ddl_executor_->result_set();
-      // If max_rows < 0, there's no maximum on the number of rows to return
-      while ((num_rows < max_rows || max_rows < 0)
-          && num_rows_fetched_ < all_rows.size()) {
-        fetched_rows->AddOneRow(all_rows[num_rows_fetched_]);
-        ++num_rows_fetched_;
-        ++num_rows;
-      }
-      eos_ = (num_rows_fetched_ == all_rows.size());
-      return Status::OK;
+  // query with a FROM clause
+  RETURN_IF_ERROR(coord_->Wait());
+  query_state_ = QueryState::FINISHED;  // results will be ready after this call
+  // Fetch the next batch if we've returned the current batch entirely
+  if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
+    RETURN_IF_ERROR(FetchNextBatch());
+  }
+  if (current_batch_ == NULL) return Status::OK;
+
+  {
+    SCOPED_TIMER(row_materialization_timer_);
+    // Convert the available rows, limited by max_rows
+    int available = current_batch_->num_rows() - current_batch_row_;
+    int fetched_count = available;
+    // max_rows <= 0 means no limit
+    if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
+    for (int i = 0; i < fetched_count; ++i) {
+      TupleRow* row = current_batch_->GetRow(current_batch_row_);
+      RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
+      RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
+      ++num_rows_fetched_;
+      ++current_batch_row_;
     }
   }
   return Status::OK;

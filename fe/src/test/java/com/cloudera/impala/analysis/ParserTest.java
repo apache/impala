@@ -1288,7 +1288,8 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT, VALUES\n");
+        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT, VALUES, " +
+        "EXPLAIN\n");
 
     // missing select list
     ParserError("select from t",
@@ -1387,4 +1388,16 @@ public class ParserTest {
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
   }
+
+  @Test
+  public void TestExplain() {
+    ParsesOk("explain select a from tbl");
+    ParsesOk("explain insert into tbl select a, b, c, d from tbl");
+    ParserError("explain");
+    // cannot EXPLAIN an explain stmt
+    ParserError("explain explain select a from tbl");
+    // cannot EXPLAIN DDL stmt
+    ParserError("explain CREATE TABLE Foo (i int)");
+  }
+
 }

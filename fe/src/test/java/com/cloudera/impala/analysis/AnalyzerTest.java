@@ -2671,6 +2671,32 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestExplain() {
+    // Analysis error from explain insert: too many partitioning columns.
+    AnalysisError("explain insert into table functional.alltypessmall " +
+        "partition (year=2009, month=4, year=10)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes",
+        "Superfluous columns in PARTITION clause: year.");
+
+    // Analysis error from explain query
+    AnalysisError("explain " +
+    		"select id from (select id+2 from functional.hbasealltypessmall) a",
+        "couldn't resolve column reference: 'id'");
+
+    // Positive test for explain query
+    AnalyzesOk("explain select * from functional.AllTypes");
+
+    // Positive test for explain insert
+    AnalyzesOk("explain insert into table functional.alltypessmall " +
+        "partition (year=2009, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
+        "float_col, float_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
+  }
+
+  @Test
   public void TestUnsupportedSerde() {
     AnalysisError("select * from functional.bad_serde",
                   "Failed to load metadata for table: bad_serde");

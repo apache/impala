@@ -284,9 +284,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     ~QueryExecState() {
     }
 
-    // Initiates execution of plan fragments, if there are any, and sets
-    // up the output exprs for subsequent calls to FetchRows().
-    // Also sets up profile and pre-execution counters.
+    // Initiates execution of a exec_request.
     // Non-blocking.
     Status Exec(TExecRequest* exec_request);
 
@@ -358,6 +356,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     boost::scoped_ptr<Coordinator> coord_;
 
     boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
+
+    // Result set of explain. Set iff the request is EXPLAIN <query>.
+    boost::scoped_ptr<std::vector<TResultRow> > explain_result_set_;
+
     // local runtime_state_ in case we don't have a coord_
     boost::scoped_ptr<RuntimeState> local_runtime_state_;
     ObjectPool profile_pool_;
@@ -401,6 +403,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Start/end time of the query
     TimestampValue start_time_, end_time_;
+
+    // Core logic of initiating a query or dml execution request.
+    // Initiates execution of plan fragments, if there are any, and sets
+    // up the output exprs for subsequent calls to FetchRows().
+    // Also sets up profile and pre-execution counters.
+    // Non-blocking.
+    Status ExecQueryOrDmlRequest();
 
     // Core logic of FetchRows(). Does not update query_state_/status_.
     Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);

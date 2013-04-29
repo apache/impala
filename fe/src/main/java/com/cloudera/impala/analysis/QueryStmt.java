@@ -59,6 +59,9 @@ public abstract class QueryStmt extends ParseNodeBase {
 
   protected SortInfo sortInfo;
 
+  // True if this QueryStmt is the top level query from an EXPLAIN <query>
+  private boolean isExplain = false;
+
   QueryStmt(ArrayList<OrderByElement> orderByElements, long limit) {
     this.orderByElements = orderByElements;
     this.limit = limit;
@@ -158,5 +161,12 @@ public abstract class QueryStmt extends ParseNodeBase {
   public ArrayList<Expr> getResultExprs() {
     return resultExprs;
   }
-}
 
+  public void setIsExplain(boolean isExplain) {
+    this.isExplain = isExplain;
+  }
+
+  public boolean isExplain() {
+    return isExplain;
+  }
+}

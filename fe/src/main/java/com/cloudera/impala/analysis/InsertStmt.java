@@ -52,6 +52,8 @@ public class InsertStmt extends ParseNodeBase {
   private Table table;
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
   private final List<Expr> partitionKeyExprs = new ArrayList<Expr>();
+  // True if this InsertStmt is the top level query from an EXPLAIN <query>
+  private boolean isExplain = false;
 
   public InsertStmt(TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, QueryStmt queryStmt) {
@@ -402,5 +404,13 @@ public class InsertStmt extends ParseNodeBase {
     }
     strBuilder.append(queryStmt.toSql());
     return strBuilder.toString();
+  }
+
+  public void setIsExplain(boolean isExplain) {
+    this.isExplain = isExplain;
+  }
+
+  public boolean isExplain() {
+    return isExplain;
   }
 }
