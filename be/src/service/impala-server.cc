@@ -86,6 +86,8 @@ DECLARE_int32(planservice_port);
 DECLARE_int32(be_port);
 DECLARE_string(nn);
 DECLARE_int32(nn_port);
+DECLARE_bool(enable_process_lifetime_heap_profiling);
+DECLARE_string(heap_profile_dir);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -104,8 +106,6 @@ DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to 
 // TODO: this logging should go into a per query log.
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
     "every log_mem_usage_interval'th fragment completion.");
-DEFINE_string(heap_profile_dir, "", "if non-empty, enable heap profiling and output "
-    " to specified directory.");
 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala if there are improper configs.");
 
@@ -582,7 +582,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together
-  if (!FLAGS_heap_profile_dir.empty()) {
+  if (FLAGS_enable_process_lifetime_heap_profiling) {
     HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
   }
 #endif

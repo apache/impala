@@ -25,6 +25,7 @@
 #include "runtime/mem-limit.h"
 #include "util/debug-util.h"
 #include "util/logging.h"
+#include "util/pprof-path-handlers.cc"
 #include "util/webserver.h"
 
 using namespace std;
@@ -32,6 +33,7 @@ using namespace google;
 using namespace boost;
 using namespace impala;
 
+DECLARE_bool(enable_process_lifetime_heap_profiling);
 DEFINE_int64(web_log_bytes, 1024 * 1024,
     "The maximum number of bytes to display on the debug webserver's log page");
 
@@ -104,4 +106,11 @@ void impala::AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_
   webserver->RegisterPathHandler("/varz", FlagsHandler);
   webserver->RegisterPathHandler("/memz",
       bind<void>(&MemUsageHandler, process_mem_limit, _1, _2));
+
+#ifndef ADDRESS_SANITIZER
+  // Remote (on-demand) profiling is disabled if the process is already being profiled.
+  if (!FLAGS_enable_process_lifetime_heap_profiling) {
+    AddPprofPathHandlers(webserver);
+  }
+#endif
 }
