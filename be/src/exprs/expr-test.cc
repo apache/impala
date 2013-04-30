@@ -1163,6 +1163,8 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', 1, 1)", "H");
   TestStringValue("substring('Hello', 2, 100)", "ello");
   TestStringValue("substring('Hello', -3, 2)", "ll");
+  TestStringValue("substring('Hello', 1, 0)", "");
+  TestStringValue("substring('Hello', 1, -1)", "");
   TestIsNull("substring(NULL, 1, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', NULL, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', 1, NULL)", TYPE_STRING);

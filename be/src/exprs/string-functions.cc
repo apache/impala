@@ -44,15 +44,15 @@ void* StringFunctions::Substring(Expr* e, TupleRow* row) {
   int* pos = reinterpret_cast<int*>(op2->GetValue(row));
   int* len = op3 != NULL ? reinterpret_cast<int*>(op3->GetValue(row)) : NULL;
   if (str == NULL || pos == NULL || (op3 != NULL && len == NULL)) return NULL;
-  string tmp(str->ptr, str->len);
   int fixed_pos = *pos;
-  int fixed_len = (len == NULL ? str->len : *len);
-  string result;
   if (fixed_pos < 0) fixed_pos = str->len + fixed_pos + 1;
-  if (fixed_pos > 0 && fixed_pos <= str->len && fixed_len > 0) {
-    result = tmp.substr(fixed_pos - 1, fixed_len);
+  int max_len = str->len - fixed_pos + 1;
+  int fixed_len = (len == NULL ? max_len : ::min(*len, max_len));
+  if (fixed_pos != 0 && fixed_pos <= str->len && fixed_len > 0) {
+    e->result_.string_val = str->Substring(fixed_pos - 1, fixed_len);
+  } else {
+    e->result_.string_val = StringValue();
   }
-  e->result_.SetStringVal(result);
   return &e->result_.string_val;
 }
 

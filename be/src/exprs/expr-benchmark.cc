@@ -250,32 +250,32 @@ Benchmark* BenchmarkConditionalFunctions() {
 
 // StringFunctions:      Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                         length               823.5                  1X
-//                     substring1               25.75            0.03127X
-//                     substring2               26.21            0.03183X
-//                           left               455.1             0.5527X
-//                          right               455.4              0.553X
-//                          lower               93.85              0.114X
-//                          upper               93.85              0.114X
-//                        reverse               291.4             0.3538X
-//                           trim               377.3             0.4582X
-//                          ltrim               471.9              0.573X
-//                          rtrim               507.5             0.6162X
-//                          space               52.18            0.06337X
-//                          ascii               937.5              1.138X
-//                          instr                 157             0.1907X
-//                         locate               169.1             0.2053X
-//                        locate2               150.3             0.1825X
-//                         concat               97.98              0.119X
-//                        concat2               67.86            0.08241X
-//                       concatws                 131             0.1591X
-//                      concatws2               64.59            0.07843X
-//                         repeat                88.2             0.1071X
-//                           lpad               133.2             0.1618X
-//                           rpad                 131              0.159X
-//                    find_in_set               117.1             0.1422X
-//                 regexp_extract               5.189           0.006299X
-//                 regexp_replace              0.5945          0.0007217X
+//                         length               920.2                  1X
+//                     substring1               351.4             0.3819X
+//                     substring2               327.9             0.3563X
+//                           left               508.6             0.5527X
+//                          right               508.2             0.5522X
+//                          lower               103.9             0.1129X
+//                          upper               103.2             0.1121X
+//                        reverse               324.9             0.3531X
+//                           trim               421.2             0.4578X
+//                          ltrim               526.6             0.5723X
+//                          rtrim               566.5             0.6156X
+//                          space               94.63             0.1028X
+//                          ascii                1048              1.139X
+//                          instr               175.6             0.1909X
+//                         locate               184.7             0.2007X
+//                        locate2               175.8             0.1911X
+//                         concat               109.5              0.119X
+//                        concat2               75.83            0.08241X
+//                       concatws               143.4             0.1559X
+//                      concatws2               70.38            0.07649X
+//                         repeat               98.54             0.1071X
+//                           lpad               154.7             0.1681X
+//                           rpad               145.6             0.1582X
+//                    find_in_set               83.38            0.09061X
+//                 regexp_extract                6.42           0.006977X
+//                 regexp_replace              0.7435           0.000808X
 Benchmark* BenchmarkStringFunctions() {
   Benchmark* suite = new Benchmark("StringFunctions");
   BENCHMARK("length", "length('Hello World!')");

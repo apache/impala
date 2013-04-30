@@ -65,7 +65,10 @@ struct StringValue {
   StringValue Substring(int start_pos) const;
 
   // Returns the substring starting at start_pos with given length.
-  // If new_len < 0 then the substring from start_pos to end of string is returned.
+  // If new_len < 0 then the substring from start_pos to end of string is returned. If
+  // new_len > len, len is extended to new_len.
+  // TODO: len should never be extended. This is not a trivial fix because UrlParser
+  // depends on the current behavior.
   StringValue Substring(int start_pos, int new_len) const;
 
   // Trims leading and trailing spaces.
