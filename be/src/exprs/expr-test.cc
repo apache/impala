@@ -2091,7 +2091,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("unix_timestamp('1970-01-01 00:00:00 extra text', 'yyyy-MM-dd HH:mm:ss')",
             TYPE_INT, 0);
   TestIsNull("unix_timestamp(NULL)", TYPE_INT);
+  TestIsNull("unix_timestamp('00:00:00')", TYPE_INT);
   TestIsNull("unix_timestamp(NULL, 'yyyy-MM-dd')", TYPE_INT);
+  TestIsNull("unix_timestamp('00:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
   TestIsNull("unix_timestamp('1970-01-01 10:10:10', NULL)", TYPE_INT);
   TestIsNull("unix_timestamp(NULL, NULL)", TYPE_INT);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");

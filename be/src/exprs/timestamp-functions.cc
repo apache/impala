@@ -71,7 +71,6 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
   } else if (e->GetNumChildren() == 1) {
     Expr* op = e->children()[0];
     tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-    if (tv == NULL) return NULL;
   } else {
     Expr* op = e->children()[0];
     StringValue* value = reinterpret_cast<StringValue*>(op->GetValue(row));
@@ -100,8 +99,9 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
 
     TimestampValue val(tvalue.ptr, tvalue.len);
     tv = &val;
-    if (tv->date().is_special()) return NULL;
   }
+
+  if (tv == NULL || tv->date().is_special()) return NULL;
 
   ptime temp;
   tv->ToPtime(&temp);
