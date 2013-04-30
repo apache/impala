@@ -42,50 +42,50 @@ Status HBaseTableFactory::Init() {
   // Get o.a.h.Configuration via HBaseConfiguration
   jclass hbase_conf_cl =
       env->FindClass("org/apache/hadoop/hbase/HBaseConfiguration");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   jmethodID hbase_conf_create_id =
       env->GetStaticMethodID(hbase_conf_cl, "create",
           "()Lorg/apache/hadoop/conf/Configuration;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   jobject local_conf =
       env->CallStaticObjectMethod(hbase_conf_cl, hbase_conf_create_id);
   RETURN_IF_ERROR(
       JniUtil::LocalToGlobalRef(env, local_conf, &conf_));
   env->DeleteLocalRef(local_conf);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // ExecutorService from java.util.concurrent.Executors#newCachedThreadPool
   // Get an executor that can spin up and down threads; this should allow
   // repeated calls to HBase to be fast but still mean no extra memory or
   // threads are needed if there have been no HBase scans in a while.
   jclass executors_cl = env->FindClass("java/util/concurrent/Executors");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   jmethodID executors_cached_thread = env->GetStaticMethodID(executors_cl,
       "newCachedThreadPool", "()Ljava/util/concurrent/ExecutorService;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Now create a single executor that will be used for all HTable's.
   jobject local_executor =
       env->CallStaticObjectMethod(executors_cl, executors_cached_thread);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Make sure the GC doesn't clean up the executor.
   RETURN_IF_ERROR(
       JniUtil::LocalToGlobalRef(env, local_executor, &executor_));
 
   env->DeleteLocalRef(local_executor);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Executor class and methods for shutdown.
   executor_cl_ = env->FindClass("java/util/concurrent/ExecutorService");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   executor_shutdown_id_ = env->GetMethodID(executor_cl_, "shutdownNow",
       "()Ljava/util/List;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   RETURN_IF_ERROR(HBaseTable::InitJNI());
   return Status::OK;

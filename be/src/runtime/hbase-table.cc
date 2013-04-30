@@ -53,9 +53,9 @@ Status HBaseTable::Close() {
   if (env == NULL) return Status("Error creating JNIEnv");
 
   env->CallObjectMethod(htable_, htable_close_id_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   env->DeleteGlobalRef(htable_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   htable_ = NULL;
   return Status::OK;
 }
@@ -66,26 +66,26 @@ Status HBaseTable::Init() {
 
   // Get the Java string for the table name
   jstring jtable_name_string = env->NewStringUTF(table_name_.c_str());
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   // Use o.a.h.hbase.util.Bytes.toBytes to convert into a byte array.
   jobject jtable_name = env->CallStaticObjectMethod(bytes_cl_,
       bytes_to_bytes_id_, jtable_name_string);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Create the HTable.
   jobject local_htable = env->NewObject(htable_cl_,
       htable_ctor_, conf_, jtable_name, executor_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Make sure the GC doesn't remove the HTable until told to.
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_htable, &htable_));
 
   // Now clean up the un-needed refs.
   env->DeleteLocalRef(jtable_name_string);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   env->DeleteLocalRef(jtable_name);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   return Status::OK;
 }
 
@@ -102,7 +102,7 @@ Status HBaseTable::InitJNI() {
 
   bytes_to_bytes_id_ = env->GetStaticMethodID(bytes_cl_, "toBytes",
       "(Ljava/lang/String;)[B");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // HTable
   RETURN_IF_ERROR(
@@ -112,19 +112,19 @@ Status HBaseTable::InitJNI() {
   htable_ctor_ = env->GetMethodID(htable_cl_, "<init>",
       "(Lorg/apache/hadoop/conf/Configuration;"
       "[BLjava/util/concurrent/ExecutorService;)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   htable_close_id_ = env->GetMethodID(htable_cl_, "close", "()V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   htable_get_scanner_id_ = env->GetMethodID(htable_cl_, "getScanner",
       "(Lorg/apache/hadoop/hbase/client/Scan;)"
       "Lorg/apache/hadoop/hbase/client/ResultScanner;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   htable_put_id_ = env->GetMethodID(htable_cl_, "put",
       "(Ljava/util/List;)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   return Status::OK;
 }
@@ -136,7 +136,7 @@ Status HBaseTable::GetResultScanner(const jobject& scan,
 
   (*result_scanner) = env->CallObjectMethod(htable_,
       htable_get_scanner_id_, scan);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   return Status::OK;
 }
 
@@ -145,7 +145,7 @@ Status HBaseTable::Put(const jobject& puts_list) {
   if (env == NULL) return Status("Error creating JNIEnv");
 
   env->CallObjectMethod(htable_, htable_put_id_, puts_list);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // TODO(eclark): FlushCommits
   return Status::OK;

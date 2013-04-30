@@ -218,7 +218,7 @@ public class HBaseScanNode extends ScanNode {
     List<HRegionLocation> regionsLoc;
     try {
       hbaseTbl   = new HTable(hbaseConf, tbl.getHBaseTableName());
-      regionsLoc = getRegionsInRange(hbaseTbl, startKey, stopKey);
+      regionsLoc = hbaseTbl.getRegionsInRange(startKey, stopKey);
     } catch (IOException e) {
       throw new RuntimeException(
           "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
@@ -273,39 +273,6 @@ public class HBaseScanNode extends ScanNode {
       }
     }
     return result;
-  }
-
-  /**
-   * Get the corresponding regions for an arbitrary range of keys.
-   * TODO: this function will be implemented inside HTable in Dave's patch.
-   *       use HTable's implementation when the patch published.
-   * <p>
-   * @param startRow Starting row in range, inclusive
-   * @param endRow Ending row in range, inclusive
-   * @return A list of HRegionLocations corresponding to the regions that
-   * contain the specified range
-   * @throws IOException if a remote or network exception occurs
-   */
-  private List<HRegionLocation> getRegionsInRange(HTable hbaseTbl,
-      final byte[] startKey, final byte[] endKey) throws IOException {
-    boolean endKeyIsEndOfTable =
-        Bytes.equals(endKey, HConstants.EMPTY_END_ROW);
-    if ((Bytes.compareTo(startKey, endKey) > 0) &&
-        (endKeyIsEndOfTable == false)) {
-      throw new IllegalArgumentException(
-        "Invalid range: " + Bytes.toStringBinary(startKey) +
-        " > " + Bytes.toStringBinary(endKey));
-    }
-    List<HRegionLocation> regionList = new ArrayList<HRegionLocation>();
-    byte [] currentKey = startKey;
-    do {
-      HRegionLocation regionLocation = hbaseTbl.getRegionLocation(currentKey);
-      regionList.add(regionLocation);
-      currentKey = regionLocation.getRegionInfo().getEndKey();
-    } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
-             (endKeyIsEndOfTable == true ||
-              Bytes.compareTo(currentKey, endKey) < 0));
-    return regionList;
   }
 
   /**

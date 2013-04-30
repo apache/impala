@@ -38,6 +38,7 @@ import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
@@ -391,13 +392,7 @@ public class Frontend {
         request.sessionState.database, request.sessionState.user);
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("analyze query " + request.stmt);
-    try {
-      analysisResult = analysisCtxt.analyze(request.stmt);
-    } catch (AnalysisException e) {
-      // Write the entire stack trace of e to the log (first param is an empty message).
-      LOG.info("", e);
-      throw e;
-    }
+    analysisResult = analysisCtxt.analyze(request.stmt);
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();

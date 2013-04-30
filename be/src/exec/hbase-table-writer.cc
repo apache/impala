@@ -61,18 +61,18 @@ Status HBaseTableWriter::InitJNI() {
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(
           env, "org/apache/hadoop/hbase/client/Put", &put_cl_));
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   put_ctor_ = env->GetMethodID(put_cl_, "<init>", "([B)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   put_add_id_ = env->GetMethodID(put_cl_, "add",
     "([B[B[B)Lorg/apache/hadoop/hbase/client/Put;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "java/util/ArrayList", &list_cl_));
   list_ctor_ = env->GetMethodID(list_cl_, "<init>", "(I)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   list_add_id_ = env->GetMethodID(list_cl_, "add", "(Ljava/lang/Object;)Z");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   return Status::OK;
 }
@@ -126,22 +126,22 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
 
           env->CallObjectMethod(put, put_add_id_, cf_array, qual_array,
               val_array);
-          RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+          RETURN_ERROR_IF_EXC(env);
 
           // Clean up the local references.
           env->DeleteLocalRef(cf_array);
-          RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+          RETURN_ERROR_IF_EXC(env);
           env->DeleteLocalRef(qual_array);
-          RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+          RETURN_ERROR_IF_EXC(env);
           env->DeleteLocalRef(val_array);
-          RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+          RETURN_ERROR_IF_EXC(env);
         }
       }
     }
 
     DCHECK(put != NULL);
     env->DeleteLocalRef(put);
-    RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(env);
   }
 
   // Send the array list to HTable.
@@ -161,14 +161,14 @@ Status HBaseTableWriter::CleanJNI() {
   }
 
   env->DeleteGlobalRef(put_list_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   put_list_ = NULL;
   return Status::OK;
 }
 
 Status HBaseTableWriter::CreatePutList(JNIEnv* env, int num_puts) {
   jobject local_put_list = env->NewObject(list_cl_, list_ctor_, num_puts);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_put_list, &put_list_));
 
@@ -182,14 +182,14 @@ Status HBaseTableWriter::CreatePut(JNIEnv* env, const string& rk,
   RETURN_IF_ERROR(CreateByteArray(env, rk, &rk_array));
 
   (*put) = env->NewObject(put_cl_, put_ctor_, rk_array);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Add the put to the list.
   env->CallObjectMethod(put_list_, list_add_id_, *put);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   env->DeleteLocalRef(rk_array);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   return Status::OK;
 }
@@ -199,11 +199,11 @@ Status HBaseTableWriter::CreateByteArray(JNIEnv* env, const string& s,
   int s_len = static_cast<jsize>(s.size());
   // Create the byte array.
   (*j_array) = env->NewByteArray(s_len);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   // Copy in the chars backing the std::string
   env->SetByteArrayRegion((*j_array), 0, s_len,
       reinterpret_cast<const jbyte*>(s.data()));
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   return Status::OK;
 }

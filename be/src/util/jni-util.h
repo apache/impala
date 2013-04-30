@@ -64,18 +64,18 @@
     } \
   } while (false)
 
-#define THROW_IF_EXC(env, exc_class, throwable_to_string_id_) \
+#define THROW_IF_EXC(env, exc_class) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
       DCHECK((throwable_to_string_id_) != NULL); \
-      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          exc, (throwable_to_string_id_));                              \
+      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
-      const char* c_msg = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      const char* c_stack = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
       (env)->ExceptionClear(); \
-      (env)->ThrowNew((exc_class), c_msg); \
+      (env)->ThrowNew((exc_class), c_stack); \
       return; \
     } \
   } while (false)
@@ -84,12 +84,12 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          JniUtil::throwable_to_string_id(), exc); \
+      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
-      const char* c_msg = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-      VLOG(1) << string(c_msg); \
+      const char* c_stack = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
+      VLOG(1) << string(c_stack); \
      return; \
     } \
   } while (false)
@@ -98,26 +98,31 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          JniUtil::throwable_to_string_id(), exc);                          \
+      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
-      const char* c_msg = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-      LOG(ERROR) << string(c_msg); \
+      const char* c_stack = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
+      LOG(ERROR) << string(c_stack); \
      exit(1); \
     } \
   } while (false)
 
-#define RETURN_ERROR_IF_EXC(env, throwable_to_string_id_) \
+#define RETURN_ERROR_IF_EXC(env) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-      DCHECK((throwable_to_string_id_) != NULL); \
+      DCHECK((JniUtil::throwable_to_string_id()) != NULL); \
       jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (throwable_to_string_id_), exc); \
+          (JniUtil::throwable_to_string_id()), exc); \
       jboolean is_copy; \
       const char* c_msg = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (JniUtil::throwable_to_stack_trace_id()), exc); \
+      const char* c_stack = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
+      VLOG(1) << std::string(c_stack); \
       (env)->ExceptionClear(); \
       return Status(c_msg); \
     } \
@@ -182,6 +187,7 @@ class JniUtil {
   static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref);
 
   static jmethodID throwable_to_string_id() { return throwable_to_string_id_; }
+  static jmethodID throwable_to_stack_trace_id() { return throwable_to_stack_trace_id_; }
 
   // Global reference to java JniUtil class
   static jclass jni_util_class() { return jni_util_cl_; }
@@ -196,6 +202,7 @@ class JniUtil {
   static jclass jni_util_cl_;
   static jclass internal_exc_cl_;
   static jmethodID throwable_to_string_id_;
+  static jmethodID throwable_to_stack_trace_id_;
   // List of global references created with GetGlobalClassRef() or LocalToGlobalRef.
   // All global references are deleted in Cleanup().
   static std::vector<jobject> global_refs_;

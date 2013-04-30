@@ -15,6 +15,7 @@
 package com.cloudera.impala.common;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 
@@ -27,7 +28,6 @@ public class JniUtil {
    * Returns a formatted string containing the simple exception name and the
    * exception message without the full stack trace. Includes the
    * the chain of causes each in a separate line.
-   * Writes the full stack trace to the log.
    */
   public static String throwableToString(Throwable t) {
     Writer output = new StringWriter();
@@ -46,4 +46,12 @@ public class JniUtil {
     return output.toString();
   }
 
+  /**
+   * Returns the stack trace of the Throwable object.
+   */
+  public static String throwableToStackTrace(Throwable t) {
+    Writer output = new StringWriter();
+    t.printStackTrace(new PrintWriter(output));
+    return output.toString();
+  }
 }

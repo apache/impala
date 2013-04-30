@@ -740,12 +740,12 @@ Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
   jstring value_arg = jni_env->NewStringUTF(key.c_str());
   jstring java_config_value = static_cast<jstring>(
       jni_env->CallObjectMethod(fe_, get_hadoop_config_value_id_, value_arg));
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   const char *str = jni_env->GetStringUTFChars(java_config_value, NULL);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   *output = str;
   jni_env->ReleaseStringUTFChars(java_config_value, str);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
 
   return Status::OK;
 }
@@ -1265,7 +1265,7 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
     jbyteArray request_bytes;
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &catalog_update, &request_bytes));
     jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
   } else {
     try {
       planservice_client_->UpdateMetastore(catalog_update);
@@ -1285,7 +1285,7 @@ Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, alter_table_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1297,7 +1297,7 @@ Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_database_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1309,7 +1309,7 @@ Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_table_like_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1321,7 +1321,7 @@ Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_table_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1333,7 +1333,7 @@ Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, drop_database_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1345,7 +1345,7 @@ Status ImpalaServer::DropTable(const TDropTableParams& params) {
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, drop_table_id_, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1364,7 +1364,7 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
 
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
 
   TDescribeTableResult result;
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, columns));
@@ -1390,7 +1390,7 @@ Status ImpalaServer::GetTableNames(const string* db, const string* pattern,
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
 
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, table_names));
   return Status::OK;
@@ -1411,7 +1411,7 @@ Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) 
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
 
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, db_names));
   return Status::OK;
@@ -1427,7 +1427,7 @@ Status ImpalaServer::GetExecRequest(
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
     jbyteArray result_bytes = static_cast<jbyteArray>(
         jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
     // TODO: dealloc result_bytes?
     // TODO: figure out if we should detach here
@@ -1449,13 +1449,13 @@ Status ImpalaServer::GetExplainPlan(
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
     jstring java_explain_string = static_cast<jstring>(
         jni_env->CallObjectMethod(fe_, get_explain_plan_id_, query_request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
     jboolean is_copy;
     const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
     *explain_string = str;
     jni_env->ReleaseStringUTFChars(java_explain_string, str);
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
     return Status::OK;
   } else {
     try {
@@ -1472,7 +1472,7 @@ Status ImpalaServer::ResetCatalogInternal() {
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jni_env->CallObjectMethod(fe_, reset_catalog_id_);
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
   } else {
     try {
       planservice_client_->RefreshMetadata();
@@ -1500,7 +1500,7 @@ Status ImpalaServer::ResetTableInternal(const string& db_name, const string& tab
   jstring db_name_arg = jni_env->NewStringUTF(db_name.c_str());
   jstring table_name_arg = jni_env->NewStringUTF(table_name.c_str());
   jni_env->CallObjectMethod(fe_, reset_table_id_, db_name_arg, table_name_arg);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
 
@@ -1830,13 +1830,13 @@ Status ImpalaServer::ValidateSettings() {
   JNIEnv* jni_env = getJNIEnv();
   jstring error_string =
       static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_));
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   jboolean is_copy;
   const char *str = jni_env->GetStringUTFChars(error_string, &is_copy);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
   ss << str;
   jni_env->ReleaseStringUTFChars(error_string, str);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(jni_env);
 
   if (ss.str().size() > 0) {
     return Status(ss.str());

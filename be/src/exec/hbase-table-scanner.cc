@@ -147,94 +147,94 @@ Status HBaseTableScanner::Init() {
 
   // Scan method ids.
   scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "()V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_set_max_versions_id_ = env->GetMethodID(scan_cl_, "setMaxVersions",
       "(I)Lorg/apache/hadoop/hbase/client/Scan;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_set_caching_id_ = env->GetMethodID(scan_cl_, "setCaching", "(I)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_add_column_id_ = env->GetMethodID(scan_cl_, "addColumn",
       "([B[B)Lorg/apache/hadoop/hbase/client/Scan;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_set_filter_id_ = env->GetMethodID(scan_cl_, "setFilter",
       "(Lorg/apache/hadoop/hbase/filter/Filter;)Lorg/apache/hadoop/hbase/client/Scan;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_set_start_row_id_ = env->GetMethodID(scan_cl_, "setStartRow",
       "([B)Lorg/apache/hadoop/hbase/client/Scan;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_set_stop_row_id_ = env->GetMethodID(scan_cl_, "setStopRow",
       "([B)Lorg/apache/hadoop/hbase/client/Scan;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // ResultScanner method ids.
   resultscanner_next_id_ = env->GetMethodID(resultscanner_cl_, "next",
       "()Lorg/apache/hadoop/hbase/client/Result;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   resultscanner_close_id_ = env->GetMethodID(resultscanner_cl_, "close", "()V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Result method ids.
   result_raw_id_ = env->GetMethodID(result_cl_, "raw",
       "()[Lorg/apache/hadoop/hbase/KeyValue;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   result_get_bytes_id_ = env->GetMethodID(result_cl_, "getBytes",
       "()Lorg/apache/hadoop/hbase/io/ImmutableBytesWritable;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // ImmutableBytesWritable method ids.
   immutable_bytes_writable_get_id_ =
       env->GetMethodID(immutable_bytes_writable_cl_, "get", "()[B");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   immutable_bytes_writable_get_length_id_ =
       env->GetMethodID(immutable_bytes_writable_cl_, "getLength", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   immutable_bytes_writable_get_offset_id_ =
       env->GetMethodID(immutable_bytes_writable_cl_, "getOffset", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // KeyValue method ids.
   keyvalue_get_buffer_id_ = env->GetMethodID(keyvalue_cl_, "getBuffer", "()[B");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_family_offset_id_ =
       env->GetMethodID(keyvalue_cl_, "getFamilyOffset", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_family_length_id_ =
       env->GetMethodID(keyvalue_cl_, "getFamilyLength", "()B");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_qualifier_offset_id_ =
       env->GetMethodID(keyvalue_cl_, "getQualifierOffset", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_qualifier_length_id_ =
       env->GetMethodID(keyvalue_cl_, "getQualifierLength", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_row_offset_id_ = env->GetMethodID(keyvalue_cl_, "getRowOffset", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_row_length_id_ = env->GetMethodID(keyvalue_cl_, "getRowLength", "()S");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_value_offset_id_ = env->GetMethodID(keyvalue_cl_, "getValueOffset", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   keyvalue_get_value_length_id_ = env->GetMethodID(keyvalue_cl_, "getValueLength", "()I");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // HConstants fields.
   jfieldID empty_start_row_id =
       env->GetStaticFieldID(hconstants_cl_, "EMPTY_START_ROW", "[B");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   empty_row_ = env->GetStaticObjectField(hconstants_cl_, empty_start_row_id);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, empty_row_, &empty_row_));
 
   // FilterList method ids.
   filter_list_ctor_ = env->GetMethodID(filter_list_cl_, "<init>",
       "(Lorg/apache/hadoop/hbase/filter/FilterList$Operator;)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   filter_list_add_filter_id_ = env->GetMethodID(filter_list_cl_, "addFilter",
       "(Lorg/apache/hadoop/hbase/filter/Filter;)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // FilterList.Operator fields.
   jfieldID must_pass_all_id = env->GetStaticFieldID(filter_list_op_cl_, "MUST_PASS_ALL",
       "Lorg/apache/hadoop/hbase/filter/FilterList$Operator;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   must_pass_all_op_ = env->GetStaticObjectField(filter_list_op_cl_, must_pass_all_id);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, must_pass_all_op_, &must_pass_all_op_));
 
@@ -242,12 +242,12 @@ Status HBaseTableScanner::Init() {
   single_column_value_filter_ctor_ =
       env->GetMethodID(single_column_value_filter_cl_, "<init>",
           "([B[BLorg/apache/hadoop/hbase/filter/CompareFilter$CompareOp;[B)V");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // Get op array from CompareFilter.CompareOp.
   jmethodID compare_op_values = env->GetStaticMethodID(compare_op_cl_, "values",
       "()[Lorg/apache/hadoop/hbase/filter/CompareFilter$CompareOp;");
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   compare_ops_ =
       (jobjectArray) env->CallStaticObjectMethod(compare_op_cl_, compare_op_values);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, reinterpret_cast<jobject>(compare_ops_),
@@ -270,16 +270,16 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   // scan_ = new Scan();
   DCHECK(scan_ == NULL);
   scan_ = env->NewObject(scan_cl_, scan_ctor_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   scan_ = env->NewGlobalRef(scan_);
 
   // scan_.setMaxVersions(1);
   env->CallObjectMethod(scan_, scan_set_max_versions_id_, 1);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // scan_.setCaching(rows_cached_);
   env->CallObjectMethod(scan_, scan_set_caching_id_, rows_cached_);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   const vector<SlotDescriptor*>& slots = tuple_desc->slots();
   // Restrict scan to materialized families/qualifiers.
@@ -295,7 +295,7 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     RETURN_IF_ERROR(CreateByteArray(env, qualifier, &qualifier_bytes));
     // scan_.addColumn(family_bytes, qualifier_bytes);
     env->CallObjectMethod(scan_, scan_add_column_id_, family_bytes, qualifier_bytes);
-    RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(env);
   }
 
   // circumvent hbase bug: make sure to select all cols that have filters,
@@ -321,7 +321,7 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     RETURN_IF_ERROR(CreateByteArray(env, it->qualifier, &qualifier_bytes));
     // scan_.addColumn(family_bytes, qualifier_bytes);
     env->CallObjectMethod(scan_, scan_add_column_id_, family_bytes, qualifier_bytes);
-    RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(env);
     ++num_addl_requested_cols_;
   }
 
@@ -330,12 +330,12 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     // filter_list = new FilterList(Operator.MUST_PASS_ALL);
     jobject filter_list =
         env->NewObject(filter_list_cl_, filter_list_ctor_, must_pass_all_op_);
-    RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(env);
     vector<THBaseFilter>::const_iterator it;
     for (it = filters.begin(); it != filters.end(); ++it) {
       // hbase_op = CompareFilter.CompareOp.values()[it->op_ordinal];
       jobject hbase_op = env->GetObjectArrayElement(compare_ops_, it->op_ordinal);
-      RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+      RETURN_ERROR_IF_EXC(env);
       jbyteArray family_bytes;
       RETURN_IF_ERROR(CreateByteArray(env, it->family, &family_bytes));
       jbyteArray qualifier_bytes;
@@ -347,14 +347,14 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
       jobject filter = env->NewObject(single_column_value_filter_cl_,
           single_column_value_filter_ctor_, family_bytes, qualifier_bytes, hbase_op,
           value_bytes);
-      RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+      RETURN_ERROR_IF_EXC(env);
       // filter_list.add(filter);
       env->CallBooleanMethod(filter_list, filter_list_add_filter_id_, filter);
-      RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+      RETURN_ERROR_IF_EXC(env);
     }
     // scan.setFilter(filter_list);
     env->CallObjectMethod(scan_, scan_set_filter_id_, filter_list);
-    RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(env);
   }
 
   return Status::OK;
@@ -368,11 +368,11 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
 
   // scan_.setStartRow(start_bytes);
   env->CallObjectMethod(scan_, scan_set_start_row_id_, start_bytes);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // scan_.setStopRow(end_bytes);
   env->CallObjectMethod(scan_, scan_set_stop_row_id_, end_bytes);
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
 
   // resultscanner_ = htable_.getScanner(scan_);
   if (resultscanner_ != NULL) env->DeleteGlobalRef(resultscanner_);
@@ -380,7 +380,7 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
 
   resultscanner_ = env->NewGlobalRef(resultscanner_);
 
-  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  RETURN_ERROR_IF_EXC(env);
   return Status::OK;
 }
 

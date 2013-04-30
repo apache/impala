@@ -165,7 +165,7 @@ Status ImpalaServer::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request
     jbyteArray result_bytes = static_cast<jbyteArray>(
         jni_env->CallObjectMethod(fe_, exec_hs2_metadata_op_id_,
             request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
     return Status::OK;
   } else {
