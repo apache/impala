@@ -183,7 +183,11 @@ Status ExecEnv::StartServices() {
 
   // Must happen after all topic registrations / callbacks are done
   if (state_store_subscriber_.get() != NULL) {
-    RETURN_IF_ERROR(state_store_subscriber_->Start());
+    Status status = state_store_subscriber_->Start();
+    if (!status.ok()) {
+      status.AddErrorMsg("State Store Subscriber did not start up.");
+      return status;
+    }
   }
 
   return Status::OK;

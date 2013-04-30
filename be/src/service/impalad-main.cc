@@ -89,7 +89,8 @@ int main(int argc, char** argv) {
 
   Status status = exec_env.StartServices();
   if (!status.ok()) {
-    LOG(ERROR) << "Impalad services did not start correctly, exiting";
+    LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: " 
+               << status.GetErrorMsg();
     ShutdownLogging();
     exit(1);
   }

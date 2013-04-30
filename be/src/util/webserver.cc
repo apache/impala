@@ -166,7 +166,7 @@ Status Webserver::Start() {
 
   if (context_ == NULL) {
     stringstream error_msg;
-    error_msg << "Could not start webserver on port: " << port_;
+    error_msg << "Webserver: Could not start on port: " << port_;
     return Status(error_msg.str());
   }
 

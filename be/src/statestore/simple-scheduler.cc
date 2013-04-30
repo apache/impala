@@ -100,8 +100,12 @@ Status SimpleScheduler::Init() {
   if (statestore_subscriber_ != NULL) {
     StateStoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1, _2);
-    RETURN_IF_ERROR(
-        statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb));
+    Status status =
+        statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
+    if (!status.ok()) {
+      status.AddErrorMsg("SimpleScheduler failed to start");
+      return status;
+    }
   }
   if (metrics_ != NULL) {
     total_assignments_ =
@@ -120,6 +124,7 @@ Status SimpleScheduler::Init() {
     Status status = HostnameToIpAddrs(hostname, &ipaddrs);
     if (!status.ok()) {
       VLOG(1) << "Failed to resolve " << hostname << ": " << status.GetErrorMsg();
+      status.AddErrorMsg("SimpleScheduler failed to start");
       return status;
     }
     // Find a non-localhost address for this host; if one can't be
