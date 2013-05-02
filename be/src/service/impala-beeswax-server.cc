@@ -61,8 +61,6 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/ImpalaPlanService.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Frontend_types.h"
 
 using namespace std;

@@ -19,8 +19,6 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/ImpalaPlanService.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -87,7 +85,7 @@ struct TestData {
 Planner planner;
 ObjectPool pool;
 
-// Utility function to get prepare select list for exprs.  Assumes this is a 
+// Utility function to get prepare select list for exprs.  Assumes this is a
 // constant query
 static Status PrepareSelectList(const TExecRequest& request, vector<Expr*>* exprs) {
   const TQueryExecRequest& query_request = request.query_exec_request;
@@ -441,7 +439,7 @@ Benchmark* BenchmarkMathFunctions() {
 Benchmark* BenchmarkTimestampFunctions() {
   Benchmark* suite = new Benchmark("TimestampFunctions");
   BENCHMARK("literal", "cast('2012-01-01 09:10:11.123456789' as timestamp)");
-  BENCHMARK("to_string", 
+  BENCHMARK("to_string",
       "cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as string)");
   BENCHMARK("add_year", "date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 10 years)");
@@ -465,9 +463,9 @@ Benchmark* BenchmarkTimestampFunctions() {
       "as timestamp), interval 1033 microseconds)");
   BENCHMARK("add_nano", "date_add(cast('2012-01-01 00:00:00.000000001' "
       "as timestamp), interval 1033 nanoseconds)");
-  BENCHMARK("unix_timestamp1", 
+  BENCHMARK("unix_timestamp1",
       "unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')");
-  BENCHMARK("unix_timestamp2", 
+  BENCHMARK("unix_timestamp2",
       "unix_timestamp('1970-10-01', 'yyyy-MM-dd')");
   BENCHMARK("from_unix1", "from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')");
   BENCHMARK("from_unix2", "from_unixtime(0, 'yyyy-MM-dd')");
@@ -479,15 +477,15 @@ Benchmark* BenchmarkTimestampFunctions() {
   BENCHMARK("hour", "hour(cast('09:10:11.000000' as timestamp))");
   BENCHMARK("minute", "minute(cast('09:10:11.000000' as timestamp))");
   BENCHMARK("second", "second(cast('09:10:11.000000' as timestamp))");
-  BENCHMARK("to date", 
+  BENCHMARK("to date",
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))");
   BENCHMARK("date diff", "datediff(cast('2011-12-22 09:10:11.12345678' as timestamp), "
       "cast('2012-12-22' as timestamp))");
 #if 0
   // TODO: need to create a valid runtime state for these functions
-  BENCHMARK("from utc", 
+  BENCHMARK("from utc",
       "from_utc_timestamp(cast(1.3041352164485E9 as timestamp), 'PST')");
-  BENCHMARK("to utc", 
+  BENCHMARK("to utc",
       "to_utc_timestamp(cast('2011-01-01 01:01:01' as timestamp), 'PST')");
   BENCHMARK("now", "now()");
   BENCHMARK("unix_timestamp", "unix_timestamp()");

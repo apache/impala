@@ -60,11 +60,9 @@ add_library(Webserver STATIC
 
 target_link_libraries(Webserver pthread dl Util)
 
-add_executable(refresh-catalog refresh-catalog.cc)
 add_executable(network-perf-benchmark network-perf-benchmark.cc)
 add_executable(parquet-reader parquet-reader.cc)
 
-target_link_libraries(refresh-catalog ${IMPALA_LINK_LIBS})
 target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 

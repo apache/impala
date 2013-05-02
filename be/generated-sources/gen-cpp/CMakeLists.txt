@@ -23,9 +23,6 @@ set(SRC_FILES
   ImpalaInternalService.cpp
   ImpalaInternalService_constants.cpp
   ImpalaInternalService_types.cpp
-  ImpalaPlanService.cpp
-  ImpalaPlanService_constants.cpp
-  ImpalaPlanService_types.cpp
   ImpalaService.cpp
   ImpalaService_constants.cpp
   ImpalaService_types.cpp

@@ -43,8 +43,6 @@ using namespace apache::thrift;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax; // Converting QueryState
 
-DECLARE_bool(use_planservice);
-
 // HiveServer2 error returning macro
 #define HS2_RETURN_ERROR(return_val, error_msg, error_state) \
   do { \
@@ -158,20 +156,14 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
 
 Status ImpalaServer::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
     TMetadataOpResponse* result) {
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, exec_hs2_metadata_op_id_,
-            request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-    return Status::OK;
-  } else {
-    return Status("HiveServer2 metadata operations are not supported with external"
-        " planservice");
-  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, exec_hs2_metadata_op_id_, request_bytes));
+  RETURN_ERROR_IF_EXC(jni_env);
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
+  return Status::OK;
 }
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,

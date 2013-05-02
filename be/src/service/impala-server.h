@@ -64,7 +64,6 @@ class TClientRequest;
 class TExecRequest;
 class TSessionState;
 class TQueryOptions;
-class ImpalaPlanServiceClient;
 
 class ThriftServer;
 
@@ -803,13 +802,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // If true, codegen exprs for queries without from clause
   bool select_exprs_codegen_enabled_;
-
-  // plan service-related - impalad optionally uses a standalone
-  // plan service (see FLAGS_use_planservice etc)
-  boost::shared_ptr<apache::thrift::transport::TTransport> planservice_socket_;
-  boost::shared_ptr<apache::thrift::transport::TTransport> planservice_transport_;
-  boost::shared_ptr<apache::thrift::protocol::TProtocol> planservice_protocol_;
-  boost::scoped_ptr<ImpalaPlanServiceClient> planservice_client_;
 
   // map from query id to exec state; QueryExecState is owned by us and referenced
   // as a shared_ptr to allow asynchronous deletion

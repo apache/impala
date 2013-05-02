@@ -26,8 +26,6 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
               "the Kerberos principal, if enabled. If not set, the system default will be"
               " used");
 
-DEFINE_string(planservice_host, "localhost", "Host on which planservice is running");
-DEFINE_int32(planservice_port, 20000, "Port on which planservice is running");
 DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
 
 // Kerberos is enabled if and only if principal is set.

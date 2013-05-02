@@ -65,8 +65,6 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/ImpalaPlanService.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Frontend_types.h"
 
 using namespace std;
@@ -80,9 +78,6 @@ using namespace apache::thrift::concurrency;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax;
 
-DEFINE_bool(use_planservice, false, "Use external planservice if true");
-DECLARE_string(planservice_host);
-DECLARE_int32(planservice_port);
 DECLARE_int32(be_port);
 DECLARE_string(nn);
 DECLARE_int32(nn_port);
@@ -587,77 +582,67 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 #endif
 
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    // create instance of java class JniFrontend
-    jclass fe_class = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
-    jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
-    EXIT_IF_EXC(jni_env);
-    create_exec_request_id_ =
-        jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-    get_explain_plan_id_ =
-        jni_env->GetMethodID(fe_class, "getExplainPlan", "([B)Ljava/lang/String;");
-    EXIT_IF_EXC(jni_env);
-    reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
-    EXIT_IF_EXC(jni_env);
-    reset_table_id_ = jni_env->GetMethodID(fe_class, "resetTable",
-        "(Ljava/lang/String;Ljava/lang/String;)V");
-    EXIT_IF_EXC(jni_env);
-    get_hadoop_config_id_ =
-        jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml", "()Ljava/lang/String;");
-    EXIT_IF_EXC(jni_env);
-    get_hadoop_config_value_id_ =
-        jni_env->GetMethodID(fe_class, "getHadoopConfigValue",
-          "(Ljava/lang/String;)Ljava/lang/String;");
-    EXIT_IF_EXC(jni_env);
-    check_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "checkHadoopConfig",
-       "()Ljava/lang/String;");
-    EXIT_IF_EXC(jni_env);
-    update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    get_table_names_id_ = jni_env->GetMethodID(fe_class, "getTableNames", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-    describe_table_id_ = jni_env->GetMethodID(fe_class, "describeTable", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-    get_db_names_id_ = jni_env->GetMethodID(fe_class, "getDbNames", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-    exec_hs2_metadata_op_id_ =
-        jni_env->GetMethodID(fe_class, "execHiveServer2MetadataOp", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-    alter_table_id_ = jni_env->GetMethodID(fe_class, "alterTable", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    create_table_id_ = jni_env->GetMethodID(fe_class, "createTable", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    create_table_like_id_ = jni_env->GetMethodID(fe_class, "createTableLike", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    create_database_id_ = jni_env->GetMethodID(fe_class, "createDatabase", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    drop_table_id_ = jni_env->GetMethodID(fe_class, "dropTable", "([B)V");
-    EXIT_IF_EXC(jni_env);
-    drop_database_id_ = jni_env->GetMethodID(fe_class, "dropDatabase", "([B)V");
-    EXIT_IF_EXC(jni_env);
+  JNIEnv* jni_env = getJNIEnv();
+  // create instance of java class JniFrontend
+  jclass fe_class = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
+  jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
+  EXIT_IF_EXC(jni_env);
+  create_exec_request_id_ =
+      jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
+  EXIT_IF_EXC(jni_env);
+  get_explain_plan_id_ =
+      jni_env->GetMethodID(fe_class, "getExplainPlan", "([B)Ljava/lang/String;");
+  EXIT_IF_EXC(jni_env);
+  reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
+  EXIT_IF_EXC(jni_env);
+  reset_table_id_ = jni_env->GetMethodID(fe_class, "resetTable",
+      "(Ljava/lang/String;Ljava/lang/String;)V");
+  EXIT_IF_EXC(jni_env);
+  get_hadoop_config_id_ =
+      jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml", "()Ljava/lang/String;");
+  EXIT_IF_EXC(jni_env);
+  get_hadoop_config_value_id_ = jni_env->GetMethodID(fe_class, "getHadoopConfigValue",
+      "(Ljava/lang/String;)Ljava/lang/String;");
+  EXIT_IF_EXC(jni_env);
+  check_hadoop_config_id_ =
+      jni_env->GetMethodID(fe_class, "checkHadoopConfig", "()Ljava/lang/String;");
+  EXIT_IF_EXC(jni_env);
+  update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  get_table_names_id_ = jni_env->GetMethodID(fe_class, "getTableNames", "([B)[B");
+  EXIT_IF_EXC(jni_env);
+  describe_table_id_ = jni_env->GetMethodID(fe_class, "describeTable", "([B)[B");
+  EXIT_IF_EXC(jni_env);
+  get_db_names_id_ = jni_env->GetMethodID(fe_class, "getDbNames", "([B)[B");
+  EXIT_IF_EXC(jni_env);
+  exec_hs2_metadata_op_id_ =
+      jni_env->GetMethodID(fe_class, "execHiveServer2MetadataOp", "([B)[B");
+  EXIT_IF_EXC(jni_env);
+  alter_table_id_ = jni_env->GetMethodID(fe_class, "alterTable", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  create_table_id_ = jni_env->GetMethodID(fe_class, "createTable", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  create_table_like_id_ = jni_env->GetMethodID(fe_class, "createTableLike", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  create_database_id_ = jni_env->GetMethodID(fe_class, "createDatabase", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  drop_table_id_ = jni_env->GetMethodID(fe_class, "dropTable", "([B)V");
+  EXIT_IF_EXC(jni_env);
+  drop_database_id_ = jni_env->GetMethodID(fe_class, "dropDatabase", "([B)V");
+  EXIT_IF_EXC(jni_env);
 
-    jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
-    jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
-    EXIT_IF_EXC(jni_env);
-    EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
+  jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
+  jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
+  EXIT_IF_EXC(jni_env);
+  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 
-    Status status = ValidateSettings();
-    if (!status.ok()) {
-      LOG(ERROR) << status.GetErrorMsg();
-      if (FLAGS_abort_on_config_error) {
-        LOG(ERROR) << "Impala is aborted due to improper configurations.";
-        exit(1);
-      }
+  Status status = ValidateSettings();
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetErrorMsg();
+    if (FLAGS_abort_on_config_error) {
+      LOG(ERROR) << "Impala is aborted due to improper configurations.";
+      exit(1);
     }
-  } else {
-    planservice_socket_.reset(new TSocket(FLAGS_planservice_host,
-        FLAGS_planservice_port));
-    planservice_transport_.reset(new TBufferedTransport(planservice_socket_));
-    planservice_protocol_.reset(new TBinaryProtocol(planservice_transport_));
-    planservice_client_.reset(new ImpalaPlanServiceClient(planservice_protocol_));
-    planservice_transport_->open();
   }
 
   Webserver::PathHandlerCallback varz_callback =
@@ -716,10 +701,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     stringstream* output) {
   (*output) << "<h2>Hadoop Configuration</h2>";
-  if (FLAGS_use_planservice) {
-    (*output) << "Using external PlanService, no Hadoop configs available";
-    return;
-  }
   JNIEnv* jni_env = getJNIEnv();
   jstring java_html_string =
       static_cast<jstring>(jni_env->CallObjectMethod(fe_, get_hadoop_config_id_));
@@ -733,9 +714,6 @@ void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
 }
 
 Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
-  if (FLAGS_use_planservice) {
-    return Status("Using external PlanService, no Hadoop configs available");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jstring value_arg = jni_env->NewStringUTF(key.c_str());
   jstring java_config_value = static_cast<jstring>(
@@ -1260,27 +1238,16 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
 
 Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   VLOG_QUERY << "UpdateMetastore()";
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &catalog_update, &request_bytes));
-    jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
-    RETURN_ERROR_IF_EXC(jni_env);
-  } else {
-    try {
-      planservice_client_->UpdateMetastore(catalog_update);
-    } catch (TException& e) {
-      return Status(e.what());
-    }
-  }
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &catalog_update, &request_bytes));
+  jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
+  RETURN_ERROR_IF_EXC(jni_env);
 
   return Status::OK;
 }
 
 Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
-  if (FLAGS_use_planservice) {
-    return Status("AlterTable not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1290,9 +1257,6 @@ Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
 }
 
 Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
-  if (FLAGS_use_planservice) {
-   return Status("CreateDatabase not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1302,9 +1266,6 @@ Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
 }
 
 Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
-  if (FLAGS_use_planservice) {
-    return Status("CreateTableLike not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1314,9 +1275,6 @@ Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
 }
 
 Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
-  if (FLAGS_use_planservice) {
-    return Status("CreateTable not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1326,9 +1284,6 @@ Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
 }
 
 Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
-  if (FLAGS_use_planservice) {
-    return Status("DropDatabase not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1338,9 +1293,6 @@ Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
 }
 
 Status ImpalaServer::DropTable(const TDropTableParams& params) {
-  if (FLAGS_use_planservice) {
-    return Status("DropTable not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
@@ -1351,9 +1303,6 @@ Status ImpalaServer::DropTable(const TDropTableParams& params) {
 
 Status ImpalaServer::DescribeTable(const string& db, const string& table,
     TDescribeTableResult* columns) {
- if (FLAGS_use_planservice) {
-   return Status("DescribeTable not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   TDescribeTableParams params;
@@ -1373,9 +1322,6 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
 
 Status ImpalaServer::GetTableNames(const string* db, const string* pattern,
     TGetTablesResult* table_names) {
-  if (FLAGS_use_planservice) {
-    return Status("GetTableNames not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   TGetTablesParams params;
@@ -1397,9 +1343,6 @@ Status ImpalaServer::GetTableNames(const string* db, const string* pattern,
 }
 
 Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) {
-  if (FLAGS_use_planservice) {
-    return Status("GetDbNames not supported with external planservice");
-  }
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   TGetDbsParams params;
@@ -1419,71 +1362,45 @@ Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) 
 
 Status ImpalaServer::GetExecRequest(
     const TClientRequest& request, TExecRequest* result) {
-  if (!FLAGS_use_planservice) {
-    // TODO: figure out if repeated calls to
-    // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-    // TODO: dealloc result_bytes?
-    // TODO: figure out if we should detach here
-    //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
-    return Status::OK;
-  } else {
-    planservice_client_->CreateExecRequest(*result, request);
-    return Status::OK;
-  }
+  // TODO: figure out if repeated calls to
+  // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
+  RETURN_ERROR_IF_EXC(jni_env);
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
+  // TODO: dealloc result_bytes?
+  // TODO: figure out if we should detach here
+  //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
+  return Status::OK;
 }
 
 Status ImpalaServer::GetExplainPlan(
     const TClientRequest& query_request, string* explain_string) {
-  if (!FLAGS_use_planservice) {
-    // TODO: figure out if repeated calls to
-    // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray query_request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
-    jstring java_explain_string = static_cast<jstring>(
-        jni_env->CallObjectMethod(fe_, get_explain_plan_id_, query_request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    jboolean is_copy;
-    const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
-    RETURN_ERROR_IF_EXC(jni_env);
-    *explain_string = str;
-    jni_env->ReleaseStringUTFChars(java_explain_string, str);
-    RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK;
-  } else {
-    try {
-      planservice_client_->GetExplainString(*explain_string, query_request);
-    } catch (TException& e) {
-      return Status(e.what());
-    }
-    return Status::OK;
-  }
+  // TODO: figure out if repeated calls to
+  // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
+  JNIEnv* jni_env = getJNIEnv();
+  jbyteArray query_request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
+  jstring java_explain_string = static_cast<jstring>(
+      jni_env->CallObjectMethod(fe_, get_explain_plan_id_, query_request_bytes));
+  RETURN_ERROR_IF_EXC(jni_env);
+  jboolean is_copy;
+  const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
+  RETURN_ERROR_IF_EXC(jni_env);
+  *explain_string = str;
+  jni_env->ReleaseStringUTFChars(java_explain_string, str);
+  RETURN_ERROR_IF_EXC(jni_env);
+  return Status::OK;
 }
 
 Status ImpalaServer::ResetCatalogInternal() {
   LOG(INFO) << "Refreshing catalog";
-  if (!FLAGS_use_planservice) {
-    JNIEnv* jni_env = getJNIEnv();
-    jni_env->CallObjectMethod(fe_, reset_catalog_id_);
-    RETURN_ERROR_IF_EXC(jni_env);
-  } else {
-    try {
-      planservice_client_->RefreshMetadata();
-    } catch (TTransportException& e) {
-      stringstream msg;
-      msg << "RefreshMetadata rpc failed: " << e.what();
-      LOG(ERROR) << msg.str();
-      // TODO: different error code here?
-      return Status(msg.str());
-    }
-  }
+  JNIEnv* jni_env = getJNIEnv();
+  jni_env->CallObjectMethod(fe_, reset_catalog_id_);
+  RETURN_ERROR_IF_EXC(jni_env);
 
   ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME->Update(
       TimestampValue::local_time().DebugString());
@@ -1492,9 +1409,6 @@ Status ImpalaServer::ResetCatalogInternal() {
 }
 
 Status ImpalaServer::ResetTableInternal(const string& db_name, const string& table_name) {
-  if (FLAGS_use_planservice) {
-    return Status("ResetTable not supported with external planservice");
-  }
   LOG(INFO) << "Resetting table: " << db_name << "." << table_name;
   JNIEnv* jni_env = getJNIEnv();
   jstring db_name_arg = jni_env->NewStringUTF(db_name.c_str());

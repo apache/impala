@@ -38,7 +38,6 @@
 #include "util/container-util.h"
 #include "util/parse-util.h"
 #include "util/mem-info.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
@@ -85,7 +84,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   has_thread_token_ = true;
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
-      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads), 
+      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
   if (exec_env_->mem_limit() != NULL) {
@@ -277,9 +276,9 @@ Status PlanFragmentExecutor::OpenInternal() {
   // Setting to NULL ensures that the d'tor won't double-close the sink.
   sink_.reset(NULL);
   done_ = true;
-    
+
   ReleaseThreadToken();
-    
+
   StopReportThread();
   SendReport(true);
 

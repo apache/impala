@@ -26,7 +26,7 @@ add_library(Service
   impala-beeswax-server.cc
 )
 
-# this shared library provides Impala executor functionality to FE test and planservice
+# this shared library provides Impala executor functionality to FE test
 add_library(fesupport SHARED
   fe-support.cc
 )

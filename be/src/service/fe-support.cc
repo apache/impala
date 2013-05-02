@@ -41,7 +41,6 @@
 #include "util/thrift-server.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Data_types.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 
 using namespace impala;
 using namespace std;
