@@ -211,10 +211,11 @@ public class SelectStmt extends QueryStmt {
 
   /**
    * Expand "*" select list item.
-   * @param analyzer
-   * @throws AnalysisException
    */
   private void expandStar(Analyzer analyzer) throws AnalysisException {
+    if (tableRefs.isEmpty()) {
+      throw new AnalysisException("'*' expression in select list requires FROM clause.");
+    }
     // expand in From clause order
     for (TableRef tableRef: tableRefs) {
       expandStar(analyzer, tableRef.getAlias(), tableRef.getDesc());

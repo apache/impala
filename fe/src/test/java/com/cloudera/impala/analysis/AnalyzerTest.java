@@ -427,6 +427,11 @@ public class AnalyzerTest {
     AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " +
         "from functional.alltypes, functional_seq.alltypes");
     AnalyzesOk("select * from functional.alltypes, functional_seq.alltypes");
+    // '*' without from clause has no meaning.
+    AnalysisError("select *", "'*' expression in select list requires FROM clause.");
+    AnalysisError("select 1, *, 2+4",
+        "'*' expression in select list requires FROM clause.");
+    AnalysisError("select a.*", "unknown table: a");
   }
 
   @Test
