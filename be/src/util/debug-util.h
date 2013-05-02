@@ -52,6 +52,7 @@ std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);
+std::string PrintEncoding(const parquet::Encoding::type& type);
 
 // Parse 's' into a TUniqueId object.  The format of s needs to be the output format
 // from PrintId.  (<hi_part>:<low_part>)

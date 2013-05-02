@@ -78,6 +78,7 @@ THRIFT_ENUM_OUTPUT_FN(Encoding);
 
 THRIFT_ENUM_PRINT_FN(TStmtType);
 THRIFT_ENUM_PRINT_FN(QueryState);
+THRIFT_ENUM_PRINT_FN(Encoding);
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {
   os << PrintId(id);

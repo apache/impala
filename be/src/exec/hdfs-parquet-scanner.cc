@@ -29,6 +29,7 @@
 #include "runtime/string-value.h"
 #include "util/bit-util.h"
 #include "util/decompress.h"
+#include "util/debug-util.h"
 #include "util/rle-encoding.h"
 #include "util/runtime-profile.h"
 #include "util/thrift-util.h"
@@ -91,11 +92,15 @@ class HdfsParquetScanner::ColumnReader {
   ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc) 
     : parent_(parent),
       desc_(desc),
+      field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
       decompressed_data_pool_(new MemPool()),
       num_buffered_values_(0) {
   }
 
   void set_metadata(const parquet::ColumnMetaData* metadata) { metadata_ = metadata; }
+  void set_field_repetition_type(const parquet::FieldRepetitionType::type t) { 
+    field_repetition_type_ = t; 
+  }
   int64_t total_len() const { return metadata_->total_compressed_size; }
   const SlotDescriptor* slot_desc() const { return desc_; }
 
@@ -114,6 +119,10 @@ class HdfsParquetScanner::ColumnReader {
 
   HdfsParquetScanner* parent_;
   const SlotDescriptor* desc_;
+
+  // This is either required, optional or repeated.
+  // If it is required, the column cannot have NULLs.
+  parquet::FieldRepetitionType::type field_repetition_type_;
 
   const parquet::ColumnMetaData* metadata_;
   ScannerContext::Stream* stream_;
@@ -197,7 +206,10 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     uint32_t header_size = num_bytes;
     status = DeserializeThriftMsg(buffer, &header_size, true, &current_page_header_);
     if (!status.ok()) {
-      if (header_size >= MAX_PAGE_HEADER_SIZE) return status;
+      if (header_size >= MAX_PAGE_HEADER_SIZE) {
+        status.AddErrorMsg("ParquetScanner: Could not deserialize page header.");
+        return status;
+      }
       // Stitch the header bytes that are split across buffers.
       uint8_t header_buffer[MAX_PAGE_HEADER_SIZE];
       int header_first_part = header_size;
@@ -214,7 +226,10 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       status = 
           DeserializeThriftMsg(header_buffer, &header_size, true, &current_page_header_);
 
-      RETURN_IF_ERROR(status);
+      if (!status.ok()) {
+        status.AddErrorMsg("ParquetScanner: Could not deserialize page header.");
+        return status;
+      }
       DCHECK_GT(header_size, header_first_part);
       header_size = header_size - header_first_part;
     }
@@ -251,31 +266,36 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     } else {
       // TODO: handle the other codecs.
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
+      DCHECK_EQ(current_page_header_.compressed_page_size, 
+          current_page_header_.uncompressed_page_size);
     }
+
     
-    // Initialize the definition level data
-    int32_t num_definition_bytes = 0;
-    switch (current_page_header_.data_page_header.definition_level_encoding) {
-      case parquet::Encoding::RLE:
-        if (!ReadWriteUtil::Read(&data_, &data_size, &num_definition_bytes, &status)) {
-          return status;
+    if (field_repetition_type_ == parquet::FieldRepetitionType::OPTIONAL) {
+      // Initialize the definition level data
+      int32_t num_definition_bytes = 0;
+      switch (current_page_header_.data_page_header.definition_level_encoding) {
+        case parquet::Encoding::RLE:
+          if (!ReadWriteUtil::Read(&data_, &data_size, &num_definition_bytes, &status)) {
+            return status;
+          }
+          rle_def_levels_ = RleDecoder(data_, num_definition_bytes);
+          break;
+        case parquet::Encoding::BIT_PACKED:
+          num_definition_bytes = BitUtil::Ceil(num_buffered_values_, 8);
+          bit_packed_def_levels_ = BitReader(data_, num_definition_bytes);
+          break;
+        default: {
+          stringstream ss;
+          ss << "Unsupported definition level encoding: " 
+            << current_page_header_.data_page_header.definition_level_encoding;
+          return Status(ss.str());
         }
-        rle_def_levels_ = RleDecoder(data_, num_definition_bytes);
-        break;
-      case parquet::Encoding::BIT_PACKED:
-        num_definition_bytes = BitUtil::Ceil(num_buffered_values_, 8);
-        bit_packed_def_levels_ = BitReader(data_, num_definition_bytes);
-        break;
-      default: {
-        stringstream ss;
-        ss << "Unsupported definition level encoding: " 
-           << current_page_header_.data_page_header.definition_level_encoding;
-        return Status(ss.str());
       }
+      DCHECK_GT(num_definition_bytes, 0);
+      data_ += num_definition_bytes;
+      data_size -= num_definition_bytes;
     }
-    DCHECK_GT(num_definition_bytes, 0);
-    data_ += num_definition_bytes;
-    data_size -= num_definition_bytes;
 
     if (desc_->type() == TYPE_BOOLEAN) {
       // Initialize bool decoder
@@ -290,6 +310,12 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
   
 // TODO More codegen here as well.
 inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
+  if (field_repetition_type_ == parquet::FieldRepetitionType::REQUIRED) {
+    // This column is required so there is nothing encoded for the definition
+    // levels.
+    return 1;
+  }
+
   uint8_t definition_level;
   bool valid;
   switch (current_page_header_.data_page_header.definition_level_encoding) {
@@ -572,9 +598,11 @@ Status HdfsParquetScanner::InitColumns() {
     }
 
     RETURN_IF_ERROR(ValidateColumn(i, col_idx));
-
-    parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    
+    const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
+    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
     column_readers_[i]->set_metadata(&col_chunk.meta_data);
+    column_readers_[i]->set_field_repetition_type(schema_element.repetition_type);
     int64_t col_start = col_chunk.meta_data.data_page_offset;
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
     total_bytes += col_len;
@@ -630,16 +658,28 @@ Status HdfsParquetScanner::ValidateFileMetadata() {
   return Status::OK;
 }
 
+bool IsEncodingSupported(parquet::Encoding::type e) {
+  switch (e) {
+    case parquet::Encoding::PLAIN:
+    case parquet::Encoding::BIT_PACKED:
+    case parquet::Encoding::RLE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
   parquet::ColumnChunk& file_data = file_metadata_.row_groups[0].columns[col_idx];
+  const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
 
   // Check the encodings are supported
   vector<parquet::Encoding::type>& encodings = file_data.meta_data.encodings;
   for (int i = 0; i < encodings.size(); ++i) {
-    if (encodings[i] != parquet::Encoding::PLAIN) {
+    if (!IsEncodingSupported(encodings[i])) {
       stringstream ss;
       ss << "File " << stream_->filename() << " uses an unsupported encoding: " 
-         << encodings[i] << " for column " << col_idx;
+         << PrintEncoding(encodings[i]) << " for column " << col_idx;
       return Status(ss.str());
     }
   }
@@ -670,6 +710,16 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
     stringstream ss;
     ss << "File " << stream_->filename() << " contains a nested schema for column "
        << col_idx << ".  This is currently not supported.";
+    return Status(ss.str());
+  }
+
+  // Check that this column is optional or required
+  if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
+      schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
+    stringstream ss;
+    ss << "File " << stream_->filename() << " column " << col_idx 
+       << " contains an unsupported column repetition type: " 
+       << schema_element.repetition_type;
     return Status(ss.str());
   }
 

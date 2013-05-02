@@ -160,6 +160,53 @@ void OutputDataPage<string>(impala::RleDecoder* definition_data,
   }
 }
 
+string TypeMapping(Type::type t) {
+  switch (t) {
+    case Type::BOOLEAN:
+      return "BOOLEAN";
+    case Type::INT32: 
+      return "INT32";
+    case Type::INT64: 
+      return "INT64";
+    case Type::FLOAT:
+      return "FLOAT";
+    case Type::DOUBLE:
+      return "DOUBLE";
+    case Type::BYTE_ARRAY:
+      return "BYTE_ARRAY";
+    default:
+      return "";
+  }
+}
+
+void AppendSchema(const vector<SchemaElement>& schema, int level, 
+    int* idx, stringstream* ss) {
+  for (int i = 0; i < level; ++i) {
+    (*ss) << "  ";
+  }
+  (*ss) << schema[*idx].name;
+  if (schema[*idx].__isset.type) (*ss) << "  " << TypeMapping(schema[*idx].type);
+  (*ss) << endl;
+
+  int num_children = schema[*idx].num_children;
+  ++*idx;
+  for (int i = 0; i < num_children; ++i) {
+    AppendSchema(schema, level + 1, idx, ss);
+  }
+}
+
+string GetSchema(const FileMetaData& md) {
+  const vector<SchemaElement>& schema = md.schema;
+  if (schema.empty()) return "Invalid schema";
+  int num_root_elements = schema[0].num_children;
+  stringstream ss;
+  int idx = 1;
+  for (int i = 0; i < num_root_elements; ++i) {
+    AppendSchema(schema, 0, &idx, &ss);
+  }
+  return ss.str();
+}
+
 // Simple utility to read parquet files on local disk.  This utility validates the
 // file is correctly formed and can output values from each data page.  The
 // entire file is buffered in memory so this is not suitable for very large files.
@@ -210,6 +257,7 @@ int main(int argc, char** argv) {
   bool status = DeserializeThriftMsg(metadata, &metadata_len, true, &file_metadata);
   assert(status);
   cerr << ThriftDebugString(file_metadata) << endl;
+  cerr << "Schema: " << endl << GetSchema(file_metadata) << endl;
 
   int pages_skipped = 0;
   int pages_read = 0;
@@ -234,8 +282,8 @@ int main(int argc, char** argv) {
       cerr << "  Reading column " << c << endl;
       ColumnChunk& col = rg.columns[c];
       
-      uint8_t* col_end = buffer + col.file_offset;
       uint8_t* data = buffer + col.meta_data.data_page_offset;
+      uint8_t* col_end = buffer + col.file_offset + col.meta_data.total_compressed_size;
 
       CompressionCodec::type codec = col.meta_data.codec;
       if (codec != CompressionCodec::UNCOMPRESSED &&
@@ -287,10 +335,6 @@ int main(int argc, char** argv) {
           data_page_data = reinterpret_cast<uint8_t*>(&decompression_buffer[0]);
         }
 
-        int32_t num_definition_bytes = *reinterpret_cast<int32_t*>(data_page_data);
-        uint8_t* definition_data = data_page_data + sizeof(int32_t);
-        uint8_t* values = data_page_data + num_definition_bytes + sizeof(int32_t);
-    
         int num_output_values = num_values;
         if (FLAGS_values_per_data_page >= 0) {
           num_output_values = min(num_values, FLAGS_values_per_data_page);
@@ -299,6 +343,10 @@ int main(int argc, char** argv) {
           rows_csv.resize(rows_csv.size() + num_output_values);
         }
 
+        int32_t num_definition_bytes = *reinterpret_cast<int32_t*>(data_page_data);
+        uint8_t* definition_data = data_page_data + sizeof(int32_t);
+        uint8_t* values = data_page_data + num_definition_bytes + sizeof(int32_t);
+    
         impala::RleDecoder definition_levels(definition_data, num_definition_bytes);
 
         switch (col.meta_data.type) {

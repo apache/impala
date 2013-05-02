@@ -21,6 +21,7 @@
 #include "runtime/runtime-state.h"
 #include "util/bit-util.h"
 #include "util/buffer-builder.h"
+#include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/integer-array.h"
 #include "util/rle-encoding.h"
@@ -443,7 +444,10 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   for (int i = 0; i < columns_.size(); ++i) {
     ColumnMetaData metadata;
     metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_->type()];
+    // Add all encodings that were used in this file.  Currently we only use PLAIN
+    // for data values and RLE for the definition levels.
     metadata.encodings.push_back(Encoding::PLAIN);
+    metadata.encodings.push_back(Encoding::RLE);
     metadata.path_in_schema.push_back(table_desc_->col_names()[i + num_clustering_cols]);
     metadata.codec = columns_[i]->codec_;
     current_row_group_->columns[i].__set_meta_data(metadata);
