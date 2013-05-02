@@ -7,6 +7,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Catalog;
 import com.google.common.base.Preconditions;
 
@@ -25,8 +26,9 @@ public class ToSqlTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      AnalysisContext analysisCtxt = new AnalysisContext(catalog, catalog.DEFAULT_DB,
-          System.getProperty("user.name"));
+      AnalysisContext analysisCtxt = new AnalysisContext(catalog,
+          Catalog.DEFAULT_DB, new User(System.getProperty("user.name")));
+
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Preconditions.checkNotNull(analysisResult.getStmt());
       return analysisResult;

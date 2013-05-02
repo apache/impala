@@ -47,9 +47,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
+import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
@@ -78,6 +81,7 @@ import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.google.common.base.Preconditions;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -91,12 +95,17 @@ public class JniFrontend {
 
   private final Frontend frontend;
 
-  public JniFrontend() {
-    frontend = new Frontend();
-  }
-
-  public JniFrontend(boolean lazy) {
-    frontend = new Frontend(lazy);
+  /**
+   * Create a new instance of the Jni Frontend.
+   */
+  public JniFrontend(boolean lazy, String serverName,
+      String authorizationPolicyFile) throws InternalException {
+    // Validate the authorization configuration before initializing the Frontend.
+    // If there are any configuration problems Impala startup will fail.
+    AuthorizationConfig authorizationConfig =
+        new AuthorizationConfig(serverName, authorizationPolicyFile);
+    authorizationConfig.validateConfig();
+    frontend = new Frontend(lazy, authorizationConfig);
   }
 
   /**
@@ -295,7 +304,12 @@ public class JniFrontend {
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetTablesParams params = new TGetTablesParams();
     deserializeThrift(params, thriftGetTablesParams);
-    List<String> tables = frontend.getTableNames(params.db, params.pattern);
+    // If the session was not set it indicates this is an internal Impala call.
+    User user = params.isSetSession() ?
+        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
+
+    Preconditions.checkState(!params.isSetSession() || user != null );
+    List<String> tables = frontend.getTableNames(params.db, params.pattern, user);
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
@@ -317,7 +331,10 @@ public class JniFrontend {
   public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetDbsParams params = new TGetDbsParams();
     deserializeThrift(params, thriftGetTablesParams);
-    List<String> dbs = frontend.getDbNames(params.pattern);
+    // If the session was not set it indicates this is an internal Impala call.
+    User user = params.isSetSession() ?
+        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
+    List<String> dbs = frontend.getDbNames(params.pattern, user);
 
     TGetDbsResult result = new TGetDbsResult();
     result.setDbs(dbs);

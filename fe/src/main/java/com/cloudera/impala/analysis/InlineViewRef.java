@@ -20,6 +20,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -71,7 +72,8 @@ public class InlineViewRef extends TableRef {
    * the underlying, fully substituted query block select list expressions.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     // Analyze the inline view query statement with its own analyzer
     inlineViewAnalyzer = new Analyzer(analyzer);
     queryStmt.analyze(inlineViewAnalyzer);
@@ -99,7 +101,11 @@ public class InlineViewRef extends TableRef {
     LOG.debug("inline view smap: " + sMap.debugString());
 
     // Now do the remaining join analysis
-    analyzeJoin(analyzer);
+    try {
+      analyzeJoin(analyzer);
+    } catch (InternalException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
   }
 
   /**
@@ -197,5 +203,10 @@ public class InlineViewRef extends TableRef {
   @Override
   protected String tableRefToSql() {
     return "(" + queryStmt.toSql() + ") " + alias;
+  }
+
+  @Override
+  public String debugString() {
+    return tableRefToSql();
   }
 }

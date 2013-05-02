@@ -114,6 +114,13 @@ DEFINE_string(profile_log_dir, "", "The directory in which profile log files are
 DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
     "profile log file before a new one is created");
 
+// Authorization related flags. Both must be set to valid values to properly configure
+// authorization.
+DEFINE_string(server_name, "", "The name to use for securing this impalad "
+    "server during authorization. If set, authorization will be enabled.");
+DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
+    "file. If set, authorization will be enabled.");
+
 namespace impala {
 
 ThreadManager* fe_tm;
@@ -321,7 +328,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   JNIEnv* jni_env = getJNIEnv();
   // create instance of java class JniFrontend
   jclass fe_class = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
-  jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
+  jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>",
+      "(ZLjava/lang/String;Ljava/lang/String;)V");
   EXIT_IF_EXC(jni_env);
   create_exec_request_id_ =
       jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
@@ -368,7 +376,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   EXIT_IF_EXC(jni_env);
 
   jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
-  jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
+  jstring policy_file_path =
+      jni_env->NewStringUTF(FLAGS_authorization_policy_file.c_str());
+  jstring server_name =
+      jni_env->NewStringUTF(FLAGS_server_name.c_str());
+  jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy, server_name, policy_file_path);
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 
@@ -779,7 +791,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
 void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   TGetDbsResult get_dbs_result;
-  Status status = GetDbNames(NULL, &get_dbs_result);
+  Status status = GetDbNames(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
     (*output) << "Error: " << status.GetErrorMsg();
     return;
@@ -801,7 +813,7 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     BOOST_FOREACH(const string& db, db_names) {
       (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
       TGetTablesResult get_table_results;
-      Status status = GetTableNames(db, NULL, &get_table_results);
+      Status status = GetTableNames(db, NULL, NULL, &get_table_results);
       if (!status.ok()) {
         (*output) << "Error: " << status.GetErrorMsg();
         continue;
@@ -823,7 +835,7 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 
     BOOST_FOREACH(const string& db, db_names) {
       TGetTablesResult get_table_results;
-      Status status = GetTableNames(db, NULL, &get_table_results);
+      Status status = GetTableNames(db, NULL, NULL, &get_table_results);
       if (!status.ok()) {
         (*output) << "Error: " << status.GetErrorMsg();
         continue;
@@ -1089,12 +1101,12 @@ void ImpalaServer::Wait(shared_ptr<QueryExecState> exec_state) {
 
 Status ImpalaServer::UpdateCatalogMetrics() {
   TGetDbsResult db_names;
-  RETURN_IF_ERROR(GetDbNames(NULL, &db_names));
+  RETURN_IF_ERROR(GetDbNames(NULL, NULL, &db_names));
   ImpaladMetrics::CATALOG_NUM_DBS->Update(db_names.dbs.size());
   ImpaladMetrics::CATALOG_NUM_TABLES->Update(0L);
   BOOST_FOREACH(const string& db, db_names.dbs) {
     TGetTablesResult table_names;
-    RETURN_IF_ERROR(GetTableNames(db, NULL, &table_names));
+    RETURN_IF_ERROR(GetTableNames(db, NULL, NULL, &table_names));
     ImpaladMetrics::CATALOG_NUM_TABLES->Increment(table_names.tables.size());
   }
 
@@ -1201,7 +1213,7 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
 }
 
 Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
-    TGetTablesResult* table_names) {
+    const TSessionState* session, TGetTablesResult* table_names) {
   JNIEnv* jni_env = getJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
@@ -1212,17 +1224,22 @@ Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
   if (pattern != NULL) {
     params.__set_pattern(*pattern);
   }
+  if (session != NULL) {
+    params.__set_session(*session);
+  }
 
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
+
   RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, table_names));
   return Status::OK;
 }
 
-Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) {
+Status ImpalaServer::GetDbNames(const string* pattern, const TSessionState* session,
+    TGetDbsResult* db_names) {
   JNIEnv* jni_env = getJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
@@ -1231,10 +1248,14 @@ Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) 
   if (pattern != NULL) {
     params.__set_pattern(*pattern);
   }
+  if (session != NULL) {
+    params.__set_session(*session);
+  }
 
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
+
   RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, db_names));

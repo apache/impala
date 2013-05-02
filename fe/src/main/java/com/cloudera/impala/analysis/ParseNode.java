@@ -14,8 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 
 public interface ParseNode {
 
@@ -25,7 +25,8 @@ public interface ParseNode {
    * @param analyzer
    * @throws AnalysisException, InternalException
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException;
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException;
 
   /**
    * @return SQL syntax corresponding to this node.

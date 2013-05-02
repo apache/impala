@@ -26,14 +26,28 @@ include "cli_service.thrift"
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
 
-// Arguments to getTableNames, which returns a list of tables that match an 
+// Per-client session state
+struct TSessionState {
+  // The default database for the session
+  1: required string database
+
+  // The user to whom this session belongs
+  2: required string user
+}
+
+// Arguments to getTableNames, which returns a list of tables that match an
 // optional pattern.
 struct TGetTablesParams {
   // If not set, match tables in all DBs
-  1: optional string db 
+  1: optional string db
 
   // If not set, match every table
-  2: optional string pattern 
+  2: optional string pattern
+
+  // Session state for the user who initiated this request. If authorization is
+  // enabled, only the tables this user has access to will be returned. If not
+  // set, access checks will be skipped (used for internal Impala requests)
+  3: optional TSessionState session
 }
 
 // getTableNames returns a list of unqualified table names
@@ -46,6 +60,11 @@ struct TGetTablesResult {
 struct TGetDbsParams {
   // If not set, match every database
   1: optional string pattern
+
+  // Session state for the user who initiated this request. If authorization is
+  // enabled, only the databases this user has access to will be returned. If not
+  // set, access checks will be skipped (used for internal Impala requests)
+  2: optional TSessionState session
 }
 
 // getDbNames returns a list of database names
@@ -329,14 +348,7 @@ struct TDropTableParams {
   2: required bool if_exists
 }
 
-// Per-client session state
-struct TSessionState {
-  // The default database, changed by USE <database> queries.
-  1: required string database
 
-  // The user who this session belongs to.
-  2: required string user
-}
 
 struct TClientRequest {
   // select stmt to be executed
@@ -518,6 +530,11 @@ struct TMetadataOpRequest {
   7: optional cli_service.TGetTableTypesReq get_table_types_req
   8: optional cli_service.TGetColumnsReq get_columns_req
   9: optional cli_service.TGetFunctionsReq get_functions_req
+
+  // Session state for the user who initiated this request. If authorization is
+  // enabled, only the server objects this user has access to will be returned.
+  // If not set, access checks will be skipped (used for internal Impala requests)
+  10: optional TSessionState session
 }
 
 // Output of JniFrontend.hiveServer2MetadataOperation

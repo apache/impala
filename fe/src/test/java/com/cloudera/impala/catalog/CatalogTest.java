@@ -22,7 +22,8 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.google.common.collect.Sets;
 
@@ -76,9 +77,10 @@ public class CatalogTest {
     }
   }
 
-  @Test public void TestColSchema() throws TableLoadingException {
-    Db defaultDb = catalog.getDb("functional");
-    Db testDb = catalog.getDb("functional_seq");
+  @Test
+  public void TestColSchema() throws TableLoadingException {
+    Db defaultDb = getDb(catalog, "functional");
+    Db testDb = getDb(catalog, "functional_seq");
 
     assertNotNull(defaultDb);
     assertEquals(defaultDb.getName(), "functional");
@@ -258,7 +260,7 @@ public class CatalogTest {
   }
 
   @Test public void TestPartitions() throws TableLoadingException {
-    HdfsTable table = (HdfsTable) catalog.getDb("functional").getTable("AllTypes");
+    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("AllTypes");
     List<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
@@ -292,7 +294,7 @@ public class CatalogTest {
   @Test
   public void testStats() throws TableLoadingException {
     // make sure the stats for functional.alltypesagg look correct
-    HdfsTable table = (HdfsTable) catalog.getDb("functional").getTable("AllTypesAgg");
+    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("AllTypesAgg");
 
     Column idCol = table.getColumn("id");
     assertEquals(idCol.getStats().getAvgSerializedSize(),
@@ -363,36 +365,36 @@ public class CatalogTest {
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
     HBaseTable table =
-        (HBaseTable)catalog.getDb("functional").getTable("internal_hbase_table");
+        (HBaseTable)getDb(catalog, "functional").getTable("internal_hbase_table");
     assertNotNull("internal_hbase_table was not found", table);
   }
 
   @Test(expected = TableLoadingException.class)
   public void testMapColumnsFails() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("map_table");
+    Table table = getDb(catalog, "functional").getTable("map_table");
   }
 
   @Test(expected = TableLoadingException.class)
   public void testArrayColumnsFails() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("array_table");
+    Table table = getDb(catalog, "functional").getTable("array_table");
   }
 
   @Test
   public void testDatabaseDoesNotExist() {
-    Db nonExistentDb = catalog.getDb("doesnotexist");
+    Db nonExistentDb = getDb(catalog, "doesnotexist");
     assertNull(nonExistentDb);
   }
 
   @Test
   public void testCreateTableMetadata() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("alltypes");
+    Table table = getDb(catalog, "functional").getTable("alltypes");
     // Tables are created via Impala so the metadata should have been populated properly.
     // alltypes is an external table.
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.EXTERNAL_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
-    table = catalog.getDb("functional").getTable("alltypesinsert");
+    table = getDb(catalog, "functional").getTable("alltypesinsert");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.MANAGED_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
@@ -401,7 +403,7 @@ public class CatalogTest {
   @Test
   public void testLoadingUnsupportedTableTypes() {
     try {
-      Table table = catalog.getDb("functional").getTable("hive_view");
+      Table table = getDb(catalog, "functional").getTable("hive_view");
       fail("Expected TableLoadingException when loading VIRTUAL_VIEW");
     } catch (TableLoadingException e) {
       assertEquals("Unsupported table type 'VIRTUAL_VIEW' for: functional.hive_view",
@@ -409,7 +411,7 @@ public class CatalogTest {
     }
 
     try {
-      Table table = catalog.getDb("functional").getTable("hive_index_tbl");
+      Table table = getDb(catalog, "functional").getTable("hive_index_tbl");
       fail("Expected TableLoadingException when loading INDEX_TABLE");
     } catch (TableLoadingException e) {
       assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
@@ -422,7 +424,7 @@ public class CatalogTest {
   // escape char.
   @Test public void TestTableWithBadEscapeChar() throws TableLoadingException {
     HdfsTable table =
-        (HdfsTable) catalog.getDb("functional").getTable("escapechartesttable");
+        (HdfsTable) getDb(catalog, "functional").getTable("escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();
     for (HdfsPartition p: partitions) {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
@@ -449,5 +451,14 @@ public class CatalogTest {
     // could throw an exception when the retry attempts maxed out. This exception
     // would have details on the number of retries, etc. We also need coverage for the
     // case where we we have a few failure/retries and then a success.
+  }
+
+  private static Db getDb(Catalog catalog, String dbName) {
+    try {
+      return catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ANY);
+    } catch (AuthorizationException e) {
+      // Wrap as unchecked exception
+      throw new IllegalStateException(e);
+    }
   }
 }

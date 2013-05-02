@@ -1,0 +1,27 @@
+# The [groups] section maps roles to (hadoop) user groups.
+[groups]
+${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
+          select_functional_alltypesagg, insert_functional_alltypes, insert_parquet,\
+          new_table_uri
+
+# The [roles] section defines privileges for objects in the authorizeable hierarchy.
+# Each role must start at the server-level and go down. If no "action" is specified, the
+# role will have all permissions at that level. For more information see the Hive Access
+# documentation.
+[roles]
+all_server = server=server1
+all_tpch = server=server1->db=tpch
+all_newdb = server=server1->db=newdb
+all_functional_seq_snap = server=server1->db=functional_seq_snap
+select_tpcds = server=server1->db=tpcds->table=*->action=select
+select_functional_alltypesagg =\
+    server=server1->db=functional->table=alltypesagg->action=select
+insert_functional_alltypes = server=server1->db=functional->table=alltypes->action=insert
+insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
+
+new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table
+
+# This section is not currently used by Impala. It allows for a admin specified mapping of
+# users -> roles rather than using the built-in hadoop group mapping.
+[users]
+${USER} = ${USER}

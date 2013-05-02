@@ -45,7 +45,6 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HBaseTableSink;
 import com.cloudera.impala.thrift.THBaseTable;

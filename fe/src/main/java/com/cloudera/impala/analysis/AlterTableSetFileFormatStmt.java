@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
@@ -76,9 +77,10 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
-    // Alterting the table, rather than the partition.
+    // Altering the table, rather than the partition.
     if (partitionSpec.size() == 0) {
       return;
     }

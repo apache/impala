@@ -17,7 +17,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from functional.alltypes");
-    AnalysisError("select int_col from badtbl", "Unknown table");
+    AnalysisError("select int_col from badtbl", "Table does not exist: default.badtbl");
 
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM FUNCTIONAL.ALLTYPES");
@@ -855,9 +855,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("insert overwrite table functional.alltypes " +
         "partition (year, month) " +
         "values(1, true, 'a', 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp)," +
-        "2009, 10)", "Target table 'alltypes' and result of select statement are not " +
-        "union compatible.\nIncompatible types 'TINYINT' and 'STRING' in column " +
-        "'<slot 2>'.");
+        "2009, 10)", "Target table 'functional.alltypes' and result of select " +
+        "statement are not union compatible.\nIncompatible types 'TINYINT' and " +
+        "'STRING' in column '<slot 2>'.");
   }
 
   @Test
@@ -982,9 +982,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union " +
-            "compatible.\n" +
-            "Target table expects 11 columns but the select statement returns 13.");
+        "Target table 'functional.alltypessmall' and result of select statement " +
+        "are not union compatible.\n" +
+        "Target table expects 11 columns but the select statement returns 13.");
   }
 
   /**
@@ -1099,8 +1099,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, timestamp_col from functional.alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union " +
-        "compatible.\n" +
+        "Target table 'functional.alltypessmall' and result of select statement are " +
+        "not union compatible.\n" +
         "Target table expects 11 columns but the select statement returns 10.");
     // Not union compatible, incompatible type in last column (bool_col -> string).
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
@@ -1108,8 +1108,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, bool_col, timestamp_col " +
         "from functional.alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union " +
-        "compatible.\n" +
+        "Target table 'functional.alltypessmall' and result of select " +
+        "statement are not union compatible.\n" +
         "Incompatible types 'STRING' and 'BOOLEAN' in column 'bool_col'.");
     // Too many partitioning columns.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
@@ -1144,8 +1144,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union " +
-        "compatible.\n" +
+        "Target table 'functional.alltypessmall' and result of select statement are " +
+        "not union compatible.\n" +
         "Target table expects 11 columns but the select statement returns 13.");
 
     // Partition columns should be type-checked

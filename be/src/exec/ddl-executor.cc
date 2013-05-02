@@ -28,18 +28,20 @@ DdlExecutor::DdlExecutor(ImpalaServer* impala_server)
   DCHECK(impala_server != NULL);
 }
 
-Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
-  switch (exec_request->ddl_type) {
+Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
+    const TSessionState& session) {
+  switch (exec_request.ddl_type) {
     case TDdlType::SHOW_TABLES: {
-      TShowTablesParams* params = &exec_request->show_tables_params;
+      const TShowTablesParams* params = &exec_request.show_tables_params;
       // A NULL pattern means match all tables. However, Thrift string types can't
       // be NULL in C++, so we have to test if it's set rather than just blindly
       // using the value.
-      string* table_name = params->__isset.show_pattern ? &(params->show_pattern) : NULL;
+      const string* table_name =
+          params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
       TGetTablesResult table_names;
       RETURN_IF_ERROR(impala_server_->GetTableNames(params->db, table_name,
-          &table_names));
+          &session, &table_names));
 
       // Set the result set
       result_set_.resize(table_names.tables.size());
@@ -51,10 +53,11 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
       return Status::OK;
     }
     case TDdlType::SHOW_DBS: {
-      TShowDbsParams* params = &exec_request->show_dbs_params;
+      const TShowDbsParams* params = &exec_request.show_dbs_params;
       TGetDbsResult db_names;
-      string* db_pattern = params->__isset.show_pattern ? (&params->show_pattern) : NULL;
-      RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &db_names));
+      const string* db_pattern =
+          params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &session, &db_names));
 
       // Set the result set
       result_set_.resize(db_names.dbs.size());
@@ -67,7 +70,7 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
     }
     case TDdlType::DESCRIBE: {
       TDescribeTableResult table_columns;
-      TDescribeTableParams* params = &exec_request->describe_table_params;
+      const TDescribeTableParams* params = &exec_request.describe_table_params;
       RETURN_IF_ERROR(impala_server_->DescribeTable(params->db,
           params->table_name, &table_columns));
 
@@ -85,20 +88,20 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
       return Status::OK;
     }
     case TDdlType::ALTER_TABLE:
-      return impala_server_->AlterTable(exec_request->alter_table_params);
+      return impala_server_->AlterTable(exec_request.alter_table_params);
     case TDdlType::CREATE_DATABASE:
-      return impala_server_->CreateDatabase(exec_request->create_db_params);
+      return impala_server_->CreateDatabase(exec_request.create_db_params);
     case TDdlType::CREATE_TABLE_LIKE:
-      return impala_server_->CreateTableLike(exec_request->create_table_like_params);
+      return impala_server_->CreateTableLike(exec_request.create_table_like_params);
     case TDdlType::CREATE_TABLE:
-      return impala_server_->CreateTable(exec_request->create_table_params);
+      return impala_server_->CreateTable(exec_request.create_table_params);
     case TDdlType::DROP_DATABASE:
-      return impala_server_->DropDatabase(exec_request->drop_db_params);
+      return impala_server_->DropDatabase(exec_request.drop_db_params);
     case TDdlType::DROP_TABLE:
-      return impala_server_->DropTable(exec_request->drop_table_params);
+      return impala_server_->DropTable(exec_request.drop_table_params);
     default: {
       stringstream ss;
-      ss << "Unknown DDL exec request type: " << exec_request->ddl_type;
+      ss << "Unknown DDL exec request type: " << exec_request.ddl_type;
       return Status(ss.str());
     }
   }

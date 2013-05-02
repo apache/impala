@@ -14,20 +14,18 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.google.common.base.Joiner;
+import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -41,7 +39,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
 
   public AlterTableAddReplaceColsStmt(TableName tableName, List<ColumnDef> columnDefs,
       boolean replaceExistingCols) {
-    super(tableName); 
+    super(tableName);
     Preconditions.checkState(columnDefs != null && columnDefs.size() > 0);
     this.columnDefs = Lists.newArrayList(columnDefs);
     this.replaceExistingCols = replaceExistingCols;
@@ -70,7 +68,8 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     Table t = getTargetTable();
 

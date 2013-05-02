@@ -39,6 +39,7 @@
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
+    <hive.access.version>${env.IMPALA_HIVE_ACCESS_VERSION}</hive.access.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
   </properties>
 
@@ -77,6 +78,36 @@
       <version>${hadoop.version}</version>
       <scope>system</scope>
       <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/lib/hadoop-auth-${hadoop.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.access</groupId>
+      <artifactId>access-core</artifactId>
+      <version>${hive.access.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/access-${hive.access.version}-SNAPSHOT/lib/access-core-${hive.access.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.access</groupId>
+      <artifactId>access-provider-file</artifactId>
+      <version>${hive.access.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/access-${hive.access.version}-SNAPSHOT/lib/access-provider-file-${hive.access.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.access</groupId>
+      <artifactId>access-binding-hive</artifactId>
+      <version>${hive.access.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/access-${hive.access.version}-SNAPSHOT/lib/access-binding-hive-${hive.access.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-core</artifactId>
+      <version>1.2.1</version>
     </dependency>
 
     <dependency>

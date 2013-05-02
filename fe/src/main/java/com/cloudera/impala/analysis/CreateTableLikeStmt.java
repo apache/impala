@@ -14,26 +14,19 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
-import java.util.ArrayList;
-
-import com.cloudera.impala.analysis.TableName;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
-import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
-
-import com.google.common.base.Joiner;
+import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a CREATE TABLE LIKE statement which creates a new table based on
  * a copy of an existing table definition.
  */
-public class CreateTableLikeStmt extends ParseNodeBase {
+public class CreateTableLikeStmt extends StatementBase {
   private final TableName tableName;
   private final TableName srcTableName;
   private final boolean isExternal;
@@ -122,10 +115,12 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     return owner;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) {
@@ -170,29 +165,23 @@ public class CreateTableLikeStmt extends ParseNodeBase {
     return params;
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
-    srcDbName =
-        srcTableName.isFullyQualified() ? srcTableName.getDb() : analyzer.getDefaultDb();
-    owner = analyzer.getUser();
+    Preconditions.checkState(srcTableName != null && !srcTableName.isEmpty());
 
-    if (analyzer.getCatalog().getDb(dbName) == null) {
-      throw new AnalysisException("Database does not exist: " + dbName);
-    }
+    // Make sure the source table exists and the user has permission to access it.
+    srcDbName = analyzer
+        .getTable(srcTableName, Privilege.VIEW_METADATA)
+        .getDb().getName();
+    dbName = analyzer.getTargetDbName(tableName);
 
-    if (analyzer.getCatalog().getDb(srcDbName) == null) {
-      throw new AnalysisException("Database does not exist: " + srcDbName);
+    if (analyzer.dbContainsTable(dbName, tableName.getTbl(), Privilege.CREATE) &&
+        !ifNotExists) {
+      throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
+          String.format("%s.%s", dbName, getTbl()));
     }
-
-    if (!analyzer.getCatalog().containsTable(srcDbName, getSrcTbl())) {
-      throw new AnalysisException(String.format("Source table does not exist: %s.%s",
-          srcDbName, getSrcTbl()));
-    }
-
-    if (analyzer.getCatalog().containsTable(dbName, getTbl()) && !ifNotExists) {
-      throw new AnalysisException(String.format("Table already exists: %s.%s",
-          dbName, getTbl()));
-    }
+    owner = analyzer.getUser().getName();
   }
 }

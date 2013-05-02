@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -29,7 +30,7 @@ import com.google.common.collect.Lists;
  * an inline view, or a base table, such as Hive table or HBase table. This abstract
  * representation of table also contains the JOIN specification.
  */
-public abstract class TableRef extends ParseNodeBase {
+public abstract class TableRef implements ParseNode {
   // Table alias
   protected final String alias;
 
@@ -279,4 +280,11 @@ public abstract class TableRef extends ParseNodeBase {
   abstract public String getAlias();
 
   abstract public TableName getAliasAsName();
+
+  /*
+   * Gets the privilege requirement. This is always SELECT for TableRefs.
+   */
+  public Privilege getPrivilegeRequirement() {
+    return Privilege.SELECT;
+  }
 }

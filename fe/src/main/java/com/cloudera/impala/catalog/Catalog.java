@@ -14,15 +14,23 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,7 +46,12 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.authorization.AuthorizationChecker;
+import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequest;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
@@ -66,11 +79,19 @@ public class Catalog {
   public static final String DEFAULT_DB = "default";
   private static final Logger LOG = Logger.getLogger(Catalog.class);
   private static final int META_STORE_CLIENT_POOL_SIZE = 5;
+  //TODO: Make the reload interval configurable.
+  private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
   private final boolean lazy;
   private int nextTableId;
   private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
   // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
   private final Object metastoreDdlLock = new Object();
+  private final ScheduledExecutorService policyReader =
+      Executors.newScheduledThreadPool(1);
+  private final AuthorizationConfig authzConfig;
+  // Lock used to synchronize refreshing the AuthorizationChecker.
+  private final ReentrantReadWriteLock authzCheckerLock = new ReentrantReadWriteLock();
+  private AuthorizationChecker authzChecker;
 
   // map from db name to DB
   private final LazyDbMap dbs = new LazyDbMap();
@@ -171,8 +192,8 @@ public class Catalog {
       try {
         return dbMetadataCache.get(dbName.toLowerCase());
       } catch (ExecutionException e) {
-        // Search for the cause of the exception. If a load failed due to the database not
-        // being found, callers should get 'null' instead of having to handle the
+        // Search for the cause of the exception. If a load failed due to the database
+        // not being found, callers should get 'null' instead of having to handle the
         // exception.
         Throwable cause = e.getCause();
         while(cause != null) {
@@ -214,52 +235,8 @@ public class Catalog {
     }
   }
 
-  /**
-   * Thrown by some methods when a table column is not found in the metastore
-   */
-  public static class ColumnNotFoundException extends ImpalaException {
-    // Dummy serial ID to satisfy Eclipse
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public ColumnNotFoundException(String s) { super(s); }
-  }
-
-  /**
-   * Thrown by some methods when a Partition is not found in the metastore
-   */
-  public static class PartitionNotFoundException extends ImpalaException {
-    // Dummy serial ID to satisfy Eclipse
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public PartitionNotFoundException(String s) { super(s); }
-  }
-
-
-  /**
-   * Thrown by some methods when a table can't be found in the metastore
-   */
-  public static class TableNotFoundException extends ImpalaException {
-    // Dummy serial UID to avoid warnings
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public TableNotFoundException(String s) { super(s); }
-
-    public TableNotFoundException(String s, Exception cause) { super(s, cause); }
-  }
-
-  /**
-   * Thrown by some methods when a database is not found in the metastore
-   */
-  public static class DatabaseNotFoundException extends ImpalaException {
-    // Dummy serial ID to satisfy Eclipse
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public DatabaseNotFoundException(String s) { super(s); }
-  }
-
-
   public Catalog() {
-    this(true, true);
+    this(true, true, AuthorizationConfig.createAuthDisabledConfig());
   }
 
   /**
@@ -267,13 +244,28 @@ public class Catalog {
    * the constructor. If raiseExceptions is false, exceptions will be logged and
    * swallowed. Otherwise, exceptions are re-raised.
    */
-  public Catalog(boolean lazy, boolean raiseExceptions) {
+  public Catalog(boolean lazy, boolean raiseExceptions,
+      AuthorizationConfig authzConfig) {
     this.nextTableId = 0;
     this.lazy = lazy;
+    this.authzConfig = authzConfig;
+    this.authzChecker = createAuthorizationChecker(authzConfig);
+
+    // If authorization is enabled, reload the policy on a regular basis.
+    if (authzConfig.isEnabled()) {
+      // Stagger the reads across nodes
+      Random randomGen = new Random(UUID.randomUUID().hashCode());
+      int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
+
+      policyReader.scheduleAtFixedRate(
+          new AuthorizationPolicyReader(authzConfig),
+          delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
+    }
 
     try {
       metaStoreClientPool.addClients(META_STORE_CLIENT_POOL_SIZE);
       MetaStoreClient msClient = metaStoreClientPool.getClient();
+
       try {
         dbs.add(msClient.getHiveClient().getAllDatabases());
       } finally {
@@ -294,8 +286,40 @@ public class Catalog {
         }
         throw new IllegalStateException(e);
       }
+
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
+    }
+  }
+
+  private class AuthorizationPolicyReader implements Runnable {
+    private final AuthorizationConfig config;
+
+    public AuthorizationPolicyReader(AuthorizationConfig config) {
+      this.config = config;
+    }
+
+    public void run() {
+      LOG.info("Reloading authorization policy file from: " + config.getPolicyFile());
+      authzCheckerLock.writeLock().lock();
+      try {
+        authzChecker = createAuthorizationChecker(config);
+      } finally {
+        authzCheckerLock.writeLock().unlock();
+      }
+    }
+  }
+
+  private static AuthorizationChecker createAuthorizationChecker(
+      AuthorizationConfig config) {
+    try {
+      return new AuthorizationChecker(config);
+    } catch (IOException e) {
+      // The Hive Access code doesn't actually ever throw an IOException, but it does
+      // contain a throws declaration. If the file doesn't exist the current
+      // behavior is to fail to give access to any user request. Leaving this here
+      // in case that behavior changes.
+      throw new IllegalStateException(e);
     }
   }
 
@@ -355,8 +379,8 @@ public class Catalog {
           break;
         }
         if (!iterator.hasNext()) {
-          throw new ColumnNotFoundException(
-              String.format("Column name %s not found in table %s.", colName, tableName));
+          throw new ColumnNotFoundException(String.format(
+              "Column name %s not found in table %s.", colName, tableName));
         }
       }
       applyAlterTable(msTbl);
@@ -481,8 +505,8 @@ public class Catalog {
           break;
         }
         if (!iterator.hasNext()) {
-          throw new ColumnNotFoundException(
-              String.format("Column name %s not found in table %s.", colName, tableName));
+          throw new ColumnNotFoundException(String.format(
+              "Column name %s not found in table %s.", colName, tableName));
         }
       }
       applyAlterTable(msTbl);
@@ -517,13 +541,14 @@ public class Catalog {
   /**
    * Changes the file format for the given table or partition. This is a metadata only
    * operation, existing table data will not be converted to the new format. After
-   * changing the file format the table metadata is marked as invalid and will be reloaded
-   * on the next access.
+   * changing the file format the table metadata is marked as invalid and will be
+   * reloaded on the next access.
    */
   public void alterTableSetFileFormat(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat)
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, PartitionNotFoundException, TableNotFoundException,
+      TableLoadingException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock) {
@@ -641,7 +666,7 @@ public class Catalog {
       InvalidObjectException, org.apache.thrift.TException {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
-    if (ifNotExists && getDb(dbName) != null) {
+    if (ifNotExists && getDbInternal(dbName) != null) {
       LOG.info("Skipping database creation because " + dbName + " already exists and " +
           "ifNotExists is true.");
       return;
@@ -812,7 +837,7 @@ public class Catalog {
       boolean isExternal, String comment, FileFormat fileFormat, String location,
       boolean ifNotExists) throws MetaException, NoSuchObjectException,
       AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException,
-      ImpalaException, TableLoadingException {
+      ImpalaException, TableLoadingException, TableNotFoundException {
     checkTableNameFullyQualified(tableName);
     checkTableNameFullyQualified(srcTableName);
     if (ifNotExists && containsTable(tableName.getDb(), tableName.getTbl())) {
@@ -820,7 +845,7 @@ public class Catalog {
           "ifNotExists is true.", tableName));
       return;
     }
-    Table srcTable = getTable(srcTableName.getDb(), srcTableName.getTbl());
+    Table srcTable = getTableInternal(srcTableName.getDb(), srcTableName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tableName.getDb());
@@ -903,52 +928,138 @@ public class Catalog {
   }
 
   /**
-   * Case-insensitive lookup. Returns null if the database does not exist.
+   * Checks whether a given user has sufficient privileges to access an authorizeable
+   * object.
+   * @throws AuthorizationException - If the user does not have sufficient privileges.
    */
-  public Db getDb(String db) {
-    Preconditions.checkState(db != null && !db.isEmpty(),
+  public void checkAccess(User user, PrivilegeRequest privilegeRequest)
+      throws AuthorizationException {
+    Preconditions.checkNotNull(user);
+    Preconditions.checkNotNull(privilegeRequest);
+
+    if (!hasAccess(user, privilegeRequest)) {
+      Privilege privilege = privilegeRequest.getPrivilege();
+      if (EnumSet.of(Privilege.ANY, Privilege.ALL, Privilege.VIEW_METADATA)
+          .contains(privilege)) {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to access: %s",
+            user.getName(), privilegeRequest.getName()));
+      } else {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to execute '%s' on: %s",
+            user.getName(), privilege, privilegeRequest.getName()));
+      }
+    }
+  }
+
+  private boolean hasAccess(User user, PrivilegeRequest request) {
+    authzCheckerLock.readLock().lock();
+    try {
+      Preconditions.checkNotNull(authzChecker);
+      return authzChecker.hasAccess(user, request);
+    } finally {
+      authzCheckerLock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
+   * Returns null if no matching database is found.
+   */
+  private Db getDbInternal(String dbName) {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
-    return dbs.get(db);
+    return dbs.get(dbName);
+  }
+
+  /**
+   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
+   * Returns null if no matching database is found. Throws an AuthorizationException
+   * if the given user doesn't have enough privileges to access the database.
+   */
+  public Db getDb(String dbName, User user, Privilege privilege)
+      throws AuthorizationException {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+        "Null or empty database name given as argument to Catalog.getDb");
+    PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
+    if (privilege == Privilege.ANY) {
+      checkAccess(user, pb.any().onAnyTable(dbName).toRequest());
+    } else {
+      checkAccess(user, pb.allOf(privilege).onDb(dbName).toRequest());
+    }
+    return dbs.get(dbName);
   }
 
   /**
    * Returns a list of tables in the supplied database that match
-   * tablePattern. See filterStringsByPattern for details of the pattern match
-   * semantics.
+   * tablePattern and the user has privilege to access. See filterStringsByPattern
+   * for details of the pattern match semantics.
    *
    * dbName must not be null. tablePattern may be null (and thus matches
    * everything).
    *
+   * User is the user from the current session or ImpalaInternalUser for internal
+   * metadata requests (for example, populating the debug webpage Catalog view).
+   *
    * Table names are returned unqualified.
    */
-  public List<String> getTableNames(String dbName, String tablePattern)
+  public List<String> getTableNames(String dbName, String tablePattern, User user)
       throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
-    List<String> matchingTables = Lists.newArrayList();
 
-    Db db = getDb(dbName);
+    Db db = getDbInternal(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    return filterStringsByPattern(db.getAllTableNames(), tablePattern);
+
+    List<String> tables = filterStringsByPattern(db.getAllTableNames(), tablePattern);
+    if (authzConfig.isEnabled()) {
+      Iterator<String> iter = tables.iterator();
+      while (iter.hasNext()) {
+        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+            .allOf(Privilege.ANY).onTable(dbName, iter.next()).toRequest();
+        if (!hasAccess(user, privilegeRequest)) {
+          iter.remove();
+        }
+      }
+    }
+    return tables;
   }
 
   /**
-   * Returns a list of databases that match dbPattern. See
-   * filterStringsByPattern for details of the pattern match semantics.
+   * Returns a list of databases that match dbPattern and the user has privilege to
+   * access. See filterStringsByPattern for details of the pattern match semantics.
    *
-   * dbPattern may be null (and thus matches
-   * everything).
+   * dbPattern may be null (and thus matches everything).
+   *
+   * User is the user from the current session or ImpalaInternalUser for internal
+   * metadata requests (for example, populating the debug webpage Catalog view).
    */
-  public List<String> getDbNames(String dbPattern) {
-    return filterStringsByPattern(dbs.getAllDbNames(), dbPattern);
+  public List<String> getDbNames(String dbPattern, User user) {
+    List<String> matchingDbs = filterStringsByPattern(dbs.getAllDbNames(), dbPattern);
+
+    // If authorization is enabled, filter out the databases the user does not
+    // have permissions on.
+    if (authzConfig.isEnabled()) {
+      Iterator<String> iter = matchingDbs.iterator();
+      while (iter.hasNext()) {
+        String dbName = iter.next();
+        PrivilegeRequest request = new PrivilegeRequestBuilder()
+            .any().onAnyTable(dbName).toRequest();
+        if (!hasAccess(user, request)) {
+          iter.remove();
+        }
+      }
+    }
+    return matchingDbs;
   }
 
   /**
-   * Returns a list of all known databases in the Catalog.
+   * Returns a list of all known databases in the Catalog that the given user
+   * has privileges to access.
    */
-  public List<String> getAllDbNames() {
-    return getDbNames(null);
+  public List<String> getAllDbNames(User user) {
+    return getDbNames(null, user);
   }
 
   /**
@@ -991,14 +1102,42 @@ public class Catalog {
     return filtered;
   }
 
+  private boolean containsTable(String dbName, String tableName) {
+    Db db = getDbInternal(dbName);
+    return (db == null) ? false : db.containsTable(tableName);
+  }
+
+  /**
+   * Returns true if the table and the database exist in the Impala Catalog. Returns
+   * false if either the table or the database do not exist. This will
+   * not trigger a metadata load for the given table name.
+   * @throws AuthorizationException - If the user does not have sufficient privileges.
+   */
+  public boolean containsTable(String dbName, String tableName, User user,
+      Privilege privilege) throws AuthorizationException {
+    // Make sure the user has privileges to check if the table exists.
+    checkAccess(user, new PrivilegeRequestBuilder()
+        .allOf(privilege).onTable(dbName, tableName).toRequest());
+    return containsTable(dbName, tableName);
+  }
+
   /**
    * Returns true if the table and the database exist in the Impala Catalog. Returns
    * false if the database does not exist or the table does not exist. This will
    * not trigger a metadata load for the given table name.
+   * @throws AuthorizationException - If the user does not have sufficient privileges.
+   * @throws DatabaseNotFoundException - If the database does not exist.
    */
-  public boolean containsTable(String dbName, String tableName) {
-    Db db = getDb(dbName);
-    return db != null && db.containsTable(tableName);
+  public boolean dbContainsTable(String dbName, String tableName, User user,
+      Privilege privilege) throws AuthorizationException, DatabaseNotFoundException {
+    // Make sure the user has privileges to check if the table exists.
+    checkAccess(user, new PrivilegeRequestBuilder()
+        .allOf(privilege).onTable(dbName, tableName).toRequest());
+    Db db = getDbInternal(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database not found: " + dbName);
+    }
+    return db.containsTable(tableName);
   }
 
   /**
@@ -1025,9 +1164,9 @@ public class Catalog {
    * @throws TableNotFoundException - If the table does not exist.
    * @throws TableLoadingException - If there is an error loading the table metadata.
    */
-  public Table getTable(String dbName, String tableName) throws
+  private Table getTableInternal(String dbName, String tableName) throws
       DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
-    Db db = getDb(dbName);
+    Db db = getDbInternal(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database not found: " + dbName);
     }
@@ -1037,6 +1176,22 @@ public class Catalog {
           String.format("Table not found: %s.%s", dbName, tableName));
     }
     return table;
+  }
+
+  /**
+   * Returns the Table object for the given dbName/tableName. This will trigger a
+   * metadata load if the table metadata is not yet cached.
+   * @throws DatabaseNotFoundException - If the database does not exist.
+   * @throws TableNotFoundException - If the table does not exist.
+   * @throws TableLoadingException - If there is an error loading the table metadata.
+   * @throws AuthorizationException - If the user does not have sufficient privileges.
+   */
+  public Table getTable(String dbName, String tableName, User user,
+      Privilege privilege) throws DatabaseNotFoundException, TableNotFoundException,
+      TableLoadingException, AuthorizationException {
+    checkAccess(user, new PrivilegeRequestBuilder()
+        .allOf(privilege).onTable(dbName, tableName).toRequest());
+    return getTableInternal(dbName, tableName);
   }
 
   /**
@@ -1052,7 +1207,7 @@ public class Catalog {
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     String partitionNotFoundMsg =
         "Partition not found: " + Joiner.on(", ").join(partitionSpec);
-    Table table = getTable(dbName, tableName);
+    Table table = getTableInternal(dbName, tableName);
     // This is not an Hdfs table, throw an error.
     if (!(table instanceof HdfsTable)) {
       throw new PartitionNotFoundException(partitionNotFoundMsg);
@@ -1071,7 +1226,8 @@ public class Catalog {
       TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
     checkTableNameFullyQualified(tableName);
-    return getTable(tableName.getDb(), tableName.getTbl()).getMetaStoreTable().deepCopy();
+    return getTableInternal(tableName.getDb(), tableName.getTbl())
+        .getMetaStoreTable().deepCopy();
   }
 
   /*
@@ -1079,7 +1235,7 @@ public class Catalog {
    * the database does not exist no error is returned (there is nothing to invalidate).
    */
   public void invalidateTable(String dbName, String tableName, boolean ifExists) {
-    Db db = getDb(dbName);
+    Db db = getDbInternal(dbName);
     if (db != null) {
       db.invalidateTable(tableName, ifExists);
     }

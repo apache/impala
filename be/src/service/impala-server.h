@@ -419,14 +419,25 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // If pattern is NULL, match all tables otherwise match only those tables that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
+  // The TSessionState parameter is used to filter results of metadata operations when
+  // authorization is enabled. If this is a user initiated request, it should
+  // be set to the user's current session. If this is an Impala internal request,
+  // the session should be set to NULL which will skip privilege checks returning all
+  // results.
   Status GetTableNames(const std::string& db, const std::string* pattern,
-      TGetTablesResult* table_names);
+      const TSessionState* session, TGetTablesResult* table_names);
 
   // Return all databases matching the optional argument 'pattern'.
   // If pattern is NULL, match all databases otherwise match only those databases that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetDbNames(const std::string* pattern, TGetDbsResult* table_names);
+  // The TSessionState parameter is used to filter results of metadata operations when
+  // authorization is enabled. If this is a user initiated request, it should
+  // be set to the user's current session. If this is an Impala internal request,
+  // the session should be set to NULL which will skip privilege checks returning all
+  // results.
+  Status GetDbNames(const std::string* pattern, const TSessionState* session,
+      TGetDbsResult* table_names);
 
   // Returns (in the output parameter) a list of columns for the specified table
   // in the specified database.

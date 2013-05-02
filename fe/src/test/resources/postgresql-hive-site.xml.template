@@ -86,6 +86,11 @@
 </property-->
 
 <property>
+  <name>hive.access.conf.url</name>
+  <value>file:///${IMPALA_HOME}/fe/src/test/resources/auth-site.xml</value>
+</property>
+
+<property>
   <name>hive.metastore.rawstore.impl</name>
   <value>org.apache.hadoop.hive.metastore.ObjectStore</value>
   <description>Name of the class that implements org.apache.hadoop.hive.metastore.rawstore interface. This class is used to store and retrieval of raw metadata objects such as table, database</description>

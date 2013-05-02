@@ -17,6 +17,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -48,7 +50,8 @@ public class PlannerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    frontend = new Frontend(true);
+    frontend = new Frontend(true,
+        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
@@ -144,7 +147,7 @@ public class PlannerTest {
    * of 'testCase'.
    */
   private void RunTestCase(TestCase testCase, TQueryOptions options,
-      StringBuilder errorLog, StringBuilder actualOutput) {
+      StringBuilder errorLog, StringBuilder actualOutput) throws AuthorizationException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
 
@@ -251,7 +254,8 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile, TQueryOptions options) {
+  private void runPlannerTestFile(String testFile, TQueryOptions options)
+      throws AuthorizationException {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -286,7 +290,11 @@ public class PlannerTest {
   private void runPlannerTestFile(String testFile) {
     TQueryOptions options = new TQueryOptions();
     options.allow_unsupported_formats = true;
-    runPlannerTestFile(testFile, options);
+    try {
+      runPlannerTestFile(testFile, options);
+    } catch (AuthorizationException e) {
+      fail("Authorization error: " + e.getMessage());
+    }
   }
 
   @Test

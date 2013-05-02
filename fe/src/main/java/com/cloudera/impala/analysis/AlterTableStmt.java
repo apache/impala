@@ -14,20 +14,18 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Catalog.DatabaseNotFoundException;
-import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TTableName;
-
 import com.google.common.base.Preconditions;
 
 /**
  * Base class for all ALTER TABLE statements.
  */
-public abstract class AlterTableStmt extends ParseNodeBase {
+public abstract class AlterTableStmt extends StatementBase {
   private final TableName tableName;
 
   // Set during analysis.
@@ -67,24 +65,8 @@ public abstract class AlterTableStmt extends ParseNodeBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    // If table name was not fully qualified, use the current default database.
-    String dbName =
-        tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
-
-    // Analyzing ALTER TABLE statements requires inspecting the table metadata. This may
-    // trigger a metadata load, in which case we want to return the errors as
-    // AnalysisExceptions.
-    try { 
-      table = analyzer.getCatalog().getTable(dbName, getTbl());
-    } catch (DatabaseNotFoundException e) {
-      throw new AnalysisException("Unknown database: " + dbName);
-    } catch (TableNotFoundException e) {
-      throw new AnalysisException(
-          String.format("Unknown table: %s.%s", dbName, getTbl()));
-    } catch (TableLoadingException e) {
-      throw new AnalysisException(String.format(
-          "Unable to load metadata for table: %s.%s", dbName, getTbl()), e);
-    }
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    table = analyzer.getTable(tableName, Privilege.ALTER);
   }
 }

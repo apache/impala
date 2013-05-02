@@ -14,27 +14,26 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableDropColParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
+import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAlterTableDropColParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
 
 /**
  * Represents an ALTER TABLE DROP COLUMN statement.
- * Note: Hive does not support this syntax for droppping columns, but it is supported 
- * by mysql. 
+ * Note: Hive does not support this syntax for droppping columns, but it is supported
+ * by mysql.
  */
 public class AlterTableDropColStmt extends AlterTableStmt {
   private final String colName;
 
   public AlterTableDropColStmt(TableName tableName, String colName) {
-    super(tableName); 
+    super(tableName);
     Preconditions.checkState(colName != null && !colName.isEmpty());
     this.colName = colName;
   }
@@ -53,7 +52,8 @@ public class AlterTableDropColStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     Table t = getTargetTable();
     String tableName = getDb() + "." + getTbl();
@@ -61,9 +61,9 @@ public class AlterTableDropColStmt extends AlterTableStmt {
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {
       if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
         throw new AnalysisException("Cannot drop partition column: " + fs.getName());
-      } 
+      }
     }
-   
+
     if (t.getColumns().size() - t.getMetaStoreTable().getPartitionKeysSize() <= 1) {
       throw new AnalysisException(String.format(
           "Cannot drop column '%s' from %s. Tables must contain at least 1 column.",

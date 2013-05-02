@@ -54,6 +54,7 @@ echo "Metastore DB: hive_${METASTORE_DB}"
 pushd ${CONFIG_DIR}
 # Cleanup any existing files
 rm -f {core,hbase,hive}-site.xml
+rm -f authz-provider.ini
 
 # TODO: Throw an error if the template references an undefined environment variable
 if [ $CREATE_METASTORE -eq 1 ]; then
@@ -80,6 +81,9 @@ generate_config hbase-site.xml.template hbase-site.xml
 echo "Generating core-site.xml"
 # Update dfs.block.local-path-access.user with the current user
 generate_config core-site.xml.template core-site.xml
+
+echo "Generating authorization policy file"
+generate_config authz-policy.ini.template authz-policy.ini
 popd
 
 echo "Completed config generation"

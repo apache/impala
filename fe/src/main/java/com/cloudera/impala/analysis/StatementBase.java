@@ -14,11 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 
-abstract class ParseNodeBase implements ParseNode {
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+/*
+ * Base class for all Impala SQL statements.
+ */
+abstract class StatementBase implements ParseNode {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     throw new AnalysisException("not implemented");
   }
 

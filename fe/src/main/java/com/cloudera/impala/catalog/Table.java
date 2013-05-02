@@ -23,8 +23,6 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;

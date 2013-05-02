@@ -14,18 +14,17 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
+import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCreateDbParams;
-
-import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.hive.metastore.api.Database;
 
 /**
  * Represents a CREATE DATABASE statement
  */
-public class CreateDbStmt extends ParseNodeBase {
+public class CreateDbStmt extends StatementBase {
   private final String dbName;
   private final String location;
   private final String comment;
@@ -68,10 +67,12 @@ public class CreateDbStmt extends ParseNodeBase {
     return location;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE DATABASE");
     if (ifNotExists) {
@@ -98,13 +99,21 @@ public class CreateDbStmt extends ParseNodeBase {
     return params;
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     // Note: It is possible that a database with the same name was created external to
     // this Impala instance. If that happens, the caller will not get an
     // AnalysisException when creating the database, they will get a Hive
-    // AlreadyExistsException.
-    if (analyzer.getCatalog().getDb(getDb()) != null && !ifNotExists) {
-      throw new AnalysisException("Database already exists: " + getDb());
+    // AlreadyExistsException once the request has been sent to the metastore.
+    Db db = analyzer.getCatalog().getDb(getDb(), analyzer.getUser(), Privilege.CREATE);
+    if (db != null && !ifNotExists) {
+      throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
+    }
+
+    if (location != null) {
+      analyzer.getCatalog().checkAccess(analyzer.getUser(),
+          new PrivilegeRequestBuilder().onURI(location).all().toRequest());
     }
   }
 }

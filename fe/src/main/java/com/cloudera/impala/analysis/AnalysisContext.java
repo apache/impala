@@ -16,6 +16,8 @@ package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
 
+import com.cloudera.impala.authorization.User;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TQueryGlobals;
@@ -32,11 +34,11 @@ public class AnalysisContext {
   private final String defaultDatabase;
 
   // The user who initiated the request.
-  private final String user;
+  private final User user;
 
   private final TQueryGlobals queryGlobals;
 
-  public AnalysisContext(Catalog catalog, String defaultDb, String user) {
+  public AnalysisContext(Catalog catalog, String defaultDb, User user) {
     this.catalog = catalog;
     this.defaultDatabase = defaultDb;
     this.user = user;
@@ -44,7 +46,7 @@ public class AnalysisContext {
   }
 
   static public class AnalysisResult {
-    private ParseNode stmt;
+    private StatementBase stmt;
     private Analyzer analyzer;
 
     public boolean isAlterTableStmt() {
@@ -171,7 +173,7 @@ public class AnalysisContext {
       return (DescribeStmt) stmt;
     }
 
-    public ParseNode getStmt() {
+    public StatementBase getStmt() {
       return stmt;
     }
 
@@ -189,12 +191,13 @@ public class AnalysisContext {
    * @throws AnalysisException
    *           on any kind of error, including parsing error.
    */
-  public AnalysisResult analyze(String stmt) throws AnalysisException {
+  public AnalysisResult analyze(String stmt) throws AnalysisException,
+      AuthorizationException {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     try {
       AnalysisResult result = new AnalysisResult();
-      result.stmt = (ParseNode) parser.parse().value;
+      result.stmt = (StatementBase) parser.parse().value;
       if (result.stmt == null) {
         return null;
       }
@@ -202,6 +205,8 @@ public class AnalysisContext {
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
+      throw e;
+    } catch (AuthorizationException e) {
       throw e;
     } catch (Exception e) {
       throw new AnalysisException(parser.getErrorMsg(stmt), e);

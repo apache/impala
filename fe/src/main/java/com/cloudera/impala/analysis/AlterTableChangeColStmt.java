@@ -14,23 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableChangeColParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.google.common.base.Joiner;
+import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAlterTableChangeColParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Represents an ALTER TABLE CHANGE COLUMN colName newColDef statement.
@@ -43,7 +35,7 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
 
   public AlterTableChangeColStmt(TableName tableName, String colName,
       ColumnDef newColDef) {
-    super(tableName); 
+    super(tableName);
     Preconditions.checkNotNull(newColDef);
     Preconditions.checkState(colName != null && !colName.isEmpty());
     this.colName = colName;
@@ -70,7 +62,8 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     Table t = getTargetTable();
     String tableName = getDb() + "." + getTbl();
@@ -95,7 +88,7 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
 
     // Verify that if the column name is being changed, the new name doesn't conflict
     // with an existing column.
-    if (!colName.toLowerCase().equals(newColDef.getColName().toLowerCase()) && 
+    if (!colName.toLowerCase().equals(newColDef.getColName().toLowerCase()) &&
         t.getColumn(newColDef.getColName()) != null) {
       throw new AnalysisException("Column already exists: " + newColDef.getColName());
     }

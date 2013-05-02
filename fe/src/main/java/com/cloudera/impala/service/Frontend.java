@@ -36,15 +36,21 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.TableName;
+import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.User;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -85,24 +91,22 @@ import com.google.common.collect.Maps;
 public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
   private final boolean lazyCatalog;
+
   private Catalog catalog;
+  private final AuthorizationConfig authzConfig;
 
-  public Frontend() {
-    // Default to lazy loading
-    this(true);
-  }
-
-  public Frontend(boolean lazy) {
+  public Frontend(boolean lazy, AuthorizationConfig authorizationConfig) {
     this.lazyCatalog = lazy;
-    this.catalog = new Catalog(lazy, false);
+    this.authzConfig = authorizationConfig;
+    this.catalog = new Catalog(lazy, false, authzConfig);
   }
 
   /**
    * Invalidates all catalog metadata, forcing a reload.
    */
   public void resetCatalog() {
-    this.catalog.close();
-    this.catalog = new Catalog(lazyCatalog, true);
+    catalog.close();
+    catalog = new Catalog(lazyCatalog, true, authzConfig);
   }
 
   /**
@@ -112,13 +116,18 @@ public class Frontend {
    * @throws TableNotFoundException - If the specified table does not exist.
    */
   public void resetTable(String dbName, String tableName)
-      throws Catalog.DatabaseNotFoundException, Catalog.TableNotFoundException {
-    Db db = catalog.getDb(dbName);
+      throws DatabaseNotFoundException, TableNotFoundException,
+      AuthorizationException {
+
+    // TODO: Currently refresh commands are not authorized. Once REFRESH becomes a SQL
+    // statement (IMPALA-339) the authorization code can be added in.
+    // For now just use the internal Admin user.
+    Db db = catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
     if (db == null) {
-      throw new Catalog.DatabaseNotFoundException("Database not found: " + dbName);
+      throw new DatabaseNotFoundException("Database not found: " + dbName);
     }
     if (!db.containsTable(tableName)) {
-      throw new Catalog.TableNotFoundException(
+      throw new TableNotFoundException(
           "Table not found: " + dbName + "." + tableName);
     }
     LOG.info("Invalidating table metadata: " + dbName + "." + tableName);
@@ -328,23 +337,22 @@ public class Frontend {
   }
 
   /**
-   * Returns all tables that match the specified database and pattern.  If
-   * pattern is null, matches all tables. If db is null, all databases are
-   * searched for matches.
+   * Returns all tables that match the specified database and pattern that are accessible
+   * to the given user. If pattern is null, matches all tables. If db is null, all
+   * databases are searched for matches.
    */
-  public List<String> getTableNames(String dbName, String tablePattern)
+  public List<String> getTableNames(String dbName, String tablePattern, User user)
       throws ImpalaException {
-    return catalog.getTableNames(dbName, tablePattern);
+    return catalog.getTableNames(dbName, tablePattern, user);
   }
 
   /**
-   * Returns all tables that match the specified database and pattern.  If
-   * pattern is null, matches all tables. If db is null, all databases are
-   * searched for matches.
+   * Returns all database names that match the specified database and pattern that
+   * are accessible to the given user. If pattern is null, matches all dbs.
    */
-  public List<String> getDbNames(String dbPattern)
+  public List<String> getDbNames(String dbPattern, User user)
       throws ImpalaException {
-    return catalog.getDbNames(dbPattern);
+    return catalog.getDbNames(dbPattern, user);
   }
 
   /**
@@ -354,7 +362,7 @@ public class Frontend {
    */
   public List<TColumnDef> describeTable(String dbName, String tableName)
       throws ImpalaException {
-    Db db = catalog.getDb(dbName);
+    Db db = catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
     if (db == null) {
       throw new AnalysisException("Unknown database: " + dbName);
     }
@@ -388,9 +396,11 @@ public class Frontend {
    */
   public TExecRequest createExecRequest(
       TClientRequest request, StringBuilder explainString)
-      throws InternalException, AnalysisException, NotImplementedException {
+      throws AuthorizationException, InternalException, AnalysisException,
+      NotImplementedException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog,
-        request.sessionState.database, request.sessionState.user);
+        request.sessionState.database,
+        new User(request.sessionState.user));
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("analyze query " + request.stmt);
     analysisResult = analysisCtxt.analyze(request.stmt);
@@ -524,24 +534,27 @@ public class Frontend {
    */
   public TMetadataOpResponse execHiveServer2MetadataOp(TMetadataOpRequest request)
       throws ImpalaException {
+    User user = request.isSetSession() ?
+        new User(request.session.getUser()) : ImpalaInternalAdminUser.getInstance();
     switch (request.opcode) {
       case GET_TYPE_INFO: return MetadataOp.getTypeInfo();
       case GET_SCHEMAS:
       {
         TGetSchemasReq req = request.getGet_schemas_req();
-        return MetadataOp.getSchemas(catalog, req.getCatalogName(), req.getSchemaName());
+        return MetadataOp.getSchemas(
+            catalog, req.getCatalogName(), req.getSchemaName(), user);
       }
       case GET_TABLES:
       {
         TGetTablesReq req = request.getGet_tables_req();
         return MetadataOp.getTables(catalog, req.getCatalogName(), req.getSchemaName(),
-            req.getTableName(), req.getTableTypes());
+            req.getTableName(), req.getTableTypes(), user);
       }
       case GET_COLUMNS:
       {
         TGetColumnsReq req = request.getGet_columns_req();
         return MetadataOp.getColumns(catalog, req.getCatalogName(), req.getSchemaName(),
-            req.getTableName(), req.getColumnName());
+            req.getTableName(), req.getColumnName(), user);
       }
       case GET_CATALOGS: return MetadataOp.getCatalogs();
       case GET_TABLE_TYPES: return MetadataOp.getTableTypes();
@@ -562,7 +575,8 @@ public class Frontend {
    */
   public void updateMetastore(TCatalogUpdate update) throws ImpalaException {
     // Only update metastore for Hdfs tables.
-    Table table = catalog.getTable(update.getDb_name(), update.getTarget_table());
+    Table table = catalog.getTable(update.getDb_name(), update.getTarget_table(),
+        ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
     if (!(table instanceof HdfsTable)) {
       LOG.warn("Unexpected table type in updateMetastore: "
           + update.getTarget_table());

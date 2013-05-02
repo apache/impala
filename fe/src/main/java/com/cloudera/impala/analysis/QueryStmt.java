@@ -30,7 +30,7 @@ import com.google.common.collect.Lists;
  * analysis of the ORDER BY and LIMIT clauses.
  *
  */
-public abstract class QueryStmt extends ParseNodeBase {
+public abstract class QueryStmt extends StatementBase {
   protected ArrayList<OrderByElement> orderByElements;
   protected final long limit;
 

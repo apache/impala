@@ -18,9 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 
 /**
@@ -55,7 +55,8 @@ public class UnionStmt extends QueryStmt {
       this.qualifier = qualifier;
     }
 
-    public void analyze(Analyzer parent) throws AnalysisException, InternalException {
+    public void analyze(Analyzer parent) throws AnalysisException,
+        AuthorizationException {
       analyzer = new Analyzer(parent);
       queryStmt.analyze(analyzer);
     }
@@ -99,7 +100,7 @@ public class UnionStmt extends QueryStmt {
    */
   @Override
   public void analyze(Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, AuthorizationException {
     Preconditions.checkState(operands.size() > 0);
 
     // Propagates DISTINCT from left to right,

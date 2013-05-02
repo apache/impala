@@ -14,17 +14,17 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TDropTableParams;
 import com.cloudera.impala.thrift.TTableName;
-
 import com.google.common.base.Preconditions;
 
 /**
  * Represents a DROP [IF EXISTS] TABLE statement
  */
-public class DropTableStmt extends ParseNodeBase {
+public class DropTableStmt extends StatementBase {
   private final TableName tableName;
   private final boolean ifExists;
 
@@ -56,10 +56,12 @@ public class DropTableStmt extends ParseNodeBase {
     return this.ifExists;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DROP TABLE ");
     if (ifExists) {
@@ -80,18 +82,16 @@ public class DropTableStmt extends ParseNodeBase {
     return params;
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
-    
-    // Only run this analysis if the user did not specify the IF EXISTS clause
-    if (!ifExists && analyzer.getCatalog().getDb(dbName) == null) {
-      throw new AnalysisException("Unknown database: " + dbName);
-    }
-
-    if (!ifExists && !analyzer.getCatalog().containsTable(dbName, getTbl())) {
-      throw new AnalysisException(String.format("Unknown table: %s.%s",
-          dbName, getTbl()));
+    dbName = analyzer.getTargetDbName(tableName);
+    if (!analyzer.getCatalog()
+        .containsTable(dbName, tableName.getTbl(), analyzer.getUser(), Privilege.DROP) &&
+        !ifExists) {
+      throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG +
+          String.format("%s.%s", dbName, getTbl()));
     }
   }
 }

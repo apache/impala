@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -37,8 +38,8 @@ public class BaseTableRef extends TableRef {
 
   /**
    * Returns the name of the table referred to. Before analysis, the table name
-   * may not be fully qualified; afterwards it is guaranteed to be fully
-   * qualified.
+   * may not be fully qualified. If the table name is unqualified, the current
+   * default database from the analyzer will be used as the db name.
    */
   public TableName getName() {
     return name;
@@ -48,10 +49,16 @@ public class BaseTableRef extends TableRef {
    * Register this table ref and then analyze the Join clause.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    Preconditions.checkNotNull(getPrivilegeRequirement());
     desc = analyzer.registerBaseTableRef(this);
     isAnalyzed = true;  // true that we have assigned desc
-    analyzeJoin(analyzer);
+    try {
+      analyzeJoin(analyzer);
+    } catch (InternalException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
   }
 
   @Override
@@ -86,5 +93,9 @@ public class BaseTableRef extends TableRef {
   @Override
   protected String tableRefToSql() {
     return name.toString() + (alias != null ? " " + alias : "");
+  }
+
+  public String debugString() {
+    return tableRefToSql();
   }
 }

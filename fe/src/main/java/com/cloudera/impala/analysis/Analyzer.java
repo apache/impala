@@ -26,13 +26,18 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.User;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TQueryGlobals;
@@ -49,12 +54,18 @@ import com.google.common.collect.Sets;
  * holding the referenced conjuncts), to make substitute() simple.
  */
 public class Analyzer {
+  // Common analysis error messages
+  public final static String DB_DOES_NOT_EXIST_ERROR_MSG = "Database does not exist: ";
+  public final static String DB_ALREADY_EXISTS_ERROR_MSG = "Database already exists: ";
+  public final static String TBL_DOES_NOT_EXIST_ERROR_MSG = "Table does not exist: ";
+  public final static String TBL_ALREADY_EXISTS_ERROR_MSG = "Table already exists: ";
+
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
   private final DescriptorTable descTbl;
   private final Catalog catalog;
   private final String defaultDb;
-  private final String user;
+  private final User user;
   private final IdGenerator<ExprId> conjunctIdGenerator;
   private final TQueryGlobals queryGlobals;
 
@@ -113,11 +124,11 @@ public class Analyzer {
    * @param catalog
    */
   public Analyzer(Catalog catalog) {
-    this(catalog, Catalog.DEFAULT_DB, System.getProperty("user.name"),
+    this(catalog, Catalog.DEFAULT_DB, new User(System.getProperty("user.name")),
         createQueryGlobals());
   }
 
-  public Analyzer(Catalog catalog, String defaultDb, String user,
+  public Analyzer(Catalog catalog, String defaultDb, User user,
         TQueryGlobals queryGlobals) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
@@ -161,33 +172,15 @@ public class Analyzer {
    * "name.tbl" and "name.db.tbl" as aliases.
    * @param ref the BaseTableRef to be registered
    * @return newly created TupleDescriptor
-   * @throws AnalysisException
    */
-  public TupleDescriptor registerBaseTableRef(BaseTableRef ref) throws AnalysisException {
+  public TupleDescriptor registerBaseTableRef(BaseTableRef ref)
+      throws AnalysisException, AuthorizationException {
     String lookupAlias = ref.getAlias().toLowerCase();
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
 
-    // Always register the ref under the unqualified table name (if there's no
-    // explicit alias), but the *table* must be fully qualified.
-    String dbName =
-        ref.getName().getDb() == null ? getDefaultDb() : ref.getName().getDb();
-    Db db = catalog.getDb(dbName);
-    if (db == null) {
-      throw new AnalysisException("Unknown db: '" + ref.getName().getDb() + "'.");
-    }
-
-    Table tbl = null;
-    try {
-      tbl = db.getTable(ref.getName().getTbl());
-    } catch (TableLoadingException e) {
-      throw new AnalysisException("Failed to load metadata for table: " +
-          ref.getName().getTbl(), e);
-    }
-    if (tbl == null) {
-      throw new AnalysisException("Unknown table: '" + ref.getName().getTbl() + "'");
-    }
+    Table tbl = getTable(ref.getName(), ref.getPrivilegeRequirement());
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setTable(tbl);
     aliasMap.put(lookupAlias, result);
@@ -630,12 +623,77 @@ public class Analyzer {
     return defaultDb;
   }
 
-  public String getUser() {
+  public User getUser() {
     return user;
   }
 
   public TQueryGlobals getQueryGlobals() {
     return queryGlobals;
+  }
+
+  /*
+   * Returns the Catalog Table object for the TableName at the given Privilege level.
+   *
+   * If the user does not have sufficient privileges to access the table an
+   * AuthorizationException is thrown.
+   * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
+   */
+  public Table getTable(TableName tableName, Privilege privilege)
+      throws AuthorizationException, AnalysisException {
+    Preconditions.checkNotNull(tableName);
+    Preconditions.checkNotNull(privilege);
+    Table table = null;
+    tableName = new TableName(getTargetDbName(tableName), tableName.getTbl());
+
+    // This may trigger a metadata load, in which case we want to return the errors as
+    // AnalysisExceptions.
+    try {
+      table =
+          catalog.getTable(tableName.getDb(), tableName.getTbl(), getUser(), privilege);
+    } catch (DatabaseNotFoundException e) {
+      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tableName.getDb());
+    } catch (TableNotFoundException e) {
+      throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tableName.toString());
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(String.format("Failed to load metadata for table: %s",
+          tableName), e);
+    }
+    Preconditions.checkNotNull(table);
+    return table;
+  }
+
+  /*
+   * Returns the Catalog Db object for the given database name at the given
+   * Privilege level.
+   *
+   * If the user does not have sufficient privileges to access the database an
+   * AuthorizationException is thrown.
+   * If the database does not exist in the catalog an AnalysisError is thrown.
+   */
+  public Db getDb(String dbName, Privilege privilege)
+      throws AnalysisException, AuthorizationException {
+    Db db = catalog.getDb(dbName, getUser(), privilege);
+    if (db == null) {
+      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    }
+    return db;
+  }
+
+  /*
+   * Checks if the given database contains the given table for the given Privilege
+   * level. If the table exists in the database, true is returned. Otherwise false.
+   *
+   * If the user does not have sufficient privileges to access the table an
+   * AuthorizationException is thrown.
+   * If the database does not exist in the catalog an AnalysisError is thrown.
+   */
+  public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
+      throws AuthorizationException, AnalysisException {
+    try {
+      return catalog.dbContainsTable(dbName, tableName, getUser(), privilege);
+    } catch (DatabaseNotFoundException e) {
+      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    }
   }
 
   /**
@@ -649,5 +707,13 @@ public class Analyzer {
     String nowStr = formatter.format(currentDate.getTime());
     queryGlobals.setNow_string(nowStr);
     return queryGlobals;
+  }
+
+  /*
+   * If the table name is fully qualified, the database from the TableName object will
+   * be returned. Otherwise the default analyzer database will be returned.
+   */
+  public String getTargetDbName(TableName tableName) {
+    return tableName.isFullyQualified() ? tableName.getDb() : getDefaultDb();
   }
 }

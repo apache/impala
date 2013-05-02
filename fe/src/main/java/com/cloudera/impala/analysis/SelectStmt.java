@@ -21,6 +21,7 @@ import java.util.ListIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
@@ -107,7 +108,8 @@ public class SelectStmt extends QueryStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs) {
@@ -263,7 +265,7 @@ public class SelectStmt extends QueryStmt {
    * @throws AnalysisException
    */
   private void analyzeAggregation(Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException {
     if (groupingExprs == null && !selectList.isDistinct()
         && !Expr.contains(resultExprs, AggregateExpr.class)) {
       // we're not computing aggregates
@@ -340,7 +342,11 @@ public class SelectStmt extends QueryStmt {
     ArrayList<AggregateExpr> nonAvgAggExprs = Lists.newArrayList();
     Expr.collectList(aggExprs, AggregateExpr.class, nonAvgAggExprs);
     aggExprs = nonAvgAggExprs;
-    createAggInfo(groupingExprsCopy, aggExprs, analyzer);
+    try {
+      createAggInfo(groupingExprsCopy, aggExprs, analyzer);
+    } catch (InternalException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
 
     // combine avg smap with the one that produces the final agg output
     AggregateInfo finalAggInfo =

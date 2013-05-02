@@ -14,36 +14,42 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 
 /**
- * Representation of a DESCRIBE table statement. 
+ * Representation of a DESCRIBE table statement.
  */
-public class DescribeStmt extends ParseNodeBase {
+public class DescribeStmt extends StatementBase {
   private TableName table;
 
   public DescribeStmt(TableName table) {
     this.table = table;
   }
 
+  @Override
   public String toSql() {
-    return "DESCRIBE " + table; 
+    return "DESCRIBE " + table;
   }
 
   public TableName getTable() {
     return table;
   }
 
+  @Override
   public String debugString() {
     return toSql() + table.toString();
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     if (!table.isFullyQualified()) {
       table = new TableName(analyzer.getDefaultDb(), table.getTbl());
     }
+    analyzer.getTable(table, Privilege.VIEW_METADATA);
   }
 
   public TDescribeTableParams toThrift() {

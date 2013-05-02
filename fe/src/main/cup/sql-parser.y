@@ -191,7 +191,7 @@ terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 
-nonterminal ParseNodeBase stmt;
+nonterminal StatementBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
 // Single values statement.
@@ -247,7 +247,7 @@ nonterminal ArrayList<String> opt_join_hints;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
-nonterminal ParseNodeBase explain_stmt;
+nonterminal StatementBase explain_stmt;
 nonterminal ArrayList<PartitionKeyValue> partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;

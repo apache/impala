@@ -54,6 +54,10 @@ popd
 echo "Splitting HBase table"
 ${IMPALA_HOME}/testdata/bin/split-hbase.sh
 
+echo COPYING AUTHORIZATION POLICY FILE
+hadoop fs -rm -f /test-warehouse/authz-policy.ini
+hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini /test-warehouse/
+
 # TODO: The multi-format table will move these files. So we need to copy them to a
 # temporary location for that table to use. Should find a better way to handle this.
 echo COPYING DATA FOR DEPENDENT TABLES

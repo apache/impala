@@ -38,7 +38,7 @@ class DdlExecutor {
 
   // Runs a DDL query to completion. Once Exec() returns, all rows are available in
   // result_set().
-  Status Exec(TDdlExecRequest* exec_request);
+  Status Exec(const TDdlExecRequest& exec_request, const TSessionState& session);
 
   // Runs a metadata operation to completion. Once Exec() returns, all rows are
   // available in result_set() and the result set schema can be retrieved from

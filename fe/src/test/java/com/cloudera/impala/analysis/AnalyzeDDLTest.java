@@ -82,9 +82,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
       // Table/Db does not exist
       AnalysisError("alter table db_does_not_exist.alltypes " + kw +
-          " partition (i=1)", "Unknown database: db_does_not_exist");
+          " partition (i=1)", "Database does not exist: db_does_not_exist");
       AnalysisError("alter table functional.table_does_not_exist " + kw +
-          " partition (i=1)", "Unknown table: functional.table_does_not_exist");
+          " partition (i=1)", "Table does not exist: functional.table_does_not_exist");
     }
 
     // IF NOT EXISTS properly checks for partition existence
@@ -135,9 +135,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes add columns (i int)",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist add columns (i int)",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
   }
 
   @Test
@@ -157,9 +157,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes drop column col1",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist drop column col1",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
   }
 
   @Test
@@ -184,9 +184,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist change c1 c2 double",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
   }
 
   @Test
@@ -253,17 +253,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes set fileformat sequencefile",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist set fileformat rcfile",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
     AnalysisError("alter table db_does_not_exist.alltypes set location '/a/b'",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist set location '/a/b'",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
     AnalysisError("alter table functional.no_tbl partition(i=1) set location '/a/b'",
-        "Unknown table: functional.no_tbl");
+        "Table does not exist: functional.no_tbl");
     AnalysisError("alter table no_db.alltypes partition(i=1) set fileformat textfile",
-        "Unknown database: no_db");
+        "Database does not exist: no_db");
   }
 
   @Test
@@ -276,12 +276,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Table already exists: functional.alltypesagg");
 
     AnalysisError("alter table functional.table_does_not_exist rename to new_table",
-        "Unknown table: functional.table_does_not_exist");
+        "Table does not exist: functional.table_does_not_exist");
     AnalysisError("alter table db_does_not_exist.alltypes rename to new_table",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
 
     AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
   }
 
   @Test
@@ -290,15 +290,20 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop table functional.alltypes");
 
     // If the database does not exist, and the user hasn't specified "IF EXISTS",
-    // an analysis error should be thrown.
+    // an analysis error should be thrown
     AnalysisError("drop database db_does_not_exist",
-        "Unknown database: db_does_not_exist");
+        "Database does not exist: db_does_not_exist");
     AnalysisError("drop table db_does_not_exist.alltypes",
-        "Unknown database: db_does_not_exist");
+        "Table does not exist: db_does_not_exist.alltypes");
 
     // No error is thrown if the user specifies IF EXISTS
     AnalyzesOk("drop database if exists db_does_not_exist");
+
+    // No error is thrown if the database does not exist
     AnalyzesOk("drop table if exists db_does_not_exist.alltypes");
+    // No error is thrown if the database table does not exist and IF EXISTS
+    // is true
+    AnalyzesOk("drop table if exists functional.notbl");
   }
 
   @Test
@@ -317,7 +322,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table functional.alltypes like functional.alltypes",
         "Table already exists: functional.alltypes");
     AnalysisError("create table functional.new_table like functional.tbl_does_not_exist",
-        "Source table does not exist: functional.tbl_does_not_exist");
+        "Table does not exist: functional.tbl_does_not_exist");
     AnalysisError("create table functional.new_table like db_does_not_exist.alltypes",
         "Database does not exist: db_does_not_exist");
     AnalysisError("create table functional.alltypes (i int)",

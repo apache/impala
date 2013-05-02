@@ -18,10 +18,10 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExpr;
 
 public class AnalyzerTest {
@@ -127,8 +127,8 @@ public class AnalyzerTest {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
       fail("Analysis error:\n" + e.toString());
-    } catch (InternalException e) {
-      fail("Internal exception:\n" + e.toString());
+    } catch (AuthorizationException e) {
+      fail("Authorization error:\n" + e.toString());
     }
     if (node instanceof SelectStmt) {
       CheckSelectToThrift((SelectStmt) node);
@@ -168,10 +168,9 @@ public class AnalyzerTest {
             errorString.startsWith(expectedErrorString));
       }
       return;
-    } catch (InternalException e) {
-      fail("Internal exception:\n" + e.toString());
+    } catch (AuthorizationException e) {
+      fail("Authorization error: " + e.getMessage());
     }
-
     fail("Stmt didn't result in analysis error: " + stmt);
   }
 
@@ -200,13 +199,13 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestMemLayout() throws AnalysisException {
+  public void TestMemLayout() throws AnalysisException, AuthorizationException {
     testSelectStar();
     testNonNullable();
     TestMixedNullable();
   }
 
-  private void testSelectStar() throws AnalysisException {
+  private void testSelectStar() throws AnalysisException, AuthorizationException {
     AnalyzesOk("select * from functional.AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
     for (SlotDescriptor slotD : descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
@@ -292,10 +291,10 @@ public class AnalyzerTest {
    *    We do not support table partitioning on timestamp columns
    */
   @Test
-  public void TestUnsupportedTypes() {
+  public void TestUnsupportedTypes() throws AuthorizationException {
     // The table metadata should not have been loaded.
     AnalysisError("select * from functional.map_table",
-        "Failed to load metadata for table: map_table");
+        "Failed to load metadata for table: functional.map_table");
 
     // Select supported types from a table with mixed supported/unsupported types.
     AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
@@ -311,13 +310,13 @@ public class AnalyzerTest {
         "Unsupported type 'DECIMAL' in 'dec_col'.");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
-        "Failed to load metadata for table: unsupported_partition_types");
+        "Failed to load metadata for table: functional.unsupported_partition_types");
   }
 
   @Test
   public void TestUnsupportedSerde() {
     AnalysisError("select * from functional.bad_serde",
-                  "Failed to load metadata for table: bad_serde");
+                  "Failed to load metadata for table: functional.bad_serde");
   }
 
   @Test

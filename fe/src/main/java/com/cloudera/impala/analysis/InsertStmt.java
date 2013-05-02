@@ -19,15 +19,13 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.DataSink;
 import com.google.common.base.Preconditions;
 
@@ -36,7 +34,7 @@ import com.google.common.base.Preconditions;
  * whose results are to be inserted.
  *
  */
-public class InsertStmt extends ParseNodeBase {
+public class InsertStmt extends StatementBase {
   // Target table name as seen by the parser
   private final TableName originalTableName;
   // Target table into which to insert. May be qualified by analyze()
@@ -66,30 +64,17 @@ public class InsertStmt extends ParseNodeBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     queryStmt.analyze(analyzer);
     List<Expr> selectListExprs = queryStmt.getResultExprs();
-    Catalog catalog = analyzer.getCatalog();
 
     if (!targetTableName.isFullyQualified()) {
       this.targetTableName = new TableName(analyzer.getDefaultDb(),
                                            targetTableName.getTbl());
     }
 
-    try {
-      Db db = catalog.getDb(targetTableName.getDb());
-      if (db == null) {
-        throw new AnalysisException("Unknown db: '" + targetTableName.getDb() + "'.");
-      }
-      table = catalog.getDb(targetTableName.getDb()).getTable(targetTableName.getTbl());
-    } catch (TableLoadingException e) {
-      throw new AnalysisException("Failed to load metadata for table: "
-          + targetTableName.getTbl(), e);
-    }
-    if (table == null) {
-      throw new AnalysisException("Unknown table: '" + targetTableName.toString() +
-          "' in db: '" + targetTableName.getDb() + "'.");
-    }
+    table = analyzer.getTable(targetTableName, Privilege.INSERT);
 
     // Add target table to descriptor table.
     analyzer.getDescTbl().addReferencedTable(table);
@@ -288,7 +273,7 @@ public class InsertStmt extends ParseNodeBase {
 
     int numNonClusteringCols = columns.size() - numClusteringCols;
     if (numNonClusteringCols != selectListExprs.size() - numDynamicPartKeys) {
-      throw new AnalysisException("Target table '" + targetTableName.getTbl()
+      throw new AnalysisException("Target table '" + targetTableName
           + "' and result of select statement are not union compatible.\n"
           + "Target table expects "
           + numNonClusteringCols + " columns but the select statement returns "
@@ -332,7 +317,7 @@ public class InsertStmt extends ParseNodeBase {
         PrimitiveType.getAssignmentCompatibleType(colType, exprType);
     // Incompatible types.
     if (!compatibleType.isValid()) {
-      throw new AnalysisException("Target table '" + targetTableName.getTbl()
+      throw new AnalysisException("Target table '" + targetTableName
           + "' and result of select statement are not union compatible.\n"
           + "Incompatible types '" + colType.toString() + "' and '"
           + exprType.toString() + "' in column '" + expr.toSql() + "'.");

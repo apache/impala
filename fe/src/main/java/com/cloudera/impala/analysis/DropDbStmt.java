@@ -14,16 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TDropDbParams;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a DROP [IF EXISTS] DATABASE statement
  */
-public class DropDbStmt extends ParseNodeBase {
+public class DropDbStmt extends StatementBase {
   private final String dbName;
   private final boolean ifExists;
 
@@ -44,10 +43,12 @@ public class DropDbStmt extends ParseNodeBase {
     return ifExists;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
+  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DROP DATABASE");
     if (ifExists) {
@@ -64,13 +65,16 @@ public class DropDbStmt extends ParseNodeBase {
     return params;
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!ifExists && analyzer.getCatalog().getDb(dbName) == null) {
-      throw new AnalysisException("Unknown database: " + dbName);
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    if (analyzer.getCatalog().getDb(dbName, analyzer.getUser(), Privilege.DROP) == null
+        && !ifExists) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
 
-    if (analyzer.getDefaultDb().equals(getDb())) {
-      throw new AnalysisException("Cannot drop current default database: " + getDb());
+    if (analyzer.getDefaultDb().toLowerCase().equals(dbName.toLowerCase())) {
+      throw new AnalysisException("Cannot drop current default database: " + dbName);
     }
   }
 }

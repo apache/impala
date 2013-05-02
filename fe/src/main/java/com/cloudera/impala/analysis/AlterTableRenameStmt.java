@@ -14,16 +14,13 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableRenameParams;
 import com.cloudera.impala.thrift.TAlterTableType;
 import com.cloudera.impala.thrift.TTableName;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-
 import com.google.common.base.Preconditions;
 
 /**
@@ -33,7 +30,7 @@ public class AlterTableRenameStmt extends AlterTableStmt {
   private final TableName newTableName;
 
   // Set during analysis
-  private String dbName;
+  private String newDbName;
 
   public AlterTableRenameStmt(TableName oldTableName, TableName newTableName) {
     super(oldTableName);
@@ -46,8 +43,8 @@ public class AlterTableRenameStmt extends AlterTableStmt {
   }
 
   public String getNewDb() {
-    Preconditions.checkNotNull(dbName);
-    return dbName;
+    Preconditions.checkNotNull(newDbName);
+    return newDbName;
   }
 
   @Override
@@ -61,19 +58,13 @@ public class AlterTableRenameStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
-    // If new new table name was not fully qualified, use the current default database.
-    dbName = 
-        newTableName.isFullyQualified() ? newTableName.getDb() : analyzer.getDefaultDb();
-
-    if (analyzer.getCatalog().getDb(dbName) == null) {
-      throw new AnalysisException("Unknown database: " + dbName);
-    }
-
-    if (analyzer.getCatalog().containsTable(dbName, getNewTbl())) {
-      throw new AnalysisException(String.format("Table already exists: %s.%s",
-          dbName, getNewTbl())); 
+    newDbName = analyzer.getTargetDbName(newTableName);
+    if (analyzer.dbContainsTable(newDbName, newTableName.getTbl(), Privilege.CREATE)) {
+      throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
+          String.format("%s.%s", newDbName, getNewTbl()));
     }
   }
 }

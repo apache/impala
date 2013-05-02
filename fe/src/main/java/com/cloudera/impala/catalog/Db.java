@@ -24,8 +24,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
-import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
-import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -56,19 +54,6 @@ public class Db {
 
   // map from table name to Table
   private final LazyTableMap tables;
-
-  /**
-   * Thrown when a table cannot be loaded due to an error.
-   */
-  public static class TableLoadingException extends ImpalaException {
-    public TableLoadingException(String s, Throwable cause) {
-      super(s, cause);
-    }
-
-    public TableLoadingException(String s) {
-      super(s);
-    }
-  };
 
   /**
    * Loads all tables in the the table map, ignoring any tables that don't load
@@ -264,7 +249,7 @@ public class Db {
     try {
       Db db = new Db(dbName, catalog, client);
       // Load all the table metadata
-      if (!lazy) db.forceLoadAllTables();        
+      if (!lazy) db.forceLoadAllTables();
       return db;
     } catch (MetaException e) {
       // turn into unchecked exception

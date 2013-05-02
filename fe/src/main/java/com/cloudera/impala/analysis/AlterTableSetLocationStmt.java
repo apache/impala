@@ -16,6 +16,8 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
@@ -75,9 +77,16 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
-    // Alterting the table, rather than the partition.
+
+    if (location != null) {
+      analyzer.getCatalog().checkAccess(analyzer.getUser(),
+          new PrivilegeRequestBuilder().onURI(location).all().toRequest());
+    }
+
+    // Altering the table, rather than the partition.
     if (partitionSpec.size() == 0) {
       return;
     }

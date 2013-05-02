@@ -96,7 +96,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         return Status::OK;
       }
       ddl_executor_.reset(new DdlExecutor(impala_server_));
-      Status status = ddl_executor_->Exec(&exec_request_.ddl_exec_request);
+      Status status = ddl_executor_->Exec(exec_request_.ddl_exec_request,
+          query_session_state_);
       {
         lock_guard<mutex> l(lock_);
         return UpdateQueryStatus(status);

@@ -14,12 +14,12 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TShowDbsParams;
 
 /**
- * Representation of a SHOW DATABASES [pattern] statement. 
+ * Representation of a SHOW DATABASES [pattern] statement.
  * Acceptable syntax:
  *
  * SHOW DATABASES
@@ -28,7 +28,7 @@ import com.cloudera.impala.thrift.TShowDbsParams;
  * SHOW SCHEMAS LIKE 'pattern'
  *
  */
-public class ShowDbsStmt extends ParseNodeBase {
+public class ShowDbsStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
   private final String pattern;
 
@@ -52,6 +52,7 @@ public class ShowDbsStmt extends ParseNodeBase {
     return pattern;
   }
 
+  @Override
   public String toSql() {
     if (pattern == null) {
         return "SHOW DATABASES";
@@ -60,11 +61,14 @@ public class ShowDbsStmt extends ParseNodeBase {
     }
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     // Nothing to do here
   }
 

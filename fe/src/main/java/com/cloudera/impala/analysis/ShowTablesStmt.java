@@ -14,14 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TShowTablesParams;
-
 import com.google.common.base.Preconditions;
 
 /**
- * Representation of a SHOW TABLES [pattern] statement. 
+ * Representation of a SHOW TABLES [pattern] statement.
  * Acceptable syntax:
  *
  * SHOW TABLES
@@ -32,9 +32,9 @@ import com.google.common.base.Preconditions;
  * SHOW TABLES IN database LIKE "pattern"
  *
  * In Hive, the 'LIKE' is optional. Also SHOW TABLES unquotedpattern is accepted
- * by the parser but returns no results. We don't support that syntax. 
+ * by the parser but returns no results. We don't support that syntax.
  */
-public class ShowTablesStmt extends ParseNodeBase {
+public class ShowTablesStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
   private final String pattern;
 
@@ -64,7 +64,7 @@ public class ShowTablesStmt extends ParseNodeBase {
    * General purpose constructor which builds a show statement that matches
    * table names against a given pattern in the supplied database.
    *
-   * If pattern is null, all tables in the supplied database match. 
+   * If pattern is null, all tables in the supplied database match.
    * If database is null, the default database is searched.
    */
   public ShowTablesStmt(String database, String pattern) {
@@ -86,6 +86,7 @@ public class ShowTablesStmt extends ParseNodeBase {
     return postAnalysisDb;
   }
 
+  @Override
   public String toSql() {
     if (pattern == null) {
       if (parsedDb == null) {
@@ -102,12 +103,19 @@ public class ShowTablesStmt extends ParseNodeBase {
     }
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     postAnalysisDb = (parsedDb == null ? analyzer.getDefaultDb() : parsedDb);
+    if (analyzer.getCatalog().getDb(
+        postAnalysisDb, analyzer.getUser(), Privilege.ANY) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb);
+    }
   }
 
   public TShowTablesParams toThrift() {

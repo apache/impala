@@ -16,13 +16,14 @@ package com.cloudera.impala.service;
 
 import java.sql.DatabaseMetaData;
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.OpcodeRegistry;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
@@ -34,7 +35,6 @@ import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSetMetadata;
-import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.collect.Lists;
 
 /**
@@ -226,7 +226,8 @@ public class MetadataOp {
    * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
   private static DbsTablesColumns getDbsTablesColumns(Catalog catalog, String catalogName,
-      String schemaName, String tableName, String columnName) throws ImpalaException {
+      String schemaName, String tableName, String columnName, User user)
+      throws ImpalaException {
     DbsTablesColumns result = new DbsTablesColumns();
 
     // Hive does not have a catalog concept. Returns nothing if the request specifies an
@@ -243,7 +244,7 @@ public class MetadataOp {
     Pattern tablePattern = Pattern.compile(convertedTablePattern);
     Pattern columnPattern = Pattern.compile(convertedColumnPattern);
 
-    for (String dbName: catalog.getAllDbNames()) {
+    for (String dbName: catalog.getAllDbNames(user)) {
       if (!schemaPattern.matcher(dbName).matches()) {
         continue;
       }
@@ -251,8 +252,8 @@ public class MetadataOp {
       List<String> tableList = Lists.newArrayList();
       List<List<Column>> tablesColumnsList = Lists.newArrayList();
       if (tableName != null) {
-        Db db = catalog.getDb(dbName);
-        for (String tabName: db.getAllTableNames()) {
+        Db db = catalog.getDb(dbName, user, Privilege.ANY);
+        for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
           if (!tablePattern.matcher(tabName).matches()) {
             continue;
           }
@@ -294,12 +295,13 @@ public class MetadataOp {
    * catalogName, schemaName, tableName and columnName are JDBC search patterns.
    */
   public static TMetadataOpResponse getColumns(Catalog catalog, String catalogName,
-      String schemaName, String tableName, String columnName) throws ImpalaException {
+      String schemaName, String tableName, String columnName, User user)
+      throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
 
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
     DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, tableName, columnName);
+        schemaName, tableName, columnName, user);
 
     for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
       String dbName = dbsTablesColumns.dbs.get(i);
@@ -352,12 +354,12 @@ public class MetadataOp {
    * catalogName and schemaName are JDBC search patterns.
    */
   public static TMetadataOpResponse getSchemas(Catalog catalog, String catalogName,
-      String schemaName) throws ImpalaException {
+      String schemaName, User user) throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.
     DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, null, null);
+        schemaName, null, null, user);
 
     for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
       String dbName = dbsTablesColumns.dbs.get(i);
@@ -380,7 +382,7 @@ public class MetadataOp {
    * tableTypes specifies which table types to search for (TABLE, VIEW, etc).
    */
   public static TMetadataOpResponse getTables(Catalog catalog, String catalogName,
-      String schemaName, String tableName, List<String> tableTypes)
+      String schemaName, String tableName, List<String> tableTypes, User user)
           throws ImpalaException{
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLES_MD);
 
@@ -401,7 +403,7 @@ public class MetadataOp {
 
     // Get the list of schemas, tables that satisfy the search conditions.
     DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, tableName, null);
+        schemaName, tableName, null, user);
 
     for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
       String dbName = dbsTablesColumns.dbs.get(i);

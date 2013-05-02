@@ -14,14 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TUseDbParams;
 
 /**
- * Representation of a USE db statement. 
+ * Representation of a USE db statement.
  */
-public class UseStmt extends ParseNodeBase {
+public class UseStmt extends StatementBase {
   private final String database;
 
   public UseStmt(String db) {
@@ -32,17 +33,22 @@ public class UseStmt extends ParseNodeBase {
     return database;
   }
 
+  @Override
   public String toSql() {
     return "USE " + database;
   }
 
+  @Override
   public String debugString() {
     return toSql();
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    if (analyzer.getCatalog().getDb(getDatabase()) == null) {
-      throw new AnalysisException("Database does not exist: " + getDatabase());
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    if (analyzer.getCatalog().getDb(
+        database, analyzer.getUser(), Privilege.ANY) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + getDatabase());
     }
   }
 
