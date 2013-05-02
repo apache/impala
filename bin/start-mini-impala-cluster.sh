@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Starts up a single Impalad with the specified command line arguments. An optional
+# Starts up an in-process impala cluster. The number of backeds is 3 by default, 
+# and can be controled by the -num_backends flag.
 # -build_type parameter can be passed to determine the build type to use for the
-# impalad instance.
-
+# in-process cluster.
 
 BUILD_TYPE=debug
 IMPALAD_ARGS=""
@@ -46,4 +46,4 @@ done
 . ${IMPALA_HOME}/bin/set-classpath.sh
 
 CLASSPATH=$CLASSPATH_PREFIX:$CLASSPATH \
-  $IMPALA_HOME/be/build/${BUILD_TYPE}/service/impalad ${IMPALAD_ARGS}
+  $IMPALA_HOME/be/build/${BUILD_TYPE}/testutil/mini-impala-cluster ${IMPALAD_ARGS}

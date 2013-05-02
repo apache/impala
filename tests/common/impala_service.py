@@ -91,12 +91,12 @@ class ImpaladService(BaseImpalaService):
     match = re.match(r'Known Backends \((\d+)\)', result)
     return None if match is None else int(match.group(1))
 
-  def wait_for_num_known_live_backends(self, expected_value, timeout=30):
+  def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1):
     start_time = time()
     while (time() - start_time < timeout):
       value = None
       try:
-        value = self.get_num_known_live_backends(timeout=timeout)
+        value = self.get_num_known_live_backends(timeout=timeout, interval=interval)
       except Exception, e:
         LOG.error(e)
       if value == expected_value:
@@ -121,5 +121,6 @@ class StateStoredService(BaseImpalaService):
   def __init__(self, hostname, webserver_port):
     super(StateStoredService, self).__init__(hostname, webserver_port)
 
-  def wait_for_live_backends(self, num_backends, timeout=15):
-    self.wait_for_metric_value('statestore.live-backends', num_backends, timeout=timeout)
+  def wait_for_live_backends(self, num_backends, timeout=15, interval=1):
+    self.wait_for_metric_value('statestore.live-backends', num_backends,
+                               timeout=timeout, interval=interval)

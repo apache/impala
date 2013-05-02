@@ -32,4 +32,3 @@ def exec_shell_cmd(cmd, run_in_background=False):
     stdout, stderr = p.communicate()
     rc = p.returncode
     return rc, stdout, stderr
-

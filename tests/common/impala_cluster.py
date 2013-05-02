@@ -42,6 +42,13 @@ class ImpalaCluster(object):
     LOG.info("Found %d impalad processes and %d statestored processes" %\
         (len(self.__impalads), len(self.__statestoreds)))
 
+  def refresh(self):
+    """ Re-loads the impalad/statestored processes if they exist.
+
+    Helpful to confirm that processes have been killed.
+    """
+    self.__impalads, self.__statestoreds = self.__build_impala_process_lists()
+
   @property
   def statestored(self):
     """
@@ -50,8 +57,8 @@ class ImpalaCluster(object):
     Note: Currently we expectly a single statestore process, in the future this might
     change in which case this should return the "active" statestore.
     """
-    assert len(self.__statestoreds) == 1, 'No statestored found in cluster'
-    return self.__statestoreds[0]
+    # If no statestored process exists, return an empty list.
+    return self.__statestoreds[0] if len(self.__statestoreds) > 0 else list()
 
   @property
   def impalads(self):
@@ -82,7 +89,12 @@ class ImpalaCluster(object):
     statestored = list()
     # TODO: Consider using process_iter() here
     for pid in psutil.get_pid_list():
-      process = psutil.Process(pid)
+      try:
+        process = psutil.Process(pid)
+      except psutil.NoSuchProcess, e:
+        # A process from get_pid_list() no longer exists, continue.
+        LOG.info(e)
+        continue
       if process.name == 'impalad' and len(process.cmdline) >= 1:
         impalads.append(ImpaladProcess(process.cmdline))
       elif process.name == 'statestored' and len(process.cmdline) >= 1:
