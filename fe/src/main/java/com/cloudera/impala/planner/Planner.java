@@ -76,8 +76,6 @@ public class Planner {
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
 
   private final IdGenerator<PlanNodeId> nodeIdGenerator = new IdGenerator<PlanNodeId>();
-  private final IdGenerator<PlanFragmentId> fragmentIdGenerator =
-      new IdGenerator<PlanFragmentId>();
 
   /**
    * Create plan fragments for an analyzed statement, given a set of execution options.

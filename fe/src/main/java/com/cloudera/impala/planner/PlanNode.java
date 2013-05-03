@@ -56,7 +56,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected final String planNodeName;
 
   protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
-  protected PlanFragmentId fragmentId;  // assigned by planner after fragmentation step
   protected long limit; // max. # of rows to be returned; 0: no limit
 
   // ids materialized by the tree rooted at this node
@@ -124,14 +123,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   public PlanNodeId getId() {
     return id;
-  }
-
-  public void setFragmentId(PlanFragmentId id) {
-    fragmentId = id;
-  }
-
-  public PlanFragmentId getFragmentId() {
-    return fragmentId;
   }
 
   public long getLimit() {
