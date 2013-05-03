@@ -21,6 +21,7 @@
 #include "runtime/runtime-state.h"
 #include "util/bit-util.h"
 #include "util/buffer-builder.h"
+#include "util/compress.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/integer-array.h"
@@ -28,7 +29,6 @@
 #include "util/thrift-util.h"
 
 #include <sstream>
-#include <snappy.h>
 
 #include "gen-cpp/ImpalaService_types.h"
 
@@ -59,10 +59,12 @@ class HdfsParquetTableWriter::ColumnWriter {
   // expr - the expression to generate output values for this column.
   ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr) 
     : parent_(parent), expr_(expr), 
-      codec_(CompressionCodec::SNAPPY),    // Default to snappy compressed
       num_data_pages_(0), current_page_(NULL),
       num_values_(0),
       total_byte_size_(0) {
+    // Default to snappy compressed
+    Codec::CreateCompressor(parent_->state_, NULL, false, THdfsCompression::SNAPPY,
+      &compressor_);
   }
 
   // Append the row to this column.  This buffers the value into a data page.
@@ -89,6 +91,9 @@ class HdfsParquetTableWriter::ColumnWriter {
 
   uint64_t num_values() const { return num_values_; }
   uint64_t total_size() const { return total_byte_size_; }
+  parquet::CompressionCodec::type codec() const { 
+    return parquet::CompressionCodec::SNAPPY; 
+  }
  
  private:
   friend class HdfsParquetTableWriter;
@@ -141,8 +146,8 @@ class HdfsParquetTableWriter::ColumnWriter {
   HdfsParquetTableWriter* parent_;
   Expr* expr_;
 
-  // Compression codec for this column
-  parquet::CompressionCodec::type codec_;
+  // Compression codec for this column.  If NULL, this column is will not be compressed.
+  scoped_ptr<Codec> compressor_;
   
   vector<DataPage> pages_;
 
@@ -277,39 +282,41 @@ Status HdfsParquetTableWriter::ColumnWriter::Flush(int64_t* file_pos) {
   }
   return Status::OK;
 }
-  
+
 int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   DCHECK(current_page_ != NULL);
   if (current_page_->finalized) return 0;
 
+  PageHeader& header = current_page_->header;
   int64_t bytes_added = 0;
   if (expr_->type() == TYPE_BOOLEAN) {
     // Compute size of bool bits, they are encoded differently.
     int num_bools = current_page_->bool_values->count();
     int num_bytes = BitUtil::Ceil(num_bools, 8);
-    current_page_->header.uncompressed_page_size += num_bytes;
+    header.uncompressed_page_size += num_bytes;
     bytes_added += num_bytes;
   }
     
   // Compute size of definition bits
   current_page_->def_levels->Flush();
   current_page_->num_def_bytes = sizeof(int32_t) + current_page_->def_levels->len();
-  current_page_->header.uncompressed_page_size += current_page_->num_def_bytes;
+  header.uncompressed_page_size += current_page_->num_def_bytes;
+  bytes_added += current_page_->num_def_bytes;
 
   // At this point we know all the data for the data page.  Combine them into one
   // buffer
-  char* uncompressed_data = NULL;
-  if (codec_ == CompressionCodec::UNCOMPRESSED) {
-    uncompressed_data = reinterpret_cast<char*>(parent_->per_file_mem_pool_->Allocate(
-        current_page_->header.uncompressed_page_size));
+  uint8_t* uncompressed_data = NULL;
+  if (compressor_.get() == NULL) {
+    uncompressed_data = 
+        parent_->per_file_mem_pool_->Allocate(header.uncompressed_page_size);
   } else {
     // We have compression.  Combine into the staging buffer.
     parent_->compression_staging_buffer_.resize(
-        current_page_->header.uncompressed_page_size);
-    uncompressed_data = reinterpret_cast<char*>(&parent_->compression_staging_buffer_[0]);
+        header.uncompressed_page_size);
+    uncompressed_data = &parent_->compression_staging_buffer_[0];
   }
 
-  BufferBuilder buffer(uncompressed_data, current_page_->header.uncompressed_page_size);
+  BufferBuilder buffer(uncompressed_data, header.uncompressed_page_size);
   
   // Copy the definition (null) data
   int num_def_level_bytes = current_page_->def_levels->len();
@@ -319,24 +326,19 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   // TODO: copy repetition data when we support nested types.
   buffer.Append(current_page_->values_buffer, buffer.capacity() - buffer.size());
 
-  if (codec_ != CompressionCodec::UNCOMPRESSED) {
-    DCHECK_EQ(codec_, CompressionCodec::SNAPPY);
-    int max_compressed_size = 
-        snappy::MaxCompressedLength(current_page_->header.uncompressed_page_size);
-    uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
-    size_t compressed_size;
-    snappy::RawCompress(uncompressed_data, current_page_->header.uncompressed_page_size,
-        reinterpret_cast<char*>(compressed_data), &compressed_size);
-
-    current_page_->data = compressed_data;
-    current_page_->header.compressed_page_size = compressed_size;
-  } else {
+  // Apply compression if necessary
+  if (compressor_.get() == NULL) {
     current_page_->data = reinterpret_cast<uint8_t*>(uncompressed_data);
-    current_page_->header.compressed_page_size = 
-        current_page_->header.uncompressed_page_size;
+    header.compressed_page_size = header.uncompressed_page_size;
+  } else {
+    int max_compressed_size = compressor_->MaxOutputLen(header.uncompressed_page_size);
+    DCHECK_GT(max_compressed_size, 0);
+    uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
+    header.compressed_page_size = max_compressed_size;
+    compressor_->ProcessBlock(header.uncompressed_page_size, uncompressed_data,
+        &header.compressed_page_size, &compressed_data);
+    current_page_->data = compressed_data;
   }
-
-  bytes_added += current_page_->num_def_bytes;
     
   // Add the size of the data page header
   uint8_t* header_buffer;
@@ -346,7 +348,7 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   bytes_added += header_len;
 
   current_page_->finalized = true;
-  total_byte_size_ += header_len + current_page_->header.compressed_page_size;
+  total_byte_size_ += header_len + header.compressed_page_size;
   return bytes_added;
 }
   
@@ -449,7 +451,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
     metadata.encodings.push_back(Encoding::PLAIN);
     metadata.encodings.push_back(Encoding::RLE);
     metadata.path_in_schema.push_back(table_desc_->col_names()[i + num_clustering_cols]);
-    metadata.codec = columns_[i]->codec_;
+    metadata.codec = columns_[i]->codec();
     current_row_group_->columns[i].__set_meta_data(metadata);
   }
 

@@ -52,7 +52,7 @@ class DecompressorTest : public ::testing::Test{
 
     uint8_t* compressed;
     int compressed_length = 0;
-    EXPECT_TRUE(compressor->ProcessBlock(sizeof (input_),
+    EXPECT_TRUE(compressor->ProcessBlock(sizeof(input_),
           input_, &compressed_length, &compressed).ok());
     uint8_t* output;
     int out_len = 0;
@@ -60,7 +60,7 @@ class DecompressorTest : public ::testing::Test{
         decompressor->ProcessBlock(compressed_length,
             compressed, &out_len, &output).ok());
 
-    EXPECT_TRUE(memcmp(&input_, output, sizeof (input_)) == 0);
+    EXPECT_TRUE(memcmp(&input_, output, sizeof(input_)) == 0);
 
     // Try again specifying the output buffer and length.
     out_len = sizeof (input_);
@@ -68,7 +68,7 @@ class DecompressorTest : public ::testing::Test{
     EXPECT_TRUE(decompressor->ProcessBlock(compressed_length,
           compressed, &out_len, &output).ok());
 
-    EXPECT_TRUE(memcmp(&input_, output, sizeof (input_)) == 0);
+    EXPECT_TRUE(memcmp(&input_, output, sizeof(input_)) == 0);
   }
 
   uint8_t input_[2 * 26 * 1024];

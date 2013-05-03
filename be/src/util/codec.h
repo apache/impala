@@ -34,6 +34,8 @@ class RuntimeState;
 // will be added.  Each of these objects inherits from this class. The objects
 // are instantiated in the Create static methods defined here.  The type of
 // compression is defined in the Thrift interface THdfsCompression.
+// TODO: make this pure virtual (no members) so that external codecs (e.g. Lzo)
+// can implement this without binary dependency issues.
 class Codec {
  public:
   // These are the codec string representation used in Hadoop.
@@ -54,6 +56,8 @@ class Codec {
   //  format: the type of decompressor to create.
   // Output:
   //  decompressor: pointer to the decompressor class to use.
+  // If mem_pool is NULL, then the resulting codec will never allocate memory and
+  // the caller must be responsible for it.
   static Status CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
                                    bool reuse, THdfsCompression::type format,
                                    Codec** decompressor);
@@ -91,27 +95,40 @@ class Codec {
   static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
                                  bool reuse, const std::string& codec,
                                  boost::scoped_ptr<Codec>* compressor);
+  
+  // Return the name of a compression algorithm.
+  static std::string GetCodecName(THdfsCompression::type);
 
   virtual ~Codec() {}
 
   // Process a block of data, either compressing or decompressing it.  
   // If *output_length is 0, the function will allocate from its mempool.  
   // If *output_length is non-zero, it should be the length of *output and must
-  // be exactly the size of the transformed output.  
+  // be big enough to contain the transformed output.
   // Inputs:
   //   input_length: length of the data to process
   //   input: data to process
-  // In/Out:
-  //   output_length: Length of the output, if known, 0 otherwise.  
-  // Output:
-  //   output: Pointer to processed data
-  // If this needs to allocate memory, a mempool must be passed into the c'tor.
+  //
+  // If the output buffer is allocated by the caller, *output must be the 
+  // preallocated buffer and *output_length the buffer length.
+  //
+  // If the output buffer needs to be allocated by the codec, ProcessBlock
+  // must be called with *output_length == 0 and *output will be set to the
+  // buffer allocated by the codec.  In this case, a mempool must have been
+  // passed into the c'tor.
+  //
+  // In either case, *output_length will be set to the actual length of the
+  // transformed output.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output)  = 0;
 
-  // Return the name of a compression algorithm.
-  static std::string GetCodecName(THdfsCompression::type);
-  
+  // Returns the maximum result length from applying the codec to input.
+  // Note this is not the exact result length, simply a bound to allow preallocating
+  // a buffer.
+  // This must be an O(1) operation (i.e. cannot read all of input).  Codecs that
+  // don't support this should return -1.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL) = 0;
+
   // Largest block we will compress/decompress: 2GB.
   // We are dealing with compressed blocks that are never this big but we
   // want to guard against a corrupt file that has the block length as some

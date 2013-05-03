@@ -27,10 +27,11 @@ namespace impala {
 
 class GzipDecompressor : public Codec {
  public:
-  GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate);
+  GzipDecompressor(
+      MemPool* mem_pool = NULL, bool reuse_buffer = false, bool is_deflate = false);
   virtual ~GzipDecompressor();
 
-  // Process a block of data.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
@@ -54,7 +55,7 @@ class BzipDecompressor : public Codec {
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipDecompressor() { }
 
-  // Process a block of data.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
  protected:
@@ -64,10 +65,10 @@ class BzipDecompressor : public Codec {
 
 class SnappyDecompressor : public Codec {
  public:
-  SnappyDecompressor(MemPool* mem_pool, bool reuse_buffer);
+  SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual ~SnappyDecompressor() { }
 
-  // Process a block of data.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
@@ -82,7 +83,7 @@ class SnappyBlockDecompressor : public Codec {
   SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~SnappyBlockDecompressor() { }
 
-  //Process a block of data.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 

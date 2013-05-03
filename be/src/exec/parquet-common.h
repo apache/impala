@@ -40,6 +40,14 @@ const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BYTE_ARRAY,
 };
 
+// Mapping of parquet codec enums to Impala enums
+const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
+  THdfsCompression::NONE,
+  THdfsCompression::SNAPPY,
+  THdfsCompression::GZIP,
+  THdfsCompression::LZO
+};
+
 }
 
 #endif

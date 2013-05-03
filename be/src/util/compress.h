@@ -44,14 +44,7 @@ class GzipCompressor : public Codec {
   virtual ~GzipCompressor();
 
   // Returns an upper bound on the max compressed length.
-  int MaxCompressedLen(int input_len);
-
-  // Compresses 'input' into 'output'.  Output must be preallocated and
-  // at least big enough.
-  // *output_length should be called with the length of the output buffer and on return
-  // is the length of the output.
-  Status Compress(int input_length, uint8_t* input, 
-      int* output_length, uint8_t* output);
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
@@ -70,12 +63,22 @@ class GzipCompressor : public Codec {
   // These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
   const static int GZIP_CODEC = 16;     // Output Gzip.
+  
+  // Compresses 'input' into 'output'.  Output must be preallocated and
+  // at least big enough.
+  // *output_length should be called with the length of the output buffer and on return
+  // is the length of the output.
+  Status Compress(int input_length, uint8_t* input, 
+      int* output_length, uint8_t* output);
 };
 
 class BzipCompressor : public Codec {
  public:
   BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipCompressor() { }
+
+  // Returns an upper bound on the max compressed length.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
@@ -87,7 +90,11 @@ class BzipCompressor : public Codec {
 class SnappyBlockCompressor : public Codec {
  public:
   SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
+  
   virtual ~SnappyBlockCompressor() { }
+
+  // Returns an upper bound on the max compressed length.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
@@ -103,20 +110,13 @@ class SnappyCompressor : public Codec {
   SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual ~SnappyCompressor() { }
 
+  // Returns an upper bound on the max compressed length.
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+
   // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
   
-  // Returns an upper bound on the max compressed length.
-  int MaxCompressedLen(int input_len);
-
-  // Compresses 'input' into 'output'.  Output must be preallocated and
-  // at least big enough.
-  // *output_length should be called with the length of the output buffer and on return
-  // is the length of the output.
-  Status Compress(int input_length, uint8_t* input, 
-      int* output_length, uint8_t* output);
-
  protected:
   // Snappy does not need initialization
   virtual Status Init() { return Status::OK; }

@@ -15,10 +15,11 @@
 #include "runtime/row-batch.h"
 
 #include <stdint.h>  // for intptr_t
-#include <snappy.h>
 
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
+#include "util/compress.h"
+#include "util/decompress.h"
 #include "gen-cpp/Data_types.h"
 
 DEFINE_bool(compress_rowbatches, true,
@@ -73,14 +74,14 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   if (FLAGS_compress_rowbatches && size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
-    int max_compressed_size = snappy::MaxCompressedLength(size);
-    if (compression_scratch_.size() < max_compressed_size) {
-      compression_scratch_.resize(max_compressed_size);
+    SnappyCompressor compressor;
+    int compressed_size = compressor.MaxOutputLen(size);
+    if (compression_scratch_.size() < compressed_size) {
+      compression_scratch_.resize(compressed_size);
     }
-    size_t compressed_size;
-    char* compressed_output = const_cast<char*>(compression_scratch_.c_str());
-    snappy::RawCompress(output_batch->tuple_data.c_str(), size,
-                        compressed_output, &compressed_size);
+    uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
+    uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
+    compressor.ProcessBlock(size, input, &compressed_size, &compressed_output);
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
@@ -110,15 +111,16 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
     tuple_data_pool_(new MemPool()) {
   if (input_batch.is_compressed) {
     // Decompress tuple data into data pool
-    const char* compressed_data = input_batch.tuple_data.c_str();
+    uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
     size_t compressed_size = input_batch.tuple_data.size();
-    size_t uncompressed_size;
-    bool success = snappy::GetUncompressedLength(compressed_data, compressed_size,
-                                                 &uncompressed_size);
-    DCHECK(success) << "snappy::GetUncompressedLength failed";
-    char* data = reinterpret_cast<char*>(tuple_data_pool_->Allocate(uncompressed_size));
-    success = snappy::RawUncompress(compressed_data, compressed_size, data);
-    DCHECK(success) << "snappy::RawUncompress failed";
+    
+    SnappyDecompressor decompressor;
+    int uncompressed_size = decompressor.MaxOutputLen(compressed_size, compressed_data);
+    DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
+    uint8_t* data = tuple_data_pool_->Allocate(uncompressed_size);
+    Status status = decompressor.ProcessBlock(compressed_size, compressed_data,
+        &uncompressed_size, &data);
+    DCHECK(status.ok()) << "RowBatch decompression failed.";
   } else {
     // Tuple data uncompressed, copy directly into data pool
     uint8_t* data = tuple_data_pool_->Allocate(input_batch.tuple_data.size());

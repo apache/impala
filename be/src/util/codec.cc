@@ -111,6 +111,11 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
     case THdfsCompression::SNAPPY:
       *compressor = new SnappyCompressor(mem_pool, reuse);
       break;
+    default: {
+      stringstream ss;
+      ss << "Unsupported codec: " << format;
+      return Status(ss.str());
+    }
   }
 
   return (*compressor)->Init();
@@ -167,6 +172,11 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
     case THdfsCompression::SNAPPY:
       *decompressor = new SnappyDecompressor(mem_pool, reuse);
       break;
+    default: {
+      stringstream ss;
+      ss << "Unsupported codec: " << format;
+      return Status(ss.str());
+    }
   }
 
   return (*decompressor)->Init();

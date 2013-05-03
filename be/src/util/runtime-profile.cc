@@ -512,10 +512,11 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   // easy to compress.
   GzipCompressor compressor(GzipCompressor::ZLIB);
   vector<uint8_t> compressed_buffer;
-  compressed_buffer.resize(compressor.MaxCompressedLen(serialized_buffer.size()));
+  compressed_buffer.resize(compressor.MaxOutputLen(serialized_buffer.size()));
   int result_len = compressed_buffer.size();
-  compressor.Compress(serialized_buffer.size(), &serialized_buffer[0], &result_len,
-      &compressed_buffer[0]);
+  uint8_t* compressed_buffer_ptr = &compressed_buffer[0];
+  compressor.ProcessBlock(serialized_buffer.size(), &serialized_buffer[0],
+      &result_len, &compressed_buffer_ptr);
   compressed_buffer.resize(result_len);
 
   Base64Encode(compressed_buffer, out);

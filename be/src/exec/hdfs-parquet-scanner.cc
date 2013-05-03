@@ -34,8 +34,6 @@
 #include "util/runtime-profile.h"
 #include "util/thrift-util.h"
 
-#include <snappy.h>
-
 using namespace std;
 using namespace boost;
 using namespace impala;
@@ -97,10 +95,20 @@ class HdfsParquetScanner::ColumnReader {
       num_buffered_values_(0) {
   }
 
-  void set_metadata(const parquet::ColumnMetaData* metadata) { metadata_ = metadata; }
   void set_field_repetition_type(const parquet::FieldRepetitionType::type t) { 
     field_repetition_type_ = t; 
   }
+
+  Status Prepare(const parquet::ColumnMetaData* metadata) { 
+    metadata_ = metadata; 
+    if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
+      RETURN_IF_ERROR(Codec::CreateDecompressor(
+          parent_->scan_node_->runtime_state(), NULL, false,
+          PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
+    }
+    return Status::OK;
+  }
+
   int64_t total_len() const { return metadata_->total_compressed_size; }
   const SlotDescriptor* slot_desc() const { return desc_; }
 
@@ -125,6 +133,7 @@ class HdfsParquetScanner::ColumnReader {
   parquet::FieldRepetitionType::type field_repetition_type_;
 
   const parquet::ColumnMetaData* metadata_;
+  scoped_ptr<Codec> decompressor_;
   ScannerContext::Stream* stream_;
 
   // Pool to allocate decompression buffers from.
@@ -246,31 +255,21 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
 
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
 
-    if (metadata_->codec == parquet::CompressionCodec::SNAPPY) {
+    int uncompressed_size = current_page_header_.uncompressed_page_size;
+    if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
-      size_t uncompressed_size;
-      bool success = snappy::GetUncompressedLength(reinterpret_cast<const char*>(data_),
-          current_page_header_.compressed_page_size, &uncompressed_size);
-      if (!success || uncompressed_size != current_page_header_.uncompressed_page_size) {
-        return Status("Corrupt data page");
-      }
-
-      uint8_t* decompressed_buffer = 
-          decompressed_data_pool_->Allocate(uncompressed_size);
-      success = snappy::RawUncompress(reinterpret_cast<const char*>(data_), 
-          current_page_header_.compressed_page_size, 
-          reinterpret_cast<char*>(decompressed_buffer));
-      if (!success) return Status("Corrupt data page");
+      uint8_t* decompressed_buffer = decompressed_data_pool_->Allocate(uncompressed_size);
+      RETURN_IF_ERROR(decompressor_->ProcessBlock(
+          current_page_header_.compressed_page_size, data_, 
+          &uncompressed_size, &decompressed_buffer)); 
+      DCHECK_LE(current_page_header_.uncompressed_page_size, uncompressed_size);
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;
     } else {
-      // TODO: handle the other codecs.
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
-      DCHECK_EQ(current_page_header_.compressed_page_size, 
-          current_page_header_.uncompressed_page_size);
+      DCHECK_EQ(current_page_header_.compressed_page_size, uncompressed_size);
     }
 
-    
     if (field_repetition_type_ == parquet::FieldRepetitionType::OPTIONAL) {
       // Initialize the definition level data
       int32_t num_definition_bytes = 0;
@@ -601,8 +600,8 @@ Status HdfsParquetScanner::InitColumns() {
     
     const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
-    column_readers_[i]->set_metadata(&col_chunk.meta_data);
     column_readers_[i]->set_field_repetition_type(schema_element.repetition_type);
+    RETURN_IF_ERROR(column_readers_[i]->Prepare(&col_chunk.meta_data));
     int64_t col_start = col_chunk.meta_data.data_page_offset;
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
     total_bytes += col_len;
@@ -679,17 +678,18 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
     if (!IsEncodingSupported(encodings[i])) {
       stringstream ss;
       ss << "File " << stream_->filename() << " uses an unsupported encoding: " 
-         << PrintEncoding(encodings[i]) << " for column " << col_idx;
+         << PrintEncoding(encodings[i]) << " for column " << schema_element.name;
       return Status(ss.str());
     }
   }
 
   // Check the compression is supported
   if (file_data.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED &&
-      file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY) {
+      file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY &&
+      file_data.meta_data.codec != parquet::CompressionCodec::GZIP) {
     stringstream ss;
     ss << "File " << stream_->filename() << " uses an unsupported compression: " 
-        << file_data.meta_data.codec << " for column " << col_idx;
+        << file_data.meta_data.codec << " for column " << schema_element.name;
     return Status(ss.str());
   }
 
@@ -698,8 +698,8 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[impala_data->desc_->type()];
   if (type != file_data.meta_data.type) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " has an incompatible type with the "
-       << " table schema for column " << col_idx << ".  Expected type: " 
+    ss << "File " << stream_->filename() << " has an incompatible type with the"
+       << " table schema for column " << schema_element.name << ".  Expected type: "
        << type << ".  Actual type: " << file_data.meta_data.type;
     return Status(ss.str());
   }
@@ -709,7 +709,7 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
   if (schema_path.size() != 1) {
     stringstream ss;
     ss << "File " << stream_->filename() << " contains a nested schema for column "
-       << col_idx << ".  This is currently not supported.";
+       << schema_element.name << ".  This is currently not supported.";
     return Status(ss.str());
   }
 
@@ -717,7 +717,7 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
   if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
       schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " column " << col_idx 
+    ss << "File " << stream_->filename() << " column " << schema_element.name 
        << " contains an unsupported column repetition type: " 
        << schema_element.repetition_type;
     return Status(ss.str());

@@ -44,6 +44,8 @@ std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
 std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
 std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
 std::ostream& operator<<(std::ostream& os, const parquet::Encoding::type& type);
+std::ostream& operator<<(std::ostream& os, const parquet::CompressionCodec::type& type);
+std::ostream& operator<<(std::ostream& os, const parquet::Type::type& type);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
