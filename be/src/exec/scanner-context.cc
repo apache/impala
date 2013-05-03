@@ -93,6 +93,7 @@ ScannerContext::Stream::Stream(ScannerContext* parent)
 
 void ScannerContext::Stream::SetInitialBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   scan_range_ = buffer->scan_range();
+  file_desc_ = parent_->scan_node_->GetFileDesc(filename());
   scan_range_start_ = scan_range_->offset();
   total_bytes_returned_ = 0;
   current_buffer_pos_ = NULL;
@@ -440,4 +441,8 @@ void ScannerContext::Cancel() {
   for (int i = 0; i < streams_.size(); ++i) {
     streams_[i]->read_ready_cv_.notify_one();
   }
+}
+
+bool ScannerContext::Stream::eof() {
+  return file_offset() == file_desc_->file_length;
 }

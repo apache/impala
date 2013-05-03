@@ -29,6 +29,7 @@
 
 namespace impala {
 
+struct HdfsFileDesc;
 class HdfsPartitionDescriptor;
 class HdfsScanNode;
 class MemPool;
@@ -141,7 +142,10 @@ class ScannerContext {
   
     // If true, all bytes in this scan range have been returned
     bool eosr() const { return read_eosr_ || total_bytes_returned_ >= total_len_; }
-  
+
+    // If true, the stream has reached the end of the file.
+    bool eof();
+
     const char* filename() { return scan_range_->file(); }
     const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
   
@@ -189,6 +193,7 @@ class ScannerContext {
     friend class ScannerContext;
     ScannerContext* parent_;
     const DiskIoMgr::ScanRange* scan_range_;
+    const HdfsFileDesc* file_desc_;
   
     // Byte offset for this scan range
     int64_t scan_range_start_;

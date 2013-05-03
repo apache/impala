@@ -122,7 +122,7 @@ class HdfsScanner {
   static const char* LLVM_CLASS_NAME;
   
  protected:
-  // For EvalConjunctsForScanner
+  // The scan node that started this scanner
   HdfsScanNode* scan_node_;
 
   // RuntimeState for error reporting
