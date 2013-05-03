@@ -422,18 +422,13 @@ public class Frontend {
     for (PlanFragment fragment: fragments) {
       TPlanFragment thriftFragment = fragment.toThrift();
       queryExecRequest.addToFragments(thriftFragment);
-      if (fragment.getPlanRoot() != null) {
-        fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
-      }
+      Preconditions.checkNotNull(fragment.getPlanRoot());
+      fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
     explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
     queryExecRequest.setQuery_plan(explainString.toString());
-    if (fragments.get(0).getPlanRoot() != null) {
-      // a SELECT without FROM clause will only have a single fragment, which won't
-      // have a plan tree
-      queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
-    }
+    queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
 
     // set fragment destinations
     for (int i = 1; i < fragments.size(); ++i) {

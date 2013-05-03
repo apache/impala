@@ -534,3 +534,33 @@ RELOAD alltypesinsert
 ---- RESULTS
 year=2010/month=4/: 25
 ====
+---- QUERY
+# static partition insert from a constant select
+insert into alltypesinsert
+partition(year=2010, month=4)
+select 100, false, 1, 1, 1, 10, 
+10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2010/month=4/: 1
+====
+---- QUERY
+# dynamic partition insert from a constant select
+insert into table alltypesinsert
+partition (year, month) 
+select 200, true, 2, 2, 2, 20, 
+20.0, 20.0, "02/01/09", "1", cast("2009-02-01 00:02:00" as timestamp), 2010, 4
+---- RESULTS
+year=2010/month=4/: 1
+====
+---- QUERY
+# verify contents of alltypesinsert
+select * from alltypesinsert order by id limit 2
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+100,false,1,1,1,10,10,10,'02/01/09','1',2009-02-01 00:01:00,2010,4
+200,true,2,2,2,20,20,20,'02/01/09','1',2009-02-01 00:02:00,2010,4
+====

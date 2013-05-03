@@ -95,9 +95,11 @@ class Coordinator {
   // have started executing at their respective backends.
   // 'Request' must contain at least a coordinator plan fragment (ie, can't
   // be for a query like 'SELECT 1').
+  // Populates and prepares output_exprs from the coordinator's fragment if there is one,
+  // and LLVM optimizes them together with the fragment's other exprs.
   // A call to Exec() must precede all other member function calls.
   Status Exec(const TUniqueId& query_id, TQueryExecRequest* request,
-              const TQueryOptions& query_options);
+              const TQueryOptions& query_options, std::vector<Expr*>* output_exprs);
 
   // Blocks until result rows are ready to be retrieved via GetNext(), or, if the
   // query doesn't return rows, until the query finishes or is cancelled.

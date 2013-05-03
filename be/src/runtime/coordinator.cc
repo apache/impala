@@ -33,6 +33,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
+#include "exprs/expr.h"
 #include "exec/data-sink.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-sender.h"
@@ -277,7 +278,7 @@ static void ProcessQueryOptions(
 
 Status Coordinator::Exec(
     const TUniqueId& query_id, TQueryExecRequest* request,
-    const TQueryOptions& query_options) {
+    const TQueryOptions& query_options, vector<Expr*>* output_exprs) {
   DCHECK_GT(request->fragments.size(), 0);
   needs_finalization_ = request->__isset.finalize_params;
   if (needs_finalization_) {
@@ -318,11 +319,24 @@ Status Coordinator::Exec(
     // will be the case, the exception is parallel INSERT queries), start
     // this before starting any more plan fragments in backend threads,
     // otherwise they start sending data before the local exchange node
-    // had a chance to register with the stream mgr
+    // had a chance to register with the stream mgr.
     TExecPlanFragmentParams rpc_params;
     SetExecPlanFragmentParams(
         0, request->fragments[0], 0, fragment_exec_params_[0], 0, coord, &rpc_params);
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
+
+    // Prepare output_exprs before optimizing the LLVM module. The other exprs of this
+    // coordinator fragment have been prepared in executor_->Prepare().
+    DCHECK(output_exprs != NULL);
+    RETURN_IF_ERROR(Expr::CreateExprTrees(
+        runtime_state()->obj_pool(), request->fragments[0].output_exprs, output_exprs));
+    for (int i = 0; i < output_exprs->size(); ++i) {
+      RETURN_IF_ERROR(
+          Expr::Prepare((*output_exprs)[i], runtime_state(), row_desc(), false));
+    }
+
+    // Run optimization only after preparing the executor and the output exprs.
+    executor_->OptimizeLlvmModule();
   } else {
     executor_.reset(NULL);
   }

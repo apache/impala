@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,6 +36,7 @@ import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -71,10 +71,6 @@ public class Planner {
   // used for determining whether a broadcast join is feasible.
   private final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
-  // For generating a string of the current time.
-  private final SimpleDateFormat formatter =
-      new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-
   private final IdGenerator<PlanNodeId> nodeIdGenerator = new IdGenerator<PlanNodeId>();
 
   /**
@@ -97,20 +93,18 @@ public class Planner {
     LOG.info("create single-node plan");
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
-    if (singleNodePlan != null) {
-      // compute referenced slots before calling computeMemLayout()
-      markRefdSlots(analyzer, singleNodePlan, queryStmt.getResultExprs());
-      // compute mem layout *before* finalize(); finalize() may reference
-      // TupleDescriptor.avgSerializedSize
-      analyzer.getDescTbl().computeMemLayout();
-      singleNodePlan.finalize(analyzer);
-    }
+    Preconditions.checkNotNull(singleNodePlan);
+    // compute referenced slots before calling computeMemLayout()
+    markRefdSlots(analyzer, singleNodePlan, queryStmt.getResultExprs());
+    // compute mem layout *before* finalize(); finalize() may reference
+    // TupleDescriptor.avgSerializedSize
+    analyzer.getDescTbl().computeMemLayout();
+    singleNodePlan.finalize(analyzer);
+
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
-    if (queryOptions.num_nodes == 1 || singleNodePlan == null) {
+    if (queryOptions.num_nodes == 1) {
       // single-node execution; we're almost done
-      if (singleNodePlan != null) {
-        singleNodePlan = addUnassignedConjuncts(analyzer, singleNodePlan);
-      }
+      singleNodePlan = addUnassignedConjuncts(analyzer, singleNodePlan);
       fragments.add(new PlanFragment(singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
       // For inserts, unless there is a limit clause, leave the root fragment
@@ -118,7 +112,7 @@ public class Planner {
       // so we can pass it back to the client.
       boolean isPartitioned = false;
       if (analysisResult.isInsertStmt() && !queryStmt.hasLimitClause()) {
-          isPartitioned = true;
+        isPartitioned = true;
       }
       LOG.info("create plan fragments");
       long perNodeMemLimit = queryOptions.mem_limit;
@@ -130,7 +124,7 @@ public class Planner {
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
     if (analysisResult.isInsertStmt()) {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
-      if (queryOptions.num_nodes != 1 && singleNodePlan != null) {
+      if (queryOptions.num_nodes != 1) {
         // repartition on partition keys
         rootFragment = repartitionForInsert(
             rootFragment, insertStmt.getPartitionKeyExprs(), analyzer, fragments);
@@ -777,7 +771,6 @@ public class Planner {
     return selectNode;
   }
 
-
   /**
    * Create tree of PlanNodes that implements the Select/Project/Join/Group by/Having
    * of the selectStmt query block.
@@ -787,8 +780,10 @@ public class Planner {
   private PlanNode createSelectPlan(
       SelectStmt selectStmt, Analyzer analyzer, long defaultOrderByLimit)
       throws NotImplementedException, InternalException {
-    // no from clause -> nothing to plan
-    if (selectStmt.getTableRefs().isEmpty()) return null;
+    // no from clause -> materialize the select's exprs with a MergeNode
+    if (selectStmt.getTableRefs().isEmpty()) {
+      return createConstantSelectPlan(selectStmt, analyzer);
+    }
 
     // collect ids of tuples materialized by the subtree that includes all joins
     // and scans
@@ -869,6 +864,32 @@ public class Planner {
 
     return root;
   }
+
+  /**
+  * Returns a MergeNode that materializes the exprs of the constant selectStmt.
+  * Replaces the resultExprs of the selectStmt with SlotRefs into the materialized tuple.
+  */
+ private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer) {
+   Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
+   ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
+   // Create tuple descriptor for materialized tuple.
+   TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
+   tupleDesc.setIsMaterialized(true);
+   MergeNode mergeNode =
+       new MergeNode(new PlanNodeId(nodeIdGenerator), tupleDesc.getId());
+   // Analysis guarantees that selects without a FROM clause only have constant exprs.
+   mergeNode.addConstExprList(Lists.newArrayList(resultExprs));
+
+   // Replace the select stmt's resultExprs with SlotRefs into tupleDesc.
+   for (int i = 0; i < resultExprs.size(); ++i) {
+     SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(tupleDesc);
+     slotDesc.setIsMaterialized(true);
+     slotDesc.setType(resultExprs.get(i).getType());
+     SlotRef slotRef = new SlotRef(slotDesc);
+     resultExprs.set(i, slotRef);
+   }
+   return mergeNode;
+ }
 
   /**
    * Returns true if predicate can be correctly evaluated by a tree materializing
@@ -1312,11 +1333,11 @@ public class Planner {
     Analyzer analyzer = operand.getAnalyzer();
     if (queryStmt instanceof SelectStmt) {
       SelectStmt selectStmt = (SelectStmt) queryStmt;
-      PlanNode selectPlan = createSelectPlan(selectStmt, analyzer, -1);
-      if (selectPlan == null) {
+      if (selectStmt.getTableRefs().isEmpty()) {
         // Select with no FROM clause.
         topMergeNode.addConstExprList(selectStmt.getResultExprs());
       } else {
+        PlanNode selectPlan = createSelectPlan(selectStmt, analyzer, -1);
         topMergeNode.addChild(selectPlan, selectStmt.getResultExprs());
       }
       return;

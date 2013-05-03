@@ -2,7 +2,15 @@ select 1 + 1
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
 ====

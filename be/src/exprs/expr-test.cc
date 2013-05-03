@@ -63,6 +63,7 @@ using namespace Apache::Hadoop::Hive;
 
 namespace impala {
 ImpaladQueryExecutor* executor_;
+bool disable_codegen_;
 
 class ExprTest : public testing::Test {
  protected:
@@ -637,32 +638,32 @@ void ExprTest::TestCast(const string& stmt, const char* val) {
   }
 }
 
-void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string& string_val) {
+void TestSingleLiteralConstruction(PrimitiveType type, void* value,
+    const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
+  RuntimeState state(TUniqueId(), TQueryOptions(), "", NULL);
 
   Expr* expr = Expr::CreateLiteral(&pool, type, value);
   EXPECT_TRUE(expr != NULL);
-  Expr::Prepare(expr, NULL, desc);
+  Expr::Prepare(expr, &state, desc, disable_codegen_);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
 
   expr = Expr::CreateLiteral(&pool, type, string_val);
   EXPECT_TRUE(expr != NULL);
-  Expr::Prepare(expr, NULL, desc);
+  Expr::Prepare(expr, &state, desc, disable_codegen_);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
 }
 
 TEST_F(ExprTest, NullLiteral) {
-  // TODO: how do we get the planner to use null literal vs literal predicate?
-  // For now, just make it manually.  It is used by the partition creation code.
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
-    Status status = Expr::Prepare(&expr, NULL, RowDescriptor());
+    RuntimeState state(TUniqueId(), TQueryOptions(), "", NULL);
+    Status status = Expr::Prepare(&expr, &state, RowDescriptor(), disable_codegen_);
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(expr.GetValue(NULL) == NULL);
   }
 }
-
 
 TEST_F(ExprTest, LiteralConstruction) {
   bool b_val = true;
@@ -2509,6 +2510,7 @@ int main(int argc, char **argv) {
 
   vector<string> options;
   options.push_back("DISABLE_CODEGEN=1");
+  disable_codegen_ = true;
   executor_->setExecOptions(options);
 
   cout << "Running without codegen" << endl;
@@ -2516,8 +2518,8 @@ int main(int argc, char **argv) {
   if (ret != 0) return ret;
   
   options.push_back("DISABLE_CODEGEN=0");
+  disable_codegen_ = false;
   executor_->setExecOptions(options);
-  impala_server->impala_server()->EnableCodegenForSelectExprs();
   cout << endl << "Running with codegen" << endl;
   return RUN_ALL_TESTS();
 }

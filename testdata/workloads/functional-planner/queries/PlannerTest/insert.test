@@ -381,3 +381,59 @@ PLAN FRAGMENT 1
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
 ====
+# static partition insert from a constant select
+insert into table functional.alltypessmall
+partition (year=2010, month=4) 
+select 100, false, 1, 1, 1, 10, 
+10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+====
+# dynamic partition insert from a constant select
+insert into table functional.alltypessmall
+partition (year, month) 
+select 100, false, 1, 1, 1, 10, 
+10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp), 2010, 4
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+====

@@ -27,8 +27,8 @@ import com.google.common.base.Objects;
 abstract public class ScanNode extends PlanNode {
   protected final TupleDescriptor desc;
 
-  public ScanNode(PlanNodeId id, TupleDescriptor desc, String planNodeName) {
-    super(id, desc.getId().asList(), planNodeName);
+  public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
+    super(id, desc.getId().asList(), displayName);
     this.desc = desc;
   }
 

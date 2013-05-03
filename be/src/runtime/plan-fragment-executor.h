@@ -121,6 +121,10 @@ class PlanFragmentExecutor {
   // Releases the thread token for this fragment executor.
   void ReleaseThreadToken();
 
+  // Optimizes the code-generated functions in runtime_state_->llvm_codegen().
+  // Can be called exactly once. Logs the error status if optimization failed.
+  void OptimizeLlvmModule();
+
   // call these only after Prepare()
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();

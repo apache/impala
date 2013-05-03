@@ -183,42 +183,22 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
     bool has_coordinator_fragment =
         query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
     DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
-    bool has_from_clause = query_exec_request.__isset.desc_tbl;
 
-    if (!has_from_clause) {
-      // query without a FROM clause: only one fragment, and it doesn't have a plan
-      DCHECK(!query_exec_request.fragments[0].__isset.plan);
-      DCHECK_EQ(query_exec_request.fragments.size(), 1);
-      // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no
-      // coordinator fragment actually executing to drive the sink.
-      // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
-      local_runtime_state_.reset(new RuntimeState(
-          query_id_, exec_request->query_options,
-          query_exec_request.query_globals.now_string,
-          NULL /* = we don't expect to be executing anything here */));
-      RETURN_IF_ERROR(PrepareSelectListExprs(local_runtime_state_.get(),
-          query_exec_request.fragments[0].output_exprs, RowDescriptor()));
-    } else {
-      // If the first fragment has a "limit 0", simply set EOS to true and return.
-      // TODO: Remove this check if this is an INSERT. To be compatible with
-      // Hive, OVERWRITE inserts must clear out target tables / static
-      // partitions even if no rows are written.
-      DCHECK(query_exec_request.fragments[0].__isset.plan);
-      if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
-        eos_ = true;
-        return Status::OK;
-      }
-
-      coord_.reset(new Coordinator(exec_env_));
-      RETURN_IF_ERROR(coord_->Exec(
-          query_id_, &query_exec_request, exec_request->query_options));
-
-      if (has_coordinator_fragment) {
-        RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
-            query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
-      }
-      profile_.AddChild(coord_->query_profile());
+    // If the first fragment has a "limit 0", simply set EOS to true and return.
+    // TODO: Remove this check if this is an INSERT. To be compatible with
+    // Hive, OVERWRITE inserts must clear out target tables / static
+    // partitions even if no rows are written.
+    DCHECK(query_exec_request.fragments[0].__isset.plan);
+    if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
+      eos_ = true;
+      return Status::OK;
     }
+
+    coord_.reset(new Coordinator(exec_env_));
+    RETURN_IF_ERROR(coord_->Exec(
+        query_id_, &query_exec_request, exec_request->query_options, &output_exprs_));
+
+    profile_.AddChild(coord_->query_profile());
   } else {
     ddl_executor_.reset(new DdlExecutor(impala_server_));
     RETURN_IF_ERROR(ddl_executor_->Exec(&exec_request_.ddl_exec_request));
@@ -376,40 +356,14 @@ void ImpalaServer::QueryExecState::Cancel() {
   if (coord_.get() != NULL) coord_->Cancel();
 }
 
-Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
-    RuntimeState* runtime_state,
-    const vector<TExpr>& exprs, const RowDescriptor& row_desc) {
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(runtime_state->obj_pool(), exprs, &output_exprs_));
-  for (int i = 0; i < output_exprs_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc,
-        !impala_server_->select_exprs_codegen_enabled_));
-  }
-  return Status::OK;
-}
-
-void ImpalaServer::EnableCodegenForSelectExprs() {
-  select_exprs_codegen_enabled_ = true;
-}
-
 Status ImpalaServer::QueryExecState::UpdateMetastore() {
   if (stmt_type() != TStmtType::DML) return Status::OK;
-
 
   DCHECK(exec_request().__isset.query_exec_request);
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (!query_exec_request.__isset.finalize_params) return Status::OK;
 
   TFinalizeParams& finalize_params = query_exec_request.finalize_params;
-  // TODO: Doesn't handle INSERT with no FROM
-  if (coord() == NULL) {
-    stringstream ss;
-    ss << "INSERT with no FROM clause not fully supported, not updating metastore"
-       << " (query_id: " << query_id() << ")";
-    VLOG_QUERY << ss.str();
-    return Status(ss.str());
-  }
-
   TCatalogUpdate catalog_update;
   if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
     VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
@@ -523,6 +477,7 @@ Status ImpalaServer::FragmentExecState::Prepare(
     const TExecPlanFragmentParams& exec_params) {
   exec_params_ = exec_params;
   RETURN_IF_ERROR(executor_.Prepare(exec_params));
+  executor_.OptimizeLlvmModule();
   return Status::OK;
 }
 
@@ -619,8 +574,7 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env),
-      select_exprs_codegen_enabled_(false) {
+    : exec_env_(exec_env) {
   // Initialize default config
   InitializeConfigVariables();
 

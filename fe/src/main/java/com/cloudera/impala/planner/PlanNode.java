@@ -53,7 +53,8 @@ import com.google.common.collect.Sets;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
-  protected final String planNodeName;
+  // String used for this node in getExplainString().
+  protected final String displayName;
 
   protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
   protected long limit; // max. # of rows to be returned; 0: no limit
@@ -89,27 +90,27 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   //  Node should compact data.
   protected boolean compactData;
 
-  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String planNodeName) {
+  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String displayName) {
     this.id = id;
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
     this.cardinality = -1;
-    this.planNodeName = planNodeName;
+    this.displayName = displayName;
   }
 
-  protected PlanNode(PlanNodeId id, String planNodeName) {
+  protected PlanNode(PlanNodeId id, String displayName) {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
     this.cardinality = -1;
-    this.planNodeName = planNodeName;
+    this.displayName = displayName;
   }
 
   /**
    * Copy c'tor. Also passes in new id.
    */
-  protected PlanNode(PlanNodeId id, PlanNode node, String planNodeName) {
+  protected PlanNode(PlanNodeId id, PlanNode node, String displayName) {
     this.id = id;
     this.limit = node.limit;
     this.tupleIds = Lists.newArrayList(node.tupleIds);
@@ -118,7 +119,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.conjuncts = Expr.cloneList(node.conjuncts, null);
     this.cardinality = -1;
     this.compactData = node.compactData;
-    this.planNodeName = planNodeName;
+    this.displayName = displayName;
   }
 
   public PlanNodeId getId() {
@@ -224,7 +225,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Print the current node
     // The plan node header line will be prefixed by rootPrefix and the remaining details
     // will be prefixed by detailPrefix.
-    expBuilder.append(rootPrefix + id.asInt() + ":" + planNodeName + "\n");
+    expBuilder.append(rootPrefix + id.asInt() + ":" + displayName + "\n");
     expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
     if (limit != -1) expBuilder.append(detailPrefix + "limit: " + limit + "\n");
     // Output Tuple Ids only when explain plan level is set to verbose

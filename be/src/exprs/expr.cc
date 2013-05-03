@@ -513,7 +513,7 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
     bool disable_codegen, bool* thread_safe) {
   RETURN_IF_ERROR(root->Prepare(state, row_desc));
   LlvmCodeGen* codegen = NULL;
-  // state might be NULL when called from Expr-test
+  // state might be NULL when called from tests
   if (state != NULL) codegen = state->llvm_codegen();
 
   // codegen == NULL means jitting is disabled.

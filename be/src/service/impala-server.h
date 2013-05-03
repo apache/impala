@@ -237,11 +237,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Returns Status::OK unless there is a JNI error.
   Status GetHadoopConfigValue(const std::string& key, std::string* output);
 
-  // Enables codegen for queries with no from clause.  This is normally disabled
-  // since evaluating a expr tree once is cheaper than doing codegen.
-  // This is only exposed for debugging purposes.
-  void EnableCodegenForSelectExprs();
-
  private:
   class FragmentExecState;
 
@@ -359,8 +354,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // QueryExecState to QueryExecState).
     const TSessionState query_session_state_;
 
-    // not set for queries w/o FROM, ddl queries, or short-circuited (i.e. queries with
-    // "limit 0")
+    // not set for ddl queries, or queries with "limit 0"
     boost::scoped_ptr<Coordinator> coord_;
 
     boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
@@ -419,10 +413,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // 'result'. The values' scales (# of digits after decimal) are stored in 'scales'.
     // result and scales must have been resized to the number of columns before call.
     Status GetRowValue(TupleRow* row, vector<void*>* result, vector<int>* scales);
-
-    // Set output_exprs_, based on exprs.
-    Status PrepareSelectListExprs(RuntimeState* runtime_state,
-        const vector<TExpr>& exprs, const RowDescriptor& row_desc);
 
     // Gather and publish all required updates to the metastore
     Status UpdateMetastore();
@@ -791,9 +781,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
   ExecEnv* exec_env_;  // not owned
-
-  // If true, codegen exprs for queries without from clause
-  bool select_exprs_codegen_enabled_;
 
   // map from query id to exec state; QueryExecState is owned by us and referenced
   // as a shared_ptr to allow asynchronous deletion
