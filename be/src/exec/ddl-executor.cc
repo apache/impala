@@ -38,7 +38,7 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
       string* table_name = params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
       TGetTablesResult table_names;
-      RETURN_IF_ERROR(impala_server_->GetTableNames(&params->db, table_name,
+      RETURN_IF_ERROR(impala_server_->GetTableNames(params->db, table_name,
           &table_names));
 
       // Set the result set

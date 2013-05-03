@@ -28,7 +28,7 @@ const char* ImpaladMetricKeys::IMPALA_SERVER_VERSION =
     "impala-server.version";
 const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
     "impala-server.ready";
-const char* ImpaladMetricKeys::IMPALA_SERVER_LAST_REFRESH_TIME = 
+const char* ImpaladMetricKeys::IMPALA_SERVER_LAST_REFRESH_TIME =
     "impala-server.last-refresh-time";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
     "impala-server.num-queries";
@@ -46,8 +46,12 @@ const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
 const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
     "impala-server.io-mgr.num-buffers";
-const char* ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS = 
+const char* ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS =
     "impala-server.io-mgr.num-unused-buffers";
+const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
+    "catalog.num-databases";
+const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
+    "catalog.num-tables";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -63,6 +67,8 @@ Metrics::IntMetric* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
+Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
+Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
@@ -98,6 +104,12 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
   IO_MGR_NUM_UNUSED_BUFFERS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
+
+  // Initialize catalog metrics
+  CATALOG_NUM_DBS = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);
+  CATALOG_NUM_TABLES = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
 }
 
 }

@@ -485,6 +485,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Call FE to get TClientRequestResult.
   Status GetExecRequest(const TClientRequest& request, TExecRequest* result);
 
+  // Updates the number of databases / tables metrics from the FE catalog
+  Status UpdateCatalogMetrics();
+
   // Make any changes required to the metastore as a result of an
   // INSERT query, e.g. newly created partitions.
   Status UpdateMetastore(const TCatalogUpdate& catalog_update);
@@ -590,12 +593,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
   // table name returned is unqualified.
-  // If db is NULL, match table names from all databases, otherwise restrict the
-  // search to the named database.
   // If pattern is NULL, match all tables otherwise match only those tables that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetTableNames(const std::string* db, const std::string* pattern,
+  Status GetTableNames(const std::string& db, const std::string* pattern,
       TGetTablesResult* table_names);
 
   // Return all databases matching the optional argument 'pattern'.

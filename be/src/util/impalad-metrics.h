@@ -52,18 +52,24 @@ class ImpaladMetricKeys {
 
   // Number of bytes currently in use across all mem pools
   static const char* MEM_POOL_TOTAL_BYTES;
-  
+
   // Number of bytes currently in use across all hash tables
   static const char* HASH_TABLE_TOTAL_BYTES;
-  
+
   // Number of files currently opened by the io mgr
   static const char* IO_MGR_NUM_OPEN_FILES;
 
   // Number of IO buffers allocated by the io mgr
   static const char* IO_MGR_NUM_BUFFERS;
-  
+
   // Number of IO buffers that are currently unused (and can be GC'ed)
   static const char* IO_MGR_NUM_UNUSED_BUFFERS;
+
+  // Number of DBs in the catalog
+  static const char* CATALOG_NUM_DBS;
+
+  // Number of tables in the catalog
+  static const char* CATALOG_NUM_TABLES;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -85,6 +91,8 @@ class ImpaladMetrics {
   static Metrics::IntMetric* IO_MGR_NUM_OPEN_FILES;
   static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
   static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
+  static Metrics::IntMetric* CATALOG_NUM_DBS;
+  static Metrics::IntMetric* CATALOG_NUM_TABLES;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(Metrics* m);

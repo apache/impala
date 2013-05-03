@@ -696,6 +696,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         bind<void>(mem_fn(&ImpalaServer::MembershipCallback), this, _1, _2);
     exec_env->subscriber()->AddTopic(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
   }
+
+  EXIT_IF_ERROR(UpdateCatalogMetrics());
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
@@ -1011,7 +1013,7 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
   BOOST_FOREACH(const string& db, db_names) {
     (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
     TGetTablesResult get_table_results;
-    Status status = GetTableNames(&db, NULL, &get_table_results);
+    Status status = GetTableNames(db, NULL, &get_table_results);
     vector<string>& table_names = get_table_results.tables;
     if (!status.ok()) {
       (*output) << "Error: " << status.GetErrorMsg();
@@ -1137,6 +1139,12 @@ Status ImpalaServer::ExecuteInternal(
 
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
+  if (result.stmt_type == TStmtType::DDL) {
+    Status status = UpdateCatalogMetrics();
+    if (!status.ok()) {
+      VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetErrorMsg();
+    }
+  }
 
   if ((*exec_state)->coord() != NULL) {
     const unordered_set<TNetworkAddress>& unique_hosts =
@@ -1236,6 +1244,20 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   }
 }
 
+Status ImpalaServer::UpdateCatalogMetrics() {
+  TGetDbsResult db_names;
+  RETURN_IF_ERROR(GetDbNames(NULL, &db_names));
+  ImpaladMetrics::CATALOG_NUM_DBS->Update(db_names.dbs.size());
+  ImpaladMetrics::CATALOG_NUM_TABLES->Update(0L);
+  BOOST_FOREACH(const string& db, db_names.dbs) {
+    TGetTablesResult table_names;
+    RETURN_IF_ERROR(GetTableNames(db, NULL, &table_names));
+    ImpaladMetrics::CATALOG_NUM_TABLES->Increment(table_names.tables.size());
+  }
+
+  return Status::OK;
+}
+
 Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   VLOG_QUERY << "UpdateMetastore()";
   JNIEnv* jni_env = getJNIEnv();
@@ -1320,14 +1342,13 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
   return Status::OK;
 }
 
-Status ImpalaServer::GetTableNames(const string* db, const string* pattern,
+Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
     TGetTablesResult* table_names) {
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   TGetTablesParams params;
-  if (db != NULL) {
-    params.__set_db(*db);
-  }
+  params.__set_db(db);
+
   if (pattern != NULL) {
     params.__set_pattern(*pattern);
   }
@@ -1404,6 +1425,11 @@ Status ImpalaServer::ResetCatalogInternal() {
 
   ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME->Update(
       TimestampValue::local_time().DebugString());
+
+  Status status = UpdateCatalogMetrics();
+  if (!status.ok()) {
+    VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetErrorMsg();
+  }
 
   return Status::OK;
 }
