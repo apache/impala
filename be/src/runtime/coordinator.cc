@@ -294,6 +294,7 @@ Status Coordinator::Exec(
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
+  query_profile_->AddInfoString("Query Status", "OK");
   SCOPED_TIMER(query_profile_->total_time_counter());
 
   RETURN_IF_ERROR(ComputeScanRangeAssignment(*request));
@@ -1089,6 +1090,10 @@ void Coordinator::ReportQuerySummary() {
   // The fragment has finished executing.  Update the profile to compute the
   // fraction of time spent in each node.
   if (executor_.get() != NULL) executor_->profile()->ComputeTimeInProfile();
+
+  if (!query_status_.ok()) {
+    query_profile_->AddInfoString("Query Status", query_status_.GetErrorMsg());
+  }
 
   if (!backend_exec_states_.empty()) {
     // Average all remote fragments for each fragment.

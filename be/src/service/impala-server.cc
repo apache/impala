@@ -114,6 +114,15 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   profile_.set_name("Query (id=" + PrintId(exec_request->request_id) + ")");
   query_id_ = exec_request->request_id;
 
+  summary_profile_.AddInfoString("Start Time", start_time().DebugString());
+  summary_profile_.AddInfoString("End Time", "");
+  summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
+  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
+  summary_profile_.AddInfoString("User", user());
+  summary_profile_.AddInfoString("Default Db", default_db());
+  summary_profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
+
   if (exec_request->stmt_type == TStmtType::QUERY ||
       exec_request->stmt_type == TStmtType::DML) {
     DCHECK(exec_request_.__isset.query_exec_request);
@@ -121,6 +130,16 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
 
     // we always need at least one plan fragment
     DCHECK_GT(query_exec_request.fragments.size(), 0);
+
+    if (query_exec_request.__isset.query_plan) {
+      stringstream plan_ss;
+      // Add some delimiters to make it clearer where the plan
+      // begins and the profile ends
+      plan_ss << "\n----------------\n"
+              << query_exec_request.query_plan
+              << "----------------";
+      summary_profile_.AddInfoString("Plan", plan_ss.str());
+    }
 
     // If desc_tbl is not set, query has SELECT with no FROM. In that
     // case, the query can only have a single fragment, and that fragment needs to be
@@ -162,24 +181,6 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       if (has_coordinator_fragment) {
         RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
-      }
-
-      summary_profile_.AddInfoString("Start Time", start_time().DebugString());
-      summary_profile_.AddInfoString("End Time", "");
-      summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
-      summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
-      summary_profile_.AddInfoString("Impala Version", GetVersionString());
-      summary_profile_.AddInfoString("User", user());
-      summary_profile_.AddInfoString("Default Db", default_db());
-      summary_profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
-      if (query_exec_request.__isset.query_plan) {
-        stringstream plan_ss;
-        // Add some delimiters to make it clearer where the plan
-        // begins and the profile ends
-        plan_ss << "\n----------------\n"
-                << query_exec_request.query_plan
-                << "----------------";
-        summary_profile_.AddInfoString("Plan", plan_ss.str());
       }
       profile_.AddChild(coord_->query_profile());
     }
