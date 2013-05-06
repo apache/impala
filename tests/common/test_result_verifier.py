@@ -4,6 +4,7 @@
 # This modules contians utility functions used to help verify query test results.
 #
 import logging
+import math
 import os
 import pytest
 import sys
@@ -88,6 +89,14 @@ class ResultRow(object):
   def __str__(self):
     return ','.join(['%s' % col for col in self.columns])
 
+# If comparing against a float or double, don't do a strict comparison
+# See: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
+def compare_float(x, y, epsilon):
+  # For the purposes of test validation, we want to treat nans as equal.  The
+  # floating point spec defines nan != nan.
+  if math.isnan(x) and math.isnan(y):
+    return True
+  return abs(x - y) <= epsilon
 
 # Represents a column in a row
 class ResultColumn(object):
@@ -106,12 +115,10 @@ class ResultColumn(object):
     if (self.value == 'NULL' or other.value == 'NULL') or \
        ('inf' in self.value or 'inf' in other.value):
       return self.value == other.value
-    # If comparing against a float or double, don't do a strict comparison
-    # See: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
     elif self.column_type == 'float':
-      return abs(float(self.value) - float(other.value)) <= 10e-5
+      return compare_float(float(self.value), float(other.value), 10e-5)
     elif self.column_type == 'double':
-      return abs(float(self.value) - float(other.value)) <= 10e-10
+      return compare_float(float(self.value), float(other.value), 10e-10)
     else:
       return self.value == other.value
 

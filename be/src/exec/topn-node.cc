@@ -79,9 +79,7 @@ bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* cons
     if (lhs_value != NULL && rhs_value == NULL) return true;
 
     int result = RawValue::Compare(lhs_value, rhs_value, lhs_expr->type());
-    if (!less_than) {
-      result = -result;
-    }
+    if (!less_than) result = -result;
     if (result > 0) return false;
     if (result < 0) return true;
     // Otherwise, try the next Expr

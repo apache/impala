@@ -679,3 +679,35 @@ bigint
 ---- RESULTS
 NULL
 ====
+---- QUERY
+# Test queries with divide by 0
+select if(id % 2 = 0, id, -id) / if(id < 5, 0, 1) as v 
+from alltypestiny order by v desc limit 100;
+---- TYPES
+DOUBLE
+---- RESULTS
+inf
+inf
+6
+-5
+-7
+-inf
+-inf
+-nan
+====
+---- QUERY
+# Test queries with divide by 0
+select if(id % 2 = 0, id, -id) / if(id < 5, 0, 1) as v 
+from alltypestiny order by v asc limit 100;
+---- TYPES
+DOUBLE
+---- RESULTS
+-nan
+-inf
+-inf
+-7
+-5
+6
+inf
+inf
+====
