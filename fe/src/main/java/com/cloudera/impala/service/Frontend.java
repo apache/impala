@@ -396,14 +396,7 @@ public class Frontend {
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();
-    result.setSql_stmt(request.stmt);
     result.setQuery_options(request.getQueryOptions());
-
-    // assign request_id
-    UUID requestId = UUID.randomUUID();
-    result.setRequest_id(
-        new TUniqueId(requestId.getMostSignificantBits(),
-                      requestId.getLeastSignificantBits()));
 
     if (analysisResult.isDdlStmt()) {
       result.stmt_type = TStmtType.DDL;

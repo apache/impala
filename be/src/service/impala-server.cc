@@ -70,6 +70,7 @@
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
+using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
@@ -109,10 +110,44 @@ namespace impala {
 ThreadManager* fe_tm;
 ThreadManager* be_tm;
 
+ImpalaServer::QueryExecState::QueryExecState(
+    ExecEnv* exec_env, ImpalaServer* server,
+    shared_ptr<ImpalaServer::SessionState> session,
+    const TSessionState& query_session_state, const string& sql_stmt)
+  : sql_stmt_(sql_stmt),
+    exec_env_(exec_env),
+    parent_session_(session),
+    query_session_state_(query_session_state),
+    coord_(NULL),
+    profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
+    server_profile_(&profile_pool_, "ImpalaServer"),
+    summary_profile_(&profile_pool_, "Summary"),
+    eos_(false),
+    query_state_(beeswax::QueryState::CREATED),
+    current_batch_(NULL),
+    current_batch_row_(0),
+    num_rows_fetched_(0),
+    impala_server_(server),
+    start_time_(TimestampValue::local_time()) {
+  row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
+  query_events_ = summary_profile_.AddEventSequence("Query Timeline");
+  query_events_->Start();
+  profile_.AddChild(&summary_profile_);
+  profile_.AddChild(&server_profile_);
+
+  // Creating a random_generator every time is not free, but
+  // benchmarks show it to be slightly cheaper than contending for a
+  // single generator under a lock (since random_generator is not
+  // thread-safe).
+  random_generator uuid_generator;
+  uuid query_uuid = uuid_generator();
+  query_id_.hi = *reinterpret_cast<uint64_t*>(&query_uuid.data[0]);
+  query_id_.lo = *reinterpret_cast<uint64_t*>(&query_uuid.data[8]);
+}
+
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
-  profile_.set_name("Query (id=" + PrintId(exec_request->request_id) + ")");
-  query_id_ = exec_request->request_id;
+  profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
 
   summary_profile_.AddInfoString("Start Time", start_time().DebugString());
   summary_profile_.AddInfoString("End Time", "");
@@ -121,7 +156,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
   summary_profile_.AddInfoString("User", user());
   summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", exec_request->sql_stmt);
+  summary_profile_.AddInfoString("Sql Statement", sql_stmt());
 
   if (exec_request->stmt_type == TStmtType::QUERY ||
       exec_request->stmt_type == TStmtType::DML) {
@@ -158,7 +193,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       // coordinator fragment actually executing to drive the sink.
       // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
       local_runtime_state_.reset(new RuntimeState(
-          exec_request->request_id, exec_request->query_options,
+          query_id_, exec_request->query_options,
           query_exec_request.query_globals.now_string,
           NULL /* = we don't expect to be executing anything here */));
       RETURN_IF_ERROR(PrepareSelectListExprs(local_runtime_state_.get(),
@@ -176,7 +211,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
 
       coord_.reset(new Coordinator(exec_env_));
       RETURN_IF_ERROR(coord_->Exec(
-          exec_request->request_id, &query_exec_request, exec_request->query_options));
+          query_id_, &query_exec_request, exec_request->query_options));
 
       if (has_coordinator_fragment) {
         RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
@@ -202,8 +237,6 @@ void ImpalaServer::QueryExecState::Done() {
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
   ddl_executor_.reset(new DdlExecutor(impala_server_));
   RETURN_IF_ERROR(ddl_executor_->Exec(exec_request));
-  query_id_ = ddl_executor_->request_id();
-  VLOG_QUERY << "query_id:" << query_id_.hi << ":" << query_id_.lo;
   result_metadata_ = ddl_executor_->result_set_metadata();
   return Status::OK;
 }
@@ -1108,10 +1141,18 @@ Status ImpalaServer::ExecuteInternal(
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
 
-  exec_state->reset(
-      new QueryExecState(exec_env_, this, session_state, query_session_state));
-  (*exec_state)->query_events()->MarkEvent("Start execution");
   *registered_exec_state = false;
+
+  exec_state->reset(new QueryExecState(
+      exec_env_, this, session_state, query_session_state, request.stmt));
+
+  (*exec_state)->query_events()->MarkEvent("Start execution");
+
+  // register exec state as early as possible so that queries that
+  // take a long time to plan show up, and to handle incoming status
+  // reports before execution starts.
+  RETURN_IF_ERROR(RegisterQuery(session_state, *exec_state));
+  *registered_exec_state = true;
 
   TExecRequest result;
   {
@@ -1125,18 +1166,17 @@ Status ImpalaServer::ExecuteInternal(
       lock_guard<mutex> l(session_state->lock);
       session_state->database = result.ddl_exec_request.use_db_params.db;
     }
+    TUniqueId query_id = (*exec_state)->query_id();
     exec_state->reset();
+    // USE statements are unique in that they're completely finished as of this point.
+    UnregisterQuery(query_id);
+    *registered_exec_state = false;
     return Status::OK;
   }
 
   if (result.__isset.result_set_metadata) {
     (*exec_state)->set_result_metadata(result.result_set_metadata);
   }
-
-  // register exec state before starting execution in order to handle incoming
-  // status reports
-  RETURN_IF_ERROR(RegisterQuery(session_state, result.request_id, *exec_state));
-  *registered_exec_state = true;
 
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
@@ -1162,14 +1202,14 @@ Status ImpalaServer::ExecuteInternal(
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
-    const TUniqueId& query_id, const shared_ptr<QueryExecState>& exec_state) {
+    const shared_ptr<QueryExecState>& exec_state) {
   lock_guard<mutex> l2(session_state->lock);
   if (session_state->closed) {
     return Status("Session has been closed, ignoring query.");
   }
 
   lock_guard<mutex> l(query_exec_state_map_lock_);
-
+  const TUniqueId& query_id = exec_state->query_id();
   QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
   if (entry != query_exec_state_map_.end()) {
     // There shouldn't be an active query with that same id.
@@ -1914,7 +1954,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   id = exec_state.query_id();
   const TExecRequest& request = exec_state.exec_request();
 
-  stmt = request.__isset.sql_stmt ? request.sql_stmt : "N/A";
+  stmt = exec_state.sql_stmt();
   stmt_type = request.stmt_type;
   user = exec_state.user();
   default_db = exec_state.default_db();

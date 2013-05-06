@@ -110,7 +110,6 @@ Status DdlExecutor::Exec(const TMetadataOpRequest& exec_request) {
   TMetadataOpResponse metdata_op_result_;
   RETURN_IF_ERROR(impala_server_->ExecHiveServer2MetadataOp(exec_request,
       &metdata_op_result_));
-  request_id_ = metdata_op_result_.request_id;
   result_set_metadata_ = metdata_op_result_.result_set_metadata;
   result_set_ = metdata_op_result_.results;
   return Status::OK;

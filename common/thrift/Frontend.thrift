@@ -516,35 +516,27 @@ struct TMetadataOpRequest {
 
 // Output of JniFrontend.hiveServer2MetadataOperation
 struct TMetadataOpResponse {
-  // Globally unique id for this request.
-  1: required Types.TUniqueId request_id
-  
   // Schema of the result
-  2: required TResultSetMetadata result_set_metadata
+  1: required TResultSetMetadata result_set_metadata
   
   // Result set
-  3: required list<Data.TResultRow> results
+  2: required list<Data.TResultRow> results
 }
 
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type;
 
-  2: optional string sql_stmt;
-
-  // Globally unique id for this request. Assigned by the planner.
-  3: required Types.TUniqueId request_id
-
   // Copied from the corresponding TClientRequest
-  4: required ImpalaInternalService.TQueryOptions query_options;
+  2: required ImpalaInternalService.TQueryOptions query_options;
 
   // TQueryExecRequest for the backend
   // Set iff stmt_type is QUERY or DML
-  5: optional TQueryExecRequest query_exec_request
+  3: optional TQueryExecRequest query_exec_request
 
   // Set iff stmt_type is DDL
-  6: optional TDdlExecRequest ddl_exec_request
+  4: optional TDdlExecRequest ddl_exec_request
 
   // Metadata of the query result set (not set for DML)
-  7: optional TResultSetMetadata result_set_metadata
+  5: optional TResultSetMetadata result_set_metadata
 }

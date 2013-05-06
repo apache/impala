@@ -282,27 +282,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
    public:
     QueryExecState(ExecEnv* exec_env, ImpalaServer* server,
         boost::shared_ptr<SessionState> session,
-        const TSessionState& query_session_state)
-      : exec_env_(exec_env),
-        parent_session_(session),
-        query_session_state_(query_session_state),
-        coord_(NULL),
-        profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
-        server_profile_(&profile_pool_, "ImpalaServer"),
-        summary_profile_(&profile_pool_, "Summary"),
-        eos_(false),
-        query_state_(beeswax::QueryState::CREATED),
-        current_batch_(NULL),
-        current_batch_row_(0),
-        num_rows_fetched_(0),
-        impala_server_(server),
-        start_time_(TimestampValue::local_time()) {
-      row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
-      query_events_ = summary_profile_.AddEventSequence("Query Timeline");
-      query_events_->Start();
-      profile_.AddChild(&summary_profile_);
-      profile_.AddChild(&server_profile_);
-    }
+        const TSessionState& query_session_state,
+        const std::string& sql_stmt);
 
     ~QueryExecState() {
     }
@@ -358,11 +339,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     const RuntimeProfile& profile() const { return profile_; }
     const TimestampValue& start_time() const { return start_time_; }
     const TimestampValue& end_time() const { return end_time_; }
+    const std::string& sql_stmt() const { return sql_stmt_; }
 
     RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
    private:
     TUniqueId query_id_;
+    const std::string sql_stmt_;
+
     boost::mutex lock_;  // protects all following fields
     ExecEnv* exec_env_;
 
@@ -519,7 +503,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Registers the query exec state with query_exec_state_map_ using the globally
   // unique query_id and add the query id to session state's open query list.
   Status RegisterQuery(boost::shared_ptr<SessionState> session_state,
-      const TUniqueId& query_id, const boost::shared_ptr<QueryExecState>& exec_state);
+      const boost::shared_ptr<QueryExecState>& exec_state);
 
   // Cancel the query execution if the query is still running. Removes exec_state from
   // query_exec_state_map_, and removes the query id from session state's open query list
@@ -897,6 +881,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;
+
+  // Lock to protect uuid_generator
+  boost::mutex uuid_lock_;
 };
 
 // Create an ImpalaServer and Thrift servers.

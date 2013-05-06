@@ -122,7 +122,19 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
   }
 
   shared_ptr<QueryExecState> exec_state;
-  exec_state.reset(new QueryExecState(exec_env_, this, session, TSessionState()));
+  // There is no query text available because this metadata operation
+  // comes from an RPC which does not provide the query text.
+  // TODO: Consider reconstructing the query text from the metadata operation.
+  exec_state.reset(new QueryExecState(exec_env_, this, session, TSessionState(), "N/A"));
+  Status register_status = RegisterQuery(session, exec_state);
+  if (!register_status.ok()) {
+    status->__set_statusCode(
+        apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+    status->__set_errorMessage(register_status.GetErrorMsg());
+    status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
+    return;
+  }
+
   // start execution of metadata first;
   Status exec_status = exec_state->Exec(request);
   if (!exec_status.ok()) {
@@ -134,17 +146,6 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
   }
 
   exec_state->UpdateQueryState(QueryState::FINISHED);
-
-  // register exec state after execution is success
-  Status register_status = RegisterQuery(session, exec_state->query_id(), exec_state);
-  if (!register_status.ok())
-  {
-    status->__set_statusCode(
-        apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
-    status->__set_errorMessage(register_status.GetErrorMsg());
-    status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
-    return;
-  }
 
   handle->__set_hasResultSet(true);
   // TODO: create secret for operationId
@@ -223,14 +224,17 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
 
   // Generate session id and the secret
-  uuid sessionid = uuid_generator_();
-  uuid secret = uuid_generator_();
-  return_val.sessionHandle.sessionId.guid.assign(sessionid.begin(), sessionid.end());
-  return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
-  DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
-  DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
-  return_val.__isset.sessionHandle = true;
 
+  {
+    lock_guard<mutex> l(uuid_lock_);
+    uuid sessionid = uuid_generator_();
+    uuid secret = uuid_generator_();
+    return_val.sessionHandle.sessionId.guid.assign(sessionid.begin(), sessionid.end());
+    return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
+    DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
+    DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
+    return_val.__isset.sessionHandle = true;
+  }
   // create a session state: initialize start time, session type, database and default
   // query options.
   // TODO: put secret in session state map and check it

@@ -520,19 +520,14 @@ public class MetadataOp {
   }
 
   /**
-   * Returns an TMetadataOpResponse with the specified schema and a unique request id
-   * will be assigned. The result set will be empty.
+   * Returns an TMetadataOpResponse with the specified schema. The
+   * result set will be empty.
    */
   private static TMetadataOpResponse createEmptyMetadataOpResponse(
       TResultSetMetadata metadata) {
     TMetadataOpResponse result = new TMetadataOpResponse();
     result.results = Lists.newArrayList();
     result.result_set_metadata = metadata;
-    UUID requestId = UUID.randomUUID();
-    result.setRequest_id(
-        new TUniqueId(requestId.getMostSignificantBits(),
-                      requestId.getLeastSignificantBits()));
-    LOG.debug("Request id=" + result.request_id);
     return result;
   }
 
