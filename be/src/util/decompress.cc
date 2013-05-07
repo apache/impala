@@ -190,11 +190,9 @@ int SnappyDecompressor::MaxOutputLen(int input_len, const uint8_t* input) {
 
 Status SnappyDecompressor::ProcessBlock(int input_length, uint8_t* input,
                                         int* output_length, uint8_t** output) {
-  int uncompressed_length;
-
   // If length is set then the output has been allocated.
   if (*output_length == 0) {
-    uncompressed_length = MaxOutputLen(input_length, input);
+    int uncompressed_length = MaxOutputLen(input_length, input);
     if (uncompressed_length < 0) return Status("Snappy: GetUncompressedLength failed");
     if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < uncompressed_length) {
       buffer_length_ = uncompressed_length;
@@ -204,6 +202,7 @@ Status SnappyDecompressor::ProcessBlock(int input_length, uint8_t* input,
       out_buffer_ = memory_pool_->Allocate(buffer_length_);
     }
     *output = out_buffer_;
+    *output_length = uncompressed_length;
   }
 
   if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
@@ -211,7 +210,6 @@ Status SnappyDecompressor::ProcessBlock(int input_length, uint8_t* input,
     return Status("Snappy: RawUncompress failed");
   }
   
-  *output_length = uncompressed_length;
   return Status::OK;
 }
 

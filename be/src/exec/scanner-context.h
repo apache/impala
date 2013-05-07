@@ -300,9 +300,7 @@ class ScannerContext {
   // This should only be called from the scanner thread.
   void CommitRows(int num_rows);
 
-  // Creates streams for this context.  This can only be called once in the lifetime 
-  // of this object.
-  // Any existing streams are reset.
+  // Creates streams for this context.  Any previous streams are now invalid.
   void CreateStreams(int num_streams);
 
   // Close() and Cancel() are used together to coordinate proper cleanup.

@@ -66,10 +66,10 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // File metadata thrift object
   parquet::FileMetaData file_metadata_;
-  
-  // The scan range group for this scanner.
-  DiskIoMgr::ScanRangeGroup scan_range_group_;
 
+  // Scan range for the metadata.
+  const DiskIoMgr::ScanRange* metadata_range_;
+  
   // Returned in ProcessSplit
   Status parse_status_;
 
@@ -94,7 +94,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // Walks file_metadata_ and initiates reading the materialized columns.  This 
   // initializes column_readers_ and issues the reads for the columns.
-  Status InitColumns();
+  Status InitColumns(int row_group_idx);
 
   // Validates the file metadata
   Status ValidateFileMetadata();
