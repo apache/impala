@@ -1419,6 +1419,20 @@ public class ParserTest {
   }
 
   @Test
+  public void TestResetMetadata() {
+    ParsesOk("invalidate metadata");
+    ParsesOk("invalidate metadata Foo");
+    ParsesOk("invalidate metadata Foo.S");
+    ParsesOk("refresh Foo");
+    ParsesOk("refresh Foo.S");
+
+    ParserError("invalidate");
+    ParserError("invalidate metadata Foo.S.S");
+    ParserError("REFRESH Foo.S.S");
+    ParserError("refresh");
+  }
+
+  @Test
   public void TestGetErrorMsg() {
 
     // missing select
@@ -1427,8 +1441,8 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, LOAD, SELECT, SHOW, " +
-        "USE, VALUES, WITH\n");
+        "Expected: ALTER, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, INVALIDATE, LOAD, " +
+        "REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",

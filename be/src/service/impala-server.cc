@@ -1029,21 +1029,6 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   return Status::OK;
 }
 
-Status ImpalaServer::ResetCatalogInternal() {
-  LOG(INFO) << "Refreshing catalog";
-  RETURN_IF_ERROR(frontend_->ResetCatalog());
-
-  ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME->Update(
-      TimestampValue::local_time().DebugString());
-
-  Status status = UpdateCatalogMetrics();
-  if (!status.ok()) {
-    VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetErrorMsg();
-  }
-
-  return Status::OK;
-}
-
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);

@@ -174,14 +174,15 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
   KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,KW_INTERVAL,
-  KW_INTO, KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION,
-  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
-  KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME,
-  KW_REPLACE, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT,
-  KW_SEQUENCEFILE, KW_SET, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
-  KW_TABLE, KW_TABLES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
-  KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_VALUES, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERVAL,
+  KW_INTO, KW_IS, KW_INVALIDATE, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD,
+  KW_LOCATION, KW_MIN, KW_MAX, KW_METADATA, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER,
+  KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE,
+  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA,
+  KW_SCHEMAS, KW_SELECT, KW_SEQUENCEFILE, KW_SET, KW_SHOW, KW_SEMI, KW_SMALLINT,
+  KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
+  KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_VALUES,
+  KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -215,6 +216,7 @@ nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
+nonterminal ResetMetadataStmt reset_metadata_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
@@ -342,6 +344,8 @@ stmt ::=
   {: RESULT = explain; :}
   | load_stmt: load
   {: RESULT = load; :}
+  | reset_metadata_stmt: reset_metadata
+  {: RESULT = reset_metadata; :}
   ;
 
 load_stmt ::=
@@ -355,6 +359,15 @@ overwrite_val ::=
   {: RESULT = Boolean.TRUE; :}
   | /* empty */
   {: RESULT = Boolean.FALSE; :}
+  ;
+
+reset_metadata_stmt ::=
+  KW_INVALIDATE KW_METADATA
+  {: RESULT = new ResetMetadataStmt(null, false); :}
+  | KW_INVALIDATE KW_METADATA table_name:table
+  {: RESULT = new ResetMetadataStmt(table, false); :}
+  | KW_REFRESH table_name:table
+  {: RESULT = new ResetMetadataStmt(table, true); :}
   ;
 
 explain_stmt ::=

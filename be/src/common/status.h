@@ -49,6 +49,7 @@ class Status {
   static const Status OK;
   static const Status CANCELLED;
   static const Status MEM_LIMIT_EXCEEDED;
+  static const Status DEPRECATED_RPC;
 
   // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status)

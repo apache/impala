@@ -188,8 +188,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const apache::hive::service::cli::thrift::TFetchResultsReq& request);
   virtual void GetLog(apache::hive::service::cli::thrift::TGetLogResp& return_val,
       const apache::hive::service::cli::thrift::TGetLogReq& request);
-  virtual void ResetCatalog(TResetCatalogResp& return_val);
-  virtual void ResetTable(TResetTableResp& return_val, const TResetTableReq& request);
 
   // ImpalaService common extensions (implemented in impala-server.cc)
   // ImpalaInternalService rpcs
@@ -334,9 +332,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // query_exec_state_map_, and removes the query id from session state's open query list
   // Returns true if it found a registered exec_state, otherwise false.
   bool UnregisterQuery(const TUniqueId& query_id);
-
-  // Non-thrift callable version of ResetCatalog
-  Status ResetCatalogInternal();
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
   // Queries still need to be unregistered, usually via Close, after cancellation.

@@ -30,6 +30,8 @@ const Status Status::OK;
 const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled", true);
 const Status Status::MEM_LIMIT_EXCEEDED(
     TStatusCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded", true);
+const Status Status::DEPRECATED_RPC(TStatusCode::NOT_IMPLEMENTED_ERROR,
+    "Deprecated RPC; please update your client", true);
 
 Status::ErrorDetail::ErrorDetail(const TStatus& status)
   : error_code(status.status_code),

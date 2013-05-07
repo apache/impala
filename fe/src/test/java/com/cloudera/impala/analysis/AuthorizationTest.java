@@ -28,6 +28,7 @@ import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
@@ -54,6 +55,7 @@ public class AuthorizationTest {
   private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   private final static User USER = new User(System.getProperty("user.name"));
   private final AnalysisContext analysisContext;
+  private final AnalysisContext adminUserAnalysisContext;
   private final Frontend fe;
 
   public AuthorizationTest() throws IOException {
@@ -61,6 +63,8 @@ public class AuthorizationTest {
         new AuthorizationConfig("server1", AUTHZ_POLICY_FILE);
     Catalog catalog = new Catalog(true, false, authzConfig);
     analysisContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
+    adminUserAnalysisContext = new AnalysisContext(catalog,
+        Catalog.DEFAULT_DB, ImpalaInternalAdminUser.getInstance());
     fe = new Frontend(true, authzConfig);
   }
 
@@ -207,6 +211,30 @@ public class AuthorizationTest {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
     }
+  }
+
+  @Test
+  public void TestResetMetadata() throws AnalysisException, AuthorizationException {
+    // Positive cases (user has privileges on these tables).
+    AuthzOk("invalidate metadata functional.alltypesagg");
+    AuthzOk("refresh functional.alltypesagg");
+
+    // TODO: Use a real user to run this positive test case once
+    // AuthorizationChecker supports LocalGroupAuthorizationProvider.
+    adminUserAnalysisContext.analyze("invalidate metadata");
+
+    AuthzError("invalidate metadata",
+        "User '%s' does not have privileges to access: server");
+    AuthzError("invalidate metadata unknown_db.alltypessmall",
+        "User '%s' does not have privileges to access: unknown_db.alltypessmall");
+    AuthzError("invalidate metadata functional_seq.alltypessmall",
+        "User '%s' does not have privileges to access: functional_seq.alltypessmall");
+    AuthzError("invalidate metadata functional.unknown_table",
+        "User '%s' does not have privileges to access: functional.unknown_table");
+    AuthzError("invalidate metadata functional.alltypessmall",
+        "User '%s' does not have privileges to access: functional.alltypessmall");
+    AuthzError("refresh functional.alltypessmall",
+        "User '%s' does not have privileges to access: functional.alltypessmall");
   }
 
   @Test

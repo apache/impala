@@ -147,29 +147,14 @@ struct TPingImpalaServiceResp {
   1: string version
 }
 
-// Parameters for a ResetTable request which will reset a table's metadata.
-// If is_refresh is true, the metadata will be refreshed immediately.
-// Otherwise, the metadata will be invalidated and then loaded on the next
-// access.
+// Parameters for a ResetTable request which will invalidate a table's metadata.
+// DEPRECATED.
 struct TResetTableReq {
   // Name of the table's parent database.
   1: required string db_name
 
   // Name of the table.
   2: required string table_name
-  
-  // If set to true, refresh the metadata immediately. Otherwise, invalidate the metadata
-  3: optional bool is_refresh
-}
-
-// Response from call to ResetCatalog
-struct TResetCatalogResp {
-  1: required Status.TStatus status
-}
-
-// Response from call to ResetTable
-struct TResetTableResp {
-  1: required Status.TStatus status
 }
 
 // For all rpc that return a TStatus as part of their result type,
@@ -186,9 +171,11 @@ service ImpalaService extends beeswax.BeeswaxService {
       throws(1:beeswax.BeeswaxException error);
         
   // Invalidates all catalog metadata, forcing a reload
+  // DEPRECATED; execute query "invalidate metadata" to refresh metadata 
   Status.TStatus ResetCatalog();
 
   // Invalidates a specific table's catalog metadata, forcing a reload on the next access
+  // DEPRECATED; execute query "refresh <table>" to refresh metadata
   Status.TStatus ResetTable(1:TResetTableReq request)
 
   // Returns the runtime profile string for the given query handle.
@@ -206,9 +193,4 @@ service ImpalaService extends beeswax.BeeswaxService {
 
 // Impala HiveServer2 service
 service ImpalaHiveServer2Service extends cli_service.TCLIService {
-  // Invalidates all catalog metadata, forcing a reload
-  TResetCatalogResp ResetCatalog();
-
-  // Invalidates a specific table's catalog metadata, forcing a reload on the next access
-  TResetTableResp ResetTable(1:TResetTableReq request);
 }

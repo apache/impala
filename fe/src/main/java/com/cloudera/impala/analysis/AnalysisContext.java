@@ -101,6 +101,10 @@ public class AnalysisContext {
       return stmt instanceof DescribeStmt;
     }
 
+    public boolean isResetMetadataStmt() {
+      return stmt instanceof ResetMetadataStmt;
+    }
+
     public boolean isExplainStmt() {
       if (isQueryStmt()) return ((QueryStmt)stmt).isExplain();
       if (isInsertStmt()) return ((InsertStmt)stmt).isExplain();
@@ -110,7 +114,8 @@ public class AnalysisContext {
     public boolean isDdlStmt() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateDbStmt() ||
-          isDropDbStmt() || isDropTableStmt() || isAlterTableStmt();
+          isDropDbStmt() || isDropTableStmt() || isAlterTableStmt() ||
+          isResetMetadataStmt();
     }
 
     public boolean isDmlStmt() {

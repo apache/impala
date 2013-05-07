@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
+import com.cloudera.impala.analysis.ResetMetadataStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -45,6 +46,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.FileFormat;
@@ -83,6 +85,7 @@ import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TResetMetadataParams;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStmtType;
@@ -111,7 +114,7 @@ public class Frontend {
   /**
    * Invalidates all catalog metadata, forcing a reload.
    */
-  public void resetCatalog() {
+  private void resetCatalog() {
     catalog.close();
     catalog = new Catalog(lazyCatalog, true, authzConfig);
   }
@@ -120,14 +123,9 @@ public class Frontend {
    * If isRefresh is false, invalidates a specific table's metadata, forcing the
    * metadata to be reloaded on the next access.
    * If isRefresh is true, performs an immediate incremental refresh.
-   * @throws DatabaseNotFoundException - If the specified database does not exist.
-   * @throws TableNotFoundException - If the specified table does not exist.
    */
-  public void resetTable(String dbName, String tableName, boolean isRefresh)
-      throws DatabaseNotFoundException, TableNotFoundException, AuthorizationException {
-    // TODO: Currently refresh commands are not authorized. Once REFRESH becomes a SQL
-    // statement (IMPALA-339) the authorization code can be added in.
-    // For now just use the internal Admin user.
+  private void resetTable(String dbName, String tableName, boolean isRefresh)
+      throws CatalogException {
     Db db = catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ANY);
     if (db == null) {
       throw new DatabaseNotFoundException("Database not found: " + dbName);
@@ -201,6 +199,11 @@ public class Frontend {
     } else if (analysis.isDropTableStmt()) {
       ddl.ddl_type = TDdlType.DROP_TABLE;
       ddl.setDrop_table_params(analysis.getDropTableStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isResetMetadataStmt()) {
+      ddl.ddl_type = TDdlType.RESET_METADATA;
+      ResetMetadataStmt resetMetadataStmt = (ResetMetadataStmt) analysis.getStmt();
+      ddl.setReset_metadata_params(resetMetadataStmt.toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     }
 
@@ -603,5 +606,20 @@ public class Frontend {
 
     // Refresh the table metadata.
     resetTable(dbName, tblName, true);
+  }
+
+  /**
+   * Execute a reset metadata statement.
+   */
+  public void execResetMetadata(TResetMetadataParams params)
+      throws CatalogException {
+    if (params.isSetTable_name()) {
+      resetTable(params.getTable_name().getDb_name(),
+          params.getTable_name().getTable_name(), params.isIs_refresh());
+    } else {
+      // Invalidate the catalog if no table name is provided.
+      Preconditions.checkArgument(!params.isIs_refresh());
+      resetCatalog();
+    }
   }
 }

@@ -74,7 +74,10 @@ public class AuthorizationChecker {
 
     List<Authorizable> authorizeables = Lists.newArrayList();
     authorizeables.add(new org.apache.access.core.Server(config.getServerName()));
-    authorizeables.addAll(request.getAuthorizeable().getHiveAuthorizeableHierarchy());
+    // If request.getAuthorizeable() is null, the request is for server-level permission.
+    if (request.getAuthorizeable() != null) {
+      authorizeables.addAll(request.getAuthorizeable().getHiveAuthorizeableHierarchy());
+    }
 
     // The Hive Access API does not currently provide a way to check if the user
     // has any privileges on a given resource.

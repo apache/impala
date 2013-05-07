@@ -346,6 +346,24 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestResetMetadata() {
+    AnalyzesOk("invalidate metadata");
+    AnalyzesOk("invalidate metadata functional.alltypessmall");
+    AnalyzesOk("invalidate metadata functional.bad_serde");
+    AnalyzesOk("refresh functional.alltypessmall");
+    AnalyzesOk("refresh functional.bad_serde");
+
+    AnalysisError("invalidate metadata functional.unknown_table",
+        "Table does not exist: functional.unknown_table");
+    AnalysisError("invalidate metadata unknown_db.unknown_table",
+        "Database does not exist: unknown_db");
+    AnalysisError("refresh functional.unknown_table",
+        "Table does not exist: functional.unknown_table");
+    AnalysisError("refresh unknown_db.unknown_table",
+        "Database does not exist: unknown_db");
+  }
+
+  @Test
   public void TestExplain() {
     // Analysis error from explain insert: too many partitioning columns.
     AnalysisError("explain insert into table functional.alltypessmall " +

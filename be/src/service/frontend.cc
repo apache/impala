@@ -50,8 +50,6 @@ Frontend::Frontend() {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
-    {"resetCatalog", "()V", &reset_catalog_id_},
-    {"resetTable", "([B)V", &reset_table_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
     {"getHadoopConfigValue", "(Ljava/lang/String;)Ljava/lang/String;",
          &get_hadoop_config_value_id_},
@@ -67,6 +65,7 @@ Frontend::Frontend() {
     {"createDatabase", "([B)V", &create_database_id_},
     {"dropTable", "([B)V", &drop_table_id_},
     {"dropDatabase", "([B)V", &drop_database_id_},
+    {"resetMetadata", "([B)V", &reset_metadata_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
@@ -176,6 +175,10 @@ Status Frontend::DropTable(const TDropTableParams& params) {
   return CallJniMethodWithThriftArgs(drop_table_id_, params);
 }
 
+Status Frontend::ResetMetadata(const TResetMetadataParams& params) {
+  return CallJniMethodWithThriftArgs(reset_metadata_id_, params);
+}
+
 Status Frontend::DescribeTable(const TDescribeTableParams& params,
     TDescribeTableResult* response) {
   return CallJniMethodWithThriftArgs(describe_table_id_, params, response);
@@ -218,19 +221,6 @@ Status Frontend::GetExplainPlan(
     const TClientRequest& query_request, string* explain_string) {
   return CallJniMethodWithThriftArgs(
       get_explain_plan_id_, query_request, explain_string);
-}
-
-Status Frontend::ResetCatalog() {
-  JNIEnv* jni_env = getJNIEnv();
-  jni_env->CallObjectMethod(fe_, reset_catalog_id_);
-  RETURN_ERROR_IF_EXC(jni_env);
-  return Status::OK;
-}
-
-Status Frontend::ResetTable(const TResetTableReq& reset_table_request) {
-  LOG(INFO) << "Resetting table: "
-            << reset_table_request.db_name << "." << reset_table_request.table_name;
-  return CallJniMethodWithThriftArgs(reset_table_id_, reset_table_request);
 }
 
 Status Frontend::ValidateSettings() {

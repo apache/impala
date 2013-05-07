@@ -346,7 +346,7 @@ class ImpalaShell(cmd.Cmd):
       self.__print_if_verbose('Server version: %s' % self.server_version)
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
-        self.cmdqueue.append('refresh' + ImpalaShell.CMD_DELIM)
+        self.cmdqueue.append('invalidate metadata' + ImpalaShell.CMD_DELIM)
       if self.current_db:
         self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
@@ -815,47 +815,6 @@ class ImpalaShell(cmd.Cmd):
     print_to_stderr(explanation.textual)
     return True
 
-  def do_refresh(self, args):
-    """Fast incremental refresh an Impala table metadata"""
-    status = RpcStatus.ERROR
-    if not args:
-        print 'Usage: refresh [databaseName.][tableName]'
-        return False
-    else:
-      db_table_name = self.__parse_table_name_arg(args)
-      if db_table_name is None:
-        print 'Usage: refresh [databaseName.][tableName]'
-        return False
-      reset_table_req = TResetTableReq(*db_table_name)
-      reset_table_req.is_refresh = True
-      start = time.time()
-      (_, status) = self.__do_rpc(
-          lambda: self.imp_service.ResetTable(reset_table_req))
-      end = time.time()
-      if status == RpcStatus.OK:
-        self.__print_if_verbose("Successfully refreshed table: %s in %2.2fs" % \
-            ('.'.join(db_table_name), (end-start)))
-    return status == RpcStatus.OK
-
-  def do_invalidate(self, args):
-    """Refresh the Impalad catalog"""
-    status = RpcStatus.ERROR
-    if not args:
-      (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
-      if status == RpcStatus.OK:
-        self.__print_if_verbose("Successfully refreshed catalog")
-    else:
-      db_table_name = self.__parse_table_name_arg(args)
-      if db_table_name is None:
-        print_to_stderr('Usage: refresh [databaseName.][tableName]')
-        return False
-      (_, status) = self.__do_rpc(
-          lambda: self.imp_service.ResetTable(TResetTableReq(*db_table_name)))
-      if status == RpcStatus.OK:
-        self.__print_if_verbose(
-            "Successfully invalidated table: %s" % '.'.join(db_table_name))
-    return status == RpcStatus.OK
-
   def do_history(self, args):
     """Display command history"""
     # Deal with readline peculiarity. When history does not exists,
@@ -885,8 +844,10 @@ class ImpalaShell(cmd.Cmd):
         print_to_stderr('Unable to save history: %s' % i)
 
   def default(self, args):
-    print_to_stderr("Unrecognized command")
-    return True
+    query = self.__create_beeswax_query_handle()
+    query.query = args
+    query.configuration = self.__options_to_string_list()
+    return self.__execute_query(query)
 
   def emptyline(self):
     """If an empty line is entered, do nothing"""

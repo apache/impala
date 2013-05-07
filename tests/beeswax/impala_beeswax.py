@@ -208,13 +208,12 @@ class ImpalaBeeswaxClient(object):
     return self.__do_rpc(lambda: self.imp_service.get_state(query_handle))
 
   def refresh(self):
-    """Reload the Impalad catalog"""
-    return self.__do_rpc(lambda: self.imp_service.ResetCatalog()) == 0
+    """Invalidate the Impalad catalog"""
+    return self.__execute_query("invalidate metadata")
 
   def refresh_table(self, db_name, table_name):
-    """Reload a specific table from the catalog"""
-    return self.__do_rpc(lambda:\
-        self.imp_service.ResetTable(TResetTableReq(db_name, table_name))) == 0
+    """Refresh a specific table from the catalog"""
+    return self.__execute_query("refresh %s.%s" % (db_name, table_name))
 
   def fetch_results(self, query_string, query_handle):
     """Fetches query results given a handle and query type (insert, use, other)"""

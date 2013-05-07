@@ -45,13 +45,6 @@ class Frontend {
   // Call FE to get TClientRequestResult.
   Status GetExecRequest(const TClientRequest& request, TExecRequest* result);
 
-  // Performs a full catalog metadata reset, invalidating all table and database metadata.
-  Status ResetCatalog();
-
-  // Resets the specified table's catalog metadata, forcing a reload on the next access.
-  // Returns an error if the table or database was not found in the catalog.
-  Status ResetTable(const TResetTableReq& reset_table_request);
-
   // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
   // table name returned is unqualified.
   // If pattern is NULL, match all tables otherwise match only those tables that
@@ -118,6 +111,9 @@ class Frontend {
   // successful, otherwise CANCELLED is returned.
   Status DropTable(const TDropTableParams& drop_table_params);
 
+  // Reset the metadata
+  Status ResetMetadata(const TResetMetadataParams& reset_metadata_params);
+
   // Validate Hadoop config; requires FE
   Status ValidateSettings();
 
@@ -149,8 +145,6 @@ class Frontend {
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
   jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
   jmethodID check_hadoop_config_id_; // JniFrontend.checkHadoopConfig()
-  jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
-  jmethodID reset_table_id_; // JniFrontend.resetTable
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
@@ -162,6 +156,7 @@ class Frontend {
   jmethodID create_table_like_id_; // JniFrontend.createTableLike
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
+  jmethodID reset_metadata_id_; // JniFrontend.resetMetadata
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;
 

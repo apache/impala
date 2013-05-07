@@ -91,6 +91,8 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       return frontend_->DropDatabase(exec_request.drop_db_params);
     case TDdlType::DROP_TABLE:
       return frontend_->DropTable(exec_request.drop_table_params);
+    case TDdlType::RESET_METADATA:
+      return frontend_->ResetMetadata(exec_request.reset_metadata_params);
     default: {
       stringstream ss;
       ss << "Unknown DDL exec request type: " << exec_request.ddl_type;

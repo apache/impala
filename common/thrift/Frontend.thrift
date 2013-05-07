@@ -371,6 +371,17 @@ struct TDropTableParams {
   2: required bool if_exists
 }
 
+// Parameters of REFRESH/INVALIDATE METADATA commands
+// NOTE: This struct should only be used for intra-process communication.
+struct TResetMetadataParams {
+  // If true, refresh. Otherwise, invalidate metadata
+  1: required bool is_refresh
+
+  // Fully qualified name of the table to refresh or invalidate; not set if invalidating
+  // the entire catalog
+  2: optional TTableName table_name
+}
+
 struct TClientRequest {
   // select stmt to be executed
   1: required string stmt
@@ -515,6 +526,7 @@ enum TDdlType {
   CREATE_TABLE_LIKE,
   DROP_DATABASE,
   DROP_TABLE,
+  RESET_METADATA
 }
 
 struct TDdlExecRequest {
@@ -549,6 +561,9 @@ struct TDdlExecRequest {
 
   // Parameters for DROP TABLE
   11: optional TDropTableParams drop_table_params
+  
+  // Parameters for REFRESH/INVALIDATE METADATA
+  12: optional TResetMetadataParams reset_metadata_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)

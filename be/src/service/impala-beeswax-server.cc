@@ -409,11 +409,11 @@ void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
 }
 
 void ImpalaServer::ResetCatalog(impala::TStatus& status) {
-  ResetCatalogInternal().ToThrift(&status);
+  Status::DEPRECATED_RPC.ToThrift(&status);
 }
 
 void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& request) {
-  frontend_->ResetTable(request).ToThrift(&status);
+  Status::DEPRECATED_RPC.ToThrift(&status);
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {

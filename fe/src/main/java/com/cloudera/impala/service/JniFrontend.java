@@ -74,9 +74,8 @@ import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TResetMetadataParams;
 import com.google.common.base.Preconditions;
-import com.cloudera.impala.thrift.TResetTableReq;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -700,15 +699,10 @@ public class JniFrontend {
     return "";
   }
 
-  public void resetTable(byte[] thriftResetTableRequest)
+  public void resetMetadata(byte[] thriftResetMetadataRequest)
       throws ImpalaException {
-    TResetTableReq request = new TResetTableReq();
-    deserializeThrift(request, thriftResetTableRequest);
-    frontend.resetTable(request.getDb_name(), request.getTable_name(),
-        request.isSetIs_refresh() && request.isIs_refresh());
-  }
-
-  public void resetCatalog() {
-    frontend.resetCatalog();
+    TResetMetadataParams request = new TResetMetadataParams();
+    deserializeThrift(request, thriftResetMetadataRequest);
+    frontend.execResetMetadata(request);
   }
 }

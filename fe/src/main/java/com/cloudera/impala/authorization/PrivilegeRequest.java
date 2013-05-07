@@ -17,7 +17,8 @@ package com.cloudera.impala.authorization;
 import com.google.common.base.Preconditions;
 
 /*
- * Represents a privilege request in the context of an Authorizeable object.
+ * Represents a privilege request in the context of an Authorizeable object. If no
+ * Authorizeable object is provided, it represents a privilege request on the server.
  * For example, SELECT on table Foo in database Bar.
  */
 public class PrivilegeRequest {
@@ -31,18 +32,24 @@ public class PrivilegeRequest {
     this.privilege = privilege;
   }
 
+  public PrivilegeRequest(Privilege privilege) {
+    Preconditions.checkNotNull(privilege);
+    this.authorizeable = null;
+    this.privilege = privilege;
+  }
+
   /*
-   * Returns Authorizeable object.
+   * Returns Authorizeable object. Null if the request is for server-level permission.
    */
   public Authorizeable getAuthorizeable() {
     return authorizeable;
   }
 
   /*
-   * Name of the Authorizeable.
+   * Name of the Authorizeable. Authorizeable refers to the server if it's null.
    */
   public String getName() {
-    return authorizeable.getName();
+    return (authorizeable != null) ? authorizeable.getName() : "server";
   }
 
   /*
