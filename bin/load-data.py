@@ -82,7 +82,7 @@ def exec_hive_query_from_file(file_name):
     sys.exit(ret_val)
 
 def exec_impala_query_from_file(file_name):
-  impala_refresh_cmd = "%s --impalad=%s -q 'refresh'" %\
+  impala_refresh_cmd = "%s --impalad=%s -q 'invalidate'" %\
       (IMPALA_SHELL_CMD, options.impala_shell_args)
   impala_cmd = "%s --impalad=%s -f %s" %\
       (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)

@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -31,6 +32,8 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -85,6 +88,15 @@ public class Db {
    * Before loading any metadata, the table name map is checked to ensure the given
    * table is "known". If it is not, no metadata is loaded and an exception
    * is thrown.
+   *
+   * Table metadata can be invalidated or refreshed.
+   * invalidate(tableName) will mark the table metdata cache invalidated and
+   * will do a full reload of that table when retriving the table on the next get().
+   * refresh(tableName), which calls reload(), will perform a synchronous fast
+   * incremental refresh of the table. Depending on implementation, it might reuse
+   * existing metadata and the refreshed metadata might still contain stale metadata.
+   * In both cases, the existing Table metadata object won't be modified. A new copy of
+   * the Table metadata object will be created and put into tableMetadataCache.
    */
   private class LazyTableMap {
     // Cache of table metadata with key of lower-case table name
@@ -96,7 +108,21 @@ public class Db {
               @Override
               public Table load(String tableName) throws TableNotFoundException,
                   TableLoadingException {
-                return loadTable(tableName);
+                return loadTable(tableName, null);
+              }
+
+              @Override
+              public ListenableFuture<Table> reload(String tableName, Table oldValue)
+                  throws ImpalaException {
+                SettableFuture<Table> newValue = SettableFuture.create();
+                try {
+                  newValue.set(loadTable(tableName, oldValue));
+                } catch (ImpalaException e) {
+                  // Invalidate the table metadata if load failed.
+                  invalidate(tableName);
+                  throw e;
+                }
+                return newValue;
               }
             });
 
@@ -116,22 +142,33 @@ public class Db {
     }
 
     /**
-     * Invalidate the metadata for the given table name and marks the table metadata load
-     * state as uninitialized. If ifExists is true, this will only invalidate if the table
-     * name already exists in the tableNameMap. If ifExists is false, the table metadata
-     * will be invalidated and the metadata state will be set to UNINITIALIZED
-     * (potentially adding a new item to the table name map).
+     * Refresh the metadata for the given table name if the table cache already exists,
+     * or load the table metadata if the table has not been loaded.
+     * If refreshing the table metadata failed, no exception will be thrown but the
+     * exiting metadata will be invalidated.
      */
-    public void invalidate(String tableName, boolean ifExists) {
+    public void refresh(String tableName) {
+      // tableMetadataCache.refresh() calls reload().
+      tableMetadataCache.refresh(tableName);
+    }
+
+    /**
+     * Invalidate the metadata for the given table name and marks the table metadata load
+     * state as uninitialized if the table exists in the tableNameMap.
+     */
+    public void invalidate(String tableName) {
       tableName = tableName.toLowerCase();
-      if (ifExists) {
-        if(tableNameMap.replace(tableName, MetadataLoadState.UNINITIALIZED) != null) {
-          tableMetadataCache.invalidate(tableName);
-        }
-      } else {
-        tableNameMap.put(tableName, MetadataLoadState.UNINITIALIZED);
-        tableMetadataCache.invalidate(tableName);
-      }
+      tableNameMap.replace(tableName, MetadataLoadState.UNINITIALIZED);
+      tableMetadataCache.invalidate(tableName);
+    }
+
+    /**
+     * Add an uninitialized table.
+     */
+    public void add(String tableName) {
+      tableName = tableName.toLowerCase();
+      tableNameMap.put(tableName, MetadataLoadState.UNINITIALIZED);
+      tableMetadataCache.invalidate(tableName);
     }
 
     /**
@@ -187,8 +224,8 @@ public class Db {
       }
     }
 
-    private Table loadTable(String tableName) throws TableNotFoundException,
-        TableLoadingException {
+    private Table loadTable(String tableName, Table oldValue) throws
+        TableNotFoundException, TableLoadingException {
       tableName = tableName.toLowerCase();
       MetadataLoadState metadataState = tableNameMap.get(tableName);
 
@@ -197,15 +234,16 @@ public class Db {
         throw new TableNotFoundException("Table not found: " + tableName);
       }
 
-      // We should never have a case where we make it here and the metadata is marked
-      // as already loaded.
-      Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
+      // We should never have a case where we are doing a fresh load (i.e. not called
+      // from reload()) and the metadata is marked as already loaded.
+      Preconditions.checkState(oldValue != null ||
+          metadataState != MetadataLoadState.LOADED);
       MetaStoreClient msClient = parentCatalog.getMetaStoreClient();
       Table table = null;
       try {
         // Try to load the table Metadata
         table = Table.load(parentCatalog.getNextTableId(), msClient.getHiveClient(),
-            Db.this, tableName);
+            Db.this, tableName, oldValue);
       } finally {
         msClient.release();
       }
@@ -278,6 +316,13 @@ public class Db {
   }
 
   /**
+   * Adds a table to the table list. Table cache will be populated on the next getTable().
+   */
+  public void addTable(String tableName) {
+    tables.add(tableName);
+  }
+
+  /**
    * Removes the table name and any cached metadata from the Table cache.
    */
   public void removeTable(String tableName) {
@@ -285,13 +330,19 @@ public class Db {
   }
 
   /**
-   * Marks the table as invalid so the next access will trigger a metadata load. If
-   * the ifExists parameter is true, this will only invalidate if the table name already
-   * exists in collection of known tables. If ifExists is false, the table metadata will
-   * be invalidated and the metadata state will be set to UNINITIALIZED (potentially
-   * adding a new item to the known table names).
+   * Refresh the metadata for the given table name if the table already exists in the
+   * cache, or load the table metadata if the table has not been loaded.
+   * If refreshing the table metadata failed, no exception will be thrown but the
+   * existing metadata will be invalidated.
    */
-  public void invalidateTable(String tableName, boolean ifExists) {
-    tables.invalidate(tableName, ifExists);
+  public void refreshTable(String tableName) {
+    tables.refresh(tableName);
+  }
+
+  /**
+   * Marks the table as invalid so the next access will trigger a metadata load.
+   */
+  public void invalidateTable(String tableName) {
+    tables.invalidate(tableName);
   }
 }

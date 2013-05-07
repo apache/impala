@@ -178,7 +178,8 @@ public class LoadDataStmt extends StatementBase {
       // Verify the files being loaded are supported.
       for (FileStatus fStatus: fs.listStatus(source)) {
         if (fs.isDirectory(fStatus.getPath())) continue;
-        String result = partition.checkFileCompressionTypeSupported(fStatus.getPath());
+        String result = partition.checkFileCompressionTypeSupported(
+            fStatus.getPath().toString());
         if (!result.isEmpty()) {
           throw new AnalysisException(result);
         }

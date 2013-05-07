@@ -53,7 +53,7 @@ public class InlineView extends Table {
    * This should never be called.
    */
   @Override
-  public Table load(HiveMetaStoreClient client,
+  public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     // An inline view is never loaded
     throw new UnsupportedOperationException("Inline View should never be loaded");
@@ -79,6 +79,7 @@ public class InlineView extends Table {
         "Inline View should never be the target of an insert");
   }
 
+  @Override
   public int getNumNodes() {
     throw new UnsupportedOperationException("InlineView.getNumNodes() not supported");
   }

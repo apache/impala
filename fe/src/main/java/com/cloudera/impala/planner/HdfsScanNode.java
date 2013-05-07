@@ -160,46 +160,46 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
     List<TScanRangeLocations> result = Lists.newArrayList();
-    List<HdfsTable.PartitionBlockMetadata> partitionBlockMd =
-        HdfsTable.getBlockMetadata(partitions);
-    for (HdfsTable.PartitionBlockMetadata partition: partitionBlockMd) {
-      for (HdfsTable.BlockMetadata block: partition.getBlockMetadata()) {
-        String[] blockHostPorts = block.getHostPorts();
-        if (blockHostPorts.length == 0) {
-          // we didn't get locations for this block; for now, just ignore the block
-          // TODO: do something meaningful with that
-          continue;
-        }
-
-        // record host/ports and volume ids
-        Preconditions.checkState(blockHostPorts.length > 0);
-        List<TScanRangeLocation> locations = Lists.newArrayList();
-        for (int i = 0; i < blockHostPorts.length; ++i) {
-          TScanRangeLocation location = new TScanRangeLocation();
-          String hostPort = blockHostPorts[i];
-          location.setServer(addressToTNetworkAddress(hostPort));
-          location.setVolume_id(block.getDiskId(i));
-          locations.add(location);
-        }
-
-        // create scan ranges, taking into account maxScanRangeLength
-        long currentOffset = block.getOffset();
-        long remainingLength = block.getLength();
-        while (remainingLength > 0) {
-          long currentLength = remainingLength;
-          if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
-            currentLength = maxScanRangeLength;
+    for (HdfsPartition partition: partitions) {
+      for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
+        for (HdfsPartition.FileBlock block: fileDesc.getFileBlocks()) {
+          String[] blockHostPorts = block.getHostPorts();
+          if (blockHostPorts.length == 0) {
+            // we didn't get locations for this block; for now, just ignore the block
+            // TODO: do something meaningful with that
+            continue;
           }
-          TScanRange scanRange = new TScanRange();
-          scanRange.setHdfs_file_split(
-              new THdfsFileSplit(block.getFileName(), currentOffset,
-                currentLength, partition.getPartition().getId(), block.getFileSize()));
-          TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
-          scanRangeLocations.scan_range = scanRange;
-          scanRangeLocations.locations = locations;
-          result.add(scanRangeLocations);
-          remainingLength -= currentLength;
-          currentOffset += currentLength;
+
+          // record host/ports and volume ids
+          Preconditions.checkState(blockHostPorts.length > 0);
+          List<TScanRangeLocation> locations = Lists.newArrayList();
+          for (int i = 0; i < blockHostPorts.length; ++i) {
+            TScanRangeLocation location = new TScanRangeLocation();
+            String hostPort = blockHostPorts[i];
+            location.setServer(addressToTNetworkAddress(hostPort));
+            location.setVolume_id(block.getDiskId(i));
+            locations.add(location);
+          }
+
+          // create scan ranges, taking into account maxScanRangeLength
+          long currentOffset = block.getOffset();
+          long remainingLength = block.getLength();
+          while (remainingLength > 0) {
+            long currentLength = remainingLength;
+            if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
+              currentLength = maxScanRangeLength;
+            }
+            TScanRange scanRange = new TScanRange();
+            scanRange.setHdfs_file_split(
+                new THdfsFileSplit(block.getFileName(), currentOffset,
+                  currentLength, partition.getId(), block.getFileSize()));
+            TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
+            scanRangeLocations.scan_range = scanRange;
+            scanRangeLocations.locations = locations;
+            result.add(scanRangeLocations);
+            remainingLength -= currentLength;
+            currentOffset += currentLength;
+          }
         }
       }
     }

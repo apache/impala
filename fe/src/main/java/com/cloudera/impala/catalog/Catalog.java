@@ -55,6 +55,15 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
+import com.cloudera.impala.thrift.TAlterTableChangeColParams;
+import com.cloudera.impala.thrift.TAlterTableDropColParams;
+import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableParams;
+import com.cloudera.impala.thrift.TAlterTableRenameParams;
+import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
+import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -332,11 +341,85 @@ public class Catalog {
   }
 
   /**
-   * Appends one or more columns to the given table, optionally replacing all existing
-   * columns. After performing the operation the table metadata is marked as invalid and
-   * will be reloaded on the next access.
+   * Execute the ALTER TABLE command according to the TAlterTableParams and refresh the
+   * table metadata (except RENAME).
+   * TODO: consider moving alter table to its own class.
    */
-  public void alterTableAddReplaceCols(TableName tableName, List<TColumnDef> columns,
+  public void alterTable(TAlterTableParams params) throws ImpalaException, MetaException,
+      org.apache.thrift.TException, InvalidObjectException, ImpalaException,
+      TableLoadingException {
+    switch (params.getAlter_type()) {
+      case ADD_REPLACE_COLUMNS:
+        TAlterTableAddReplaceColsParams addReplaceColParams =
+            params.getAdd_replace_cols_params();
+        alterTableAddReplaceCols(TableName.fromThrift(params.getTable_name()),
+            addReplaceColParams.getColumns(),
+            addReplaceColParams.isReplace_existing_cols());
+        break;
+      case ADD_PARTITION:
+        TAlterTableAddPartitionParams addPartParams = params.getAdd_partition_params();
+        alterTableAddPartition(TableName.fromThrift(params.getTable_name()),
+            addPartParams.getPartition_spec(), addPartParams.getLocation(),
+            addPartParams.isIf_not_exists());
+        break;
+      case DROP_COLUMN:
+        TAlterTableDropColParams dropColParams = params.getDrop_col_params();
+        alterTableDropCol(TableName.fromThrift(params.getTable_name()),
+            dropColParams.getCol_name());
+        break;
+      case CHANGE_COLUMN:
+        TAlterTableChangeColParams changeColParams = params.getChange_col_params();
+        alterTableChangeCol(TableName.fromThrift(params.getTable_name()),
+            changeColParams.getCol_name(), changeColParams.getNew_col_def());
+        break;
+      case DROP_PARTITION:
+        TAlterTableDropPartitionParams dropPartParams = params.getDrop_partition_params();
+        alterTableDropPartition(TableName.fromThrift(params.getTable_name()),
+            dropPartParams.getPartition_spec(), dropPartParams.isIf_exists());
+        break;
+      case RENAME_TABLE:
+        TAlterTableRenameParams renameParams = params.getRename_params();
+        alterTableRename(TableName.fromThrift(params.getTable_name()),
+            TableName.fromThrift(renameParams.getNew_table_name()));
+        // Renamed table can't be fast refreshed anyway. Return now.
+        return;
+      case SET_FILE_FORMAT:
+        TAlterTableSetFileFormatParams fileFormatParams =
+            params.getSet_file_format_params();
+        List<TPartitionKeyValue> fileFormatPartitionSpec = null;
+        if (fileFormatParams.isSetPartition_spec()) {
+          fileFormatPartitionSpec = fileFormatParams.getPartition_spec();
+        }
+        alterTableSetFileFormat(TableName.fromThrift(params.getTable_name()),
+            fileFormatPartitionSpec,
+            FileFormat.fromThrift(fileFormatParams.getFile_format()));
+        break;
+      case SET_LOCATION:
+        TAlterTableSetLocationParams setLocationParams = params.getSet_location_params();
+        List<TPartitionKeyValue> partitionSpec = null;
+        if (setLocationParams.isSetPartition_spec()) {
+          partitionSpec = setLocationParams.getPartition_spec();
+        }
+        alterTableSetLocation(TableName.fromThrift(params.getTable_name()),
+            partitionSpec, setLocationParams.getLocation());
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unknown ALTER TABLE operation type: " + params.getAlter_type());
+    }
+
+    // refresh metadata after ALTER TABLE
+    Db db = getDbInternal(params.getTable_name().getDb_name());
+    if (db != null) {
+      db.refreshTable(params.getTable_name().getTable_name());
+    }
+  }
+
+  /**
+   * Appends one or more columns to the given table, optionally replacing all existing
+   * columns.
+   */
+  private void alterTableAddReplaceCols(TableName tableName, List<TColumnDef> columns,
       boolean replaceExistingCols) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
        TableLoadingException {
@@ -358,7 +441,7 @@ public class Catalog {
    * Changes the column definition of an existing column. This can be used to rename a
    * column, add a comment to a column, or change the datatype of a column.
    */
-  public void alterTableChangeCol(TableName tableName, String colName,
+  private void alterTableChangeCol(TableName tableName, String colName,
       TColumnDef newColDef) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
        TableLoadingException, ColumnNotFoundException {
@@ -388,10 +471,9 @@ public class Catalog {
   }
 
   /**
-   * Adds a new partition to the given table. After performing the operation the table
-   * metadata is marked as invalid and will be reloaded on the next access.
+   * Adds a new partition to the given table.
    */
-  public void alterTableAddPartition(TableName tableName,
+  private void alterTableAddPartition(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, String location, boolean ifNotExists)
       throws MetaException, AlreadyExistsException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
@@ -436,15 +518,13 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
   }
 
   /**
-   * Drops an existing partition from the given table. After performing the operation the
-   * table metadata is marked as invalid and will be reloaded on the next access.
+   * Drops an existing partition from the given table.
    */
-  public void alterTableDropPartition(TableName tableName,
+  private void alterTableDropPartition(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, boolean ifExists) throws MetaException,
       NoSuchObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
@@ -481,15 +561,13 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
   }
 
   /**
-   * Removes a column from the given table. After performing the operation the
-   * table metadata is marked as invalid and will be reloaded on the next access.
+   * Removes a column from the given table.
    */
-  public void alterTableDropCol(TableName tableName, String colName)
+  private void alterTableDropCol(TableName tableName, String colName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, ColumnNotFoundException,
       TableLoadingException {
@@ -517,7 +595,7 @@ public class Catalog {
    * Renames an existing table. After renaming the table, the metadata is marked as
    * invalid and will be reloaded on the next access.
    */
-  public void alterTableRename(TableName tableName, TableName newTableName)
+  private void alterTableRename(TableName tableName, TableName newTableName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
     synchronized (metastoreDdlLock) {
@@ -531,10 +609,15 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      // Remove the old table name from the cache and then invalidate the new table.
+      // Remove the old table name from the cache and add the new table.
       Db db = dbs.get(tableName.getDb());
-      if (db != null) db.removeTable(tableName.getTbl());
-      invalidateTable(newTableName.getDb(), newTableName.getTbl(), false);
+      if (db != null) {
+        db.removeTable(tableName.getTbl());
+      }
+      db = dbs.get(newTableName.getDb());
+      if (db != null) {
+        db.addTable(newTableName.getTbl());
+      }
     }
   }
 
@@ -544,11 +627,10 @@ public class Catalog {
    * changing the file format the table metadata is marked as invalid and will be
    * reloaded on the next access.
    */
-  public void alterTableSetFileFormat(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat)
-      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
-      DatabaseNotFoundException, PartitionNotFoundException, TableNotFoundException,
-      TableLoadingException {
+  private void alterTableSetFileFormat(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
+      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
+      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock) {
@@ -586,7 +668,7 @@ public class Catalog {
    * Changes the HDFS storage location for the given table. This is a metadata only
    * operation, existing table data will not be as part of changing the location.
    */
-  public void alterTableSetLocation(TableName tableName,
+  private void alterTableSetLocation(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, String location) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
@@ -629,7 +711,6 @@ public class Catalog {
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     } finally {
       msClient.release();
-      invalidateTable(msTbl.getDbName(), msTbl.getTableName(), true);
     }
   }
 
@@ -645,7 +726,6 @@ public class Catalog {
       updateLastDdlTime(msTbl, msClient);
     } finally {
       msClient.release();
-      invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
   }
 
@@ -894,7 +974,10 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      invalidateTable(newTable.getDbName(), newTable.getTableName(), false);
+      Db db = getDbInternal(newTable.getDbName());
+      if (db != null) {
+        db.addTable(newTable.getTableName());
+      }
     }
   }
 
@@ -1230,35 +1313,52 @@ public class Catalog {
         .getMetaStoreTable().deepCopy();
   }
 
-  /*
-   * Marks the table as invalid so the next access will trigger a metadata load. If
-   * the database does not exist no error is returned (there is nothing to invalidate).
-   */
-  public void invalidateTable(String dbName, String tableName, boolean ifExists) {
-    Db db = getDbInternal(dbName);
-    if (db != null) {
-      db.invalidateTable(tableName, ifExists);
-    }
-  }
 
   /**
    * Sets the table parameter 'transient_lastDdlTime' to System.currentTimeMillis()/1000
-   * in the given msTbl. If msClient is not null then this method applies alter_table()
-   * to update the Metastore. Otherwise, the caller is responsible for the final update.
+   * in the given msTbl. 'transient_lastDdlTime' is guaranteed to be changed.
+   * If msClient is not null then this method applies alter_table() to update the
+   * Metastore. Otherwise, the caller is responsible for the final update.
    */
   public static void updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
       MetaStoreClient msClient)
       throws MetaException, NoSuchObjectException, TException {
     Preconditions.checkNotNull(msTbl);
     LOG.debug("Updating lastDdlTime for table: " + msTbl.getTableName());
+    long lastDdlTime = getLastDdlTime(msTbl);
+    long currentTime = System.currentTimeMillis() / 1000;
+    while (lastDdlTime == currentTime) {
+      // We need to make sure that lastDdlTime will be changed but we don't want to set
+      // lastDdlTime to a future time when this function returns. If the last DDL and
+      // this one happened within a sec, sleep for a second.
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {}
+      currentTime = System.currentTimeMillis() / 1000;
+    }
     Map<String, String> params = msTbl.getParameters();
     // This is exactly how Hive updates the last ddl time.
-    params.put("transient_lastDdlTime",
-        Long.toString(System.currentTimeMillis() / 1000));
+    params.put("transient_lastDdlTime", Long.toString(currentTime));
     msTbl.setParameters(params);
     if (msClient != null) {
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     }
+  }
+
+  /**
+   * Returns the table parameter 'transient_lastDdlTime', or -1 if it's not set.
+   * TODO: move this and updateLastDdlTime to a metastore helper class.
+   */
+  public static long getLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    Preconditions.checkNotNull(msTbl);
+    Map<String, String> params = msTbl.getParameters();
+    String lastDdlTimeStr = params.get("transient_lastDdlTime");
+    if (lastDdlTimeStr != null) {
+      try {
+        return Long.parseLong(lastDdlTimeStr);
+      } catch (NumberFormatException e) {}
+    }
+    return -1;
   }
 }

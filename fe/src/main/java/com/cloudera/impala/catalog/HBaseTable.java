@@ -154,7 +154,7 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public Table load(HiveMetaStoreClient client,
+  public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     try {
       hbaseTableName = getHBaseTableName(msTbl);
@@ -202,8 +202,6 @@ public class HBaseTable extends Table {
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
       numClusteringCols = 1;
-
-      return this;
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " + name,
           e);

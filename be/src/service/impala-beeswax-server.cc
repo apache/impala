@@ -413,7 +413,7 @@ void ImpalaServer::ResetCatalog(impala::TStatus& status) {
 }
 
 void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& request) {
-  ResetTableInternal(request.db_name, request.table_name).ToThrift(&status);
+  ResetTableInternal(request).ToThrift(&status);
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {

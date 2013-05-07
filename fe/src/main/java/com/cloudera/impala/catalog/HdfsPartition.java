@@ -14,10 +14,13 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.BlockLocation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
@@ -36,23 +39,31 @@ import com.google.common.collect.Maps;
  */
 public class HdfsPartition {
   /**
-   * Metadata for a single file in this partition - the full path and the length of the
-   * file.
+   * Metadata for a single file in this partition
    */
   static public class FileDescriptor {
+    // TODO: split filePath into dir and file name and reuse the dir string to save
+    // memory.
     private final String filePath;
     private final long fileLength;
-    private HdfsCompression fileCompression;
+    private final HdfsCompression fileCompression;
+    private final long modificationTime;
+    private final List<FileBlock> fileBlocks;
 
     public String getFilePath() { return filePath; }
     public long getFileLength() { return fileLength; }
+    public long getModificationTime() { return modificationTime; }
     public HdfsCompression getFileCompression() { return fileCompression; }
+    public List<FileBlock> getFileBlocks() { return fileBlocks; }
 
-    public FileDescriptor(String filePath, long fileLength) {
+    public FileDescriptor(String filePath, long fileLength, long modificationTime) {
       Preconditions.checkNotNull(filePath);
       Preconditions.checkArgument(fileLength >= 0);
       this.filePath = filePath;
       this.fileLength = fileLength;
+      this.modificationTime = modificationTime;
+      fileCompression = HdfsCompression.fromFileName(filePath);
+      fileBlocks = Lists.newArrayList();
     }
 
     @Override
@@ -61,8 +72,84 @@ public class HdfsPartition {
           .add("Length", fileLength).toString();
     }
 
-    public void setCompression(HdfsCompression compression) {
-      fileCompression = compression;
+    public void addFileBlock(FileBlock blockMd) {
+      fileBlocks.add(blockMd);
+    }
+  }
+
+  /**
+   * File Block metadata
+   */
+  public static class FileBlock {
+    private final String fileName;
+    private final long fileSize; // total size of the file holding the block, in bytes
+    private final long offset;
+    private final long length;
+
+    // result of BlockLocation.getNames(): list of (IP:port) hosting this block
+    private final String[] hostPorts;
+
+    // hostPorts[i] stores this block on diskId[i]; the BE uses this information to
+    // schedule scan ranges
+    private int[] diskIds;
+
+    /**
+     * Construct a FileBlock from blockLocation and populate hostPorts from
+     * BlockLocation.getNames(). Does not fill diskIds.
+     */
+    public FileBlock(String fileName, long fileSize, BlockLocation blockLocation) {
+      Preconditions.checkNotNull(blockLocation);
+      this.fileName = fileName;
+      this.fileSize = fileSize;
+      this.offset = blockLocation.getOffset();
+      this.length = blockLocation.getLength();
+
+      String[] blockHostPorts;
+      try {
+        blockHostPorts = blockLocation.getNames();
+      } catch (IOException e) {
+        // this shouldn't happen, getNames() doesn't throw anything
+        String errorMsg = "BlockLocation.getNames() failed:\n" + e.getMessage();
+        LOG.error(errorMsg);
+        throw new IllegalStateException(errorMsg);
+      }
+
+      // use String.intern() to reuse string
+      hostPorts = new String[blockHostPorts.length];
+      for (int i = 0; i < blockHostPorts.length; ++i) {
+        hostPorts[i] = blockHostPorts[i].intern();
+      }
+    }
+
+    public String getFileName() { return fileName; }
+    public long getFileSize() { return fileSize; }
+    public long getOffset() { return offset; }
+    public long getLength() { return length; }
+    public String[] getHostPorts() { return hostPorts; }
+
+    public void setDiskIds(int[] diskIds) {
+      Preconditions.checkArgument(diskIds.length == hostPorts.length);
+      this.diskIds = diskIds;
+    }
+
+    /**
+     * Return the disk id of the block in BlockLocation.getNames()[hostIndex]; -1 if
+     * disk id is not supported.
+     */
+    public int getDiskId(int hostIndex) {
+      if (diskIds == null) return -1;
+      Preconditions.checkArgument(hostIndex >= 0);
+      Preconditions.checkArgument(hostIndex < diskIds.length);
+      return diskIds[hostIndex];
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("offset", offset)
+          .add("length", length)
+          .add("#disks", diskIds.length)
+          .toString();
     }
   }
 
@@ -92,7 +179,9 @@ public class HdfsPartition {
 
   private final org.apache.hadoop.hive.metastore.api.Partition msPartition;
 
-  private final List<HdfsPartition.FileDescriptor> fileDescriptors;
+  private final List<FileDescriptor> fileDescriptors;
+
+  private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
 
   public HdfsStorageDescriptor getInputFormatDescriptor() { return fileFormatDescriptor; }
 
@@ -145,6 +234,15 @@ public class HdfsPartition {
     this.fileDescriptors = ImmutableList.copyOf(fileDescriptors);
     this.fileFormatDescriptor = fileFormatDescriptor;
     this.id = id;
+    // TODO: instead of raising an exception, we should consider marking this partition
+    // invalid and moving on, so that table loading won't fail and user can query other
+    // partitions.
+    for (FileDescriptor fileDescriptor: fileDescriptors) {
+      String result = checkFileCompressionTypeSupported(fileDescriptor.getFilePath());
+      if (!result.isEmpty()) {
+        throw new RuntimeException(result);
+      }
+    }
   }
 
   public HdfsPartition(HdfsTable table,
@@ -173,11 +271,11 @@ public class HdfsPartition {
    * Impala only supports .lzo on text files for partitions that have been declared in
    * the metastore as TEXT_LZO. For now, raise an error on any other type.
    */
-  public String checkFileCompressionTypeSupported(Path file) {
+  public String checkFileCompressionTypeSupported(String fileName) {
     // Check to see if the file has a compression suffix.
     // Impala only supports .lzo on text files that have been declared in the metastore
     // as TEXT_LZO. For now, raise an error on any other type.
-    HdfsCompression compressionType = HdfsCompression.fromFileName(file.getName());
+    HdfsCompression compressionType = HdfsCompression.fromFileName(fileName);
     if (compressionType == HdfsCompression.LZO_INDEX) {
       // Index files are read by the LZO scanner directly.
       return "";
@@ -186,20 +284,20 @@ public class HdfsPartition {
     HdfsStorageDescriptor sd = getInputFormatDescriptor();
     if (compressionType == HdfsCompression.LZO) {
       if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
-        return "Compressed file not supported without compression input format: " + file;
+        return "Compressed file not supported without compression input format: " +
+            fileName;
       }
     } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
-      return "Expected file with .lzo suffix: " + file;
+      return "Expected file with .lzo suffix: " + fileName;
     } else if (sd.getFileFormat() == HdfsFileFormat.TEXT
                && compressionType != HdfsCompression.NONE) {
-      return "Compressed text files are not supported: " + file;
+      return "Compressed text files are not supported: " + fileName;
     }
     return "";
   }
 
   /**
    * Return the size (in bytes) of all the files inside this partition
-   * @return
    */
   public long getSize() {
     long result = 0;

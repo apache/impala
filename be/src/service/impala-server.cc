@@ -339,8 +339,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   EXIT_IF_EXC(jni_env);
   reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
   EXIT_IF_EXC(jni_env);
-  reset_table_id_ = jni_env->GetMethodID(fe_class, "resetTable",
-      "(Ljava/lang/String;Ljava/lang/String;)V");
+  reset_table_id_ = jni_env->GetMethodID(fe_class, "resetTable", "([B)V");
   EXIT_IF_EXC(jni_env);
   get_hadoop_config_id_ =
       jni_env->GetMethodID(fe_class, "getHadoopConfig", "(Z)Ljava/lang/String;");
@@ -1330,16 +1329,16 @@ Status ImpalaServer::ResetCatalogInternal() {
   return Status::OK;
 }
 
-Status ImpalaServer::ResetTableInternal(const string& db_name, const string& table_name) {
-  LOG(INFO) << "Resetting table: " << db_name << "." << table_name;
+Status ImpalaServer::ResetTableInternal(const TResetTableReq& reset_table_request) {
+  LOG(INFO) << "Resetting table: "
+            << reset_table_request.db_name << "." << reset_table_request.table_name;
   JNIEnv* jni_env = getJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jstring db_name_arg = jni_env->NewStringUTF(db_name.c_str());
-  RETURN_ERROR_IF_EXC(jni_env);
-  jstring table_name_arg = jni_env->NewStringUTF(table_name.c_str());
-  RETURN_ERROR_IF_EXC(jni_env);
-  jni_env->CallObjectMethod(fe_, reset_table_id_, db_name_arg, table_name_arg);
+  jbyteArray reset_request_bytes;
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &reset_table_request,
+      &reset_request_bytes));
+  jni_env->CallObjectMethod(fe_, reset_table_id_, reset_request_bytes);
   RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }

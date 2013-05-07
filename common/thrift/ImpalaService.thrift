@@ -147,13 +147,19 @@ struct TPingImpalaServiceResp {
   1: string version
 }
 
-// Parameters for a ResetTable request which will invalidate a table's metadata.
+// Parameters for a ResetTable request which will reset a table's metadata.
+// If is_refresh is true, the metadata will be refreshed immediately.
+// Otherwise, the metadata will be invalidated and then loaded on the next
+// access.
 struct TResetTableReq {
   // Name of the table's parent database.
   1: required string db_name
 
   // Name of the table.
   2: required string table_name
+  
+  // If set to true, refresh the metadata immediately. Otherwise, invalidate the metadata
+  3: optional bool is_refresh
 }
 
 // Response from call to ResetCatalog

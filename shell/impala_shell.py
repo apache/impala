@@ -816,7 +816,29 @@ class ImpalaShell(cmd.Cmd):
     return True
 
   def do_refresh(self, args):
-    """Reload the Impalad catalog"""
+    """Fast incremental refresh an Impala table metadata"""
+    status = RpcStatus.ERROR
+    if not args:
+        print 'Usage: refresh [databaseName.][tableName]'
+        return False
+    else:
+      db_table_name = self.__parse_table_name_arg(args)
+      if db_table_name is None:
+        print 'Usage: refresh [databaseName.][tableName]'
+        return False
+      reset_table_req = TResetTableReq(*db_table_name)
+      reset_table_req.is_refresh = True
+      start = time.time()
+      (_, status) = self.__do_rpc(
+          lambda: self.imp_service.ResetTable(reset_table_req))
+      end = time.time()
+      if status == RpcStatus.OK:
+        self.__print_if_verbose("Successfully refreshed table: %s in %2.2fs" % \
+            ('.'.join(db_table_name), (end-start)))
+    return status == RpcStatus.OK
+
+  def do_invalidate(self, args):
+    """Refresh the Impalad catalog"""
     status = RpcStatus.ERROR
     if not args:
       (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
@@ -831,7 +853,7 @@ class ImpalaShell(cmd.Cmd):
           lambda: self.imp_service.ResetTable(TResetTableReq(*db_table_name)))
       if status == RpcStatus.OK:
         self.__print_if_verbose(
-            "Successfully refreshed table: %s" % '.'.join(db_table_name))
+            "Successfully invalidated table: %s" % '.'.join(db_table_name))
     return status == RpcStatus.OK
 
   def do_history(self, args):

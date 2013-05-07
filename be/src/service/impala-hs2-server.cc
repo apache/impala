@@ -653,7 +653,7 @@ void ImpalaServer::ResetCatalog(TResetCatalogResp& return_val) {
 void ImpalaServer::ResetTable(TResetTableResp& return_val,
     const TResetTableReq& request) {
   VLOG_RPC << "ResetTable(): request=" << ThriftDebugString(request);
-  ResetTableInternal(request.db_name, request.table_name).ToThrift(&return_val.status);
+  ResetTableInternal(request).ToThrift(&return_val.status);
   VLOG_RPC << "ResetTable(): return_val=" << ThriftDebugString(return_val);
 }
 

@@ -59,6 +59,9 @@ public abstract class Table {
   /**  map from lowercase col. name to Column */
   protected final Map<String, Column> colsByName;
 
+  // The lastDdlTime recorded in the table parameter; -1 if not set
+  protected final long lastDdlTime;
+
   protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     this.id = id;
@@ -68,6 +71,7 @@ public abstract class Table {
     this.owner = owner;
     this.colsByPos = Lists.newArrayList();
     this.colsByName = Maps.newHashMap();
+    this.lastDdlTime = (msTable != null) ? Catalog.getLastDdlTime(msTable) : -1;
   }
 
   public TableId getId() {
@@ -90,29 +94,26 @@ public abstract class Table {
   }
 
   /**
-   * Populate members of 'this' from metastore info.
-   *
-   * @param client
-   * @param msTbl
-   * @return
-   *         this if successful
-   *         null if loading table failed
+   * Populate members of 'this' from metastore info. Reuse metadata from oldValue if the
+   * metadata is still valid.
    */
-  public abstract Table load(
-      HiveMetaStoreClient client,
+  public abstract void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
-
 
   /**
    * Creates the Impala representation of Hive/HBase metadata for one table.
    * Calls load() on the appropriate instance of Table subclass.
+   * oldCacheEntry is the existing cache entry and might still contain valid info to help
+   * speed up metadata loading. oldCacheEntry is null if there is no existing cache entry
+   * (i.e. during fresh load).
    * @return new instance of HdfsTable or HBaseTable
    *         null if the table does not exist
    * @throws TableLoadingException if there was an error loading the table.
    * @throws TableNotFoundException if the table was not found
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
-      String tblName) throws TableLoadingException, TableNotFoundException {
+      String tblName, Table oldCacheEntry) throws TableLoadingException,
+      TableNotFoundException {
     // turn all exceptions into TableLoadingException
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -135,7 +136,8 @@ public abstract class Table {
         throw new TableLoadingException("Unrecognized table type for table: " + tblName);
       }
       // Have the table load itself.
-      return table.load(client, msTbl);
+      table.load(oldCacheEntry, client, msTbl);
+      return table;
     } catch (TableLoadingException e) {
       throw e;
     } catch (NoSuchObjectException e) {

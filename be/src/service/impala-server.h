@@ -352,7 +352,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
   // Non-thrift callable version of ResetTable
-  Status ResetTableInternal(const std::string& db_name, const std::string& table_name);
+  Status ResetTableInternal(const TResetTableReq& reset_table_request);
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
   // Queries still need to be unregistered, usually via Close, after cancellation.
