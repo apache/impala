@@ -33,6 +33,9 @@ struct TBackendDescriptor {
   // IP address corresponding to address.hostname. Explicitly including this saves the
   // cost of resolution at every Impalad (since IP addresses are needed for scheduling)
   2: required string ip_address;
+
+  // The address of the debug HTTP server
+  3: optional Types.TNetworkAddress debug_http_address;
 }
 
 // Description of a single entry in a topic

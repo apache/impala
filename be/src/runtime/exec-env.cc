@@ -84,13 +84,13 @@ ExecEnv::ExecEnv()
 
     scheduler_.reset(
         new SimpleScheduler(state_store_subscriber_.get(), subscriber_id.str(),
-                            backend_address, metrics_.get()));
+                            backend_address, metrics_.get(), webserver_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
-    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
-  
+
   Status status = disk_io_mgr_->Init(thread_mgr());
   CHECK(status.ok());
 
@@ -124,14 +124,14 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         statestore_address, metrics_.get()));
 
     scheduler_.reset(new SimpleScheduler(state_store_subscriber_.get(), ss.str(),
-                                         backend_address, metrics_.get()));
+        backend_address, metrics_.get(), webserver_.get()));
 
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
-    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
-  
+
   Status status = disk_io_mgr_->Init(thread_mgr());
   CHECK(status.ok());
 
@@ -166,7 +166,7 @@ Status ExecEnv::StartServices() {
   }
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
-  
+
   disk_io_mgr_->SetProcessMemLimit(mem_limit_.get());
 
   // Start services in order to ensure that dependencies between them are met

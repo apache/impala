@@ -43,7 +43,7 @@ class SimpleSchedulerTest : public testing::Test {
     backends.at(1).hostname = "localhost";
     backends.at(1).port = base_port_;
 
-    hostname_scheduler_.reset(new SimpleScheduler(backends, NULL));
+    hostname_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL));
 
     // Setup local_remote_scheduler_
     backends.resize(4);
@@ -57,7 +57,7 @@ class SimpleSchedulerTest : public testing::Test {
         ++k;
       }
     }
-    local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
+    local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL));
   }
 
   int base_port_;
@@ -79,15 +79,15 @@ TEST_F(SimpleSchedulerTest, LocalMatches) {
     data_locations.at(i).hostname = "127.0.0.1";
     data_locations.at(i).port = 0;
   }
-  SimpleScheduler::HostList hostports;
+  SimpleScheduler::BackendList backends;
 
-  local_remote_scheduler_->GetHosts(data_locations, &hostports);
+  local_remote_scheduler_->GetBackends(data_locations, &backends);
 
-  // Expect 5 round robin hostports
-  EXPECT_EQ(5, hostports.size());
+  // Expect 5 round robin backends
+  EXPECT_EQ(5, backends.size());
   for (int i = 0; i < 5; ++i) {
-    EXPECT_EQ(hostports.at(i).hostname, "127.0.0.1");
-    EXPECT_EQ(hostports.at(i).port, base_port_ + i % 2);
+    EXPECT_EQ(backends.at(i).address.hostname, "127.0.0.1");
+    EXPECT_EQ(backends.at(i).address.port, base_port_ + i % 2);
   }
 }
 
@@ -101,15 +101,15 @@ TEST_F(SimpleSchedulerTest, HostnameTest) {
   data_locations.at(1).hostname = "127.0.0.1";
   data_locations.at(1).port = 0;
 
-  SimpleScheduler::HostList hostports;
+  SimpleScheduler::BackendList backends;
 
-  hostname_scheduler_->GetHosts(data_locations, &hostports);
+  hostname_scheduler_->GetBackends(data_locations, &backends);
 
-  // Expect 2 round robin hostports
-  EXPECT_EQ(2, hostports.size());
+  // Expect 2 round robin backends
+  EXPECT_EQ(2, backends.size());
   for (int i = 0; i < 2; ++i) {
-    EXPECT_EQ(hostports.at(i).hostname, "127.0.0.1");
-    EXPECT_EQ(hostports.at(i).port, base_port_);
+    EXPECT_EQ(backends.at(i).address.hostname, "127.0.0.1");
+    EXPECT_EQ(backends.at(i).address.port, base_port_);
   }
 }
 
@@ -122,9 +122,9 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
     data_locations.at(i).hostname = "non exists ipaddress";
     data_locations.at(i).port = 0;
   }
-  SimpleScheduler::HostList hostports;
+  SimpleScheduler::BackendList backends;
 
-  local_remote_scheduler_->GetHosts(data_locations, &hostports);
+  local_remote_scheduler_->GetBackends(data_locations, &backends);
 
   // Expect 5 round robin on ipaddress, then on port
   // 1. 127.0.0.1:1000
@@ -132,17 +132,17 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   // 3. 127.0.0.1:1001
   // 4. 127.0.0.0:1001
   // 5. 127.0.0.1:1000
-  EXPECT_EQ(5, hostports.size());
-  EXPECT_EQ(hostports.at(0).hostname, "127.0.0.1");
-  EXPECT_EQ(hostports.at(0).port, 1000);
-  EXPECT_EQ(hostports.at(1).hostname, "127.0.0.0");
-  EXPECT_EQ(hostports.at(1).port, 1000);
-  EXPECT_EQ(hostports.at(2).hostname, "127.0.0.1");
-  EXPECT_EQ(hostports.at(2).port, 1001);
-  EXPECT_EQ(hostports.at(3).hostname, "127.0.0.0");
-  EXPECT_EQ(hostports.at(3).port, 1001);
-  EXPECT_EQ(hostports.at(4).hostname, "127.0.0.1");
-  EXPECT_EQ(hostports.at(4).port, 1000);
+  EXPECT_EQ(5, backends.size());
+  EXPECT_EQ(backends.at(0).address.hostname, "127.0.0.1");
+  EXPECT_EQ(backends.at(0).address.port, 1000);
+  EXPECT_EQ(backends.at(1).address.hostname, "127.0.0.0");
+  EXPECT_EQ(backends.at(1).address.port, 1000);
+  EXPECT_EQ(backends.at(2).address.hostname, "127.0.0.1");
+  EXPECT_EQ(backends.at(2).address.port, 1001);
+  EXPECT_EQ(backends.at(3).address.hostname, "127.0.0.0");
+  EXPECT_EQ(backends.at(3).address.port, 1001);
+  EXPECT_EQ(backends.at(4).address.hostname, "127.0.0.1");
+  EXPECT_EQ(backends.at(4).address.port, 1000);
 }
 
 }

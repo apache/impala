@@ -30,6 +30,7 @@
 #include "util/webserver.h"
 #include "util/logging.h"
 #include "util/debug-util.h"
+#include "util/thrift-util.h"
 
 using namespace std;
 using namespace boost;
@@ -70,18 +71,14 @@ const char* GetDefaultDocumentRoot() {
 
 namespace impala {
 
-Webserver::Webserver()
-  : port_(FLAGS_webserver_port),
-    interface_(FLAGS_webserver_interface),
-    context_(NULL) {
-
+Webserver::Webserver() : context_(NULL) {
+  http_address_ = MakeNetworkAddress(
+      FLAGS_webserver_interface.empty() ? "0.0.0.0" : FLAGS_webserver_interface,
+      FLAGS_webserver_port);
 }
 
-Webserver::Webserver(const int port)
-  : port_(port),
-    // Serve on all interfaces
-    interface_("0.0.0.0") {
-
+Webserver::Webserver(const int port) : context_(NULL) {
+  http_address_ = MakeNetworkAddress("0.0.0.0", port);
 }
 
 Webserver::~Webserver() {
@@ -109,7 +106,7 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* ou
 
 void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
   vector<string> arg_pairs;
-  split(arg_pairs, args, boost::is_any_of("&"));
+  split(arg_pairs, args, is_any_of("&"));
 
   BOOST_FOREACH(const string& arg_pair, arg_pairs) {
     vector<string> key_value;
@@ -126,12 +123,15 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
 }
 
 Status Webserver::Start() {
-  LOG(INFO) << "Starting webserver on " << interface_
-            << (interface_.empty() ? "all interfaces, port " : ":") << port_;
+  LOG(INFO) << "Starting webserver on " << http_address_;
 
-  string port_as_string = boost::lexical_cast<string>(port_);
   stringstream listening_spec;
-  listening_spec << interface_ << (interface_.empty() ? "" : ":") << port_as_string;
+  if (IsWildcardAddress(http_address_.hostname)) {
+    listening_spec << http_address_;
+  } else {
+    string port_as_string = lexical_cast<string>(http_address_.port);
+    listening_spec << ":" << port_as_string;
+  }
   string listening_str = listening_spec.str();
   vector<const char*> options;
 
@@ -166,7 +166,7 @@ Status Webserver::Start() {
 
   if (context_ == NULL) {
     stringstream error_msg;
-    error_msg << "Webserver: Could not start on port: " << port_;
+    error_msg << "Webserver: Could not start on address " << http_address_;
     return Status(error_msg.str());
   }
 

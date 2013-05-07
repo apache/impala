@@ -34,4 +34,13 @@ Status GetHostname(std::string* hostname);
 // Utility method because Thrift does not supply useful constructors
 TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
 
+// Returns true if the ip address parameter is the wildcard interface (0.0.0.0)
+bool IsWildcardAddress(const std::string& ipaddress);
+
+// Utility method to print address as address:port
+void TNetworkAddressToString(const TNetworkAddress& address, std::string* out);
+
+// Prints a hostport as ipaddress:port
+std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
+
 }

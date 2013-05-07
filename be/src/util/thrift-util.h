@@ -177,12 +177,6 @@ Status WaitForLocalServer(const ThriftServer& server, int num_retries,
 Status WaitForServer(const std::string& host, int port, int num_retries,
    int retry_interval_ms);
 
-// Utility method to print address as address:port
-void TNetworkAddressToString(const TNetworkAddress& address, std::string* out);
-
-// Prints a hostport as ipaddress:port
-std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
-
 // Print a TColumnValue. If null, print "NULL".
 std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);
 

@@ -23,6 +23,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
+#include "util/network-util.h"
 
 namespace impala {
 
@@ -61,6 +62,8 @@ class Webserver {
   // subsequent registrations for that URL.
   void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback,
                            bool is_styled = true, bool is_on_nav_bar = true);
+
+  const TNetworkAddress& http_address() { return http_address_; }
 
  private:
   // Container class for a list of path handler callbacks for a single URL.
@@ -120,9 +123,8 @@ class Webserver {
   typedef std::map<std::string, PathHandler> PathHandlerMap;
   PathHandlerMap path_handlers_;
 
-  const int port_;
-  // If empty, webserver will bind to all interfaces.
-  const std::string interface_;
+  // The address of the interface on which to run this webserver.
+  TNetworkAddress http_address_;
 
   // Handle to Mongoose context; owned and freed by Mongoose internally
   struct mg_context* context_;

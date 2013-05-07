@@ -662,10 +662,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::CatalogPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/catalog", catalog_callback);
 
-  Webserver::PathHandlerCallback backends_callback =
-      bind<void>(mem_fn(&ImpalaServer::BackendsPathHandler), this, _1, _2);
-  exec_env->webserver()->RegisterPathHandler("/backends", backends_callback);
-
   Webserver::PathHandlerCallback profile_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
   exec_env->webserver()->
@@ -1051,23 +1047,6 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
       (*output) << endl << endl;
     }
   }
-}
-
-void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  Scheduler::HostList backends;
-  exec_env_->scheduler()->GetAllKnownHosts(&backends);
-  sort(backends.begin(), backends.end(), TNetworkAddressComparator);
-
-  (*output) << "<h2>Known Backends "
-            << "(" << backends.size() << ")"
-            << "</h2>";
-
-  (*output) << "<pre>";
-  BOOST_FOREACH(const Scheduler::HostList::value_type& host, backends) {
-    (*output) << host << endl;
-  }
-  (*output) << "</pre>";
 }
 
 void ImpalaServer::ArchiveQuery(const QueryExecState& query) {

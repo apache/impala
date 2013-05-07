@@ -118,17 +118,6 @@ Status WaitForServer(const string& host, int port, int num_retries,
   return Status("Server did not come up");
 }
 
-void TNetworkAddressToString(const TNetworkAddress& address, string* out) {
-  stringstream ss;
-  ss << address;
-  *out = ss.str();
-}
-
-std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport) {
-  out << hostport.hostname << ":" << hostport.port;
-  return out;
-}
-
 std::ostream& operator<<(std::ostream& out, const TColumnValue& colval) {
   if (colval.__isset.boolVal) {
     out << ((colval.boolVal) ? "true" : "false");

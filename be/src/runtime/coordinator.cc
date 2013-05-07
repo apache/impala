@@ -1227,7 +1227,7 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
     for (int j = 0; j < dest_params.hosts.size(); ++j) {
       TPlanFragmentDestination& dest = params.destinations[j];
       dest.fragment_instance_id = dest_params.instance_ids[j];
-      dest.server = TNetworkAddress(dest_params.hosts[j]);
+      dest.server = dest_params.hosts[j];
       VLOG_RPC  << "dest for fragment " << i << ":"
                 << " instance_id=" << dest.fragment_instance_id
                 << " server=" << dest.server;
@@ -1383,7 +1383,8 @@ Status Coordinator::ComputeScanRangeAssignment(
     int volume_id = -1;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
       // Deprioritize non-collocated datanodes by assigning a very high initial bytes
-      uint64_t initial_bytes = (!exec_env_->scheduler()->HasLocalHost(location.server)) ?
+      uint64_t initial_bytes =
+          (!exec_env_->scheduler()->HasLocalBackend(location.server)) ?
           numeric_limits<int64_t>::max() : 0L;
       uint64_t* assigned_bytes =
           FindOrInsert(&assigned_bytes_per_host, location.server, initial_bytes);
@@ -1409,7 +1410,9 @@ Status Coordinator::ComputeScanRangeAssignment(
 
     TNetworkAddress exec_hostport;
     if (!exec_at_coord) {
-      RETURN_IF_ERROR(exec_env_->scheduler()->GetHost(*data_host, &exec_hostport));
+      TBackendDescriptor backend;
+      RETURN_IF_ERROR(exec_env_->scheduler()->GetBackend(*data_host, &backend));
+      exec_hostport = backend.address;
     } else {
       exec_hostport = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
     }

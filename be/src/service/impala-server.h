@@ -579,9 +579,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback that prints a list of all known databases and tables
   void CatalogPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
-  // Webserver callback that prints a list of known backends
-  void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
-
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 

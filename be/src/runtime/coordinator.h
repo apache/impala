@@ -202,7 +202,7 @@ class Coordinator {
   // per-fragment instance TPlanFragmentExecParams;
   // hosts.size() == instance_ids.size()
   struct FragmentExecParams {
-    SimpleScheduler::HostList hosts; // execution backends
+    std::vector<TNetworkAddress> hosts; // execution backends
     std::vector<TUniqueId> instance_ids;
     std::vector<TPlanFragmentDestination> destinations;
     std::map<PlanNodeId, int> per_exch_num_senders;

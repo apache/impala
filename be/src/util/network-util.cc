@@ -94,5 +94,19 @@ TNetworkAddress MakeNetworkAddress(const string& hostname, int port) {
   return ret;
 }
 
+bool IsWildcardAddress(const string& ipaddress) {
+  return ipaddress == "0.0.0.0";
+}
+
+void TNetworkAddressToString(const TNetworkAddress& address, string* out) {
+  stringstream ss;
+  ss << address;
+  *out = ss.str();
+}
+
+ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {
+  out << hostport.hostname << ":" << hostport.port;
+  return out;
+}
 
 }

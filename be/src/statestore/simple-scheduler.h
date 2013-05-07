@@ -31,7 +31,7 @@
 
 namespace impala {
 
-// Performs simple scheduling by matching between a list of hosts configured
+// Performs simple scheduling by matching between a list of backends configured
 // either from the state-store, or from a static list of addresses, and a list
 // of target data locations.
 //
@@ -46,57 +46,62 @@ class SimpleScheduler : public Scheduler {
   //  - backend_id - unique identifier for this Impala backend (usually a host:port)
   //  - backend_address - the address that this backend listens on
   SimpleScheduler(StateStoreSubscriber* subscriber, const std::string& backend_id,
-      const TNetworkAddress& backend_address, Metrics* metrics);
+      const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics);
+  SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics,
+      Webserver* webserver);
 
-  // Returns a list of backends such that the impalad at hostports[i] should be used to
+  // Returns a list of backends such that the impalad at backends[i] should be used to
   // read data from data_locations[i].
   // For each data_location, we choose a backend whose host matches the data_location in
-  // a round robin fashion and insert it into hostports.
+  // a round robin fashion and insert it into backends.
   // If no match is found for a data location, assign the data location in round-robin
   // order to any of the backends.
-  // If the set of available hosts is updated between calls, round-robin state is reset.
-  virtual impala::Status GetHosts(const HostList& data_locations, HostList* hostports);
+  // If the set of available backends is updated between calls, round-robin state is reset.
+  virtual Status GetBackends(const std::vector<TNetworkAddress>& data_locations,
+      BackendList* backends);
 
-  // Return a backend such that the impalad at hostport should be used to read data
+  // Return a backend such that the impalad at backend.address should be used to read data
   // from the given data_loation
-  virtual impala::Status GetHost(const TNetworkAddress& data_location,
-      TNetworkAddress* hostport);
+  virtual impala::Status GetBackend(const TNetworkAddress& data_location,
+      TBackendDescriptor* backend);
 
-  virtual void GetAllKnownHosts(HostList* hostports);
+  virtual void GetAllKnownBackends(BackendList* backends);
 
-  virtual bool HasLocalHost(const TNetworkAddress& data_location) {
-    boost::lock_guard<boost::mutex> l(host_map_lock_);
-    HostMap::iterator entry = host_map_.find(data_location.hostname);
-    return (entry != host_map_.end() && entry->second.size() > 0);
+  virtual bool HasLocalBackend(const TNetworkAddress& data_location) {
+    boost::lock_guard<boost::mutex> l(backend_map_lock_);
+    BackendMap::iterator entry = backend_map_.find(data_location.hostname);
+    return (entry != backend_map_.end() && entry->second.size() > 0);
   }
 
   // Registers with the subscription manager if required
   virtual impala::Status Init();
 
  private:
-  // Protects access to host_map_ and host_ip_map_, which might otherwise be updated
+  // Protects access to backend_map_ and backend_ip_map_, which might otherwise be updated
   // asynchronously with respect to reads. Also protects the locality
-  // counters, which are updated in GetHosts.
-  boost::mutex host_map_lock_;
+  // counters, which are updated in GetBackends.
+  boost::mutex backend_map_lock_;
 
   // Map from a datanode's IP address to a list of backend addresses running on that node.
-  typedef boost::unordered_map<std::string, std::list<TNetworkAddress> > HostMap;
-  HostMap host_map_;
+  typedef boost::unordered_map<std::string, std::list<TBackendDescriptor> > BackendMap;
+  BackendMap backend_map_;
 
   // Map from a datanode's hostname to its IP address to support both hostname based
   // lookup.
-  typedef boost::unordered_map<std::string, std::string> HostIpAddressMap;
-  HostIpAddressMap host_ip_map_;
+  typedef boost::unordered_map<std::string, std::string> BackendIpAddressMap;
+  BackendIpAddressMap backend_ip_map_;
 
   // Metrics subsystem access
-  impala::Metrics* metrics_;
+  Metrics* metrics_;
 
-  // round robin entry in HostMap for non-local host assignment
-  HostMap::iterator next_nonlocal_host_entry_;
+  // Webserver for /backends. Not owned by us.
+  Webserver* webserver_;
+
+  // round robin entry in BackendMap for non-local host assignment
+  BackendMap::iterator next_nonlocal_backend_entry_;
 
   // Pointer to a subscription manager (which we do not own) which is used to register
   // for dynamic updates to the set of available backends. May be NULL if the set of
@@ -124,6 +129,9 @@ class SimpleScheduler : public Scheduler {
   // Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& service_state,
       std::vector<TTopicUpdate>* topic_updates);
+
+  // Webserver callback that prints a list of known backends
+  void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 };
 
 }

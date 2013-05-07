@@ -31,9 +31,9 @@ Status ThriftClientImpl::Open() {
     stringstream msg;
     msg << "Couldn't open transport for " << ipaddress() << ":" << port()
         << "(" << e.what() << ")";
-    return impala::Status(msg.str());
+    return Status(msg.str());
   }
-  return impala::Status::OK;
+  return Status::OK;
 }
 
 Status ThriftClientImpl::OpenWithRetry(
