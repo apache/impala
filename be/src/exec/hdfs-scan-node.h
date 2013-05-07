@@ -142,6 +142,8 @@ class HdfsScanNode : public ScanNode {
   
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
+  const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
+
   hdfsFS hdfs_connection() { return hdfs_connection_; }
 
   RuntimeState* runtime_state() { return runtime_state_; }

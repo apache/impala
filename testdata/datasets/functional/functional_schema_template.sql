@@ -899,6 +899,20 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, N
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+nullformat_custom
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  a boolean,
+  b string,
+  c int,
+  d double)
+STORED AS {file_format}
+TBLPROPERTIES("serialization.null.format" = "xyz");
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 escapechartesttable
 ---- PARTITION_COLUMNS
 id int

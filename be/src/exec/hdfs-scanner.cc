@@ -281,7 +281,9 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   vector<Function*> slot_fns;
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    Function* fn = TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc);
+    Function* fn = TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc,
+        node->hdfs_table()->null_column_value().data(),
+        node->hdfs_table()->null_column_value().size(), true);
     if (fn == NULL) return NULL;
     slot_fns.push_back(fn);
   }

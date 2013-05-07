@@ -81,8 +81,8 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
       if (value != NULL) {
         output_exprs_[j]->PrintValue(value, &row_stringstream);
       } else {
-        // NULL values in hive are encoded as '\N'
-        row_stringstream << "\\N";
+        // NULLs in hive are encoded based on the 'serialization.null.format' property.
+        row_stringstream << table_desc_->null_column_value();
       }
       // Append field delimiter.
       if (j + 1 < num_non_partition_cols) {

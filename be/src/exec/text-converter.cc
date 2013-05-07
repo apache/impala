@@ -29,8 +29,11 @@ using namespace impala;
 using namespace llvm;
 using namespace std;
 
-TextConverter::TextConverter(char escape_char) 
-  : escape_char_(escape_char) {
+TextConverter::TextConverter(char escape_char, const string& null_col_val,
+    bool check_null)
+  : escape_char_(escape_char),
+    null_col_val_(null_col_val),
+    check_null_(check_null) {
 }
 
 void TextConverter::UnescapeString(StringValue* value, MemPool* pool) {
@@ -90,11 +93,18 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
 //   ret i1 false
 // }
 Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen, 
-    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc) {
+    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
+    const char* null_col_val, int len, bool check_null) {
   SCOPED_TIMER(codegen->codegen_timer());
 
-  // Codegen is_null_string 
-  Function* is_null_string_fn = codegen->GetFunction(IRFunction::STRING_IS_NULL);
+  // Codegen is_null_string
+  bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');
+  Function* is_null_string_fn;
+  if (is_default_null) {
+    is_null_string_fn = codegen->GetFunction(IRFunction::IS_NULL_STRING);
+  } else {
+    is_null_string_fn = codegen->GetFunction(IRFunction::GENERIC_IS_NULL_STRING);
+  }
   if (is_null_string_fn == NULL) return NULL;
 
   StructType* tuple_type = tuple_desc->GenerateLlvmStruct(codegen);
@@ -125,11 +135,25 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", fn);
   }
 
-  // Check if the data is '\N'
-  Value* is_null = builder.CreateCall2(is_null_string_fn, args[1], args[2]);
+  // Check if the data matches the configured NULL string.
+  Value* is_null;
+  if (check_null) {
+    if (is_default_null) {
+      is_null = builder.CreateCall2(is_null_string_fn, args[1], args[2]);
+    } else {
+      is_null = builder.CreateCall4(is_null_string_fn, args[1], args[2],
+          codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
+              const_cast<char*>(null_col_val)),
+          codegen->GetIntConstant(TYPE_INT, len));
+    }
+  } else {
+    // Constant FALSE as branch condition. We rely on later optimization passes
+    // to remove the branch and THEN block.
+    is_null = codegen->false_value();
+  }
   builder.CreateCondBr(is_null, set_null_block, 
       slot_desc->type() == TYPE_STRING ? parse_slot_block : check_zero_block);
-  
+
   if (slot_desc->type() != TYPE_STRING) {
     builder.SetInsertPoint(check_zero_block);
     // If len <= 0 and it is not a string col, set slot to NULL

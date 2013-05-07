@@ -15,6 +15,7 @@
 #include "exec/hdfs-scanner.h"
 #include "runtime/row-batch.h"
 #include "util/string-parser.h"
+#include "runtime/string-value.inline.h"
 
 using namespace std;
 using namespace impala;
@@ -114,6 +115,11 @@ double IrStringToDouble(const char* s, int len, StringParser::ParseResult* resul
 extern "C"
 bool IrIsNullString(const char* data, int len) {
   return len == 2 && data[0] == '\\' && data[1] == 'N';
+}
+
+extern "C"
+bool IrGenericIsNullString(const char* s, int slen, const char* n, int nlen) {
+  return slen == nlen && StringCompare(s, slen, n, nlen, slen) == 0;
 }
 #endif
 

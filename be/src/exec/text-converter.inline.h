@@ -27,6 +27,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/mem-pool.h"
+#include "runtime/string-value.inline.h"
 
 namespace impala {
 
@@ -37,12 +38,13 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
   if (len == 0 && slot_desc->type() != TYPE_STRING) {
     tuple->SetNull(slot_desc->null_indicator_offset());
     return true;
-  } else if (len == 2 && data[0] == '\\' && data[1] == 'N') {
-    // Hive encodes NULLs as '\N'
+  } else if (check_null_ && len == null_col_val_.size() &&
+      StringCompare(data, len, null_col_val_.data(), null_col_val_.size(), len) == 0) {
+    // We matched the special NULL indicator.
     tuple->SetNull(slot_desc->null_indicator_offset());
     return true;
-  } 
-    
+  }
+
   StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
   void* slot = tuple->GetSlot(slot_desc->tuple_offset());
 

@@ -204,6 +204,9 @@ class HdfsTableDescriptor : public TableDescriptor {
   const std::string& null_partition_key_value() const {
     return null_partition_key_value_;
   }
+  const std::string& null_column_value() const {
+    return null_column_value_;
+  }
 
   typedef std::map<int64_t, HdfsPartitionDescriptor*> PartitionIdToDescriptorMap;
 
@@ -224,6 +227,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   std::string hdfs_base_dir_;
   std::vector<std::string> col_names_;
   std::string null_partition_key_value_;
+  // Special string to indicate NULL values in text-encoded columns.
+  std::string null_column_value_;
   PartitionIdToDescriptorMap partition_descriptors_;
   // Owned by DescriptorTbl
   ObjectPool* object_pool_;

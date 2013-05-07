@@ -48,3 +48,22 @@ select * from hbaseinsertalltypesagg limit 1
 ---- SETUP
 RELOAD hbaseinsertalltypesagg
 ====
+---- QUERY
+# test inserting Hive's default text representation of NULL '\N' 
+# and make sure a scan returns the string and not NULL
+insert into table hbaseinsertalltypesagg
+select 9999999, bigint_col, false, "\\N", double_col, float_col, 
+int_col, smallint_col, "\\N", timestamp_col, tinyint_col from alltypesagg limit 1
+---- RESULTS
+: 1
+---- SETUP
+RELOAD hbaseinsertalltypesagg
+====
+---- QUERY
+select id, date_string_col, string_col from hbaseinsertalltypesagg 
+where id = 9999999
+---- TYPES
+int, string, string
+---- RESULTS
+9999999,'\N','\N'
+====

@@ -59,7 +59,8 @@ HdfsRCFileScanner::~HdfsRCFileScanner() {
 
 Status HdfsRCFileScanner::Prepare() {
   RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
-  text_converter_.reset(new TextConverter(0));
+  text_converter_.reset(
+      new TextConverter(0, scan_node_->hdfs_table()->null_column_value()));
   scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }

@@ -90,6 +90,9 @@ struct THdfsTable {
   // TTableDescriptor, so there should be an equal number of each.
   3: required string nullPartitionKeyValue
 
+  // String to indicate a NULL column value in text files
+  5: required string nullColumnValue
+
   // map from partition id to partition metadata
   4: required map<i64, THdfsPartition> partitions
 }

@@ -65,7 +65,8 @@ Status HdfsSequenceScanner::InitNewRange() {
 
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   
-  text_converter_.reset(new TextConverter(hdfs_partition->escape_char()));
+  text_converter_.reset(new TextConverter(hdfs_partition->escape_char(),
+      scan_node_->hdfs_table()->null_column_value()));
   
   delimited_text_parser_.reset(new DelimitedTextParser(scan_node_, '\0',
       hdfs_partition->field_delim(), hdfs_partition->collection_delim(),

@@ -42,7 +42,7 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_pool_(new MemPool()),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
-      text_converter_(new TextConverter('\\')) {
+      text_converter_(new TextConverter('\\', "", false)) {
 }
 
 HBaseScanNode::~HBaseScanNode() {
