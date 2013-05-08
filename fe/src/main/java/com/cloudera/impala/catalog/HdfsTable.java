@@ -688,9 +688,8 @@ public class HdfsTable extends Table {
         HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
     Path path = new Path(storageDescriptor.getLocation());
     List<FileDescriptor> fileDescriptors = Lists.newArrayList();
-    FileSystem fs = path.getFileSystem(new Configuration());
-    if (fs.exists(path)) {
-      for (FileStatus fileStatus: fs.listStatus(path)) {
+    if (DFS.exists(path)) {
+      for (FileStatus fileStatus: DFS.listStatus(path)) {
         String fileName = fileStatus.getPath().getName().toString();
         if (fileName.startsWith(".") || fileName.startsWith("_")) {
           // Ignore hidden file starting with . or _
