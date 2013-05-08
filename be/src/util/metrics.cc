@@ -46,23 +46,6 @@ Status Metrics::Init(Webserver* webserver) {
   return Status::OK;
 }
 
-void Metrics::PrintMetricMap(stringstream* output) {
-  lock_guard<mutex> l(lock_);
-  BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
-    m.second->Print(output);
-    (*output) << endl;
-  }
-}
-
-void Metrics::PrintMetricMapAsJson(vector<string>* metrics) {
-  lock_guard<mutex> l(lock_);
-  BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
-    stringstream ss;
-    m.second->PrintJson(&ss);
-    metrics->push_back(ss.str());
-  }
-}
-
 string Metrics::DebugString() {
   stringstream ss;
   Webserver::ArgumentMap empty_map;
@@ -78,20 +61,47 @@ string Metrics::DebugStringJson() {
 }
 
 void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* output) {
-  if (args.find("raw") == args.end()) {
-    (*output) << "<pre>";
-    PrintMetricMap(output);
-    (*output) << "</pre>";
+  Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
+  lock_guard<mutex> l(lock_);
+  if (args.find("raw") == args.end()) (*output) << "<pre>";
+  if (metric_name == args.end()) {
+    BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
+      m.second->Print(output);
+      (*output) << endl;
+    }
   } else {
-    PrintMetricMap(output);
+    MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
+    if (metric == metric_map_.end()) {
+      (*output) << "Metric '" << metric_name->second << "' not found";
+    } else {
+      metric->second->Print(output);
+      (*output) << endl;
+    }
   }
+  if (args.find("raw") == args.end()) (*output) << "</pre>";
 }
 
 void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* output) {
+  Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
+  lock_guard<mutex> l(lock_);
   (*output) << "{";
-  vector<string> metrics;
-  PrintMetricMapAsJson(&metrics);
-  (*output) << join(metrics, ",\n");
+  if (metric_name == args.end()) {
+    bool first = true;
+    BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
+      if (first) {
+        first = false;
+      } else {
+        (*output) << ",\n";
+      }
+      m.second->PrintJson(output);
+    }
+  } else {
+    MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
+    if (metric != metric_map_.end()) {
+      metric->second->PrintJson(output);
+      (*output) << endl;
+    }
+  }
   (*output) << "}";
 }
 

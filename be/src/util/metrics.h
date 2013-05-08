@@ -223,12 +223,6 @@ class Metrics {
   // Guards metric_map_
   boost::mutex lock_;
 
-  // Writes metric_map_ as a list of key : value pairs
-  void PrintMetricMap(std::stringstream* output);
-
-  // Builds a list of metrics as Json-style "key": "value" pairs
-  void PrintMetricMapAsJson(std::vector<std::string>* metrics);
-
   // Webserver callback (on /metrics), renders metrics as single text page
   void TextCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 
