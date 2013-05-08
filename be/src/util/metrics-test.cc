@@ -33,6 +33,8 @@ class MetricsTest : public testing::Test {
         1.23);
     string_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("string",
         string("hello world"));
+    inf_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("inf_double", 0.0);
+    stats_metric_ = metrics_->RegisterMetric(new StatsMetric<double>("stats"));
 
     vector<int> items;
     items.push_back(1); items.push_back(2); items.push_back(3);
@@ -49,11 +51,13 @@ class MetricsTest : public testing::Test {
   Metrics::BooleanMetric* bool_metric_;
   Metrics::IntMetric* int_metric_;
   Metrics::DoubleMetric* double_metric_;
+  Metrics::DoubleMetric* inf_metric_;
   Metrics::StringMetric* string_metric_;
 
   ListMetric<int>* list_metric_;
   SetMetric<int>* set_metric_;
   SetMetric<string>* string_set_metric_; // For quote testing
+  StatsMetric<double>* stats_metric_;
 
  private:
   boost::scoped_ptr<Metrics> metrics_;
@@ -130,6 +134,34 @@ TEST_F(MetricsTest, JsonQuoting) {
   // Other types in sets should not be quoted
   EXPECT_NE(metrics()->DebugStringJson().find("\"set\": [4, 5, 6]"), string::npos);
 }
+
+TEST_F(MetricsTest, NonfiniteDoubles) {
+  inf_metric_->Update(1.0 / 0.0);
+  EXPECT_NE(metrics()->DebugString().find("inf_double:inf"), string::npos);
+  EXPECT_NE(metrics()->DebugStringJson().find("\"inf_double\": null"), string::npos);
+
+  inf_metric_->Update(0.0 / 0.0);
+  EXPECT_NE(metrics()->DebugString().find("inf_double:-nan"), string::npos);
+  EXPECT_NE(metrics()->DebugStringJson().find("\"inf_double\": null"), string::npos);
+}
+
+TEST_F(MetricsTest, StatsMetric) {
+  // Uninitialised stats metrics don't print anything other than the count
+  EXPECT_NE(metrics()->DebugStringJson().find("\"stats\": { \"count\": 0 }"),
+            string::npos);
+
+  EXPECT_NE(metrics()->DebugString().find("stats: count: 0"), string::npos);
+  EXPECT_EQ(metrics()->DebugString().find("stats: count: 0, mean:"), string::npos);
+
+  stats_metric_->Update(0.0);
+  stats_metric_->Update(1.0);
+  stats_metric_->Update(2.0);
+
+  EXPECT_NE(metrics()->DebugString().find(
+      "stats: count: 3, last: 2, min: 0, max: 2, mean: 1, stddev: 0.816497"),
+      string::npos);
+}
+
 }
 
 int main(int argc, char **argv) {

@@ -125,7 +125,7 @@ StateStore::StateStore(Metrics* metrics)
       metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
                                                     set<string>()));
   last_heartbeat_loop_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_LAST_UPDATE_LOOP_TIME, 0.0));
+      new StatsMetric<double>(STATESTORE_LAST_UPDATE_LOOP_TIME));
   client_cache_->InitMetrics(metrics, "subscriber");
 }
 

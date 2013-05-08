@@ -38,6 +38,10 @@ template<typename T> void PrintPrimitiveAsJson(const T& v, std::stringstream* ou
 template<> void PrintPrimitiveAsJson<std::string>(const std::string& v,
                                                   std::stringstream* out);
 
+// Specialisation to intercept NaN and inf and print them as null,
+// because JSON doesn't allow for non-finite floating point values (!)
+template<> void PrintPrimitiveAsJson<double>(const double& v, std::stringstream* out);
+
 // Publishes execution metrics to a webserver page
 // TODO: Reconsider naming here; Metrics is too general.
 class Metrics {
@@ -122,6 +126,11 @@ class Metrics {
     const std::string key_;
 
     friend class Metrics;
+
+    // Some sub-metrics may not want to initialise a value
+    // (e.g. statistic-gathering metrics). This constructor is
+    // accessible to subclasses, but not to clients.
+    Metric(const std::string& key) : key_(key) { }
   };
 
   // PrimitiveMetrics are the most common metric type, whose values natively
@@ -141,11 +150,11 @@ class Metrics {
     }
 
    protected:
-    virtual void PrintValue(std::stringstream* out)  {
+    virtual void PrintValue(std::stringstream* out) {
       (*out) << this->value_;
     }
 
-    virtual void PrintValueJson(std::stringstream* out)  {
+    virtual void PrintValueJson(std::stringstream* out) {
       PrintPrimitiveAsJson(this->value_, out);
     }
   };

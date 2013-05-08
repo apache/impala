@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/logging.h"
 #include "util/metrics.h"
+
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
+#include <boost/math/special_functions/fpclassify.hpp>
 
+#include "common/logging.h"
 #include "util/impalad-metrics.h"
 
 using namespace impala;
@@ -93,7 +95,16 @@ void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* out
   (*output) << "}";
 }
 
-template<> void impala::PrintPrimitiveAsJson<std::string>(const string& v,
-                                                          stringstream* out) {
+template<> void PrintPrimitiveAsJson<std::string>(const string& v, stringstream* out) {
   (*out) << "\"" << v << "\"";
+}
+
+template<> void PrintPrimitiveAsJson<double>(const double& v, stringstream* out) {
+  if (isfinite(v)) {
+    (*out) << v;
+  } else {
+    // This does not call the std::string override, but instead writes
+    // the literal null, in keeping with the JSON spec.
+    PrintPrimitiveAsJson("null", out);
+  }
 }

@@ -24,6 +24,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
 #include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/count.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
@@ -149,12 +150,14 @@ class MapMetric : public Metrics::Metric<std::map<K, V> > {
 
 // Metric which accumulates min, max and mean of all values
 // Printed output looks like:
-// name: last: 0.0141562, min: 4.546e-06, max: 0.0243637, mean: 0.00336871, stddev:0.03366
+// name: count: 4, last: 0.0141, min: 4.546e-06, max: 0.0243, mean: 0.0336, stddev: 0.0336
+//
+// After construction, all statistics are ill-defined. The first call
+// to Update will initialise all stats.
 template <typename T>
 class StatsMetric : public Metrics::Metric<T> {
  public:
-  StatsMetric(const std::string& key, const T& value)
-      : Metrics::Metric<T>(key, value) { }
+  StatsMetric(const std::string& key) : Metrics::Metric<T>(key) { }
 
   void Update(const T& value) {
     boost::lock_guard<boost::mutex> l(this->lock_);
@@ -163,27 +166,41 @@ class StatsMetric : public Metrics::Metric<T> {
   }
 
   virtual void PrintValueJson(std::stringstream* out) {
-    (*out) << "{ \"last\": " << this->value_
-           << ", \"min\": " << boost::accumulators::min(this->acc_)
-           << ", \"max\": " << boost::accumulators::max(this->acc_)
-           << ", \"mean\": " << boost::accumulators::mean(this->acc_)
-           << ", \"stddev\":" << sqrt(boost::accumulators::variance(this->acc_))
-           << " }";
+    (*out) << "{ \"count\": ";
+    PrintPrimitiveAsJson(boost::accumulators::count(this->acc_), out);
+    if (boost::accumulators::count(this->acc_) > 0) {
+      (*out) << ", \"last\": ";
+      PrintPrimitiveAsJson(this->value_, out);
+      (*out) << ", \"min\": ";
+      PrintPrimitiveAsJson(boost::accumulators::min(this->acc_), out);
+      (*out) << ", \"max\": ";
+      PrintPrimitiveAsJson(boost::accumulators::max(this->acc_), out);
+      (*out) << ", \"mean\": ";
+      PrintPrimitiveAsJson(boost::accumulators::mean(this->acc_), out);
+      (*out) << ", \"stddev\": ";
+      PrintPrimitiveAsJson(sqrt(boost::accumulators::variance(this->acc_)), out);
+    }
+    (*out) << " }";
   }
 
   virtual void PrintValue(std::stringstream* out) {
-    (*out) << " last: " << this->value_
-           << ", min: " << boost::accumulators::min(this->acc_)
-           << ", max: " << boost::accumulators::max(this->acc_)
-           << ", mean: " << boost::accumulators::mean(this->acc_)
-           << ", stddev:" << sqrt(boost::accumulators::variance(this->acc_));
+    (*out) << " count: " << boost::accumulators::count(this->acc_);
+    if (boost::accumulators::count(this->acc_) > 0) {
+      (*out) << ", last: " << this->value_
+             << ", min: " << boost::accumulators::min(this->acc_)
+             << ", max: " << boost::accumulators::max(this->acc_)
+             << ", mean: " << boost::accumulators::mean(this->acc_)
+             << ", stddev: " << sqrt(boost::accumulators::variance(this->acc_));
+    }
   }
  private:
   boost::accumulators::accumulator_set<T,
       boost::accumulators::features<boost::accumulators::tag::mean,
+                                    boost::accumulators::tag::count,
                                     boost::accumulators::tag::min,
                                     boost::accumulators::tag::max,
                                     boost::accumulators::tag::variance> > acc_;
+
 };
 
 };

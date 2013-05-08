@@ -82,10 +82,10 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
           "statestore-subscriber.last-recovery-time", 0.0);
   heartbeat_interval_metric_ =
       metrics->RegisterMetric(
-          new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time", 0.0));
+          new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time"));
   heartbeat_duration_metric_ =
       metrics->RegisterMetric(
-          new StatsMetric<double>("statestore-subscriber.heartbeat-duration", 0.0));
+          new StatsMetric<double>("statestore-subscriber.heartbeat-duration"));
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
