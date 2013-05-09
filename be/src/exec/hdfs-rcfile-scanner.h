@@ -233,7 +233,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state);
   virtual ~HdfsRCFileScanner();
   
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 

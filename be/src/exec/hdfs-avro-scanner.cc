@@ -49,8 +49,8 @@ HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
 HdfsAvroScanner::~HdfsAvroScanner() {
 }
 
-Status HdfsAvroScanner::Prepare() {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
+Status HdfsAvroScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
   slot_descs_.resize(scan_node_->num_cols() - scan_node_->num_partition_keys(), NULL);
   const vector<SlotDescriptor*>& materialized_slots = scan_node_->materialized_slots();
   vector<SlotDescriptor*>::const_iterator it;
@@ -312,12 +312,12 @@ Status HdfsAvroScanner::ProcessRange() {
       MemPool* pool;
       Tuple* tuple;
       TupleRow* tuple_row;
-      int max_tuples = context_->GetMemory(&pool, &tuple, &tuple_row);
+      int max_tuples = GetMemory(&pool, &tuple, &tuple_row);
       if (scan_node_->materialized_slots().empty()) {
         // No slots to materialize (e.g. count(*)), no need to decode data
         int n = min(num_records, static_cast<int64_t>(max_tuples));
         int num_to_commit = WriteEmptyTuples(context_, tuple_row, n);
-        if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+        if (num_to_commit > 0) CommitRows(num_to_commit);
         num_records -= n;
         COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
       } else {
@@ -329,7 +329,7 @@ Status HdfsAvroScanner::ProcessRange() {
     }
 
     if (!stream_->compact_data()) {
-      context_->AcquirePool(data_buffer_pool_.get());
+      AttachPool(data_buffer_pool_.get());
     }
     RETURN_IF_ERROR(ReadSync());
   }
@@ -345,7 +345,7 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
   for (int i = 0; i < n; ++i) {
     // Initialize tuple from the partition key template tuple before writing the
     // slots
-    InitTuple(context_->template_tuple(), tuple);
+    InitTuple(template_tuple_, tuple);
 
     // Decode record
     for (int j = 0; j < slot_descs_.size(); ++j) {
@@ -369,11 +369,11 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
     // Evaluate the conjuncts and add the row to the batch
     if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, tuple_row)) {
       ++num_to_commit;
-      tuple_row = context_->next_row(tuple_row);
-      tuple = context_->next_tuple(tuple);
+      tuple_row = next_row(tuple_row);
+      tuple = next_tuple(tuple);
     }
   }
-  context_->CommitRows(num_to_commit);
+  CommitRows(num_to_commit);
   (*num_records) -= n;
   COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
 

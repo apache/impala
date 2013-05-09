@@ -57,8 +57,8 @@ HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* stat
 HdfsRCFileScanner::~HdfsRCFileScanner() {
 }
 
-Status HdfsRCFileScanner::Prepare() {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
+Status HdfsRCFileScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
   text_converter_.reset(
       new TextConverter(0, scan_node_->hdfs_table()->null_column_value()));
   scan_node_->IncNumScannersCodegenDisabled();
@@ -240,7 +240,7 @@ void HdfsRCFileScanner::ResetRowGroup() {
 
   if (!stream_->compact_data()) {
     // We are done with this row group, pass along non-compact external buffers
-    context_->AcquirePool(data_buffer_pool_.get());
+    AttachPool(data_buffer_pool_.get());
     row_group_buffer_size_ = 0;
   }
 }
@@ -480,7 +480,7 @@ Status HdfsRCFileScanner::ProcessRange() {
     MemPool* pool;
     Tuple* tuple;
     TupleRow* current_row;
-    int max_tuples = context_->GetMemory(&pool, &tuple, &current_row);
+    int max_tuples = GetMemory(&pool, &tuple, &current_row);
     max_tuples = min(max_tuples, num_rows_ - row_pos_);
 
     if (materialized_slots.empty()) {
@@ -488,7 +488,7 @@ Status HdfsRCFileScanner::ProcessRange() {
       // we can shortcircuit the parse loop
       row_pos_ += max_tuples;
       int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-      if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+      if (num_to_commit > 0) CommitRows(num_to_commit);
       COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
       continue;
     }
@@ -499,7 +499,7 @@ Status HdfsRCFileScanner::ProcessRange() {
 
       // Initialize tuple from the partition key template tuple before writing the
       // slots
-      InitTuple(context_->template_tuple(), tuple);
+      InitTuple(template_tuple_, tuple);
 
       for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
         const SlotDescriptor* slot_desc = *it;
@@ -537,11 +537,11 @@ Status HdfsRCFileScanner::ProcessRange() {
       // Evaluate the conjuncts and add the row to the batch
       if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
         ++num_to_commit;
-        current_row = context_->next_row(current_row);
-        tuple = context_->next_tuple(tuple);
+        current_row = next_row(current_row);
+        tuple = next_tuple(tuple);
       }
     }
-    context_->CommitRows(num_to_commit);
+    CommitRows(num_to_commit);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
     if (scan_node_->ReachedLimit()) break;
     if (context_->cancelled()) return Status::CANCELLED;

@@ -27,8 +27,6 @@
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-#include <hdfs.h>
-
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
@@ -440,7 +438,7 @@ class HdfsScanNode : public ScanNode {
   // Total number of bytes read via short circuit read
   RuntimeProfile::Counter* bytes_read_short_circuit_;
   
-  // Create a new scanner for this partition type and initialize it.
+  // Create a new scanner for this partition type.
   // If the scanner cannot be created return NULL.
   HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);
 

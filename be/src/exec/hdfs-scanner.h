@@ -22,9 +22,11 @@
 #include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "exec/hdfs-scan-node.h"
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
 #include "runtime/disk-io-mgr.h"
+#include "runtime/row-batch.h"
 
 namespace impala {
 
@@ -32,9 +34,7 @@ class Compression;
 class DescriptorTbl;
 class Expr;
 class HdfsPartitionDescriptor;
-class HdfsScanNode;
 class MemPool;
-class RowBatch;
 class SlotDescriptor;
 class Status;
 class TextConverter;
@@ -63,17 +63,24 @@ struct FieldLocation {
 // 1. Prepare
 // 2. ProcessSplit
 // 3. Close
-// ProcessSplit does not return until the split is complete (or an error) occurred.  
+// ProcessSplit does not return until the split is complete (or an error) occurred.
 // The HdfsScanner works in tandem with the ScannerContext to interleave IO
 // and parsing.
-// For codegen, the implementation is split into two parts.  
-// 1. During the Prepare() phase of the ScanNode, the scanner subclass's static 
-//    Codegen() function will be called to perform codegen for that scanner type 
+//
+// For codegen, the implementation is split into two parts.
+// 1. During the Prepare() phase of the ScanNode, the scanner subclass's static
+//    Codegen() function will be called to perform codegen for that scanner type
 //    for the specific tuple desc. This codegen'd function is cached in the HdfsScanNode.
 // 2. During the GetNext() phase (where we create one Scanner for each scan range),
 //    the created scanner subclass can retrieve, from the scan node, the codegen'd
-//    function to use.  
+//    function to use.
 // This way, we only codegen once per scanner type, rather than once per scanner object.
+//
+// This class also encapsulates row batch management.  Subclasses should call CommitRows
+// after writing to the current row batch, which handles creating row batches, attaching
+// resources (IO buffers and mempools) to the current row batch, and passing row batches
+// up to the scan node . Subclasses can also use GetMemory to help with per-row memory
+// management.
 class HdfsScanner {
  public:
   // Assumed size of an OS file block.  Used mostly when reading file format headers, etc.
@@ -85,12 +92,12 @@ class HdfsScanner {
   virtual ~HdfsScanner();
 
   // One-time initialisation of state that is constant across scan ranges.
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
 
   // Process an entire split, reading bytes from the context's streams.  Context is 
   // initialized with the split data (e.g. template tuple, partition descriptor, etc).
   // This function should only return on error or end of scan range.
-  virtual Status ProcessSplit(ScannerContext* context) = 0;
+  virtual Status ProcessSplit() = 0;
 
   // Release all resources the scanner has allocated.  This is the last chance for
   // the scanner to attach any resources to the ScannerContext object.
@@ -147,11 +154,31 @@ class HdfsScanner {
   // Cache of conjuncts_mem_.size()
   int num_conjuncts_;
 
+  // A partially materialized tuple with only partition key slots set.
+  // The non-partition key slots are set to NULL.  The template tuple
+  // must be copied into tuple_ before any of the other slots are
+  // materialized.
+  // Pointer is NULL if there are no partition key slots.
+  // This template tuple is computed once for each file and valid for
+  // the duration of that file.
+  // It is owned by the HDFS scan node.
+  Tuple* template_tuple_;
+
   // Fixed size of each tuple, in bytes
   int tuple_byte_size_;
 
-  // Current tuple.
+  // Current tuple pointer into tuple_mem_.
   Tuple* tuple_;
+
+  // The current row batch being populated. Creating new row batches, attaching context
+  // resources, and handing off to the scan node is handled by this class in CommitRows,
+  // but AttachPool must be called by scanner subclasses to attach any memory allocated by
+  // that subclass. All row batches created by this class are transferred to the scan
+  // node (i.e., all batches are ultimately owned by the scan node).
+  RowBatch* batch_;
+
+  // The tuple memory of batch_.
+  uint8_t* tuple_mem_;
 
   // number of errors in current file
   int num_errors_in_file_;
@@ -173,12 +200,6 @@ class HdfsScanner {
   // cheap to create and destroy.
   Status parse_status_;
 
-  // Initialize the context and stream
-  void SetContext(ScannerContext* context) {
-    context_ = context;
-    stream_ = context->GetStream();
-  }
-
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
   typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*, 
@@ -198,6 +219,35 @@ class HdfsScanner {
   // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
   Status InitializeCodegenFn(HdfsPartitionDescriptor* partition, 
       THdfsFileFormat::type type, const std::string& scanner_name);
+
+  // Set batch_ to a new row batch and update tuple_mem_ accordingly.
+  void StartNewRowBatch();
+
+  // Gets memory for outputting tuples into batch_.
+  //  *pool is the mem pool that should be used for memory allocated for those tuples.
+  //  *tuple_mem should be the location to output tuples, and
+  //  *tuple_row_mem for outputting tuple rows.
+  // Returns the maximum number of tuples/tuple rows that can be output (before the
+  // current row batch is complete and a new one is allocated).
+  // Memory returned from this call is invalidated after calling CommitRows.  Callers must
+  // call GetMemory again after calling this function.
+  int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
+
+  // Commit num_rows to the current row batch.  If this completes the row batch, the
+  // row batch is enqueued with the scan node and StartNewRowBatch is called.
+  void CommitRows(int num_rows);
+
+  // Attach all remaining resources from context_ to batch_ and send batch_ to the scan
+  // node. This must be called after all rows have been committed and before closing
+  // context_ (likely in Close()).
+  void AddFinalRowBatch();
+
+  // Release all memory in 'pool' to batch_.
+  void AttachPool(MemPool* pool) {
+    DCHECK(batch_ != NULL);
+    DCHECK(pool != NULL);
+    batch_->tuple_data_pool()->AcquireData(pool, false);
+  }
 
   // Utility method to write out tuples when there are no materialized
   // fields (e.g. select count(*) or only partition keys).
@@ -286,6 +336,16 @@ class HdfsScanner {
     } else {
       memset(tuple, 0, sizeof(uint8_t) * num_null_bytes_);
     }
+  }
+
+  inline Tuple* next_tuple(Tuple* t) const {
+    uint8_t* mem = reinterpret_cast<uint8_t*>(t);
+    return reinterpret_cast<Tuple*>(mem + tuple_byte_size_);
+  }
+
+  inline TupleRow* next_row(TupleRow* r) const {
+    uint8_t* mem = reinterpret_cast<uint8_t*>(r);
+    return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
   }
 };
 

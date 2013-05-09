@@ -56,9 +56,9 @@ void HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   }
 }
 
-Status HdfsTextScanner::ProcessSplit(ScannerContext* context) {
+Status HdfsTextScanner::ProcessSplit() {
   // Reset state for new scan range
-  InitNewRange(context);
+  InitNewRange();
 
   // Find the first tuple.  If tuple_found is false, it means we went through the entire
   // scan range without finding a single tuple.  The bytes will be picked up
@@ -80,22 +80,22 @@ Status HdfsTextScanner::ProcessSplit(ScannerContext* context) {
 }
 
 Status HdfsTextScanner::Close() {
-  context_->AcquirePool(boundary_mem_pool_.get());
+  AttachPool(boundary_mem_pool_.get());
+  AddFinalRowBatch();
   // We must flush any pending batches in the row batch before telling the scan node
-  // the range is complete. 
+  // the range is complete.
   context_->Close();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, THdfsCompression::NONE);
-  
+
   scan_node_->ReleaseCodegenFn(THdfsFileFormat::TEXT, codegen_fn_);
   codegen_fn_ = NULL;
-  
+
   COUNTER_UPDATE(scan_node_->memory_used_counter(),
       boundary_mem_pool_->peak_allocated_bytes());
   return Status::OK;
 }
 
-void HdfsTextScanner::InitNewRange(ScannerContext* context) {
-  SetContext(context);
+void HdfsTextScanner::InitNewRange() {
   stream_->set_read_past_buffer_size(NEXT_BLOCK_READ_SIZE);
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   
@@ -166,7 +166,7 @@ Status HdfsTextScanner::FinishScanRange() {
 
         MemPool* pool;
         TupleRow* tuple_row_mem;
-        int max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row_mem);
+        int max_tuples = GetMemory(&pool, &tuple_, &tuple_row_mem);
         DCHECK_GE(max_tuples, 1);
         // Set variables for proper error outputting on boundary tuple
         batch_start_ptr_ = boundary_row_.str().ptr;
@@ -174,7 +174,7 @@ Status HdfsTextScanner::FinishScanRange() {
         int num_tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
         DCHECK_LE(num_tuples, 1);
         DCHECK_GE(num_tuples, 0);
-        context_->CommitRows(num_tuples);
+        CommitRows(num_tuples);
         COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
       }
       break;
@@ -201,7 +201,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
   
     MemPool* pool;
     TupleRow* tuple_row_mem;
-    int max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row_mem);
+    int max_tuples = GetMemory(&pool, &tuple_, &tuple_row_mem);
     
     if (past_scan_range) {
       // byte_buffer_ptr_ is already set from FinishScanRange()
@@ -264,7 +264,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     
     // Commit the rows to the row batch and scan node
     if (num_tuples_materialized > 0) {
-      context_->CommitRows(num_tuples_materialized);
+      CommitRows(num_tuples_materialized);
     }
 
     COUNTER_UPDATE(scan_node_->rows_read_counter(), *num_tuples);
@@ -331,8 +331,8 @@ Function* HdfsTextScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conj
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
 }
 
-Status HdfsTextScanner::Prepare() {
-  RETURN_IF_ERROR(HdfsScanner::Prepare());
+Status HdfsTextScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   
   parse_delimiter_timer_ = ADD_CHILD_TIMER(scan_node_->runtime_profile(),
       "DelimiterParseTime", ScanNode::SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
@@ -426,8 +426,8 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
 
       if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, tuple_row)) {
         ++num_tuples_materialized;
-        tuple_ = context_->next_tuple(tuple_);
-        tuple_row = context_->next_row(tuple_row);
+        tuple_ = next_tuple(tuple_);
+        tuple_row = next_row(tuple_row);
       }
     } 
 
@@ -442,12 +442,12 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
     int tuples_returned = 0;
     // Call jitted function if possible
     if (write_tuples_fn_ != NULL) {
-      tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
-          context_->row_byte_size(), fields, num_tuples, max_added_tuples, 
+      tuples_returned = write_tuples_fn_(this, pool, tuple_row,
+          batch_->row_byte_size(), fields, num_tuples, max_added_tuples,
           scan_node_->materialized_slots().size(), num_tuples_processed);
     } else {
-      tuples_returned = WriteAlignedTuples(pool, tuple_row, 
-          context_->row_byte_size(), fields, num_tuples, max_added_tuples, 
+      tuples_returned = WriteAlignedTuples(pool, tuple_row,
+          batch_->row_byte_size(), fields, num_tuples, max_added_tuples,
           scan_node_->materialized_slots().size(), num_tuples_processed);
     }
     if (tuples_returned == -1) return 0;
@@ -464,7 +464,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
   // Write out the remaining slots (resulting in a partially materialized tuple)
   if (num_fields != 0) {
     DCHECK(tuple_ != NULL);
-    InitTuple(context_->template_tuple(), partial_tuple_);
+    InitTuple(template_tuple_, partial_tuple_);
     // If there have been no materialized tuples at this point, copy string data
     // out of byte_buffer and reuse the byte_buffer.  The copied data can be at
     // most one tuple's worth.

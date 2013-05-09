@@ -37,7 +37,6 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
-  Tuple* template_tuple = context_->template_tuple();
 
   uint8_t error[slots_per_tuple];
   memset(error, 0, sizeof(error));
@@ -49,7 +48,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
     uint8_t error_in_row = false;
     // Materialize a single tuple.  This function will be replaced by a codegen'd
     // function.
-    if (WriteCompleteTuple(pool, fields, tuple, tuple_row, template_tuple, 
+    if (WriteCompleteTuple(pool, fields, tuple, tuple_row, template_tuple_,
           error, &error_in_row)) {
       ++tuples_returned;
       tuple_mem += tuple_byte_size_;

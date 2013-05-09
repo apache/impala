@@ -71,7 +71,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
  protected:
   // Implementation of BaseSeqeunceScanner super class methods
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
   virtual FileHeader* AllocateFileHeader();
   // TODO: check that file schema matches metadata schema
   virtual Status ReadFileHeader();

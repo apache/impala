@@ -57,8 +57,8 @@ BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state
 BaseSequenceScanner::~BaseSequenceScanner() {
 }
 
-Status BaseSequenceScanner::Prepare() {
-  RETURN_IF_ERROR(HdfsScanner::Prepare());
+Status BaseSequenceScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
@@ -66,7 +66,8 @@ Status BaseSequenceScanner::Prepare() {
 }
 
 Status BaseSequenceScanner::Close() {
-  context_->AcquirePool(data_buffer_pool_.get());
+  AttachPool(data_buffer_pool_.get());
+  AddFinalRowBatch();
   context_->Close();
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
@@ -79,9 +80,7 @@ Status BaseSequenceScanner::Close() {
   return Status::OK;
 }
 
-Status BaseSequenceScanner::ProcessSplit(ScannerContext* context) {
-  SetContext(context);
-
+Status BaseSequenceScanner::ProcessSplit() {
   header_ = reinterpret_cast<FileHeader*>(
       scan_node_->GetFileMetadata(stream_->filename()));
   if (header_ == NULL) {

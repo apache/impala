@@ -165,7 +165,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   virtual ~HdfsSequenceScanner();
   
   // Implementation of HdfsScanner interface.
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
 
   // Codegen writing tuples and evaluating predicates
   static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);

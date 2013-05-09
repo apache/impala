@@ -90,8 +90,8 @@ Status HdfsSequenceScanner::InitNewRange() {
   return Status::OK;
 }
 
-Status HdfsSequenceScanner::Prepare() {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
+Status HdfsSequenceScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
 
   // Allocate the scratch space for two pass parsing.  The most fields we can go
   // through in one parse pass is the batch size (tuples) * the number of fields per tuple
@@ -245,14 +245,14 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
 Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   MemPool* pool;
   TupleRow* tuple_row;
-  int64_t max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row);
+  int64_t max_tuples = GetMemory(&pool, &tuple_, &tuple_row);
   int num_to_process = min(max_tuples, num_buffered_records_in_compressed_block_);
   num_buffered_records_in_compressed_block_ -= num_to_process;
 
   if (scan_node_->materialized_slots().empty()) {
     // Handle case where there are no slots to materialize (e.g. count(*))
     num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
-    if (num_to_process > 0) context_->CommitRows(num_to_process);
+    if (num_to_process > 0) CommitRows(num_to_process);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
     return Status::OK;
   }
@@ -304,17 +304,17 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (write_tuples_fn_ != NULL) {
     // last argument: seq always starts at record_location[0]
     tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
-        context_->row_byte_size(), &field_locations_[0], num_to_process,
+        batch_->row_byte_size(), &field_locations_[0], num_to_process,
         max_added_tuples, scan_node_->materialized_slots().size(), 0); 
   } else {
     tuples_returned = WriteAlignedTuples(pool, tuple_row, 
-        context_->row_byte_size(), &field_locations_[0], num_to_process,
+        batch_->row_byte_size(), &field_locations_[0], num_to_process,
         max_added_tuples, scan_node_->materialized_slots().size(), 0);
   }
 
   if (tuples_returned == -1) return parse_status_;
   COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
-  context_->CommitRows(tuples_returned);
+  CommitRows(tuples_returned);
   return Status::OK;
 }
 
@@ -345,7 +345,7 @@ Status HdfsSequenceScanner::ProcessRange() {
 
     MemPool* pool;
     TupleRow* tuple_row_mem;
-    int max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row_mem);
+    int max_tuples = GetMemory(&pool, &tuple_, &tuple_row_mem);
     DCHECK_GT(max_tuples, 0);
     
     // Parse the current record.
@@ -369,7 +369,7 @@ Status HdfsSequenceScanner::ProcessRange() {
       memset(errors, 0, sizeof(errors));
 
       add_row = WriteCompleteTuple(pool, &field_locations_[0], tuple_, tuple_row_mem,
-          context_->template_tuple(), &errors[0], &error_in_row);
+          template_tuple_, &errors[0], &error_in_row);
 
       if (UNLIKELY(error_in_row)) {
         ReportTupleParseError(&field_locations_[0], errors, 0);
@@ -379,7 +379,7 @@ Status HdfsSequenceScanner::ProcessRange() {
       add_row = WriteEmptyTuples(context_, tuple_row_mem, 1);
     }
 
-    if (add_row) context_->CommitRows(1);
+    if (add_row) CommitRows(1);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), 1);
     if (scan_node_->ReachedLimit()) break;
     if (context_->cancelled()) return Status::CANCELLED;
@@ -505,7 +505,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   // We are reading a new compressed block.  Pass the previous buffer pool 
   // bytes to the batch.  We don't need them anymore.
   if (!stream_->compact_data()) {
-    context_->AcquirePool(data_buffer_pool_.get());
+    AttachPool(data_buffer_pool_.get());
   }
 
   block_start_ = stream_->file_offset();

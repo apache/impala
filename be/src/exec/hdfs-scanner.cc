@@ -57,6 +57,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       num_conjuncts_(0),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
+      batch_(NULL),
       num_errors_in_file_(0),
       has_noncompact_strings_(!scan_node->compact_data() &&
                               !scan_node->tuple_desc()->string_slots().empty()),
@@ -66,10 +67,16 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
 
 HdfsScanner::~HdfsScanner() {
   DCHECK(codegen_fn_ == NULL);
+  DCHECK(batch_ == NULL);
 }
 
-Status HdfsScanner::Prepare() {
+Status HdfsScanner::Prepare(ScannerContext* context) {
+  context_ = context;
+  stream_ = context->GetStream();
+  template_tuple_ = scan_node_->InitTemplateTuple(
+      state_, context_->partition_descriptor()->partition_key_values());
   RETURN_IF_ERROR(CreateConjunctsCopy());
+  StartNewRowBatch();
   return Status::OK;
 }
 
@@ -108,6 +115,47 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
   return Status::OK;
 }
 
+void HdfsScanner::StartNewRowBatch() {
+  batch_ = new RowBatch(
+      scan_node_->row_desc(), state_->batch_size(), *state_->mem_limits());
+  tuple_mem_ =
+      batch_->tuple_data_pool()->Allocate(state_->batch_size() * tuple_byte_size_);
+}
+
+int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
+  DCHECK(batch_ != NULL);
+  DCHECK(!batch_->IsFull());
+  *pool = batch_->tuple_data_pool();
+  *tuple_mem = reinterpret_cast<Tuple*>(tuple_mem_);
+  *tuple_row_mem = batch_->GetRow(batch_->AddRow());
+  return batch_->capacity() - batch_->num_rows();
+}
+
+void HdfsScanner::CommitRows(int num_rows) {
+  DCHECK(batch_ != NULL);
+  DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
+  batch_->CommitRows(num_rows);
+  tuple_mem_ += scan_node_->tuple_desc()->byte_size() * num_rows;
+
+  // We need to pass the row batch to the scan node if we accumulate too much
+  // memory (in io buffers and mem pools).  This can happen if the query is very
+  // selective.
+  // TODO: We could also compact the row batch and at this point to reclaim the
+  // memory that way.
+  if (batch_->IsFull() || batch_->AtResourceLimit()) {
+    context_->AttachCompletedResources(batch_, /* done */ false);
+    scan_node_->AddMaterializedRowBatch(batch_);
+    StartNewRowBatch();
+  }
+}
+
+void HdfsScanner::AddFinalRowBatch() {
+  DCHECK(batch_ != NULL);
+  context_->AttachCompletedResources(batch_, /* done */ true);
+  scan_node_->AddMaterializedRowBatch(batch_);
+  batch_ = NULL;
+}
+
 // In this code path, no slots were materialized from the input files.  The only
 // slots are from partition keys.  This lets us simplify writing out the batches.
 //   1. template_tuple_ is the complete tuple.
@@ -121,7 +169,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
   }
   DCHECK_GT(num_tuples, 0);
 
-  if (context_->template_tuple() == NULL) {
+  if (template_tuple_ == NULL) {
     // No slots from partitions keys or slots.  This is count(*).  Just add the
     // number of rows to the batch.
     row_batch->AddRows(num_tuples);
@@ -131,7 +179,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
     int row_idx = row_batch->AddRow();
     
     TupleRow* current_row = row_batch->GetRow(row_idx);
-    current_row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
+    current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
     if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
       return 0;
     }
@@ -146,7 +194,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
       row_idx = row_batch->AddRow();
       DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
       TupleRow* current_row = row_batch->GetRow(row_idx);
-      current_row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
+      current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
       row_batch->CommitLastRow();
     }
   } 
@@ -168,15 +216,15 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
   if (num_tuples == 0) return 0;
 
   if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
-  if (context_->template_tuple() == NULL) {
+  if (template_tuple_ == NULL) {
     return num_tuples;
   } else {
-    row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
-    row = context->next_row(row);
+    row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+    row = next_row(row);
 
     for (int n = 1; n < num_tuples; ++n) {
-      row->SetTuple(scan_node_->tuple_idx(), context_->template_tuple());
-      row = context->next_row(row);
+      row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+      row = next_row(row);
     }
   } 
   return num_tuples;
@@ -525,4 +573,3 @@ void HdfsScanner::IssueFileRanges(const char* filename) {
   HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename);
   scan_node_->AddDiskIoRange(file_desc);
 }
-

@@ -43,9 +43,9 @@ class HdfsParquetScanner : public HdfsScanner {
   HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state);
 
   virtual ~HdfsParquetScanner();
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
   virtual Status Close();
-  virtual Status ProcessSplit(ScannerContext* context);
+  virtual Status ProcessSplit();
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
  private:

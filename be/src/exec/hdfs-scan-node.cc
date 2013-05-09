@@ -26,6 +26,8 @@
 #include <boost/foreach.hpp>
 #include <dlfcn.h>
 
+#include <hdfs.h>
+
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
@@ -315,12 +317,8 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
       DCHECK(false) << "Unknown Hdfs file format type:" << partition->file_format();
       return NULL;
   }
-  if (scanner != NULL) {
-    scanner_pool_->Add(scanner);
-    // TODO better error handling
-    Status status = scanner->Prepare();
-    DCHECK(status.ok());
-  }
+  DCHECK(scanner != NULL);
+  scanner_pool_->Add(scanner);
   return scanner;
 }
 
@@ -784,7 +782,10 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) 
   {
     SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
     ScopedCounter scoped_counter(&active_scanner_thread_counter_, -1);
-    status = scanner->ProcessSplit(context);
+    status = scanner->Prepare(context);
+    if (status.ok()) {
+      status = scanner->ProcessSplit();
+    }
     scanner->Close();
     if (context->num_buffers_added() != 0) {
       // This scanner saw at least one io buffer indicating the io mgr reserved

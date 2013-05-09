@@ -33,9 +33,9 @@ class HdfsTextScanner : public HdfsScanner {
   virtual ~HdfsTextScanner();
 
   // Implementation of HdfsScanner interface.
-  virtual Status Prepare();
+  virtual Status Prepare(ScannerContext* context);
   virtual Status GetNext(RowBatch* row_batch, bool* eosr);
-  virtual Status ProcessSplit(ScannerContext* context);
+  virtual Status ProcessSplit();
   virtual Status Close();
 
   // Issue io manager byte ranges for 'files'
@@ -65,7 +65,7 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Initializes this scanner for this context.  The context maps to a single
   // scan range.
-  void InitNewRange(ScannerContext* context);
+  void InitNewRange();
 
   // Finds the start of the first tuple in this scan range and initializes 
   // byte_buffer_ptr to be the next character (the start of the first tuple).  If 

@@ -181,8 +181,8 @@ class HdfsParquetScanner::ColumnReader {
   bool DecodePlainValue(void* slot, MemPool* pool);
 };
 
-Status HdfsParquetScanner::Prepare() {
-  RETURN_IF_ERROR(HdfsScanner::Prepare());
+Status HdfsParquetScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   column_readers_.resize(scan_node_->materialized_slots().size());
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     column_readers_[i] = scan_node_->runtime_state()->obj_pool()->Add(
@@ -198,7 +198,8 @@ Status HdfsParquetScanner::Prepare() {
 }
 
 Status HdfsParquetScanner::Close() {
-  context_->AcquirePool(dictionary_pool_.get());
+  AttachPool(dictionary_pool_.get());
+  AddFinalRowBatch();
   context_->Close();
   // TODO: this doesn't really work for parquet since the file is 
   // not uniformly compressed.
@@ -216,7 +217,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
 
   // We're about to move to the next data page.  The previous data page is 
   // now complete, pass along the memory allocated for it.
-  parent_->context_->AcquirePool(decompressed_data_pool_.get());
+  parent_->AttachPool(decompressed_data_pool_.get());
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (either eosr or
@@ -484,9 +485,7 @@ inline bool HdfsParquetScanner::ColumnReader::DecodePlainValue(void* slot,
   return true;
 }
   
-Status HdfsParquetScanner::ProcessSplit(ScannerContext* context) {
-  SetContext(context);
-
+Status HdfsParquetScanner::ProcessSplit() {
   HdfsFileDesc* file_desc = scan_node_->GetFileDesc(stream_->filename());
   DCHECK(file_desc != NULL);
   
@@ -529,11 +528,11 @@ Status HdfsParquetScanner::AssembleRows() {
     MemPool* pool;
     Tuple* tuple;
     TupleRow* row;
-    int num_rows = context_->GetMemory(&pool, &tuple, &row);
+    int num_rows = GetMemory(&pool, &tuple, &row);
     int num_to_commit = 0;
 
     for (int i = 0; i < num_rows; ++i) {
-      InitTuple(context_->template_tuple(), tuple);
+      InitTuple(template_tuple_, tuple);
       for (int c = 0; c < column_readers_.size(); ++c) {
         if (!column_readers_[c]->ReadValue(pool, tuple)) {
           assemble_rows_timer_.Stop();
@@ -543,7 +542,7 @@ Status HdfsParquetScanner::AssembleRows() {
           // are reading.
           DCHECK(c == 0 || !parse_status_.ok()) << "c=" << c << " " 
               << parse_status_.GetErrorMsg();;
-          context_->CommitRows(num_to_commit);
+          CommitRows(num_to_commit);
           COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
           return parse_status_;
         }
@@ -551,12 +550,12 @@ Status HdfsParquetScanner::AssembleRows() {
     
       row->SetTuple(scan_node_->tuple_idx(), tuple);
       if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) {
-        row = context_->next_row(row);
-        tuple = context_->next_tuple(tuple);
+        row = next_row(row);
+        tuple = next_tuple(tuple);
         ++num_to_commit;
       } 
     }
-    context_->CommitRows(num_to_commit);
+    CommitRows(num_to_commit);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
   }
 
@@ -632,12 +631,12 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
         MemPool* pool;
         Tuple* tuple;
         TupleRow* current_row;
-        int max_tuples = context_->GetMemory(&pool, &tuple, &current_row);
+        int max_tuples = GetMemory(&pool, &tuple, &current_row);
         max_tuples = min(static_cast<int64_t>(max_tuples), num_tuples);
         num_tuples -= max_tuples;
 
         int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-        if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+        if (num_to_commit > 0) CommitRows(num_to_commit);
       }
 
       *eosr = true;
