@@ -48,6 +48,9 @@ void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* outpu
 // by calling HeapProfileStart(filename), continue to do work, and then, some number of
 // seconds later, call GetHeapProfile() followed by HeapProfilerStop().
 void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+#ifdef ADDRESS_SANITIZER
+  (*output) << "Heap profiling is not available with address sanitizer builds.";
+#else
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
   if (it != args.end()) {
@@ -61,12 +64,16 @@ void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) 
   HeapProfilerStop();
   (*output) << profile;
   delete profile;
+#endif
 }
 
 // pprof asks for the url /pprof/profile?seconds=XX to get cpu-profiling information.
 // The server should respond by calling ProfilerStart(), continuing to do its work,
 // and then, XX seconds later, calling ProfilerStop().
 void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+#ifdef ADDRESS_SANITIZER
+  (*output) << "CPU profiling is not available with address sanitizer builds.";
+#else
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
   if (it != args.end()) {
@@ -85,15 +92,20 @@ void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* ou
   }
   (*output) << prof_file.rdbuf();
   prof_file.close();
+#endif
 }
 
 // pprof asks for the url /pprof/growth to get heap-profiling delta (growth) information.
 // The server should respond by calling:
 // MallocExtension::instance()->GetHeapGrowthStacks(&output);
 void PprofGrowthHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+#ifdef ADDRESS_SANITIZER
+  (*output) << "Growth profiling is not available with address sanitizer builds.";
+#else
   string heap_growth_stack;
   MallocExtension::instance()->GetHeapGrowthStacks(&heap_growth_stack);
   (*output) << heap_growth_stack;
+#endif
 }
 
 // pprof asks for the url /pprof/symbol to map from hex addresses to variable names.

@@ -126,8 +126,8 @@ void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args,
   // Replace new lines with <br> for html
   string tmp(buf);
   replace_all(tmp, "\n", tags.line_break);
-#endif
   (*output) << tmp << tags.end_pre_tag;
+#endif
 }
 
 void impala::AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit) {
