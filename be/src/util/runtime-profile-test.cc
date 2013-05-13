@@ -17,6 +17,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include <boost/bind.hpp>
+#include <boost/foreach.hpp>
 #include "common/object-pool.h"
 #include "util/runtime-profile.h"
 #include "util/cpu-info.h"
@@ -347,6 +348,49 @@ TEST(CountersTest, BucketCounters) {
   EXPECT_EQ(val0, buckets[0]->double_value());
   EXPECT_EQ(val1, buckets[1]->double_value());
 }
+
+TEST(CountersTest, EventSequences) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile::EventSequence* seq = profile.AddEventSequence("event sequence");
+  seq->MarkEvent("aaaa");
+  seq->MarkEvent("bbbb");
+  seq->MarkEvent("cccc");
+
+  EXPECT_EQ(3, seq->events().size());
+
+  uint64_t last_timestamp = 0;
+  string last_string = "";
+  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, seq->events()) {
+    EXPECT_TRUE(ev.second >= last_timestamp);
+    last_timestamp = ev.second;
+    EXPECT_TRUE(ev.first > last_string);
+    last_string = ev.first;
+  }
+
+  TRuntimeProfileTree thrift_profile;
+  profile.ToThrift(&thrift_profile);
+  EXPECT_TRUE(thrift_profile.nodes[0].__isset.event_sequences);
+  EXPECT_EQ(1, thrift_profile.nodes[0].event_sequences.size());
+
+  RuntimeProfile* reconstructed_profile =
+      RuntimeProfile::CreateFromThrift(&pool, thrift_profile);
+
+  last_timestamp = 0;
+  last_string = "";
+  EXPECT_EQ(NULL, reconstructed_profile->GetEventSequence("doesn't exist"));
+  seq = reconstructed_profile->GetEventSequence("event sequence");
+  EXPECT_TRUE(seq != NULL);
+  EXPECT_EQ(3, seq->events().size());
+  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, seq->events()) {
+    EXPECT_TRUE(ev.second >= last_timestamp);
+    last_timestamp = ev.second;
+    EXPECT_TRUE(ev.first > last_string);
+    last_string = ev.first;
+  }
+
+}
+
 }
 
 int main(int argc, char **argv) {

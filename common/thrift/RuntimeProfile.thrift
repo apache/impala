@@ -30,13 +30,21 @@ enum TCounterType {
 struct TCounter {
   1: required string name
   2: required TCounterType type
-  3: required i64 value 
+  3: required i64 value
+}
+
+// Thrift version of RuntimeProfile::EventSequence - list of (label, timestamp) pairs
+// which represent an ordered sequence of events.
+struct TEventSequence {
+  1: required string name
+  2: required list<i64> timestamps
+  3: required list<string> labels
 }
 
 // A single runtime profile
 struct TRuntimeProfileNode {
   1: required string name
-  2: required i32 num_children 
+  2: required i32 num_children
   3: required list<TCounter> counters
   // TODO: should we make metadata a serializable struct?  We only use it to
   // store the node id right now so this is sufficient.
@@ -46,15 +54,18 @@ struct TRuntimeProfileNode {
   // corresponds to indent param of RuntimeProfile::AddChild()
   5: required bool indent
 
-  // map of key,value info strings that capture any kind of additional information 
+  // map of key,value info strings that capture any kind of additional information
   // about the profiled object
   6: required map<string, string> info_strings
 
   // Auxilliary structure to capture the info strings display order when printed
   7: required list<string> info_strings_display_order
-  
+
   // map from parent counter name to child counter name
   8: required map<string, set<string>> child_counters_map
+
+  // List of event sequences that capture ordered events in a query's lifetime
+  9: optional list<TEventSequence> event_sequences
 }
 
 // A flattened tree of runtime profiles, obtained by an

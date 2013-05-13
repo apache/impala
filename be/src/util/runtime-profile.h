@@ -160,6 +160,15 @@ class RuntimeProfile {
    public:
     EventSequence() { }
 
+    // Helper constructor for building from Thrift
+    EventSequence(const std::vector<int64_t>& timestamps,
+                  const std::vector<std::string>& labels) {
+      DCHECK(timestamps.size() == labels.size());
+      for (int i = 0; i < timestamps.size(); ++i) {
+        events_.push_back(make_pair(labels[i], timestamps[i]));
+      }
+    }
+
     // Starts the timer without resetting it.
     void Start() { sw_.Start(); }
 
@@ -222,12 +231,14 @@ class RuntimeProfile {
   // weren't for locking.
   // Calling this concurrently on two RuntimeProfiles in reverse order results in
   // undefined behavior.
+  // TODO: Event sequences are ignored
   void Merge(RuntimeProfile* src);
 
   // Updates this profile w/ the thrift profile: behaves like Merge(), except
   // that existing counters are updated rather than added up.
   // Info strings matched up by key and are updated or added, depending on whether
   // the key has already been registered.
+  // TODO: Event sequences are ignored
   void Update(const TRuntimeProfileTree& thrift_profile);
 
   // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
@@ -266,8 +277,11 @@ class RuntimeProfile {
   // Creates and returns a new EventSequence (owned by the runtime
   // profile) - unless a timer with the same 'key' already exists, in
   // which case it is returned.
-  // TODO: EventSequences are not merged by Merge()
+  // TODO: EventSequences are not merged by Merge() or Update()
   EventSequence* AddEventSequence(const std::string& key);
+
+  // Returns event sequence with the provided name if it exists, otherwise NULL.
+  EventSequence* GetEventSequence(const std::string& name) const;
 
   // Returns a pointer to the info string value for 'key'.  Returns NULL if
   // the key does not exist.
@@ -421,7 +435,7 @@ class RuntimeProfile {
 
   typedef std::map<std::string, EventSequence*> EventSequenceMap;
   EventSequenceMap event_sequence_map_;
-  mutable boost::mutex event_sequences_lock_;
+  mutable boost::mutex event_sequence_lock_;
 
   Counter counter_total_time_;
   // Time spent in just in this profile (i.e. not the children) as a fraction
