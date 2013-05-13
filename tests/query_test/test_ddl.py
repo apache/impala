@@ -24,9 +24,25 @@ class TestDdlStatements(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   def setup_method(self, method):
-    self.teardown_method(method)
+    self.cleanup()
+    # Get the current number of queries that are in the 'EXCEPTION' state. Used for
+    # verification after running each test case.
+    self.start_exception_count = self.query_exception_count()
 
   def teardown_method(self, method):
+    self.cleanup()
+    end_exception_count = self.query_exception_count()
+    # The number of exceptions may be < than what was in setup if the queries in the
+    # EXCEPTION state were bumped out of the FINISHED list. We should never see an
+    # increase in the number of queries in the exception state.
+    assert end_exception_count <= self.start_exception_count
+
+  def query_exception_count(self):
+    """Returns the number of occurrences of 'EXCEPTION' on the debug /queries page"""
+    return len(re.findall('EXCEPTION',
+        self.impalad_test_service.read_debug_webpage('queries')))
+
+  def cleanup(self):
     map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
     self.cleanup_hdfs_dirs()
 

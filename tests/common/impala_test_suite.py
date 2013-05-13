@@ -21,6 +21,7 @@ import pprint
 import pytest
 from functools import wraps
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
+from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
@@ -71,6 +72,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
     # The ImpalaBeeswaxClient is used to execute queries in the test suite
     cls.client = cls.create_impala_client()
+    cls.impalad_test_service = ImpaladService(IMPALAD.split(':')[0])
 
   @classmethod
   def teardown_class(cls):

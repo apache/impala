@@ -247,8 +247,9 @@ Status ImpalaServer::QueryExecState::Wait() {
     RETURN_IF_ERROR(UpdateMetastore());
   }
 
-  if (exec_request_.stmt_type == TStmtType::DML) {
-    // DML queries are finished by this point
+  if (!returns_result_set()) {
+    // Queries that do not return a result are finished at this point. This includes
+    // DML operations and a subset of the DDL operations.
     eos_ = true;
   }
 
@@ -1277,7 +1278,12 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
 void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   // block until results are ready
   Status status = exec_state->Wait();
-  exec_state->query_events()->MarkEvent("Rows available");
+  if (exec_state->returns_result_set()) {
+    exec_state->query_events()->MarkEvent("Rows available");
+  } else {
+    exec_state->query_events()->MarkEvent("Request finished");
+  }
+
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
   } else {

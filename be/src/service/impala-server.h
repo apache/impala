@@ -278,6 +278,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // To avoid deadlocks, the caller must *not* acquire query_exec_state_map_lock_
   // while holding the exec state's lock.
   // TODO: Consider renaming to RequestExecState for consistency.
+  // TODO: Move this class into separate .h/.cc files.
   class QueryExecState {
    public:
     QueryExecState(ExecEnv* exec_env, ImpalaServer* server,
@@ -327,6 +328,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     bool eos() { return eos_; }
     Coordinator* coord() const { return coord_.get(); }
     int num_rows_fetched() const { return num_rows_fetched_; }
+    bool returns_result_set() { return !result_metadata_.columnDescs.empty(); }
     const TResultSetMetadata* result_metadata() { return &result_metadata_; }
     const TUniqueId& query_id() const { return query_id_; }
     const TExecRequest& exec_request() const { return exec_request_; }

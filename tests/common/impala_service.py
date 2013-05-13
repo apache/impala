@@ -37,7 +37,7 @@ class BaseImpalaService(object):
     self.hostname = hostname
     self.webserver_port = webserver_port
 
-  def _read_debug_webpage(self, page_name, timeout=10, interval=1):
+  def read_debug_webpage(self, page_name, timeout=10, interval=1):
     start_time = time()
 
     while (time() - start_time < timeout):
@@ -51,7 +51,7 @@ class BaseImpalaService(object):
 
   def get_metric_value(self, metric_name):
     """Returns the value of the the given metric name from the Impala debug webpage"""
-    return json.loads(self._read_debug_webpage('jsonmetrics'))[metric_name]
+    return json.loads(self.read_debug_webpage('jsonmetrics'))[metric_name]
 
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
     start_time = time()
@@ -79,7 +79,7 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, beeswax_port):
+  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000):
     super(ImpaladService, self).__init__(hostname, webserver_port)
     self.beeswax_port = beeswax_port
 
@@ -96,7 +96,7 @@ class ImpaladService(BaseImpalaService):
         return self.backends
 
     parser = LiveBackendHtmlParser()
-    parser.feed(self._read_debug_webpage('backends', timeout, interval))
+    parser.feed(self.read_debug_webpage('backends', timeout, interval))
     return len(parser.get_data())
 
   def wait_for_num_known_live_backends(self, expected_value, timeout=30):
@@ -122,7 +122,6 @@ class ImpaladService(BaseImpalaService):
         ImpalaBeeswaxClient('%s:%d' % (self.hostname, self.beeswax_port), use_kerberos)
     client.connect()
     return client
-
 
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
