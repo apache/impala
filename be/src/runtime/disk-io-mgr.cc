@@ -28,7 +28,7 @@
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 
-// Control the number of disks on the machine.  If 0, this comes from the system 
+// Control the number of disks on the machine.  If 0, this comes from the system
 // settings.
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // Default IO Mgr configs.
@@ -56,7 +56,7 @@ using namespace std;
 struct DiskIoMgr::DiskQueue {
   // Disk id (0-based)
   int disk_id;
-  
+
   // Lock that protects access to 'readers' and 'work_available'
   mutex lock;
 
@@ -65,8 +65,8 @@ struct DiskIoMgr::DiskQueue {
   // added to the queue.  Readers are only on the queue when they have both work
   // (scan range added) and an available buffer.
   condition_variable work_available;
-  
-  // list of all readers that have work queued on this disk and might have empty buffers 
+
+  // list of all readers that have work queued on this disk and might have empty buffers
   // to read into.
   list<ReaderContext*> readers;
 
@@ -86,7 +86,7 @@ struct DiskIoMgr::DiskQueue {
 
 // Internal per reader state. This object maintains a lot of state that is carefully
 // synchronized.  The reader maintains state across all disks as well as per disk state.
-// The object wide counts are aggregates of the per disk state values 
+// The object wide counts are aggregates of the per disk state values
 // (e.g. num_committed_ranges_ is the sum of the state.committed_ranges.size())
 // The invariants are validated in ReaderContext::Validat, which is called pervasively
 // in the code (runs only in debug).
@@ -104,7 +104,7 @@ struct DiskIoMgr::ReaderContext {
     // is invalid (i.e. it is equivalent to a dangling pointer).
     Inactive,
   };
-  
+
   friend class DiskIoMgr;
 
   // Parent object
@@ -112,7 +112,7 @@ struct DiskIoMgr::ReaderContext {
 
   // Thread pool object for this reader.  Not owned by this object.
   ThreadResourceMgr::ResourcePool* resource_pool_;
-  
+
   // Total bytes read for this reader
   RuntimeProfile::Counter* bytes_read_counter_;
 
@@ -126,7 +126,7 @@ struct DiskIoMgr::ReaderContext {
   // HdfsScanNode::disks_accessed_bitmap_
   RuntimeProfile::Counter* disks_accessed_bitmap_;
 
-  // hdfsFS connection handle.  This is set once and never changed for the duration 
+  // hdfsFS connection handle.  This is set once and never changed for the duration
   // of the reader.  NULL if this is a local reader.
   hdfsFS hdfs_connection_;
 
@@ -142,10 +142,10 @@ struct DiskIoMgr::ReaderContext {
   // All fields below are accessed by multiple threads and the lock needs to be
   // taken before accessing them.
   mutex lock_;
-  
+
   // Current state of the reader
   State state_;
-  
+
   // Status of this reader.  Set to non-ok if cancelled.
   Status status_;
 
@@ -161,9 +161,9 @@ struct DiskIoMgr::ReaderContext {
   // over this limit if the limit dropped while reads were already in flight.  In this
   // case, the limit isn't realized until future reads.
   int io_buffers_quota_;
-  
-  // The minimum number of buffers this reader needs to make any progress.  For 
-  // non-grouped ranges, this will always be a constant.  For grouped ranges, this 
+
+  // The minimum number of buffers this reader needs to make any progress.  For
+  // non-grouped ranges, this will always be a constant.  For grouped ranges, this
   // will be the number of ranges in the group.
   int min_num_buffers_;
 
@@ -179,20 +179,20 @@ struct DiskIoMgr::ReaderContext {
   int num_committed_ranges_;
 
   // list of buffers that have been read from disk but not returned to the reader.
-  // Also contains dummy buffers (just an error code)  signaling failed reads.  
-  // In the non-error state, ready_buffers_.size() + num_empty_buffers_ 
+  // Also contains dummy buffers (just an error code)  signaling failed reads.
+  // In the non-error state, ready_buffers_.size() + num_empty_buffers_
   // will be the total number of buffers allocated for this reader.
   list<BufferDescriptor*> ready_buffers_;
-  
+
   // this is just ready_buffers_.size() except ready_buffers_.size() is not thread safe
   // and we want to avoid grabbing the lock for a simple size accessor.
   // TODO: switch to lock free list.
-  int num_ready_buffers_; 
-  
+  int num_ready_buffers_;
+
   // The number of buffers currently owned by the reader.  Only included for debugging
   // and diagnostics
   int num_buffers_in_reader_;
-  
+
   // The number of scan ranges that have been completed for this reader
   int num_finished_ranges_;
 
@@ -200,7 +200,7 @@ struct DiskIoMgr::ReaderContext {
   // being used by the disk threads.
   int num_buffers_in_disk_threads_;
 
-  // Struct containing state per disk. See comments in the disk read loop on how 
+  // Struct containing state per disk. See comments in the disk read loop on how
   // they are used.
   // Each reader has 3 queues per disk for scan ranges.  This controls how many
   // scan ranges are read in parallel and the order that the ranges should be read.
@@ -234,11 +234,11 @@ struct DiskIoMgr::ReaderContext {
 
     // For each disks, the number of scan ranges that have not been fully read.
     int num_remaining_ranges;
-  
+
     // Queue of scan ranges for this reader on this disk that are currently in progress.
-    // A scan range that is currently being read by one thread cannot be picked up by 
-    // another thread and is temporarily removed from the queue.  The size of this 
-    // queue is always less than or equal to num_remaining_ranges. 
+    // A scan range that is currently being read by one thread cannot be picked up by
+    // another thread and is temporarily removed from the queue.  The size of this
+    // queue is always less than or equal to num_remaining_ranges.
     list<ScanRange*> in_flight_ranges;
 
     // Queue of scan ranges that have been committed to start but not yet started.
@@ -284,12 +284,12 @@ struct DiskIoMgr::ReaderContext {
   // of insufficient buffers.  For example, if there are 10 disks and 5 buffers, 5
   // disks will end up on this queue at any time.
   // This queue allows us to control which disk to start up when a resource becomes
-  // available. 
+  // available.
   // TODO: this could be a priority queue to do something fancier than round robin
   // (e.g. start up disks with more remaining work)
   list<DiskQueue*> unscheduled_disks_;
 
-  ReaderContext(DiskIoMgr* parent, int num_disks) 
+  ReaderContext(DiskIoMgr* parent, int num_disks)
     : parent_(parent),
       bytes_read_counter_(NULL),
       read_timer_(NULL),
@@ -299,8 +299,8 @@ struct DiskIoMgr::ReaderContext {
       disk_states_(num_disks) {
   }
 
-  // Returns a scan range to read for this reader for 'disk_id'.  
-  // Returns false if there is no scan range to read from.  This can return false 
+  // Returns a scan range to read for this reader for 'disk_id'.
+  // Returns false if there is no scan range to read from.  This can return false
   // for a number of reasons:
   // - No more ranges left or all ranges are being worked on by other threads
   // - Reader is at buffer quota and should not issue more reads.
@@ -309,7 +309,7 @@ struct DiskIoMgr::ReaderContext {
   bool GetScanRange(int disk_id, ScanRange** range, char** buffer);
 
   // Update the max io buffer queue capacity to 'new_capacity'
-  // The request can be ignored, for example, if the new capcity is lower than 
+  // The request can be ignored, for example, if the new capcity is lower than
   // the minimum number of buffers needed to read a scan range group.
   void SetMaxIoBuffers(int new_capacity);
 
@@ -325,7 +325,7 @@ struct DiskIoMgr::ReaderContext {
   //    scanner thread (the one that was acquired in step 1).
   // 3. The scanner thread finishes, releasing the thread back to the resource pool.
   // 4. The resource pool calls this function which triggers 1 again.
-  // In the case where threads became available for other reasons (i.e. another query 
+  // In the case where threads became available for other reasons (i.e. another query
   // completed), the io mgr would get notified in the same way as step 4.
   // TODO: is it easier to understand if the ScanNode calls back into the io mgr
   // for step 3 to update the bookkeeping?  This at least makes it so the thread pool
@@ -337,7 +337,7 @@ struct DiskIoMgr::ReaderContext {
   }
 
   // Resets this object for a new reader
-  void Reset(hdfsFS hdfs_connection, ThreadResourceMgr::ResourcePool* pool, 
+  void Reset(hdfsFS hdfs_connection, ThreadResourceMgr::ResourcePool* pool,
       MemLimit* limit) {
     DCHECK_EQ(state_, Inactive);
     status_ = Status::OK;
@@ -364,7 +364,7 @@ struct DiskIoMgr::ReaderContext {
     num_finished_ranges_ = 0;
     num_committed_ranges_ = 0;
     num_ready_buffers_ = 0;
-    
+
     for (int i = 0; i < disk_states_.size(); ++i) {
       disk_states_[i].Reset();
     }
@@ -375,7 +375,7 @@ struct DiskIoMgr::ReaderContext {
     resource_pool_->SetThreadAvailableCb(
       bind<void>(mem_fn(&ReaderContext::ScannerThreadAvailable), this, _1));
   }
-  
+
   // Decrements the number of active disks for this reader.  If the disk count
   // goes to 0, the disk complete condition variable is signaled.
   // Reader lock must be taken before this call.
@@ -383,7 +383,7 @@ struct DiskIoMgr::ReaderContext {
     // boost doesn't let us dcheck that the reader lock is taken
     DCHECK_GT(num_disks_with_ranges_, 0);
     if (--num_disks_with_ranges_ == 0) {
-      disks_complete_cond_var_.notify_one(); 
+      disks_complete_cond_var_.notify_one();
     }
     DCHECK(Validate()) << endl << DebugString();
   }
@@ -392,11 +392,11 @@ struct DiskIoMgr::ReaderContext {
   void EnqueueUnscheduledDisk(DiskQueue* disk_queue) {
     // We are about to unschedule this disk, it must not have any committed
     // ranges; otherwise we might deadlock.
-    DCHECK_EQ(disk_states_[disk_queue->disk_id].committed_ranges.size(), 0) 
+    DCHECK_EQ(disk_states_[disk_queue->disk_id].committed_ranges.size(), 0)
         << endl << DebugString();
     DCHECK(!disk_states_[disk_queue->disk_id].is_on_queue) << endl << DebugString();
     // Validate it is not already on the queue.
-    DCHECK(find(unscheduled_disks_.begin(), unscheduled_disks_.end(), 
+    DCHECK(find(unscheduled_disks_.begin(), unscheduled_disks_.end(),
         disk_queue) == unscheduled_disks_.end()) << endl << DebugString();
     unscheduled_disks_.push_back(disk_queue);
   }
@@ -407,7 +407,7 @@ struct DiskIoMgr::ReaderContext {
   void ScheduleNewDisks(int max_disks) {
     if (max_disks == 0) return;
     DCHECK(Validate()) << endl << DebugString();
-    
+
     // Round-robin across unscheduled disks.
     for (int i = 0; i < max_disks; ++i) {
       // No disks left that are blocked on resources, nothing to do.
@@ -415,7 +415,7 @@ struct DiskIoMgr::ReaderContext {
 
       DiskQueue* disk_queue = unscheduled_disks_.front();
       unscheduled_disks_.pop_front();
-      
+
       ReaderContext::PerDiskState& state = disk_states_[disk_queue->disk_id];
       DCHECK(!state.is_on_queue);
       state.is_on_queue = true;
@@ -431,15 +431,15 @@ struct DiskIoMgr::ReaderContext {
 };
 
 // This class provides a cache of ReaderContext objects.  ReaderContexts are recycled.
-// This is good for locality as well as lock contention.  The cache has the property that 
-// regardless of how many clients get added/removed, the memory locations for 
+// This is good for locality as well as lock contention.  The cache has the property that
+// regardless of how many clients get added/removed, the memory locations for
 // existing clients do not change (not the case with std::vector) minimizing the locks we
 // have to take across all readers.
 // All functions on this object are thread safe
 class DiskIoMgr::ReaderCache {
  public:
   ReaderCache(DiskIoMgr* io_mgr) : io_mgr_(io_mgr) {}
-  
+
   // Returns reader to the cache.  This reader object can now be reused.
   void ReturnReader(ReaderContext* reader) {
     DCHECK(reader->state_ != ReaderContext::Inactive);
@@ -461,7 +461,7 @@ class DiskIoMgr::ReaderCache {
       return reader;
     }
   }
-  
+
   // This object has the same lifetime as the disk io mgr.
   ~ReaderCache() {
     for (list<ReaderContext*>::iterator it = all_readers_.begin();
@@ -477,7 +477,7 @@ class DiskIoMgr::ReaderCache {
         it != all_readers_.end(); ++it) {
       if ((*it)->state_ != ReaderContext::Inactive) {
         return false;
-      } 
+      }
     }
     DCHECK_EQ(all_readers_.size(), inactive_readers_.size());
     return all_readers_.size() == inactive_readers_.size();
@@ -512,7 +512,7 @@ DiskIoMgr::ScanRange::ScanRange() {
   Reset(NULL, -1, -1, -1);
 }
 
-void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset, 
+void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
     int disk_id, void* meta_data) {
   file_ = file;
   len_ = len;
@@ -520,7 +520,7 @@ void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
   disk_id_ = disk_id;
   meta_data_ = meta_data;
 }
-    
+
 void DiskIoMgr::ScanRange::InitInternal(ReaderContext* reader, ScanRangeGroup* group) {
   reader_ = reader;
   group_ = group;
@@ -541,7 +541,7 @@ DiskIoMgr::BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr) :
   io_mgr_(io_mgr), reader_(NULL), buffer_(NULL) {
 }
 
-void DiskIoMgr::BufferDescriptor::Reset(ReaderContext* reader, 
+void DiskIoMgr::BufferDescriptor::Reset(ReaderContext* reader,
       ScanRange* range, char* buffer) {
   DCHECK(io_mgr_ != NULL);
   DCHECK(buffer_ == NULL);
@@ -596,7 +596,7 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
 
 DiskIoMgr::~DiskIoMgr() {
   shut_down_ = true;
-  // Notify all worker threads and shut them down. 
+  // Notify all worker threads and shut them down.
   for (int i = 0; i < disk_queues_.size(); ++i) {
     {
       // This lock is necessary to properly use the condition var to notify
@@ -610,16 +610,16 @@ DiskIoMgr::~DiskIoMgr() {
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     int disk_id = disk_queues_[i]->disk_id;
-    for (list<ReaderContext*>::iterator reader = disk_queues_[i]->readers.begin(); 
-      reader != disk_queues_[i]->readers.end(); ++reader) { 
+    for (list<ReaderContext*>::iterator reader = disk_queues_[i]->readers.begin();
+      reader != disk_queues_[i]->readers.end(); ++reader) {
       DCHECK_EQ((*reader)->disk_states_[disk_id].num_threads_in_read, 0);
       (*reader)->DecrementDiskRefCount();
     }
-  } 
+  }
 
   DCHECK(reader_cache_->ValidateAllInactive()) << endl << DebugString();
   DCHECK_EQ(num_buffers_in_readers_, 0);
-  
+
   // Delete all allocated buffers
   DCHECK_EQ(num_allocated_buffers_, free_buffers_.size());
   GcIoBuffers();
@@ -657,19 +657,19 @@ Status DiskIoMgr::RegisterReader(hdfsFS hdfs, ThreadResourceMgr::ResourcePool* p
   SetMaxIoBuffers(*reader, max_io_buffers);
   return Status::OK;
 }
-  
+
 void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
   // First cancel the reader.  This is more or less a no-op if the reader is
   // complete (common case).
   CancelReader(reader);
-  
+
   unique_lock<mutex> lock(reader->lock_);
   DCHECK(reader->Validate()) << endl << reader->DebugString();
   DCHECK(reader->ready_buffers_.empty()) << endl << reader->DebugString();
   while (reader->num_disks_with_ranges_ > 0) {
     reader->disks_complete_cond_var_.wait(lock);
   }
-  
+
   // All the disks are done with clean, validate nothing is leaking.
   DCHECK_EQ(reader->num_buffers_in_reader_, 0) << endl << reader->DebugString();
   DCHECK_EQ(reader->num_used_buffers_, 0) << endl << reader->DebugString();
@@ -693,22 +693,22 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
 // has a reference to the reader must notice the cancel and remove it from its tracking
 // structures.  The last thread to touch the reader should deallocate (aka recycle) the
 // reader context object.  Potential threads are:
-//  1. Disk threads that are currently reading for this reader.  
-//  2. Caller thread that is waiting in GetNext. 
+//  1. Disk threads that are currently reading for this reader.
+//  2. Caller thread that is waiting in GetNext.
 //
 // The steps are:
-// 1. Cancel will immediately set the reader in the Cancelled state.  This prevents any 
-// other thread from adding more ready buffers to this reader (they all take a lock and 
+// 1. Cancel will immediately set the reader in the Cancelled state.  This prevents any
+// other thread from adding more ready buffers to this reader (they all take a lock and
 // check the state before doing so).
-// 2. Return all ready buffers that are not returned from GetNext.  This also triggers 
+// 2. Return all ready buffers that are not returned from GetNext.  This also triggers
 // waking up the disks that have work queued for this reader.
 // 3. Wake up all threads waiting in GetNext().  They will notice the cancelled state and
 // return cancelled statuses.
-// 4. Disk threads notice the reader is cancelled either when picking the next reader 
-// to read for or when they try to enqueue a ready buffer.  Upon noticing the cancelled 
-// state, removes the reader from the disk queue.  The last thread per disk with an 
-// outstanding reference to the reader decrements the number of disk queues the reader 
-// is on.  
+// 4. Disk threads notice the reader is cancelled either when picking the next reader
+// to read for or when they try to enqueue a ready buffer.  Upon noticing the cancelled
+// state, removes the reader from the disk queue.  The last thread per disk with an
+// outstanding reference to the reader decrements the number of disk queues the reader
+// is on.
 void DiskIoMgr::CancelReader(ReaderContext* reader) {
   CancelReaderInternal(reader, Status::CANCELLED);
 }
@@ -732,10 +732,10 @@ void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
 
     DCHECK(reader->status_.ok());
     reader->status_ = status;
-    
+
     // The reader will be put into a cancelled state until call cleanup is complete.
     reader->state_ = ReaderContext::Cancelled;
-    
+
     ready_buffers_copy.swap(reader->ready_buffers_);
     reader->num_ready_buffers_ = 0;
     reader->num_buffers_in_reader_ += ready_buffers_copy.size();
@@ -746,13 +746,13 @@ void DiskIoMgr::CancelReaderInternal(ReaderContext* reader, Status status) {
     // required cleanup
     reader->ScheduleNewDisks(reader->unscheduled_disks_.size());
   }
-  
+
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
   // a cancelled status.
   reader->buffer_ready_cond_var_.notify_all();
 
   // Clean up already read blocks.  We can safely work on a local copy of the ready
-  // buffer.  Before releasing the reader lock, we set the reader state to Cancelled.  
+  // buffer.  Before releasing the reader lock, we set the reader state to Cancelled.
   // All other threads first check the reader state before modifying ready_buffers_.
   for (list<BufferDescriptor*>::iterator it = ready_buffers_copy.begin();
        it != ready_buffers_copy.end(); ++it) {
@@ -850,7 +850,7 @@ Status DiskIoMgr::AddScanRangeGroups(
       }
 
       if (group->ranges.size() == 1) {
-        // Optimization if the number of ranges in the group is 1.  This removes the 
+        // Optimization if the number of ranges in the group is 1.  This removes the
         // need for additional tracking state that is used for grouped ranges.
         range->InitInternal(reader, NULL);
       } else {
@@ -859,9 +859,9 @@ Status DiskIoMgr::AddScanRangeGroups(
       ranges.push_back(range);
     }
   }
-  
-  // For grouped scan ranges, we potentially need to update the number of  buffers per 
-  // disk for this reader.  For example, if the group contains 10 ranges all on one disk 
+
+  // For grouped scan ranges, we potentially need to update the number of  buffers per
+  // disk for this reader.  For example, if the group contains 10 ranges all on one disk
   // (e.g. columnar file), then the reader needs at least 10 buffers to make any progress.
   if (max_group_size > reader->io_buffers_quota_) {
     SetMaxIoBuffers(reader, max_group_size);
@@ -871,7 +871,7 @@ Status DiskIoMgr::AddScanRangeGroups(
   return AddScanRangesInternal(reader, ranges);
 }
 
-Status DiskIoMgr::AddScanRangesInternal(ReaderContext* reader, 
+Status DiskIoMgr::AddScanRangesInternal(ReaderContext* reader,
     const vector<ScanRange*>& ranges) {
   if (ranges.empty()) return Status::OK;
 
@@ -880,7 +880,7 @@ Status DiskIoMgr::AddScanRangesInternal(ReaderContext* reader,
   {
     unique_lock<mutex> lock(reader->lock_);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    
+
     if (reader->state_ == ReaderContext::Cancelled) {
       DCHECK(!reader->status_.ok());
       return reader->status_;
@@ -906,7 +906,7 @@ Status DiskIoMgr::AddScanRangesInternal(ReaderContext* reader,
     }
     reader->num_remaining_ranges_ += ranges.size();
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    
+
     reader->ScheduleNewDisks(num_new_disks);
   }
 
@@ -933,7 +933,7 @@ Status DiskIoMgr::Read(hdfsFS hdfs, ScanRange* range, BufferDescriptor** buffer)
 
   // Reassign the buffer's reader to the external context and clean up the temp context
   if (*buffer != NULL) (*buffer)->reader_ = NULL;
-  
+
   // The local context doesn't track its resources the same way.
   local_context->num_buffers_in_reader_ = 0;
 
@@ -945,7 +945,7 @@ Status DiskIoMgr::Read(hdfsFS hdfs, ScanRange* range, BufferDescriptor** buffer)
 Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool* eos) {
   unique_lock<mutex> lock(reader->lock_);
   DCHECK(reader->Validate()) << endl << reader->DebugString();
-  
+
   *buffer = NULL;
   *eos = true;
 
@@ -956,13 +956,13 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
 
   VLOG_FILE << "GetNext(): reader=" << reader->DebugString();
 
-  // Wait until a block is read, all blocks have been read and returned or 
+  // Wait until a block is read, all blocks have been read and returned or
   // reader is cancelled
   while (reader->ready_buffers_.empty() && reader->state_ == ReaderContext::Active) {
     VLOG_ROW << "GetNext: Waiting " << reader;
     reader->buffer_ready_cond_var_.wait(lock);
   }
-  
+
   DCHECK(reader->Validate()) << endl << reader->DebugString();
   if (reader->state_ == ReaderContext::Cancelled) {
     DCHECK(!reader->status_.ok());
@@ -979,7 +979,7 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   RETURN_IF_ERROR((*buffer)->status_);
 
   *eos = false;
-  
+
   if ((*buffer)->eosr_) {
     ++reader->num_finished_ranges_;
     --reader->num_remaining_ranges_;
@@ -987,7 +987,7 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
     if (reader->num_remaining_ranges_ == 0) {
       *eos = true;
       // All scan ranges complete, notify all other threads on this reader currently
-      // in GetNext()  
+      // in GetNext()
       // TODO: is it clearer if the disk thread does this?
       reader->buffer_ready_cond_var_.notify_all();
     }
@@ -999,23 +999,23 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   --reader->num_used_buffers_;
   ++reader->num_buffers_in_reader_;
   DCHECK((*buffer)->buffer_ != NULL);
-    
+
   ScanRange* range = (*buffer)->scan_range_;
   --range->num_io_buffers_;
   if (range->group_ != NULL && !(*buffer)->eosr() && range->num_io_buffers_ == 0) {
     // This scan range is part of a group and it has no more buffers queued for it
     // and the reader has exhausted all ready buffers (and it is not complete).
-    // The range is moved to the committed queue to guarantee that it is read 
+    // The range is moved to the committed queue to guarantee that it is read
     // as soon as possible.
     ReaderContext::PerDiskState& state = reader->disk_states_[range->disk_id_];
-    list<ScanRange*>::iterator it = 
+    list<ScanRange*>::iterator it =
         find(state.in_flight_ranges.begin(), state.in_flight_ranges.end(), range);
     DCHECK(it != state.in_flight_ranges.end());
     state.in_flight_ranges.erase(it);
     state.committed_ranges.push_back(range);
     ++reader->num_committed_ranges_;
   }
-  
+
   if (reader->ready_buffers_.empty()) {
     // The ready buffer is empty indicating we might need more IO for this reader.
     // Double the io buffer queue for this reader.
@@ -1027,7 +1027,7 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   return Status::OK;
 }
 
-Status DiskIoMgr::TryGetNext(ReaderContext* reader, 
+Status DiskIoMgr::TryGetNext(ReaderContext* reader,
     BufferDescriptor** buffer, bool* eos) {
   {
     unique_lock<mutex> lock(reader->lock_);
@@ -1036,7 +1036,7 @@ Status DiskIoMgr::TryGetNext(ReaderContext* reader,
       DCHECK(!reader->status_.ok());
       return reader->status_;
     }
-    
+
     if (reader->num_used_buffers_ >= reader->io_buffers_quota_
         && reader->ready_buffers_.empty() && reader->num_buffers_in_disk_threads_ == 0) {
       // No empty buffers to read into, no reads in flight and none are ready.
@@ -1071,7 +1071,7 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
   ReturnBufferDesc(buffer_desc);
 
   __sync_add_and_fetch(&num_buffers_in_readers_, -1);
-  
+
   // Null reader indicates this was a synchronous reader.  There is no more work
   // to be done for this reader.
   if (reader == NULL) return;
@@ -1150,7 +1150,7 @@ void DiskIoMgr::ReturnFreeBuffer(ReaderContext* reader, char* buffer) {
     ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Increment(1L);
   }
 }
-  
+
 bool DiskIoMgr::ReaderContext::Validate() const {
   if (state_ == ReaderContext::Inactive) {
     LOG(ERROR) << "state_ == ReaderContext::Inactive";
@@ -1175,7 +1175,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
 
   // Set of all groups that are started
   set<ScanRangeGroup*> started_groups;
-  
+
   for (int i = 0; i < disk_states_.size(); ++i) {
     const PerDiskState& state = disk_states_[i];
     num_reading_threads += state.num_threads_in_read;
@@ -1201,7 +1201,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
                  << state.num_threads_in_read;
       return false;
     }
-    
+
     // If there are no more ranges, there should be at most 1 thread working
     // for this reader for the final cleanup
     if (num_disks_with_ranges_ == 0 && state.num_threads_in_read > 1) {
@@ -1264,13 +1264,13 @@ bool DiskIoMgr::ReaderContext::Validate() const {
       }
 
       if (in_flight_it != state.in_flight_ranges.end()) {
-        // It must have at least one buffer, otherwise, it should have been in the 
+        // It must have at least one buffer, otherwise, it should have been in the
         // committed queue.
         if (range->num_io_buffers_ == 0) {
           LOG(ERROR) << "in-flight range has no buffers: " << range->DebugString();
           return false;
         }
-      } 
+      }
     }
   }
 
@@ -1288,7 +1288,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   }
 
   // Buffers either need to be unused (empty) or ready (num_ok_ready_buffers) or
-  // being read (num_reading_threads) or owned by the reader 
+  // being read (num_reading_threads) or owned by the reader
   if (num_disks_with_ranges_ == 0 && num_reading_threads > 1) {
     LOG(ERROR) << "num_disks_with_ranges_ == 0 && num_reading_threads > 1:"
                << " #reading=" << num_reading_threads;
@@ -1314,7 +1314,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
 
   return true;
 }
-  
+
 // Dumps out reader information.  Lock should be taken by caller
 string DiskIoMgr::ReaderContext::DebugString() const {
   stringstream ss;
@@ -1384,7 +1384,8 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
 
     // TODO: is there much overhead opening hdfs files?  Should we try to preserve
     // the handle across multiple scan ranges of a file?
-    range->hdfs_file_ = 
+    LOG(INFO) << "**HNR: OPENING FILE";
+    range->hdfs_file_ =
         hdfsOpenFile(hdfs_connection, range->file_, O_RDONLY, 0, 0, 0);
     if (range->hdfs_file_ == NULL) {
       return Status(AppendHdfsErrorMessage("Failed to open HDFS file ", range->file_));
@@ -1410,7 +1411,7 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
          << ": " << strerror(errno);
       return Status(ss.str());
     }
-  } 
+  }
   if (ImpaladMetrics::IO_MGR_NUM_OPEN_FILES != NULL) {
     ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(1L);
   }
@@ -1418,10 +1419,12 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
 }
 
 void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
+  LOG(INFO) << "****HNR TRYING TO CLOSE";
   if (range == NULL) return;
- 
+
   if (hdfs_connection != NULL) {
     if (range->hdfs_file_ == NULL) return;
+    LOG(INFO) << "****HNR ACTUALLY CLOSING";
     hdfsCloseFile(hdfs_connection, range->hdfs_file_);
     range->hdfs_file_ = NULL;
   } else {
@@ -1437,11 +1440,11 @@ void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
 // TODO: how do we best use the disk here.  e.g. is it good to break up a
 // 1MB read into 8 128K reads?
 // TODO: look at linux disk scheduling
-Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range, 
+Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range,
     char* buffer, int64_t* bytes_read, bool* eosr) {
   *eosr = false;
   *bytes_read = 0;
-  int bytes_to_read = min(static_cast<int64_t>(max_read_size_), 
+  int bytes_to_read = min(static_cast<int64_t>(max_read_size_),
       range->len_ - range->bytes_read_);
 
   if (hdfs_connection != NULL) {
@@ -1465,7 +1468,7 @@ Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range,
     *bytes_read = fread(buffer, 1, bytes_to_read, range->local_file_);
     if (*bytes_read < 0) {
       stringstream ss;
-      ss << "Could not read from " << range->file_ << " at byte offset: " 
+      ss << "Could not read from " << range->file_ << " at byte offset: "
          << range->bytes_read_ << ": " << strerror(errno);
       return Status(ss.str());
     }
@@ -1478,7 +1481,7 @@ Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range,
   return Status::OK;
 }
 
-inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** range, 
+inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** range,
     char** buffer) {
   *range = NULL;
   *buffer = NULL;
@@ -1501,13 +1504,13 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
 
   // First pick any committed range.
   if (!state.committed_ranges.empty()) {
-    DCHECK_GT(num_committed_ranges_, 0); 
+    DCHECK_GT(num_committed_ranges_, 0);
     *range = state.committed_ranges.front();
     state.committed_ranges.pop_front();
     --num_committed_ranges_;
     goto got_range;
-  } 
-  
+  }
+
   if (num_committed_ranges_ >= buffers_remaining) {
     // In this case, there are committed ranges on a different disk and not enough
     // buffers to do anything else.  We need to prioritize that other disk so
@@ -1515,8 +1518,8 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
     ScheduleNewDisks(1);
     EnqueueUnscheduledDisk(parent_->disk_queues_[disk_id]);
     return false;
-  } 
-  
+  }
+
   if (num_used_buffers_ >= io_buffers_quota_) {
     // This reader has no more buffers, it can't do any more work now.
     DCHECK(state.committed_ranges.empty()) << DebugString();
@@ -1548,8 +1551,8 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
           if (group->ranges[i] == *range) continue;
           ScanRange* other_range = group->ranges[i];
           PerDiskState& other_disk = disk_states_[other_range->disk_id_];
-        
-          list<ScanRange*>::iterator it = find(other_disk.unscheduled_ranges.begin(), 
+
+          list<ScanRange*>::iterator it = find(other_disk.unscheduled_ranges.begin(),
               other_disk.unscheduled_ranges.end(), other_range);
           DCHECK(it != other_disk.unscheduled_ranges.end());
           other_disk.unscheduled_ranges.erase(it);
@@ -1563,9 +1566,9 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
         state.unscheduled_ranges.pop_front();
       }
       goto got_range;
-    } 
-  } 
-  
+    }
+  }
+
   if (state.in_flight_ranges.empty()) {
     // In this case, we don't have enough quota to kick off a new range.
     // or all scan ranges are already being processed by other threads.
@@ -1573,9 +1576,9 @@ inline bool DiskIoMgr::ReaderContext::GetScanRange(int disk_id, ScanRange** rang
     ScheduleNewDisks(1);
     EnqueueUnscheduledDisk(parent_->disk_queues_[disk_id]);
     return false;
-  } 
+  }
 
-  // Continue an already started range. 
+  // Continue an already started range.
   DCHECK(!state.in_flight_ranges.empty());
   *range = state.in_flight_ranges.front();
   state.in_flight_ranges.pop_front();
@@ -1593,15 +1596,15 @@ got_range:
   return true;
 }
 
-// This functions gets the next scan range to work on. 
+// This functions gets the next scan range to work on.
 //  - wait until there is a reader with work and available buffer or the thread should
-//    terminate.  
+//    terminate.
 //  - Remove the scan range, available buffer and cycle to the next reader
 // There are a few guarantees this makes which causes some complications.
-//  1) Readers are round-robined. 
+//  1) Readers are round-robined.
 //  2) Multiple threads (including per disk) can work on the same reader.
 //  3) Scan ranges within a reader are round-robined.
-bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range, 
+bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
     ReaderContext** reader, char** buffer) {
   int disk_id = disk_queue->disk_id;
 
@@ -1619,8 +1622,8 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       if (shut_down_) break;
       DCHECK(!disk_queue->readers.empty());
 
-      // Get the next reader and remove the reader so that another disk thread 
-      // can't pick it up.  It will be enqueued before issuing the read to HDFS 
+      // Get the next reader and remove the reader so that another disk thread
+      // can't pick it up.  It will be enqueued before issuing the read to HDFS
       // so this is not a big deal (i.e. multiple disk threads can read for the
       // same reader).
       *reader = disk_queue->readers.front();
@@ -1632,7 +1635,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       // We don't have the reader lock so we'll use an atomic increment
       __sync_add_and_fetch(&state->num_threads_in_read, 1);
       __sync_synchronize();
-      
+
       disk_queue->readers.pop_front();
       state->is_on_queue = false;
     }
@@ -1646,9 +1649,9 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
     // We just picked a reader, check the mem limits.
     // TODO: we can do a lot better here.  The reader can likely make progress
     // with fewer io buffers.
-    bool process_limit_exceeded = 
+    bool process_limit_exceeded =
         (process_mem_limit_ != NULL) && process_mem_limit_->LimitExceeded();
-    bool reader_limit_exceeded = 
+    bool reader_limit_exceeded =
         ((*reader)->mem_limit_ != NULL) && (*reader)->mem_limit_->LimitExceeded();
 
     if (process_limit_exceeded && !reader_limit_exceeded) {
@@ -1664,7 +1667,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
 
     unique_lock<mutex> reader_lock((*reader)->lock_);
     VLOG_FILE << "Disk (id=" << disk_id << ") reading for " << (*reader)->DebugString();
-    
+
     // Check if reader has been cancelled
     if ((*reader)->state_ == ReaderContext::Cancelled) {
       --state->num_threads_in_read;
@@ -1690,7 +1693,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       continue;
     }
 
-    // Validate more invariants.  
+    // Validate more invariants.
     DCHECK_GE((*reader)->num_used_buffers_, 0);
 
     // Now that we've picked a scan range, put the reader back on the queue so
@@ -1698,7 +1701,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
     unique_lock<mutex> disk_lock(disk_queue->lock);
     disk_queue->readers.push_back(*reader);
     state->is_on_queue = true;
-    
+
     return true;
   }
 
@@ -1712,7 +1715,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     unique_lock<mutex> reader_lock(reader->lock_);
 
     ReaderContext::PerDiskState& state = reader->disk_states_[disk_queue->disk_id];
-    
+
     DCHECK(reader->Validate()) << endl << reader->DebugString();
     DCHECK_GT(state.num_threads_in_read, 0);
     DCHECK(buffer->buffer_ != NULL);
@@ -1739,7 +1742,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
       DCHECK(reader->Validate()) << endl << reader->DebugString();
       return;
     }
-        
+
     DCHECK_EQ(reader->state_, ReaderContext::Active);
     DCHECK(buffer->buffer_ != NULL);
 
@@ -1782,13 +1785,13 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
 }
 
 // The thread waits until there is both work (which is guaranteed to show up with an
-// empty buffer) or the entire system is being shut down.  If there is work, it reads the 
-// next chunk of the next scan range for the first reader in the queue and round robins 
+// empty buffer) or the entire system is being shut down.  If there is work, it reads the
+// next chunk of the next scan range for the first reader in the queue and round robins
 // across the readers.
 // Locks are not taken when reading from disk.  The main loop has three parts:
 //   1. GetNextScanRange(): Take locks and figure out what the next scan range to read is
 //   2. Open/Read the scan range.  No locks are taken
-//   3. HandleReadFinished(): Take locks and update the disk and reader with the 
+//   3. HandleReadFinished(): Take locks and update the disk and reader with the
 //      results of the io.
 // Cancellation checking needs to happen in both steps 1 and 3.
 void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
@@ -1797,7 +1800,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
     char* buffer = NULL;
     ReaderContext* reader = NULL;;
     ScanRange* range = NULL;
-    
+
     // Get the next scan range to read
     if (!GetNextScanRange(disk_queue, &range, &reader, &buffer)) {
       DCHECK(shut_down_);
@@ -1810,7 +1813,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
     BufferDescriptor* buffer_desc = GetBufferDesc(reader, range, buffer);
     DCHECK(buffer_desc != NULL);
 
-    // No locks in this section.  Only working on local vars.  We don't want to hold a 
+    // No locks in this section.  Only working on local vars.  We don't want to hold a
     // lock across the read call.
     buffer_desc->status_ = OpenScanRange(reader->hdfs_connection_, range);
     if (buffer_desc->status_.ok()) {
@@ -1823,12 +1826,12 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
       }
       SCOPED_TIMER(&read_timer_);
       SCOPED_TIMER(reader->read_timer_);
-      
+
       buffer_desc->status_ = ReadFromScanRange(
           reader->hdfs_connection_, range, buffer, &buffer_desc->len_,
           &buffer_desc->eosr_);
       buffer_desc->scan_range_offset_ = range->bytes_read_ - buffer_desc->len_;
-    
+
       if (reader->bytes_read_counter_ != NULL) {
         COUNTER_UPDATE(reader->bytes_read_counter_, buffer_desc->len_);
       }
@@ -1840,8 +1843,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
 
     // Finished read, update reader/disk based on the results
     HandleReadFinished(disk_queue, reader, buffer_desc);
-  } 
+  }
 
   DCHECK(shut_down_);
 }
-

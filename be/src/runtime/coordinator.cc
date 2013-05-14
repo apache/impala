@@ -352,12 +352,15 @@ Status Coordinator::Exec(
     ss << "Averaged Fragment " << i;
     fragment_profiles_[i].averaged_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
-    // Insert the avg profile after the coordinator one or the aggregate
-    // profile if there is no coordinator.
-    if (executor_.get() != NULL) {
-      query_profile_->AddChild(
-          fragment_profiles_[i].averaged_profile, true, executor_->profile());
-    }
+    // Insert the avg profiles in ascending fragment number order. If
+    // there is a coordinator fragment, it's been placed in
+    // fragment_profiles_[0].averaged_profile, ensuring that this code
+    // will put the first averaged profile immediately after it. If
+    // there is no coordinator fragment, the first averaged profile
+    // will be inserted as the first child of query_profile_, and then
+    // all other averaged fragments will follow.
+    query_profile_->AddChild(fragment_profiles_[i].averaged_profile, true,
+        (i > 0) ? fragment_profiles_[i-1].averaged_profile : NULL);
 
     ss.str("");
     ss << "Fragment " << i;
