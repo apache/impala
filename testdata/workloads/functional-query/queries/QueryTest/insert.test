@@ -434,6 +434,7 @@ bigint
 # static partition insert into string-partitioned table with special characters in partition key
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2="/\%.") SELECT "value" FROM alltypessmall LIMIT 1;
 ---- SETUP
+RESET insert_string_partitioned
 DROP PARTITIONS insert_string_partitioned
 ---- RESULTS
 s2=%2F%5C%25./: 1
