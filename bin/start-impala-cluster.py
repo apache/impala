@@ -34,6 +34,8 @@ parser.add_option("--state_store_args", dest="state_store_args", default="",
 parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true", default=False,
                   help="Instead of starting the cluster, just kill all running Impalad"\
                   " and State Store processes.")
+parser.add_option("--force_kill", dest="force_kill", action="store_true", default=False,
+                  help="Force kill impalad and statestore processes.")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
 parser.add_option("--log_dir", dest="log_dir", default="/tmp",
@@ -62,10 +64,13 @@ STATE_STORE_ARGS = options.state_store_args
 REDIRECT_STR = "> %(file_name)s 2>&1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 120
 
-def kill_all():
-  os.system("killall -9 mini-impala-cluster")
-  os.system("killall -9 impalad")
-  os.system("killall -9 statestored")
+def kill_all(force=False):
+  kill_cmd = "killall"
+  if force:
+    kill_cmd += " -9"
+  os.system("%s mini-impala-cluster" % kill_cmd)
+  os.system("%s impalad" % kill_cmd)
+  os.system("%s statestored" % kill_cmd)
   sleep(1)
 
 def start_statestore():
@@ -121,7 +126,7 @@ if __name__ == "__main__":
     print 'Please specify a cluster size > 0'
     sys.exit(1)
 
-  kill_all()
+  kill_all(force=options.force_kill)
   if not options.kill_only:
     if options.inprocess:
       start_mini_impala_cluster(options.cluster_size)

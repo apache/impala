@@ -45,6 +45,9 @@ mkdir -p ${FE_LOG_DIR}
 # Enable core dumps
 ulimit -c unlimited
 
+# Preemptively force kill impalads and the statestore to clean up any running instances.
+${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
+
 # Start an in-process Impala cluster and run queries against it using run-workload.
 # This helps verify mini-impala-cluster and run-workload have not been broken.
 # TODO: Disable running in-process cluster until IMPALA-155 is resolved.
