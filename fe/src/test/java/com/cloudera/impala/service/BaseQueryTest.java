@@ -486,15 +486,6 @@ public abstract class BaseQueryTest {
    */
   protected void runTestInExecutionMode(TestExecMode executionMode, String testFile,
       boolean abortOnError, int maxErrors) {
-    // TPCH currently takes a long time to run so just run it with one setting.
-    if (testFile.trim().startsWith("tpch")) {
-      List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
-          TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY,
-          ImmutableList.of(1024), ImmutableList.of(2),  ImmutableList.of(false));
-      runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
-      return;
-    }
-
     switch (executionMode) {
       case REDUCED:
         // TODO: Consider running with the fastest format to cut down on execution time

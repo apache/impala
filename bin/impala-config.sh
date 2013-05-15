@@ -54,6 +54,7 @@ fi
 
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
+export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
 
 export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GPERFTOOLS_VERSION=2.0
@@ -72,7 +73,9 @@ export IMPALA_AVRO_VERSION=1.7.1-cdh4.2.0
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
 export IMPALA_WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
+export IMPALA_AUX_WORKLOAD_DIR=$IMPALA_AUX_TEST_HOME/testdata/workloads
 export IMPALA_DATASET_DIR=$IMPALA_HOME/testdata/datasets
+export IMPALA_AUX_DATASET_DIR=$IMPALA_AUX_TEST_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 

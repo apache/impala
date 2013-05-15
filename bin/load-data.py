@@ -42,10 +42,16 @@ parser.add_option("--table_formats", dest="table_formats", default=None,
                   "formats. Ex. --table_formats=seq/snap/block,text/none")
 parser.add_option("--hdfs_namenode", dest="hdfs_namenode", default="localhost:20500",
                   help="HDFS name node for Avro schema URLs, default localhost:20500")
-(options, args) = parser.parse_args()
+parser.add_option("--workload_dir", dest="workload_dir",
+                  default=os.environ['IMPALA_WORKLOAD_DIR'],
+                  help="Directory that contains Impala workloads")
+parser.add_option("--dataset_dir", dest="dataset_dir",
+                  default=os.environ['IMPALA_DATASET_DIR'],
+                  help="Directory that contains Impala datasets")
+options, args = parser.parse_args()
 
-WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
-DATASET_DIR = os.environ['IMPALA_DATASET_DIR']
+WORKLOAD_DIR = options.workload_dir
+DATASET_DIR = options.dataset_dir
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
 AVRO_SCHEMA_DIR = "avro_schemas"
 

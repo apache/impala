@@ -34,11 +34,19 @@ set -u
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin
-./start-impala-cluster.py -s 1 --wait_for_cluster
+./start-impala-cluster.py -s 3 --wait_for_cluster
 # Use unbuffered logging by executing these data loading steps with 'python -u'
 python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 python -u ./load-data.py --workloads tpcds --exploration_strategy core
 python -u ./load-data.py --workloads tpch --exploration_strategy core
+# Load all the auxiliary workloads (if any exist)
+if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
+  python -u ./load-data.py --workloads all --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
+      --dataset_dir=${IMPALA_AUX_DATASET_DIR} --exploration_strategy core
+else
+  echo "Skipping load of auxilary workloads because directories do not exist"
+fi
+
 ./start-impala-cluster.py --kill_only
 popd
 

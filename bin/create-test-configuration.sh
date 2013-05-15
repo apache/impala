@@ -83,3 +83,22 @@ generate_config core-site.xml.template core-site.xml
 popd
 
 echo "Completed config generation"
+
+# Creates a symlink in TARGET_DIR to all subdirectories under SOURCE_DIR
+function symlink_subdirs {
+  SOURCE_DIR=$1
+  TARGET_DIR=$2
+  if [ -d "${SOURCE_DIR}" ]; then
+    find ${SOURCE_DIR}/ -maxdepth 1 -mindepth 1 -type d -exec ln -f -s {} ${TARGET_DIR} \;
+  else
+    echo "No auxiliary tests found at: ${SOURCE_DIR}"
+  fi
+}
+
+# The Impala test framework support running additional tests outside of the main repo.
+# This is an optional feature that can be enabled by setting the IMPALA_AUX_* environment
+# variables to valid locations.
+echo "Searching for auxiliary tests, workloads, and datasets (if any exist)."
+symlink_subdirs ${IMPALA_AUX_WORKLOAD_DIR} ${IMPALA_WORKLOAD_DIR}
+symlink_subdirs ${IMPALA_AUX_DATASET_DIR} ${IMPALA_DATASET_DIR}
+symlink_subdirs ${IMPALA_AUX_TEST_HOME}/tests ${IMPALA_HOME}/tests
