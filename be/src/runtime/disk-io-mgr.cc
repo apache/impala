@@ -1384,7 +1384,6 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
 
     // TODO: is there much overhead opening hdfs files?  Should we try to preserve
     // the handle across multiple scan ranges of a file?
-    LOG(INFO) << "**HNR: OPENING FILE";
     range->hdfs_file_ =
         hdfsOpenFile(hdfs_connection, range->file_, O_RDONLY, 0, 0, 0);
     if (range->hdfs_file_ == NULL) {
@@ -1419,12 +1418,10 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
 }
 
 void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
-  LOG(INFO) << "****HNR TRYING TO CLOSE";
   if (range == NULL) return;
 
   if (hdfs_connection != NULL) {
     if (range->hdfs_file_ == NULL) return;
-    LOG(INFO) << "****HNR ACTUALLY CLOSING";
     hdfsCloseFile(hdfs_connection, range->hdfs_file_);
     range->hdfs_file_ = NULL;
   } else {
