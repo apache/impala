@@ -52,6 +52,15 @@ public class ToSqlTest {
         "from functional.alltypes",
         "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
         "FROM functional.alltypes");
+    // Test aliases.
+    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
+        "from functional.alltypes",
+        "SELECT 1234 i, 1234.0 j, 1234.0 + 1.0 k, 1234.0 + 1.0 l " +
+        "FROM functional.alltypes");
+    // Test select without from.
+    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
+        "SELECT 1234 i, 1234.0 j, 1234.0 + 1.0 k, 1234.0 + 1.0 l");
+    // Test select without from.
     testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
         "from functional.alltypes",
         "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
@@ -196,6 +205,25 @@ public class ToSqlTest {
         "(SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION SELECT bool_col, bigint_col FROM functional.alltypes) " +
         "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
+  }
+
+  @Test
+  public void valuesTest() {
+    testToSql("values(1, 'a', 1.0)", "VALUES(1, 'a', 1.0)");
+    testToSql("values(1 as x, 'a' y, 1.0 as z)", "VALUES(1 x, 'a' y, 1.0 z)");
+    testToSql("values(1, 'a'), (2, 'b'), (3, 'c')",
+        "VALUES((1, 'a'), (2, 'b'), (3, 'c'))");
+    testToSql("values(1 x, 'a' as y), (2 as y, 'b'), (3, 'c' x)",
+        "VALUES((1 x, 'a' y), (2 y, 'b'), (3, 'c' x))");
+    testToSql("select * from (values(1, 'a'), (2, 'b')) as t",
+        "SELECT * FROM (VALUES((1, 'a'), (2, 'b'))) t");
+    testToSql("values(1, 'a'), (2, 'b') union all values(3, 'c')",
+        "VALUES((1, 'a'), (2, 'b')) UNION ALL (VALUES(3, 'c'))");
+    testToSql("insert into table functional.alltypessmall " +
+        "partition (year=2009, month=4) " +
+        "values(1, true, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', cast (0 as timestamp))",
+        "INSERT INTO TABLE functional.alltypessmall PARTITION (year=2009, month=4) " +
+        "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
   }
 
   // Test the toSql() output of insert queries.

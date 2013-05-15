@@ -513,9 +513,11 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append((i+1 != selectList.getItems().size()) ? ", " : "");
     }
     // From clause
-    strBuilder.append(" FROM ");
-    for (int i = 0; i < tableRefs.size(); ++i) {
-      strBuilder.append(tableRefs.get(i).toSql());
+    if (!tableRefs.isEmpty()) {
+      strBuilder.append(" FROM ");
+      for (int i = 0; i < tableRefs.size(); ++i) {
+        strBuilder.append(tableRefs.get(i).toSql());
+      }
     }
     // Where clause
     if (whereClause != null) {

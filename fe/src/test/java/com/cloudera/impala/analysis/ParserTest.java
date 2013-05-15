@@ -13,6 +13,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.FileFormat;
+import com.cloudera.impala.common.AnalysisException;
 
 public class ParserTest {
 
@@ -354,6 +355,42 @@ public class ParserTest {
     // Union cannot be a column or table since it's a keyword.
     ParserError("select union from test");
     ParserError("select a from union");
+  }
+
+  @Test
+  public void TestValuesStmt() throws AnalysisException {
+    // Values stmt with a single row.
+    ParsesOk("values(1, 'a', abc, 1.0, *)");
+    ParsesOk("select * from (values(1, 'a', abc, 1.0, *)) as t");
+    ParsesOk("values(1, 'a', abc, 1.0, *) union all values(1, 'a', abc, 1.0, *)");
+    ParsesOk("insert into t values(1, 'a', abc, 1.0, *)");
+    // Values stmt with multiple rows.
+    ParsesOk("values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
+    ParsesOk("select * from (values(1, abc), ('x', cde), (2), (efg, fgh, ghi)) as t");
+    ParsesOk("values(1, abc), ('x', cde), (2), (efg, fgh, ghi) " +
+        "union all values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
+    ParsesOk("insert into t values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
+    // Test additional parenthesis.
+    ParsesOk("(values(1, abc), ('x', cde), (2), (efg, fgh, ghi))");
+    ParsesOk("values((1, abc), ('x', cde), (2), (efg, fgh, ghi))");
+    ParsesOk("(values((1, abc), ('x', cde), (2), (efg, fgh, ghi)))");
+    // Test alias inside select list to assign column names.
+    ParsesOk("values(1 as x, 2 as y, 3 as z)");
+    // Test order by and limit.
+    ParsesOk("values(1, 'a') limit 10");
+    ParsesOk("values(1, 'a') order by 1");
+    ParsesOk("values(1, 'a') order by 1 limit 10");
+    ParsesOk("values(1, 'a'), (2, 'b') order by 1 limit 10");
+    ParsesOk("values((1, 'a'), (2, 'b')) order by 1 limit 10");
+
+    ParserError("values()");
+    ParserError("values 1, 'a', abc, 1.0");
+    ParserError("values(1, 'a') values(1, 'a')");
+    ParserError("select values(1, 'a')");
+    ParserError("select * from values(1, 'a', abc, 1.0) as t");
+    ParserError("values((1, 2, 3), values(1, 2, 3))");
+    ParserError("values((1, 'a'), (1, 'a') order by 1)");
+    ParserError("values((1, 'a'), (1, 'a') limit 10)");
   }
 
   @Test
@@ -1242,7 +1279,8 @@ public class ParserTest {
     ParsesOk("SELECT CAST(a as REAL) from tbl");
   }
 
-  @Test public void TestGetErrorMsg() {
+  @Test
+  public void TestGetErrorMsg() {
 
     // missing select
     ParserError("c, b, c from t",
@@ -1250,7 +1288,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT\n");
+        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT, VALUES\n");
 
     // missing select list
     ParserError("select from t",

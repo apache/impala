@@ -178,7 +178,7 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
   KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
   KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
-  KW_INTERVAL;
+  KW_INTERVAL, KW_VALUES;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -193,12 +193,16 @@ terminal String UNMATCHED_STRING_LITERAL;
 nonterminal ParseNodeBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
+// Single values statement.
+nonterminal ValuesStmt values_stmt;
 // Select or union statement.
 nonterminal QueryStmt query_stmt;
 // Single select_stmt or parenthesized query_stmt.
 nonterminal QueryStmt union_operand;
 // List of select or union blocks connected by UNION operators or a single select block.
 nonterminal List<UnionOperand> union_operand_list;
+// List of union operands consisting of constant selects.
+nonterminal List<UnionOperand> values_operand_list;
 // USE stmt
 nonterminal UseStmt use_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
@@ -679,13 +683,11 @@ union_with_order_by_or_limit ::=
 
 union_operand ::=
   select_stmt:select
-  {:
-    RESULT = select;
-  :}
+  {: RESULT = select; :}
+  | values_stmt:values
+  {: RESULT = values; :}
   | LPAREN query_stmt:query RPAREN
-  {:
-    RESULT = query;
-  :}
+  {: RESULT = query; :}
   ;
 
 union_operand_list ::=
@@ -709,6 +711,39 @@ union_op ::=
   {: RESULT = Qualifier.DISTINCT; :}
   | KW_UNION KW_ALL
   {: RESULT = Qualifier.ALL; :}
+  ;
+
+values_stmt ::=
+  KW_VALUES values_operand_list:operands
+  order_by_clause:orderByClause
+  limit_clause:limitClause
+  {:
+    RESULT = new ValuesStmt(operands, orderByClause,
+                            (limitClause == null ? -1 : limitClause.longValue()));
+  :}
+  | KW_VALUES LPAREN values_operand_list:operands RPAREN
+    order_by_clause:orderByClause
+    limit_clause:limitClause
+  {:
+    RESULT = new ValuesStmt(operands, orderByClause,
+                            (limitClause == null ? -1 : limitClause.longValue()));
+  :}
+  ;
+
+values_operand_list ::=
+  LPAREN select_list:selectList RPAREN
+  {:
+    List<UnionOperand> operands = new ArrayList<UnionOperand>();
+    operands.add(new UnionOperand(
+        new SelectStmt(selectList, null, null, null, null, null, -1), null));
+    RESULT = operands;
+  :}
+  | values_operand_list:operands COMMA LPAREN select_list:selectList RPAREN
+  {:
+    operands.add(new UnionOperand(
+        new SelectStmt(selectList, null, null, null, null, null, -1), Qualifier.ALL));
+    RESULT = operands;
+  :}
   ;
 
 use_stmt ::=

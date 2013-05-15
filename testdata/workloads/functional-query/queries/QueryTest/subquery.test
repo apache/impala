@@ -526,3 +526,59 @@ string, tinyint, tinyint, tinyint, tinyint
 '01/01/09',1,3,1,3
 '01/01/09',1,3,1,3
 ====
+---- QUERY
+# Values statement in subqueries
+select * from (values(1, 2), (3, 4)) x
+---- RESULTS
+1,2
+3,4
+---- TYPES
+TINYINT, TINYINT
+====
+---- QUERY
+# Values statement in subqueries
+select * from (select y from (values(1 as y), (11)) a where y < 10) b
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Values statement in subqueries with union
+select * from (values(1), (2) union all select * from (values(3)) y) x
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Join on inline views made up of values statements
+select * from 
+(values(1 a, 2 b), (1, 2)) x
+inner join 
+(values(1 a, 3 b), (1, 2)) y on x.a = y.a
+inner join 
+(values(1 a, 3 b), (1, 3)) z on z.b = y.b
+---- RESULTS
+1,2,1,3,1,3
+1,2,1,3,1,3
+1,2,1,3,1,3
+1,2,1,3,1,3
+---- TYPES
+TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT
+====
+---- QUERY
+# Semi and inner join on a table and on inline views made up of values statements
+select x.date_string_col, y.*, z.* from functional.alltypessmall x
+left semi join
+(values(1 a, 3 b), (1, 3)) y on y.a = x.id
+inner join 
+(values(1 a, 3 b), (1, 3)) z on z.b = y.b
+---- RESULTS
+'01/01/09',1,3,1,3
+'01/01/09',1,3,1,3
+---- TYPES
+STRING, TINYINT, TINYINT, TINYINT, TINYINT
+====

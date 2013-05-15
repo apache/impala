@@ -64,9 +64,9 @@ class SelectListItem {
   public String toSql() {
     if (!isStar) {
       Preconditions.checkNotNull(expr);
-      return expr.toSql();
+      return expr.toSql() + ((alias != null) ? " " + alias : "");
     } else if (tblName != null) {
-      return tblName.toString() + ".*";
+      return tblName.toString() + ".*" + ((alias != null) ? " " + alias : "");
     } else {
       return "*";
     }

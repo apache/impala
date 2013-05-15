@@ -44,6 +44,7 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
+import com.cloudera.impala.analysis.ValuesStmt;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
@@ -1230,10 +1231,21 @@ public class Planner {
   private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
     List<UnionOperand> operands = unionStmt.getUnionOperands();
-    Preconditions.checkState(operands.size() > 1);
+    Preconditions.checkState(operands.size() > 0);
     MergeNode mergeNode =
         new MergeNode(new PlanNodeId(nodeIdGenerator), unionStmt.getTupleId());
     PlanNode result = mergeNode;
+
+    // Only a ValuesStmt can have a single union operand.
+    if (operands.size() == 1) {
+      Preconditions.checkState(unionStmt instanceof ValuesStmt);
+      SelectStmt selectStmt = (SelectStmt) operands.get(0).getQueryStmt();
+      mergeNode.addConstExprList(selectStmt.getResultExprs());
+      addConjunctsToUnionPlan(result, unionStmt, analyzer);
+      result = addSortAndLimitToUnionPlan(result, unionStmt);
+      return result;
+    }
+
     absorbUnionOperand(operands.get(0), mergeNode, operands.get(1).getQualifier());
 
     // Put DISTINCT operands into a single mergeNode.
@@ -1287,6 +1299,15 @@ public class Planner {
       ++opIx;
     }
 
+    // Assign conjuncts, add sort and limit.
+    addConjunctsToUnionPlan(result, unionStmt, analyzer);
+    result = addSortAndLimitToUnionPlan(result, unionStmt);
+
+    return result;
+  }
+
+  private void addConjunctsToUnionPlan(PlanNode result, UnionStmt unionStmt,
+      Analyzer analyzer) {
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates on its columns.
     List<Expr> conjuncts =
@@ -1299,7 +1320,11 @@ public class Planner {
     } else {
       result.addConjuncts(conjuncts);
     }
+    analyzer.markConjunctsAssigned(conjuncts);
+  }
 
+  private PlanNode addSortAndLimitToUnionPlan(PlanNode result, UnionStmt unionStmt)
+      throws NotImplementedException {
     // Add order by and limit if present.
     SortInfo sortInfo = unionStmt.getSortInfo();
     if (sortInfo != null) {
@@ -1311,7 +1336,6 @@ public class Planner {
           false);
     }
     result.setLimit(unionStmt.getLimit());
-
     return result;
   }
 
@@ -1352,6 +1376,7 @@ public class Planner {
     // Note that the first qualifier is ALL iff all operand qualifiers are ALL,
     // because DISTINCT is propagated to the left during analysis.
     if (unionStmt.hasLimitClause() || (topQualifier == Qualifier.ALL &&
+        unionOperands.size() > 1 &&
         unionOperands.get(1).getQualifier() != Qualifier.ALL)) {
       PlanNode node = createUnionPlan(unionStmt, analyzer);
 

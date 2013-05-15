@@ -78,10 +78,10 @@ public class UnionStmt extends QueryStmt {
     }
   }
 
-  private final List<UnionOperand> operands;
+  protected final List<UnionOperand> operands;
 
   // Single tuple materialized by the union. Set in analyze().
-  private TupleId tupleId;
+  protected TupleId tupleId;
 
   public UnionStmt(List<UnionOperand> operands,
       ArrayList<OrderByElement> orderByElements, long limit) {
@@ -114,10 +114,10 @@ public class UnionStmt extends QueryStmt {
       operands.get(i).analyze(analyzer);
       List<Expr> exprs = query.getResultExprs();
       if (firstQueryExprs.size() != exprs.size()) {
-        throw new AnalysisException("Select blocks have unequal number of columns:\n" +
-            "'" + firstQuery.toSql() + "' has " +
+        throw new AnalysisException("Operands have unequal number of columns:\n" +
+            "'" + queryStmtToSql(firstQuery) + "' has " +
             firstQueryExprs.size() + " column(s)\n" +
-            "'" + query.toSql() + "' has " + exprs.size() + " column(s)");
+            "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
       }
     }
 
@@ -148,6 +148,14 @@ public class UnionStmt extends QueryStmt {
     // its resultExprs, and its sortInfo if necessary.
     createTupleAndResultExprs(analyzer);
     createSortInfo(analyzer);
+  }
+
+  /**
+   * String representation of queryStmt used in reporting errors.
+   * Allow subclasses to override this.
+   */
+  protected String queryStmtToSql(QueryStmt queryStmt) {
+    return queryStmt.toSql();
   }
 
   /**

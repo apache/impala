@@ -564,3 +564,40 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 100,false,1,1,1,10,10,10,'02/01/09','1',2009-02-01 00:01:00,2010,4
 200,true,2,2,2,20,20,20,'02/01/09','1',2009-02-01 00:02:00,2010,4
 ====
+---- QUERY
+# static partition insert from values statement
+insert into alltypesinsert
+partition(year=2010, month=4) values
+(1, false, 1, 1, 1, 10, NULL, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)),
+(2, true, 2, NULL, 2, 20, 20.0, 20.0, "02/02/09", "2", NULL),
+(3, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", NULL, cast("2009-02-03 00:01:00" as timestamp))
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2010/month=4/: 3
+====
+---- QUERY
+# dynamic partition insert from values statement
+insert into table alltypesinsert
+partition (year, month) values
+(4, true, 4, 4, 4, 40, NULL, 40.0, "02/04/09", "4", cast("2009-02-04 00:01:00" as timestamp), 2010, 4),
+(5, false, 5, NULL, 5, 50, 50.0, 50.0, "02/05/09", "5", NULL, 2010, 8),
+(6, true, 6, 6, 6, 60, 60.0, 60.0, "02/06/09", NULL, cast("2009-02-06 00:01:00" as timestamp), 2010, 8)
+---- RESULTS
+year=2010/month=4/: 1
+year=2010/month=8/: 2
+====
+---- QUERY
+# verify contents of alltypesinsert
+select * from alltypesinsert order by id limit 10
+---- RESULTS
+1,false,1,1,1,10,NULL,10,'02/01/09','1',2009-02-01 00:01:00,2010,4
+2,true,2,NULL,2,20,20,20,'02/02/09','2',NULL,2010,4
+3,false,3,3,3,30,30,30,'02/03/09','NULL',2009-02-03 00:01:00,2010,4
+4,true,4,4,4,40,NULL,40,'02/04/09','4',2009-02-04 00:01:00,2010,4
+5,false,5,NULL,5,50,50,50,'02/05/09','5',NULL,2010,8
+6,true,6,6,6,60,60,60,'02/06/09','NULL',2009-02-06 00:01:00,2010,8
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====

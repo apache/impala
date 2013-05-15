@@ -1831,6 +1831,88 @@ PLAN FRAGMENT 2
      merging 1 SELECT CONSTANT
      tuple ids: 0 
 ====
+# Values statement in subqueries
+select * from (values(1, 2)) x
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+====
+# Values statement in subqueries with predicate
+select * from (select y from (values(1 as y)) a where y < 10) b
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     predicates: <slot 0> < 10
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     predicates: <slot 0> < 10
+     merging 1 SELECT CONSTANT
+     tuple ids: 0 
+====
+# Union of values statements in subquery
+# TODO: We could combine the merge nodes below.
+select * from (values(1) union all values(2) union all select * from (values(3)) y) x
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+  |  merging 2 SELECT CONSTANT
+  |  tuple ids: 4
+  |  
+  1:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 2 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:EXCHANGE
+     tuple ids: 4 
+
+PLAN FRAGMENT 1
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  4:MERGE
+     merging 2 SELECT CONSTANT
+     tuple ids: 4 
+
+PLAN FRAGMENT 2
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  3:MERGE
+  |  tuple ids: 4 
+  |  
+  1:MERGE
+     merging 1 SELECT CONSTANT
+     tuple ids: 2 
+====
 # Inner join on inline views made up of unions of constant selects
 select * from 
 (select 1 a, 2 b union all select 1 a, 2 b) x

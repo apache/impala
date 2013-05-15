@@ -699,6 +699,24 @@ bigint
 7300
 ====
 ---- QUERY
+# Test UNION DISTINCT on large table constant selects and values statements
+select count(*) from (  
+  select * from alltypes
+  union distinct
+  values(0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1)
+  union distinct  
+  select * from alltypes
+  union distinct
+  select 1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
+  union distinct
+  values(2,true,2,2,2,20,cast(2.2 as float),20.2,'01/01/09','2',cast('2009-01-01 00:02:00.10' as timestamp),2009,1)
+) x
+---- TYPES
+bigint
+---- RESULTS
+7300
+====
+---- QUERY
 # UNION ALL with only constant selects
 select 1, 'a', NULL, 10.0f
 union all
@@ -719,6 +737,33 @@ union distinct
 select 2, 'b', NULL, 20.0f
 union distinct
 select 1, 'a', NULL, 10.0f
+---- TYPES
+tinyint, string, null, float
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'a',NULL,10.0
+2,'b',NULL,20.0
+====
+---- QUERY
+# UNION ALL with values statements
+values(1, 'a', NULL, 10.0f)
+union all
+values(2, 'b', NULL, 20.0f)
+union all
+values(3, 'c', NULL, 30.0f)
+---- TYPES
+tinyint, string, null, float
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'a',NULL,10.0
+2,'b',NULL,20.0
+3,'c',NULL,30.0
+====
+---- QUERY
+# UNION DISTINCT with values statements
+values(1, 'a', NULL, 10.0f)
+union distinct
+values(2, 'b', NULL, 20.0f)
+union distinct
+values(1, 'a', NULL, 10.0f)
 ---- TYPES
 tinyint, string, null, float
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED

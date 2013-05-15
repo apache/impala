@@ -53,6 +53,12 @@ class TestQueries(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
+  def test_values(self, vector):
+    # These tests do not read data from tables, so only run them a single time (text/none).
+    table_format = vector.get_value('table_format')
+    if (table_format.file_format == 'text' and table_format.compression_codec == 'none'):
+      self.run_test_case('QueryTest/values', vector)
+
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
     # TODO: Skip these vector combinations due to IMP-624, IMP-503

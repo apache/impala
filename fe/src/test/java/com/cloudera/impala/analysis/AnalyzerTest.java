@@ -148,8 +148,6 @@ public class AnalyzerTest {
       InsertStmt insertStmt = (InsertStmt) node;
       if (insertStmt.getQueryStmt() instanceof SelectStmt) {
         CheckSelectToThrift((SelectStmt) insertStmt.getQueryStmt());
-      } else {
-        fail("toThrift() of UnionStmt not implemented.");
       }
     }
     return node;
@@ -1854,7 +1852,7 @@ public class AnalyzerTest {
     // Unequal number of columns.
     AnalysisError("select int_col from functional.alltypes " +
         "union select int_col, float_col from functional.alltypes",
-        "Select blocks have unequal number of columns:\n" +
+        "Operands have unequal number of columns:\n" +
         "'SELECT int_col FROM functional.alltypes' has 1 column(s)\n" +
         "'SELECT int_col, float_col FROM functional.alltypes' has 2 column(s)");
     // Unequal number of columns, longer union chain.
@@ -1862,7 +1860,7 @@ public class AnalyzerTest {
         "union select tinyint_col from functional.alltypes " +
         "union select smallint_col from functional.alltypes " +
         "union select smallint_col, bigint_col from functional.alltypes",
-        "Select blocks have unequal number of columns:\n" +
+        "Operands have unequal number of columns:\n" +
         "'SELECT int_col FROM functional.alltypes' has 1 column(s)\n" +
         "'SELECT smallint_col, bigint_col FROM functional.alltypes' has 2 column(s)");
     // Incompatible types.
@@ -1900,6 +1898,65 @@ public class AnalyzerTest {
     AnalysisError("select a.smallint_col from functional.alltypes a " +
         "union select a.int_col from functional.alltypessmall",
         "unknown table alias: 'a'");
+  }
+
+  @Test
+  public void TestValuesStmt() throws AnalysisException {
+    // Values stmt with a single row.
+    AnalyzesOk("values(1, 2, 3)");
+    AnalyzesOk("select * from (values('a', NULL, 'c')) as t");
+    AnalyzesOk("values(1.0, 2, NULL) union all values(1, 2.0, 3)");
+    AnalyzesOk("insert overwrite table functional.alltypes " +
+        "partition (year=2009, month=10)" +
+        "values(1, true, 1, 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp))");
+    AnalyzesOk("insert overwrite table functional.alltypes " +
+        "partition (year, month) " +
+        "values(1, true, 1, 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp)," +
+        "2009, 10)");
+    // Values stmt with multiple rows.
+    AnalyzesOk("values((1, 2, 3), (4, 5, 6))");
+    AnalyzesOk("select * from (values('a', 'b', 'c')) as t");
+    AnalyzesOk("select * from (values(('a', 'b', 'c'), ('d', 'e', 'f'))) as t");
+    AnalyzesOk("values((1.0, 2, NULL), (2.0, 3, 4)) union all values(1, 2.0, 3)");
+    AnalyzesOk("insert overwrite table functional.alltypes " +
+        "partition (year=2009, month=10) " +
+        "values(" +
+        "(1, true, 1, 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp))," +
+        "(2, false, 2, 2, NULL, 2, 2.0, 2.0, 'b', 'b', cast(0 as timestamp))," +
+        "(3, true, 3, 3, 3, 3, 3.0, 3.0, 'c', 'c', cast(0 as timestamp)))");
+    AnalyzesOk("insert overwrite table functional.alltypes " +
+        "partition (year, month) " +
+        "values(" +
+        "(1, true, 1, 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp), 2009, 10)," +
+        "(2, false, 2, 2, NULL, 2, 2.0, 2.0, 'b', 'b', cast(0 as timestamp), 2009, 2)," +
+        "(3, true, 3, 3, 3, 3, 3.0, 3.0, 'c', 'c', cast(0 as timestamp), 2009, 3))");
+    // Test multiple aliases. Values() is like union, the column labels are 'x' and 'y'.
+    AnalyzesOk("values((1 as x, 'a' as y), (2 as k, 'b' as j))");
+    // Test order by and limit.
+    AnalyzesOk("values(1 as x, 'a') order by 2 limit 10");
+    AnalyzesOk("values(1 as x, 'a' as y), (2, 'b') order by y limit 10");
+    AnalyzesOk("values((1, 'a'), (2, 'b')) order by 1 limit 10");
+
+    AnalysisError("values(1, 'a', 1.0, *)",
+    		"'*' expression in select list requires FROM clause.");
+    AnalysisError("values(sum(1), 'a', 1.0)",
+        "aggregation without a FROM clause is not allowed");
+    AnalysisError("values(1, id, 2)",
+        "couldn't resolve column reference: 'id'");
+    AnalysisError("values((1 as x, 'a' as y), (2, 'b')) order by c limit 1",
+        "couldn't resolve column reference: 'c'");
+    AnalysisError("values((1, 2), (3, 4, 5))",
+        "Operands have unequal number of columns:\n" +
+        "'(1, 2)' has 2 column(s)\n" +
+        "'(3, 4, 5)' has 3 column(s)");
+    AnalysisError("values((1, 'a'), (3, 4))",
+        "Incompatible return types 'STRING' and 'TINYINT' of exprs ''a'' and '4'");
+    AnalysisError("insert overwrite table functional.alltypes " +
+        "partition (year, month) " +
+        "values(1, true, 'a', 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp)," +
+        "2009, 10)", "Target table 'alltypes' and result of select statement are not " +
+        "union compatible.\nIncompatible types 'TINYINT' and 'STRING' in column " +
+        "'<slot 2>'.");
   }
 
   @Test

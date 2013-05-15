@@ -408,7 +408,7 @@ PLAN FRAGMENT 0
   0:MERGE
      merging 1 SELECT CONSTANT
      tuple ids: 0 
-====
+=======
 # dynamic partition insert from a constant select
 insert into table functional.alltypessmall
 partition (year, month) 
@@ -435,5 +435,63 @@ PLAN FRAGMENT 0
 
   0:MERGE
      merging 1 SELECT CONSTANT
+     tuple ids: 0 
+====
+# static partition insert from values statement
+insert into table functional.alltypessmall
+partition (year=2010, month=4) values
+(100, false, 1, 1, 1, 10, 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)),
+(200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp)),
+(300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp))
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: 2010,4
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 0 
+====
+# dynamic partition insert from values statement
+insert into table functional.alltypessmall
+partition (year, month) values
+(100, false, 1, 1, 1, 10, 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp), 2010, 4),
+(200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp), 2010, 5),
+(300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp), 2010, 6)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: <slot 11>,<slot 12>
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: <slot 11>,<slot 12>
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
      tuple ids: 0 
 ====

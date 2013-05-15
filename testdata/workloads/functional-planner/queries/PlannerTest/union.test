@@ -4183,3 +4183,146 @@ PLAN FRAGMENT 6
      table=functional.alltypestiny #partitions=1 size=115B
      tuple ids: 0 
 ====
+// UNION ALL with only values statements
+values(1, 'a', NULL, 10.f)
+union all
+values(2, 'b', NULL, 20.f)
+union all
+values(3, 'c', NULL, 30.f)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 3 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 3 
+====
+// UNION DISTINCT with only values statements
+values(1, 'a', NULL, 10.0f)
+union distinct
+values(2, 'b', NULL, 20.0f)
+union distinct
+values(3, 'c', NULL, 30.0f)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:AGGREGATE
+  |  group by: <slot 12>, <slot 13>, <slot 14>, <slot 15>
+  |  tuple ids: 3 
+  |  
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 3 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:AGGREGATE
+  |  group by: <slot 12>, <slot 13>, <slot 14>, <slot 15>
+  |  tuple ids: 3 
+  |  
+  0:MERGE
+     merging 3 SELECT CONSTANT
+     tuple ids: 3 
+====
+// UNION ALL/DISTINCT with mixed values statements and non-constant selects
+values(1, 'a', NULL, 10.f)
+union all
+select int_col, string_col, bool_col, float_col from functional.alltypestiny
+union distinct
+values(3, 'c', NULL, 30.f)
+union all
+select int_col, string_col, bool_col, float_col from functional.alltypessmall
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:MERGE
+  |  tuple ids: 4 
+  |  
+  |----4:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4 size=6.32KB
+  |       tuple ids: 3 
+  |    
+  2:AGGREGATE
+  |  group by: <slot 16>, <slot 17>, <slot 18>, <slot 19>
+  |  tuple ids: 4 
+  |  
+  0:MERGE
+  |  merging 2 SELECT CONSTANT
+  |  tuple ids: 4 
+  |  
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 1 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  8:EXCHANGE
+     tuple ids: 4 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  10:MERGE
+  |  tuple ids: 4 
+  |  
+  4:SCAN HDFS
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 3 
+
+PLAN FRAGMENT 2
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  9:MERGE
+  |  tuple ids: 4 
+  |  
+  2:AGGREGATE
+  |  group by: <slot 16>, <slot 17>, <slot 18>, <slot 19>
+  |  tuple ids: 4 
+  |  
+  5:EXCHANGE
+     tuple ids: 4 
+
+PLAN FRAGMENT 3
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  7:MERGE
+     merging 2 SELECT CONSTANT
+     tuple ids: 4 
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  6:MERGE
+  |  tuple ids: 4 
+  |  
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 1 
+====

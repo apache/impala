@@ -630,6 +630,13 @@ class ImpalaShell(cmd.Cmd):
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
+  def do_values(self, args):
+    """Executes a VALUES(...) query, fetching all rows"""
+    query = self.__create_beeswax_query_handle()
+    query.query = "values %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__query_with_results(query)
+
   def do_use(self, args):
     """Executes a USE... query"""
     query = self.__create_beeswax_query_handle()
