@@ -919,7 +919,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
     lock_guard<mutex> l(query_locations_lock_);
     BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
       (*output) << "<tr><td>" << location.first << "<td><b>" << location.second.size()
-		<< "</b></td></tr>";
+                << "</b></td></tr>";
     }
   }
   (*output) << "</table>";

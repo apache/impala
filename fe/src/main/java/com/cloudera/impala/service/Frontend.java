@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -71,7 +70,6 @@ import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStmtType;
-import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -526,11 +524,12 @@ public class Frontend {
   }
 
   /**
-   * Create any new partitions required as a result of an INSERT statement
+   * Create any new partitions required as a result of an INSERT statement.
+   * Updates the lastDdlTime of the table if new partitions were created.
    */
   public void updateMetastore(TCatalogUpdate update) throws ImpalaException {
     // Only update metastore for Hdfs tables.
-    Table table = catalog.getDb(update.getDb_name()).getTable(update.getTarget_table());
+    Table table = catalog.getTable(update.getDb_name(), update.getTarget_table());
     if (!(table instanceof HdfsTable)) {
       LOG.warn("Unexpected table type in updateMetastore: "
           + update.getTarget_table());
@@ -539,14 +538,16 @@ public class Frontend {
 
     String dbName = table.getDb().getName();
     String tblName = table.getName();
-    if (table.getNumClusteringCols() > 0) {
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
-      try {
+    MetaStoreClient msClient = catalog.getMetaStoreClient();
+    try {
+      boolean addedNewPartition = false;
+      if (table.getNumClusteringCols() > 0) {
         // Add all partitions to metastore.
         for (String partName: update.getCreated_partitions()) {
           try {
             LOG.info("Creating partition: " + partName + " in table: " + tblName);
             msClient.getHiveClient().appendPartitionByName(dbName, tblName, partName);
+            addedNewPartition = true;
           } catch (AlreadyExistsException e) {
             LOG.info("Ignoring partition " + partName + ", since it already exists");
             // Ignore since partition already exists.
@@ -554,10 +555,21 @@ public class Frontend {
             throw new InternalException("Error updating metastore", e);
           }
         }
-      } finally {
-        msClient.release();
       }
+      if (addedNewPartition) {
+        try {
+          // Update the last DDL time of the table.
+          org.apache.hadoop.hive.metastore.api.Table msTbl =
+              table.getMetaStoreTable().deepCopy();
+          Catalog.updateLastDdlTime(msTbl, msClient);
+        } catch (Exception e) {
+          throw new InternalException("Error updating lastDdlTime", e);
+        }
+      }
+    } finally {
+      msClient.release();
     }
+
     // Mark the table metadata as invalid so it will be reloaded on the next access.
     LOG.info("Invalidating table metadata: " + dbName + "." + tblName);
     catalog.invalidateTable(dbName, tblName, true);

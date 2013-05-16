@@ -14,22 +14,20 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Iterator;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.hadoop.hive.conf.HiveConf;
-
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -37,17 +35,17 @@ import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.TableType;
-
 import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
-import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
-
+import com.cloudera.impala.thrift.TColumnDef;
+import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -55,10 +53,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
-
-import com.cloudera.impala.thrift.TColumnDef;
-import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -113,6 +107,7 @@ public class Catalog {
             // TODO: Increase concurrency level once HIVE-3521 is resolved.
             .concurrencyLevel(1)
             .build(new CacheLoader<String, Db>() {
+              @Override
               public Db load(String dbName) throws DatabaseNotFoundException {
                 return loadDb(dbName);
               }
@@ -422,14 +417,18 @@ public class Catalog {
       StorageDescriptor sd = msTbl.getSd().deepCopy();
       sd.setLocation(location);
       partition.setSd(sd);
+      MetaStoreClient msClient = getMetaStoreClient();
       try {
-        getMetaStoreClient().getHiveClient().add_partition(partition);
+        msClient.getHiveClient().add_partition(partition);
+        updateLastDdlTime(msTbl, msClient);
       } catch (AlreadyExistsException e) {
         if (!ifNotExists) {
           throw e;
         }
         LOG.info(String.format("Ignoring '%s' when adding partition to %s because" +
             " ifNotExists is true.", e, tableName));
+      } finally {
+        msClient.release();
       }
       invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
@@ -462,15 +461,19 @@ public class Catalog {
           }
         }
       }
+      MetaStoreClient msClient = getMetaStoreClient();
       try {
-        getMetaStoreClient().getHiveClient().dropPartition(tableName.getDb(),
+        msClient.getHiveClient().dropPartition(tableName.getDb(),
             tableName.getTbl(), values);
+        updateLastDdlTime(msTbl, msClient);
       } catch (NoSuchObjectException e) {
         if (!ifExists) {
           throw e;
         }
         LOG.info(String.format("Ignoring '%s' when dropping partition from %s because" +
             " ifExists is true.", e, tableName));
+      } finally {
+        msClient.release();
       }
       invalidateTable(tableName.getDb(), tableName.getTbl(), true);
     }
@@ -515,8 +518,13 @@ public class Catalog {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       msTbl.setDbName(newTableName.getDb());
       msTbl.setTableName(newTableName.getTbl());
-      getMetaStoreClient().getHiveClient().alter_table(
-          tableName.getDb(), tableName.getTbl(), msTbl);
+      MetaStoreClient msClient = getMetaStoreClient();
+      try {
+        msClient.getHiveClient().alter_table(
+            tableName.getDb(), tableName.getTbl(), msTbl);
+      } finally {
+        msClient.release();
+      }
       // Remove the old table name from the cache and then invalidate the new table.
       Db db = dbs.get(tableName.getDb());
       if (db != null) db.removeTable(tableName.getTbl());
@@ -609,6 +617,7 @@ public class Catalog {
       throws MetaException, InvalidObjectException, org.apache.thrift.TException {
     MetaStoreClient msClient = getMetaStoreClient();
     try {
+      updateLastDdlTime(msTbl, null);
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     } finally {
@@ -619,11 +628,14 @@ public class Catalog {
 
   private void applyAlterPartition(TableName tableName,
       org.apache.hadoop.hive.metastore.api.Partition msPartition) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException {
+      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
+      TableNotFoundException, TableLoadingException {
     MetaStoreClient msClient = getMetaStoreClient();
     try {
       msClient.getHiveClient().alter_partition(
           tableName.getDb(), tableName.getTbl(), msPartition);
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      updateLastDdlTime(msTbl, msClient);
     } finally {
       msClient.release();
       invalidateTable(tableName.getDb(), tableName.getTbl(), true);
@@ -663,14 +675,17 @@ public class Catalog {
     }
     LOG.info("Creating database " + dbName);
     synchronized (metastoreDdlLock) {
+      MetaStoreClient msClient = getMetaStoreClient();
       try {
-        getMetaStoreClient().getHiveClient().createDatabase(db);
+        msClient.getHiveClient().createDatabase(db);
       } catch (AlreadyExistsException e) {
         if (!ifNotExists) {
           throw e;
         }
         LOG.info(String.format("Ignoring '%s' when creating database %s because " +
             "ifNotExists is true.", e, dbName));
+      } finally {
+        msClient.release();
       }
       dbs.invalidate(dbName, false);
     }
@@ -691,7 +706,12 @@ public class Catalog {
         "Null or empty database name passed as argument to Catalog.dropDatabase");
     LOG.info("Dropping database " + dbName);
     synchronized (metastoreDdlLock) {
-      getMetaStoreClient().getHiveClient().dropDatabase(dbName, false, ifExists);
+      MetaStoreClient msClient = getMetaStoreClient();
+      try {
+        msClient.getHiveClient().dropDatabase(dbName, false, ifExists);
+      } finally {
+        msClient.release();
+      }
       dbs.remove(dbName);
     }
   }
@@ -710,8 +730,13 @@ public class Catalog {
     checkTableNameFullyQualified(tableName);
     LOG.info(String.format("Dropping table %s", tableName));
     synchronized (metastoreDdlLock) {
-      getMetaStoreClient().getHiveClient().dropTable(
-          tableName.getDb(), tableName.getTbl(), true, ifExists);
+      MetaStoreClient msClient = getMetaStoreClient();
+      try {
+        msClient.getHiveClient().dropTable(
+            tableName.getDb(), tableName.getTbl(), true, ifExists);
+      } finally {
+        msClient.release();
+      }
       Db db = dbs.get(tableName.getDb());
       if (db != null) db.removeTable(tableName.getTbl());
     }
@@ -1075,6 +1100,27 @@ public class Catalog {
     Db db = getDb(dbName);
     if (db != null) {
       db.invalidateTable(tableName, ifExists);
+    }
+  }
+
+  /**
+   * Sets the table parameter 'transient_lastDdlTime' to System.currentTimeMillis()/1000
+   * in the given msTbl. If msClient is not null then this method applies alter_table()
+   * to update the Metastore. Otherwise, the caller is responsible for the final update.
+   */
+  public static void updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
+      MetaStoreClient msClient)
+      throws MetaException, NoSuchObjectException, TException {
+    Preconditions.checkNotNull(msTbl);
+    LOG.debug("Updating lastDdlTime for table: " + msTbl.getTableName());
+    Map<String, String> params = msTbl.getParameters();
+    // This is exactly how Hive updates the last ddl time.
+    params.put("transient_lastDdlTime",
+        Long.toString(System.currentTimeMillis() / 1000));
+    msTbl.setParameters(params);
+    if (msClient != null) {
+      msClient.getHiveClient().alter_table(
+          msTbl.getDbName(), msTbl.getTableName(), msTbl);
     }
   }
 }
