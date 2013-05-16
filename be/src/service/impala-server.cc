@@ -130,6 +130,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     impala_server_(server),
     start_time_(TimestampValue::local_time()) {
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
+  client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
   query_events_ = summary_profile_.AddEventSequence("Query Timeline");
   query_events_->Start();
   profile_.AddChild(&summary_profile_);
@@ -251,6 +252,10 @@ Status ImpalaServer::QueryExecState::Wait() {
     // Queries that do not return a result are finished at this point. This includes
     // DML operations and a subset of the DDL operations.
     eos_ = true;
+  } else {
+    // Rows are available now, so start the 'wait' timer that tracks how
+    // long Impala waits for the client to fetch rows.
+    client_wait_sw_.Start();
   }
 
   return Status::OK;
@@ -258,10 +263,20 @@ Status ImpalaServer::QueryExecState::Wait() {
 
 Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
+  // Pause the wait timer, since the client has instructed us to do
+  // work on its behalf.
+  client_wait_sw_.Stop();
+  int64_t elapsed_time = client_wait_sw_.ElapsedTime();
+  client_wait_timer_->Set(elapsed_time);
+
   query_status_ = FetchRowsInternal(max_rows, fetched_rows);
   if (!query_status_.ok()) {
     query_state_ = QueryState::EXCEPTION;
   }
+
+  // If all rows have been returned, no point in continuing the timer
+  // to wait for the next call to FetchRows, which should never come.
+  if (!eos_) client_wait_sw_.Start();
   return query_status_;
 }
 

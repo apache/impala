@@ -384,6 +384,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     RuntimeProfile server_profile_;
     RuntimeProfile summary_profile_;
     RuntimeProfile::Counter* row_materialization_timer_;
+
+    // Tracks how long we are idle waiting for a client to fetch rows.
+    RuntimeProfile::Counter* client_wait_timer_;
+    // Timer to track idle time for the above counter.
+    MonotonicStopWatch client_wait_sw_;
+
     RuntimeProfile::EventSequence* query_events_;
     vector<Expr*> output_exprs_;
     bool eos_;  // if true, there are no more rows to return
