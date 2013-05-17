@@ -30,9 +30,9 @@ public class AggregateExpr extends Expr {
     COUNT("COUNT", TAggregationOp.COUNT, false),
     MIN("MIN", TAggregationOp.MIN, false),
     MAX("MAX", TAggregationOp.MAX, false),
-    DISTINCT_PC("DISTINC_PC", TAggregationOp.DISTINCT_PC, true),
+    DISTINCT_PC("DISTINCT_PC", TAggregationOp.DISTINCT_PC, true),
     MERGE_PC("MERGE_PC", TAggregationOp.MERGE_PC, true),
-    DISTINCT_PCSA("DISTINC_PCSA", TAggregationOp.DISTINCT_PCSA,true),
+    DISTINCT_PCSA("DISTINCT_PCSA", TAggregationOp.DISTINCT_PCSA,true),
     MERGE_PCSA("MERGE_PCSA", TAggregationOp.MERGE_PCSA, true),
     SUM("SUM", TAggregationOp.SUM, false),
     AVG("AVG", TAggregationOp.INVALID, false);

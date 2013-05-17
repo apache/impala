@@ -66,6 +66,7 @@ add_executable(parquet-reader parquet-reader.cc)
 target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 
+ADD_BE_TEST(authorization-test)
 ADD_BE_TEST(integer-array-test)
 ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(benchmark-test)

@@ -44,7 +44,7 @@ class TScanRange;
 //
 //   NumDisksAccessed - number of disks accessed.
 //
-//   AverageIoMgrQueueCapcity - the average queue capacity in the io mgr for this node.
+//   AverageIoMgrQueueCapacity - the average queue capacity in the io mgr for this node.
 //   AverageIoMgrQueueSize - the average queue size (for ready buffers) in the io mgr
 //     for this node.
 //

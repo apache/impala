@@ -309,7 +309,7 @@ struct DiskIoMgr::ReaderContext {
   bool GetScanRange(int disk_id, ScanRange** range, char** buffer);
 
   // Update the max io buffer queue capacity to 'new_capacity'
-  // The request can be ignored, for example, if the new capcity is lower than
+  // The request can be ignored, for example, if the new capacity is lower than
   // the minimum number of buffers needed to read a scan range group.
   void SetMaxIoBuffers(int new_capacity);
 

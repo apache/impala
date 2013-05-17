@@ -250,7 +250,7 @@ Status InitKerberos(const string& appname) {
   if (off != string::npos) {
     string hostname;
     Status status = GetHostname(&hostname);
-    if (status.ok()) {
+    if (!status.ok()) {
       stringstream ss;
       ss << "InitKerberos call to gethostname failed: errno " << errno;
       LOG(ERROR) << ss;

@@ -20,7 +20,6 @@
 #include <boost/unordered_set.hpp>
 #include <jni.h>
 #include <thrift/protocol/TDebugProtocol.h>
-#include <gtest/gtest.h>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
