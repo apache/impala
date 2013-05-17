@@ -78,7 +78,10 @@ class MemPool {
   // Allocates mempool with fixed-size chunks of size 'chunk_size'.
   // Chunk_size must be >= 0; 0 requests automatic doubling of chunk sizes,
   // up to a limit.
-  MemPool(int chunk_size = 0);
+  // 'limits' are the memlimits for this pool.  NULL can be passed if
+  // the mempool should not update limits or if the limits can only
+  // be set later.
+  MemPool(const std::vector<MemLimit*>* limits, int chunk_size = 0);
 
   // Frees all chunks of memory and subtracts the total allocated bytes
   // from the registered limits.
@@ -136,7 +139,7 @@ class MemPool {
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
   int64_t peak_allocated_bytes() const { return peak_allocated_bytes_; }
-  void set_limits(const std::vector<MemLimit*>& limits) { limits_ = limits; }
+  const std::vector<MemLimit*>& limits() { return limits_; }
   bool exceeded_limit() const { return exceeded_limit_; }
 
   // Return sum of chunk_sizes_.

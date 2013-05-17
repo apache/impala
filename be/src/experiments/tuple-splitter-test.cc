@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
   // Aggregate Column
   cols.push_back(DataProvider::ColDesc::Create<float>(-1, 1));
   
-  MemPool pool;
+  MemPool pool(NULL);
   ObjectPool obj_pool;
   RuntimeProfile profile(&obj_pool, "PartitioningTest");
   

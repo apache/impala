@@ -34,7 +34,7 @@ SelectNode::SelectNode(
 Status SelectNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   child_row_batch_.reset(
-      new RowBatch(child(0)->row_desc(), state->batch_size()));
+      new RowBatch(child(0)->row_desc(), state->batch_size(), *state->mem_limits()));
   return Status::OK;
 }
 

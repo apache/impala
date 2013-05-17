@@ -28,7 +28,7 @@ const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 
-MemPool::MemPool(int chunk_size)
+MemPool::MemPool(const vector<MemLimit*>* limits, int chunk_size)
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     // round up chunk size to nearest 8 bytes
@@ -39,6 +39,8 @@ MemPool::MemPool(int chunk_size)
     peak_allocated_bytes_(0),
     exceeded_limit_(false) {
   DCHECK_GE(chunk_size_, 0);
+
+  if (limits != NULL) limits_ = *limits;
 }
 
 MemPool::ChunkInfo::ChunkInfo(int size)

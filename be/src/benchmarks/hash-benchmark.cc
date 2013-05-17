@@ -353,7 +353,7 @@ int main(int argc, char **argv) {
   const int NUM_ROWS = 1024;
 
   ObjectPool obj_pool;
-  MemPool mem_pool;
+  MemPool mem_pool(NULL);
   RuntimeProfile int_profile(&obj_pool, "IntGen");
   RuntimeProfile mixed_profile(&obj_pool, "MixedGen");
   DataProvider int_provider(&mem_pool, &int_profile);

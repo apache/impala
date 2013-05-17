@@ -62,6 +62,7 @@ class DataStreamSender::Channel {
           const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
           PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
+      buffer_size_(buffer_size),
       client_cache_(NULL),
       row_desc_(row_desc),
       address_(MakeNetworkAddress(destination.hostname, destination.port)),
@@ -69,9 +70,6 @@ class DataStreamSender::Channel {
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
       in_flight_batch_(NULL) {
-      // TODO: figure out how to size batch_
-    int capacity = max(1, buffer_size / max(row_desc.GetRowSize(), 1));
-    batch_.reset(new RowBatch(row_desc, capacity));
   }
 
   // Initialize channel.
@@ -100,6 +98,7 @@ class DataStreamSender::Channel {
 
  private:
   DataStreamSender* parent_;
+  int buffer_size_;
 
   ImpalaInternalServiceClientCache* client_cache_;
 
@@ -132,6 +131,9 @@ class DataStreamSender::Channel {
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
+  // TODO: figure out how to size batch_
+  int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
+  batch_.reset(new RowBatch(row_desc_, capacity, *state->mem_limits()));
   return Status::OK;
 }
 

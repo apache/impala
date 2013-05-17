@@ -91,7 +91,6 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     agg_tuple_desc_(NULL),
     singleton_output_tuple_(NULL),
     num_string_slots_(0),
-    tuple_pool_(new MemPool()),
     codegen_process_row_batch_fn_(NULL),
     process_row_batch_fn_(NULL),
     needs_finalize_(tnode.agg_node.need_finalize),
@@ -106,6 +105,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
+  tuple_pool_.reset(new MemPool(state->mem_limits()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ = 
@@ -127,8 +127,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     build_exprs_.push_back(expr);
   }
   RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc(), false));
-
-  tuple_pool_->set_limits(*state->mem_limits());
 
   // TODO: how many buckets?
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, 
@@ -172,7 +170,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 
   RETURN_IF_ERROR(children_[0]->Open(state));
 
-  RowBatch batch(children_[0]->row_desc(), state->batch_size());
+  RowBatch batch(children_[0]->row_desc(), state->batch_size(), *state->mem_limits());
   int64_t num_input_rows = 0;
   int64_t num_agg_rows = 0;
   while (true) {

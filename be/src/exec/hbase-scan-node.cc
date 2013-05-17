@@ -39,7 +39,6 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_idx_(0),
       filters_(tnode.hbase_scan_node.filters),
       num_errors_(0),
-      tuple_pool_(new MemPool()),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
       text_converter_(new TextConverter('\\', "", false)) {
@@ -55,8 +54,8 @@ bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
+  tuple_pool_.reset(new MemPool(state->mem_limits())),
   hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
-  tuple_pool_->set_limits(*state->mem_limits());
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {

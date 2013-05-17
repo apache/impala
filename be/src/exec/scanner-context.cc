@@ -51,8 +51,8 @@ ScannerContext::~ScannerContext() {
 }
 
 void ScannerContext::NewRowBatch() {
-  current_row_batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size());
-  current_row_batch_->tuple_data_pool()->set_limits(*state_->mem_limits());
+  current_row_batch_ = new RowBatch(
+      scan_node_->row_desc(), state_->batch_size(), *state_->mem_limits());
   tuple_mem_ = current_row_batch_->tuple_data_pool()->Allocate(
       state_->batch_size() * tuple_byte_size_);
 }
@@ -86,9 +86,8 @@ void ScannerContext::AddFinalBatch() {
 
 ScannerContext::Stream::Stream(ScannerContext* parent) 
   : parent_(parent), is_blocked_(false), total_len_(0), 
-    boundary_pool_(new MemPool()),
+    boundary_pool_(new MemPool(parent->state_->mem_limits())),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())) {
-  boundary_pool_->set_limits(*parent_->state_->mem_limits());
 }
 
 void ScannerContext::Stream::SetInitialBuffer(DiskIoMgr::BufferDescriptor* buffer) {

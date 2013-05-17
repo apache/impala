@@ -32,7 +32,7 @@ void ValidateString(const string& std_str, const StringBuffer& str) {
 }
 
 TEST(StringBufferTest, Basic) {
-  MemPool pool;
+  MemPool pool(NULL);
   StringBuffer str(&pool);
   string std_str;
 

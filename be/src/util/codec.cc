@@ -184,6 +184,7 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 
 Codec::Codec(MemPool* mem_pool, bool reuse_buffer)
   : memory_pool_(mem_pool),
+    temp_memory_pool_(mem_pool != NULL ? &mem_pool->limits() : NULL),
     reuse_buffer_(reuse_buffer),
     out_buffer_(NULL),
     buffer_length_(0) {

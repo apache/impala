@@ -50,9 +50,8 @@ BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state
   : HdfsScanner(node, state),
     header_(NULL),
     block_start_(0),
-    data_buffer_pool_(new MemPool()),
+    data_buffer_pool_(new MemPool(state->mem_limits())),
     marker_precedes_sync_(marker_precedes_sync) {
-  data_buffer_pool_->set_limits(*state->mem_limits());
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {

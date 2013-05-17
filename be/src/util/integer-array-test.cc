@@ -26,7 +26,7 @@ namespace impala {
 // Test various bit sized arrays. Check that the values that are put in are the same
 // that come out
 TEST(IntegerArrayTest, Basic) { 
-  MemPool mempool;
+  MemPool mempool(NULL);
   for (int size = 1; size <= 12; ++size) {
     IntegerArrayBuilder build(size, 1000, &mempool);
     uint32_t value = 0;

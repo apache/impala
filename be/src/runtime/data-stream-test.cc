@@ -241,7 +241,8 @@ class DataStreamTest : public testing::Test {
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
   RowBatch* CreateRowBatch() {
-    RowBatch* batch = new RowBatch(*row_desc_, BATCH_CAPACITY);
+    RowBatch* batch = new RowBatch(
+        *row_desc_, BATCH_CAPACITY, *runtime_state_.mem_limits());
     int64_t* tuple_mem = reinterpret_cast<int64_t*>(
         batch->tuple_data_pool()->Allocate(BATCH_CAPACITY * 8));
     bzero(tuple_mem, BATCH_CAPACITY * 8);

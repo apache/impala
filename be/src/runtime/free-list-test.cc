@@ -24,7 +24,7 @@ using namespace std;
 namespace impala {
 
 TEST(FreeListTest, Basic) {
-  MemPool pool;
+  MemPool pool(NULL);
   FreeList list;
 
   int allocated_size;

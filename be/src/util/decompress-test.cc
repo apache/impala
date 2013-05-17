@@ -43,12 +43,12 @@ class DecompressorTest : public ::testing::Test{
   void RunTest(THdfsCompression::type format) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
-    MemPool* mem_pool = new MemPool;
+    MemPool mem_pool(NULL);
 
     EXPECT_TRUE(
-        Codec::CreateCompressor(NULL, mem_pool, true, format, &compressor).ok());
+        Codec::CreateCompressor(NULL, &mem_pool, true, format, &compressor).ok());
     EXPECT_TRUE(
-        Codec::CreateDecompressor(NULL, mem_pool, true, format, &decompressor).ok());
+        Codec::CreateDecompressor(NULL, &mem_pool, true, format, &decompressor).ok());
 
     uint8_t* compressed;
     int compressed_length = 0;
@@ -64,7 +64,7 @@ class DecompressorTest : public ::testing::Test{
 
     // Try again specifying the output buffer and length.
     out_len = sizeof (input_);
-    output = mem_pool->Allocate(out_len);
+    output = mem_pool.Allocate(out_len);
     EXPECT_TRUE(decompressor->ProcessBlock(compressed_length,
           compressed, &out_len, &output).ok());
 

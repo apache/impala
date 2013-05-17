@@ -36,8 +36,7 @@ using namespace std;
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs) 
   : ExecNode(pool, tnode, descs),
     tuple_row_less_than_(this),
-    priority_queue_(tuple_row_less_than_),
-    tuple_pool_(new MemPool) {
+    priority_queue_(tuple_row_less_than_) {
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
   DCHECK(status.ok()) << "TopNNode c'tor:Init failed: \n" << status.GetErrorMsg();
@@ -89,10 +88,10 @@ bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* cons
 
 Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
+  tuple_pool_.reset(new MemPool(state->mem_limits()));
   tuple_descs_ = child(0)->row_desc().tuple_descriptors();
   Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc());
   Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc());
-  tuple_pool_->set_limits(*state->mem_limits());
   abort_on_default_limit_exceeded_ = abort_on_default_limit_exceeded_ &&
       state->abort_on_default_limit_exceeded();
   return Status::OK;
@@ -106,7 +105,7 @@ Status TopNNode::Open(RuntimeState* state) {
 
   // Limit of 0, no need to fetch anything from children.
   if (limit_ != 0) {
-    RowBatch batch(child(0)->row_desc(), state->batch_size());
+    RowBatch batch(child(0)->row_desc(), state->batch_size(), *state->mem_limits());
     bool eos;
     do {
       RETURN_IF_CANCELLED(state);

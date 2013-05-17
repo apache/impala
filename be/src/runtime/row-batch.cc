@@ -108,7 +108,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
     num_tuples_per_row_(input_batch.row_tuples.size()),
     row_desc_(row_desc),
     tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
-    tuple_data_pool_(new MemPool()) {
+    tuple_data_pool_(new MemPool(NULL)) {
   if (input_batch.is_compressed) {
     // Decompress tuple data into data pool
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();

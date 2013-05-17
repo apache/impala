@@ -396,7 +396,7 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
       current_row_group_(NULL),
       row_count_(0),
       file_size_limit_(0),
-      reusable_col_mem_pool_(new MemPool),
+      reusable_col_mem_pool_(new MemPool(state->mem_limits())),
       row_idx_(0) {
 }
 
@@ -465,7 +465,7 @@ Status HdfsParquetTableWriter::InitNewFile() {
     COUNTER_SET(parent_->memory_used_counter(), 
         per_file_mem_pool_->peak_allocated_bytes());
   }
-  per_file_mem_pool_.reset(new MemPool);
+  per_file_mem_pool_.reset(new MemPool(state_->mem_limits()));
   
   // Get the file limit
   RETURN_IF_ERROR(HdfsTableSink::GetFileBlockSize(output_, &file_size_limit_));

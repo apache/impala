@@ -27,6 +27,7 @@
 
 namespace impala {
 
+class MemLimit;
 class TRowBatch;
 class Tuple;
 class TupleRow;
@@ -51,13 +52,14 @@ class RowBatch {
  public:
   // Create RowBatch for a maximum of 'capacity' rows of tuples specified
   // by 'row_desc'.
-  RowBatch(const RowDescriptor& row_desc, int capacity)
+  RowBatch(const RowDescriptor& row_desc, int capacity, 
+      const std::vector<MemLimit*>& limits)
     : has_in_flight_row_(false),
       num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(row_desc.tuple_descriptors().size()),
       row_desc_(row_desc),
-      tuple_data_pool_(new MemPool()) {
+      tuple_data_pool_(new MemPool(&limits)) {
     tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
     tuple_ptrs_ = new Tuple*[capacity_ * num_tuples_per_row_];
     DCHECK_GT(capacity, 0);
@@ -137,7 +139,7 @@ class RowBatch {
   void Reset() {
     num_rows_ = 0;
     has_in_flight_row_ = false;
-    tuple_data_pool_.reset(new MemPool());
+    tuple_data_pool_.reset(new MemPool(NULL));
     for (int i = 0; i < io_buffers_.size(); ++i) {
       io_buffers_[i]->Return();
     }

@@ -94,13 +94,11 @@ HBaseTableScanner::HBaseTableScanner(
     num_addl_requested_cols_(0),
     num_keyvalues_(0),
     all_keyvalues_present_(false),
-    value_pool_(new MemPool()),
-    buffer_pool_(new MemPool()),
+    value_pool_(new MemPool(state->mem_limits())),
+    buffer_pool_(new MemPool(state->mem_limits())),
     rows_cached_(DEFAULT_ROWS_CACHED),
     scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
       "HBaseTableScanner.ScanSetup")) {
-  value_pool_->set_limits(*state->mem_limits());
-  buffer_pool_->set_limits(*state->mem_limits());
 }
 
 Status HBaseTableScanner::Init() {

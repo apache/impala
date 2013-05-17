@@ -68,7 +68,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
-      tuple_pool_(new MemPool()),
       num_unqueued_files_(0),
       scanner_pool_(new ObjectPool()),
       num_partition_keys_(0),
@@ -79,7 +78,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_queued_io_buffers_(0),
       max_queued_io_buffers_(0),
       num_blocked_scanners_(0),
-      partition_key_pool_(new MemPool()),
       counters_reported_(false),
       disks_accessed_bitmap_(TCounterType::UNIT, 0) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
@@ -342,8 +340,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
-  tuple_pool_->set_limits(*state->mem_limits());
-  partition_key_pool_->set_limits(*state->mem_limits());
+  tuple_pool_.reset(new MemPool(state->mem_limits()));
+  partition_key_pool_.reset(new MemPool(state->mem_limits()));
   compact_data_ |= tuple_desc_->string_slots().empty();
 
   // Create mapping from column index in table to slot index in output tuple.

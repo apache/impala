@@ -23,7 +23,7 @@ using namespace std;
 namespace impala {
 
 TEST(MemPoolTest, Basic) {
-  MemPool p;
+  MemPool p(NULL);
   // allocate a total of 24K in 32-byte pieces (for which we only request 25 bytes)
   for (int i = 0; i < 768; ++i) {
     // pads to 32 bytes
@@ -34,7 +34,7 @@ TEST(MemPoolTest, Basic) {
   // .. and allocated 28K of chunks (4, 8, 16)
   EXPECT_EQ(p.GetTotalChunkSizes(), 28 * 1024);
 
-  MemPool p2;
+  MemPool p2(NULL);
   // we're passing on the first two chunks, containing 12K of data; we're left with one
   // chunk of 16K containing 12K of data
   p2.AcquireData(&p, true);
@@ -82,14 +82,14 @@ TEST(MemPoolTest, Basic) {
   EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), 32 * 1024);
 
-  MemPool p3;
+  MemPool p3(NULL);
   p3.AcquireData(&p2, true);  // we're keeping the 65k chunk
   EXPECT_EQ(p2.total_allocated_bytes(), 33 * 1024);
   EXPECT_EQ(p2.GetTotalChunkSizes(), 65 * 1024);
 }
 
 TEST(MemPoolTest, Offsets) {
-  MemPool p;
+  MemPool p(NULL);
   uint8_t* data[1024];
   int offset = 0;
   // test GetCurrentOffset()
@@ -119,7 +119,7 @@ TEST(MemPoolTest, Offsets) {
 // remaining chunks are consistent if there were more than one used chunk and some
 // free chunks.
 TEST(MemPoolTest, Keep) {
-  MemPool p;
+  MemPool p(NULL);
   p.Allocate(4*1024);
   p.Allocate(8*1024);
   p.Allocate(16*1024);
@@ -132,7 +132,7 @@ TEST(MemPoolTest, Keep) {
   p.Allocate(4*1024);
   EXPECT_EQ(p.total_allocated_bytes(), (1 + 4) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (4 + 8 + 16) * 1024);
-  MemPool p2;
+  MemPool p2(NULL);
   p2.AcquireData(&p, true);
   EXPECT_EQ(p.total_allocated_bytes(), 4 * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (8 + 16) * 1024);
@@ -145,18 +145,16 @@ TEST(MemPoolTest, Limits) {
   MemLimit limit2(240);
   MemLimit limit3(320);
 
-  MemPool* p1 = new MemPool(80);
   vector<MemLimit*> limits;
   limits.push_back(&limit1);
   limits.push_back(&limit3);
-  p1->set_limits(limits);
+  MemPool* p1 = new MemPool(&limits, 80);
   EXPECT_FALSE(p1->exceeded_limit());
 
-  MemPool* p2 = new MemPool(80);
   limits.clear();
   limits.push_back(&limit2);
   limits.push_back(&limit3);
-  p2->set_limits(limits);
+  MemPool* p2 = new MemPool(&limits, 80);
   EXPECT_FALSE(p2->exceeded_limit());
 
   // p1 exceeds a non-shared limit

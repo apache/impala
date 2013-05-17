@@ -33,6 +33,9 @@ using namespace std;
 namespace impala {
 
 class HashTableTest : public testing::Test {
+ public:
+  HashTableTest() : mem_pool_(NULL) {}
+
  protected:
   ObjectPool pool_;
   MemPool mem_pool_;

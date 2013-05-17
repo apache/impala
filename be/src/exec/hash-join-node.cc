@@ -37,7 +37,6 @@ HashJoinNode::HashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     join_op_(tnode.hash_join_node.join_op),
-    build_pool_(new MemPool()),
     codegen_process_build_batch_fn_(NULL),
     process_build_batch_fn_(NULL),
     codegen_process_probe_batch_fn_(NULL),
@@ -80,6 +79,7 @@ HashJoinNode::~HashJoinNode() {
 Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
+  build_pool_.reset(new MemPool(state->mem_limits())),
   build_timer_ =
       ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ =
@@ -111,13 +111,12 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
   }
 
-  build_pool_->set_limits(*state->mem_limits());
-
   // TODO: default buckets
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_, 
       false, id(), *state->mem_limits()));
 
-  probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
+  probe_batch_.reset(
+      new RowBatch(row_descriptor_, state->batch_size(), *state->mem_limits()));
 
   LlvmCodeGen* codegen = state->llvm_codegen();
   if (codegen != NULL) {
@@ -160,7 +159,7 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
   // The hash join node needs to keep in memory all build tuples, including the tuple
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
   // don't need to be stored in the build_pool_.
-  RowBatch build_batch(child(1)->row_desc(), state->batch_size());
+  RowBatch build_batch(child(1)->row_desc(), state->batch_size(), *state->mem_limits());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     RETURN_IF_CANCELLED(state);

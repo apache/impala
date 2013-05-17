@@ -92,7 +92,8 @@ class HdfsParquetScanner::ColumnReader {
     : parent_(parent),
       desc_(desc),
       field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
-      decompressed_data_pool_(new MemPool()),
+      decompressed_data_pool_(
+          new MemPool(parent->scan_node_->runtime_state()->mem_limits())),
       num_buffered_values_(0) {
   }
 

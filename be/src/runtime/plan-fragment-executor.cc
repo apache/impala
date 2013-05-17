@@ -183,8 +183,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     // If codegen failed, we automatically fall back to not using codegen.
   }
 
-  row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
-  row_batch_->tuple_data_pool()->set_limits(*runtime_state_->mem_limits());
+  row_batch_.reset(new RowBatch(
+      plan_->row_desc(), runtime_state_->batch_size(), *runtime_state_->mem_limits()));
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;

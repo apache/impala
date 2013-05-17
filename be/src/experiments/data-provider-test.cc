@@ -25,7 +25,8 @@ int main(int argc, char **argv) {
 
   vector<DataProvider::ColDesc> cols;
   cols.push_back(DataProvider::ColDesc::Create<bool>(false, true));
-  cols.push_back(DataProvider::ColDesc::Create<bool>(false, true, DataProvider::SEQUENTIAL));
+  cols.push_back(DataProvider::ColDesc::Create<bool>(
+      false, true, DataProvider::SEQUENTIAL));
   cols.push_back(DataProvider::ColDesc::Create<int8_t>(0, 8));
   cols.push_back(DataProvider::ColDesc::Create<int8_t>(0, 8, DataProvider::SEQUENTIAL));
   cols.push_back(DataProvider::ColDesc::Create<int16_t>(8, 16));
@@ -39,7 +40,7 @@ int main(int argc, char **argv) {
   ObjectPool obj_pool;
   RuntimeProfile profile(&obj_pool, "DataGenTest");
   
-  MemPool pool;
+  MemPool pool(NULL);
   DataProvider provider(&pool, &profile);
   provider.Reset(20, 2, cols);
   int rows;

@@ -112,8 +112,8 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // Row batch was either never set or we're moving on to a different child.
     if (child_row_batch_.get() == NULL) {
       RETURN_IF_CANCELLED(state);
-      child_row_batch_.reset(
-          new RowBatch(child(child_idx_)->row_desc(), state->batch_size()));
+      child_row_batch_.reset(new RowBatch(
+          child(child_idx_)->row_desc(), state->batch_size(), *state->mem_limits()));
       // Open child and fetch the first row batch.
       RETURN_IF_ERROR(child(child_idx_)->Open(state));
       RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
