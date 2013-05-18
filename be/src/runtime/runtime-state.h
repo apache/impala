@@ -102,7 +102,7 @@ class RuntimeState {
   ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   std::vector<MemLimit*>* mem_limits() { return &mem_limits_; }
-  MemLimit* fragment_mem_limit() { return fragment_mem_limit_; }
+  MemLimit* query_mem_limit() { return query_mem_limit_; }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -120,10 +120,11 @@ class RuntimeState {
       const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
       int buffer_size, RuntimeProfile* profile);
 
-  // Sets the fragment memory limit and adds it to mem_limits_
-  void SetFragmentMemLimit(MemLimit* limit) {
-    DCHECK(fragment_mem_limit_ == NULL);
-    fragment_mem_limit_ = limit;
+  // Sets the memory limit and adds it to mem_limits_.  This is the same MemLimit
+  // object that is used by all fragments for this query on this machine.
+  void SetQueryMemLimit(MemLimit* limit) {
+    DCHECK(query_mem_limit_ == NULL);
+    query_mem_limit_ = limit;
     mem_limits_.push_back(limit);
   }
 
@@ -214,8 +215,8 @@ class RuntimeState {
   // all mem limits that apply to this query
   std::vector<MemLimit*> mem_limits_;
 
-  // Fragment memory limit.  Also contained in mem_limits_
-  MemLimit* fragment_mem_limit_;
+  // Query memory limit.  Also contained in mem_limits_
+  MemLimit* query_mem_limit_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

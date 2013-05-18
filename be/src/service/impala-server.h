@@ -18,7 +18,6 @@
 
 #include <jni.h>
 
-#include "util/uid-util.h"  // for some reason needed right here for hash<TUniqueId>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -36,6 +35,7 @@
 #include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
+#include "util/uid-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
 #include "runtime/timestamp-value.h"

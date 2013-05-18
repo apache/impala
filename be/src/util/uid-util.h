@@ -16,19 +16,16 @@
 #ifndef IMPALA_UTIL_UID_UTIL_H
 #define IMPALA_UTIL_UID_UTIL_H
 
-#include <boost/functional/hash.hpp>
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 
-namespace boost {
-template <>
-struct hash<impala::TUniqueId> : public std::unary_function<impala::TUniqueId, size_t> {
-  std::size_t operator()(const impala::TUniqueId& id) const {
+namespace impala {
+  // This function must be called 'hash_value' to be picked up by boost.
+  inline std::size_t hash_value(const impala::TUniqueId& id) {
     std::size_t seed = 0;
     boost::hash_combine(seed, id.lo);
     boost::hash_combine(seed, id.hi);
     return seed;
   }
-};
 }
 
 #endif

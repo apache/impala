@@ -19,7 +19,6 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "common/logging.h"
-#include "util/uid-util.h"  // for some reasoon needed right here for hash<TUniqueId>
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/exec-node.h"

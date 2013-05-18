@@ -18,6 +18,7 @@
 
 #include <vector>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 
 #include "common/status.h"
@@ -136,7 +137,7 @@ class PlanFragmentExecutor {
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
   TUniqueId query_id_;
-  boost::scoped_ptr<MemLimit> mem_limit_;
+  boost::shared_ptr<MemLimit> mem_limit_;
 
   // profile reporting-related
   ReportStatusCallback report_status_cb_;

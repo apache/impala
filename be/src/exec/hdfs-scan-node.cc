@@ -452,7 +452,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
       hdfs_connection_, runtime_state_->resource_pool(),
-      &reader_context_, state->fragment_mem_limit()));
+      &reader_context_, state->query_mem_limit()));
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
   runtime_state_->io_mgr()->set_active_read_thread_counter(reader_context_,

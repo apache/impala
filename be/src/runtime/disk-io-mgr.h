@@ -22,7 +22,6 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/thread.hpp>
-#include <boost/unordered_map.hpp>
 
 #include "common/hdfs.h"
 #include "common/object-pool.h"

@@ -23,8 +23,6 @@
 
 #include "common/logging.h"
 #include "common/daemon.h"
-// TODO: fix this: we currently need to include uid-util.h before impala-server.h
-#include "util/uid-util.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
 #include "runtime/hbase-table-factory.h"
