@@ -631,8 +631,24 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // successful, otherwise CANCELLED is returned.
   Status DropTable(const TDropTableParams& drop_table_params);
 
+  // Checks settings for profile logging, including whether the output
+  // directory exists and is writeable. Calls OpenProfileLogFile to
+  // initialise the first log file. Returns OK unless there is some
+  // problem preventing profile log files from being written.
+  // If an error is returned, the constructor will disable profile logging.
+  Status InitProfileLogging();
+
+  // Opens a profile log file for profile archival. If reopen is true,
+  // reopens the current file (causing a flush to disk), otherwise
+  // closes the current file and creates a new one.
+  // Must be called with profile_log_file_lock_ held.
+  Status OpenProfileLogFile(bool reopen);
+
+  // Runs once every 5s to flush the query archival file to disk.
+  void LogFileFlushThread();
+
   // Copies a query's state into the query log. Called immediately prior to a
-  // QueryExecState's deletion.
+  // QueryExecState's deletion. Also writes the query profile to the profile log on disk.
   // Must be called with query_exec_state_map_lock_ held
   void ArchiveQuery(const QueryExecState& query);
 
@@ -768,6 +784,24 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Index that allows lookup via TUniqueId into the query log
   typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
   QueryLogIndex query_log_index_;
+
+  // Protects profile_log_file_, log_file_size and profile_log_file_name_
+  boost::mutex profile_log_file_lock_;
+
+  // Encoded query profiles are written to this stream, one per line
+  // with the following format:
+  // <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
+  std::ofstream profile_log_file_;
+
+  // Counts the number of queries written to profile_log_file_; used to
+  // decide when to close the file and start a new one.
+  uint64_t profile_log_file_size_;
+
+  // Current query log file name.
+  std::string profile_log_file_name_;
+
+  // If profile logging is enabled, wakes once every 5s to flush query profiles to disk
+  boost::scoped_ptr<boost::thread> profile_log_file_flush_thread_;
 
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend

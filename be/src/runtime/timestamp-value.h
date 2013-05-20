@@ -34,18 +34,18 @@ time_t to_time_t(boost::posix_time::ptime t);
 class  TimestampValue {
  public:
   TimestampValue(const boost::gregorian::date& d,
-                 const boost::posix_time::time_duration& t) 
+                 const boost::posix_time::time_duration& t)
       : time_of_day_(t),
         date_(d) {
   }
   TimestampValue() { }
 
   TimestampValue(const boost::posix_time::ptime& t)
-      : time_of_day_(t.time_of_day()), 
+      : time_of_day_(t.time_of_day()),
         date_(t.date()) {
   }
 
-  TimestampValue(const TimestampValue& tv) 
+  TimestampValue(const TimestampValue& tv)
       : time_of_day_(tv.time_of_day_),
         date_(tv.date_) {
   }
@@ -170,7 +170,7 @@ class  TimestampValue {
         static_cast<double>(time_of_day_.fractional_seconds() * FRACTIONAL);
   }
   static size_t Size() {
-    return sizeof(boost::posix_time::time_duration) + sizeof(boost::gregorian::date); 
+    return sizeof(boost::posix_time::time_duration) + sizeof(boost::gregorian::date);
   }
 
   boost::posix_time::time_duration time_of_day() { return time_of_day_; }

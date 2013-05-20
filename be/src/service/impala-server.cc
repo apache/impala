@@ -15,7 +15,9 @@
 #include "service/impala-server.h"
 
 #include <algorithm>
+#include <exception>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
 #include <jni.h>
@@ -69,6 +71,7 @@
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
+using namespace boost::filesystem;
 using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
@@ -104,10 +107,21 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala if there are improper configs.");
 
+DEFINE_string(profile_log_dir, "", "The directory in which profile log files are"
+    " written. If blank, defaults to <log_file_dir>/profiles");
+DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
+    "profile log file before a new one is created");
+
 namespace impala {
 
 ThreadManager* fe_tm;
 ThreadManager* be_tm;
+
+// Prefix of profile log filenames. The version number is
+// internal, and does not correspond to an Impala release - it should
+// be changed only when the file format changes.
+const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
+const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
 
 ImpalaServer::QueryExecState::QueryExecState(
     ExecEnv* exec_env, ImpalaServer* server,
@@ -293,7 +307,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
   if (ddl_executor_ != NULL || explain_result_set_ != NULL) {
     // DDL or EXPLAIN
-    DCHECK(ddl_executor_ == NULL || explain_result_set_ == NULL); 
+    DCHECK(ddl_executor_ == NULL || explain_result_set_ == NULL);
     query_state_ = QueryState::FINISHED;
     int num_rows = 0;
     const vector<TResultRow>& all_rows = (ddl_executor_ != NULL) ?
@@ -590,7 +604,8 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env) {
+    : profile_log_file_size_(0),
+      exec_env_(exec_env) {
   // Initialize default config
   InitializeConfigVariables();
 
@@ -664,6 +679,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     }
   }
 
+  if (!InitProfileLogging().ok()) {
+    LOG(ERROR) << "Query profile archival is disabled";
+    FLAGS_log_query_to_file = false;
+  }
+
   Webserver::PathHandlerCallback varz_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/varz", varz_callback);
@@ -713,6 +733,50 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   EXIT_IF_ERROR(UpdateCatalogMetrics());
+}
+
+Status ImpalaServer::InitProfileLogging() {
+  if (!FLAGS_log_query_to_file) return Status::OK;
+
+  if (FLAGS_profile_log_dir.empty()) {
+    stringstream ss;
+    ss << FLAGS_log_dir << "/profiles/";
+    FLAGS_profile_log_dir = ss.str();
+  }
+
+  LOG(INFO) << "Profile log path: " << FLAGS_profile_log_dir;
+
+  if (!exists(FLAGS_profile_log_dir)) {
+    LOG(INFO) << "Profile log directory does not exist, creating: "
+              << FLAGS_profile_log_dir;
+    try {
+      create_directory(FLAGS_profile_log_dir);
+    } catch (const std::exception& e) { // Explicit std:: to distinguish from boost::
+      LOG(ERROR) << "Could not create profile log directory: "
+                 << FLAGS_profile_log_dir << ", " << e.what();
+      return Status("Failed to create profile log directory");
+    }
+  }
+
+  if (!is_directory(FLAGS_profile_log_dir)) {
+    LOG(ERROR) << "Profile log path is not a directory ("
+               << FLAGS_profile_log_dir << ")";
+    return Status("Profile log path is not a directory");
+  }
+
+  LOG(INFO) << "Profile log path is a directory ("
+            << FLAGS_profile_log_dir << ")";
+
+  Status log_file_status = OpenProfileLogFile(false);
+  if (!log_file_status.ok()) {
+    LOG(ERROR) << "Could not open query log file for writing: "
+               << log_file_status.GetErrorMsg();
+    return log_file_status;
+  }
+  profile_log_file_flush_thread_.reset(
+      new thread(&ImpalaServer::LogFileFlushThread, this));
+
+  return Status::OK;
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
@@ -1067,23 +1131,63 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
   }
 }
 
-void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
-  string encoded_profile_str;
+Status ImpalaServer::OpenProfileLogFile(bool reopen) {
+  if (profile_log_file_.is_open()) {
+    // flush() alone does not apparently fsync, but we actually want
+    // the results to become visible, hence the close / reopen
+    profile_log_file_.flush();
+    profile_log_file_.close();
+  }
+  if (!reopen) {
+    stringstream ss;
+    int64_t ms_since_epoch = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+    ss << FLAGS_profile_log_dir << "/" << PROFILE_LOG_FILE_PREFIX
+       << ms_since_epoch;
+    profile_log_file_name_ = ss.str();
+    profile_log_file_size_ = 0;
+  }
+  profile_log_file_.open(profile_log_file_name_.c_str(), ios_base::app | ios_base::out);
+  if (!profile_log_file_.is_open()) return Status("Could not open log file");
+  return Status::OK;
+}
 
+void ImpalaServer::LogFileFlushThread() {
+  while (true) {
+    sleep(5);
+    {
+      lock_guard<mutex> l(profile_log_file_lock_);
+      OpenProfileLogFile(true);
+    }
+  }
+}
+
+void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
+  string encoded_profile_str = query.profile().SerializeToArchiveString();
+
+  // If there was an error initialising archival (e.g. directory is
+  // not writeable), FLAGS_log_query_to_file will have been set to
+  // false
   if (FLAGS_log_query_to_file) {
-    // GLOG chops logs off past the max log len.  Output the profile to the log
-    // in parts.
-    // TODO: is there a better way?
-    int max_output_len = google::LogMessage::kMaxLogMessageLen - 1000;
-    DCHECK_GT(max_output_len, 1000);
-    encoded_profile_str = query.profile().SerializeToArchiveString();
-    int num_lines = BitUtil::Ceil(encoded_profile_str.size(), max_output_len);
-    int encoded_str_len = encoded_profile_str.size();
-    for (int i = 0; i < num_lines; ++i) {
-      int len = ::min(max_output_len, encoded_str_len - i * max_output_len);
-      LOG(INFO) << "Query " << query.query_id() << " finished ("
-                << (i + 1) << "/" << num_lines << ") "
-                << string(encoded_profile_str.c_str() + i * max_output_len, len);
+    lock_guard<mutex> l(profile_log_file_lock_);
+    if (!profile_log_file_.is_open() ||
+        profile_log_file_size_ > FLAGS_max_profile_log_file_size) {
+      // Roll the file
+      Status status = OpenProfileLogFile(false);
+      if (!status.ok()) {
+        LOG_EVERY_N(WARNING, 1000) << "Could not open new query log file ("
+                                   << google::COUNTER << " attempts failed): "
+                                   << status.GetErrorMsg();
+        LOG_EVERY_N(WARNING, 1000)
+            << "Disable query logging with --log_query_to_file=false";
+      }
+    }
+
+    if (profile_log_file_.is_open()) {
+      int64_t timestamp = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+      profile_log_file_ << timestamp << " " << query.query_id() << " "
+                      << encoded_profile_str
+                      << "\n"; // Not std::endl, since that causes an implicit flush
+      ++profile_log_file_size_;
     }
   }
 
