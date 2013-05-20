@@ -89,12 +89,12 @@ class HBaseTableScanner {
   Status Next(JNIEnv* env, bool* has_next);
 
   // Get the current HBase row key.
-  void GetRowKey(JNIEnv* env, void** key, int* key_length);
+  Status GetRowKey(JNIEnv* env, void** key, int* key_length);
 
   // Used to fetch HBase values in order of family/qualifier.
   // Fetch the next value matching family and qualifier into value/value_length.
   // If there is no match, value is set to NULL and value_length to 0.
-  void GetValue(JNIEnv* env, const std::string& family, const std::string& qualifier,
+  Status GetValue(JNIEnv* env, const std::string& family, const std::string& qualifier,
       void** value, int* value_length);
 
   // Close HTable and ResultScanner.
@@ -168,14 +168,10 @@ class HBaseTableScanner {
   jobject scan_;           // Java type Scan
   jobject resultscanner_;  // Java type ResultScanner
 
-  // Helper members for retrieving results from a scan. Updated in Next(), and
-  // NextValue() methods.
-  jobject result_;  // Java type Result
-  jobjectArray keyvalues_;  // Java type KeyValue[]. Result of result_.raw();
-  jobject keyvalue_;  // Java type KeyValue
-  // Byte array backing the KeyValues[] created in one call to Next().
-  jbyteArray byte_array_;
-  void* buffer_;  // C version of byte_array_.
+  // Helper members for retrieving results from a scan. Updated in Next() and
+  // used by GetRowKey() and GetValue().
+  jobjectArray keyvalues_;  // Java type KeyValue[]. Result of resultscanner_.next().raw()
+  void* buffer_;  // C version of resultscanner_.next().getBytes()
   int buffer_length_;  // size of buffer
 
   // The offset of the ImmutableByteWritable (returned by result_.getBytes()).

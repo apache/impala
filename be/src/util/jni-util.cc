@@ -26,6 +26,17 @@ jmethodID JniUtil::throwable_to_string_id_ = NULL;
 jmethodID JniUtil::throwable_to_stack_trace_id_ = NULL;
 vector<jobject> JniUtil::global_refs_;
 
+Status JniLocalFrame::push(JNIEnv* env, int max_local_ref) {
+  DCHECK(env_ == NULL);
+  DCHECK_GT(max_local_ref, 0);
+  if (env->PushLocalFrame(max_local_ref) < 0) {
+    env->ExceptionClear();
+    return Status("failed to push frame");
+  }
+  env_ = env;
+  return Status::OK;
+}
+
 Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref) {
   *class_ref = NULL;
   jclass local_cl = env->FindClass(class_str);

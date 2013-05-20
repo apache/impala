@@ -60,8 +60,10 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   DeserializeThriftMsg(env, thrift_query_globals_bytes, &query_globals);
   RuntimeState state(query_globals.now_string);
   jbyteArray result_bytes;
-
+  JniLocalFrame jni_frame;
   Expr* e;
+  THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
+                     result_bytes);
   THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,
                      JniUtil::internal_exc_class(), result_bytes);
   THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,

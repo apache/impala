@@ -152,6 +152,25 @@ namespace impala {
 
 class Status;
 
+// Utility class to push/pop a single JNI frame. "push" will push a JNI frame and the
+// d'tor will pop the JNI frame. Frames establish a scope for local references. Local
+// references go out of scope when their frame is popped, which enables the GC to clean up
+// the corresponding objects.
+class JniLocalFrame {
+ public:
+  JniLocalFrame(): env_(NULL) {}
+  ~JniLocalFrame() { if (env_ != NULL) env_->PopLocalFrame(NULL); }
+
+  // Pushes a new JNI local frame. The frame can support max_local_ref local references.
+  // The number of local references created inside the frame might exceed max_local_ref,
+  // but there is no guarantee that memory will be available.
+  // Push should be called at most once.
+  Status push(JNIEnv* env, int max_local_ref=10);
+
+ private:
+  JNIEnv* env_;
+};
+
 // Utility class for JNI-related functionality.
 // Init() should be called as soon as the native library is loaded.
 // Creates global class references, and promotes local references to global references.

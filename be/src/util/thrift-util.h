@@ -111,6 +111,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
 
   // create jbyteArray given buffer
   *serialized_msg = env->NewByteArray(size);
+  RETURN_ERROR_IF_EXC(env);
   if (*serialized_msg == NULL) return Status("couldn't construct jbyteArray");
   env->SetByteArrayRegion(*serialized_msg, 0, size, reinterpret_cast<jbyte*>(buffer));
   RETURN_ERROR_IF_EXC(env);

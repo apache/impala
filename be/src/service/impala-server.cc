@@ -783,6 +783,9 @@ void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     stringstream* output) {
   jboolean as_text = (args.find("raw") != args.end());
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  Status status = jni_frame.push(jni_env);
+  if (!status.ok()) return;
   jstring java_string = static_cast<jstring>(jni_env->CallObjectMethod(fe_,
       get_hadoop_config_id_, as_text));
   RETURN_IF_EXC(jni_env);
@@ -796,7 +799,10 @@ void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
 
 Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jstring value_arg = jni_env->NewStringUTF(key.c_str());
+  RETURN_ERROR_IF_EXC(jni_env);
   jstring java_config_value = static_cast<jstring>(
       jni_env->CallObjectMethod(fe_, get_hadoop_config_value_id_, value_arg));
   RETURN_ERROR_IF_EXC(jni_env);
@@ -1397,6 +1403,8 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   VLOG_QUERY << "UpdateMetastore()";
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &catalog_update, &request_bytes));
   jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
   RETURN_ERROR_IF_EXC(jni_env);
@@ -1407,6 +1415,8 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
 Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, alter_table_id_, request_bytes);
   RETURN_ERROR_IF_EXC(jni_env);
@@ -1415,6 +1425,8 @@ Status ImpalaServer::AlterTable(const TAlterTableParams& params) {
 
 Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_database_id_, request_bytes);
@@ -1424,6 +1436,8 @@ Status ImpalaServer::CreateDatabase(const TCreateDbParams& params) {
 
 Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_table_like_id_, request_bytes);
@@ -1433,6 +1447,8 @@ Status ImpalaServer::CreateTableLike(const TCreateTableLikeParams& params) {
 
 Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, create_table_id_, request_bytes);
@@ -1442,6 +1458,8 @@ Status ImpalaServer::CreateTable(const TCreateTableParams& params) {
 
 Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, drop_database_id_, request_bytes);
@@ -1451,6 +1469,8 @@ Status ImpalaServer::DropDatabase(const TDropDbParams& params) {
 
 Status ImpalaServer::DropTable(const TDropTableParams& params) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jni_env->CallObjectMethod(fe_, drop_table_id_, request_bytes);
@@ -1461,6 +1481,8 @@ Status ImpalaServer::DropTable(const TDropTableParams& params) {
 Status ImpalaServer::DescribeTable(const string& db, const string& table,
     TDescribeTableResult* columns) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   TDescribeTableParams params;
   params.__set_db(db);
@@ -1469,7 +1491,6 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
-
   RETURN_ERROR_IF_EXC(jni_env);
 
   TDescribeTableResult result;
@@ -1480,6 +1501,8 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
 Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
     TGetTablesResult* table_names) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   TGetTablesParams params;
   params.__set_db(db);
@@ -1491,7 +1514,6 @@ Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
-
   RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, table_names));
@@ -1500,6 +1522,8 @@ Status ImpalaServer::GetTableNames(const string& db, const string* pattern,
 
 Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   TGetDbsParams params;
   if (pattern != NULL) {
@@ -1509,7 +1533,6 @@ Status ImpalaServer::GetDbNames(const string* pattern, TGetDbsResult* db_names) 
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
-
   RETURN_ERROR_IF_EXC(jni_env);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, db_names));
@@ -1521,13 +1544,14 @@ Status ImpalaServer::GetExecRequest(
   // TODO: figure out if repeated calls to
   // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
   RETURN_ERROR_IF_EXC(jni_env);
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-  // TODO: dealloc result_bytes?
   // TODO: figure out if we should detach here
   //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
   return Status::OK;
@@ -1538,6 +1562,8 @@ Status ImpalaServer::GetExplainPlan(
   // TODO: figure out if repeated calls to
   // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray query_request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
   jstring java_explain_string = static_cast<jstring>(
@@ -1572,8 +1598,12 @@ Status ImpalaServer::ResetCatalogInternal() {
 Status ImpalaServer::ResetTableInternal(const string& db_name, const string& table_name) {
   LOG(INFO) << "Resetting table: " << db_name << "." << table_name;
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jstring db_name_arg = jni_env->NewStringUTF(db_name.c_str());
+  RETURN_ERROR_IF_EXC(jni_env);
   jstring table_name_arg = jni_env->NewStringUTF(table_name.c_str());
+  RETURN_ERROR_IF_EXC(jni_env);
   jni_env->CallObjectMethod(fe_, reset_table_id_, db_name_arg, table_name_arg);
   RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
@@ -1903,6 +1933,8 @@ Status ImpalaServer::ValidateSettings() {
   // TODO: check OS setting
   stringstream ss;
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jstring error_string =
       static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_));
   RETURN_ERROR_IF_EXC(jni_env);

@@ -83,10 +83,7 @@ HBaseTableScanner::HBaseTableScanner(
     htable_(NULL),
     scan_(NULL),
     resultscanner_(NULL),
-    result_(NULL),
     keyvalues_(NULL),
-    keyvalue_(NULL),
-    byte_array_(NULL),
     buffer_(NULL),
     buffer_length_(0),
     keyvalue_index_(0),
@@ -257,6 +254,8 @@ Status HBaseTableScanner::Init() {
 Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_desc,
     const vector<THBaseFilter>& filters) {
   SCOPED_TIMER(scan_setup_timer_);
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
 
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
@@ -287,6 +286,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].second;
     // The row key has an empty qualifier.
     if (qualifier.empty()) continue;
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(env));
     jbyteArray family_bytes;
     RETURN_IF_ERROR(CreateByteArray(env, family, &family_bytes));
     jbyteArray qualifier_bytes;
@@ -313,6 +314,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
       }
     }
     if (requested) continue;
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(env));
     jbyteArray family_bytes;
     RETURN_IF_ERROR(CreateByteArray(env, it->family, &family_bytes));
     jbyteArray qualifier_bytes;
@@ -331,6 +334,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     RETURN_ERROR_IF_EXC(env);
     vector<THBaseFilter>::const_iterator it;
     for (it = filters.begin(); it != filters.end(); ++it) {
+      JniLocalFrame jni_frame;
+      RETURN_IF_ERROR(jni_frame.push(env));
       // hbase_op = CompareFilter.CompareOp.values()[it->op_ordinal];
       jobject hbase_op = env->GetObjectArrayElement(compare_ops_, it->op_ordinal);
       RETURN_ERROR_IF_EXC(env);
@@ -359,6 +364,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
 }
 
 Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range) {
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
   jbyteArray start_bytes;
   CreateByteArray(env, scan_range.start_key(), &start_bytes);
   jbyteArray end_bytes;
@@ -411,15 +418,17 @@ Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const std::string& s,
 }
 
 Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
+  jobject result = NULL;
   {
     SCOPED_TIMER(scan_node_->read_timer());
     while (true) {
-      if (result_ != NULL) env->DeleteLocalRef(result_);
       // result_ = resultscanner_.next();
-      result_ = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+      result = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
 
       // jump to the next region when finished with the current region.
-      if (result_ == NULL &&
+      if (result == NULL &&
           current_scan_range_idx_ + 1 < scan_range_vector_->size()) {
         ++current_scan_range_idx_;
         RETURN_IF_ERROR(InitScanRange(env,
@@ -430,15 +439,16 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     }
   }
 
-  if (result_ == NULL) {
+  if (result == NULL) {
     *has_next = false;
     return Status::OK;
   }
 
-  if (keyvalues_ != NULL) env->DeleteLocalRef(keyvalues_);
-  // keyvalues_ = result_.raw();
+  if (keyvalues_ != NULL) env->DeleteGlobalRef(keyvalues_);
+  // keyvalues_ = result.raw();
   keyvalues_ =
-      reinterpret_cast<jobjectArray>(env->CallObjectMethod(result_, result_raw_id_));
+      reinterpret_cast<jobjectArray>(env->CallObjectMethod(result, result_raw_id_));
+  keyvalues_ = reinterpret_cast<jobjectArray>(env->NewGlobalRef(keyvalues_));
   num_keyvalues_ = env->GetArrayLength(keyvalues_);
   // Check that raw() didn't return more keyvalues than expected.
   // If num_requested_keyvalues_ is 0 then only row key is asked for and this check
@@ -458,9 +468,8 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   keyvalue_index_ = 0;
   // All KeyValues are backed by the same buffer. Place it into the C buffer_.
   jobject immutable_bytes_writable =
-      env->CallObjectMethod(result_, result_get_bytes_id_);
-  if (byte_array_ != NULL) env->DeleteLocalRef(byte_array_);
-  byte_array_ = (jbyteArray)
+      env->CallObjectMethod(result, result_get_bytes_id_);
+  jbyteArray byte_array = (jbyteArray)
       env->CallObjectMethod(immutable_bytes_writable, immutable_bytes_writable_get_id_);
 
   int bytes_array_length = env->CallIntMethod(immutable_bytes_writable,
@@ -468,7 +477,6 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   result_bytes_offset_ = env->CallIntMethod(immutable_bytes_writable,
       immutable_bytes_writable_get_offset_id_);
   COUNTER_UPDATE(scan_node_->bytes_read_counter(), bytes_array_length);
-  env->DeleteLocalRef(immutable_bytes_writable);
 
   // Copy the data from the java byte array to our buffer_.
   // Re-allocate buffer_ if necessary.
@@ -477,7 +485,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     buffer_ = buffer_pool_->Allocate(bytes_array_length);
     buffer_length_ = bytes_array_length;
   }
-  env->GetByteArrayRegion(byte_array_, result_bytes_offset_, bytes_array_length,
+  env->GetByteArrayRegion(byte_array, result_bytes_offset_, bytes_array_length,
       reinterpret_cast<jbyte*>(buffer_));
 
   value_pool_->Clear();
@@ -485,59 +493,64 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   return Status::OK;
 }
 
-void HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
-  if (keyvalue_ != NULL) env->DeleteLocalRef(keyvalue_);
-  keyvalue_ = env->GetObjectArrayElement(keyvalues_, 0);
-  *key_length = env->CallShortMethod(keyvalue_, keyvalue_get_row_length_id_);
+Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
+  jobject keyvalue = env->GetObjectArrayElement(keyvalues_, 0);
+  *key_length = env->CallShortMethod(keyvalue, keyvalue_get_row_length_id_);
   int key_offset =
-      env->CallIntMethod(keyvalue_, keyvalue_get_row_offset_id_) - result_bytes_offset_;
+      env->CallIntMethod(keyvalue, keyvalue_get_row_offset_id_) - result_bytes_offset_;
   // Allocate one extra byte for null-terminator.
   *key = value_pool_->Allocate(*key_length + 1);
   memcpy(*key, reinterpret_cast<char*>(buffer_) + key_offset, *key_length);
   reinterpret_cast<char*>(*key)[*key_length] = '\0';
+  return Status::OK;
 }
 
-void HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
+Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
     const string& qualifier, void** value, int* value_length) {
   // Current row doesn't have any more keyvalues. All remaining values are NULL.
   if (keyvalue_index_ >= num_keyvalues_) {
     *value = NULL;
     *value_length = 0;
-    return;
+    return Status::OK;
   }
-  keyvalue_ = env->GetObjectArrayElement(keyvalues_, keyvalue_index_);
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
+  jobject keyvalue = env->GetObjectArrayElement(keyvalues_, keyvalue_index_);
   if (!all_keyvalues_present_) {
     // Check family. If it doesn't match, we have a NULL value.
-    int family_offset = env->CallIntMethod(keyvalue_, keyvalue_get_family_offset_id_) -
+    int family_offset = env->CallIntMethod(keyvalue, keyvalue_get_family_offset_id_) -
         result_bytes_offset_;
-    int family_length = env->CallByteMethod(keyvalue_, keyvalue_get_family_length_id_);
+    int family_length = env->CallByteMethod(keyvalue, keyvalue_get_family_length_id_);
     if (CompareStrings(family, family_offset, family_length) != 0) {
       *value = NULL;
       *value_length = 0;
-      return;
+      return Status::OK;
     }
     // Check qualifier. If it doesn't match, we have a NULL value.
     int qualifier_offset =
-        env->CallIntMethod(keyvalue_, keyvalue_get_qualifier_offset_id_) -
+        env->CallIntMethod(keyvalue, keyvalue_get_qualifier_offset_id_) -
         result_bytes_offset_;
     int qualifier_length =
-        env->CallIntMethod(keyvalue_, keyvalue_get_qualifier_length_id_);
+        env->CallIntMethod(keyvalue, keyvalue_get_qualifier_length_id_);
     if (CompareStrings(qualifier, qualifier_offset, qualifier_length) != 0) {
       *value = NULL;
       *value_length = 0;
-      return;
+      return Status::OK;
     }
   }
   // The requested family/qualifier matches the keyvalue at keyvalue_index_.
   // Copy the cell.
-  *value_length = env->CallIntMethod(keyvalue_, keyvalue_get_value_length_id_);
-  int value_offset = env->CallIntMethod(keyvalue_, keyvalue_get_value_offset_id_) -
+  *value_length = env->CallIntMethod(keyvalue, keyvalue_get_value_length_id_);
+  int value_offset = env->CallIntMethod(keyvalue, keyvalue_get_value_offset_id_) -
                      result_bytes_offset_;
   // Allocate one extra byte for null-terminator.
   *value = value_pool_->Allocate(*value_length + 1);
   memcpy(*value, reinterpret_cast<char*>(buffer_) + value_offset, *value_length);
   reinterpret_cast<char*>(*value)[*value_length] = '\0';
   ++keyvalue_index_;
+  return Status::OK;
 }
 
 int HBaseTableScanner::CompareStrings(const string& s, int offset, int length) {
@@ -560,18 +573,9 @@ void HBaseTableScanner::Close(JNIEnv* env) {
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
     env->DeleteGlobalRef(resultscanner_);
   }
-  if (scan_ != NULL) {
-    env->DeleteGlobalRef(scan_);
-  }
+  if (scan_ != NULL) env->DeleteGlobalRef(scan_);
+  if (keyvalues_ != NULL) env->DeleteGlobalRef(keyvalues_);
 
   // Close the HTable so that the connections are not kept around.
-  if (htable_.get() != NULL) {
-    htable_->Close();
-  }
-
-  // Delete all local references
-  if (result_ != NULL) env->DeleteLocalRef(result_);
-  if (keyvalues_ != NULL) env->DeleteLocalRef(keyvalues_);
-  if (keyvalue_ != NULL) env->DeleteLocalRef(keyvalue_);
-  if (byte_array_ != NULL) env->DeleteLocalRef(byte_array_);
+  if (htable_.get() != NULL) htable_->Close();
 }

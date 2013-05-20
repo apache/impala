@@ -62,6 +62,8 @@ Status HBaseTable::Close() {
 
 Status HBaseTable::Init() {
   JNIEnv* env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
   if (env == NULL) return Status("Error creating JNIEnv");
 
   // Get the Java string for the table name
@@ -79,13 +81,6 @@ Status HBaseTable::Init() {
 
   // Make sure the GC doesn't remove the HTable until told to.
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_htable, &htable_));
-
-  // Now clean up the un-needed refs.
-  env->DeleteLocalRef(jtable_name_string);
-  RETURN_ERROR_IF_EXC(env);
-
-  env->DeleteLocalRef(jtable_name);
-  RETURN_ERROR_IF_EXC(env);
   return Status::OK;
 }
 

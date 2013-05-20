@@ -178,7 +178,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     if (row_key_slot_ != NULL) {
       void* key;
       int key_length;
-      hbase_scanner_->GetRowKey(env, &key, &key_length);
+      RETURN_IF_ERROR(hbase_scanner_->GetRowKey(env, &key, &key_length));
       if (key == NULL) {
         tuple_->SetNull(row_key_slot_->null_indicator_offset());
       } else {
@@ -191,8 +191,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     for (int i = 0; i < sorted_non_key_slots_.size(); ++i) {
       void* value;
       int value_length;
-      hbase_scanner_->GetValue(env, sorted_cols_[i]->first, sorted_cols_[i]->second,
-          &value, &value_length);
+      RETURN_IF_ERROR(hbase_scanner_->GetValue(env, sorted_cols_[i]->first,
+          sorted_cols_[i]->second, &value, &value_length));
       if (value == NULL) {
         tuple_->SetNull(sorted_non_key_slots_[i]->null_indicator_offset());
       } else {

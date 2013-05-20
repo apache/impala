@@ -158,6 +158,8 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
 Status ImpalaServer::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
     TMetadataOpResponse* result) {
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
