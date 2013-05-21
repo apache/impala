@@ -34,6 +34,7 @@ namespace impala {
 //  - 1-indexed positions
 //  - supported negative positions (count from the end of the string)
 //  - [optional] len.  No len indicates longest substr possible
+template <class T>
 void* StringFunctions::Substring(Expr* e, TupleRow* row) {
   DCHECK_GE(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
@@ -41,13 +42,13 @@ void* StringFunctions::Substring(Expr* e, TupleRow* row) {
   Expr* op3 = NULL;
   if (e->GetNumChildren() == 3) op3 = e->children()[2];
   StringValue* str = reinterpret_cast<StringValue*>(op1->GetValue(row));
-  int* pos = reinterpret_cast<int*>(op2->GetValue(row));
-  int* len = op3 != NULL ? reinterpret_cast<int*>(op3->GetValue(row)) : NULL;
+  T* pos = reinterpret_cast<T*>(op2->GetValue(row));
+  T* len = op3 != NULL ? reinterpret_cast<T*>(op3->GetValue(row)) : NULL;
   if (str == NULL || pos == NULL || (op3 != NULL && len == NULL)) return NULL;
-  int fixed_pos = *pos;
+  T fixed_pos = *pos;
   if (fixed_pos < 0) fixed_pos = str->len + fixed_pos + 1;
-  int max_len = str->len - fixed_pos + 1;
-  int fixed_len = (len == NULL ? max_len : ::min(*len, max_len));
+  T max_len = str->len - fixed_pos + 1;
+  T fixed_len = (len == NULL ? max_len : ::min(*len, max_len));
   if (fixed_pos != 0 && fixed_pos <= str->len && fixed_len > 0) {
     e->result_.string_val = str->Substring(fixed_pos - 1, fixed_len);
   } else {
@@ -59,12 +60,13 @@ void* StringFunctions::Substring(Expr* e, TupleRow* row) {
 // Implementation of Left.  The signature is
 //    string left(string input, int len)
 // This behaves identically to the mysql implementation.
+template <class T>
 void* StringFunctions::Left(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   StringValue* str = reinterpret_cast<StringValue*>(op1->GetValue(row));
-  int* len = reinterpret_cast<int*>(op2->GetValue(row));
+  T* len = reinterpret_cast<T*>(op2->GetValue(row));
   if (str == NULL || len == NULL) return NULL;
   e->result_.string_val.ptr = str->ptr;
   e->result_.string_val.len = str->len <= *len ? str->len : *len;
@@ -74,16 +76,117 @@ void* StringFunctions::Left(Expr* e, TupleRow* row) {
 // Implementation of Right.  The signature is
 //    string right(string input, int len)
 // This behaves identically to the mysql implementation.
+template <class T>
 void* StringFunctions::Right(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   StringValue* str = reinterpret_cast<StringValue*>(op1->GetValue(row));
-  int* len = reinterpret_cast<int*>(op2->GetValue(row));
+  T* len = reinterpret_cast<T*>(op2->GetValue(row));
   if (str == NULL || len == NULL) return NULL;
   e->result_.string_val.len = str->len <= *len ? str->len : *len;
   e->result_.string_val.ptr = str->ptr;
   if (str->len > *len) e->result_.string_val.ptr += str->len - *len;
+  return &e->result_.string_val;
+}
+
+template <class T>
+void* StringFunctions::Space(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  T* num = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
+  if (num == NULL) return NULL;
+  if (*num <= 0) {
+    e->result_.string_val.ptr = NULL;
+    e->result_.string_val.len = 0;
+    return &e->result_.string_val;
+  }
+  e->result_.string_data = string(*num, ' ');
+  e->result_.SyncStringVal();
+  return &e->result_.string_val;
+}
+
+template <class T>
+void* StringFunctions::Repeat(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  T* num = reinterpret_cast<T*>(e->children()[1]->GetValue(row));
+  if (num == NULL || str == NULL) return NULL;
+  if (str->len == 0 || *num <= 0) {
+    e->result_.string_val.ptr = NULL;
+    e->result_.string_val.len = 0;
+    return &e->result_.string_val;
+  }
+  e->result_.string_data.resize(str->len * (*num));
+  e->result_.SyncStringVal();
+
+  char* ptr = e->result_.string_val.ptr;
+  for (T i = 0; i < *num; ++i) {
+    memcpy(ptr, str->ptr, str->len);
+    ptr += str->len;
+  }
+  return &e->result_.string_val;
+}
+
+template <class T>
+void* StringFunctions::Lpad(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  T* len = reinterpret_cast<T*>(e->children()[1]->GetValue(row));
+  StringValue* pad = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
+  if (str == NULL || len == NULL || pad == NULL || *len < 0) return NULL;
+  // Corner cases: Shrink the original string, or leave it alone.
+  // TODO: Hive seems to go into an infinite loop if pad->len == 0,
+  // so we should pay attention to Hive's future solution to be compatible.
+  if (*len <= str->len || pad->len == 0) {
+    e->result_.string_val.ptr = str->ptr;
+    e->result_.string_val.len = *len;
+    return &e->result_.string_val;
+  }
+  e->result_.string_data.resize(*len);
+  e->result_.SyncStringVal();
+
+  // Prepend chars of pad.
+  T padded_prefix_len = *len - str->len;
+  int pad_index = 0;
+  int result_index = 0;
+  char* ptr = e->result_.string_val.ptr;
+
+  while (result_index < padded_prefix_len) {
+    ptr[result_index++] = pad->ptr[pad_index++];
+    pad_index = pad_index % pad->len;
+  }
+  // Append given string.
+  memcpy(ptr + result_index, str->ptr, str->len);
+  return &e->result_.string_val;
+}
+
+template <class T>
+void* StringFunctions::Rpad(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  T* len = reinterpret_cast<T*>(e->children()[1]->GetValue(row));
+  StringValue* pad = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
+  if (str == NULL || len == NULL || pad == NULL || *len < 0) return NULL;
+  // Corner cases: Shrink the original string, or leave it alone.
+  // TODO: Hive seems to go into an infinite loop if pad->len == 0,
+  // so we should pay attention to Hive's future solution to be compatible.
+  if (*len <= str->len || pad->len == 0) {
+    e->result_.string_val.ptr = str->ptr;
+    e->result_.string_val.len = *len;
+    return &e->result_.string_val;
+  }
+  e->result_.string_data.resize(*len);
+  e->result_.SyncStringVal();
+  char* ptr = e->result_.string_val.ptr;
+
+  memcpy(ptr, str->ptr, str->len);
+  // Append chars of pad until desired length.
+  int pad_index = 0;
+  int result_len = str->len;
+  while (result_len < *len) {
+    ptr[result_len++] = pad->ptr[pad_index++];
+    pad_index = pad_index % pad->len;
+  }
   return &e->result_.string_val;
 }
 
@@ -216,41 +319,6 @@ void* StringFunctions::Rtrim(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
-void* StringFunctions::Space(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  int32_t* num = reinterpret_cast<int32_t*>(e->children()[0]->GetValue(row));
-  if (num == NULL) return NULL;
-  if (*num <= 0) {
-    e->result_.string_val.ptr = NULL;
-    e->result_.string_val.len = 0;
-    return &e->result_.string_val;
-  }
-  e->result_.string_data = string(*num, ' ');
-  e->result_.SyncStringVal();
-  return &e->result_.string_val;
-}
-
-void* StringFunctions::Repeat(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
-  int32_t* num = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
-  if (num == NULL || str == NULL) return NULL;
-  if (str->len == 0 || *num <= 0) {
-    e->result_.string_val.ptr = NULL;
-    e->result_.string_val.len = 0;
-    return &e->result_.string_val;
-  }
-  e->result_.string_data.resize(str->len * (*num));
-  e->result_.SyncStringVal();
-
-  char* ptr = e->result_.string_val.ptr;
-  for (int32_t i = 0; i < *num; ++i) {
-    memcpy(ptr, str->ptr, str->len);
-    ptr += str->len;
-  }
-  return &e->result_.string_val;
-}
-
 void* StringFunctions::Ascii(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
@@ -258,67 +326,6 @@ void* StringFunctions::Ascii(Expr* e, TupleRow* row) {
   // Hive returns 0 when given an empty string.
   e->result_.int_val = (str->len == 0) ? 0 : static_cast<int32_t>(str->ptr[0]);
   return &e->result_.int_val;
-}
-
-void* StringFunctions::Lpad(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
-  int32_t* len = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
-  StringValue* pad = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
-  if (str == NULL || len == NULL || pad == NULL) return NULL;
-  // Corner cases: Shrink the original string, or leave it alone.
-  // TODO: Hive seems to go into an infinite loop if pad->len == 0,
-  // so we should pay attention to Hive's future solution to be compatible.
-  if (*len <= str->len || pad->len == 0) {
-    e->result_.string_val.ptr = str->ptr;
-    e->result_.string_val.len = *len;
-    return &e->result_.string_val;
-  }
-  e->result_.string_data.resize(*len);
-  e->result_.SyncStringVal();
-
-  // Prepend chars of pad.
-  int padded_prefix_len = *len - str->len;
-  int pad_index = 0;
-  int result_index = 0;
-  char* ptr = e->result_.string_val.ptr;
-
-  while (result_index < padded_prefix_len) {
-    ptr[result_index++] = pad->ptr[pad_index++];
-    pad_index = pad_index % pad->len;
-  }
-  // Append given string.
-  memcpy(ptr + result_index, str->ptr, str->len);
-  return &e->result_.string_val;
-}
-
-void* StringFunctions::Rpad(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
-  int32_t* len = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
-  StringValue* pad = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
-  if (str == NULL || len == NULL || pad == NULL) return NULL;
-  // Corner cases: Shrink the original string, or leave it alone.
-  // TODO: Hive seems to go into an infinite loop if pad->len == 0,
-  // so we should pay attention to Hive's future solution to be compatible.
-  if (*len <= str->len || pad->len == 0) {
-    e->result_.string_val.ptr = str->ptr;
-    e->result_.string_val.len = *len;
-    return &e->result_.string_val;
-  }
-  e->result_.string_data.resize(*len);
-  e->result_.SyncStringVal();
-  char* ptr = e->result_.string_val.ptr;
-
-  memcpy(ptr, str->ptr, str->len);
-  // Append chars of pad until desired length.
-  int pad_index = 0;
-  int result_len = str->len;
-  while (result_len < *len) {
-    ptr[result_len++] = pad->ptr[pad_index++];
-    pad_index = pad_index % pad->len;
-  }
-  return &e->result_.string_val;
 }
 
 void* StringFunctions::Instr(Expr* e, TupleRow* row) {
@@ -343,11 +350,12 @@ void* StringFunctions::Locate(Expr* e, TupleRow* row) {
   return &e->result_.int_val;
 }
 
+template <class T>
 void* StringFunctions::LocatePos(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   StringValue* substr = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
   StringValue* str = reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
-  int32_t* start_pos = reinterpret_cast<int32_t*>(e->children()[2]->GetValue(row));
+  T* start_pos = reinterpret_cast<T*>(e->children()[2]->GetValue(row));
   if (str == NULL || substr == NULL || start_pos == NULL) return NULL;
   // Hive returns 0 for *start_pos <= 0,
   // but throws an exception for *start_pos > str->len.
@@ -369,11 +377,12 @@ void* StringFunctions::LocatePos(Expr* e, TupleRow* row) {
   return &e->result_.int_val;
 }
 
+template <class T>
 void* StringFunctions::RegexpExtract(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
   StringValue* pattern = reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
-  int32_t* index = reinterpret_cast<int32_t*>(e->children()[2]->GetValue(row));
+  T* index = reinterpret_cast<T*>(e->children()[2]->GetValue(row));
   if (str == NULL || pattern == NULL || index == NULL) return NULL;
   FunctionCall* func_expr = static_cast<FunctionCall*>(e);
   // Compile the regex if pattern is not constant,
@@ -569,5 +578,28 @@ void* StringFunctions::ParseUrlKey(Expr* e, TupleRow* row) {
   }
   return &e->result_.string_val;
 }
+
+// Explicit template instantiation is required for proper linking. These functions
+// are only indirectly called via a function pointer provided by the opcode registry
+// which does not trigger implicit template instantiation.
+// Must be kept in sync with common/function-registry/impala_functions.py.
+template void* StringFunctions::Substring<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Substring<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Left<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Left<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Right<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Right<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Space<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Space<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Repeat<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Repeat<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Lpad<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Lpad<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Rpad<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::Rpad<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::LocatePos<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::LocatePos<int64_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::RegexpExtract<int32_t>(Expr* e, TupleRow* row);
+template void* StringFunctions::RegexpExtract<int64_t>(Expr* e, TupleRow* row);
 
 }

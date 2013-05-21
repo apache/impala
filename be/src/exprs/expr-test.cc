@@ -1124,19 +1124,19 @@ TEST_F(ExprTest, InPredicate) {
 TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', 1)", "Hello");
   TestStringValue("substring('Hello', -2)", "lo");
-  TestStringValue("substring('Hello', 0)", "");
+  TestStringValue("substring('Hello', cast(0 as bigint))", "");
   TestStringValue("substring('Hello', -5)", "Hello");
-  TestStringValue("substring('Hello', -6)", "");
+  TestStringValue("substring('Hello', cast(-6 as bigint))", "");
   TestStringValue("substring('Hello', 100)", "");
   TestIsNull("substring(NULL, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', NULL)", TYPE_STRING);
   TestIsNull("substring(NULL, NULL)", TYPE_STRING);
 
   TestStringValue("substring('Hello', 1, 1)", "H");
-  TestStringValue("substring('Hello', 2, 100)", "ello");
-  TestStringValue("substring('Hello', -3, 2)", "ll");
+  TestStringValue("substring('Hello', cast(2 as bigint), 100)", "ello");
+  TestStringValue("substring('Hello', -3, cast(2 as bigint))", "ll");
   TestStringValue("substring('Hello', 1, 0)", "");
-  TestStringValue("substring('Hello', 1, -1)", "");
+  TestStringValue("substring('Hello', cast(1 as bigint), cast(-1 as bigint))", "");
   TestIsNull("substring(NULL, 1, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', NULL, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', 1, NULL)", TYPE_STRING);
@@ -1167,12 +1167,12 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("reverse('')", "");
   TestIsNull("reverse(NULL)", TYPE_STRING);
   TestStringValue("strleft('abcdefg', 3)", "abc");
-  TestStringValue("strleft('abcdefg', 10)", "abcdefg");
+  TestStringValue("strleft('abcdefg', cast(10 as bigint))", "abcdefg");
   TestIsNull("strleft(NULL, 3)", TYPE_STRING);
   TestIsNull("strleft('abcdefg', NULL)", TYPE_STRING);
   TestIsNull("strleft(NULL, NULL)", TYPE_STRING);
   TestStringValue("strright('abcdefg', 3)", "efg");
-  TestStringValue("strright('abcdefg', 10)", "abcdefg");
+  TestStringValue("strright('abcdefg', cast(10 as bigint))", "abcdefg");
   TestIsNull("strright(NULL, 3)", TYPE_STRING);
   TestIsNull("strright('abcdefg', NULL)", TYPE_STRING);
   TestIsNull("strright(NULL, NULL)", TYPE_STRING);
@@ -1201,16 +1201,16 @@ TEST_F(ExprTest, StringFunctions) {
 
   TestStringValue("space(0)", "");
   TestStringValue("space(-1)", "");
-  TestStringValue("space(1)", " ");
+  TestStringValue("space(cast(1 as bigint))", " ");
   TestStringValue("space(6)", "      ");
   TestIsNull("space(NULL)", TYPE_STRING);
 
   TestStringValue("repeat('', 0)", "");
-  TestStringValue("repeat('', 6)", "");
+  TestStringValue("repeat('', cast(6 as bigint))", "");
   TestStringValue("repeat('ab', 0)", "");
   TestStringValue("repeat('ab', -1)", "");
   TestStringValue("repeat('ab', 1)", "ab");
-  TestStringValue("repeat('ab', 6)", "abababababab");
+  TestStringValue("repeat('ab', cast(6 as bigint))", "abababababab");
   TestIsNull("repeat(NULL, 6)", TYPE_STRING);
   TestIsNull("repeat('ab', NULL)", TYPE_STRING);
   TestIsNull("repeat(NULL, NULL)", TYPE_STRING);
@@ -1224,22 +1224,24 @@ TEST_F(ExprTest, StringFunctions) {
 
   TestStringValue("lpad('', 0, '')", "");
   TestStringValue("lpad('abc', 0, '')", "");
-  TestStringValue("lpad('abc', 3, '')", "abc");
+  TestStringValue("lpad('abc', cast(3 as bigint), '')", "abc");
   TestStringValue("lpad('abc', 2, 'xyz')", "ab");
   TestStringValue("lpad('abc', 6, 'xyz')", "xyzabc");
-  TestStringValue("lpad('abc', 5, 'xyz')", "xyabc");
+  TestStringValue("lpad('abc', cast(5 as bigint), 'xyz')", "xyabc");
   TestStringValue("lpad('abc', 10, 'xyz')", "xyzxyzxabc");
+  TestIsNull("lpad('abc', -10, 'xyz')", TYPE_STRING);
   TestIsNull("lpad(NULL, 10, 'xyz')", TYPE_STRING);
   TestIsNull("lpad('abc', NULL, 'xyz')", TYPE_STRING);
   TestIsNull("lpad('abc', 10, NULL)", TYPE_STRING);
   TestIsNull("lpad(NULL, NULL, NULL)", TYPE_STRING);
   TestStringValue("rpad('', 0, '')", "");
   TestStringValue("rpad('abc', 0, '')", "");
-  TestStringValue("rpad('abc', 3, '')", "abc");
+  TestStringValue("rpad('abc', cast(3 as bigint), '')", "abc");
   TestStringValue("rpad('abc', 2, 'xyz')", "ab");
   TestStringValue("rpad('abc', 6, 'xyz')", "abcxyz");
-  TestStringValue("rpad('abc', 5, 'xyz')", "abcxy");
+  TestStringValue("rpad('abc', cast(5 as bigint), 'xyz')", "abcxy");
   TestStringValue("rpad('abc', 10, 'xyz')", "abcxyzxyzx");
+  TestIsNull("rpad('abc', -10, 'xyz')", TYPE_STRING);
   TestIsNull("rpad(NULL, 10, 'xyz')", TYPE_STRING);
   TestIsNull("rpad('abc', NULL, 'xyz')", TYPE_STRING);
   TestIsNull("rpad('abc', 10, NULL)", TYPE_STRING);
@@ -1269,18 +1271,18 @@ TEST_F(ExprTest, StringFunctions) {
   // Test locate with starting pos param.
   // Note that Hive expects positions starting from 1 as input.
   TestValue("locate('', '', 0)", TYPE_INT, 0);
-  TestValue("locate('abc', '', 0)", TYPE_INT, 0);
+  TestValue("locate('abc', '', cast(0 as bigint))", TYPE_INT, 0);
   TestValue("locate('', 'abc', 0)", TYPE_INT, 0);
   TestValue("locate('', 'abc', -1)", TYPE_INT, 0);
   TestValue("locate('', '', 1)", TYPE_INT, 0);
-  TestValue("locate('', 'abcde', 10)", TYPE_INT, 0);
+  TestValue("locate('', 'abcde', cast(10 as bigint))", TYPE_INT, 0);
   TestValue("locate('abcde', 'abcde', -1)", TYPE_INT, 0);
   TestValue("locate('abcde', 'abcde', 10)", TYPE_INT, 0);
   TestValue("locate('abc', 'abcdef', 0)", TYPE_INT, 0);
   TestValue("locate('abc', 'abcdef', 1)", TYPE_INT, 1);
   TestValue("locate('abc', 'xyzabcdef', 3)", TYPE_INT, 4);
   TestValue("locate('abc', 'xyzabcdef', 4)", TYPE_INT, 4);
-  TestValue("locate('abc', 'abcabcabc', 5)", TYPE_INT, 7);
+  TestValue("locate('abc', 'abcabcabc', cast(5 as bigint))", TYPE_INT, 7);
   TestIsNull("locate(NULL, 'abcabcabc', 5)", TYPE_INT);
   TestIsNull("locate('abc', NULL, 5)", TYPE_INT);
   TestIsNull("locate('abc', 'abcabcabc', NULL)", TYPE_INT);
@@ -1332,19 +1334,21 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 0)", "abxcy1234a");
   TestStringValue("regexp_extract('a.x.y.*a',"
       "'a\\\\.x\\\\.y\\\\.\\\\*a', 0)", "a.x.y.*a");
-  TestStringValue("regexp_extract('abxcy1234a', 'abczy', 0)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'abczy', cast(0 as bigint))", "");
   TestStringValue("regexp_extract('abxcy1234a', 'a\\\\.x\\\\.y\\\\.\\\\*a', 0)", "");
   TestStringValue("regexp_extract('axcy1234a', 'a.x.y.*a', 0)","");
   // Accessing non-existant group should return empty string.
-  TestStringValue("regexp_extract('abxcy1234a', 'a.x', 2)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x', cast(2 as bigint))", "");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.*a', 1)", "");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 5)", "");
   // Multiple groups enclosed in ().
   TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 0)", "abxcy1234a");
   TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 1)", "abx");
   TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 2)", "cy12");
-  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 3)", "34a");
-  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 4)", "");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)',"
+      "cast(3 as bigint))", "34a");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)',"
+      "cast(4 as bigint))", "");
   // Empty strings.
   TestStringValue("regexp_extract('', '', 0)", "");
   TestStringValue("regexp_extract('abxcy1234a', '', 0)", "");
@@ -1938,6 +1942,12 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 10 years) as string)",
       "2002-01-01 09:10:11.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval cast(10 as bigint) years) as string)",
+      "2022-01-01 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval cast(10 as bigint) years) as string)",
+      "2002-01-01 09:10:11.123456789");
   // Add/sub months.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 13 months) as string)",
@@ -1946,10 +1956,10 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as timestamp), interval 13 months) as string)",
       "2012-01-01 09:10:11.123456789");
   TestStringValue("cast(date_add(cast('2012-01-31 09:10:11.123456789' "
-      "as timestamp), interval 1 month) as string)",
+      "as timestamp), interval cast(1 as bigint) month) as string)",
       "2012-02-29 09:10:11.123456789");
   TestStringValue("cast(date_sub(cast('2012-02-29 09:10:11.123456789' "
-      "as timestamp), interval 1 month) as string)",
+      "as timestamp), interval cast(1 as bigint) month) as string)",
       "2012-01-31 09:10:11.123456789");
   // Add/sub weeks.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
@@ -1959,10 +1969,10 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as timestamp), interval 2 weeks) as string)",
       "2012-01-01 09:10:11.123456789");
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
-      "as timestamp), interval 53 weeks) as string)",
+      "as timestamp), interval cast(53 as bigint) weeks) as string)",
       "2013-01-06 09:10:11.123456789");
   TestStringValue("cast(date_sub(cast('2013-01-06 09:10:11.123456789' "
-      "as timestamp), interval 53 weeks) as string)",
+      "as timestamp), interval cast(53 as bigint) weeks) as string)",
       "2012-01-01 09:10:11.123456789");
   // Add/sub days.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
@@ -1972,10 +1982,10 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as timestamp), interval 10 days) as string)",
       "2011-12-22 09:10:11.123456789");
   TestStringValue("cast(date_add(cast('2011-12-22 09:10:11.12345678' "
-      "as timestamp), interval 10 days) as string)",
+      "as timestamp), interval cast(10 as bigint) days) as string)",
       "2012-01-01 09:10:11.123456780");
   TestStringValue("cast(date_sub(cast('2011-12-22 09:10:11.12345678' "
-      "as timestamp), interval 365 days) as string)",
+      "as timestamp), interval cast(365 as bigint) days) as string)",
       "2010-12-22 09:10:11.123456780");
   // Add/sub days (HIVE's date_add/sub variant).
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
@@ -1985,17 +1995,23 @@ TEST_F(ExprTest, TimestampFunctions) {
       "cast(date_sub(cast('2012-01-01 09:10:11.123456789' as timestamp), 10) as string)",
       "2011-12-22 09:10:11.123456789");
   TestStringValue(
-      "cast(date_add(cast('2011-12-22 09:10:11.12345678' as timestamp), 10) as string)",
-      "2012-01-01 09:10:11.123456780");
+      "cast(date_add(cast('2011-12-22 09:10:11.12345678' as timestamp),"
+      "cast(10 as bigint)) as string)", "2012-01-01 09:10:11.123456780");
   TestStringValue(
-      "cast(date_sub(cast('2011-12-22 09:10:11.12345678' as timestamp), 365) as string)",
-      "2010-12-22 09:10:11.123456780");
+      "cast(date_sub(cast('2011-12-22 09:10:11.12345678' as timestamp),"
+      "cast(365 as bigint)) as string)", "2010-12-22 09:10:11.123456780");
   // Add/sub hours.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
       "as timestamp), interval 25 hours) as string)",
       "2012-01-02 01:00:00.123456789");
   TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.123456789' "
       "as timestamp), interval 25 hours) as string)",
+      "2012-01-01 00:00:00.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval cast(25 as bigint) hours) as string)",
+      "2012-01-02 01:00:00.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.123456789' "
+      "as timestamp), interval cast(25 as bigint) hours) as string)",
       "2012-01-01 00:00:00.123456789");
   // Add/sub minutes.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
@@ -2004,12 +2020,24 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-02 01:33:00.123456789' "
       "as timestamp), interval 1533 minutes) as string)",
       "2012-01-01 00:00:00.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval cast(1533 as bigint) minutes) as string)",
+      "2012-01-02 01:33:00.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:33:00.123456789' "
+      "as timestamp), interval cast(1533 as bigint) minutes) as string)",
+      "2012-01-01 00:00:00.123456789");
   // Add/sub seconds.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
       "as timestamp), interval 90033 seconds) as string)",
       "2012-01-02 01:00:33.123456789");
   TestStringValue("cast(date_sub(cast('2012-01-02 01:00:33.123456789' "
       "as timestamp), interval 90033 seconds) as string)",
+      "2012-01-01 00:00:00.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval cast(90033 as bigint) seconds) as string)",
+      "2012-01-02 01:00:33.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:33.123456789' "
+      "as timestamp), interval cast(90033 as bigint) seconds) as string)",
       "2012-01-01 00:00:00.123456789");
   // Add/sub milliseconds.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
@@ -2018,6 +2046,12 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.033000001' "
       "as timestamp), interval 90000033 milliseconds) as string)",
       "2012-01-01 00:00:00.000000001");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval cast(90000033 as bigint) milliseconds) as string)",
+      "2012-01-02 01:00:00.033000001");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.033000001' "
+      "as timestamp), interval cast(90000033 as bigint) milliseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
   // Add/sub microseconds.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
       "as timestamp), interval 1033 microseconds) as string)",
@@ -2025,12 +2059,24 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.001033001' "
       "as timestamp), interval 1033 microseconds) as string)",
       "2012-01-01 00:00:00.000000001");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval cast(1033 as bigint) microseconds) as string)",
+      "2012-01-01 00:00:00.001033001");
+  TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.001033001' "
+      "as timestamp), interval cast(1033 as bigint) microseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
   // Add/sub nanoseconds.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
       "as timestamp), interval 1033 nanoseconds) as string)",
       "2012-01-01 00:00:00.000001034");
   TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.000001034' "
       "as timestamp), interval 1033 nanoseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval cast(1033 as bigint) nanoseconds) as string)",
+      "2012-01-01 00:00:00.000001034");
+  TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.000001034' "
+      "as timestamp), interval cast(1033 as bigint) nanoseconds) as string)",
       "2012-01-01 00:00:00.000000001");
 
   // NULL arguments.
@@ -2045,13 +2091,22 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test add/sub behavior with very large time values.
   string max_int = lexical_cast<string>(numeric_limits<int32_t>::max());
+  string max_long = lexical_cast<string>(numeric_limits<int32_t>::max());
   TestStringValue(
         "cast(years_add(cast('2000-01-01 00:00:00' "
         "as timestamp), " + max_int + ") as string)",
         "1999-01-01 00:00:00");
   TestStringValue(
       "cast(years_sub(cast('2000-01-01 00:00:00' "
+      "as timestamp), " + max_long + ") as string)",
+      "2001-01-01 00:00:00");
+  TestStringValue(
+      "cast(years_add(cast('2000-01-01 00:00:00' "
       "as timestamp), " + max_int + ") as string)",
+      "1999-01-01 00:00:00");
+  TestStringValue(
+      "cast(years_sub(cast('2000-01-01 00:00:00' "
+      "as timestamp), " + max_long + ") as string)",
       "2001-01-01 00:00:00");
 
   TestValue("unix_timestamp(cast('1970-01-01 00:00:00' as timestamp))", TYPE_INT, 0);

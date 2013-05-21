@@ -247,119 +247,39 @@ void* TimestampFunctions::ToDate(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
-void* TimestampFunctions::YearsAdd(Expr* e, TupleRow* row) {
-  return TimestampDateOp<years>(e, row, true);
-}
-
-void* TimestampFunctions::YearsSub(Expr* e, TupleRow* row) {
-  return TimestampDateOp<years>(e, row, false);
-}
-
-void* TimestampFunctions::MonthsAdd(Expr* e, TupleRow* row) {
-  return TimestampDateOp<months>(e, row, true);
-}
-
-void* TimestampFunctions::MonthsSub(Expr* e, TupleRow* row) {
-  return TimestampDateOp<months>(e, row, false);
-}
-
-void* TimestampFunctions::WeeksAdd(Expr* e, TupleRow* row) {
-  return TimestampDateOp<weeks>(e, row, true);
-}
-
-void* TimestampFunctions::WeeksSub(Expr* e, TupleRow* row) {
-  return TimestampDateOp<weeks>(e, row, false);
-}
-
-void* TimestampFunctions::DaysAdd(Expr* e, TupleRow* row) {
-  return TimestampDateOp<date_duration>(e, row, true);
-}
-
-void* TimestampFunctions::DaysSub(Expr* e, TupleRow* row) {
-  return TimestampDateOp<date_duration>(e, row, false);
-}
-
-void* TimestampFunctions::HoursAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<hours>(e, row, true);
-}
-
-void* TimestampFunctions::HoursSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<hours>(e, row, false);
-}
-
-void* TimestampFunctions::MinutesAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<minutes>(e, row, true);
-}
-
-void* TimestampFunctions::MinutesSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<minutes>(e, row, false);
-}
-
-void* TimestampFunctions::SecondsAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<seconds>(e, row, true);
-}
-
-void* TimestampFunctions::SecondsSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<seconds>(e, row, false);
-}
-
-void* TimestampFunctions::MillisAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<milliseconds>(e, row, true);
-}
-
-void* TimestampFunctions::MillisSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<milliseconds>(e, row, false);
-}
-
-void* TimestampFunctions::MicrosAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<microseconds>(e, row, true);
-}
-
-void* TimestampFunctions::MicrosSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<microseconds>(e, row, false);
-}
-
-void* TimestampFunctions::NanosAdd(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<nanoseconds>(e, row, true);
-}
-
-void* TimestampFunctions::NanosSub(Expr* e, TupleRow* row) {
-  return TimestampTimeOp<nanoseconds>(e, row, false);
-}
-
-template <class UNIT>
-void* TimestampFunctions::TimestampDateOp(Expr* e, TupleRow* row, bool is_add) {
+template <bool ISADD, class VALTYPE, class UNIT>
+void* TimestampFunctions::DateAddSub(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  int32_t* count = reinterpret_cast<int32_t*>(op2->GetValue(row));
+  VALTYPE* count = reinterpret_cast<VALTYPE*>(op2->GetValue(row));
   if (tv == NULL || count == NULL) return NULL;
 
   if (tv->date().is_special()) return NULL;
 
   UNIT unit(*count);
   TimestampValue
-      value((is_add ? tv->date() + unit : tv->date() - unit), tv->time_of_day());
+      value((ISADD ? tv->date() + unit : tv->date() - unit), tv->time_of_day());
   e->result_.timestamp_val = value;
 
   return &e->result_.timestamp_val;
 }
 
-template <class UNIT>
-void* TimestampFunctions::TimestampTimeOp(Expr* e, TupleRow* row, bool is_add) {
+template <bool ISADD, class VALTYPE, class UNIT>
+void* TimestampFunctions::TimeAddSub(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  int32_t* count = reinterpret_cast<int32_t*>(op2->GetValue(row));
+  VALTYPE* count = reinterpret_cast<VALTYPE*>(op2->GetValue(row));
   if (tv == NULL || count == NULL) return NULL;
 
   if (tv->date().is_special()) return NULL;
 
   UNIT unit(*count);
   ptime p(tv->date(), tv->time_of_day());
-  TimestampValue value(is_add ? p + unit : p - unit);
+  TimestampValue value(ISADD ? p + unit : p - unit);
   e->result_.timestamp_val = value;
 
   return &e->result_.timestamp_val;
@@ -481,5 +401,92 @@ time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz) {
   return time_zone_ptr();
 
 }
+
+// Explicit template instantiation is required for proper linking. These functions
+// are only indirectly called via a function pointer provided by the opcode registry
+// which does not trigger implicit template instantiation.
+// Must be kept in sync with common/function-registry/impala_functions.py.
+
+template void*
+TimestampFunctions::DateAddSub<true, int32_t, years>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int64_t, years>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int32_t, years>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int64_t, years>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int32_t, months>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int64_t, months>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int32_t, months>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int64_t, months>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int32_t, weeks>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int64_t, weeks>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int32_t, weeks>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int64_t, weeks>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int32_t, days>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<true, int64_t, days>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int32_t, days>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::DateAddSub<false, int64_t, days>(Expr* e, TupleRow* row);
+
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, hours>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, hours>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, hours>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, hours>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, minutes>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, minutes>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, minutes>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, minutes>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, seconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, seconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, seconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, seconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, milliseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, milliseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, milliseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, milliseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, microseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, microseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, microseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, microseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int32_t, nanoseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<true, int64_t, nanoseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int32_t, nanoseconds>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::TimeAddSub<false, int64_t, nanoseconds>(Expr* e, TupleRow* row);
 
 }

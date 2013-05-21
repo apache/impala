@@ -41,6 +41,10 @@ class TimestampFunctions {
   // Optional second argument is the format of the string.
   static void* FromUnix(Expr* e, TupleRow* row);
 
+  // Convert a timestamp to or from a particular timezone based time.
+  static void* FromUtc(Expr* e, TupleRow* row);
+  static void* ToUtc(Expr* e, TupleRow* row);
+
   // Functions to extract parts of the timestamp, return integers.
   static void* Year(Expr* e, TupleRow* row);
   static void* Month(Expr* e, TupleRow* row);
@@ -55,38 +59,14 @@ class TimestampFunctions {
   static void* Now(Expr* e, TupleRow* row);
   static void* ToDate(Expr* e, TupleRow* row);
   static void* DateDiff(Expr* e, TupleRow* row);
-  static void* YearsAdd(Expr* e, TupleRow* row);
-  static void* YearsSub(Expr* e, TupleRow* row);
-  static void* MonthsAdd(Expr* e, TupleRow* row);
-  static void* MonthsSub(Expr* e, TupleRow* row);
-  static void* WeeksAdd(Expr* e, TupleRow* row);
-  static void* WeeksSub(Expr* e, TupleRow* row);
-  static void* DaysAdd(Expr* e, TupleRow* row);
-  static void* DaysSub(Expr* e, TupleRow* row);
-  static void* HoursAdd(Expr* e, TupleRow* row);
-  static void* HoursSub(Expr* e, TupleRow* row);
-  static void* MinutesAdd(Expr* e, TupleRow* row);
-  static void* MinutesSub(Expr* e, TupleRow* row);
-  static void* SecondsAdd(Expr* e, TupleRow* row);
-  static void* SecondsSub(Expr* e, TupleRow* row);
-  static void* MillisAdd(Expr* e, TupleRow* row);
-  static void* MillisSub(Expr* e, TupleRow* row);
-  static void* MicrosAdd(Expr* e, TupleRow* row);
-  static void* MicrosSub(Expr* e, TupleRow* row);
-  static void* NanosAdd(Expr* e, TupleRow* row);
-  static void* NanosSub(Expr* e, TupleRow* row);
 
-  // Helper for add/sub functions on the date portion.
-  template <class UNIT>
-  static void* TimestampDateOp(Expr* e, TupleRow* row, bool is_add);
+  // Add/sub functions on the date portion.
+  template <bool ISADD, class VALTYPE, class UNIT>
+  static void* DateAddSub(Expr* e, TupleRow* row);
 
-  // Helper for add/sub functions on the time portion.
-  template <class UNIT>
-  static void* TimestampTimeOp(Expr* e, TupleRow* row, bool is_add);
-
-  // Convert a timestamp to or from a particular timezone based time.
-  static void* FromUtc(Expr* e, TupleRow* row);
-  static void* ToUtc(Expr* e, TupleRow* row);
+  // Add/sub functions on the time portion.
+  template <bool ISADD, class VALTYPE, class UNIT>
+  static void* TimeAddSub(Expr* e, TupleRow* row);
 
   // Helper function to check date/time format strings.
   // TODO: eventually return format converted from Java to Boost.

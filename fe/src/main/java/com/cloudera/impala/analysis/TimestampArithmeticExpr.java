@@ -20,9 +20,9 @@ import java.util.Map;
 import com.cloudera.impala.analysis.ArithmeticExpr.Operator;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Preconditions;
 
 /**
@@ -105,8 +105,8 @@ public class TimestampArithmeticExpr extends Expr {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
-    // Check if name of function call is date_sub or date_add.
     if (funcName != null) {
+      // Set op based on funcName for function-call like version.
       if (funcName.toUpperCase().equals("DATE_ADD")) {
         op = ArithmeticExpr.Operator.ADD;
       } else if (funcName.toUpperCase().equals("DATE_SUB")) {
@@ -117,6 +117,7 @@ public class TimestampArithmeticExpr extends Expr {
             "Expected function name 'DATE_ADD' or 'DATE_SUB'.");
       }
     }
+
     timeUnit = TIME_UNITS_MAP.get(timeUnitIdent.toUpperCase());
     if (timeUnit == null) {
       throw new AnalysisException("Invalid time unit '" + timeUnitIdent +
@@ -124,26 +125,36 @@ public class TimestampArithmeticExpr extends Expr {
     }
 
     // The first child must return a timestamp or null.
-    if (getChild(0).getType() != PrimitiveType.TIMESTAMP
-        && !getChild(0).getType().isNull()) {
+    if (getChild(0).getType() != PrimitiveType.TIMESTAMP &&
+        !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
           getChild(0).getType() + "'. Expected type 'TIMESTAMP'.");
     }
 
-    // The second child must be of type 'INT' or castable to it.
-    if (getChild(1).getType() != PrimitiveType.INT) {
-      if (PrimitiveType.isImplicitlyCastable(getChild(1).getType(), PrimitiveType.INT)) {
-        castChild(PrimitiveType.INT, 1);
-      } else {
-        throw new AnalysisException("Operand '" + getChild(1).toSql() +
-            "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
-            getChild(1).getType() + "' which is incompatible with expected type 'INT'.");
-      }
+    // The second child must be an integer type.
+    if (!getChild(1).getType().isIntegerType() &&
+        !getChild(1).getType().isNull()) {
+      throw new AnalysisException("Operand '" + getChild(1).toSql() +
+          "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
+          getChild(1).getType() + "'. Expected an integer type.");
     }
 
-    type = PrimitiveType.TIMESTAMP;
-    opcode = getOpCode();
+    PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
+    for (int i = 0; i < this.children.size(); ++i) {
+      this.children.get(i).analyze(analyzer);
+      argTypes[i] = this.children.get(i).getType();
+    }
+    String funcOpName = String.format("%sS_%s", timeUnit.toString(),
+        (op == ArithmeticExpr.Operator.ADD) ? "ADD" : "SUB");
+    FunctionOperator funcOp = OpcodeRegistry.instance().getFunctionOperator(funcOpName);
+    OpcodeRegistry.Signature match =
+        OpcodeRegistry.instance().getFunctionInfo(funcOp, true, argTypes);
+    // We have already done type checking to ensure the function will resolve.
+    Preconditions.checkNotNull(match);
+    Preconditions.checkState(match.returnType == PrimitiveType.TIMESTAMP);
+    opcode = match.opcode;
+    type = match.returnType;
   }
 
   @Override
@@ -164,92 +175,12 @@ public class TimestampArithmeticExpr extends Expr {
     return op;
   }
 
-  private TExprOpcode getOpCode() {
-    // Select appropriate opcode based on op and timeUnit.
-    switch (timeUnit) {
-      case YEAR: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_YEARS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_YEARS_SUB;
-        }
-      }
-      case MONTH: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_MONTHS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_MONTHS_SUB;
-        }
-      }
-      case WEEK: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_WEEKS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_WEEKS_SUB;
-        }
-      }
-      case DAY: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_DAYS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_DAYS_SUB;
-        }
-      }
-      case HOUR: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_HOURS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_HOURS_SUB;
-        }
-      }
-      case MINUTE: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_MINUTES_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_MINUTES_SUB;
-        }
-      }
-      case SECOND: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_SECONDS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_SECONDS_SUB;
-        }
-      }
-      case MILLISECOND: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_MILLISECONDS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_MILLISECONDS_SUB;
-        }
-      }
-      case MICROSECOND: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_MICROSECONDS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_MICROSECONDS_SUB;
-        }
-      }
-      case NANOSECOND: {
-        if (op == Operator.ADD) {
-          return TExprOpcode.TIMESTAMP_NANOSECONDS_ADD;
-        } else {
-          return TExprOpcode.TIMESTAMP_NANOSECONDS_SUB;
-        }
-      }
-      default: {
-        Preconditions.checkState(false, "Unexpected time unit '" + timeUnit + "'.");
-      }
-    }
-    return null;
-  }
-
   @Override
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
     if (funcName != null) {
       // Function-call like version.
-      strBuilder.append(funcName + "(");
+      strBuilder.append(funcName.toUpperCase() + "(");
       strBuilder.append(getChild(0).toSql() + ", ");
       strBuilder.append("INTERVAL ");
       strBuilder.append(getChild(1).toSql());

@@ -138,6 +138,10 @@ public enum PrimitiveType {
         || this == DATETIME || this == TIMESTAMP;
   }
 
+  public boolean isIntegerType() {
+    return this == TINYINT || this == SMALLINT || this == INT || this == BIGINT;
+  }
+
   private static ArrayList<PrimitiveType> numericTypes;
   static {
     numericTypes = Lists.newArrayList();

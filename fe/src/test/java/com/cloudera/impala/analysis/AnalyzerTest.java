@@ -1559,7 +1559,7 @@ public class AnalyzerTest {
   @Test
   public void TestTimestampArithmeticExpressions() {
     String[] valueTypeCols =
-        new String[] {"tinyint_col", "smallint_col", "int_col", "NULL"};
+        new String[] {"tinyint_col", "smallint_col", "int_col", "bigint_col", "NULL"};
 
     // Tests all time units.
     for (TimeUnit timeUnit : TimeUnit.values()) {
@@ -1609,34 +1609,30 @@ public class AnalyzerTest {
     AnalysisError("select date_add(float_col, interval 10 years) " +
         "from functional.alltypes",
         "Operand 'float_col' of timestamp arithmetic expression " +
-        "'date_add(float_col, INTERVAL 10 years)' returns type 'FLOAT'. " +
+        "'DATE_ADD(float_col, INTERVAL 10 years)' returns type 'FLOAT'. " +
         "Expected type 'TIMESTAMP'.");
     AnalysisError("select date_add(string_col, interval 10 years) " +
         "from functional.alltypes",
         "Operand 'string_col' of timestamp arithmetic expression " +
-        "'date_add(string_col, INTERVAL 10 years)' returns type 'STRING'. " +
+        "'DATE_ADD(string_col, INTERVAL 10 years)' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP'.");
 
-    // Second operand is not compatible with type INT. Non-function-call like version.
+    // Second operand is not compatible with a fixed-point type.
+    // Non-function-call like version.
     AnalysisError("select timestamp_col + interval 5.2 years from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'timestamp_col + INTERVAL 5.2 years' returns type 'DOUBLE' " +
-        "which is incompatible with expected type 'INT'.");
-    AnalysisError("select timestamp_col + interval bigint_col years " +
-        "from functional.alltypes",
-        "Operand 'bigint_col' of timestamp arithmetic expression " +
-        "'timestamp_col + INTERVAL bigint_col years' returns type 'BIGINT' " +
-        "which is incompatible with expected type 'INT'.");
+        "'timestamp_col + INTERVAL 5.2 years' returns type 'DOUBLE'. " +
+        "Expected an integer type.");
 
-    // No implicit cast from STRING to INT
+    // No implicit cast from STRING to integer types.
     AnalysisError("select timestamp_col + interval '10' years from functional.alltypes",
                   "Operand ''10'' of timestamp arithmetic expression 'timestamp_col + " +
-                  "INTERVAL '10' years' returns type 'STRING' which is incompatible " +
-                  "with expected type 'INT'.");
+                  "INTERVAL '10' years' returns type 'STRING'. " +
+                  "Expected an integer type.");
     AnalysisError("select date_add(timestamp_col, interval '10' years) " +
                   "from functional.alltypes", "Operand ''10'' of timestamp arithmetic " +
-                  "expression 'date_add(timestamp_col, INTERVAL '10' years)' returns " +
-                  "type 'STRING' which is incompatible with expected type 'INT'.");
+                  "expression 'DATE_ADD(timestamp_col, INTERVAL '10' years)' returns " +
+                  "type 'STRING'. Expected an integer type.");
 
     // Cast from STRING to INT.
     AnalyzesOk("select timestamp_col + interval cast('10' as int) years " +
@@ -1644,13 +1640,8 @@ public class AnalyzerTest {
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 5.2 years + timestamp_col from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'INTERVAL 5.2 years + timestamp_col' returns type 'DOUBLE' " +
-        "which is incompatible with expected type 'INT'.");
-    AnalysisError("select interval bigint_col years + timestamp_col " +
-        "from functional.alltypes",
-        "Operand 'bigint_col' of timestamp arithmetic expression " +
-        "'INTERVAL bigint_col years + timestamp_col' returns type 'BIGINT' " +
-        "which is incompatible with expected type 'INT'.");
+        "'INTERVAL 5.2 years + timestamp_col' returns type 'DOUBLE'. " +
+        "Expected an integer type.");
     // Cast from STRING to INT.
     AnalyzesOk("select interval cast('10' as int) years + timestamp_col " +
         "from functional.alltypes");
@@ -1658,13 +1649,8 @@ public class AnalyzerTest {
     AnalysisError("select date_add(timestamp_col, interval 5.2 years) " +
         "from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'date_add(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE' " +
-        "which is incompatible with expected type 'INT'.");
-    AnalysisError("select date_add(timestamp_col, interval bigint_col years) " +
-        "from functional.alltypes",
-        "Operand 'bigint_col' of timestamp arithmetic expression " +
-        "'date_add(timestamp_col, INTERVAL bigint_col years)' returns type 'BIGINT' " +
-        "which is incompatible with expected type 'INT'.");
+        "'DATE_ADD(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE'. " +
+        "Expected an integer type.");
     // Cast from STRING to INT.
     AnalyzesOk("select date_add(timestamp_col, interval cast('10' as int) years) " +
         " from functional.alltypes");
@@ -1684,11 +1670,11 @@ public class AnalyzerTest {
     AnalysisError("select date_add(timestamp_col, interval 10 error) " +
         "from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
-        "'date_add(timestamp_col, INTERVAL 10 error)'.");
+        "'DATE_ADD(timestamp_col, INTERVAL 10 error)'.");
     AnalysisError("select date_sub(timestamp_col, interval 10 error) " +
         "from functional.alltypes",
         "Invalid time unit 'error' in timestamp arithmetic expression " +
-        "'date_sub(timestamp_col, INTERVAL 10 error)'.");
+        "'DATE_SUB(timestamp_col, INTERVAL 10 error)'.");
   }
 
   @Test

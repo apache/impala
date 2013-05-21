@@ -27,9 +27,13 @@ class TupleRow;
 
 class StringFunctions {
  public:
-  static void* Substring(Expr* e, TupleRow* row);
-  static void* Left(Expr* e, TupleRow* row);
-  static void* Right(Expr* e, TupleRow* row);
+  template <class T> static void* Substring(Expr* e, TupleRow* row);
+  template <class T> static void* Left(Expr* e, TupleRow* row);
+  template <class T> static void* Right(Expr* e, TupleRow* row);
+  template <class T> static void* Space(Expr* e, TupleRow* row);
+  template <class T> static void* Repeat(Expr* e, TupleRow* row);
+  template <class T> static void* Lpad(Expr* e, TupleRow* row);
+  template <class T> static void* Rpad(Expr* e, TupleRow* row);
   static void* Length(Expr* e, TupleRow* row);
   static void* Lower(Expr* e, TupleRow* row);
   static void* Upper(Expr* e, TupleRow* row);
@@ -37,15 +41,11 @@ class StringFunctions {
   static void* Trim(Expr* e, TupleRow* row);
   static void* Ltrim(Expr* e, TupleRow* row);
   static void* Rtrim(Expr* e, TupleRow* row);
-  static void* Space(Expr* e, TupleRow* row);
-  static void* Repeat(Expr* e, TupleRow* row);
   static void* Ascii(Expr* e, TupleRow* row);
-  static void* Lpad(Expr* e, TupleRow* row);
-  static void* Rpad(Expr* e, TupleRow* row);
   static void* Instr(Expr* e, TupleRow* row);
   static void* Locate(Expr* e, TupleRow* row);
-  static void* LocatePos(Expr* e, TupleRow* row);
-  static void* RegexpExtract(Expr* e, TupleRow* row);
+  template <class T> static void* LocatePos(Expr* e, TupleRow* row);
+  template <class T> static void* RegexpExtract(Expr* e, TupleRow* row);
   static void* RegexpReplace(Expr* e, TupleRow* row);
   static void* Concat(Expr* e, TupleRow* row);
   static void* ConcatWs(Expr* e, TupleRow* row);
