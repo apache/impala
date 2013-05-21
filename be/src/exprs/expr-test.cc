@@ -2240,6 +2240,25 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", else_val);
 
+  // Test IsNull() function on all applicable types and NULL.
+  TestValue("isnull(true, NULL)", TYPE_BOOLEAN, true);
+  TestValue("isnull(1, NULL)", TYPE_INT, 1);
+  TestValue("isnull(1 + 1, NULL)", TYPE_BIGINT, 2);
+  TestValue("isnull(10.0, NULL)", TYPE_DOUBLE, 10.0);
+  TestStringValue("isnull('abc', NULL)", "abc");
+  TestTimestampValue("isnull(" + default_timestamp_str_ + ", NULL)",
+      default_timestamp_val_);
+  // Test first argument is NULL.
+  TestValue("isnull(NULL, true)", TYPE_BOOLEAN, true);
+  TestValue("isnull(NULL, 1)", TYPE_INT, 1);
+  TestValue("isnull(NULL, 1 + 1)", TYPE_BIGINT, 2);
+  TestValue("isnull(NULL, 10.0)", TYPE_DOUBLE, 10.0);
+  TestStringValue("isnull(NULL, 'abc')", "abc");
+  TestTimestampValue("isnull(NULL, " + default_timestamp_str_ + ")",
+      default_timestamp_val_);
+  // Test NULL. The return type is boolean to avoid a special NULL function signature.
+  TestIsNull("isnull(NULL, NULL)", TYPE_BOOLEAN);
+
   TestIsNull("coalesce(NULL)", TYPE_DOUBLE);
   TestIsNull("coalesce(NULL, NULL)", TYPE_DOUBLE);
   TestValue("coalesce(TRUE)", TYPE_BOOLEAN, true);

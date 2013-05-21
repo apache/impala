@@ -215,6 +215,20 @@ functions = [
         'ConditionalFunctions::IfString', ['if']],
   ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], \
         'ConditionalFunctions::IfTimestamp', ['if']],
+
+  ['Conditional_IsNull', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  ['Conditional_IsNull', 'INT', ['INT', 'INT'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  ['Conditional_IsNull', 'BIGINT', ['BIGINT', 'BIGINT'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  ['Conditional_IsNull', 'DOUBLE', ['DOUBLE', 'DOUBLE'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  ['Conditional_IsNull', 'STRING', ['STRING', 'STRING'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  ['Conditional_IsNull', 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], \
+        'ConditionalFunctions::IsNull', ['isnull']],
+  
   ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], \
         'ConditionalFunctions::CoalesceBool', ['coalesce']],
   ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], \

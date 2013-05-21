@@ -34,6 +34,7 @@ class ConditionalFunctions {
   static void* IfDouble(Expr* e, TupleRow* row);
   static void* IfString(Expr* e, TupleRow* row);
   static void* IfTimestamp(Expr* e, TupleRow* row);
+  static void* IsNull(Expr* e, TupleRow* row);
   static void* CoalesceBool(Expr* e, TupleRow* row);
   static void* CoalesceInt(Expr* e, TupleRow* row);
   static void* CoalesceFloat(Expr* e, TupleRow* row);

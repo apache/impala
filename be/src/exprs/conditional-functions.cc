@@ -160,6 +160,13 @@ void* ConditionalFunctions::IfTimestamp(Expr* e, TupleRow* row) {
   return &e->result_.timestamp_val;
 }
 
+void* ConditionalFunctions::IsNull(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  void* val = e->children()[0]->GetValue(row);
+  if (val != NULL) return val;
+  return e->children()[1]->GetValue(row);
+}
+
 void* ConditionalFunctions::CoalesceBool(Expr* e, TupleRow* row) {
   DCHECK_GE(e->GetNumChildren(), 1);
   int num_children = e->children().size();

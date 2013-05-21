@@ -1760,6 +1760,7 @@ public class AnalyzerTest {
 
   @Test
   public void TestConditionalExprs() {
+    // Test IF conditional expr.
     AnalyzesOk("select if(true, false, false)");
     AnalyzesOk("select if(1 != 2, false, false)");
     AnalyzesOk("select if(bool_col, false, true) from functional.alltypes");
@@ -1778,6 +1779,22 @@ public class AnalyzerTest {
         "No matching function with those arguments: if (BOOLEAN, BOOLEAN)");
     AnalysisError("select if(false)",
         "No matching function with those arguments: if (BOOLEAN)");
+
+    // Test IsNull() conditional function.
+    for (PrimitiveType t: PrimitiveType.values()) {
+      String literal = typeToLiteralValue.get(t);
+      AnalyzesOk(String.format("select isnull(%s, %s)", literal, literal));
+      AnalyzesOk(String.format("select isnull(%s, NULL)", literal));
+      AnalyzesOk(String.format("select isnull(NULL, %s)", literal));
+    }
+    // IsNull() requires two arguments.
+    AnalysisError("select isnull(1)",
+        "No matching function with those arguments: isnull (TINYINT)");
+    AnalysisError("select isnull(1, 2, 3)",
+        "No matching function with those arguments: isnull (TINYINT, TINYINT, TINYINT)");
+    // Incompatible types.
+    AnalysisError("select isnull('a', true)",
+        "No matching function with those arguments: isnull (STRING, BOOLEAN)");
   }
 
   @Test
