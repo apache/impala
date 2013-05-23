@@ -494,12 +494,12 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid query handle");
 
+  // make sure we release the lock on exec_state if we see any error
+  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+
   if (exec_state->num_rows_fetched() == 0) {
     exec_state->query_events()->MarkEvent("First row fetched");
   }
-
-  // make sure we release the lock on exec_state if we see any error
-  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
 
   if (exec_state->query_state() == QueryState::EXCEPTION) {
     // we got cancelled or saw an error; either way, return now

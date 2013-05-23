@@ -286,6 +286,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Initiates execution of a exec_request.
     // Non-blocking.
+    // Must *not* be called with lock_ held.
     Status Exec(TExecRequest* exec_request);
 
     // Execute a HiveServer2 metadata operation
@@ -305,7 +306,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Update query state if the requested state isn't already obsolete.
     void UpdateQueryState(beeswax::QueryState::type query_state);
 
-    void SetErrorStatus(const Status& status);
+    // Update the query status and the "Query Status" summary profile string.
+    // If current status is already != ok, no update is made (we preserve the first error)
+    // If called with a non-ok argument, the expectation is that the query will be aborted
+    // quickly.
+    // Returns the status argument (so we can write
+    // RETURN_IF_ERROR(UpdateQueryStatus(SomeOperation())).
+    // Does not take lock_, but requires it: caller must ensure lock_
+    // is taken before calling UpdateQueryStatus
+    Status UpdateQueryStatus(const Status& status);
 
     // Sets state to EXCEPTION and cancels coordinator.
     // Caller needs to hold lock().
@@ -571,6 +580,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CatalogPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
+  // Must not be called with exec_state->lock() already taken.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 
   // Initialize "default_configs_" to show the default values for ImpalaQueryOptions and

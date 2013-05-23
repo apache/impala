@@ -157,20 +157,24 @@ ImpalaServer::QueryExecState::QueryExecState(
   uuid query_uuid = uuid_generator();
   query_id_.hi = *reinterpret_cast<uint64_t*>(&query_uuid.data[0]);
   query_id_.lo = *reinterpret_cast<uint64_t*>(&query_uuid.data[8]);
+
+  summary_profile_.AddInfoString("Start Time", start_time().DebugString());
+  summary_profile_.AddInfoString("End Time", "");
+  summary_profile_.AddInfoString("Query Type", "N/A");
+  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_.AddInfoString("Query Status", "OK");
+  summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
+  summary_profile_.AddInfoString("User", user());
+  summary_profile_.AddInfoString("Default Db", default_db());
+  summary_profile_.AddInfoString("Sql Statement", sql_stmt);
 }
 
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
   profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
 
-  summary_profile_.AddInfoString("Start Time", start_time().DebugString());
-  summary_profile_.AddInfoString("End Time", "");
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
-  summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
-  summary_profile_.AddInfoString("User", user());
-  summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", sql_stmt());
 
   switch (exec_request->stmt_type) {
     case TStmtType::QUERY:
@@ -188,7 +192,11 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         return Status::OK;
       }
       ddl_executor_.reset(new DdlExecutor(impala_server_));
-      return ddl_executor_->Exec(&exec_request_.ddl_exec_request);
+      Status status = ddl_executor_->Exec(&exec_request_.ddl_exec_request);
+      {
+        lock_guard<mutex> l(lock_);
+        return UpdateQueryStatus(status);
+      }
     }
     default:
       stringstream errmsg;
@@ -233,8 +241,12 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest() {
   }
 
   coord_.reset(new Coordinator(exec_env_));
-  RETURN_IF_ERROR(coord_->Exec(
-      query_id_, &query_exec_request, exec_request_.query_options, &output_exprs_));
+  Status status = coord_->Exec(
+      query_id_, &query_exec_request, exec_request_.query_options, &output_exprs_);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(UpdateQueryStatus(status));
+  }
 
   profile_.AddChild(coord_->query_profile());
   return Status::OK;
@@ -281,10 +293,8 @@ Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
   int64_t elapsed_time = client_wait_sw_.ElapsedTime();
   client_wait_timer_->Set(elapsed_time);
 
-  query_status_ = FetchRowsInternal(max_rows, fetched_rows);
-  if (!query_status_.ok()) {
-    query_state_ = QueryState::EXCEPTION;
-  }
+  // FetchInternal has already taken our lock_
+  UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
 
   // If all rows have been returned, no point in continuing the timer
   // to wait for the next call to FetchRows, which should never come.
@@ -297,11 +307,15 @@ void ImpalaServer::QueryExecState::UpdateQueryState(QueryState::type query_state
   if (query_state_ < query_state) query_state_ = query_state;
 }
 
-void ImpalaServer::QueryExecState::SetErrorStatus(const Status& status) {
-  DCHECK(!status.ok());
-  lock_guard<mutex> l(lock_);
-  query_state_ = QueryState::EXCEPTION;
-  query_status_ = status;
+Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
+  // Preserve the first non-ok status
+  if (!status.ok() && query_status_.ok()) {
+    query_state_ = QueryState::EXCEPTION;
+    query_status_ = status;
+    summary_profile_.AddInfoString("Query Status", query_status_.GetErrorMsg());
+  }
+
+  return status;
 }
 
 Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
@@ -1248,20 +1262,32 @@ Status ImpalaServer::ExecuteInternal(
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
 
-  // register exec state as early as possible so that queries that
-  // take a long time to plan show up, and to handle incoming status
-  // reports before execution starts.
-  RETURN_IF_ERROR(RegisterQuery(session_state, *exec_state));
-  *registered_exec_state = true;
-
   TExecRequest result;
   {
-    RETURN_IF_ERROR(GetExecRequest(request, &result));
-    (*exec_state)->query_events()->MarkEvent("Planning finished");
-  }
+    // Keep a lock on exec_state so that registration and setting
+    // result_metadata are atomic.
+    //
+    // Note: this acquires the exec_state lock *before* the
+    // query_exec_state_map_ lock. This is the opposite of
+    // GetQueryExecState(..., true), and therefore looks like a
+    // candidate for deadlock. The reason this works here is that
+    // GetQueryExecState cannot find exec_state (under the exec state
+    // map lock) and take it's lock until RegisterQuery has
+    // finished. By that point, the exec state map lock will have been
+    // given up, so the classic deadlock interleaving is not possible.
+    lock_guard<mutex> l(*(*exec_state)->lock());
 
-  if (result.__isset.result_set_metadata) {
-    (*exec_state)->set_result_metadata(result.result_set_metadata);
+    // register exec state as early as possible so that queries that
+    // take a long time to plan show up, and to handle incoming status
+    // reports before execution starts.
+    RETURN_IF_ERROR(RegisterQuery(session_state, *exec_state));
+    *registered_exec_state = true;
+
+    RETURN_IF_ERROR((*exec_state)->UpdateQueryStatus(GetExecRequest(request, &result)));
+    (*exec_state)->query_events()->MarkEvent("Planning finished");
+    if (result.__isset.result_set_metadata) {
+      (*exec_state)->set_result_metadata(result.result_set_metadata);
+    }
   }
 
   // start execution of query; also starts fragment status reports
@@ -1363,16 +1389,18 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
 void ImpalaServer::Wait(shared_ptr<QueryExecState> exec_state) {
   // block until results are ready
   Status status = exec_state->Wait();
-  if (exec_state->returns_result_set()) {
-    exec_state->query_events()->MarkEvent("Rows available");
-  } else {
-    exec_state->query_events()->MarkEvent("Request finished");
-  }
+  {
+    lock_guard<mutex> l(*(exec_state->lock()));
+    if (exec_state->returns_result_set()) {
+      exec_state->query_events()->MarkEvent("Rows available");
+    } else {
+      exec_state->query_events()->MarkEvent("Request finished");
+    }
 
+    exec_state->UpdateQueryStatus(status);
+  }
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
-  } else {
-    exec_state->SetErrorStatus(status);
   }
 }
 
