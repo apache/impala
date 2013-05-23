@@ -16,7 +16,6 @@
 #
 # Impala's shell
 import cmd
-import csv
 import getpass
 import prettytable
 import os
@@ -28,6 +27,7 @@ import threading
 import time
 from optparse import OptionParser
 from Queue import Queue, Empty
+from shell_output import OutputStream, DelimitedOutputFormatter, PrettyOutputFormatter
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -41,7 +41,6 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
-COMMENT_TOKEN = '--'
 VERSION_STRING = "build version not available"
 HISTORY_LENGTH = 100
 
@@ -58,33 +57,6 @@ class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
   OK = 0
   ERROR = 1
-
-
-class OutputWriter(object):
-  """Helper class for saving result set output to a file"""
-  def __init__(self, file_name, field_delim):
-    # The default csv field size limit is too small to write large result sets. Set it to
-    # an artibrarily large value.
-    csv.field_size_limit(sys.maxint)
-    self.file_name = file_name
-
-    if not field_delim:
-      raise ValueError, 'A field delimiter is required to output results to a file'
-    self.field_delim = field_delim.decode('string-escape')
-    if len(self.field_delim) != 1:
-      raise ValueError, 'Field delimiter must be a 1-character string'
-
-  def write_rows(self, rows, mode='ab'):
-    output_file = None
-    try:
-      output_file = open(self.file_name, mode)
-      writer =\
-          csv.writer(output_file, delimiter=self.field_delim, quoting=csv.QUOTE_MINIMAL)
-      writer.writerows(rows)
-    finally:
-      if output_file:
-        output_file.close()
-
 
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
@@ -133,10 +105,11 @@ class ImpalaShell(cmd.Cmd):
     self.cached_prompt = str()
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
-    self.output_writer = None
-    if options.output_file:
-      self.output_writer =\
-          OutputWriter(options.output_file, options.output_file_field_delim)
+    self.output_file = options.output_file
+    # Output formatting flags/options
+    self.output_delimiter = options.output_delimiter
+    self.write_delimited = options.write_delimited
+    self.print_header = options.print_header
     try:
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
@@ -169,7 +142,7 @@ class ImpalaShell(cmd.Cmd):
     get_default_query_options = self.imp_service.get_default_configuration(False)
     options, status = self.__do_rpc(lambda: get_default_query_options)
     if status != RpcStatus.OK:
-      print 'Unable to retrive default query options'
+      print_to_stderr('Unable to retrive default query options')
     for option in options:
       self.default_query_options[option.key.upper()] = option.value
 
@@ -182,7 +155,7 @@ class ImpalaShell(cmd.Cmd):
     try:
       os.system(args)
     except Exception, e:
-      print 'Error running command : %s' % e
+      print_to_stderr('Error running command : %s' % e)
     return True
 
   def sanitise_input(self, args, interactive=True):
@@ -307,7 +280,7 @@ class ImpalaShell(cmd.Cmd):
 
     tokens = args.split("=")
     if len(tokens) != 2:
-      print "Error: SET <option>=<value>"
+      print_to_stderr("Error: SET <option>=<value>")
       return False
     option_upper = tokens[0].upper()
     if option_upper not in self.default_query_options.keys():
@@ -403,12 +376,12 @@ class ImpalaShell(cmd.Cmd):
         self.server_version = result.version
         self.connected = True
       except Exception, e:
-        print ("Error: Unable to communicate with impalad service. This service may not "
-               "be an impalad instance. Check host:port and try again.")
+        print_to_stderr("Error: Unable to communicate with impalad service. This "
+               "service may not be an impalad instance. Check host:port and try again.")
         self.transport.close()
         raise
     except Exception, e:
-      print "Error connecting: %s, %s" % (type(e),e)
+      print_to_stderr("Error connecting: %s, %s" % (type(e),e))
       # If a connection to another impalad failed while already connected
       # reset the prompt to disconnected.
       self.prompt = self.DISCONNECTED_PROMPT
@@ -450,16 +423,19 @@ class ImpalaShell(cmd.Cmd):
     handle.hadoop_user = self.user
     return handle
 
-  def __construct_table_header(self, handle):
+  def __get_column_names(self, handle):
+    metadata = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle))
+    return [fs.name for fs in metadata[0].schema.fieldSchemas]
+
+  def __construct_table_header(self, handle, column_names):
     """ Constructs the table header for a given query handle.
 
     Should be called after the query has finished and before data is fetched. All data
     is left aligned.
     """
-    metadata = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle))
     table = prettytable.PrettyTable()
-    for field_schema in metadata[0].schema.fieldSchemas:
-      table.add_column(field_schema.name, [])
+    for column in column_names:
+      table.add_column(column, [])
     table.align = "l"
     return table
 
@@ -488,7 +464,7 @@ class ImpalaShell(cmd.Cmd):
       if query_state == self.query_state["FINISHED"]:
         break
       elif query_state == self.query_state["EXCEPTION"]:
-        print 'Query aborted, unable to fetch data'
+        print_to_stderr('Query aborted, unable to fetch data')
         if self.connected:
           log, status = self._ImpalaShell__do_rpc(
             lambda: self.imp_service.get_log(handle.log_context))
@@ -504,9 +480,21 @@ class ImpalaShell(cmd.Cmd):
     if not self.__expect_result_metadata(query.query):
       self.__close_query_handle(handle)
       return True
-    table = self.__construct_table_header(handle)
+
     # Results are ready, fetch them till they're done.
     self.__print_if_verbose('Query finished, fetching results ...')
+    column_names = self.__get_column_names(handle)
+    if self.write_delimited:
+      formatter = DelimitedOutputFormatter(field_delim=self.output_delimiter)
+      self.output_stream = OutputStream(formatter, filename=self.output_file)
+      # print the column names
+      if self.print_header:
+        self.output_stream.write([column_names])
+    else:
+      prettytable = self.__construct_table_header(handle, column_names)
+      formatter = PrettyOutputFormatter(prettytable)
+      self.output_stream = OutputStream(formatter, filename=self.output_file)
+
     result_rows = []
     num_rows_fetched = 0
     while True:
@@ -522,28 +510,12 @@ class ImpalaShell(cmd.Cmd):
       num_rows_fetched += len(results.data)
       result_rows.extend(results.data)
       if len(result_rows) >= self.fetch_batch_size or not results.has_more:
-        rows = [r.split('\t') for r in result_rows]
-        try:
-          map(table.add_row, rows)
-          # Clear the rows that have been added. The goal is is to stream the table
-          # in batch_size quantums.
-          print table
-          table.clear_rows()
-        except Exception, e:
-          # beeswax returns each row as a tab separated string. If a string column
-          # value in a row has tabs, it will break the row split. Default to displaying
-          # raw results. This will change with a move to the hiverserver2 interface.
-          # Reference:  https://issues.cloudera.org/browse/IMPALA-116
-          print ('\n').join(result_rows)
+        rows = [row.split('\t') for row in result_rows]
+        self.output_stream.write(rows)
         result_rows = []
-        if self.output_writer:
-          # Writing to output files is also impacted by the beeswax bug mentioned
-          # above. This means that if a string column has a tab, it will break the row
-          # split causing the wrong number of fields to be written to the output file.
-          # Reference:  https://issues.cloudera.org/browse/IMPALA-116
-          self.output_writer.write_rows(rows)
-        if not results.has_more:
-          break
+      if not results.has_more:
+        break
+
     # Don't include the time to get the runtime profile in the query execution time
     end = time.time()
     self.__print_runtime_profile_if_enabled(handle)
@@ -569,14 +541,14 @@ class ImpalaShell(cmd.Cmd):
 
   def __print_if_verbose(self, message):
     if self.verbose:
-      print message
+      print_to_stderr(message)
 
   def __parse_table_name_arg(self, arg):
     """ Parses an argument string and returns the result as a db name, table name combo.
 
     If the table name was not fully qualified, the current database is returned as the db.
     Otherwise, the table is split into db/table name parts and returned.
-    If an invalid format is provide, None is returned.
+    If an invalid format is provided, None is returned.
     """
     if not arg:
       return None
@@ -615,10 +587,10 @@ class ImpalaShell(cmd.Cmd):
   def do_profile(self, args):
     """Prints the runtime profile of the last INSERT or SELECT query executed."""
     if len(args) > 0:
-      print "'profile' does not accept any arguments"
+      print_to_stderr("'profile' does not accept any arguments")
       return False
     elif self.last_query_handle is None:
-      print 'No previous query available to profile'
+      print_to_stderr('No previous query available to profile')
       return False
     self.__print_runtime_profile(self.last_query_handle)
     return True
@@ -669,7 +641,7 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "insert %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    print "Query: %s" % (query.query,)
+    print_to_stderr("Query: %s" % (query.query,))
     start, end = time.time(), 0
     (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
 
@@ -682,12 +654,12 @@ class ImpalaShell(cmd.Cmd):
       if query_state == self.query_state["FINISHED"]:
         break
       elif query_state == self.query_state["EXCEPTION"]:
-        print 'Query failed'
+        print_to_stderr('Query failed')
         if self.connected:
           # Retrieve error message (if any) from log.
           log, status = self._ImpalaShell__do_rpc(
             lambda: self.imp_service.get_log(handle.log_context))
-          print log,
+          print_to_stderr(log)
           query_successful = False
           break
         else:
@@ -710,7 +682,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __cancel_query(self, handle):
     """Cancel a query on a keyboard interrupt from the shell."""
-    print 'Cancelling query ...'
+    print_to_stderr('Cancelling query ...')
     # Cancel sets query_state to EXCEPTION before calling cancel() in the
     # co-ordinator, so we don't need to wait.
     (_, status) = self.__do_rpc(lambda: self.imp_service.Cancel(handle))
@@ -750,7 +722,7 @@ class ImpalaShell(cmd.Cmd):
       results = rpc_results.get_nowait()
     except Empty:
       # Unexpected exception in __do_rpc_thread.
-      print 'Unexpected exception, no results returned.'
+      print_to_stderr('Unexpected exception, no results returned.')
       results = (None, RpcStatus.ERROR)
     return results
 
@@ -765,7 +737,7 @@ class ImpalaShell(cmd.Cmd):
 
     """
     if not self.connected:
-      print "Not connected (use CONNECT to establish a connection)"
+      print_to_stderr("Not connected (use CONNECT to establish a connection)")
       rpc_results.put((None, RpcStatus.ERROR))
     try:
       ret = rpc()
@@ -780,19 +752,19 @@ class ImpalaShell(cmd.Cmd):
           status = RpcStatus.ERROR
       rpc_results.put((ret, status))
     except BeeswaxService.QueryNotFoundException, q:
-      print 'Error: Stale query handle'
+      print_to_stderr('Error: Stale query handle')
     # beeswaxException prints out the entire object, printing
     # just the message is far more readable/helpful.
     except BeeswaxService.BeeswaxException, b:
-      print "ERROR: %s" % (b.message,)
+      print_to_stderr("ERROR: %s" % (b.message,))
     except TTransportException, e:
-      print "Error communicating with impalad: %s" % (e,)
+      print_to_stderr("Error communicating with impalad: %s" % (e,))
       self.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     except TApplicationException, t:
-      print "Application Exception : %s" % (t,)
+      print_to_stderr("Application Exception : %s" % (t,))
     except Exception, u:
-      print 'Unknown Exception : %s' % (u,)
+      print_to_stderr('Unknown Exception : %s' % (u,))
       self.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     rpc_results.put((None, RpcStatus.ERROR))
@@ -803,12 +775,12 @@ class ImpalaShell(cmd.Cmd):
     # Args is all text except for 'explain', so no need to strip it out
     query.query = args
     query.configuration = self.__options_to_string_list()
-    print "Explain query: %s" % (query.query,)
+    print_to_stderr("Explain query: %s" % (query.query,))
     (explanation, status) = self.__do_rpc(lambda: self.imp_service.explain(query))
     if status != RpcStatus.OK:
       return False
 
-    print explanation.textual
+    print_to_stderr(explanation.textual)
     return True
 
   def do_refresh(self, args):
@@ -821,7 +793,7 @@ class ImpalaShell(cmd.Cmd):
     else:
       db_table_name = self.__parse_table_name_arg(args)
       if db_table_name is None:
-        print 'Usage: refresh [databaseName.][tableName]'
+        print_to_stderr('Usage: refresh [databaseName.][tableName]')
         return False
       (_, status) = self.__do_rpc(
           lambda: self.imp_service.ResetTable(TResetTableReq(*db_table_name)))
@@ -837,9 +809,9 @@ class ImpalaShell(cmd.Cmd):
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
         cmd = self.readline.get_history_item(index)
-        print '[%d]: %s' % (index, cmd)
+        print_to_stderr('[%d]: %s' % (index, cmd))
     else:
-      print 'readline module not found, history is not supported.'
+      print_to_stderr('readline module not found, history is not supported.')
     return True
 
   def preloop(self):
@@ -848,7 +820,7 @@ class ImpalaShell(cmd.Cmd):
       try:
         self.readline.read_history_file(self.history_file)
       except IOError, i:
-        print 'Unable to load history: %s' % i
+        print_to_stderr('Unable to load history: %s' % i)
 
   def postloop(self):
     """Save session commands in history."""
@@ -856,10 +828,10 @@ class ImpalaShell(cmd.Cmd):
       try:
         self.readline.write_history_file(self.history_file)
       except IOError, i:
-        print 'Unable to save history: %s' % i
+        print_to_stderr('Unable to save history: %s' % i)
 
   def default(self, args):
-    print "Unrecognized command"
+    print_to_stderr("Unrecognized command")
     return True
 
   def emptyline(self):
@@ -868,8 +840,8 @@ class ImpalaShell(cmd.Cmd):
 
   def do_version(self, args):
     """Prints the Impala build version"""
-    print "Shell version: %s" % VERSION_STRING
-    print "Server version: %s" % self.server_version
+    print_to_stderr("Shell version: %s" % VERSION_STRING)
+    print_to_stderr("Server version: %s" % self.server_version)
     return True
 
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
@@ -878,6 +850,9 @@ available commands.
 Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 (Shell build version: %s)""" % VERSION_STRING
+
+def print_to_stderr(message):
+  print >>sys.stderr, message
 
 def parse_query_text(query_text):
   """Parse query file text and filter comments """
@@ -898,7 +873,7 @@ def execute_queries_non_interactive_mode(options):
       queries = parse_query_text(query_file_handle.read())
       query_file_handle.close()
     except Exception, e:
-      print 'Error: %s' % e
+      print_to_stderr('Error: %s' % e)
       sys.exit(1)
   elif options.query:
     queries = parse_query_text(options.query)
@@ -914,7 +889,7 @@ def execute_queries_non_interactive_mode(options):
     sanitized_queries.append(shell.sanitise_input(query, interactive=False))
   for query in sanitized_queries:
     if not shell.onecmd(query):
-      print 'Could not execute command: %s' % query
+      print_to_stderr('Could not execute command: %s' % query)
       if not options.ignore_query_failure:
         sys.exit(1)
 
@@ -929,11 +904,16 @@ if __name__ == "__main__":
   parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
                     action="store_true", help="Connect to a kerberized impalad")
   parser.add_option("-o", "--output_file", dest="output_file", default=None,
-                    help="If set, query results will be saved to the given file as well "\
-                    "as output to the console. Results from multiple queries will be "\
-                    "be append to the same file")
-  parser.add_option("--output_file_field_delim", dest="output_file_field_delim",
-                    default=',', help="Field delimiter to use in the output file")
+                    help=("If set, query results will written to the "
+                          "given file. Results from multiple semicolon-terminated "
+                          "queries will be appended to the same file"))
+  parser.add_option("-B", "--delimited", dest="write_delimited", action="store_true",
+                    help="Output rows in delimited mode")
+  parser.add_option("--print_header", dest="print_header", action="store_true",
+                    help=("Print column names in delimited mode, true by default"
+                          " when pretty-printed.")
+  parser.add_option("--output_delimiter", dest="output_delimiter", default='\t',
+                    help="Field delimiter to use for output in delimited mode")
   parser.add_option("-s", "--kerberos_service_name",
                     dest="kerberos_service_name", default=None,
                     help="Service name of a kerberized impalad, default is 'impala'")
@@ -957,7 +937,7 @@ if __name__ == "__main__":
 
   # Arguments that could not be parsed are stored in args. Print an error and exit.
   if len(args) > 0:
-    print 'Error, could not parse arguments "%s"' % (' ').join(args)
+    print_to_stderr('Error, could not parse arguments "%s"' % (' ').join(args))
     parser.print_help()
     sys.exit(1)
 
@@ -970,16 +950,17 @@ if __name__ == "__main__":
     try:
       import sasl
     except ImportError:
-      print 'sasl not found.'
+      print_to_stderr('sasl not found.')
       sys.exit(1)
     from thrift_sasl import TSaslClientTransport
 
     # The service name defaults to 'impala' if not specified by the user.
     if not options.kerberos_service_name:
       options.kerberos_service_name = 'impala'
-    print "Using service name '%s' for kerberos" % options.kerberos_service_name
+    print_to_stderr("Using service name '%s' for kerberos" \
+                    % options.kerberos_service_name)
   elif options.kerberos_service_name:
-    print 'Kerberos not enabled, ignoring service name'
+     print_to_stderr('Kerberos not enabled, ignoring service name')
 
   if options.output_file:
     try:
@@ -987,7 +968,7 @@ if __name__ == "__main__":
       # if successful.
       open(options.output_file, 'wb')
     except IOError, e:
-      print 'Error opening output file for writing: %s' % e
+      print_to_stderr('Error opening output file for writing: %s' % e)
       sys.exit(1)
 
   if options.query or options.query_file:
