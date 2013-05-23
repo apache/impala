@@ -454,12 +454,9 @@ class ExprTest : public testing::Test {
   template <typename T> void TestFixedPointLimits(PrimitiveType type) {
     // cast to non-char type first, otherwise we might end up interpreting
     // the min/max as an ascii value
-    // We need to add 1 to t_min because there are no negative integer literals.
-    // The reason is that whether a minus belongs to an
-    // arithmetic expr or a literal must be decided by the parser, not the lexer.
-    int64_t t_min = numeric_limits<T>::min() + 1;
+    int64_t t_min = numeric_limits<T>::min();
     int64_t t_max = numeric_limits<T>::max();
-    TestValue(lexical_cast<string>(t_min), type, numeric_limits<T>::min() + 1);
+    TestValue(lexical_cast<string>(t_min), type, numeric_limits<T>::min());
     TestValue(lexical_cast<string>(t_max), type, numeric_limits<T>::max());
   }
 
@@ -591,27 +588,6 @@ class ExprTest : public testing::Test {
   }
 };
 
-// TODO: Remove this specialization once the parser supports
-// int literals with value numeric_limits<int64_t>::min().
-// Currently the parser can handle negative int literals up to
-// numeric_limits<int64_t>::min()+1.
-template <>
-void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
-  int64_t t_min = numeric_limits<int64_t>::min() + 1;
-  int64_t t_max = numeric_limits<int64_t>::max();
-  TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
-  TestEqual(lexical_cast<string>(t_min), true);
-  TestEqual(lexical_cast<string>(t_max), true);
-  if (test_boundaries) {
-    // this requires a cast of the second operand to a higher-resolution type
-    TestComparison(lexical_cast<string>(t_min - 1),
-                 lexical_cast<string>(t_max), true);
-    // this requires a cast of the first operand to a higher-resolution type
-    TestComparison(lexical_cast<string>(t_min),
-                 lexical_cast<string>(t_max + 1), true);
-  }
-}
-
 // Test casting 'stmt' to each of the native types.  The result should be 'val'
 // 'stmt' is a partial stmt that could be of any valid type.
 template<>
@@ -645,11 +621,6 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value,
   RuntimeState state(TUniqueId(), TQueryOptions(), "", NULL);
 
   Expr* expr = Expr::CreateLiteral(&pool, type, value);
-  EXPECT_TRUE(expr != NULL);
-  Expr::Prepare(expr, &state, desc, disable_codegen_);
-  EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
-
-  expr = Expr::CreateLiteral(&pool, type, string_val);
   EXPECT_TRUE(expr != NULL);
   Expr::Prepare(expr, &state, desc, disable_codegen_);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);

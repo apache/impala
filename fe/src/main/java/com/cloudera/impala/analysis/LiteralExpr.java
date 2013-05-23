@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.math.BigInteger;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -100,8 +102,8 @@ public abstract class LiteralExpr extends Expr {
     case SMALLINT:
     case INT:
     case BIGINT:
-      if (val.isSetIntVal()) result = new IntLiteral(Long.valueOf(val.intVal));
-      if (val.isSetLongVal()) result = new IntLiteral(Long.valueOf(val.longVal));
+      if (val.isSetIntVal()) result = new IntLiteral(BigInteger.valueOf(val.intVal));
+      if (val.isSetLongVal()) result = new IntLiteral(BigInteger.valueOf(val.longVal));
       break;
     case FLOAT:
     case DOUBLE:

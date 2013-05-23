@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -430,6 +431,66 @@ public class AnalyzerTest {
     AnalysisError("select 1, *, 2+4",
         "'*' expression in select list requires FROM clause.");
     AnalysisError("select a.*", "unknown table: a");
+  }
+
+  @Test
+  public void TestNumericLiteralMinMaxValues() {
+    testNumericLiteral(Byte.toString(Byte.MIN_VALUE), PrimitiveType.TINYINT);
+    testNumericLiteral(Byte.toString(Byte.MAX_VALUE), PrimitiveType.TINYINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MIN_VALUE), PrimitiveType.SMALLINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MAX_VALUE), PrimitiveType.TINYINT);
+
+    testNumericLiteral(Short.toString(Short.MIN_VALUE), PrimitiveType.SMALLINT);
+    testNumericLiteral(Short.toString(Short.MAX_VALUE), PrimitiveType.SMALLINT);
+    testNumericLiteral("- " + Short.toString(Short.MIN_VALUE), PrimitiveType.INT);
+    testNumericLiteral("- " + Short.toString(Short.MAX_VALUE), PrimitiveType.SMALLINT);
+
+    testNumericLiteral(Integer.toString(Integer.MIN_VALUE), PrimitiveType.INT);
+    testNumericLiteral(Integer.toString(Integer.MAX_VALUE), PrimitiveType.INT);
+    testNumericLiteral("- " + Integer.toString(Integer.MIN_VALUE), PrimitiveType.BIGINT);
+    testNumericLiteral("- " + Integer.toString(Integer.MAX_VALUE), PrimitiveType.INT);
+
+    testNumericLiteral(Long.toString(Long.MIN_VALUE), PrimitiveType.BIGINT);
+    testNumericLiteral(Long.toString(Long.MAX_VALUE), PrimitiveType.BIGINT);
+    AnalysisError(String.format("select - %s", Long.toString(Long.MIN_VALUE)),
+        "Literal '9223372036854775808' exceeds maximum range of integers.");
+    testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), PrimitiveType.BIGINT);
+
+    // Test overflow/underflow.
+    AnalysisError(String.format("select %s1", Long.toString(Long.MIN_VALUE)),
+        "Literal '-92233720368547758081' exceeds maximum range of integers.");
+    AnalysisError(String.format("select %s1", Long.toString(Long.MAX_VALUE)),
+        "Literal '92233720368547758071' exceeds maximum range of integers.");
+    // Test min int64-1.
+    BigInteger minMinusOne = BigInteger.valueOf(Long.MIN_VALUE);
+    minMinusOne = minMinusOne.subtract(BigInteger.ONE);
+    AnalysisError(String.format("select %s", minMinusOne.toString()),
+        "Literal '-9223372036854775809' exceeds maximum range of integers.");
+    // Test max int64+1.
+    BigInteger maxPlusOne = BigInteger.valueOf(Long.MAX_VALUE);
+    maxPlusOne = maxPlusOne.add(BigInteger.ONE);
+    AnalysisError(String.format("select %s", maxPlusOne.toString()),
+        "Literal '9223372036854775808' exceeds maximum range of integers.");
+
+    // Test floating-point types.
+    // TODO: Fix detecting the min resolution type for floating-point literals.
+    testNumericLiteral(Float.toString(Float.MIN_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral(Float.toString(Float.MAX_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MAX_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MIN_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MAX_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), PrimitiveType.DOUBLE);
+  }
+
+  /**
+   * Asserts that "select literal" analyzes ok and that the expectedType
+   * matches the actual type.
+   */
+  private void testNumericLiteral(String literal, PrimitiveType expectedType) {
+    SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + literal);
+    Assert.assertEquals(expectedType, selectStmt.resultExprs.get(0).getType());
   }
 
   @Test

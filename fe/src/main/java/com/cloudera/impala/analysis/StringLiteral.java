@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.math.BigInteger;
 
 import java_cup.runtime.Symbol;
 
@@ -52,7 +53,7 @@ public class StringLiteral extends LiteralExpr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.STRING_LITERAL;
-   
+
     msg.string_literal = new TStringLiteral(getUnescapedValue());
   }
 
@@ -105,7 +106,8 @@ public class StringLiteral extends LiteralExpr {
     try {
       // We allow simple chaining of MINUS to recognize negative numbers.
       // Currently we can't handle string literals containing full fledged expressions
-      // which are implicitly cast to a numeric literal. This would require invoking the parser.
+      // which are implicitly cast to a numeric literal.
+      // This would require invoking the parser.
       sym = scanner.next_token();
       while (sym.sym == SqlParserSymbols.SUBTRACT) {
         multiplier *= -1;
@@ -119,7 +121,7 @@ public class StringLiteral extends LiteralExpr {
     }
     if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
       Long val = (Long) sym.value;
-      return new IntLiteral(new Long(val * (long)multiplier));
+      return new IntLiteral(BigInteger.valueOf(val * (long)multiplier));
     }
     if (sym.sym == SqlParserSymbols.FLOATINGPOINT_LITERAL) {
       return new FloatLiteral((Double) sym.value * multiplier);

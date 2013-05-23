@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.math.BigInteger;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -23,50 +25,55 @@ import com.cloudera.impala.thrift.TIntLiteral;
 import com.google.common.base.Preconditions;
 
 public class IntLiteral extends LiteralExpr {
-  private long value;
+  // We use a higher-resolution type to address edge cases such as Long.MIN_VALUE,
+  // which the lexer/parser cannot properly recognize by itself.
+  // We detect overflow and set the type in analysis.
+  private BigInteger value;
 
-  private void init(Long value) {
-    this.value = value.longValue();
-    if (this.value <= Byte.MAX_VALUE && this.value >= Byte.MIN_VALUE) {
+  public IntLiteral(BigInteger value) {
+    this.value = value;
+  }
+
+  public IntLiteral(String value) throws AnalysisException {
+    Long longValue = null;
+    try {
+      longValue = new Long(value);
+    } catch (NumberFormatException e) {
+      throw new AnalysisException("invalid integer literal: " + value, e);
+    }
+    this.value = BigInteger.valueOf(longValue.longValue());
+    analyze(null);
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+    if (value.compareTo(BigInteger.valueOf(Byte.MAX_VALUE)) <= 0 &&
+        value.compareTo(BigInteger.valueOf(Byte.MIN_VALUE)) >= 0) {
       type = PrimitiveType.TINYINT;
-    } else if (this.value <= Short.MAX_VALUE && this.value >= Short.MIN_VALUE) {
+    } else if (value.compareTo(BigInteger.valueOf(Short.MAX_VALUE)) <= 0 &&
+        value.compareTo(BigInteger.valueOf(Short.MIN_VALUE)) >= 0) {
       type = PrimitiveType.SMALLINT;
-    } else if (this.value <= Integer.MAX_VALUE && this.value >= Integer.MIN_VALUE) {
+    } else if (value.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) <= 0 &&
+        value.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) >= 0) {
       type = PrimitiveType.INT;
     } else {
-      Preconditions.checkState(this.value <= Long.MAX_VALUE
-          && this.value >= Long.MIN_VALUE);
+      if (value.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ||
+          value.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) < 0) {
+        throw new AnalysisException(
+            String.format("Literal '%s' exceeds maximum range of integers.", toSql()));
+      }
       type = PrimitiveType.BIGINT;
     }
   }
 
-  public IntLiteral(Long value) {
-    init(value);
-  }
-
-  /** C'tor forcing type, e.g., due to implicit cast */
-  public IntLiteral(Long value, PrimitiveType type) {
-    this.value = value.longValue();
-    this.type = type;
-  }
-
-  public IntLiteral(String value) throws AnalysisException {
-    Long intValue = null;
-    try {
-      intValue = new Long(value);
-    } catch (NumberFormatException e) {
-      throw new AnalysisException("invalid integer literal: " + value, e);
-    }
-    init(intValue);
-  }
-
   public long getValue() {
-    return value;
+    return value.longValue();
   }
 
   @Override
   public String getStringValue() {
-    return Long.toString(value);
+    return value.toString();
   }
 
   @Override
@@ -74,7 +81,7 @@ public class IntLiteral extends LiteralExpr {
     if (!super.equals(obj)) {
       return false;
     }
-    return value == ((IntLiteral) obj).value;
+    return value.equals(((IntLiteral) obj).value);
   }
 
   @Override
@@ -85,7 +92,7 @@ public class IntLiteral extends LiteralExpr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.INT_LITERAL;
-    msg.int_literal = new TIntLiteral(value);
+    msg.int_literal = new TIntLiteral(value.longValue());
   }
 
   @Override
@@ -95,14 +102,13 @@ public class IntLiteral extends LiteralExpr {
       this.type = targetType;
       return this;
     } else if (targetType.isFloatingPointType()) {
-      return new FloatLiteral(new Double(value), targetType);
+      return new FloatLiteral(new Double(value.longValue()), targetType);
     }
     return this;
   }
 
   @Override
   public void swapSign() throws NotImplementedException {
-    // swapping sign does not change the type
-    value = -value;
+    value = value.negate();
   }
 }

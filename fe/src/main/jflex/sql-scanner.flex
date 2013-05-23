@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java_cup.runtime.Symbol;
 import java.lang.Integer;
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -281,9 +282,9 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 }
 
 {IntegerLiteral} {
-  Long val = null;
+  BigInteger val = null;
   try {
-    val = new Long(yytext());
+    val = new BigInteger(yytext());
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }

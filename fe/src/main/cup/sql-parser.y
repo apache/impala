@@ -19,6 +19,7 @@ import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java_cup.runtime.Symbol;
@@ -185,7 +186,7 @@ terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
 terminal String NUMERIC_OVERFLOW;
-terminal Long INTEGER_LITERAL;
+terminal BigInteger INTEGER_LITERAL;
 terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
@@ -1098,11 +1099,15 @@ sign_chain_expr ::=
   SUBTRACT expr:e
   {:
     // integrate signs into literals
-    if (e.isLiteral() && e.getType().isNumericType()) {
+    // integer literals require analysis to set their type, so the instance check below
+    // is not equivalent to e.getType().isNumericType()
+    if (e.isLiteral() &&
+       (e instanceof IntLiteral || e instanceof FloatLiteral)) {
       ((LiteralExpr)e).swapSign();
       RESULT = e;
     } else {
-      RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, new IntLiteral((long)-1), e);
+      RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
+                                  new IntLiteral(BigInteger.valueOf(-1)), e);
     }
   :}
   | ADD expr:e

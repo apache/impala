@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 
 import org.junit.Test;
@@ -394,23 +395,44 @@ public class ParserTest {
   }
 
   @Test
-  public void TestOverflow() {
-    ParsesOk("select " + Long.toString(Long.MAX_VALUE) + " from test");
-    // We need to add 1 to MIN_VALUE because there are no negative integer literals.
-    // The reason is that whether a minus belongs to an
-    // arithmetic expr or a literal must be decided by the parser, not the lexer.
-    ParsesOk("select " + Long.toString(Long.MIN_VALUE+1) + " from test");
-    ParsesOk("select " + Double.toString(Double.MAX_VALUE) + " from test");
-    ParsesOk("select " + Double.toString(Double.MIN_VALUE) + " from test");
-    ParsesOk("select 0.0 from test");
-    ParserError("select " + Long.toString(Long.MAX_VALUE) + "1 from test");
-    ParserError("select " + Long.toString(Long.MIN_VALUE) + "1 from test");
-    // java converts a float overflow to infinity, we consider it an error
-    ParserError("select " + Double.toString(Double.MAX_VALUE) + "1 from test");
+  public void TestNumericLiteralMinMaxValues() {
+    // Test integer types.
+    ParsesOk(String.format("select %s", Byte.toString(Byte.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Byte.toString(Byte.MAX_VALUE)));
+    ParsesOk(String.format("select %s", Short.toString(Short.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Short.toString(Short.MAX_VALUE)));
+    ParsesOk(String.format("select %s", Integer.toString(Integer.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Integer.toString(Integer.MAX_VALUE)));
+    ParsesOk(String.format("select %s", Long.toString(Long.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Long.toString(Long.MAX_VALUE)));
+
+    // Overflowing long integers parse ok. Analysis will handle it.
+    ParsesOk(String.format("select %s1", Long.toString(Long.MIN_VALUE)));
+    ParsesOk(String.format("select %s1", Long.toString(Long.MAX_VALUE)));
+    // Test min int64-1.
+    BigInteger minMinusOne = BigInteger.valueOf(Long.MAX_VALUE);
+    minMinusOne = minMinusOne.add(BigInteger.ONE);
+    ParsesOk(String.format("select %s", minMinusOne.toString()));
+    // Test max int64+1.
+    BigInteger maxPlusOne = BigInteger.valueOf(Long.MAX_VALUE);
+    maxPlusOne = maxPlusOne.add(BigInteger.ONE);
+    ParsesOk(String.format("select %s", maxPlusOne.toString()));
+
+    // Test floating-point types.
+    ParsesOk(String.format("select %s", Float.toString(Float.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Float.toString(Float.MAX_VALUE)));
+    ParsesOk(String.format("select -%s", Float.toString(Float.MIN_VALUE)));
+    ParsesOk(String.format("select -%s", Float.toString(Float.MAX_VALUE)));
+    ParsesOk(String.format("select %s", Double.toString(Double.MIN_VALUE)));
+    ParsesOk(String.format("select %s", Double.toString(Double.MAX_VALUE)));
+    ParsesOk(String.format("select -%s", Double.toString(Double.MIN_VALUE)));
+    ParsesOk(String.format("select -%s", Double.toString(Double.MAX_VALUE)));
     // Java converts a float underflow to 0.0.
     // Since there is no easy, reliable way to detect underflow,
     // we don't consider it an error.
-    ParsesOk("select " + Double.toString(Double.MIN_VALUE) + "1 from test");
+    ParsesOk(String.format("select %s1", Double.toString(Double.MIN_VALUE)));
+    // java converts a float overflow to infinity, we consider it an error
+    ParserError(String.format("select %s1", Double.toString(Double.MAX_VALUE)));
   }
 
   @Test
@@ -1347,12 +1369,6 @@ public class ParserTest {
         "Unmatched string literal at:\n" +
         "select c, 'b, c from t\n" +
         "           ^\n");
-
-    // numeric overflow for Long literal
-    ParserError("select " + Long.toString(Long.MAX_VALUE) + "1 from t",
-        "Numeric overflow at:\n" +
-        "select 92233720368547758071 from t\n" +
-        "       ^\n");
 
     // test placement of error indicator ^ on queries with multiple lines
     ParserError("select (i + 5)(1 - i) from t",
