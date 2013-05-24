@@ -644,7 +644,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Must be called with profile_log_file_lock_ held.
   Status OpenProfileLogFile(bool reopen);
 
-  // Runs once every 5s to flush the query archival file to disk.
+  // Runs once every 5s to flush the profile log file to disk.
   void LogFileFlushThread();
 
   // Copies a query's state into the query log. Called immediately prior to a
