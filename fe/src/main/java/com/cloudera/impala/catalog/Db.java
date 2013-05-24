@@ -14,25 +14,19 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
 
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
 import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
-
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -48,7 +42,7 @@ import com.google.common.collect.MapMaker;
  * object.
  *
  * Tables are stored in a map from the table name to the table object. They may
- * be loaded 'eagerly' at construction or 'lazily' on first reference. 
+ * be loaded 'eagerly' at construction or 'lazily' on first reference.
  * Tables are accessed via getTable which may trigger a metadata read in two cases:
  *  * if the table has never been loaded
  *  * if the table loading failed on the previous attempt
@@ -64,7 +58,7 @@ public class Db {
   private final LazyTableMap tables;
 
   /**
-   * Thrown when a table cannot be loaded due to an error. 
+   * Thrown when a table cannot be loaded due to an error.
    */
   public static class TableLoadingException extends ImpalaException {
     public TableLoadingException(String s, Throwable cause) {
@@ -114,6 +108,7 @@ public class Db {
             // TODO: Increase concurrency level once HIVE-3521 is resolved.
             .concurrencyLevel(1)
             .build(new CacheLoader<String, Table>() {
+              @Override
               public Table load(String tableName) throws TableNotFoundException,
                   TableLoadingException {
                 return loadTable(tableName);
@@ -139,7 +134,7 @@ public class Db {
      * Invalidate the metadata for the given table name and marks the table metadata load
      * state as uninitialized. If ifExists is true, this will only invalidate if the table
      * name already exists in the tableNameMap. If ifExists is false, the table metadata
-     * will be invalidated and the metadata state will be set to UNINITIALIZED 
+     * will be invalidated and the metadata state will be set to UNINITIALIZED
      * (potentially adding a new item to the table name map).
      */
     public void invalidate(String tableName, boolean ifExists) {
@@ -155,7 +150,7 @@ public class Db {
     }
 
     /**
-     * Removes the table from the metadata cache 
+     * Removes the table from the metadata cache
      */
     public void remove(String tableName) {
       tableName = tableName.toLowerCase();
@@ -268,17 +263,10 @@ public class Db {
        boolean lazy) {
     try {
       Db db = new Db(dbName, catalog, client);
-      if (!lazy) {
-        // Load all the table metadata
-        for (String tableName: db.getAllTableNames() ) {
-          db.getTable(tableName);
-        }
-      }
+      // Load all the table metadata
+      if (!lazy) db.forceLoadAllTables();        
       return db;
     } catch (MetaException e) {
-      // turn into unchecked exception
-      throw new IllegalStateException(e);
-    } catch (TableLoadingException e) {
       // turn into unchecked exception
       throw new IllegalStateException(e);
     }

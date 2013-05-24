@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,12 +68,12 @@ public class Catalog {
   private static final int META_STORE_CLIENT_POOL_SIZE = 5;
   private final boolean lazy;
   private int nextTableId;
-  private final MetaStoreClientPool metaStoreClientPool;
+  private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
   // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
   private final Object metastoreDdlLock = new Object();
 
   // map from db name to DB
-  private final LazyDbMap dbs;
+  private final LazyDbMap dbs = new LazyDbMap();
 
   // Tracks whether a Table/Db has all of its metadata loaded.
   enum MetadataLoadState {
@@ -119,35 +118,25 @@ public class Catalog {
         .makeMap();
 
     /**
-     * Initializes the class with a list of valid database names and marks each
-     * database's metadata as uninitialized.
+     * Initializes the class without any database.
      */
-    public LazyDbMap(List<String> dbNames) {
-      for (String dbName: dbNames) {
-        dbNameMap.put(dbName.toLowerCase(), MetadataLoadState.UNINITIALIZED);
-      }
+    public LazyDbMap() {}
+
+    /**
+     * Add the database to the map and mark the metadata as uninitialized
+     */
+    public void add(String dbName) {
+      dbName = dbName.toLowerCase();
+      Preconditions.checkArgument(!dbNameMap.containsKey(dbName));
+      dbNameMap.put(dbName, MetadataLoadState.UNINITIALIZED);
     }
 
     /**
-     * Invalidate the metadata for the given db name and marks the db metadata load
-     * state as uninitialized. Invalidating the metadata will cause the next access to
-     * the db to reload (synchronize) its metadata from the metastore.
-     * If ifExists is true, this will only invalidate if the db name already exists in
-     * the dbNameMap. If ifExists is false, the db metadata will be invalidated and the
-     * metadata state will be set as UNINITIALIZED (potentially adding a new item to the
-     * db name map).
+     * Add the databases to the map and mark the metadata as uninitialized
      */
-    public void invalidate(String dbName, boolean ifExists) {
-      dbName = dbName.toLowerCase();
-      if (ifExists) {
-        if (dbNameMap.replace(dbName, MetadataLoadState.UNINITIALIZED) != null) {
-          // TODO: Should we always invalidate the metadata cache even if the db
-          // doesn't exist in the db name map?
-          dbMetadataCache.invalidate(dbName);
-        }
-      } else {
-        dbNameMap.put(dbName, MetadataLoadState.UNINITIALIZED);
-        dbMetadataCache.invalidate(dbName);
+    public void add(List<String> dbNames) {
+      for (String dbName: dbNames) {
+        add(dbName);
       }
     }
 
@@ -282,22 +271,19 @@ public class Catalog {
     this.nextTableId = 0;
     this.lazy = lazy;
 
-    MetaStoreClientPool clientPool = null;
-    LazyDbMap dbMap = null;
     try {
-      clientPool = new MetaStoreClientPool(META_STORE_CLIENT_POOL_SIZE);
-      MetaStoreClient msClient = clientPool.getClient();
-
+      metaStoreClientPool.addClients(META_STORE_CLIENT_POOL_SIZE);
+      MetaStoreClient msClient = metaStoreClientPool.getClient();
       try {
-        dbMap = new LazyDbMap(msClient.getHiveClient().getAllDatabases());
+        dbs.add(msClient.getHiveClient().getAllDatabases());
       } finally {
         msClient.release();
       }
 
       if (!lazy) {
         // Load all the metadata
-        for (String dbName: dbMap.getAllDbNames()) {
-          dbMap.get(dbName);
+        for (String dbName: dbs.getAllDbNames()) {
+          dbs.get(dbName);
         }
       }
     } catch (Exception e) {
@@ -308,13 +294,9 @@ public class Catalog {
         }
         throw new IllegalStateException(e);
       }
-
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
-
-    metaStoreClientPool = clientPool == null ? new MetaStoreClientPool(0) : clientPool;
-    dbs = dbMap == null ? new LazyDbMap(new ArrayList<String>()) : dbMap;
   }
 
   /**
@@ -687,7 +669,7 @@ public class Catalog {
       } finally {
         msClient.release();
       }
-      dbs.invalidate(dbName, false);
+      dbs.add(dbName);
     }
   }
 

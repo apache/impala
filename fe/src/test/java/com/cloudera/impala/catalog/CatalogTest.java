@@ -9,22 +9,21 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.Db.TableLoadingException;
-import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.common.MetaStoreClientPool;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
@@ -363,7 +362,7 @@ public class CatalogTest {
   @Test
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
-    HBaseTable table = 
+    HBaseTable table =
         (HBaseTable)catalog.getDb("functional").getTable("internal_hbase_table");
     assertNotNull("internal_hbase_table was not found", table);
   }

@@ -14,13 +14,12 @@
 
 package com.cloudera.impala.common;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
@@ -36,6 +35,7 @@ public class MetaStoreClientPool {
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool =
       new ConcurrentLinkedQueue<MetaStoreClient>();
   private Boolean poolClosed = false;
+  private final HiveConf hiveConf;
 
   /**
    * A wrapper around the HiveMetaStoreClient that manages interations with the
@@ -93,7 +93,15 @@ public class MetaStoreClientPool {
   }
 
   public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
-    for (int i = 0; i < initialSize; ++i) {
+    this.hiveConf = hiveConf;
+    addClients(initialSize);
+  }
+
+  /**
+   * Add numClients to the client pool.
+   */
+  public void addClients(int numClients) {
+    for (int i = 0; i < numClients; ++i) {
       clientPool.add(new MetaStoreClient(hiveConf));
     }
   }
@@ -105,7 +113,7 @@ public class MetaStoreClientPool {
     MetaStoreClient client = clientPool.poll();
     // The pool was empty so create a new client and return that.
     if (client == null) {
-      client = new MetaStoreClient(new HiveConf(MetaStoreClientPool.class));
+      client = new MetaStoreClient(hiveConf);
     }
     client.markInUse();
     return client;
