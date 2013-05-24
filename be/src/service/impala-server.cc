@@ -182,6 +182,11 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       return Status::OK;
     }
     case TStmtType::DDL: {
+      if (exec_request_.ddl_exec_request.ddl_type == TDdlType::USE) {
+        lock_guard<mutex> l(parent_session_->lock);
+        parent_session_->database = exec_request_.ddl_exec_request.use_db_params.db;
+        return Status::OK;
+      }
       ddl_executor_.reset(new DdlExecutor(impala_server_));
       return ddl_executor_->Exec(&exec_request_.ddl_exec_request);
     }
@@ -1255,20 +1260,6 @@ Status ImpalaServer::ExecuteInternal(
     (*exec_state)->query_events()->MarkEvent("Planning finished");
   }
 
-  if (result.stmt_type == TStmtType::DDL &&
-      result.ddl_exec_request.ddl_type == TDdlType::USE) {
-    {
-      lock_guard<mutex> l(session_state->lock);
-      session_state->database = result.ddl_exec_request.use_db_params.db;
-    }
-    TUniqueId query_id = (*exec_state)->query_id();
-    exec_state->reset();
-    // USE statements are unique in that they're completely finished as of this point.
-    UnregisterQuery(query_id);
-    *registered_exec_state = false;
-    return Status::OK;
-  }
-
   if (result.__isset.result_set_metadata) {
     (*exec_state)->set_result_metadata(result.result_set_metadata);
   }
@@ -1369,7 +1360,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
   return true;
 }
 
-void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
+void ImpalaServer::Wait(shared_ptr<QueryExecState> exec_state) {
   // block until results are ready
   Status status = exec_state->Wait();
   if (exec_state->returns_result_set()) {

@@ -326,18 +326,12 @@ void ImpalaServer::ExecuteStatement(
 
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
-  if (exec_state.get() == NULL) {
-    // No execution required for this query (USE)
-    // Leave operation handle identifier empty
-    return_val.operationHandle.__set_hasResultSet(false);
-    return;
-  }
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
-  return_val.operationHandle.__set_hasResultSet(true);
+  return_val.operationHandle.__set_hasResultSet(exec_state->returns_result_set());
   // TODO: create secret for operationId and store the secret in exec_state
   TUniqueIdToTHandleIdentifier(exec_state->query_id(), exec_state->query_id(),
-      &return_val.operationHandle.operationId);
+                               &return_val.operationHandle.operationId);
 
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
@@ -532,14 +526,6 @@ void ImpalaServer::CancelOperation(
 void ImpalaServer::CloseOperation(
     TCloseOperationResp& return_val,
     const TCloseOperationReq& request) {
-  if (request.operationHandle.operationId.guid.size() == 0) {
-    // An empty operation handle identifier means no execution and no result for this
-    // query (USE <database>).
-    return_val.status.__set_statusCode(
-        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
-    return;
-  }
-
   TUniqueId query_id;
   TUniqueId secret;
   THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
@@ -606,15 +592,6 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
         SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
   }
 
-  if (request.operationHandle.operationId.guid.size() == 0) {
-    // An empty operation handle identifier means no execution and no result for this
-    // query (USE <database>).
-    return_val.__set_hasMoreRows(false);
-    return_val.status.__set_statusCode(
-        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
-    return;
-  }
-
   // Convert Operation id to TUniqueId and get the query exec state.
   // TODO: check secret
   TUniqueId query_id;
@@ -635,14 +612,6 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
 }
 
 void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
-  if (request.operationHandle.operationId.guid.size() == 0) {
-    // An empty operation handle identifier means no execution and no log for this
-    // query (USE <database>).
-    return_val.status.__set_statusCode(
-        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
-    return;
-  }
-
   // Convert Operation id to TUniqueId and get the query exec state.
   TUniqueId query_id;
   TUniqueId secret;

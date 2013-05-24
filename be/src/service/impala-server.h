@@ -318,7 +318,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     SessionState* parent_session() { return parent_session_.get(); }
     const std::string user() const { return parent_session_->user; }
     const std::string default_db() const { return query_session_state_.database; }
-    bool eos() { return eos_; }
+    bool eos() const { return eos_; }
     Coordinator* coord() const { return coord_.get(); }
     int num_rows_fetched() const { return num_rows_fetched_; }
     bool returns_result_set() { return !result_metadata_.columnDescs.empty(); }
