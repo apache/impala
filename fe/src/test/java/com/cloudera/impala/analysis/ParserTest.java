@@ -395,6 +395,55 @@ public class ParserTest {
   }
 
   @Test
+  public void TestWithClause() throws AnalysisException {
+    ParsesOk("with t as (select 1 as a) select a from t");
+    ParsesOk("with t as (select c from tab) select * from t");
+    ParsesOk("with t as (values(1, 2, 3), (4, 5, 6)) select * from t");
+    ParsesOk("with t1 as (select 1 as a), t2 as (select 2 as a) select a from t1");
+    ParsesOk("with t1 as (select c from tab), t2 as (select c from tab)" +
+        "select c from t2");
+    // With clause and union statement.
+    ParsesOk("with t1 as (select 1 as a), t2 as (select 2 as a)" +
+        "select a from t1 union all select a from t2");
+    // With clause and join.
+    ParsesOk("with t1 as (select 1 as a), t2 as (select 2 as a)" +
+        "select a from t1 inner join t2 on t1.a = t2.a");
+    // With clause in inline view.
+    ParsesOk("select * from (with t as (select 1 as a) select * from t) as a");
+    // With clause in query statement of insert statement.
+    ParsesOk("insert into x with t as (select * from tab) select * from t");
+    ParsesOk("insert into x with t as (values(1, 2, 3)) select * from t");
+    // With clause before insert statement.
+    ParsesOk("with t as (select 1) insert into x select * from t");
+
+    // Multiple with clauses. Operands must be in parenthesis to
+    // have their own with clause.
+    ParsesOk("with t as (select 1) " +
+    		"(with t as (select 2) select * from t) union all " +
+    		"(with t as (select 3) select * from t)");
+    ParsesOk("with t as (select 1) " +
+        "(with t as (select 2) select * from t) union all " +
+        "(with t as (select 3) select * from t) order by 1 limit 1");
+    // Multiple with clauses. One before the insert and one inside the query statement.
+    ParsesOk("with t as (select 1) insert into x with t as (select 2) select * from t");
+
+    // Empty with clause.
+    ParserError("with t as () select 1");
+    // Missing select, union or insert statement after with clause.
+    ParserError("select * from (with t as (select 1 as a)) as a");
+    ParserError("with t as (select 1)");
+    // Missing parenthesis around with query statement.
+    ParserError("with t as select 1 as a select a from t");
+    ParserError("with t as select 1 as a union all select a from t");
+    ParserError("with t1 as (select 1 as a), t2 as select 2 as a select a from t");
+    ParserError("with t as select 1 as a select a from t");
+    // Insert in with clause is not valid.
+    ParserError("with t as (insert into x select * from tab) select * from t");
+    // Union operands need to be parenthesized to have their own with clause.
+    ParserError("select * from t union all with t as (select 2) select * from t");
+  }
+
+  @Test
   public void TestNumericLiteralMinMaxValues() {
     // Test integer types.
     ParsesOk(String.format("select %s", Byte.toString(Byte.MIN_VALUE)));
@@ -427,6 +476,7 @@ public class ParserTest {
     ParsesOk(String.format("select %s", Double.toString(Double.MAX_VALUE)));
     ParsesOk(String.format("select -%s", Double.toString(Double.MIN_VALUE)));
     ParsesOk(String.format("select -%s", Double.toString(Double.MAX_VALUE)));
+
     // Java converts a float underflow to 0.0.
     // Since there is no easy, reliable way to detect underflow,
     // we don't consider it an error.
@@ -1330,7 +1380,7 @@ public class ParserTest {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT, VALUES, " +
-        "EXPLAIN\n");
+        "EXPLAIN, WITH\n");
 
     // missing select list
     ParserError("select from t",

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -31,6 +32,8 @@ import com.google.common.collect.Lists;
  *
  */
 public abstract class QueryStmt extends StatementBase {
+  protected WithClause withClause;
+
   protected ArrayList<OrderByElement> orderByElements;
   protected final long limit;
 
@@ -66,6 +69,14 @@ public abstract class QueryStmt extends StatementBase {
     this.orderByElements = orderByElements;
     this.limit = limit;
     this.sortInfo = null;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    if (hasWithClause()) {
+      withClause.analyze(analyzer);
+    }
   }
 
   /**
@@ -134,6 +145,18 @@ public abstract class QueryStmt extends StatementBase {
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 
+  public void setWithClause(WithClause withClause) {
+    this.withClause = withClause;
+  }
+
+  public boolean hasWithClause() {
+    return withClause != null;
+  }
+
+  public WithClause getWithClause() {
+    return withClause;
+  }
+
   public ArrayList<OrderByElement> getOrderByElements() {
     return orderByElements;
   }
@@ -174,4 +197,15 @@ public abstract class QueryStmt extends StatementBase {
   public boolean isExplain() {
     return isExplain;
   }
+
+  public ArrayList<OrderByElement> cloneOrderByElements() {
+    return orderByElements != null ? Lists.newArrayList(orderByElements) : null;
+  }
+
+  public WithClause cloneWithClause() {
+    return withClause != null ? withClause.clone() : null;
+  }
+
+  @Override
+  public abstract QueryStmt clone();
 }

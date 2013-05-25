@@ -76,6 +76,9 @@ public class Analyzer {
   // null.
   private final Analyzer parentAnalyzer;
 
+  // map from lowercase table alias to a virtual-view definition of a WITH clause.
+  private final Map<String, VirtualViewRef> withClauseViews = Maps.newHashMap();
+
   // map from lowercase table alias to descriptor.
   private final Map<String, TupleDescriptor> aliasMap = Maps.newHashMap();
 
@@ -166,6 +169,64 @@ public class Analyzer {
   }
 
   /**
+   * Replaces BaseTableRefs in tblRefs whose alias matches a view registered in
+   * this analyzer or its parent analyzers with a clone of the matching inline view.
+   * The cloned inline view inherits the context-dependent attributes such as the
+   * on-clause, join hints, etc. from the original BaseTableRef.
+   *
+   * Matches views from the inside out, i.e., we first look
+   * in this analyzer then in the parentAnalyzer then and its parent, etc.
+   *
+   * This method is used for substituting views from WITH clauses.
+   */
+  public void substituteBaseTablesWithMatchingViews(List<TableRef> tblRefs) {
+    for (int i = 0; i < tblRefs.size(); ++i) {
+      if (!(tblRefs.get(i) instanceof BaseTableRef)) continue;
+      BaseTableRef tblRef = (BaseTableRef) tblRefs.get(i);
+      VirtualViewRef viewDefinition = findViewDefinition(tblRef);
+      if (viewDefinition == null) continue;
+
+      // Instantiate the virtual view to replace the original BaseTableRef.
+      VirtualViewRef viewInstantiation = viewDefinition.instantiate(tblRef);
+      tblRefs.set(i, viewInstantiation);
+    }
+  }
+
+  /**
+   * Searches the hierarchy of analyzers bottom-up for a registered (non-inline) view
+   * whose alias matches the table name of the given BaseTableRef. Returns the
+   * InlineViewRef from the innermost scope (analyzer).
+   * Returns null if no matching views were found.
+   */
+  public VirtualViewRef findViewDefinition(BaseTableRef ref) {
+    // Do not consider views from the WITH clause if the table name is fully qualified,
+    // or if view replacement was explicitly disabled.
+    if (!ref.getName().isFullyQualified() && ref.isReplacableByView()) {
+      Analyzer analyzer = this;
+      do {
+        String baseTableName = ref.getName().getTbl().toLowerCase();
+        VirtualViewRef view = analyzer.withClauseViews.get(baseTableName);
+        if (view != null) return view;
+        analyzer = analyzer.parentAnalyzer;
+      } while (analyzer != null);
+    }
+    return null;
+    // TODO: Search for matching views from the global scope, i.e., the catalog,
+    // when Impala supports virtual views (IMPALA-372).
+  }
+
+  /**
+   * Adds view to this analyzer's withClauseViews. Throws an exception if a view
+   * definition with the same alias has already been registered.
+   */
+  public void registerWithClauseView(VirtualViewRef ref) throws AnalysisException {
+    if (withClauseViews.put(ref.getAlias().toLowerCase(), ref) != null) {
+      throw new AnalysisException(
+          String.format("Duplicate table alias: '%s'", ref.getAlias()));
+    }
+  }
+
+  /**
    * Checks that 'name' references an existing table and that alias
    * isn't already registered. Creates and returns an empty TupleDescriptor
    * and registers it against alias. If alias is empty, register
@@ -213,7 +274,7 @@ public class Analyzer {
       throws AnalysisException {
     String lookupAlias = ref.getAlias().toLowerCase();
     if (aliasMap.containsKey(lookupAlias)) {
-      throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
+      throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
 
     // Create a fake catalog table for the inline view
@@ -617,6 +678,10 @@ public class Analyzer {
       }
     }
     return compatibleType;
+  }
+
+  public Map<String, VirtualViewRef> getWithClauseViews() {
+    return withClauseViews;
   }
 
   public String getDefaultDb() {

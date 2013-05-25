@@ -28,6 +28,11 @@ import com.google.common.base.Preconditions;
 public class BaseTableRef extends TableRef {
   private final TableName name;
 
+  // Indicates whether this table should be considered for view replacement.
+  // Used to disambiguate non-fully-qualified references to base tables
+  // from WITH-clause views.
+  private boolean allowViewReplacement = true;
+
   public BaseTableRef(TableName name, String alias) {
     super(alias);
     Preconditions.checkArgument(!name.toString().isEmpty());
@@ -35,6 +40,14 @@ public class BaseTableRef extends TableRef {
     this.name = name;
   }
 
+  /**
+   * C'tor for cloning.
+   */
+  public BaseTableRef(BaseTableRef other) {
+    super(other);
+    this.name = other.name;
+    this.allowViewReplacement = other.allowViewReplacement;
+  }
 
   /**
    * Returns the name of the table referred to. Before analysis, the table name
@@ -97,5 +110,30 @@ public class BaseTableRef extends TableRef {
 
   public String debugString() {
     return tableRefToSql();
+  }
+
+  @Override
+  public TableRef clone() {
+    return new BaseTableRef(this);
+  }
+
+  /**
+   * Disable view replacement for this table.
+   * See comment on allowViewReplacement.
+   */
+  public void disableViewReplacement() {
+    allowViewReplacement = false;
+  }
+
+  /**
+   * Enable view replacement for this table.
+   * See comment on allowViewReplacement.
+   */
+  public void enableViewReplacement() {
+    allowViewReplacement = true;
+  }
+
+  public boolean isReplacableByView() {
+    return allowViewReplacement;
   }
 }

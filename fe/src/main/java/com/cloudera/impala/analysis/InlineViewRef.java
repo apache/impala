@@ -35,13 +35,13 @@ public class InlineViewRef extends TableRef {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
   // The select or union statement of the inline view
-  private final QueryStmt queryStmt;
+  protected final QueryStmt queryStmt;
 
   // queryStmt has its own analysis context
-  private Analyzer inlineViewAnalyzer;
+  protected Analyzer inlineViewAnalyzer;
 
   // list of tuple ids materialized by queryStmt
-  private final ArrayList<TupleId> materializedTupleIds = Lists.newArrayList();
+  protected final ArrayList<TupleId> materializedTupleIds = Lists.newArrayList();
 
   // Map inline view colname to the underlying, fully substituted expression.
   // This map is built bottom-up, by recursively applying the substitution
@@ -50,7 +50,7 @@ public class InlineViewRef extends TableRef {
   // (and therefore can be evaluated at runtime).
   // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
   // makeOutputNullable() if this inline view is a nullable side of an outer join.
-  private final Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
+  protected final Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
 
   /**
    * Constructor with alias and inline view select statement
@@ -59,6 +59,7 @@ public class InlineViewRef extends TableRef {
    */
   public InlineViewRef(String alias, QueryStmt queryStmt) {
     super(alias);
+    Preconditions.checkNotNull(queryStmt);
     this.queryStmt = queryStmt;
   }
 
@@ -208,5 +209,10 @@ public class InlineViewRef extends TableRef {
   @Override
   public String debugString() {
     return tableRefToSql();
+  }
+
+  @Override
+  public TableRef clone() {
+    return new InlineViewRef(alias, queryStmt.clone());
   }
 }

@@ -83,4 +83,12 @@ class SelectListItem {
     return expr.toColumnLabel().toLowerCase();
   }
 
+  @Override
+  public SelectListItem clone() {
+    if (isStar) {
+      return createStarItem(tblName);
+    }
+    return new SelectListItem(expr.clone(), alias);
+  }
+
 }

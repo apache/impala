@@ -180,7 +180,7 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
   KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
   KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
-  KW_INTERVAL, KW_VALUES, KW_EXPLAIN;
+  KW_INTERVAL, KW_VALUES, KW_EXPLAIN, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -217,7 +217,7 @@ nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
-nonterminal SelectListItem star_expr ;
+nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal ArrayList<Expr> func_arg_list;
@@ -241,9 +241,12 @@ nonterminal AggregateParamsList aggregate_param_list;
 nonterminal AggregateExpr.Operator aggregate_operator;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
+nonterminal ArrayList<VirtualViewRef> with_table_ref_list;
+nonterminal WithClause with_clause;
 nonterminal TableRef table_ref;
 nonterminal BaseTableRef base_table_ref;
 nonterminal InlineViewRef inline_view_ref;
+nonterminal VirtualViewRef with_table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_join_hints;
@@ -353,18 +356,18 @@ explain_stmt ::=
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
 insert_stmt ::=
-  KW_INSERT KW_OVERWRITE optional_kw_table table_name:table LPAREN
+  with_clause:w KW_INSERT KW_OVERWRITE optional_kw_table table_name:table LPAREN
   optional_ident_list:col_perm RPAREN partition_clause:list optional_query_stmt:query
-  {: RESULT = new InsertStmt(table, true, list, query, col_perm); :}
-  | KW_INSERT KW_OVERWRITE optional_kw_table table_name:table
+  {: RESULT = new InsertStmt(w, table, true, list, query, col_perm); :}
+  | with_clause:w KW_INSERT KW_OVERWRITE optional_kw_table table_name:table
   partition_clause:list query_stmt:query
-  {: RESULT = new InsertStmt(table, true, list, query, null); :}
-  | KW_INSERT KW_INTO optional_kw_table table_name:table LPAREN
+  {: RESULT = new InsertStmt(w, table, true, list, query, null); :}
+  | with_clause:w KW_INSERT KW_INTO optional_kw_table table_name:table LPAREN
   optional_ident_list:col_perm RPAREN partition_clause:list optional_query_stmt:query
-  {: RESULT = new InsertStmt(table, false, list, query, col_perm); :}
-  | KW_INSERT KW_INTO optional_kw_table table_name:table
+  {: RESULT = new InsertStmt(w, table, false, list, query, col_perm); :}
+  | with_clause:w KW_INSERT KW_INTO optional_kw_table table_name:table
   partition_clause:list query_stmt:query
-  {: RESULT = new InsertStmt(table, false, list, query, null); :}
+  {: RESULT = new InsertStmt(w, table, false, list, query, null); :}
   ;
 
 optional_query_stmt ::=
@@ -670,7 +673,7 @@ static_partition_key_value ::=
 // even if the union has order by and limit.
 // ORDER BY and LIMIT bind to the preceding select statement by default.
 query_stmt ::=
-  union_operand_list:operands
+  with_clause:w union_operand_list:operands
   {:
     QueryStmt queryStmt = null;
     if (operands.size() == 1) {
@@ -678,10 +681,40 @@ query_stmt ::=
     } else {
       queryStmt = new UnionStmt(operands, null, -1);
     }
+    queryStmt.setWithClause(w);
     RESULT = queryStmt;
   :}
-  | union_with_order_by_or_limit:union
-  {: RESULT = union; :}
+  | with_clause:w union_with_order_by_or_limit:union
+  {:
+    union.setWithClause(w);
+    RESULT = union;
+  :}
+  ;
+
+with_clause ::=
+  KW_WITH with_table_ref_list:list
+  {: RESULT = new WithClause(list); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+with_table_ref ::=
+  IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
+  {: RESULT = new VirtualViewRef(alias, query); :}
+  ;
+
+with_table_ref_list ::=
+  with_table_ref:t
+  {:
+    ArrayList<VirtualViewRef> list = new ArrayList<VirtualViewRef>();
+    list.add(t);
+    RESULT = list;
+  :}
+  | with_table_ref_list:list COMMA with_table_ref:t
+  {:
+    list.add(t);
+    RESULT = list; 
+  :}
   ;
 
 // We must have a non-empty order by or limit for them to bind to the union.
@@ -827,7 +860,9 @@ describe_stmt ::=
 
 select_stmt ::=
     select_clause:selectList
-  {: RESULT = new SelectStmt(selectList, null, null, null, null, null, -1); :}
+  {:
+    RESULT = new SelectStmt(selectList, null, null, null, null, null, -1);
+  :}
   |
     select_clause:selectList
     from_clause:tableRefList

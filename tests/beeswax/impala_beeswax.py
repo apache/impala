@@ -16,6 +16,7 @@ import sys
 import shlex
 import traceback
 import getpass
+import re
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -79,6 +80,9 @@ class QueryResult(object):
 
 # Interface to beeswax. Responsible for executing queries, fetching results.
 class ImpalaBeeswaxClient(object):
+  # Regex applied to all tokens of a query to detect the query type.
+  INSERT_REGEX = re.compile("^insert$", re.I)
+
   def __init__(self, impalad, use_kerberos=False):
     self.connected = False
     self.impalad = impalad
@@ -256,13 +260,16 @@ class ImpalaBeeswaxClient(object):
     return exec_result
 
   def __get_query_type(self, query_string):
-    lexer = shlex.shlex(query_string.lstrip())
-    # ignore string quotes when splitting for queries with 
-    # single quoted string literals with an escaped single quote inside, e.g.:
-    # select '\''
-    # otherwise shlex will fail because of an unterminated quoted string
-    lexer.quotes = ''
-    return list(lexer)[0].lower()
+    # Set posix=True and add "'" to escaped quotes
+    # to deal with escaped quotes in string literals
+    lexer = shlex.shlex(query_string.lstrip(), posix=True)
+    lexer.escapedquotes += "'"
+    # Because the WITH clause may precede INSERT or SELECT queries,
+    # just checking the first token is insufficient.
+    tokens = list(lexer)
+    if filter(self.INSERT_REGEX.match, tokens):
+      return "insert"
+    return tokens[0].lower()
 
   def __build_error_message(self, exception):
     """Construct a meaningful exception string"""

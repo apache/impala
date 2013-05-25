@@ -15,8 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -28,10 +26,10 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
-import com.google.common.collect.Lists;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Representation of a single insert statement, including the select statement
@@ -39,6 +37,8 @@ import com.google.common.base.Joiner;
  *
  */
 public class InsertStmt extends StatementBase {
+  // List of inline views that may be referenced in queryStmt.
+  private final WithClause withClause;
   // Target table name as seen by the parser
   private final TableName originalTableName;
   // Target table into which to insert. May be qualified by analyze()
@@ -81,9 +81,10 @@ public class InsertStmt extends StatementBase {
   // clause, where the static value is specified.
   private final List<String> columnPermutation;
 
-  public InsertStmt(TableName targetTable, boolean overwrite,
+  public InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, QueryStmt queryStmt,
       List<String> columnPermutation) {
+    this.withClause = withClause;
     this.targetTableName = targetTable;
     this.originalTableName = targetTableName;
     this.overwrite = overwrite;
@@ -97,6 +98,10 @@ public class InsertStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (withClause != null) {
+      withClause.analyze(analyzer);
+    }
+
     List<Expr> selectListExprs;
     if (!needsGeneratedQueryStatement) {
       queryStmt.analyze(analyzer);
@@ -469,6 +474,11 @@ public class InsertStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
+
+    if (withClause != null) {
+      strBuilder.append(withClause.toSql() + " ");
+    }
+
     strBuilder.append("INSERT ");
     if (overwrite) {
       strBuilder.append("OVERWRITE ");

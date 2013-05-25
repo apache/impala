@@ -368,6 +368,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testWithClause() {
+    runPlannerTestFile("with-clause");
+  }
+
+  @Test
   public void testTpch() {
     // TODO: Q20-Q22 are disabled due to IMP-137. Once that bug is resolved they should
     // be re-enabled.

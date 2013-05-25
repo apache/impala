@@ -110,6 +110,11 @@ public class SelectStmt extends QueryStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    super.analyze(analyzer);
+
+    // Replace BaseTableRefs with views from the WITH clause.
+    analyzer.substituteBaseTablesWithMatchingViews(tableRefs);
+
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs) {
@@ -509,6 +514,11 @@ public class SelectStmt extends QueryStmt {
   @Override
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
+    if (withClause != null) {
+      strBuilder.append(withClause.toSql());
+      strBuilder.append(" ");
+    }
+
     // Select list
     strBuilder.append("SELECT ");
     if (selectList.isDistinct()) {
@@ -571,5 +581,24 @@ public class SelectStmt extends QueryStmt {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());
       }
     }
+  }
+
+  private ArrayList<TableRef> cloneTableRefs() {
+    ArrayList<TableRef> clone = Lists.newArrayList();
+    for (TableRef tblRef : tableRefs) {
+      clone.add(tblRef.clone());
+    }
+    return clone;
+  }
+
+  @Override
+  public QueryStmt clone() {
+    SelectStmt selectClone = new SelectStmt(selectList.clone(), cloneTableRefs(),
+        (whereClause != null) ? whereClause.clone(null) : null,
+        (groupingExprs != null) ? Expr.cloneList(groupingExprs, null) : null,
+        (havingClause != null) ? havingClause.clone(null) : null,
+        cloneOrderByElements(), limit);
+    selectClone.setWithClause(cloneWithClause());
+    return selectClone;
   }
 }

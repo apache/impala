@@ -1,0 +1,76 @@
+====
+---- QUERY
+# Basic test with a single with-clause view.
+with t as (select int_col x, bigint_col y from functional.alltypestiny)
+select count(x), count(y) from t
+---- RESULTS
+8,8
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Multiple views in with-clause. Only one view is used.
+with t1 as (select int_col x, bigint_col y from functional.alltypestiny), 
+t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
+select x, y from t2
+---- RESULTS
+1,10
+---- TYPES
+TINYINT, TINYINT
+====
+---- QUERY
+# Multiple views in with-clause. All views are used in a union.
+with t1 as (select int_col x, bigint_col y from functional.alltypestiny), 
+t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
+select * from t1 union all select * from t2 union all (select * from t3) order by x limit 20
+---- RESULTS
+0,0
+0,0
+0,0
+0,0
+1,10
+1,10
+1,10
+1,10
+1,10
+2,20
+3,30
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# Multiple views in with-clause. All views are used in a join.
+with t1 as (select int_col x, bigint_col y from functional.alltypes limit 2), 
+t2 as (select int_col x, bigint_col y from functional.alltypestiny limit 2),
+t3 as (select int_col x, bigint_col y from functional.alltypessmall limit 2)
+select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
+---- RESULTS
+0,0,0,0,0,0
+1,10,1,10,1,10
+---- TYPES
+INT, BIGINT, INT, BIGINT, INT, BIGINT
+====
+---- QUERY
+# Self-join of with-clause table to make sure the join op is properly set
+# in the cloned inline-view instances.
+with t as (select int_col x, bigint_col y from functional.alltypestiny order by id limit 2)
+select * from t t1 left outer join t t2 on t1.y = t2.x full outer join t t3 on t2.y = t3.x
+order by t1.x limit 10
+---- RESULTS
+0,0,0,0,0,0
+1,10,NULL,NULL,NULL,NULL
+NULL,NULL,NULL,NULL,1,10
+---- TYPES
+INT, BIGINT, INT, BIGINT, INT, BIGINT
+====
+---- QUERY
+# Multiple with clauses. One for the UnionStmt and one for each union operand.
+with t1 as (values('a', 'b'))
+(with t2 as (values('c', 'd')) select * from t2) union all
+(with t3 as (values('e', 'f')) select * from t3)
+---- RESULTS
+'e','f'
+'c','d'
+---- TYPES
+STRING, STRING
+====

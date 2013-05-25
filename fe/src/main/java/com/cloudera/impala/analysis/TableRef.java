@@ -35,7 +35,7 @@ public abstract class TableRef implements ParseNode {
   protected final String alias;
 
   protected JoinOperator joinOp;
-  private ArrayList<String> joinHints;
+  protected ArrayList<String> joinHints;
   protected Expr onClause;
   protected List<String> usingColNames;
 
@@ -59,13 +59,35 @@ public abstract class TableRef implements ParseNode {
     isAnalyzed = false;
   }
 
+  /**
+   * C'tor for cloning.
+   */
+  protected TableRef(TableRef other) {
+    super();
+    this.alias = other.alias;
+    this.joinOp = other.joinOp;
+    this.joinHints = (joinHints != null) ? Lists.newArrayList(other.joinHints) : null;
+    this.onClause = (onClause != null) ? other.onClause.clone() : null;
+    this.usingColNames =
+        (usingColNames != null) ? Lists.newArrayList(other.usingColNames) : null;
+    isAnalyzed = false;
+  }
+
   public JoinOperator getJoinOp() {
     // if it's not explicitly set, we're doing an inner join
     return (joinOp == null ? JoinOperator.INNER_JOIN : joinOp);
   }
 
+  public ArrayList<String> getJoinHints() {
+    return joinHints;
+  }
+
   public Expr getOnClause() {
     return onClause;
+  }
+
+  public List<String> getUsingClause() {
+    return usingColNames;
   }
 
   /**
@@ -280,6 +302,9 @@ public abstract class TableRef implements ParseNode {
   abstract public String getAlias();
 
   abstract public TableName getAliasAsName();
+
+  @Override
+  public abstract TableRef clone();
 
   /*
    * Gets the privilege requirement. This is always SELECT for TableRefs.

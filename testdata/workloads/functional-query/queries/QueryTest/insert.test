@@ -601,3 +601,31 @@ select * from alltypesinsert order by id limit 10
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Test with clause in an insert statement.
+with t1 as (select * from alltypestiny)
+insert into alltypesinsert partition(year, month) select * from t1
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2009/month=1/: 2
+year=2009/month=2/: 2
+year=2009/month=3/: 2
+year=2009/month=4/: 2
+====
+---- QUERY
+# Test with clause in an insert statement and in its query statement.
+with t1 as (select * from alltypestiny)
+insert into alltypesinsert partition(year, month)
+with t2 as (select * from alltypestiny)
+select * from t1 union all select * from t2
+---- SETUP
+RESET alltypesinsert
+RELOAD alltypesinsert
+---- RESULTS
+year=2009/month=1/: 4
+year=2009/month=2/: 4
+year=2009/month=3/: 4
+year=2009/month=4/: 4
+====

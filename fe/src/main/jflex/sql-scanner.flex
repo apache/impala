@@ -157,7 +157,8 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));
     keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
     keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP));
-    keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES)); 
+    keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));
+    keywordMap.put("with", new Integer(SqlParserSymbols.KW_WITH));
   }
     
   // map from token id to token description

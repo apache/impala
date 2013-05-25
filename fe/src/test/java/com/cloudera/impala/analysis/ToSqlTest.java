@@ -228,6 +228,38 @@ public class ToSqlTest {
         "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
   }
 
+  @Test
+  public void withClauseTest() {
+    // WITH clause in select stmt.
+    testToSql("with t as (select * from functional.alltypes) select * from t",
+        "WITH t AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
+    // WITH clause in select stmt with a join and an ON clause.
+    testToSql("with t as (select * from functional.alltypes) " +
+        "select * from t a inner join t b on (a.int_col = b.int_col)",
+        "WITH t AS (SELECT * FROM functional.alltypes) " +
+        "SELECT * FROM t a INNER JOIN t b " +
+        "ON (functional.alltypes.int_col = functional.alltypes.int_col)");
+    // WITH clause in select stmt with a join and a USING clause.
+    testToSql("with t as (select * from functional.alltypes) " +
+        "select * from t a inner join t b using(int_col)",
+        "WITH t AS (SELECT * FROM functional.alltypes) " +
+        "SELECT * FROM t a INNER JOIN t b USING (int_col)");
+    // WITH clause in a union stmt.
+    testToSql("with t1 as (select * from functional.alltypes)" +
+    		"select * from t1 union all select * from t1",
+        "WITH t1 AS (SELECT * FROM functional.alltypes) " +
+    		"SELECT * FROM t1 UNION ALL SELECT * FROM t1");
+    // WITH clause in values stmt.
+    testToSql("with t1 as (select * from functional.alltypes) values(1, 2), (3, 4)",
+        "WITH t1 AS (SELECT * FROM functional.alltypes) VALUES((1, 2), (3, 4))");
+    // WITH clause in insert stmt.
+    testToSql("with t1 as (select * from functional.alltypes) " +
+        "insert into functional.alltypes partition(year, month) select * from t1",
+        "WITH t1 AS (SELECT * FROM functional.alltypes) " +
+        "INSERT INTO TABLE functional.alltypes PARTITION (year, month) " +
+        "SELECT * FROM t1");
+  }
+
   // Test the toSql() output of insert queries.
   @Test
   public void insertTest() {

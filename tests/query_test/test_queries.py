@@ -53,6 +53,9 @@ class TestQueries(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
+  def test_with_clause(self, vector):
+    self.run_test_case('QueryTest/with-clause', vector)
+
   def test_values(self, vector):
     # These tests do not read data from tables, so only run them a single time (text/none).
     table_format = vector.get_value('table_format')

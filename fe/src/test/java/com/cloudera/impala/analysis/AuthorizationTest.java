@@ -134,6 +134,25 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestWithClause() throws AuthorizationException, AnalysisException {
+    // User has SELECT privileges on table in WITH-clause view.
+    AuthzOk("with t as (select * from functional.alltypesagg) select * from t");
+    // User doesn't have SELECT privileges on table in WITH-clause view.
+    AuthzError("with t as (select * from functional.alltypes) select * from t",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
+
+    // User has SELECT privileges on table in WITH-clause view in INSERT.
+    AuthzOk("with t as (select * from functional_seq_snap.alltypes) " +
+        "insert into functional_parquet.alltypes partition(month,year) select * from t");
+    // User doesn't have SELECT privileges on table in WITH-clause view in INSERT.
+    AuthzError("with t as (select * from functional_parquet.alltypes) " +
+        "insert into functional_parquet.alltypes partition(month,year) select * from t",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+         "functional_parquet.alltypes");
+  }
+
+  @Test
   public void TestExplain() throws AuthorizationException, AnalysisException {
     AuthzOk("explain select * from functional.alltypesagg");
     AuthzOk("explain insert into functional_parquet.alltypes " +

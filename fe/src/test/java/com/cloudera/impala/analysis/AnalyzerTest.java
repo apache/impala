@@ -18,6 +18,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -44,6 +45,11 @@ public class AnalyzerTest {
     typeToLiteralValue.put(PrimitiveType.DATE, "'2012-12-21'");
     typeToLiteralValue.put(PrimitiveType.DATETIME, "'2012-12-21 00:00:00'");
     typeToLiteralValue.put(PrimitiveType.TIMESTAMP, "'2012-12-21 00:00:00.000'");
+  }
+
+  protected Analyzer createAnalyzer(String defaultDb) {
+    return new Analyzer(catalog, defaultDb, new User(System.getProperty("user.name")),
+        Analyzer.createQueryGlobals());
   }
 
   @BeforeClass
@@ -119,10 +125,17 @@ public class AnalyzerTest {
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt) {
+    return AnalyzesOk(stmt, new Analyzer(catalog));
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   */
+  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
+    this.analyzer = analyzer;
     LOG.info("analyzing " + stmt);
     ParseNode node = ParsesOk(stmt);
     assertNotNull(node);
-    analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -146,6 +159,15 @@ public class AnalyzerTest {
    * is non-null.
    */
   public void AnalysisError(String stmt, String expectedErrorString) {
+    AnalysisError(stmt, new Analyzer(catalog), expectedErrorString);
+  }
+
+  /**
+   * Asserts if stmt passes analysis or the error string doesn't match and it
+   * is non-null.
+   */
+  public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
+    this.analyzer = analyzer;
     LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -157,7 +179,6 @@ public class AnalyzerTest {
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(node);
-    analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -331,7 +352,7 @@ public class AnalyzerTest {
 
     // Analysis error from explain query
     AnalysisError("explain " +
-    		"select id from (select id+2 from functional.hbasealltypessmall) a",
+        "select id from (select id+2 from functional.hbasealltypessmall) a",
         "couldn't resolve column reference: 'id'");
 
     // Positive test for explain query

@@ -19,12 +19,14 @@ import cmd
 import getpass
 import prettytable
 import os
+import shlex
 import signal
 import socket
 import sqlparse
 import sys
 import threading
 import time
+import re
 from optparse import OptionParser
 from Queue import Queue, Empty
 from shell_output import OutputStream, DelimitedOutputFormatter, PrettyOutputFormatter
@@ -77,6 +79,8 @@ class ImpalaShell(cmd.Cmd):
   # Commands are terminated with the following delimiter.
   CMD_DELIM = ';'
   DEFAULT_DB = 'default'
+  # Regex applied to all tokens of a query to detect the query type.
+  INSERT_REGEX = re.compile("^insert$", re.I)
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
@@ -572,6 +576,45 @@ class ImpalaShell(cmd.Cmd):
     if len(db_table_name) == 2:
       return db_table_name
 
+  def __handle_insert_query(self, query):
+    print_to_stderr("Query: %s" % (query.query,))
+    start, end = time.time(), 0
+    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
+    if status != RpcStatus.OK:
+      return False
+
+    query_successful = True
+    while True:
+      query_state = self.__get_query_state(handle)
+      if query_state == self.query_state["FINISHED"]:
+        break
+      elif query_state == self.query_state["EXCEPTION"]:
+        print_to_stderr('Query failed')
+        if self.connected:
+          # Retrieve error message (if any) from log.
+          log, status = self._ImpalaShell__do_rpc(
+            lambda: self.imp_service.get_log(handle.log_context))
+          print_to_stderr(log)
+          query_successful = False
+          break
+        else:
+          return False
+      elif self.is_interrupted.isSet():
+        return self.__cancel_and_close_query(handle)
+      time.sleep(0.05)
+
+    (insert_result, status) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
+    end = time.time()
+    if status != RpcStatus.OK or self.is_interrupted.isSet():
+      return False
+
+    if query_successful:
+      self.__print_runtime_profile_if_enabled(handle)
+      num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+      self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
+      self.last_query_handle = handle
+    return query_successful
+
   def do_alter(self, args):
     query = BeeswaxService.Query()
     query.query = "alter %s" % (args,)
@@ -615,6 +658,22 @@ class ImpalaShell(cmd.Cmd):
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
 
+  def do_with(self, args):
+    """Executes a query with a WITH clause, fetching all rows"""
+    query = self.__create_beeswax_query_handle()
+    query.query = "with %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    # Set posix=True and add "'" to escaped quotes
+    # to deal with escaped quotes in string literals
+    lexer = shlex.shlex(query.query.lstrip(), posix=True)
+    lexer.escapedquotes += "'"
+    # Because the WITH clause may precede INSERT or SELECT queries,
+    # just checking the first token is insufficient.
+    tokens = list(lexer)
+    if filter(self.INSERT_REGEX.match, tokens):
+      return self.__handle_insert_query(query)    
+    return self.__query_with_results(query)
+      
   def do_use(self, args):
     """Executes a USE... query"""
     query = self.__create_beeswax_query_handle()
@@ -647,44 +706,7 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "insert %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    print_to_stderr("Query: %s" % (query.query,))
-    start, end = time.time(), 0
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
-
-    if status != RpcStatus.OK:
-      return False
-
-    query_successful = True
-    while True:
-      query_state = self.__get_query_state(handle)
-      if query_state == self.query_state["FINISHED"]:
-        break
-      elif query_state == self.query_state["EXCEPTION"]:
-        print_to_stderr('Query failed')
-        if self.connected:
-          # Retrieve error message (if any) from log.
-          log, status = self._ImpalaShell__do_rpc(
-            lambda: self.imp_service.get_log(handle.log_context))
-          print_to_stderr(log)
-          query_successful = False
-          break
-        else:
-          return False
-      elif self.is_interrupted.isSet():
-        return self.__cancel_and_close_query(handle)
-      time.sleep(0.05)
-
-    (insert_result, status) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
-    end = time.time()
-    if status != RpcStatus.OK or self.is_interrupted.isSet():
-      return False
-
-    if query_successful:
-      self.__print_runtime_profile_if_enabled(handle)
-      num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
-      self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
-      self.last_query_handle = handle
-    return query_successful
+    return self.__handle_insert_query(query)
 
   def __cancel_query(self, handle):
     """Cancel a query on a keyboard interrupt from the shell."""

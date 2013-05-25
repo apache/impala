@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
@@ -863,6 +864,169 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestWithClause() throws AnalysisException {
+    // Single view in WITH clause.
+    AnalyzesOk("with t as (select int_col x, bigint_col y from functional.alltypes)" +
+        "select x, y from t");
+    // Multiple views in WITH clause. Only one view is used.
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+        "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
+        "t4 as (select 4 x, 40 y union all select 5, 50), " +
+        "t5 as (select * from (values(6 x, 60 y)) as a) " +
+        "select x, y from t3");
+    // Multiple views in WITH clause. All views used in a union.
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+        "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
+        "t4 as (select 4 x, 40 y union all select 5, 50), " +
+        "t5 as (select * from (values(6 x, 60 y)) as a) " +
+        "select * from t1 union all select * from t2 union all select * from t3 " +
+        "union all select * from t4 union all select * from t5");
+    // Multiple views in WITH clause. All views used in a join.
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+        "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
+        "t4 as (select 4 x, 40 y union all select 5, 50), " +
+        "t5 as (select * from (values(6 x, 60 y)) as a) " +
+        "select t1.y, t2.y, t3.y, t4.y, t5.y from t1, t2, t3, t4, t5 " +
+        "where t1.y = t2.y and t2.y = t3.y and t3.y = t4.y and t4.y = t5.y");
+    // WITH clause in insert statement.
+    AnalyzesOk("with t1 as (select * from functional.alltypestiny)" +
+        "insert into functional.alltypes partition(year, month) select * from t1");
+    // WITH-clause view used in inline view.
+    AnalyzesOk("with t1 as (select 'a') select * from (select * from t1) as t2");
+    AnalyzesOk("with t1 as (select 'a') " +
+        "select * from (select * from (select * from t1) as t2) as t3");
+    // WITH-clause inside inline view.
+    AnalyzesOk("select * from (with t1 as (values(1 x, 10 y)) select * from t1) as t2");
+
+    // Test case-insensitive matching of WITH-clause views to base table refs.
+    AnalyzesOk("with T1 as (select int_col x, bigint_col y from functional.alltypes)," +
+        "t2 as (select 1 x , 10 y), T3 as (values(2 x , 20 y), (3, 30)), " +
+        "t4 as (select 4 x, 40 y union all select 5, 50), " +
+        "T5 as (select * from (values(6 x, 60 y)) as a) " +
+        "select * from t1 union all select * from T2 union all select * from t3 " +
+        "union all select * from T4 union all select * from t5");
+
+    // Multiple WITH clauses. One for the UnionStmt and one for each union operand.
+    AnalyzesOk("with t1 as (values('a', 'b')) " +
+        "(with t2 as (values('c', 'd')) select * from t2) union all" +
+        "(with t3 as (values('e', 'f')) select * from t3) order by 1 limit 1");
+    // Multiple WITH clauses. One before the insert and one inside the query statement.
+    AnalyzesOk("with t1 as (select * from functional.alltypestiny) " +
+        "insert into functional.alltypes partition(year, month) " +
+        "with t2 as (select * from functional.alltypessmall) select * from t1");
+
+    // Table aliases do not conflict because they are in different scopes.
+    // Aliases are resolved from inner-most to the outer-most scope.
+    AnalyzesOk("with t1 as (select 'a') " +
+        "select t2.* from (with t1 as (select 'b') select * from t1) as t2");
+    // Table aliases do not conflict because t1 from the inline view is never used.
+    AnalyzesOk("with t1 as (select 1), t2 as (select 2)" +
+        "select * from functional.alltypes as t1");
+    AnalyzesOk("with t1 as (select 1), t2 as (select 2) select * from t2 as t1");
+    AnalyzesOk("with t1 as (select 1) select * from (select 2) as t1");
+    // Fully-qualified table does not conflict with WITH-clause table.
+    AnalyzesOk("with alltypes as (select * from functional.alltypes) " +
+        "select * from functional.alltypes union all select * from alltypes");
+
+    // Use a custom analyzer to change the default db to functional.
+    // Recursion is prevented because 'alltypes' in t1 refers to the table
+    // functional.alltypes, and 'alltypes' in the final query refers to the
+    // view 'alltypes'.
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from alltypes), " +
+        "alltypes as (select x a, y b from t1)" +
+        "select a, b from alltypes",
+        createAnalyzer("functional"));
+    // Nested WITH clauses. Scoping prevents recursion.
+    AnalyzesOk("with t1 as (with t1 as (select int_col x, bigint_col y from alltypes) " +
+        "select x, y from t1), " +
+        "alltypes as (select x a, y b from t1) " +
+        "select a, b from alltypes",
+        createAnalyzer("functional"));
+    // Nested WITH clause inside a subquery.
+    AnalyzesOk("with t1 as " +
+        "(select * from (with t2 as (select * from functional.alltypes) " +
+        "select * from t2) t3) " +
+        "select * from t1");
+    // Nested WITH clause inside a union stmt.
+    AnalyzesOk("with t1 as " +
+        "(with t2 as (values('a', 'b')) select * from t2 union all select * from t2) " +
+        "select * from t1");
+    // Nested WITH clause inside a union stmt's operand.
+    AnalyzesOk("with t1 as " +
+        "(select 'x', 'y' union all (with t2 as (values('a', 'b')) select * from t2)) " +
+        "select * from t1");
+
+    // Single WITH clause. Multiple references to same view.
+    AnalyzesOk("with t as (select 1 x)" +
+        "select x from t union all select x from t");
+    // Multiple references in same select statement require aliases.
+    AnalyzesOk("with t as (select 'a' x)" +
+        "select t1.x, t2.x, t.x from t as t1, t as t2, t " +
+        "where t1.x = t2.x and t2.x = t.x");
+
+    // Conflicting table aliases in WITH clause.
+    AnalysisError("with t1 as (select 1), t1 as (select 2) select * from t1",
+        "Duplicate table alias: 't1'");
+    AnalysisError("with t1 as (select * from functional.alltypestiny) " +
+        "insert into functional.alltypes partition(year, month) " +
+        "with t1 as (select * from functional.alltypessmall) select * from t1",
+        "Duplicate table alias: 't1");
+    // Aliases conflict because t1 from the inline view is used.
+    AnalysisError("with t1 as (select 1 x), t2 as (select 2 y)" +
+        "select * from functional.alltypes as t1 inner join t1",
+        "Duplicate table alias: 't1'");
+    AnalysisError("with t1 as (select 1), t2 as (select 2) " +
+        "select * from t2 as t1 inner join t1",
+        "Duplicate table alias: 't1'");
+    AnalysisError("with t1 as (select 1) select * from (select 2) as t1 inner join t1",
+        "Duplicate table alias: 't1'");
+    // Multiple references in same select statement require aliases.
+    AnalysisError("with t1 as (select 'a' x) select * from t1 inner join t1",
+        "Duplicate table alias: 't1'");
+    // If one was given, we must use the explicit alias for column references.
+    AnalysisError("with t1 as (select 'a' x) select t1.x from t1 as t2",
+        "unknown table alias: 't1'");
+    // WITH-clause tables cannot be inserted into.
+    AnalysisError("with t1 as (select 'a' x) insert into t1 values('b' x)",
+        "Table does not exist: default.t1");
+
+    // Recursive table references are not allowed.
+    AnalysisError("with t as (select int_col x, bigint_col y from t) " +
+        "select x, y from t",
+        "Unsupported recursive reference to table 't' in WITH clause.");
+    AnalysisError("with t as (select 1 as x, 2 as y union all select * from t) " +
+        "select x, y from t",
+        "Unsupported recursive reference to table 't' in WITH clause.");
+    AnalysisError("with t as (select a.* from (select * from t) as a) " +
+        "select x, y from t",
+        "Unsupported recursive reference to table 't' in WITH clause.");
+    // Recursion in nested WITH clause.
+    AnalysisError("with t1 as (with t2 as (select * from t1) select * from t2) " +
+        "select * from t1 ",
+        "Unsupported recursive reference to table 't1' in WITH clause.");
+    // Recursion in nested WITH clause inside a subquery.
+    AnalysisError("with t1 as " +
+        "(select * from (with t2 as (select * from t1) select * from t2) t3) " +
+        "select * from t1",
+        "Unsupported recursive reference to table 't1' in WITH clause.");
+    // Recursion with a union's WITH clause.
+    AnalysisError("with t1 as " +
+        "(with t2 as (select * from t1) select * from t2 union all select * from t2)" +
+        "select * from t1",
+        "Unsupported recursive reference to table 't1' in WITH clause.");
+    // Recursion with a union operand's WITH clause.
+    AnalysisError("with t1 as " +
+        "(select 'x', 'y' union all (with t2 as (select * from t1) select * from t2))" +
+        "select * from t1",
+        "Unsupported recursive reference to table 't1' in WITH clause.");
+    // Recursion is prevented because a view definition may only reference
+    // views to its left.
+    AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
+        "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
+        "Table does not exist: default.t2");
+  }
+
+  @Test
   public void TestInsert() throws AnalysisException {
     for (String qualifier: ImmutableList.of("INTO", "OVERWRITE")) {
       testInsertStatic(qualifier);
@@ -1321,6 +1485,37 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "float_col, double_col, date_string_col, string_col, timestamp_col from " +
           "functional.alltypesnopart",
           "Row-key column 'id' must be explicitly mentioned in column permutation.");
+    }
+  }
+
+  /**
+   * Simple test that checks the number of members of statements and table refs
+   * against a fixed expected value. The intention is alarm developers to
+   * properly change the clone() method when adding members to statements.
+   * Once the clone() method has been appropriately changed, the expected
+   * number of members should be updated to make the test pass.
+   */
+  @Test
+  public void cloneTest() {
+    testNumberOfMembers(QueryStmt.class, 8);
+    testNumberOfMembers(UnionStmt.class, 2);
+    testNumberOfMembers(ValuesStmt.class, 0);
+
+    // Also check TableRefs.
+    testNumberOfMembers(TableRef.class, 10);
+    testNumberOfMembers(BaseTableRef.class, 2);
+    testNumberOfMembers(InlineViewRef.class, 5);
+    testNumberOfMembers(VirtualViewRef.class, 1);
+  }
+
+  @SuppressWarnings("rawtypes")
+  private void testNumberOfMembers(Class cl, int expectedNumMembers) {
+    int actualNumMembers = cl.getDeclaredFields().length;
+    if (actualNumMembers != expectedNumMembers) {
+      fail(String.format("The number of members in %s have changed.\n" +
+          "Expected %s but found %s. Please modify clone() accordingly and " +
+          "change the expected number of members in this test.",
+          cl.getSimpleName(), expectedNumMembers, actualNumMembers));
     }
   }
 }
