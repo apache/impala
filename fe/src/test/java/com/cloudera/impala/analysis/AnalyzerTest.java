@@ -327,7 +327,7 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Superfluous columns in PARTITION clause: year.");
+        "Duplicate column 'year' in partition clause");
 
     // Analysis error from explain query
     AnalysisError("explain " +

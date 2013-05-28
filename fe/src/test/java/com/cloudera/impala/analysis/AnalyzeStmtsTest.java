@@ -855,9 +855,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("insert overwrite table functional.alltypes " +
         "partition (year, month) " +
         "values(1, true, 'a', 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp)," +
-        "2009, 10)", "Target table 'functional.alltypes' and result of select " +
-        "statement are not union compatible.\nIncompatible types 'TINYINT' and " +
-        "'STRING' in column '<slot 2>'.");
+        "2009, 10)",
+        "Target table 'functional.alltypes' is incompatible with SELECT / PARTITION " +
+        "expressions.\n" +
+        "Expression '<slot 2>' (type: STRING) is not compatible with column " +
+        "'tinyint_col' (type: TINYINT)");
   }
 
   @Test
@@ -866,6 +868,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       testInsertStatic(qualifier);
       testInsertDynamic(qualifier);
       testInsertUnpartitioned(qualifier);
+      testInsertWithPermutation(qualifier);
     }
   }
 
@@ -957,34 +960,31 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "No matching select list item found for dynamic partition 'year'.\n" +
-            "The select list items corresponding to dynamic partition keys " +
-            "must be at the end of the select list.");
+        "Target table 'functional.alltypessmall' has more columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (11)");
     // No corresponding select list items of partially dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "No matching select list item found for dynamic partition 'month'.\n" +
-            "The select list items corresponding to dynamic partition keys " +
-            "must be at the end of the select list.");
+        "Target table 'functional.alltypessmall' has more columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (12)");
+
     // No corresponding select list items of partially dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "No matching select list item found for dynamic partition 'year'.\n" +
-            "The select list items corresponding to dynamic partition keys " +
-            "must be at the end of the select list.");
+        "Target table 'functional.alltypessmall' has more columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (12)");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
-        "Target table 'functional.alltypessmall' and result of select statement " +
-        "are not union compatible.\n" +
-        "Target table expects 11 columns but the select statement returns 13.");
+        "Target table 'functional.alltypessmall' has fewer columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (15)");
   }
 
   /**
@@ -992,12 +992,20 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   private void testInsertUnpartitioned(String qualifier) throws AnalysisException {
     // Wrong number of columns.
-    AnalysisError("insert " + qualifier + " table functional.alltypesnopart " +
+    AnalysisError(
+        "insert " + qualifier + " table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from functional.alltypes");
+        "float_col, double_col, date_string_col, string_col from functional.alltypes",
+        "Target table 'functional.alltypesnopart' has more columns (11) than the SELECT" +
+        " / VALUES clause returns (10)");
+
     // Wrong number of columns.
-    AnalysisError("INSERT " + qualifier +
-        " TABLE functional.hbasealltypesagg SELECT * FROM functional.alltypesagg");
+    if (!qualifier.contains("OVERWRITE")) {
+      AnalysisError("INSERT " + qualifier + " TABLE functional.hbasealltypesagg " +
+          "SELECT * FROM functional.alltypesagg",
+          "Target table 'functional.hbasealltypesagg' has fewer columns (11) than the " +
+          "SELECT / VALUES clause returns (14)");
+    }
     // Unpartitioned table without partition clause.
     AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
@@ -1026,11 +1034,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("INSERT " + qualifier +
         " TABLE functional.alltypesnopart PARTITION(year=2009) " +
         "SELECT * FROM functional.alltypes", "PARTITION clause is only valid for INSERT" +
-        " into partitioned table. 'alltypesnopart' is not partitioned");
+        " into partitioned table. 'functional.alltypesnopart' is not partitioned");
 
     // Unknown target DB
-    AnalysisError("INSERT " + qualifier +
-       " table UNKNOWNDB.alltypesnopart SELECT * from functional.alltypesnopart");
+    AnalysisError("INSERT " + qualifier + " table UNKNOWNDB.alltypesnopart SELECT * " +
+        "from functional.alltypesnopart", "Database does not exist: UNKNOWNDB");
   }
 
   /**
@@ -1093,61 +1101,60 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "No PARTITION clause given for INSERT into partitioned table 'alltypessmall'.");
+        "Not enough partition columns mentioned in query. Missing columns are: year, " +
+        "month");
     // Not union compatible, unequal number of columns.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, timestamp_col from functional.alltypes",
-        "Target table 'functional.alltypessmall' and result of select statement are " +
-        "not union compatible.\n" +
-        "Target table expects 11 columns but the select statement returns 10.");
+        "Target table 'functional.alltypessmall' has more columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (12)");
     // Not union compatible, incompatible type in last column (bool_col -> string).
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, bool_col, timestamp_col " +
         "from functional.alltypes",
-        "Target table 'functional.alltypessmall' and result of select " +
-        "statement are not union compatible.\n" +
-        "Incompatible types 'STRING' and 'BOOLEAN' in column 'bool_col'.");
-    // Too many partitioning columns.
+        "Target table 'functional.alltypessmall' is incompatible with SELECT / " +
+        "PARTITION expressions.\nExpression 'bool_col' (type: BOOLEAN) is not " +
+        "compatible with column 'string_col' (type: STRING)");
+    // Duplicate partition columns
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4, year=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Superfluous columns in PARTITION clause: year.");
+        "Duplicate column 'year' in partition clause");
     // Too few partitioning columns.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Missing partition column 'month' from PARTITION clause.");
+        "Not enough partition columns mentioned in query. Missing columns are: month");
     // Non-partitioning column in partition clause.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, bigint_col=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Missing partition column 'month' from PARTITION clause.");
+        "Column 'bigint_col' is not a partition column");
     // Loss of precision when casting in column 6 (double_col -> float).
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "double_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Inserting into target table 'alltypessmall' may result in loss of precision.\n" +
-        "Would need to cast 'double_col' to 'FLOAT'.");
+        "Possible loss of precision for target table 'functional.alltypessmall'.\n" +
+        "Expression 'double_col' (type: DOUBLE) would need to be cast to FLOAT for " +
+        "column 'float_col'");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4)" +
         "select * from functional.alltypes",
-        "Target table 'functional.alltypessmall' and result of select statement are " +
-        "not union compatible.\n" +
-        "Target table expects 11 columns but the select statement returns 13.");
-
+        "Target table 'functional.alltypessmall' has fewer columns (13) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (15)");
     // Partition columns should be type-checked
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=\"should be an int\", month=4)" +
@@ -1162,5 +1169,158 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes",
         "Non-constant expressions are not supported as static partition-key values " +
         "in 'month=int_col'.");
+
+    if (qualifier.contains("OVERWRITE")) {
+      AnalysisError("insert " + qualifier + " table functional.hbasealltypessmall " +
+          "partition(year, month) select * from functional.alltypessmall",
+          "PARTITION clause is not valid for INSERT into HBase tables. " +
+          "'functional.hbasealltypessmall' is an HBase table");
+    }
+  }
+
+  private void testInsertWithPermutation(String qualifier) throws AnalysisException {
+    // Duplicate column in permutation
+    AnalysisError("insert " + qualifier + " table functional.tinytable(a, a, b)" +
+        "values(1, 2, 3)", "Duplicate column 'a' in column permutation");
+
+    // Unknown column in permutation
+    AnalysisError("insert " + qualifier + " table functional.tinytable" +
+        "(a, c) values(1, 2)", "Unknown column 'c' in column permutation");
+
+    // Too few columns in permutation - fill with NULL values
+    AnalyzesOk("insert " + qualifier + " table functional.tinytable(a) values('hello')");
+
+    // Too many columns in select list
+    AnalysisError("insert " + qualifier + " table functional.tinytable(a, b)" +
+        " select 'a', 'b', 'c' from functional.alltypes",
+        "Column permutation mentions fewer columns (2) than the SELECT / VALUES clause" +
+        " returns (3)");
+
+    // Too few columns in select list
+    AnalysisError("insert " + qualifier + " table functional.tinytable(a, b)" +
+        " select 'a' from functional.alltypes",
+        "Column permutation mentions more columns (2) than the SELECT / VALUES clause" +
+        " returns (1)");
+
+    // Type error in select clause brought on by permutation. tinyint_col and string_col
+    // are swapped in the permutation clause
+    AnalysisError("insert " + qualifier + " table functional.alltypesnopart" +
+        "(id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col)" +
+        " select * from functional.alltypesnopart",
+        "Target table 'functional.alltypesnopart' is incompatible with SELECT / " +
+        "PARTITION expressions.\nExpression 'functional.alltypesnopart.tinyint_col' " +
+        "(type: TINYINT) is not compatible with column 'string_col' (type: STRING)");
+
+    // Above query should work fine if select list also permuted
+    AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart" +
+        "(id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col)" +
+        " select id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col" +
+        " from functional.alltypesnopart");
+
+    // Mentioning partition keys (year, month) in permutation
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes" +
+        "(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, " +
+        "year, month) select * from functional.alltypes");
+
+    // Duplicate mention of partition column
+    AnalysisError("insert " + qualifier + " table functional.alltypes" +
+        "(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, " +
+        "year, month) PARTITION(year) select * from functional.alltypes",
+        "Duplicate column 'year' in partition clause");
+
+    // Split partition columns between permutation and PARTITION clause.  Also confirm
+    // that dynamic columns in PARTITION clause are looked for at the end of the select
+    // list.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes" +
+        "(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, " +
+        "year) PARTITION(month) select * from functional.alltypes");
+
+    // Split partition columns, one dynamic in permutation clause, one static in PARTITION
+    // clause
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes(id, year)" +
+        "PARTITION(month=2009) select 1, 2 from functional.alltypes");
+
+    // Omit most columns, should default to NULL
+    AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart" +
+        "(id, bool_col) select id, bool_col from functional.alltypesnopart");
+
+    // Can't omit partition keys, they have to be mentioned somewhere
+    AnalysisError("insert " + qualifier + " table functional.alltypes(id)" +
+        " select id from functional.alltypes",
+        "Not enough partition columns mentioned in query. " +
+        "Missing columns are: year, month");
+
+    // Duplicate partition columns, one with partition key
+    AnalysisError("insert " + qualifier + " table functional.alltypes(year)" +
+        " partition(year=2012, month=3) select 1 from functional.alltypes",
+        "Duplicate column 'year' in partition clause");
+
+    // Type error between dynamic partition column mentioned in PARTITION column and
+    // select list (confirm that dynamic partition columns are mapped to the last select
+    // list expressions)
+    AnalysisError("insert " + qualifier + " table functional.alltypes" +
+        "(id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col) " +
+        "PARTITION (year, month)" +
+        " select id, bool_col, month, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col, " +
+        "year, string_col from functional.alltypes",
+        "Target table 'functional.alltypes' is incompatible with SELECT / PARTITION " +
+        "expressions.\n" +
+        "Expression 'month' (type: INT) is not compatible with column 'string_col' " +
+        "(type: STRING)");
+
+    // Empty permutation and no query statement
+    AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart()");
+    // Empty permutation can't receive any select list exprs
+    AnalysisError("insert " + qualifier + " table functional.alltypesnopart() select 1",
+        "Column permutation mentions fewer columns (0) than the SELECT / VALUES clause " +
+        "returns (1)");
+    // Empty permutation with static partition columns can omit query statement
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes() " +
+        "partition(year=2012, month=1)");
+    // No mentioned columns to receive select-list exprs
+    AnalysisError("insert " + qualifier + " table functional.alltypes() " +
+        "partition(year=2012, month=1) select 1",
+        "Column permutation and PARTITION clause mention fewer columns (0) than the " +
+        "SELECT / VALUES clause and PARTITION clause return (1)");
+    // Can't have dynamic partition columns with no query statement
+    AnalysisError("insert " + qualifier + " table functional.alltypes() " +
+       "partition(year, month)",
+       "Column permutation and PARTITION clause mention more columns (2) than the " +
+       "SELECT / VALUES clause and PARTITION clause return (0)");
+    // If there are select-list exprs for dynamic partition columns, empty permutation is
+    // ok
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes() " +
+        "partition(year, month) select 1,2 from functional.alltypes");
+
+    if (!qualifier.contains("OVERWRITE")) {
+      // Simple permutation
+      AnalyzesOk("insert " + qualifier + " table functional.hbasealltypesagg" +
+          "(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+          "float_col, double_col, date_string_col, string_col, timestamp_col) " +
+          "select * from functional.alltypesnopart");
+      // Too few columns in permutation
+      AnalysisError("insert " + qualifier + " table functional.hbasealltypesagg" +
+          "(id, tinyint_col, smallint_col, int_col, bigint_col, " +
+          "float_col, double_col, date_string_col, string_col) " +
+          "select * from functional.alltypesnopart",
+          "Column permutation mentions fewer columns (9) than the SELECT /" +
+          " VALUES clause returns (11)");
+      // Omitting the row-key column is an error
+      AnalysisError("insert " + qualifier + " table functional.hbasealltypesagg" +
+          "(bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+          "float_col, double_col, date_string_col, string_col, timestamp_col) " +
+          "select bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+          "float_col, double_col, date_string_col, string_col, timestamp_col from " +
+          "functional.alltypesnopart",
+          "Row-key column 'id' must be explicitly mentioned in column permutation.");
+    }
   }
 }

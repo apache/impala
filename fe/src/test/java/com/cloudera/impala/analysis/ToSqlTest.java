@@ -282,5 +282,29 @@ public class ToSqlTest {
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
         "double_col, date_string_col, string_col, timestamp_col, month " +
         "FROM functional.alltypes");
+
+    // Permutations
+    testToSql("insert into table functional.alltypesnopart(id, bool_col, tinyint_col) " +
+        " values(1, true, 0)",
+        "INSERT INTO TABLE functional.alltypesnopart(id, bool_col, tinyint_col) " +
+        "VALUES(1, TRUE, 0)");
+
+    // Permutations that mention partition column
+    testToSql("insert into table functional.alltypes(id, year, month) " +
+        " values(1, 1990, 12)",
+        "INSERT INTO TABLE functional.alltypes(id, year, month) " +
+        "VALUES(1, 1990, 12)");
+
+    // Empty permutation with no select statement
+    testToSql("insert into table functional.alltypesnopart()",
+              "INSERT INTO TABLE functional.alltypesnopart()");
+
+    // Permutation and explicit partition clause
+    testToSql("insert into table functional.alltypes(id) " +
+        " partition (year=2009, month) values(1, 12)",
+        "INSERT INTO TABLE functional.alltypes(id) " +
+        "PARTITION (year=2009, month) VALUES(1, 12)");
+
+
   }
 }

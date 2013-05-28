@@ -162,6 +162,11 @@ public abstract class QueryStmt extends StatementBase {
     return resultExprs;
   }
 
+  public void setResultExprs(List<Expr> resultExprs) {
+    this.resultExprs.clear();
+    this.resultExprs.addAll(resultExprs);
+  }
+
   public void setIsExplain(boolean isExplain) {
     this.isExplain = isExplain;
   }

@@ -889,6 +889,23 @@ public class ParserTest {
         "select a from src where b > 5");
     ParsesOk("insert " + qualifier + " t partition (pk1=f(a), pk2=!true and false) " +
         "select a from src where b > 5");
+    // Permutation
+    ParsesOk("insert " + qualifier + " t(a,b,c) values(1,2,3)");
+    // Permutation with mismatched select list (should parse fine)
+    ParsesOk("insert " + qualifier + " t(a,b,c) values(1,2,3,4,5,6)");
+    // Permutation and partition
+    ParsesOk("insert " + qualifier + " t(a,b,c) partition(d) values(1,2,3,4)");
+    // Empty permutation list
+    ParsesOk("insert " + qualifier + " t() select 1 from a");
+    // Permutation with optional query statement
+    ParsesOk("insert " + qualifier + " t() partition(d)");
+    ParsesOk("insert " + qualifier + " t()");
+    // No comma in permutation list
+    ParserError("insert " + qualifier + " t(a b c) select 1 from a");
+    // Can't use strings as identifiers in permutation list
+    ParserError("insert " + qualifier + " t('a') select 1 from a");
+    // Expressions not allowed in permutation list
+    ParserError("insert " + qualifier + " t(a=1, b) select 1 from a");
   }
 
   @Test
@@ -898,6 +915,8 @@ public class ParserTest {
     testInsert(true, true);
     testInsert(false, false);
     testInsert(false, true);
+    // Missing query statement
+    ParserError("insert into table t");
     // Missing 'overwrite/insert'.
     ParserError("insert table t select a from src where b > 5");
     // Missing target table identifier.
@@ -910,13 +929,13 @@ public class ParserTest {
     ParserError("insert into table t");
     // Missing parentheses around 'partition'.
     ParserError("insert overwrite table t partition pk1=10 " +
-    		"select a from src where b > 5");
+                "select a from src where b > 5");
     // Missing parentheses around 'partition'.
     ParserError("insert into table t partition pk1=10 " +
         "select a from src where b > 5");
     // Missing comma in partition list.
     ParserError("insert overwrite table t partition (pk1=10 pk2=20) " +
-    		"select a from src where b > 5");
+                "select a from src where b > 5");
     // Missing comma in partition list.
     ParserError("insert into table t partition (pk1=10 pk2=20) " +
         "select a from src where b > 5");

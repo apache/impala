@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
 import java.util.ArrayList;
 import com.google.common.collect.Lists;
 
@@ -26,8 +27,12 @@ class SelectList {
   private boolean isDistinct;
 
   public SelectList() {
-    super();
     this.isDistinct = false;
+  }
+
+  public SelectList(List<SelectListItem> items) {
+    isDistinct = false;
+    this.items.addAll(items);
   }
 
   public ArrayList<SelectListItem> getItems() {

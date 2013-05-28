@@ -30,8 +30,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Representation of a single select block, including GROUP BY, ORDERY BY and HAVING clauses.
- *
+ * Representation of a single select block, including GROUP BY, ORDER BY and HAVING
+ * clauses.
  */
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
