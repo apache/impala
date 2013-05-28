@@ -22,9 +22,6 @@
 #include "util/decompress.h"
 #include "gen-cpp/Data_types.h"
 
-DEFINE_bool(compress_rowbatches, true,
-            "if true, compresses tuple data in Serialize");
-
 using namespace std;
 
 namespace impala {
@@ -71,7 +68,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   }
   DCHECK_EQ(offset, size);
 
-  if (FLAGS_compress_rowbatches && size > 0) {
+  if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
     SnappyCompressor compressor;

@@ -46,9 +46,6 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
-// TODO: temp change to validate we don't have an incast problem for joins with big tables
-DEFINE_bool(randomize_splits, false, 
-    "if true, randomizes the order of splits");
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 
 using namespace boost;
@@ -517,20 +514,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   stringstream ss;
   ss << "Splits complete (node=" << id() << "):";
   progress_ = ProgressUpdater(ss.str(), total_splits);
-
-  if (FLAGS_randomize_splits) {
-    unsigned int seed = time(NULL);
-    srand(seed);
-    VLOG_QUERY << "Randomizing scan range order with seed=" << seed;
-    map<THdfsFileFormat::type, vector<HdfsFileDesc*> >::iterator it;
-    for (it = per_type_files.begin(); it != per_type_files.end(); ++it) {
-      vector<HdfsFileDesc*>& file_descs = it->second;
-      for (int i = 0; i < file_descs.size(); ++i) {
-        random_shuffle(file_descs[i]->splits.begin(), file_descs[i]->splits.end());
-      }
-      random_shuffle(file_descs.begin(), file_descs.end());
-    }
-  }
 
   // Issue initial ranges for all file types.
   HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]);
