@@ -81,6 +81,10 @@ functions = [
   ['Math_Positive', 'DOUBLE', ['DOUBLE'], 'MathFunctions::PositiveDouble', ['positive']],
   ['Math_Negative', 'BIGINT', ['BIGINT'], 'MathFunctions::NegativeBigInt', ['negative']],
   ['Math_Negative', 'DOUBLE', ['DOUBLE'], 'MathFunctions::NegativeDouble', ['negative']],
+  ['Math_Quotient', 'BIGINT', ['BIGINT', 'BIGINT'],\
+        'MathFunctions::QuotientBigInt', ['quotient']],
+  ['Math_Quotient', 'BIGINT', ['DOUBLE', 'DOUBLE'],\
+        'MathFunctions::QuotientDouble', ['quotient']],
 
   ['String_Substring', 'STRING', ['STRING', 'INT'], \
         'StringFunctions::Substring<int32_t>', ['substr', 'substring']], 

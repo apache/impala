@@ -65,6 +65,8 @@ class MathFunctions {
   static void* PositiveDouble(Expr* e, TupleRow* row);
   static void* NegativeBigInt(Expr* e, TupleRow* row);
   static void* NegativeDouble(Expr* e, TupleRow* row);
+  static void* QuotientDouble(Expr* e, TupleRow* row);
+  static void* QuotientBigInt(Expr* e, TupleRow* row);
 
  private:
   static const int32_t MIN_BASE = 2;

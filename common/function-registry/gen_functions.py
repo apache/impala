@@ -48,6 +48,17 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
+binary_op_check_zero = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op1 = e->children()[0];\n\
+  ${native_type1}* val1 = reinterpret_cast<${native_type1}*>(op1->GetValue(row));\n\
+  Expr* op2 = e->children()[1];\n\
+  ${native_type2}* val2 = reinterpret_cast<${native_type2}*>(op2->GetValue(row));\n\
+  if (val1 == NULL || val2 == NULL || *val2 == 0) return NULL;\n\
+  e->result_.${result_field} = (*val1 ${native_op} *val2);\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
 binary_func = Template("\
 void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   Expr* op1 = e->children()[0];\n\
@@ -180,8 +191,8 @@ templates = {
   'Subtract'    : binary_op,
   'Multiply'    : binary_op,
   'Divide'      : binary_op,
-  'Int_Divide'  : binary_op,
-  'Mod'         : binary_op,
+  'Int_Divide'  : binary_op_check_zero,
+  'Mod'         : binary_op_check_zero,
   'BitAnd'      : binary_op,
   'BitXor'      : binary_op,
   'BitOr'       : binary_op,

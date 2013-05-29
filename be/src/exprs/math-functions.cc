@@ -21,6 +21,7 @@
 #include "exprs/expr.h"
 #include "runtime/tuple-row.h"
 #include "util/string-parser.h"
+#include "opcode/functions.h"
 
 using namespace std;
 
@@ -530,6 +531,21 @@ void* MathFunctions::NegativeDouble(Expr* e, TupleRow* row) {
   if (d == NULL) return NULL;
   e->result_.double_val = -*d;
   return &e->result_.double_val;
+}
+
+void* MathFunctions::QuotientDouble(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  Expr* op1 = e->children()[0];
+  double* val1 = reinterpret_cast<double*>(op1->GetValue(row));
+  Expr* op2 = e->children()[1];
+  double* val2 = reinterpret_cast<double*>(op2->GetValue(row));
+  if (val1 == NULL || val2 == NULL || static_cast<int64_t>(*val2) == 0) return NULL;
+  e->result_.bigint_val = (static_cast<int64_t>(*val1) / static_cast<int64_t>(*val2));
+  return &e->result_.bigint_val;
+}
+
+void* MathFunctions::QuotientBigInt(Expr* e, TupleRow* row) {
+  return ComputeFunctions::Int_Divide_long_long(e, row);
 }
 
 }

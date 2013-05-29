@@ -492,7 +492,7 @@ class ExprTest : public testing::Test {
 
   // Test int ops that promote to assignment compatible type: BITAND, BITOR, BITXOR,
   // BITNOT, INT_DIVIDE, MOD.
-  // As a convention we use RightOp should denote the higher resolution type.
+  // As a convention we use RightOp as the higher resolution type.
   template <typename LeftOp, typename RightOp>
   void TestVariableResultTypeIntOps(LeftOp a, RightOp b, PrimitiveType expected_type) {
     RightOp cast_a = static_cast<RightOp>(a);
@@ -803,6 +803,15 @@ TEST_F(ExprTest, ArithmeticExprs) {
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
   TestVariableResultTypeIntOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+
+  // Test behavior of INT_DIVIDE and MOD with zero as second argument.
+  unordered_map<int, int64_t>::iterator int_iter;
+  for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
+      ++int_iter) {
+    string& val = default_type_strs_[int_iter->first];
+    TestIsNull(val + " DIV 0", static_cast<PrimitiveType>(int_iter->first));
+    TestIsNull(val + " % 0", static_cast<PrimitiveType>(int_iter->first));
+  }
 
   // Test behavior with NULLs.
   TestNullOperandVariableResultTypeIntOps<int8_t>(min_int_values_[TYPE_TINYINT],
@@ -1853,6 +1862,15 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("negative(3.14159265)", TYPE_DOUBLE, -3.14159265);
   TestValue("negative(-3.14159265)", TYPE_DOUBLE, 3.14159265);
 
+  // Test bigint param.
+  TestValue("quotient(12, 6)", TYPE_BIGINT, 2);
+  TestValue("quotient(-12, 6)", TYPE_BIGINT, -2);
+  TestIsNull("quotient(-12, 0)", TYPE_BIGINT);
+  // Test double param.
+  TestValue("quotient(30.5, 2.5)", TYPE_BIGINT, 15);
+  TestValue("quotient(-30.5, 2.5)", TYPE_BIGINT, -15);
+  TestIsNull("quotient(-30.5, 0.000999)", TYPE_BIGINT);
+
   // NULL arguments.
   TestIsNull("abs(NULL)", TYPE_DOUBLE);
   TestIsNull("sign(NULL)", TYPE_FLOAT);
@@ -1876,7 +1894,9 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("pmod(NULL, NULL)", TYPE_BIGINT);
   TestIsNull("positive(NULL)", TYPE_BIGINT);
   TestIsNull("negative(NULL)", TYPE_BIGINT);
-
+  TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);
+  TestIsNull("quotient(1.0, NULL)", TYPE_BIGINT);
+  TestIsNull("quotient(NULL, NULL)", TYPE_BIGINT);
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {
