@@ -20,12 +20,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.cloudera.impala.planner.HBaseTableSink;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -42,15 +42,16 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.planner.HBaseTableSink;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
-import org.apache.log4j.Logger;
 
 /**
  * Impala representation of HBase table metadata,
@@ -265,8 +266,7 @@ public class HBaseTable extends Table {
       }
 
       // For every region in the range.
-      List<HRegionLocation> locations =
-          hTable.getRegionsInRange(startRowKey, endRowKey);
+      List<HRegionLocation> locations = getRegionsInRange(hTable, startRowKey, endRowKey);
       for(HRegionLocation location: locations) {
         long currentHdfsSize = 0;
         long currentRowSize  = 0;
@@ -334,13 +334,13 @@ public class HBaseTable extends Table {
   }
 
   /**
-   * Hive returns the columns in order of their declaration for HBase tables. 
+   * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
   public ArrayList<Column> getColumnsInHiveOrder() {
     return colsByPos;
   }
-  
+
   @Override
   public TTableDescriptor toThrift() {
     THBaseTable tHbaseTable = new THBaseTable();
@@ -365,6 +365,7 @@ public class HBaseTable extends Table {
     return hbaseTableName;
   }
 
+  @Override
   public int getNumNodes() {
     // TODO: implement
     return 100;
@@ -383,5 +384,37 @@ public class HBaseTable extends Table {
     Preconditions.checkState(overwrite == false);
     // Create the HBaseTableSink and return it.
     return new HBaseTableSink(this);
+  }
+
+  /**
+   * This is copied from org.apache.hadoop.hbase.client.HTable. The only difference is
+   * that it does not use cache when calling getRegionLocation.
+   * TODO: Remove this function and use HTable.getRegionsInRange when the non-cache
+   * version has been ported to CDH (DISTRO-477).
+   * Get the corresponding regions for an arbitrary range of keys.
+   * <p>
+   * @param startRow Starting row in range, inclusive
+   * @param endRow Ending row in range, exclusive
+   * @return A list of HRegionLocations corresponding to the regions that
+   * contain the specified range
+   * @throws IOException if a remote or network exception occurs
+   */
+  public static List<HRegionLocation> getRegionsInRange(HTable hbaseTbl,
+    final byte[] startKey, final byte[] endKey) throws IOException {
+    final boolean endKeyIsEndOfTable = Bytes.equals(endKey, HConstants.EMPTY_END_ROW);
+    if ((Bytes.compareTo(startKey, endKey) > 0) && !endKeyIsEndOfTable) {
+      throw new IllegalArgumentException("Invalid range: " +
+          Bytes.toStringBinary(startKey) + " > " + Bytes.toStringBinary(endKey));
+    }
+    final List<HRegionLocation> regionList = new ArrayList<HRegionLocation>();
+    byte[] currentKey = startKey;
+    do {
+      // always reload region location info.
+      HRegionLocation regionLocation = hbaseTbl.getRegionLocation(currentKey, true);
+      regionList.add(regionLocation);
+      currentKey = regionLocation.getRegionInfo().getEndKey();
+    } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
+             (endKeyIsEndOfTable || Bytes.compareTo(currentKey, endKey) < 0));
+    return regionList;
   }
 }

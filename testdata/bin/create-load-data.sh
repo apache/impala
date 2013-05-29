@@ -50,6 +50,10 @@ fi
 ./start-impala-cluster.py --kill_only
 popd
 
+# Split HBase table
+echo "Splitting HBase table"
+${IMPALA_HOME}/testdata/bin/split-hbase.sh
+
 # TODO: The multi-format table will move these files. So we need to copy them to a
 # temporary location for that table to use. Should find a better way to handle this.
 echo COPYING DATA FOR DEPENDENT TABLES

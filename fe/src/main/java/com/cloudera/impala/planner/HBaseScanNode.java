@@ -218,7 +218,7 @@ public class HBaseScanNode extends ScanNode {
     List<HRegionLocation> regionsLoc;
     try {
       hbaseTbl   = new HTable(hbaseConf, tbl.getHBaseTableName());
-      regionsLoc = hbaseTbl.getRegionsInRange(startKey, stopKey);
+      regionsLoc = HBaseTable.getRegionsInRange(hbaseTbl, startKey, stopKey);
     } catch (IOException e) {
       throw new RuntimeException(
           "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
@@ -281,6 +281,7 @@ public class HBaseScanNode extends ScanNode {
    * @param rangeStartKey the start key value to be set to
    */
   private void setKeyRangeStart(THBaseKeyRange keyRange, byte[] rangeStartKey) {
+    keyRange.unsetStartKey();
     // use the max(startKey, rangeStartKey) for scan start
     if (!Bytes.equals(rangeStartKey, HConstants.EMPTY_START_ROW) ||
         !Bytes.equals(startKey, HConstants.EMPTY_START_ROW)) {
@@ -296,6 +297,7 @@ public class HBaseScanNode extends ScanNode {
    * @param rangeEndKey the end key value to be set to
    */
   private void setKeyRangeEnd(THBaseKeyRange keyRange, byte[] rangeEndKey) {
+    keyRange.unsetStopKey();
     // use the min(stopkey, regionStopKey) for scan stop
     if (!Bytes.equals(rangeEndKey, HConstants.EMPTY_END_ROW) ||
         !Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
