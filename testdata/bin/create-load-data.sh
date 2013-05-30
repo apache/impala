@@ -115,4 +115,8 @@ hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.i
 hadoop fs -rm /test-warehouse/tinytable_rc/*
 hadoop fs -put ${IMPALA_HOME}/testdata/tinytable_rc/rc_tinytable_extra_col /test-warehouse/tinytable_rc/
 
+# Add a sequence file that only contains a header (see IMPALA-362)
+hadoop fs -put ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
+               /test-warehouse/tinytable_seq_snap
+
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh

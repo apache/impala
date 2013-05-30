@@ -158,6 +158,7 @@ void ScannerContext::Stream::RemoveFirstBuffer() {
   DCHECK(!is_blocked_);
   DCHECK(current_buffer_ != NULL);
   DCHECK(!buffers_.empty());
+  read_eosr_ = current_buffer_->eosr();
   parent_->scan_node_->UpdateNumQueuedBuffers(-1);
   buffers_.pop_front();
 
@@ -259,7 +260,6 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
     // Not enough bytes, copy the end of this buffer and combine it wit the next one
     if (requested_len > current_buffer_bytes_left_) {
       if (current_buffer_ != NULL) {
-        read_eosr_ = current_buffer_->eosr();
         boundary_buffer_->Append(current_buffer_pos_, current_buffer_bytes_left_);
         *out_len += current_buffer_bytes_left_;
         requested_len -= current_buffer_bytes_left_;
