@@ -78,6 +78,8 @@ import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TLoadDataReq;
+import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -217,6 +219,25 @@ public class JniFrontend {
     deserializeThrift(params, thriftCreateDbParams);
     frontend.createDatabase(params.getDb(), params.getComment(), params.getLocation(),
         params.isIf_not_exists());
+  }
+
+  /**
+   * Loads a table or partition with one or more data files. If the "overwrite" flag
+   * in the request is true, all existing data in the table/partition will be replaced.
+   * If the "overwrite" flag is false, the files will be added alongside any existing
+   * data files.
+   */
+  public byte[] loadTableData(byte[] thriftLoadTableDataParams)
+      throws ImpalaException, IOException {
+    TLoadDataReq request = new TLoadDataReq();
+    deserializeThrift(request, thriftLoadTableDataParams);
+    TLoadDataResp response = frontend.loadTableData(request);
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(response);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   public void createTable(byte[] thriftCreateTableParams)

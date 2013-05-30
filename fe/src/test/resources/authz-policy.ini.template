@@ -2,7 +2,7 @@
 [groups]
 ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           select_functional_alltypesagg, insert_functional_alltypes, insert_parquet,\
-          new_table_uri
+          new_table_uri, tpch_data_uri
 
 # The [roles] section defines privileges for objects in the authorizeable hierarchy.
 # Each role must start at the server-level and go down. If no "action" is specified, the
@@ -20,6 +20,7 @@ insert_functional_alltypes = server=server1->db=functional->table=alltypes->acti
 insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
 
 new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table
+tpch_data_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/tpch.lineitem
 
 # This section is not currently used by Impala. It allows for a admin specified mapping of
 # users -> roles rather than using the built-in hadoop group mapping.

@@ -14,29 +14,27 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
-
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents an ALTER TABLE DROP PARTITION statement.
  */
-public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
+public class AlterTableDropPartitionStmt extends AlterTableStmt {
   private final boolean ifExists;
+  private final PartitionSpec partitionSpec;
 
   public AlterTableDropPartitionStmt(TableName tableName,
-      List<PartitionKeyValue> partitionSpec, boolean ifExists) {
-    super(tableName, partitionSpec);
+      PartitionSpec partitionSpec, boolean ifExists) {
+    super(tableName);
+    Preconditions.checkNotNull(partitionSpec);
+    this.partitionSpec = partitionSpec;
+    this.partitionSpec.setTableName(tableName);
     this.ifExists = ifExists;
   }
 
@@ -56,12 +54,7 @@ public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
     if (ifExists) {
       sb.append("IF EXISTS ");
     }
-    List<String> partitionSpecStr = Lists.newArrayList();
-    for (PartitionKeyValue kv: partitionSpec) {
-      partitionSpecStr.add(kv.getColName() + "="  + kv.getValue());
-    }
-    sb.append(String.format(" DROP PARTITION (%s) ",
-          Joiner.on(", ").join(partitionSpecStr)));
+    sb.append(" DROP " + partitionSpec.toSql());
     return sb.toString();
   }
 
@@ -70,10 +63,7 @@ public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.DROP_PARTITION);
     TAlterTableDropPartitionParams addPartParams = new TAlterTableDropPartitionParams();
-    for (PartitionKeyValue kv: partitionSpec) {
-      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
-      addPartParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
-    }
+    addPartParams.setPartition_spec(partitionSpec.toThrift());
     addPartParams.setIf_exists(ifExists);
     params.setDrop_partition_params(addPartParams);
     return params;
@@ -83,12 +73,10 @@ public class AlterTableDropPartitionStmt extends AlterTablePartitionSpecStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    Table targetTable = getTargetTable();
-    Preconditions.checkState(targetTable != null && targetTable instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable) targetTable;
-    if (!ifExists && hdfsTable.getPartition(partitionSpec) == null) {
-      throw new AnalysisException("Partition spec does not exist: (" +
-          Joiner.on(", ").join(partitionSpec) + ").");
+    if (!ifExists) {
+      partitionSpec.setPartitionShouldExist();
     }
+    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSpec.analyze(analyzer);
   }
 }

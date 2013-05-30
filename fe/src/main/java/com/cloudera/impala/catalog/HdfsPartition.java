@@ -17,6 +17,8 @@ package com.cloudera.impala.catalog;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.fs.Path;
+
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
@@ -102,6 +104,13 @@ public class HdfsPartition {
     return msPartition;
   }
 
+  /*
+   * Returns the storage location (HDFS path) of this partition.
+   */
+  public String getLocation() {
+    return msPartition.getSd().getLocation();
+  }
+
   public long getId() { return id; }
 
   public HdfsTable getTable() { return table; }
@@ -138,7 +147,7 @@ public class HdfsPartition {
     this.id = id;
   }
 
-  public HdfsPartition(HdfsTable table, 
+  public HdfsPartition(HdfsTable table,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
@@ -155,6 +164,37 @@ public class HdfsPartition {
         storageDescriptor, emptyFileDescriptorList,
         ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
     return partition;
+  }
+
+  /*
+   * Checks whether a file is supported in Impala based on the file extension.
+   * Returns an empty string if the file format is supported, otherwise a string with
+   * details on the incompatibility is returned.
+   * Impala only supports .lzo on text files for partitions that have been declared in
+   * the metastore as TEXT_LZO. For now, raise an error on any other type.
+   */
+  public String checkFileCompressionTypeSupported(Path file) {
+    // Check to see if the file has a compression suffix.
+    // Impala only supports .lzo on text files that have been declared in the metastore
+    // as TEXT_LZO. For now, raise an error on any other type.
+    HdfsCompression compressionType = HdfsCompression.fromFileName(file.getName());
+    if (compressionType == HdfsCompression.LZO_INDEX) {
+      // Index files are read by the LZO scanner directly.
+      return "";
+    }
+
+    HdfsStorageDescriptor sd = getInputFormatDescriptor();
+    if (compressionType == HdfsCompression.LZO) {
+      if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
+        return "Compressed file not supported without compression input format: " + file;
+      }
+    } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
+      return "Expected file with .lzo suffix: " + file;
+    } else if (sd.getFileFormat() == HdfsFileFormat.TEXT
+               && compressionType != HdfsCompression.NONE) {
+      return "Compressed text files are not supported: " + file;
+    }
+    return "";
   }
 
   /**

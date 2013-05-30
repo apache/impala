@@ -387,6 +387,41 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestLoad() throws AuthorizationException, AnalysisException {
+    // User has permission on table and URI.
+    AuthzOk("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+    		" into table functional.alltypes partition(month=10, year=2009)");
+
+    // User does not have permission on table.
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+        " into table functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypes");
+
+    // User does not have permission on URI.
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.part'" +
+        " into table functional.alltypes partition(month=10, year=2009)",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/tpch.part");
+
+    // URI does not exist and user does not have permission.
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/nope'" +
+        " into table functional.alltypes partition(month=10, year=2009)",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/nope");
+
+    // Table/Db does not exist, user does not have permission.
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+        " into table functional.notable",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.notable");
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+        " into table nodb.alltypes",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "nodb.alltypes");
+  }
+
+  @Test
   public void TestShowPermissions() throws AuthorizationException, AnalysisException {
     AuthzOk("show tables in functional");
     AuthzOk("show databases");

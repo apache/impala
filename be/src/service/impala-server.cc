@@ -374,6 +374,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   EXIT_IF_EXC(jni_env);
   drop_database_id_ = jni_env->GetMethodID(fe_class, "dropDatabase", "([B)V");
   EXIT_IF_EXC(jni_env);
+  load_table_data_id_ = jni_env->GetMethodID(fe_class, "loadTableData", "([B)[B");
 
   jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
   jstring policy_file_path =
@@ -1297,6 +1298,22 @@ Status ImpalaServer::GetExplainPlan(
   *explain_string = str;
   jni_env->ReleaseStringUTFChars(java_explain_string, str);
   RETURN_ERROR_IF_EXC(jni_env);
+  return Status::OK;
+}
+
+Status ImpalaServer::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
+  JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  jbyteArray request_bytes;
+
+  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(fe_, load_table_data_id_, request_bytes));
+
+  RETURN_ERROR_IF_EXC(jni_env);
+
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
   return Status::OK;
 }
 

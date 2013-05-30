@@ -450,7 +450,7 @@ class ImpalaShell(cmd.Cmd):
       return False
     return True
 
-  def __query_with_results(self, query):
+  def __execute_query(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
     start, end = time.time(), 0
     (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
@@ -619,19 +619,25 @@ class ImpalaShell(cmd.Cmd):
     query = BeeswaxService.Query()
     query.query = "alter %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_create(self, args):
     query = self.__create_beeswax_query_handle()
     query.query = "create %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_drop(self, args):
     query = self.__create_beeswax_query_handle()
     query.query = "drop %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
+
+  def do_load(self, args):
+    query = self.__create_beeswax_query_handle()
+    query.query = "load %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__execute_query(query)
 
   def do_profile(self, args):
     """Prints the runtime profile of the last INSERT or SELECT query executed."""
@@ -649,14 +655,14 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "select %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_values(self, args):
     """Executes a VALUES(...) query, fetching all rows"""
     query = self.__create_beeswax_query_handle()
     query.query = "values %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
@@ -679,7 +685,7 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "use %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    result = self.__query_with_results(query)
+    result = self.__execute_query(query)
     if result:
       self.current_db = args
     return result
@@ -689,14 +695,14 @@ class ImpalaShell(cmd.Cmd):
     query = self.__create_beeswax_query_handle()
     query.query = "show %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_describe(self, args):
     """Executes a DESCRIBE... query, fetching all rows"""
     query = self.__create_beeswax_query_handle()
     query.query = "describe %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
 
   def do_desc(self, args):
     return self.do_describe(args)

@@ -1,17 +1,3 @@
-// Copyright 2012 Cloudera Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package com.cloudera.impala.analysis;
 
 import java.util.List;
@@ -19,50 +5,82 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
-/**
- * Base class for ALTER TABLE statements that work against Partition specs
+/*
+ * Represents a partition spec - a collection of partition key/values.
  */
-public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
-  protected final List<PartitionKeyValue> partitionSpec;
+public class PartitionSpec implements ParseNode {
+  private final ImmutableList<PartitionKeyValue> partitionSpec;
+  private TableName tableName;
+  private Boolean partitionShouldExist;
+  private Privilege privilegeRequirement;
 
-  // The value Hive is configured to use for NULL partition key values.
-  // Set during analysis.
-  private String nullPartitionKeyValue;
+ // The value Hive is configured to use for NULL partition key values.
+ // Set during analysis.
+ private String nullPartitionKeyValue;
 
-  public AlterTablePartitionSpecStmt(TableName tableName,
-      List<PartitionKeyValue> partitionSpec) {
-    super(tableName);
-    Preconditions.checkState(partitionSpec != null && partitionSpec.size() > 0);
-    this.partitionSpec = Lists.newArrayList(partitionSpec);
+  public PartitionSpec(List<PartitionKeyValue> partitionSpec) {
+    this.partitionSpec = ImmutableList.copyOf(partitionSpec);
   }
 
-  public List<PartitionKeyValue> getPartitionSpec() {
+  public List<PartitionKeyValue> getPartitionSpecKeyValues() {
     return partitionSpec;
   }
 
+  public String getTbl() {
+    return tableName.getTbl();
+  }
+
   // The value Hive is configured to use for NULL partition key values.
   // Set during analysis.
-  protected String getNullPartitionKeyValue() {
+  public String getNullPartitionKeyValue() {
     Preconditions.checkNotNull(nullPartitionKeyValue);
     return nullPartitionKeyValue;
+  }
+
+  // If set, an additional analysis check will be performed to validate the target table
+  // contains the given partition spec.
+  public void setPartitionShouldExist() {
+    partitionShouldExist = Boolean.TRUE;
+  }
+
+  // If set, an additional analysis check will be performed to validate the target table
+  // does not contain the given partition spec.
+  public void setPartitionShouldNotExist() {
+    partitionShouldExist = Boolean.FALSE;
+  }
+
+  public void setTableName(TableName tableName) {
+    this.tableName = tableName;
+  }
+
+  // Set the privilege requirement for this partition spec. Must be set prior to
+  // analysis.
+  public void setPrivilegeRequirement(Privilege privilege) {
+    privilegeRequirement = privilege;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    super.analyze(analyzer);
-    Table table = getTargetTable();
-    String tableName = getDb() + "." + getTbl();
+    Preconditions.checkNotNull(tableName);
+    Preconditions.checkNotNull(privilegeRequirement);
+
+    Table table = analyzer.getTable(tableName, privilegeRequirement);
+    String tableName = table.getDb().getName() + "." + getTbl();
 
     // Make sure the target table is partitioned.
     if (table.getMetaStoreTable().getPartitionKeysSize() == 0) {
@@ -130,5 +148,42 @@ public abstract class AlterTablePartitionSpecStmt extends AlterTableStmt {
     Preconditions.checkState(table instanceof HdfsTable);
     HdfsTable hdfsTable = (HdfsTable) table;
     nullPartitionKeyValue = hdfsTable.getNullPartitionKeyValue();
+
+    if (partitionShouldExist != null) {
+      boolean partitionAlreadyExists = hdfsTable.getPartition(partitionSpec) != null;
+      if (partitionShouldExist && !partitionAlreadyExists) {
+          throw new AnalysisException("Partition spec does not exist: (" +
+              Joiner.on(", ").join(partitionSpec) + ").");
+      } else if (!partitionShouldExist && partitionAlreadyExists) {
+          throw new AnalysisException("Partition spec already exists: (" +
+              Joiner.on(", ").join(partitionSpec) + ").");
+      }
+    }
+  }
+
+  /*
+   * Returns the Thrift representation of this PartitionSpec.
+   */
+  public List<TPartitionKeyValue> toThrift() {
+    List<TPartitionKeyValue> thriftPartitionSpec = Lists.newArrayList();
+    for (PartitionKeyValue kv: partitionSpec) {
+      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
+      thriftPartitionSpec.add(new TPartitionKeyValue(kv.getColName(), value));
+    }
+    return thriftPartitionSpec;
+  }
+
+  @Override
+  public String toSql() {
+    List<String> partitionSpecStr = Lists.newArrayList();
+    for (PartitionKeyValue kv: partitionSpec) {
+      partitionSpecStr.add(kv.getColName() + "=" + kv.getValue());
+    }
+    return String.format("PARTITION (%s)", Joiner.on(", ").join(partitionSpecStr));
+  }
+
+  @Override
+  public String debugString() {
+    return toSql();
   }
 }

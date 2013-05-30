@@ -221,13 +221,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Partition spec does not exist
     AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
                   "set location '/a/b'",
-                  "No matching partition spec found: (year=2014, month=11)");
+                  "Partition spec does not exist: (year=2014, month=11)");
     AnalysisError("alter table functional.alltypes PARTITION (year=2010, year=2010) " +
                   "set location '/a/b'",
-                  "No matching partition spec found: (year=2010, year=2010)");
+                  "Duplicate partition key name: year");
     AnalysisError("alter table functional.alltypes PARTITION (month=11, year=2014) " +
                   "set fileformat sequencefile",
-                  "No matching partition spec found: (month=11, year=2014)");
+                  "Partition spec does not exist: (month=11, year=2014)");
     AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
                   "set fileformat sequencefile",
                   "Table is not partitioned: functional.alltypesnopart");
@@ -236,19 +236,19 @@ public class AnalyzeDDLTest extends AnalyzerTest {
                   "Table is not partitioned: functional.alltypesnopart");
     AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set location '/a/b'",
-                  "No matching partition spec found: (string_col='partition2')");
+                  "Partition spec does not exist: (string_col='partition2')");
     AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set fileformat sequencefile",
-                  "No matching partition spec found: (string_col='partition2')");
+                  "Partition spec does not exist: (string_col='partition2')");
     AnalysisError("alter table functional.alltypes PARTITION " +
                  "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
                   "set location '/a/b'",
-                  "No matching partition spec found: " +
+                  "Partition spec does not exist: " +
                   "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
     AnalysisError("alter table functional.alltypes PARTITION " +
                   "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
                   "set fileformat sequencefile",
-                  "No matching partition spec found: " +
+                  "Partition spec does not exist: " +
                   "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
 
     // Table/Db does not exist

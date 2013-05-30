@@ -1,0 +1,218 @@
+====
+---- QUERY
+DROP TABLE IF EXISTS functional.test_load;
+---- RESULTS
+
+====
+---- QUERY
+CREATE TABLE functional.test_load like functional.alltypes
+location '/test-warehouse/test_load'
+---- RESULTS
+
+====
+---- QUERY
+alter table functional.test_load add partition
+(year=2009, month=1)
+---- RESULTS
+
+====
+---- QUERY
+alter table functional.test_load add partition
+(year=2010, month=1)
+---- RESULTS
+
+====
+---- QUERY
+# Insert some data into one of the partitions, used to verify we are not clobbering
+# existing data when loading into a partition.
+insert overwrite table functional.test_load partition (year=2009, month=1)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes where year = 2009 and month = 1
+---- RESULTS
+year=2009/month=1/: 310
+====
+---- QUERY
+select count(*) from functional.test_load
+---- RESULTS
+310
+====
+---- QUERY
+# No data should be in the "year=2010" partition.
+select count(*) from functional.test_load where year=2010
+---- RESULTS
+0
+====
+---- QUERY
+# Load a specific data file.
+load data inpath '/tmp/load_data/1/100101.txt'
+into table functional.test_load partition(year=2010, month=1)
+---- RESULTS
+'Loaded 1 file(s). Total files in destination location: 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional.test_load where year=2010 and month=1
+---- RESULTS
+310
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Load another data file with the same name (overwrite not specified)
+load data inpath '/tmp/load_data/2/100101.txt'
+into table functional.test_load partition(year=2010, month=1)
+---- RESULTS
+'Loaded 1 file(s). Total files in destination location: 2'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional.test_load where year=2010 and month=1
+---- RESULTS
+620
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Load the file one more time, this time with overwrite.
+load data inpath '/tmp/load_data/3/100101.txt'
+overwrite into table functional.test_load partition(year=2010, month=1)
+---- RESULTS
+'Loaded 1 file(s). Total files in destination location: 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional.test_load where year=2010 and month=1
+---- RESULTS
+310
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The other partition still has the same data.
+select count(*) from functional.test_load where year=2009
+---- RESULTS
+310
+---- TYPES
+BIGINT
+====
+---- QUERY
+DROP TABLE IF EXISTS functional.test_load_nopart;
+---- RESULTS
+
+====
+---- QUERY
+create table functional.test_load_nopart like functional.alltypesnopart
+location '/test-warehouse/test_load_nopart'
+---- RESULTS
+
+====
+---- QUERY
+# Table should be empty.
+select count(*) from functional.test_load_nopart
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Load a directory of file(s) into the table.
+load data inpath '/tmp/load_data/4/'
+overwrite into table functional.test_load_nopart
+---- RESULTS
+'Loaded 4 file(s). Total files in destination location: 4'
+---- TYPES
+STRING
+====
+---- QUERY
+# Table has some data.
+select count(*) from functional.test_load_nopart
+---- RESULTS
+1000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Load more file(s) into the table without overwrite.
+load data inpath '/tmp/load_data/5/'
+into table functional.test_load_nopart
+---- RESULTS
+'Loaded 4 file(s). Total files in destination location: 8'
+---- TYPES
+STRING
+====
+---- QUERY
+# Double the data.
+select count(*) from functional.test_load_nopart
+---- RESULTS
+2000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Load a file from the partitioned table.
+load data inpath '/test-warehouse/test_load/year=2010/month=1/100101.txt'
+into table functional.test_load_nopart
+---- RESULTS
+'Loaded 1 file(s). Total files in destination location: 9'
+---- TYPES
+STRING
+====
+---- QUERY
+# The change is reflected in both tables:
+select count(*) from functional.test_load_nopart
+---- RESULTS
+2310
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from functional.test_load where year=2010 and month=1
+---- SETUP
+# A refresh needs to happen before selecting from this table because file(s) changed
+# underneath it.
+RELOAD
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Have the table load itself (with overwrite). Since the file(s) were moved from the dest
+# location there are actually no file(s) to overwrite.
+load data inpath '/test-warehouse/test_load_nopart/'
+overwrite into table functional.test_load_nopart
+---- RESULTS
+'Loaded 9 file(s). Total files in destination location: 9'
+---- TYPES
+STRING
+====
+---- QUERY
+# The table should have the same data
+select count(*) from functional.test_load_nopart
+---- RESULTS
+2310
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Have the table load itself (without overwrite)
+load data inpath '/test-warehouse/test_load_nopart/'
+into table functional.test_load_nopart
+---- RESULTS
+'Loaded 9 file(s). Total files in destination location: 9'
+---- TYPES
+STRING
+====
+---- QUERY
+# The table should still have the same data since load operations move file(s) rather than
+# copying file(s).
+select count(*) from functional.test_load_nopart
+---- RESULTS
+2310
+---- TYPES
+BIGINT
+====

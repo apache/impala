@@ -1363,6 +1363,24 @@ public class ParserTest {
   }
 
   @Test
+  public void TestLoadData() {
+    ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo");
+    ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo.Bar");
+    ParsesOk("LOAD DATA INPATH '/a/b' OVERWRITE INTO TABLE Foo.Bar");
+    ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo PARTITION(a=1, b='asdf')");
+    ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo PARTITION(a=1)");
+
+    ParserError("LOAD DATA INPATH '/a/b' INTO Foo PARTITION(a=1)");
+    ParserError("LOAD DATA INPATH '/a/b' INTO Foo PARTITION(a)");
+    ParserError("LOAD DATA INPATH '/a/b' INTO Foo PARTITION");
+    ParserError("LOAD DATA INPATH /a/b/c INTO Foo");
+    ParserError("LOAD DATA INPATH /a/b/c INTO Foo");
+
+    // Loading data from a 'LOCAL' path is not supported.
+    ParserError("LOAD DATA LOCAL INPATH '/a/b' INTO TABLE Foo");
+  }
+
+  @Test
   public void TestTypeSynonyms() {
     ParsesOk("CREATE TABLE bar (i INTEGER)");
     ParsesOk("CREATE TABLE bar (r REAL)");
@@ -1379,8 +1397,8 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, CREATE, DESCRIBE, DROP, SELECT, SHOW, USE, INSERT, VALUES, " +
-        "EXPLAIN, WITH\n");
+        "Expected: ALTER, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, LOAD, SELECT, SHOW, " +
+        "USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -1389,7 +1407,7 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, " +
+        "DISTINCTPCSA, FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, " +
         "IDENTIFIER\n");
 
     // missing from
@@ -1398,7 +1416,7 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AND, AS, BETWEEN, DIV, FROM, IS, IN, LIKE, LIMIT, NOT, OR, " +
+        "Expected: AND, AS, BETWEEN, DIV, FROM, IN, IS, LIKE, LIMIT, NOT, OR, " +
         "ORDER, REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list
@@ -1416,7 +1434,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
+        "FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -1425,7 +1443,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
+        "FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -1446,8 +1464,8 @@ public class ParserTest {
         "              ^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
@@ -1457,9 +1475,8 @@ public class ParserTest {
         "^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
-        "IDENTIFIER\n");
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
         "Syntax error at:\n" +
@@ -1469,9 +1486,8 @@ public class ParserTest {
         "from t\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
-        "IDENTIFIER\n");
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
   }
 
   @Test

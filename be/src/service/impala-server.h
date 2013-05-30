@@ -476,6 +476,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // successful, otherwise CANCELLED is returned.
   Status DropTable(const TDropTableParams& drop_table_params);
 
+  // Loads a single file or set of files into a table or partition. Saves the RPC
+  // response in the TLoadDataResp output parameter. Returns OK if the operation
+  // completed successfully.
+  Status LoadData(const TLoadDataReq& load_data_request, TLoadDataResp* response);
+
   // Checks settings for profile logging, including whether the output
   // directory exists and is writeable. Calls OpenProfileLogFile to
   // initialise the first log file. Returns OK unless there is some
@@ -668,6 +673,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   jmethodID create_table_like_id_; // JniFrontend.createTableLike
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
   jmethodID drop_table_id_; // JniFrontend.dropTable
+  jmethodID load_table_data_id_; // JniFrontend.loadTableData
   ExecEnv* exec_env_;  // not owned
 
   // map from query id to exec state; QueryExecState is owned by us and referenced

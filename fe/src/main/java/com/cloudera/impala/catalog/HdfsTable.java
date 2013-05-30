@@ -51,6 +51,7 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HdfsTableSink;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
@@ -323,10 +324,6 @@ public class HdfsTable extends Table {
       // loop over all files and record their block metadata, minus volume ids
       for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
         Path p = new Path(fileDescriptor.getFilePath());
-        // Check to see if the file has a compression suffix.
-        // We only support .lzo on text files that have been declared in
-        // the metastore as TEXT_LZO.  For now, raise an error on any
-        // other type.
         HdfsCompression compressionType =
             HdfsCompression.fromFileName(fileDescriptor.getFilePath());
         fileDescriptor.setCompression(compressionType);
@@ -334,18 +331,9 @@ public class HdfsTable extends Table {
           // Skip index files, these are read by the LZO scanner directly.
           continue;
         }
-
-        HdfsStorageDescriptor sd = partition.getInputFormatDescriptor();
-        if (compressionType == HdfsCompression.LZO) {
-          if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
-            throw new RuntimeException(
-                "Compressed file not supported without compression input format: " + p);
-          }
-        } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
-          throw new RuntimeException("Expected file with .lzo suffix: " + p);
-        } else if (sd.getFileFormat() == HdfsFileFormat.TEXT
-                   && compressionType != HdfsCompression.NONE) {
-          throw new RuntimeException("Compressed text files are not supported: " + p);
+        String checkMessage = partition.checkFileCompressionTypeSupported(p);
+        if (!checkMessage.isEmpty()) {
+          throw new RuntimeException(checkMessage);
         }
 
         BlockLocation[] locations = null;
@@ -457,6 +445,13 @@ public class HdfsTable extends Table {
 
   public String getNullColumnValue() {
     return nullColumnValue;
+  }
+
+  /*
+   * Returns the storage location (HDFS path) of this table.
+   */
+  public String getLocation() {
+    return super.getMetaStoreTable().getSd().getLocation();
   }
 
   /**
@@ -699,9 +694,8 @@ public class HdfsTable extends Table {
     List<FileDescriptor> fileDescriptors = Lists.newArrayList();
     if (DFS.exists(path)) {
       for (FileStatus fileStatus: DFS.listStatus(path)) {
-        String fileName = fileStatus.getPath().getName().toString();
-        if (fileName.startsWith(".") || fileName.startsWith("_")) {
-          // Ignore hidden file starting with . or _
+        if (FileSystemUtil.isHiddenFile(fileStatus.getPath().getName())) {
+          // Ignore hidden files.
           continue;
         }
         FileDescriptor fd = new FileDescriptor(fileStatus.getPath().toString(),

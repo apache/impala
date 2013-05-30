@@ -168,19 +168,19 @@ parser code {:
 :};
 
 terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT,
-  KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_CREATE, KW_COLUMN, KW_COLUMNS,
-  KW_COMMENT, KW_COUNT, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DESC,
-  KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV, KW_DELIMITED,
-  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXTERNAL, KW_FALSE,
-  KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP, KW_HAVING,
-  KW_IF, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
-  KW_LOCATION, KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER,
-  KW_PARQUETFILE, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RLIKE,
-  KW_RIGHT, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SET, KW_SEQUENCEFILE, KW_SHOW,
-  KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLES, KW_TERMINATED,
-  KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_TEXTFILE,
-  KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION,
-  KW_INTERVAL, KW_VALUES, KW_EXPLAIN, KW_WITH;
+  KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_COLUMN, KW_COLUMNS, KW_COMMENT,
+  KW_COUNT, KW_CREATE, KW_DATABASE, KW_DATABASES, KW_DATA, KW_DATE, KW_DATETIME,
+  KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
+  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
+  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP,
+  KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,KW_INTERVAL, KW_INTO,
+  KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MIN,
+  KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE,
+  KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RIGHT,
+  KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEQUENCEFILE, KW_SET, KW_SHOW,
+  KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED,
+  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE,
+  KW_USING, KW_VALUES, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -212,6 +212,7 @@ nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
+nonterminal LoadDataStmt load_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
@@ -255,7 +256,7 @@ nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
 nonterminal StatementBase explain_stmt;
 nonterminal List<String> col_list;
-nonterminal ArrayList<PartitionKeyValue> partition_spec;
+nonterminal PartitionSpec partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
 nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
@@ -293,6 +294,7 @@ nonterminal String dbs_or_schemas_kw;
 nonterminal String optional_kw_column;
 // Used to simplify commands where KW_TABLE is optional
 nonterminal String optional_kw_table;
+nonterminal Boolean overwrite_val;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -337,6 +339,21 @@ stmt ::=
   {: RESULT = drop_tbl; :}
   | explain_stmt: explain
   {: RESULT = explain; :}
+  | load_stmt: load
+  {: RESULT = load; :}
+  ;
+
+load_stmt ::=
+  KW_LOAD KW_DATA KW_INPATH STRING_LITERAL:path overwrite_val:overwrite KW_INTO KW_TABLE
+  table_name:table partition_spec:partition
+  {: RESULT = new LoadDataStmt(table, path, overwrite, partition); :}
+  ;
+
+overwrite_val ::=
+  KW_OVERWRITE
+  {: RESULT = Boolean.TRUE; :}
+  | /* empty */
+  {: RESULT = Boolean.FALSE; :}
   ;
 
 explain_stmt ::=
@@ -621,9 +638,9 @@ partition_key_value_list ::=
 // for dynamic and static partition key/values.
 partition_spec ::=
   KW_PARTITION LPAREN static_partition_key_value_list:list RPAREN
-  {: RESULT = list; :}
+  {: RESULT = new PartitionSpec(list); :}
   | /* Empty */
-  {: RESULT = new ArrayList<PartitionKeyValue>(); :}
+  {: RESULT = null; :}
   ;
 
 static_partition_key_value_list ::=

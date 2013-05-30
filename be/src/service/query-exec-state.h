@@ -136,8 +136,11 @@ class ImpalaServer::QueryExecState {
 
   boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
 
-  // Result set of explain. Set iff the request is EXPLAIN <query>.
-  boost::scoped_ptr<std::vector<TResultRow> > explain_result_set_;
+  // Result set used for requests that return results and are not DML, DDL, or QUERY
+  // statements. For example, EXPLAIN and LOAD use this.
+  // TODO: Move SHOW/DESCRIBE requests out of DdlExecutor (they are not really DDL) and
+  // update them to use this for their result sets.
+  boost::scoped_ptr<std::vector<TResultRow> > request_result_set_;
 
   // local runtime_state_ in case we don't have a coord_
   boost::scoped_ptr<RuntimeState> local_runtime_state_;
@@ -189,6 +192,9 @@ class ImpalaServer::QueryExecState {
   // Also sets up profile and pre-execution counters.
   // Non-blocking.
   Status ExecQueryOrDmlRequest();
+
+  // Executes a LOAD DATA
+  Status ExecLoadDataRequest();
 
   // Core logic of FetchRows(). Does not update query_state_/status_.
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);

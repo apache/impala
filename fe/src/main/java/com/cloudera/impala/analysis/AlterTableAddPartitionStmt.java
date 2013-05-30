@@ -14,33 +14,30 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
-
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents an ALTER TABLE ADD PARTITION statement.
  */
-public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
+public class AlterTableAddPartitionStmt extends AlterTableStmt {
   private final String location;
   private final boolean ifNotExists;
+  private final PartitionSpec partitionSpec;
 
   public AlterTableAddPartitionStmt(TableName tableName,
-      List<PartitionKeyValue> partitionSpec, String location, boolean ifNotExists) {
-    super(tableName, partitionSpec);
-    Preconditions.checkState(partitionSpec != null && partitionSpec.size() > 0);
+      PartitionSpec partitionSpec, String location, boolean ifNotExists) {
+    super(tableName);
+    Preconditions.checkState(partitionSpec != null);
     this.location = location;
     this.ifNotExists = ifNotExists;
+    this.partitionSpec = partitionSpec;
+    this.partitionSpec.setTableName(tableName);
   }
 
   public boolean getIfNotExists() {
@@ -63,14 +60,9 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     if (ifNotExists) {
       sb.append("IF NOT EXISTS ");
     }
-    List<String> partitionSpecStr = Lists.newArrayList();
-    for (PartitionKeyValue kv: partitionSpec) {
-      partitionSpecStr.add(kv.getColName() + "=" + kv.getValue());
-    }
-    sb.append(String.format(" PARTITION (%s) ",
-          Joiner.on(", ").join(partitionSpecStr)));
+    sb.append(" " + partitionSpec.toSql());
     if (location != null) {
-      sb.append(String.format("LOCATION '%s'", location));
+      sb.append(String.format(" LOCATION '%s'", location));
     }
     return sb.toString();
   }
@@ -80,10 +72,7 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.ADD_PARTITION);
     TAlterTableAddPartitionParams addPartParams = new TAlterTableAddPartitionParams();
-    for (PartitionKeyValue kv: partitionSpec) {
-      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
-      addPartParams.addToPartition_spec(new TPartitionKeyValue(kv.getColName(), value));
-    }
+    addPartParams.setPartition_spec(partitionSpec.toThrift());
     addPartParams.setLocation(getLocation());
     addPartParams.setIf_not_exists(ifNotExists);
     params.setAdd_partition_params(addPartParams);
@@ -94,12 +83,10 @@ public class AlterTableAddPartitionStmt extends AlterTablePartitionSpecStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    Table targetTable = getTargetTable();
-    Preconditions.checkState(targetTable != null && targetTable instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable) targetTable;
-    if (!ifNotExists && hdfsTable.getPartition(partitionSpec) != null) {
-      throw new AnalysisException("Partition spec already exists: (" +
-          Joiner.on(", ").join(partitionSpec) + ").");
+    if (!ifNotExists) {
+      partitionSpec.setPartitionShouldNotExist();
     }
+    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSpec.analyze(analyzer);
   }
 }

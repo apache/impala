@@ -14,12 +14,15 @@
 
 package com.cloudera.impala.service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -52,6 +55,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
@@ -70,6 +74,8 @@ import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
+import com.cloudera.impala.thrift.TLoadDataReq;
+import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -327,6 +333,65 @@ public class Frontend {
   }
 
   /**
+   * Loads a table or partition with one or more data files. If the "overwrite" flag
+   * in the request is true, all existing data in the table/partition will be replaced.
+   * If the "overwrite" flag is false, the files will be added alongside any existing
+   * data files.
+   */
+  public TLoadDataResp loadTableData(TLoadDataReq request) throws ImpalaException,
+      IOException {
+    TableName tableName = TableName.fromThrift(request.getTable_name());
+
+    // Get the destination for the load. If the load is targeting a partition,
+    // this the partition location. Otherwise this is the table location.
+    String destPathString = null;
+    if (request.isSetPartition_spec()) {
+      destPathString = catalog.getHdfsPartition(tableName.getDb(), tableName.getTbl(),
+          request.getPartition_spec()).getLocation();
+    } else {
+      destPathString = catalog.getTable(tableName.getDb(), tableName.getTbl(),
+          ImpalaInternalAdminUser.getInstance(), Privilege.INSERT)
+          .getMetaStoreTable().getSd().getLocation();
+    }
+
+    Path destPath = new Path(destPathString);
+    DistributedFileSystem dfs = FileSystemUtil.getDistributedFileSystem(destPath);
+
+    // Create a temporary directory within the final destination directory to stage the
+    // file move.
+    Path tmpDestPath = FileSystemUtil.makeTmpSubdirectory(destPath);
+
+    Path sourcePath = new Path(request.source_path);
+    int filesLoaded = 0;
+    if (dfs.isDirectory(sourcePath)) {
+      filesLoaded = FileSystemUtil.moveAllVisibleFiles(sourcePath, tmpDestPath);
+    } else {
+      FileSystemUtil.moveFile(sourcePath, tmpDestPath, true);
+      filesLoaded = 1;
+    }
+
+    // If this is an OVERWRITE, delete all files in the destination.
+    if (request.isOverwrite()) {
+      FileSystemUtil.deleteAllVisibleFiles(destPath);
+    }
+
+    // Move the files from the temporary location to the final destination.
+    FileSystemUtil.moveAllVisibleFiles(tmpDestPath, destPath);
+    // Cleanup the tmp directory.
+    dfs.delete(tmpDestPath, true);
+    catalog.invalidateTable(tableName.getDb(), tableName.getTbl(), true);
+
+    TLoadDataResp response = new TLoadDataResp();
+    TColumnValue col = new TColumnValue();
+    String loadMsg = String.format(
+        "Loaded %d file(s). Total files in destination location: %d",
+        filesLoaded, FileSystemUtil.getTotalNumVisibleFiles(destPath));
+    col.setStringVal(loadMsg);
+    response.setLoad_summary(new TResultRow(Lists.newArrayList(col)));
+    return response;
+  }
+
+  /**
    * Parses and plans a query in order to generate its explain string. This method does
    * not increase the query id counter.
    */
@@ -412,6 +477,12 @@ public class Frontend {
     if (analysisResult.isDdlStmt()) {
       result.stmt_type = TStmtType.DDL;
       createDdlExecRequest(analysisResult, result);
+      return result;
+    } else if (analysisResult.isLoadDataStmt()) {
+      result.stmt_type = TStmtType.LOAD;
+      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+          new TColumnDesc("summary", TPrimitiveType.STRING))));
+      result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
       return result;
     }
 

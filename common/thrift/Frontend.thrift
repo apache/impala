@@ -85,7 +85,7 @@ struct TColumnDef {
   2: optional string comment
 }
 
-// Arguments to DescribeTable, which returns a list of column descriptors for a 
+// Arguments to DescribeTable, which returns a list of column descriptors for a
 // given table
 struct TDescribeTableParams {
   1: optional string db
@@ -171,7 +171,7 @@ struct TAlterTableRenameParams {
 }
 
 // Parameters for ALTER TABLE ADD|REPLACE COLUMNS commands.
-struct TAlterTableAddReplaceColsParams { 
+struct TAlterTableAddReplaceColsParams {
   // List of columns to add to the table
   1: required list<TColumnDef> columns
 
@@ -180,7 +180,7 @@ struct TAlterTableAddReplaceColsParams {
 }
 
 // Parameters for ALTER TABLE ADD PARTITION commands
-struct TAlterTableAddPartitionParams { 
+struct TAlterTableAddPartitionParams {
   // The partition spec (list of keys and values) to add.
   1: required list<TPartitionKeyValue> partition_spec
 
@@ -193,13 +193,13 @@ struct TAlterTableAddPartitionParams {
 }
 
 // Parameters for ALTER TABLE DROP COLUMN commands.
-struct TAlterTableDropColParams { 
+struct TAlterTableDropColParams {
   // Column name to drop.
   1: required string col_name
 }
 
 // Parameters for ALTER TABLE DROP PARTITION commands
-struct TAlterTableDropPartitionParams { 
+struct TAlterTableDropPartitionParams {
   // The partition spec (list of keys and values) to add.
   1: required list<TPartitionKeyValue> partition_spec
 
@@ -208,7 +208,7 @@ struct TAlterTableDropPartitionParams {
 }
 
 // Parameters for ALTER TABLE CHANGE COLUMN commands
-struct TAlterTableChangeColParams { 
+struct TAlterTableChangeColParams {
   // Target column to change.
   1: required string col_name
 
@@ -217,7 +217,7 @@ struct TAlterTableChangeColParams {
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
-struct TAlterTableSetFileFormatParams { 
+struct TAlterTableSetFileFormatParams {
   // New file format
   1: required TFileFormat file_format
 
@@ -226,7 +226,7 @@ struct TAlterTableSetFileFormatParams {
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
-struct TAlterTableSetLocationParams { 
+struct TAlterTableSetLocationParams {
   // New HDFS storage location of the table
   1: required string location
 
@@ -348,8 +348,6 @@ struct TDropTableParams {
   2: required bool if_exists
 }
 
-
-
 struct TClientRequest {
   // select stmt to be executed
   1: required string stmt
@@ -382,7 +380,7 @@ struct TUseDbParams {
   1: required string db
 }
 
-// Results of an EXPLAIN 
+// Results of an EXPLAIN
 struct TExplainResult {
   // each line in the explain plan occupies an entry in the list
   1: required list<Data.TResultRow> results
@@ -405,20 +403,46 @@ struct TCatalogUpdate {
   3: required set<string> created_partitions;
 }
 
-// Metadata required to finalize a query - that is, to clean up after the query is done. 
+// Metadata required to finalize a query - that is, to clean up after the query is done.
 // Only relevant for INSERT queries.
 struct TFinalizeParams {
   // True if the INSERT query was OVERWRITE, rather than INTO
   1: required bool is_overwrite;
- 
+
   // The base directory in hdfs of the table targeted by this INSERT
   2: required string hdfs_base_dir;
- 
+
   // The target table name
   3: required string table_name;
 
   // The target table database
   4: required string table_db;
+}
+
+// Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.
+struct TLoadDataReq {
+  // Fully qualified table name to load data into.
+  1: required TTableName table_name
+
+  // The source data file or directory to load into the table.
+  2: required string source_path
+
+  // If true, loaded files will overwrite all data in the target table/partition's
+  // directory. If false, new files will be added alongside existing files. If there are
+  // any file name conflicts, the new files will be uniquified by appending a UUID to the
+  // base file name preserving the extension if one exists.
+  3: required bool overwrite
+
+  // An optional partition spec. Set if this operation should apply to a specific
+  // partition rather than the base table.
+  4: optional list<TPartitionKeyValue> partition_spec
+}
+
+// Response of a LOAD DATA statement.
+struct TLoadDataResp {
+  // A result row that contains information on the result of the LOAD operation. This
+  // includes details like the number of files moved as part of the request.
+  1: required Data.TResultRow load_summary
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
@@ -520,7 +544,7 @@ enum TMetadataOpcode {
 struct TMetadataOpRequest {
   // opcode
   1: required TMetadataOpcode opcode
-  
+
   // input parameter
   2: optional cli_service.TGetInfoReq get_info_req
   3: optional cli_service.TGetTypeInfoReq get_type_info_req
@@ -541,7 +565,7 @@ struct TMetadataOpRequest {
 struct TMetadataOpResponse {
   // Schema of the result
   1: required TResultSetMetadata result_set_metadata
-  
+
   // Result set
   2: required list<Data.TResultRow> results
 }
@@ -565,4 +589,7 @@ struct TExecRequest {
 
   // Result of EXPLAIN. Set iff stmt_type is EXPLAIN
   6: optional TExplainResult explain_result
+
+  // Request for LOAD DATA statements.
+  7: optional TLoadDataReq load_data_request
 }

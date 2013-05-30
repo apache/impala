@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 public class AnalyzeStmtsTest extends AnalyzerTest {
 
@@ -1024,6 +1025,103 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
         "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
         "Table does not exist: default.t2");
+  }
+
+  @Test
+  public void TestLoadData() throws AnalysisException {
+    for (String overwrite: Lists.newArrayList("", "overwrite")) {
+      // Load specific data file.
+      AnalyzesOk(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/tpch.lineitem/lineitem.tbl", overwrite));
+
+      // Load files from a data directory.
+      AnalyzesOk(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/tpch.lineitem/", overwrite));
+
+      // Load files from a data directory into a partition.
+      AnalyzesOk(String.format("load data inpath '%s' %s into table " +
+          "functional.alltypes partition(year=2009, month=12)",
+          "/test-warehouse/tpch.lineitem/", overwrite));
+
+      // Source directory cannot contain subdirs.
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/", overwrite),
+          "INPATH location '/test-warehouse/' cannot contain subdirectories.");
+
+      // Source directory cannot be empty.
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/emptytable", overwrite),
+          "INPATH location '/test-warehouse/emptytable' contains no visible files.");
+
+      // Cannot load a hidden files.
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/alltypessmall/year=2009/month=1/.hidden", overwrite),
+          "INPATH location '/test-warehouse/alltypessmall/year=2009/month=1/.hidden'" +
+          " points to a hidden file.");
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/alltypessmall/year=2009/month=1/_hidden", overwrite),
+          "INPATH location '/test-warehouse/alltypessmall/year=2009/month=1/_hidden'" +
+          " points to a hidden file.");
+
+      // Source directory does not exist.
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "/test-warehouse/does_not_exist", overwrite),
+          "INPATH location '/test-warehouse/does_not_exist' does not exist.");
+      // Empty source directory string
+      AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
+          "", overwrite), "INPATH location cannot be an empty string.");
+
+      // Partition spec does not exist in table.
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "functional.alltypes partition(year=123, month=10)",
+          "/test-warehouse/tpch.lineitem/", overwrite),
+          "Partition spec does not exist: (year=123, month=10)");
+
+      // Cannot load into non-HDFS tables.
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "functional.hbasealltypessmall",
+          "/test-warehouse/tpch.lineitem/", overwrite),
+          "LOAD DATA only supported for HDFS tables: functional.hbasealltypessmall");
+
+      // Load into partitioned table without specifying a partition spec.
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "functional.alltypes",
+          "/test-warehouse/tpch.lineitem/", overwrite),
+          "Table is partitioned but no partition spec was specified: " +
+          "functional.alltypes");
+
+      // Database/table do not exist.
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "nodb.alltypes",
+          "/test-warehouse/tpch.lineitem/", overwrite),
+          "Database does not exist: nodb");
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "functional.notbl",
+          "/test-warehouse/tpch.lineitem/", overwrite),
+          "Table does not exist: functional.notbl");
+
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "tpch.lineitem",
+          "file:///test-warehouse/test.out", overwrite),
+          "INPATH location 'file:/test-warehouse/test.out' must point to an " +
+          "HDFS file system");
+
+      // File type / table type mismatch.
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "tpch.lineitem",
+          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite),
+          "Compressed file not supported without compression input format: " +
+          "hdfs://localhost:20500/test-warehouse/alltypes_text_lzo/" +
+          "year=2009/month=4/000021_0.lzo");
+      // When table type matches, analysis passes for partitioned and unpartitioned
+      // tables.
+      AnalyzesOk(String.format("load data inpath '%s' %s into table " +
+          "functional_text_lzo.alltypes partition(year=2009, month=4)",
+          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+      AnalyzesOk(String.format("load data inpath '%s' %s into table " +
+          "functional_text_lzo.jointbl",
+          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+    }
   }
 
   @Test

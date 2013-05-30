@@ -81,6 +81,10 @@ public class AnalysisContext {
       return stmt instanceof CreateDbStmt;
     }
 
+    public boolean isLoadDataStmt() {
+      return stmt instanceof LoadDataStmt;
+    }
+
     public boolean isUseStmt() {
       return stmt instanceof UseStmt;
     }
@@ -141,6 +145,11 @@ public class AnalysisContext {
     public DropTableStmt getDropTableStmt() {
       Preconditions.checkState(isDropTableStmt());
       return (DropTableStmt) stmt;
+    }
+
+    public LoadDataStmt getLoadDataStmt() {
+      Preconditions.checkState(isLoadDataStmt());
+      return (LoadDataStmt) stmt;
     }
 
     public QueryStmt getQueryStmt() {

@@ -85,7 +85,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
     case TStmtType::DML:
       return ExecQueryOrDmlRequest();
     case TStmtType::EXPLAIN: {
-      explain_result_set_.reset(new vector<TResultRow>(
+      request_result_set_.reset(new vector<TResultRow>(
           exec_request_.explain_result.results));
       return Status::OK;
     }
@@ -102,6 +102,15 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         lock_guard<mutex> l(lock_);
         return UpdateQueryStatus(status);
       }
+    }
+    case TStmtType::LOAD: {
+      DCHECK(exec_request_.__isset.load_data_request);
+      TLoadDataResp response;
+      RETURN_IF_ERROR(
+          impala_server_->LoadData(exec_request_.load_data_request, &response));
+      request_result_set_.reset(new vector<TResultRow>);
+      request_result_set_->push_back(response.load_summary);
+      return Status::OK;
     }
     default:
       stringstream errmsg;
@@ -229,13 +238,13 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
   if (eos_) return Status::OK;
 
-  if (ddl_executor_ != NULL || explain_result_set_ != NULL) {
-    // DDL or EXPLAIN
-    DCHECK(ddl_executor_ == NULL || explain_result_set_ == NULL);
+  if (ddl_executor_ != NULL || request_result_set_ != NULL) {
+    // DDL / EXPLAIN / LOAD
+    DCHECK(ddl_executor_ == NULL || request_result_set_ == NULL);
     query_state_ = QueryState::FINISHED;
     int num_rows = 0;
     const vector<TResultRow>& all_rows = (ddl_executor_ != NULL) ?
-        ddl_executor_->result_set() : (*(explain_result_set_.get()));
+        ddl_executor_->result_set() : (*(request_result_set_.get()));
     // max_rows <= 0 means no limit
     while ((num_rows < max_rows || max_rows <= 0)
         && num_rows_fetched_ < all_rows.size()) {
