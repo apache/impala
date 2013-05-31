@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
+#include <limits.h>
 
 #include <boost/utility.hpp>
 #include <gtest/gtest.h>
@@ -76,6 +77,17 @@ TEST(BitUtil, ByteSwap) {
       static_cast<int64_t>(0x1122334455667788)), 0x8877665544332211);
 }
 
+TEST(BitUtil, Log2) {
+  EXPECT_EQ(BitUtil::Log2(1), 1);
+  EXPECT_EQ(BitUtil::Log2(2), 2);
+  EXPECT_EQ(BitUtil::Log2(3), 2);
+  EXPECT_EQ(BitUtil::Log2(4), 3);
+  EXPECT_EQ(BitUtil::Log2(5), 3);
+  EXPECT_EQ(BitUtil::Log2(INT_MAX), 31);
+  EXPECT_EQ(BitUtil::Log2(UINT_MAX), 32);
+  EXPECT_EQ(BitUtil::Log2(ULLONG_MAX), 64);
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -83,4 +95,3 @@ int main(int argc, char **argv) {
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
-

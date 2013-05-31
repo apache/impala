@@ -207,7 +207,7 @@ set fileformat textfile
 ---- QUERY
 select count(*) from alltypes_test
 ---- RESULTS
-128
+130
 ---- TYPES
 BIGINT
 ====

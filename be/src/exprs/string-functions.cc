@@ -439,7 +439,7 @@ void* StringFunctions::RegexpExtract(Expr* e, TupleRow* row) {
       const_cast<const char*>(str->ptr) + str->len,
       matches, *func_expr->GetRegex(), regex_constants::match_posix);
   if (!success) {
-    e->result_.SetStringVal("");
+    e->result_.SetStringVal(std::string());
     return &e->result_.string_val;
   }
   // match[0] is the whole string, match_res.str(1) the first group, etc.

@@ -197,7 +197,7 @@ inline bool RleDecoder::Get(T* val) {
     // The int is encoded as a vlq-encoded value.
     int32_t indicator_value = 0;
     bool result = bit_reader_.GetVlqInt(&indicator_value);
-    DCHECK(result);
+    if (!result) return false;
 
     // lsb indicates if it is a literal run or repeated run
     bool is_literal = indicator_value & 1;

@@ -30,6 +30,7 @@
 #include "util/bit-util.h"
 #include "util/decompress.h"
 #include "util/debug-util.h"
+#include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
 #include "util/runtime-profile.h"
 #include "util/thrift-util.h"
@@ -77,6 +78,7 @@ void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state) 
     : HdfsScanner(scan_node, state),
       metadata_range_(NULL),
+      dictionary_pool_(new MemPool(scan_node_->runtime_state()->mem_limits())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
   assemble_rows_timer_.Stop();
 }
@@ -97,6 +99,7 @@ class HdfsParquetScanner::ColumnReader {
       num_buffered_values_(0) {
   }
 
+  // This is called once for each row group in the file.
   Status Reset(const parquet::SchemaElement* schema_element,
       const parquet::ColumnMetaData* metadata, ScannerContext::Stream* stream) {
     DCHECK(stream != NULL);
@@ -106,7 +109,8 @@ class HdfsParquetScanner::ColumnReader {
     num_buffered_values_ = 0;
     data_ = NULL;
     stream_ = stream;
-    metadata_ = metadata; 
+    metadata_ = metadata;
+    dict_decoder_.reset();
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
           parent_->scan_node_->runtime_state(), NULL, false,
@@ -162,12 +166,19 @@ class HdfsParquetScanner::ColumnReader {
   RleDecoder rle_def_levels_;
   BitReader bit_packed_def_levels_;
 
-  // Read the next data page.
+  // Decoder for dictionary-encoded string columns.
+  scoped_ptr<DictDecoder<StringValue> > dict_decoder_;
+
+  // Read the next data page.  If a dictionary page is encountered, that will
+  // be read and this function will continue reading for the next data page.
   Status ReadDataPage();
 
   // Returns the definition level for the next value
   // Returns -1 if there was a error parsing it.
   int ReadDefinitionLevel();
+
+  // Decode a plain-encoded value from data_ into slot.
+  bool DecodePlainValue(void* slot, MemPool* pool);
 };
 
 Status HdfsParquetScanner::Prepare() {
@@ -187,6 +198,7 @@ Status HdfsParquetScanner::Prepare() {
 }
 
 Status HdfsParquetScanner::Close() {
+  context_->AcquirePool(dictionary_pool_.get());
   context_->Close();
   // TODO: this doesn't really work for parquet since the file is 
   // not uniformly compressed.
@@ -251,17 +263,48 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     if (!stream_->SkipBytes(header_size, &status)) return status;
 
     int data_size = current_page_header_.compressed_page_size;
+    int uncompressed_size = current_page_header_.uncompressed_page_size;
+
+    if (current_page_header_.type == parquet::PageType::DICTIONARY_PAGE) {
+      if (dict_decoder_.get() != NULL) {
+        return Status("Column chunk should not contain two dictionary pages.");
+      }
+      if (desc_->type() != TYPE_STRING) {
+        return Status("Unexpected dictionary page. Dictionary page is only "
+            " supported for string types.");
+      }
+
+      if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
+
+      uint8_t* dict_values = NULL;
+      if (decompressor_.get() != NULL) {
+        dict_values = parent_->dictionary_pool_->Allocate(uncompressed_size);
+        RETURN_IF_ERROR(decompressor_->ProcessBlock(data_size, data_,
+            &uncompressed_size, &dict_values));
+        data_size = uncompressed_size;
+      } else {
+        DCHECK_EQ(data_size, current_page_header_.uncompressed_page_size);
+        // Copy dictionary from io buffer (which will be recycled as we read
+        // more data) to a new buffer
+        dict_values = parent_->dictionary_pool_->Allocate(data_size);
+        memcpy(dict_values, data_, data_size);
+      }
+
+      dict_decoder_.reset(new DictDecoder<StringValue>(dict_values, data_size));
+      // Done with dictionary page, read next page
+      continue;
+    }
+
     if (current_page_header_.type != parquet::PageType::DATA_PAGE) {
       // We can safely skip non-data pages
       if (!stream_->SkipBytes(data_size, &status)) return status;
       continue;
     }
 
+    // Read Data Page
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
-
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
 
-    int uncompressed_size = current_page_header_.uncompressed_page_size;
     if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
       uint8_t* decompressed_buffer = decompressed_data_pool_->Allocate(uncompressed_size);
@@ -305,6 +348,14 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     if (desc_->type() == TYPE_BOOLEAN) {
       // Initialize bool decoder
       bool_values_ = BitReader(data_, data_size);
+    }
+
+    if (current_page_header_.data_page_header.encoding == 
+          parquet::Encoding::PLAIN_DICTIONARY) {
+      if (dict_decoder_.get() == NULL) {
+        return Status("File corrupt. Missing dictionary page.");
+      }
+      dict_decoder_->SetData(data_, data_size);
     }
 
     break;
@@ -362,6 +413,20 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
   DCHECK_EQ(definition_level, 1);
 
   void* slot = tuple->GetSlot(desc_->tuple_offset());
+  parquet::Encoding::type page_encoding = current_page_header_.data_page_header.encoding;
+  bool result;
+  if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
+    DCHECK_EQ(desc_->type(), TYPE_STRING);
+    result = dict_decoder_->GetValue(reinterpret_cast<StringValue*>(slot));
+  } else {
+    DCHECK(page_encoding == parquet::Encoding::PLAIN);
+    result = DecodePlainValue(slot, pool);
+  }
+  return result;
+}
+
+inline bool HdfsParquetScanner::ColumnReader::DecodePlainValue(void* slot,
+    MemPool* pool) {
   switch (desc_->type()) {
     case TYPE_BOOLEAN: {
       bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
@@ -612,6 +677,19 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
     int64_t col_start = col_chunk.meta_data.data_page_offset;
+
+    // If there is a dictionary page, the file format requires it to come before
+    // any data pages.  We need to start reading the column from the data page.
+    if (col_chunk.meta_data.__isset.dictionary_page_offset) {
+      if (col_chunk.meta_data.dictionary_page_offset >= col_start) {
+        stringstream ss;
+        ss << "File " << stream_->filename() << ": metadata is corrupt. "
+           << "Dictionary page (offset=" << col_chunk.meta_data.dictionary_page_offset
+           << ") must come before any data pages (offset=" << col_start << ").";
+        return Status(ss.str());
+      }
+      col_start = col_chunk.meta_data.dictionary_page_offset;
+    }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
 
     // TODO: this will need to change when we have co-located files and the columns
@@ -668,6 +746,7 @@ Status HdfsParquetScanner::ValidateFileMetadata() {
 bool IsEncodingSupported(parquet::Encoding::type e) {
   switch (e) {
     case parquet::Encoding::PLAIN:
+    case parquet::Encoding::PLAIN_DICTIONARY:
     case parquet::Encoding::BIT_PACKED:
     case parquet::Encoding::RLE:
       return true;

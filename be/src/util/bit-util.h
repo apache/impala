@@ -60,6 +60,15 @@ class BitUtil {
     int n = 64 - num_bits;
     return (v << n) >> n;
   }
+  
+  // TODO: this could be faster if we use __builtin_clz
+  // Fix this if this ever shows up in a hot path.
+  static inline int Log2(uint64_t x) {
+    DCHECK_GT(x, 0);
+    int result = 1;
+    while (x >>= 1) ++result;
+    return result;
+  }
 
   // Swaps the byte order (i.e. endianess)
   static inline int64_t ByteSwap(int64_t value) {

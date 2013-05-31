@@ -16,7 +16,10 @@
 #ifndef IMPALA_RUNTIME_STRING_VALUE_H
 #define IMPALA_RUNTIME_STRING_VALUE_H
 
+#include <string.h>
 #include <string>
+
+#include "util/hash-util.h"
 
 namespace impala {
 
@@ -35,8 +38,16 @@ struct StringValue {
 
   // Construct a StringValue from 's'.  's' must be valid for as long as
   // this object is valid.
-  StringValue(const std::string& s) 
+  StringValue(const std::string& s)
     : ptr(const_cast<char*>(s.c_str())), len(s.size()) {
+  }
+
+  // Construct a StringValue from 's'.  's' must be valid for as long as
+  // this object is valid.
+  // s must be a null-terminated string.  This constructor is to prevent
+  // accidental use of the version taking an std::string.
+  StringValue(const char* s)
+    : ptr(const_cast<char*>(s)), len(strlen(s)) {
   }
 
   // Byte-by-byte comparison. Returns:
@@ -56,6 +67,7 @@ struct StringValue {
   bool Ge(const StringValue& other) const { return Compare(other) >= 0; }
   // <
   bool Lt(const StringValue& other) const { return Compare(other) < 0; }
+  bool operator<(const StringValue& other) const { return Lt(other); }
   // >
   bool Gt(const StringValue& other) const { return Compare(other) > 0; }
 
@@ -77,6 +89,11 @@ struct StringValue {
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 };
+  
+// This function must be called 'hash_value' to be picked up by boost.
+inline std::size_t hash_value(const StringValue& v) {
+  return HashUtil::Hash(v.ptr, v.len, 0);
+}
 
 std::ostream& operator<<(std::ostream& os, const StringValue& string_value);
 

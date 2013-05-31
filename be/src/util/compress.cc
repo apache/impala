@@ -218,7 +218,7 @@ int SnappyCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
 }
 
 Status SnappyCompressor::ProcessBlock(int input_length, uint8_t* input,
-                                      int *output_length, uint8_t** output) {
+                                      int* output_length, uint8_t** output) {
   int max_compressed_len = MaxOutputLen(input_length);
   if (*output_length != 0 && *output_length < max_compressed_len) {
     return Status("SnappyCompressor::ProcessBlock: output length too small");

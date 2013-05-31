@@ -71,6 +71,10 @@ class HdfsParquetScanner : public HdfsScanner {
   
   // Returned in ProcessSplit
   Status parse_status_;
+  
+  // Pool to copy dictionary page buffer into. This pool is shared across all the
+  // pages in a column chunk.
+  boost::scoped_ptr<MemPool> dictionary_pool_;
 
   // Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
