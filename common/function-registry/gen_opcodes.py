@@ -109,7 +109,10 @@ cc_registry_preamble = '\
 #include "exprs/utility-functions.h"\n\
 #include "opcode/functions.h"\n\
 \n\
-namespace impala { \n\
+using namespace boost::posix_time;\n\
+using namespace boost::gregorian;\n\
+\n\
+namespace impala {\n\
 \n\
 void OpcodeRegistry::Init() {\n'
 

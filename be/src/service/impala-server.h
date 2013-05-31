@@ -229,7 +229,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   //  - topic_deltas: all changes to registered state-store topics
   //  - topic_updates: output parameter to publish any topic updates to. Unused.
   void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
-      vector<TTopicUpdate>* topic_updates);
+      std::vector<TTopicUpdate>* topic_updates);
 
   // Reads a configuration value from Hadoop's configuration in the
   // front-end. If the configuration key is not found, returns the
@@ -252,7 +252,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // comes from a select query, the row is in the form of expr values (void*). 'scales'
     // contains the values' scales (# of digits after decimal), with -1 indicating no
     // scale specified.
-    virtual Status AddOneRow(const vector<void*>& row, const vector<int>& scales) = 0;
+    virtual Status AddOneRow(
+        const std::vector<void*>& row, const std::vector<int>& scales) = 0;
 
     // Add the TResultRow to this result set. When a row comes from a DDL/metadata
     // operation, the row in the form of TResultRow.

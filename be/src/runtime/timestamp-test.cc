@@ -21,6 +21,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace boost::gregorian;
 
 namespace impala {
 
@@ -136,4 +137,3 @@ int main(int argc, char **argv) {
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
-

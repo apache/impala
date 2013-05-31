@@ -22,8 +22,6 @@
 #include "util/hash-util.h"
 #include "gen-cpp/Types_types.h"
 
-using namespace std;
-
 namespace impala {
 
 // Hash function for TNetworkAddress. This function must be called hash_value to be picked

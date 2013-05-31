@@ -16,14 +16,10 @@
 #ifndef IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 #define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 
-
 #include <string>
 #include <ctime>
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-using namespace std;
-using namespace boost::posix_time;
-using namespace boost::gregorian;
 
 namespace impala {
 

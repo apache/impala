@@ -166,7 +166,7 @@ class ImpalaServer::QueryExecState {
   MonotonicStopWatch client_wait_sw_;
 
   RuntimeProfile::EventSequence* query_events_;
-  vector<Expr*> output_exprs_;
+  std::vector<Expr*> output_exprs_;
   bool eos_;  // if true, there are no more rows to return
   beeswax::QueryState::type query_state_;
   Status query_status_;
@@ -200,7 +200,7 @@ class ImpalaServer::QueryExecState {
   // Evaluates 'output_exprs_' against 'row' and output the evaluated row in
   // 'result'. The values' scales (# of digits after decimal) are stored in 'scales'.
   // result and scales must have been resized to the number of columns before call.
-  Status GetRowValue(TupleRow* row, vector<void*>* result, vector<int>* scales);
+  Status GetRowValue(TupleRow* row, std::vector<void*>* result, std::vector<int>* scales);
 
   // Gather and publish all required updates to the metastore
   Status UpdateMetastore();

@@ -81,6 +81,7 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::concurrency;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax;
+using namespace boost::posix_time;
 
 DECLARE_int32(be_port);
 DECLARE_string(nn);
