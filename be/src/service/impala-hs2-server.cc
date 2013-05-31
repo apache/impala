@@ -31,6 +31,7 @@
 #include "common/version.h"
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
+#include "service/query-exec-state.h"
 #include "util/debug-util.h"
 #include "util/thrift-util.h"
 #include "util/jni-util.h"

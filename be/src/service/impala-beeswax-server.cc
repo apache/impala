@@ -45,6 +45,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/raw-value.h"
 #include "runtime/timestamp-value.h"
+#include "service/query-exec-state.h"
 #include "statestore/simple-scheduler.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
