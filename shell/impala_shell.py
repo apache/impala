@@ -910,8 +910,8 @@ if __name__ == "__main__":
   parser.add_option("-B", "--delimited", dest="write_delimited", action="store_true",
                     help="Output rows in delimited mode")
   parser.add_option("--print_header", dest="print_header", action="store_true",
-                    help=("Print column names in delimited mode, true by default"
-                          " when pretty-printed.")
+                    help="Print column names in delimited mode, true by default"
+                         " when pretty-printed.")
   parser.add_option("--output_delimiter", dest="output_delimiter", default='\t',
                     help="Field delimiter to use for output in delimited mode")
   parser.add_option("-s", "--kerberos_service_name",
