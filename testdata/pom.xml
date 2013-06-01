@@ -19,6 +19,11 @@
 
   <name>Build some test data</name>
   
+  <properties>
+    <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
+    <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -33,6 +38,35 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs</artifactId>
+      <version>${hadoop.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/hdfs/hadoop-hdfs-${hadoop.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>${hadoop.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/hadoop-common-${hadoop.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-auth</artifactId>
+      <version>${hadoop.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/lib/hadoop-auth-${hadoop.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase</artifactId>
+      <version>${hbase.version}</version>
+    </dependency>
   </dependencies>
   
   <build>

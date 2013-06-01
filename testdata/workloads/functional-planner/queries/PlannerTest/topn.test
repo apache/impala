@@ -193,7 +193,9 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select int_col, sum(float_col), min(float_col) 
 from functional.hbasealltypessmall
@@ -266,5 +268,7 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====

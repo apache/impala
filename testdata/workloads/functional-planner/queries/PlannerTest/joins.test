@@ -514,7 +514,9 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 NODE 1:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # hbase-hdfs join with scan filtering
 select *
@@ -600,7 +602,7 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 NODE 1:
-  HBASE KEYRANGE 5:5\0
+  HBASE KEYRANGE port=60202 5:5\0
 ====
 # TODO: there's a bug in the way the planner assigns predicates: x.day >= 6
 # should not be applied inside the subquery, because the subquery has a limit

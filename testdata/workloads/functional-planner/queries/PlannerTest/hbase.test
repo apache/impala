@@ -26,7 +26,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # full scan
 select * from functional.hbasealltypessmall
@@ -56,7 +58,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
@@ -90,7 +94,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # if the row key is mapped as a string col, range predicates are applied to the scan
 select * from functional.hbasestringids
@@ -128,7 +134,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 5:5\0
+  HBASE KEYRANGE port=60202 5:5\0
 ====
 select * from functional.hbasestringids
 where id > '5'
@@ -163,7 +169,8 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 5\0:<unbounded>
+  HBASE KEYRANGE port=60202 5\0:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasestringids
 where id >= '5'
@@ -198,7 +205,8 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 5:<unbounded>
+  HBASE KEYRANGE port=60202 5:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasestringids
 where id < '5'
@@ -233,7 +241,8 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:5
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:5
 ====
 select * from functional.hbasestringids
 where id <= '5'
@@ -268,7 +277,8 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:5\0
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:5\0
 ====
 select * from functional.hbasestringids
 where id > '4' and id < '5'
@@ -305,7 +315,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 4\0:5
+  HBASE KEYRANGE port=60202 4\0:5
 ====
 select * from functional.hbasestringids
 where id >= '4' and id < '5'
@@ -342,7 +352,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 4:5
+  HBASE KEYRANGE port=60202 4:5
 ====
 select * from functional.hbasestringids
 where id > '4' and id <= '5'
@@ -379,7 +389,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 4\0:5\0
+  HBASE KEYRANGE port=60202 4\0:5\0
 ====
 select * from functional.hbasestringids
 where id >= '4' and id <= '5'
@@ -416,7 +426,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 4:5\0
+  HBASE KEYRANGE port=60202 4:5\0
 ====
 # with aggregation
 select int_col, count(*) 
@@ -476,7 +486,9 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # predicates on string columns against a constant string are converted to HBase filters
 select * from functional.hbasealltypessmall where string_col = '4'
@@ -508,7 +520,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # test all comparison ops
 select * from functional.hbasealltypessmall where string_col != '4'
@@ -540,7 +554,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasealltypessmall where string_col < '4'
 ---- PLAN
@@ -571,7 +587,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasealltypessmall where string_col > '4'
 ---- PLAN
@@ -602,7 +620,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasealltypessmall where string_col <= '4'
 ---- PLAN
@@ -633,7 +653,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select * from functional.hbasealltypessmall where string_col >= '4'
 ---- PLAN
@@ -664,7 +686,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # test multiple filters
 select * from functional.hbasealltypessmall
@@ -703,7 +727,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # mix of predicates and functional.hbase filters
 select * from functional.hbasealltypessmall where string_col = '4' and tinyint_col = 5
@@ -737,7 +763,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # mix of predicates, functional.hbase filters and start/stop keys
 select * from functional.hbasestringids 
@@ -776,7 +804,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE 4:5\0
+  HBASE KEYRANGE port=60202 4:5\0
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional.hbasealltypessmall where cast(string_col as int) >= 4
@@ -808,7 +836,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # non-const comparisons cannot be turned into filters
 select * from functional.hbasealltypessmall where string_col >= date_string_col
@@ -840,5 +870,7 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====

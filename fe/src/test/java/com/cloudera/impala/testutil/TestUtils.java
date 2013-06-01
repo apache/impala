@@ -78,17 +78,6 @@ public class TestUtils {
   }
 
   /**
-   * Remove all entries that contain the searchStr from list.
-   */
-  private static void removeFromList(ArrayList<String> list, String searchStr) {
-    Iterator<String> itr = list.iterator();
-    while(itr.hasNext()) {
-      String item = itr.next();
-      if (item.contains(searchStr)) itr.remove();
-    }
-  }
-
-  /**
    * Do a line-by-line comparison of actual and expected output.
    * Comparison of the individual lines ignores whitespace.
    * If an expected line starts with expectedFilePrefix,
@@ -101,11 +90,6 @@ public class TestUtils {
    */
   public static String compareOutput(
       ArrayList<String> actual, ArrayList<String> expected, boolean orderMatters) {
-    // Ignore HBase SCANRANGELOCATIONS - string that contains "HBASE KEYRANGE "
-    // TODO: remove it once we can have deterministic region assignment.
-    removeFromList(actual, "HBASE KEYRANGE ");
-    removeFromList(expected, "HBASE KEYRANGE ");
-
     if (!orderMatters) {
       Collections.sort(actual);
       Collections.sort(expected);

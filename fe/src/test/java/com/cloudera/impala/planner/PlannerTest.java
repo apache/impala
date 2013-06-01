@@ -78,6 +78,7 @@ public class PlannerTest {
         if (locations.scan_range.isSetHbase_key_range()) {
           THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
           result.append("HBASE KEYRANGE ");
+          result.append("port=" + locations.locations.get(0).server.port+" ");
           if (keyRange.isSetStartKey()) {
             result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
           } else {
@@ -237,8 +238,9 @@ public class PlannerTest {
         testCase.getSectionContents(Section.SCANRANGELOCATIONS);
 
     if (expectedLocations.size() > 0 && locationsStr != null) {
+      // Locations' order does not matter.
       String result = TestUtils.compareOutput(
-          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, true);
+          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, false);
       if (!result.isEmpty()) {
         errorLog.append("section " + Section.SCANRANGELOCATIONS + " of query:\n"
             + query + "\n" + result);

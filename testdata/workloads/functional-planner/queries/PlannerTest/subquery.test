@@ -142,7 +142,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # subquery doing join
 select * from (select t2.*
@@ -335,7 +337,9 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # subquery join
 # multiple join predicates;
@@ -875,7 +879,9 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select c1, x2
 from (
@@ -980,7 +986,9 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE <unbounded>:<unbounded>
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # distinct *
 select distinct *
