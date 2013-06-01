@@ -38,8 +38,8 @@ TEST_F(RawValueTest, Compare) {
   int16_t s1, s2;
   s1 = 32767;
   s2 = -32767;
-  EXPECT_GT(RawValue::Compare(&i1, &i2, TYPE_INT), 0);
-  EXPECT_LT(RawValue::Compare(&i2, &i1, TYPE_INT), 0);
+  EXPECT_GT(RawValue::Compare(&s1, &s2, TYPE_SMALLINT), 0);
+  EXPECT_LT(RawValue::Compare(&s2, &s1, TYPE_SMALLINT), 0);
 }
 
 }

@@ -105,7 +105,9 @@ void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* out
   (*output) << "}";
 }
 
-template<> void PrintPrimitiveAsJson<std::string>(const string& v, stringstream* out) {
+namespace impala {
+
+template<> void PrintPrimitiveAsJson<string>(const string& v, stringstream* out) {
   (*out) << "\"" << v << "\"";
 }
 
@@ -118,3 +120,6 @@ template<> void PrintPrimitiveAsJson<double>(const double& v, stringstream* out)
     PrintPrimitiveAsJson("null", out);
   }
 }
+
+}
+

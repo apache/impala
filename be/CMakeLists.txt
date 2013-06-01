@@ -280,8 +280,13 @@ add_subdirectory(src/transport)
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
 
-add_subdirectory(generated-sources/gen-cpp)
 add_subdirectory(generated-sources/opcode)
+
+# Thrift generated files have unused variables.  Ignore those compiler
+# warnings by adding this flag.  Note: impala subdirectories should be
+# added *before* this so we can fix our issues.
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable")
+add_subdirectory(generated-sources/gen-cpp)
 
 link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common

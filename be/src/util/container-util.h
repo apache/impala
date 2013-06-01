@@ -51,7 +51,7 @@ template <typename K, typename V>
 V* FindOrInsert(std::map<K,V>* m, const K& key, const V& default_val) {
   typename std::map<K,V>::iterator it = m->find(key);
   if (it == m->end()) {
-    it = m->insert(make_pair(key, default_val)).first;
+    it = m->insert(std::make_pair(key, default_val)).first;
   }
   return &it->second;
 }
@@ -60,7 +60,7 @@ template <typename K, typename V>
 V* FindOrInsert(boost::unordered_map<K,V>* m, const K& key, const V& default_val) {
   typename boost::unordered_map<K,V>::iterator it = m->find(key);
   if (it == m->end()) {
-    it = m->insert(make_pair(key, default_val)).first;
+    it = m->insert(std::make_pair(key, default_val)).first;
   }
   return &it->second;
 }

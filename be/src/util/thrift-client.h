@@ -26,7 +26,6 @@
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <sstream>
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "transport/TSaslClientTransport.h"
 #include "transport/TSasl.h"
@@ -57,6 +56,7 @@ class ThriftClientImpl {
   // Close the connection with the remote server. May be called
   // repeatedly.
   Status Close();
+
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port)
     : ipaddress_(ipaddress),
@@ -74,7 +74,6 @@ class ThriftClientImpl {
   boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
   boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
   boost::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
-
 };
 
 
@@ -91,7 +90,6 @@ class ThriftClient : public ThriftClientImpl{
 
  private:
   boost::shared_ptr<InterfaceType> iface_;
-
 };
 
 template <class InterfaceType>
