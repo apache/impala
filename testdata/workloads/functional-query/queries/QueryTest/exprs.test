@@ -1311,3 +1311,21 @@ double, double, double, double, double, tinyint, float
 ---- RESULTS
 8.072,8.000,8.072,8,8.0720,8,8
 ====
+---- QUERY
+# Test a fix of codegen/non-codegen exprs(IMPALA-350)
+# Test having a thread-safe expr followed by a non thread-safe one and
+# vice versa.
+select count(*) from alltypes where string_col REGEXP '^1' and id < 10
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# Test a fix of codegen/non-codegen exprs(IMPALA-350)
+select count(*) from alltypes where id < 10 and string_col REGEXP '^1'
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====

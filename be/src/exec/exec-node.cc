@@ -246,9 +246,11 @@ void ExecNode::DebugString(int indentation_level, stringstream* out) const {
 }
 
 Status ExecNode::PrepareConjuncts(RuntimeState* state) {
+  codegend_conjuncts_thread_safe_ = true;
   for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
-    RETURN_IF_ERROR(
-        Expr::Prepare(*i, state, row_desc(), false, &codegend_conjuncts_thread_safe_));
+    bool is_thread_safe;
+    RETURN_IF_ERROR(Expr::Prepare(*i, state, row_desc(), false, &is_thread_safe));
+    codegend_conjuncts_thread_safe_ &= is_thread_safe;
   }
   return Status::OK;
 }
