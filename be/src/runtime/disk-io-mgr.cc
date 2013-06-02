@@ -684,6 +684,10 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
     for (; range_it != state.in_flight_ranges.end(); ++range_it) {
       CloseScanRange(reader->hdfs_connection_, *range_it);
     }
+    range_it = state.committed_ranges.begin();
+    for (; range_it != state.committed_ranges.end(); ++range_it) {
+      CloseScanRange(reader->hdfs_connection_, *range_it);
+    }
   }
   DCHECK(reader->Validate()) << endl << reader->DebugString();
   reader_cache_->ReturnReader(reader);
