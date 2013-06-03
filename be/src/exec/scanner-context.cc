@@ -60,7 +60,6 @@ void ScannerContext::NewRowBatch() {
 void ScannerContext::CreateStreams(int num_streams) {
   DCHECK_GT(num_streams, 0);
   unique_lock<mutex> l(lock_);
-  DCHECK_EQ(streams_.size(), 1);
 
   // Return all resources for the current streams
   for (int i = 0; i < streams_.size(); ++i) {
