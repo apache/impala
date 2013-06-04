@@ -433,6 +433,12 @@ class HdfsScanNode : public ScanNode {
   
   // Average queue size in io mgr.
   RuntimeProfile::Counter* average_io_mgr_queue_size_;
+
+  // Total number of bytes read locally
+  RuntimeProfile::Counter* bytes_read_local_;
+
+  // Total number of bytes read via short circuit read
+  RuntimeProfile::Counter* bytes_read_short_circuit_;
   
   // Create a new scanner for this partition type and initialize it.
   // If the scanner cannot be created return NULL.

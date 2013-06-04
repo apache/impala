@@ -334,6 +334,8 @@ class DiskIoMgr {
 
   int64_t queue_capacity(ReaderContext* reader) const;
   int64_t queue_size(ReaderContext* reader) const;
+  int64_t bytes_read_local(ReaderContext* reader) const;
+  int64_t bytes_read_short_circuit(ReaderContext* reader) const;
 
   // Returns the read throughput across all readers.    
   // TODO: should this be a sliding window?  This should report metrics for the
@@ -462,10 +464,12 @@ class DiskIoMgr {
   // if hdfs_connection is NULL, 'range' must be for a local file
   Status OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const;
 
-  // Closes the file for 'range'.  This function only modifies memory in local
-  // variables and does not need to be synchronized.
+  // Closes the file for 'range'.  This function modifies memory in local
+  // variables and updates the reader with statistics in a thread-safe manner, so
+  // it does not need to be synchronized.
   // if hdfs_connection is NULL, 'range' must be for a local file
-  void CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const;
+  void CloseScanRange(hdfsFS hdfs_connection, ScanRange* range,
+      ReaderContext* reader) const;
 
   // Reads from 'range' into 'buffer'.  Buffer is preallocated.  Returns the number
   // of bytes read.  Updates range to keep track of where in the file we are. 

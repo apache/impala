@@ -126,6 +126,12 @@ struct DiskIoMgr::ReaderContext {
   // HdfsScanNode::disks_accessed_bitmap_
   RuntimeProfile::Counter* disks_accessed_bitmap_;
 
+  // Total number of bytes read locally, updated at end of each range scan
+  int64_t bytes_read_local_;
+
+  // Total number of bytes read via short circuit read, updated at end of each range scan
+  int64_t bytes_read_short_circuit_;
+
   // hdfsFS connection handle.  This is set once and never changed for the duration
   // of the reader.  NULL if this is a local reader.
   hdfsFS hdfs_connection_;
@@ -364,6 +370,9 @@ struct DiskIoMgr::ReaderContext {
     num_finished_ranges_ = 0;
     num_committed_ranges_ = 0;
     num_ready_buffers_ = 0;
+    
+    bytes_read_local_ = 0;
+    bytes_read_short_circuit_ = 0;
 
     for (int i = 0; i < disk_states_.size(); ++i) {
       disk_states_[i].Reset();
@@ -682,11 +691,11 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
     ReaderContext::PerDiskState& state = reader->disk_states_[i];
     list<ScanRange*>::iterator range_it = state.in_flight_ranges.begin();
     for (; range_it != state.in_flight_ranges.end(); ++range_it) {
-      CloseScanRange(reader->hdfs_connection_, *range_it);
+      CloseScanRange(reader->hdfs_connection_, *range_it, reader);
     }
     range_it = state.committed_ranges.begin();
     for (; range_it != state.committed_ranges.end(); ++range_it) {
-      CloseScanRange(reader->hdfs_connection_, *range_it);
+      CloseScanRange(reader->hdfs_connection_, *range_it, reader);
     }
   }
   DCHECK(reader->Validate()) << endl << reader->DebugString();
@@ -814,6 +823,14 @@ int64_t DiskIoMgr::queue_capacity(ReaderContext* reader) const {
 
 int64_t DiskIoMgr::queue_size(ReaderContext* reader) const {
   return reader->num_ready_buffers_;
+}
+
+int64_t DiskIoMgr::bytes_read_local(ReaderContext* reader) const {
+  return reader->bytes_read_local_;
+}
+
+int64_t DiskIoMgr::bytes_read_short_circuit(ReaderContext* reader) const {
+  return reader->bytes_read_short_circuit_;
 }
 
 int64_t DiskIoMgr::GetReadThroughput() {
@@ -1421,11 +1438,23 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
   return Status::OK;
 }
 
-void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
+void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range,
+    ReaderContext* reader) const {
   if (range == NULL) return;
 
   if (hdfs_connection != NULL) {
     if (range->hdfs_file_ == NULL) return;
+
+    struct hdfsReadStatistics* read_statistics;
+    int success = hdfsFileGetReadStatistics(range->hdfs_file_, &read_statistics);
+    if (success == 0) {
+      __sync_add_and_fetch(&reader->bytes_read_local_,
+          read_statistics->totalLocalBytesRead);
+      __sync_add_and_fetch(&reader->bytes_read_short_circuit_,
+          read_statistics->totalShortCircuitBytesRead);
+      hdfsFileFreeReadStatistics(read_statistics);
+    }
+    
     hdfsCloseFile(hdfs_connection, range->hdfs_file_);
     range->hdfs_file_ = NULL;
   } else {
@@ -1727,7 +1756,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     --reader->num_buffers_in_disk_threads_;
 
     if (reader->state_ == ReaderContext::Cancelled) {
-      CloseScanRange(reader->hdfs_connection_, buffer->scan_range_);
+      CloseScanRange(reader->hdfs_connection_, buffer->scan_range_, reader);
       ReturnFreeBuffer(reader, buffer->buffer_);
       buffer->buffer_ = NULL;
       ReturnBufferDesc(buffer);
@@ -1754,7 +1783,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     //  3. Middle of scan range
     if (!buffer->status_.ok()) {
       // Error case
-      CloseScanRange(reader->hdfs_connection_, range);
+      CloseScanRange(reader->hdfs_connection_, range, reader);
       --reader->num_used_buffers_;
       --buffer->scan_range_->num_io_buffers_;
       ReturnFreeBuffer(reader, buffer->buffer_);
@@ -1763,7 +1792,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
       --state.num_remaining_ranges;
     } else {
       if (buffer->eosr_) {
-        CloseScanRange(reader->hdfs_connection_, buffer->scan_range_);
+        CloseScanRange(reader->hdfs_connection_, buffer->scan_range_, reader);
         --state.num_remaining_ranges;
       } else {
         DCHECK_LT(buffer->scan_range_->bytes_read_, buffer->scan_range_->len_);

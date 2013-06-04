@@ -471,6 +471,11 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
 
+  bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
+      TCounterType::BYTES);
+  bytes_read_short_circuit_ = ADD_COUNTER(runtime_profile(), "BytesReadShortCircuit",
+      TCounterType::BYTES);
+
   // Create num_disks+1 bucket counters
   for (int i = 0; i < state->io_mgr()->num_disks() + 1; ++i) {
     hdfs_read_thread_concurrency_bucket_.push_back(
@@ -926,6 +931,12 @@ void HdfsScanNode::UpdateCounters() {
   
   if (memory_used_counter_ != NULL) {
     COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
+  }
+
+  if (reader_context_ != NULL) {
+    bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));
+    bytes_read_short_circuit_->Set(
+        runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_));
   }
 }
 
