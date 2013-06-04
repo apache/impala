@@ -74,9 +74,6 @@ class AggregationTuple {
 
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
-
- private:
-  void* data_;
 };
 
 const char* AggregationTuple::LLVM_CLASS_NAME = "class.impala::AggregationTuple";

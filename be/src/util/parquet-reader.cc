@@ -17,17 +17,20 @@
 #include <vector>
 #include <gflags/gflags.h>
 #include <snappy.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/protocol/TDebugProtocol.h>
-#include <thrift/TApplicationException.h>
-#include <thrift/transport/TBufferTransports.h>
 #include "gen-cpp/parquet_types.h"
 
 // TCompactProtocol requires some #defines to work right.  
 // TODO: is there a better include to use?
 #define SIGNED_RIGHT_SHIFT_IS 1
 #define ARITHMETIC_RIGHT_SHIFT 1
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstring-plus-int"
 #include <thrift/protocol/TCompactProtocol.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TDebugProtocol.h>
+#include <thrift/TApplicationException.h>
+#include <thrift/transport/TBufferTransports.h>
+#pragma clang diagnostic pop
 
 #include "util/rle-encoding.h"
 

@@ -74,12 +74,6 @@ class IntegerArrayBuilder {
   // mempool - memory pool to allocate the array in.
   IntegerArrayBuilder(int bit_size, int max_count, MemPool* mempool);
 
-  // Constructor only used for vector initialization.
-  IntegerArrayBuilder()
-      : max_count_(0),
-        mempool_(NULL) {
-  }
-
   // Put an integer into the array
   // integer - the integer to put.
   // returns false if the array is full.
@@ -100,9 +94,6 @@ class IntegerArrayBuilder {
  private:
   // maximum number of integers the array can hold
   int max_count_;
-
-  // Memory pool to hold array.
-  MemPool* mempool_;
 
   // Array to hold the bits.
   IntegerArray integer_array_;

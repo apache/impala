@@ -40,8 +40,7 @@ namespace impala {
 //    writer.AppendRowBatch(batch);
 class HBaseTableWriter {
  public:
-  HBaseTableWriter(RuntimeState* state,
-                   HBaseTableDescriptor* table_desc,
+  HBaseTableWriter(HBaseTableDescriptor* table_desc,
                    const std::vector<Expr*>& output_exprs);
   Status AppendRowBatch(RowBatch* batch);
 
@@ -72,9 +71,6 @@ class HBaseTableWriter {
   // Clean up the jni global ref in put_list_, allowing the jni to garbage
   // collect all of the puts that are created by a writer.
   Status CleanJNI();
-
-  // Not owned by this
-  RuntimeState* state_;
 
   // Owned by RuntimeState not by this object
   HBaseTableDescriptor* table_desc_;

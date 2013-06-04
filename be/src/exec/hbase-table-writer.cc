@@ -36,11 +36,9 @@ jmethodID HBaseTableWriter::list_add_id_ = NULL;
 
 jmethodID HBaseTableWriter::put_add_id_ = NULL;
 
-HBaseTableWriter::HBaseTableWriter(RuntimeState* state,
-                                   HBaseTableDescriptor* table_desc,
+HBaseTableWriter::HBaseTableWriter(HBaseTableDescriptor* table_desc,
                                    const vector<Expr*>& output_exprs)
-    : state_(state),
-      table_desc_(table_desc),
+    : table_desc_(table_desc),
       table_(NULL),
       output_exprs_(output_exprs),
       put_list_(NULL) {

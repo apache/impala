@@ -81,8 +81,7 @@ uint32_t IntegerArray::GetNextValue() {
 }
 
 IntegerArrayBuilder::IntegerArrayBuilder(int bit_size, int max_count, MemPool* mempool)
-  : max_count_(max_count),
-    mempool_(mempool) { 
+  : max_count_(max_count) {
   array_size_ = IntegerArray::ArraySize(bit_size, max_count);
   integer_array_ = IntegerArray(bit_size, 0, mempool->Allocate(array_size_)); 
   memset(integer_array_.array_, 0, array_size_);

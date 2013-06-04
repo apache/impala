@@ -16,12 +16,6 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
-#include <thrift/Thrift.h>
-#include <thrift/transport/TSocket.h>
-#include <thrift/server/TNonblockingServer.h>
-#include <thrift/transport/TServerSocket.h>
-#include <thrift/concurrency/ThreadManager.h>
-#include <thrift/concurrency/PosixThreadFactory.h>
 
 #include "util/hash-util.h"
 #include "util/thrift-server.h"
@@ -36,7 +30,20 @@
 #endif
 #define SIGNED_RIGHT_SHIFT_IS 1
 #define ARITHMETIC_RIGHT_SHIFT 1
+
+// Thrift does things like throw exception("some string " + int) which just returns
+// garbage.
+// TODO: get thrift to fix this.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstring-plus-int"
+#include <thrift/Thrift.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/server/TNonblockingServer.h>
+#include <thrift/transport/TServerSocket.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/concurrency/PosixThreadFactory.h>
 #include <thrift/protocol/TCompactProtocol.h>
+#pragma clang diagnostic pop
 
 using namespace std;
 using namespace apache::thrift;
