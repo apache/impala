@@ -132,6 +132,7 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$IMPALA_LZO/build"
 export LD_LIBRARY_PATH
+export LD_PRELOAD="${LD_PRELOAD}:${LIB_JSIG}"
 
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
@@ -155,3 +156,4 @@ echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"
 echo "PYTHONPATH             = $PYTHONPATH"
 echo "JAVA_HOME              = $JAVA_HOME"
 echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
+echo "LD_PRELOAD             = $LD_PRELOAD"
