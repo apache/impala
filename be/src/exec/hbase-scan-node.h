@@ -92,14 +92,18 @@ class HBaseScanNode : public ScanNode {
   // List of non-row-key slots sorted by col_pos(). Populated in Prepare().
   std::vector<SlotDescriptor*> sorted_non_key_slots_;
 
-  // List of pointers to family/qualifier in same sort order as sorted_non_key_slots_.
+  // List of pointers to family/qualifier/binary encoding in same sort order as
+  // sorted_non_key_slots_.
   // The memory pointed to by the list-elements is owned by the corresponding 
   // HBaseTableDescriptor.
-  std::vector<const std::pair<std::string, std::string>* > sorted_cols_;
+  std::vector<const HBaseTableDescriptor::HBaseColumnDescriptor* > sorted_cols_;
 
   // Slot into which the HBase row key is written.
   // NULL if row key is not requested.
   SlotDescriptor* row_key_slot_;
+
+  // True, if row key is binary encoded
+  bool row_key_binary_encoded_;
 
   // Size of tuple buffer determined by size of tuples and capacity of row batches.
   int tuple_buffer_size_;

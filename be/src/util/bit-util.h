@@ -83,6 +83,32 @@ class BitUtil {
   static inline int32_t ByteSwap(uint32_t value) {
     return static_cast<uint32_t>(__builtin_bswap32(value));
   }
+  static inline int16_t ByteSwap(int16_t value) {
+    return (((value >> 8) & 0xff) | ((value & 0xff) << 8));
+  }
+  static inline uint16_t ByteSwap(uint16_t value) {
+    return static_cast<uint16_t>(ByteSwap(static_cast<int16_t>(value)));
+  }
+
+  // Write the swapped bytes into dst. len must be 1, 2, 4 or 8.
+  static inline void ByteSwap(void* dst, void* src, int len) {
+    switch (len) {
+      case 1:
+        *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<int8_t*>(src);
+        break;
+      case 2:
+        *reinterpret_cast<int16_t*>(dst) = ByteSwap(*reinterpret_cast<int16_t*>(src));
+        break;
+      case 4:
+        *reinterpret_cast<int32_t*>(dst) = ByteSwap(*reinterpret_cast<int32_t*>(src));
+        break;
+      case 8:
+        *reinterpret_cast<int64_t*>(dst) = ByteSwap(*reinterpret_cast<int64_t*>(src));
+        break;
+      default: DCHECK(false);
+    }
+  }
+
 };
 
 }

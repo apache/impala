@@ -53,7 +53,8 @@ Status HBaseTableSink::Init(RuntimeState* state) {
   // Prepare the expressions.
   RETURN_IF_ERROR(PrepareExprs(state));
   // Now that expressions are ready to materialize tuples, create the writer.
-  hbase_table_writer_.reset(new HBaseTableWriter(table_desc_, output_exprs_));
+  hbase_table_writer_.reset(new HBaseTableWriter(table_desc_, output_exprs_,
+      runtime_profile_));
 
   // Try and init the table writer.  This can create connections to HBase and
   // to zookeeper.

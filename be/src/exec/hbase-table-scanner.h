@@ -28,6 +28,7 @@
 namespace impala {
 
 class TupleDescriptor;
+class Tuple;
 class RuntimeState;
 class MemPool;
 class Status;
@@ -109,11 +110,22 @@ class HBaseTableScanner {
   // Get the current HBase row key.
   Status GetRowKey(JNIEnv* env, void** key, int* key_length);
 
+  // Write the current HBase row key into the tuple slot.
+  // This is used for retrieving binary encoded data directly into the tuple.
+  Status GetRowKey(JNIEnv* env, const SlotDescriptor* slot_desc, Tuple* tuple);
+
   // Used to fetch HBase values in order of family/qualifier.
   // Fetch the next value matching family and qualifier into value/value_length.
   // If there is no match, value is set to NULL and value_length to 0.
   Status GetValue(JNIEnv* env, const std::string& family, const std::string& qualifier,
       void** value, int* value_length);
+
+  // Used to fetch HBase values in order of family/qualifier.
+  // Fetch the next value matching family and qualifier into the tuple slot.
+  // If there is no match, the tuple slot is set to null.
+  // This is used for retrieving binary encoded data directly into the tuple.
+  Status GetValue(JNIEnv* env, const std::string& family, const std::string& qualifier,
+      const SlotDescriptor* slot_desc, Tuple* tuple);
 
   // Close HTable and ResultScanner.
   void Close(JNIEnv* env);
@@ -248,6 +260,20 @@ class HBaseTableScanner {
 
   // Initialize the scan to the given range
   Status InitScanRange(JNIEnv* env, const ScanRange& scan_range);
+
+  // Return the row key length and row key offset from buffer_
+  inline Status GetRowKeyLengthAndOffSet(JNIEnv* env, int* length, int* offset);
+
+  // Return the column value length and offset for the given column family name and
+  // qualifier. If there's no match for the family and qualifier, is_null is set to true.
+  inline Status GetValueLengthAndOffset(JNIEnv* env, const std::string& family,
+      const std::string& qualifier, int* length, int* offset, bool* is_null);
+
+  // Write to a tuple slot with the given hbase binary formatted data, which is in
+  // big endian.
+  // Only boolean, tinyint, smallint, int, bigint, float and double should have binary
+  // formatted data.
+  inline void WriteTupleSlot(const SlotDescriptor* slot_desc, Tuple* tuple, void* data);
 };
 
 }  // namespace impala

@@ -18,5 +18,12 @@ disable 'hbaseinsertalltypesagg'
 drop 'hbaseinsertalltypesagg'
 create 'hbaseinsertalltypesagg', 'd'
 enable 'hbaseinsertalltypesagg'
+disable 'hbasealltypessmallbinary'
+drop 'hbasealltypessmallbinary'
+create 'hbasealltypessmallbinary', 'bools', 'ints', 'floats', 'strings'
+enable 'hbasealltypessmallbinary'
+drop 'hbaseinsertalltypesaggbinary'
+create 'hbaseinsertalltypesaggbinary', 'd'
+enable 'hbaseinsertalltypesaggbinary'
 exit
 

@@ -94,14 +94,18 @@ public class HBaseTable extends Table {
   }
 
   // Parse the column description string to the column families and column
-  // qualifies.  This is a copy of the HBaseSerDe.parseColumnMapping function
-  // with parts we don't use removed.  The hive function is not public.
+  // qualifies.  This is a copy of HBaseSerDe.parseColumnMapping and
+  // parseColumnStorageTypes with parts we don't use removed. The hive functions
+  // are not public.
+  //  tableDefaultStorageIsBinary - true if table is default to binary encoding
   //  columnsMappingSpec - input string format describing the table
-  //  columnFamilies/columnQualifiers - out parameters that will be filled with the
-  //    column family and column qualifies strings for each column.
-  public void parseColumnMapping(String columnsMappingSpec, List<String> columnFamilies,
-      List<String> columnQualifiers) throws SerDeException {
-
+  //  fieldSchemas - input field schema from metastore table
+  //  columnFamilies/columnQualifiers/columnBinaryEncodings - out parameters that will be
+  //    filled with the column family, column qualifier and encoding for each column.
+  public void parseColumnMapping(boolean tableDefaultStorageIsBinary,
+      String columnsMappingSpec, List<FieldSchema> fieldSchemas,
+      List<String> columnFamilies, List<String> columnQualifiers,
+      List<Boolean> colIsBinaryEncoded) throws SerDeException {
     if (columnsMappingSpec == null) {
       throw new SerDeException(
           "Error: hbase.columns.mapping missing for this HBase table.");
@@ -145,6 +149,51 @@ public class HBaseTable extends Table {
           columnQualifiers.add(null);
         }
       }
+
+      // Set column binary encoding
+      // Only boolean, integer and floating point types can use binary storage.
+      PrimitiveType colType = getPrimitiveType(fieldSchemas.get(i).getType());
+      boolean supportBinaryEncoding = colType.equals(PrimitiveType.BOOLEAN) ||
+          colType.isIntegerType() || colType.isFloatingPointType();
+      String colName = fieldSchemas.get(i).getName();
+      if (mapInfo.length == 1) {
+        // There is no column level storage specification. Use the table storage spec.
+        colIsBinaryEncoded.add(
+            new Boolean(tableDefaultStorageIsBinary && supportBinaryEncoding));
+      } else if (mapInfo.length == 2) {
+        // There is a storage specification for the column
+        String storageOption = mapInfo[1];
+
+        if (!(storageOption.equals("-") || "string".startsWith(storageOption) ||
+            "binary".startsWith(storageOption))) {
+          throw new SerDeException("Error: A column storage specification is one of"
+              + " the following: '-', a prefix of 'string', or a prefix of 'binary'. "
+              + storageOption + " is not a valid storage option specification for "
+              + colName);
+        }
+
+        boolean isBinaryEncoded = false;
+        if ("-".equals(storageOption)) {
+          isBinaryEncoded = tableDefaultStorageIsBinary;
+        } else if ("binary".startsWith(storageOption)) {
+          isBinaryEncoded = true;
+        }
+        if (isBinaryEncoded && !supportBinaryEncoding) {
+          // Use string encoding and log a warning if the column spec is binary but the
+          // column type does not support it.
+          // TODO: Hive/HBase does not raise an exception, but should we?
+          LOG.warn("Column storage specification for column " + colName + " is binary"
+              + " but the column type " + colType.toString() + " does not support binary"
+              +	" encoding. Fallback to string format.");
+          isBinaryEncoded = false;
+        }
+        colIsBinaryEncoded.add(isBinaryEncoded);
+      } else {
+        // error in storage specification
+        throw new SerDeException("Error: " + HBaseSerDe.HBASE_COLUMNS_MAPPING
+            + " storage specification " + mappingSpec + " is not valid for column: "
+            + colName);
+      }
     }
 
     if (rowKeyIndex == -1) {
@@ -165,26 +214,41 @@ public class HBaseTable extends Table {
       if (hbaseColumnsMapping == null) {
         throw new MetaException("No hbase.columns.mapping defined in Serde.");
       }
-
+      String hbaseTableDefaultStorageType =
+          msTbl.getParameters().get(HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE);
+      boolean tableDefaultStorageIsBinary = false;
+      if (hbaseTableDefaultStorageType != null &&
+          !hbaseTableDefaultStorageType.isEmpty()) {
+        if (hbaseTableDefaultStorageType.equals("binary")) {
+          tableDefaultStorageIsBinary = true;
+        } else if (!hbaseTableDefaultStorageType.equals("string")) {
+          throw new SerDeException("Error: " +
+              HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE +
+              " parameter must be specified as" +
+              " 'string' or 'binary'; '" + hbaseTableDefaultStorageType +
+              "' is not a valid specification for this table/serde property.");
+        }
+      }
 
       // Parse HBase column-mapping string.
+      List<FieldSchema> fieldSchemas = msTbl.getSd().getCols();
       List<String> hbaseColumnFamilies = new ArrayList<String>();
       List<String> hbaseColumnQualifiers = new ArrayList<String>();
-      parseColumnMapping(hbaseColumnsMapping, hbaseColumnFamilies,
-          hbaseColumnQualifiers);
+      List<Boolean> hbaseColumnBinaryEncodings = new ArrayList<Boolean>();
+      parseColumnMapping(tableDefaultStorageIsBinary, hbaseColumnsMapping, fieldSchemas,
+          hbaseColumnFamilies, hbaseColumnQualifiers, hbaseColumnBinaryEncodings);
       Preconditions.checkState(
           hbaseColumnFamilies.size() == hbaseColumnQualifiers.size());
 
       // Populate tmp cols in the order they appear in the Hive metastore.
       // We will reorder the cols below.
-      List<FieldSchema> fieldSchemas = msTbl.getSd().getCols();
       Preconditions.checkState(fieldSchemas.size() == hbaseColumnQualifiers.size());
       List<HBaseColumn> tmpCols = new ArrayList<HBaseColumn>();
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
-            hbaseColumnQualifiers.get(i), getPrimitiveType(s.getType()),
-            s.getComment(), -1);
+            hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
+            getPrimitiveType(s.getType()), s.getComment(), -1);
         tmpCols.add(col);
       }
 
@@ -354,6 +418,7 @@ public class HBaseTable extends Table {
       } else {
         tHbaseTable.addToQualifiers("");
       }
+      tHbaseTable.addToBinary_encoded(hbaseCol.isBinaryEncoded());
     }
     TTableDescriptor tableDescriptor =
         new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(),

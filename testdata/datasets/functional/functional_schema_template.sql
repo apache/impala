@@ -539,6 +539,69 @@ FROM functional.alltypessmall;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+hbasealltypessmallbinary
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key#-,
+   bools:bool_col#-,
+   ints:tinyint_col#-,
+   ints:smallint_col#-,
+   ints:int_col#-,
+   ints:bigint_col#-,
+   floats:float_col#-,
+   floats:double_col#-,
+   strings:date_string_col#-,
+   strings:string_col#-,
+   strings:timestamp_col#s"
+)
+TBLPROPERTIES ("hbase.table.name" = "hbasealltypessmallbinary",
+               "hbase.table.default.storage.type" = "binary");
+---- LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+FROM functional.alltypessmall;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hbaseinsertalltypesaggbinary
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key#b,d:bool_col#b,d:tinyint_col#b,d:smallint_col#b,d:int_col#b,d:bigint_col#b,d:float_col#b,d:double_col#b,d:date_string_col,d:string_col,d:timestamp_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbaseinsertalltypesaggbinary");
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 hbasealltypeserror
 ---- CREATE_HIVE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (

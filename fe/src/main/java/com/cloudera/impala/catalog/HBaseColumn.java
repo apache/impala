@@ -21,12 +21,14 @@ package com.cloudera.impala.catalog;
 public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   private final String columnFamily;
   private final String columnQualifier;
+  private final boolean binaryEncoded;
 
   public HBaseColumn(String name, String columnFamily, String columnQualifier,
-      PrimitiveType type, String comment, int position) {
+      boolean binaryEncoded, PrimitiveType type, String comment, int position) {
     super(name, type, comment, position);
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
+    this.binaryEncoded = binaryEncoded;
   }
 
   public String getColumnFamily() {
@@ -36,6 +38,8 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   public String getColumnQualifier() {
     return columnQualifier;
   }
+
+  public boolean isBinaryEncoded() { return binaryEncoded; }
 
   @Override
   // We order the HBase columns in the matadata based on columnFamily,columnQualifier,

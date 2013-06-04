@@ -41,7 +41,8 @@ namespace impala {
 class HBaseTableWriter {
  public:
   HBaseTableWriter(HBaseTableDescriptor* table_desc,
-                   const std::vector<Expr*>& output_exprs);
+                   const std::vector<Expr*>& output_exprs,
+                   RuntimeProfile* profile);
   Status AppendRowBatch(RowBatch* batch);
 
   // Calls to Close release the HBaseTable.
@@ -57,10 +58,14 @@ class HBaseTableWriter {
  private:
   // Methods used to create JNI objects.
   // Create a Put using the supplied row key
-  Status CreatePut(JNIEnv* env, const std::string& rk, jobject* put);
+  Status CreatePut(JNIEnv* env, const void* rk, int rk_len, jobject* put);
 
   // Create a byte array containing the string's chars.
   Status CreateByteArray(JNIEnv* env, const std::string& s,
+                         jbyteArray* j_array);
+
+  // Create a byte array containing the input bytes.
+  Status CreateByteArray(JNIEnv* env, const void* data, int data_len,
                          jbyteArray* j_array);
 
   // Create an ArrayList<Put> to be passed to put.put(list);
@@ -70,7 +75,7 @@ class HBaseTableWriter {
 
   // Clean up the jni global ref in put_list_, allowing the jni to garbage
   // collect all of the puts that are created by a writer.
-  Status CleanJNI();
+  Status CleanUpJni();
 
   // Owned by RuntimeState not by this object
   HBaseTableDescriptor* table_desc_;
@@ -82,6 +87,9 @@ class HBaseTableWriter {
 
   // The expressions that are run to create tuples to be written to hbase.
   const std::vector<Expr*> output_exprs_;
+
+  // output_exprs_byte_sizes_[i] is the byte size of output_exprs_[i]'s type.
+  std::vector<int> output_exprs_byte_sizes_;
 
   // jni ArrayList<Put>
   jobject put_list_;
@@ -103,6 +111,17 @@ class HBaseTableWriter {
 
   // ArrayList#add(V);
   static jmethodID list_add_id_;
+
+  // cf_arrays_[i-1] is the column family jbyteArray for column i.
+  std::vector<jbyteArray> cf_arrays_;
+
+  // qual_arrays_[i-1] is the column family qualifier jbyteArray for column i.
+  std::vector<jbyteArray> qual_arrays_;
+
+  // Parent table sink's profile
+  RuntimeProfile* runtime_profile_;
+  RuntimeProfile::Counter* encoding_timer_;
+  RuntimeProfile::Counter* htable_put_timer_;
 };
 
 }  // namespace impala

@@ -67,3 +67,101 @@ int, string, string
 ---- RESULTS
 9999999,'\N','\N'
 ====
+---- QUERY
+insert into table hbaseinsertalltypesaggbinary
+select id, bigint_col, bool_col, date_string_col, double_col, float_col, 
+int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+---- RESULTS
+: 10000
+---- SETUP
+RELOAD hbaseinsertalltypesaggbinary
+====
+---- QUERY
+select count(*) from (
+  select hb.* from hbaseinsertalltypesaggbinary hb, alltypesagg a
+  where hb.id = a.id
+    and (hb.bigint_col = a.bigint_col or
+         (hb.bigint_col is null and a.bigint_col is null))
+    and (hb.bool_col = a.bool_col or
+         (hb.bool_col is null and a.bool_col is null))
+    and (hb.date_string_col = a.date_string_col or
+         (hb.date_string_col is null and a.date_string_col is null))
+    and (hb.double_col = a.double_col or
+         (hb.double_col is null and a.double_col is null))
+    and (hb.float_col = a.float_col or
+         (hb.float_col is null and a.float_col is null))
+    and (hb.int_col = a.int_col or
+         (hb.int_col is null and a.int_col is null))
+    and (hb.smallint_col = a.smallint_col or
+         (hb.smallint_col is null and a.smallint_col is null))
+    and (hb.tinyint_col = a.tinyint_col or
+         (hb.tinyint_col is null and a.tinyint_col is null))
+    and (hb.string_col = a.string_col or
+         (hb.string_col is null and a.string_col is null))
+    and (hb.timestamp_col = a.timestamp_col or
+         (hb.timestamp_col is null and a.timestamp_col is null))
+  ) x
+---- TYPES
+bigint
+---- RESULTS
+10000
+====
+---- QUERY
+select id, bool_col from hbaseinsertalltypesaggbinary 
+WHERE id > 300 
+ORDER BY id 
+LIMIT 2
+---- TYPES
+int, boolean
+---- RESULTS
+301,false
+302,true
+====
+---- QUERY
+insert into table hbaseinsertalltypesaggbinary
+select 9999999, bigint_col, false, date_string_col, double_col, float_col, 
+int_col, smallint_col, string_col, timestamp_col, tinyint_col from alltypesagg
+---- RESULTS
+: 10000
+---- SETUP
+RELOAD hbaseinsertalltypesaggbinary
+====
+---- QUERY
+select id, bool_col from hbaseinsertalltypesaggbinary 
+WHERE id = 9999999 
+ORDER BY id 
+LIMIT 2
+---- TYPES
+int, boolean
+---- RESULTS
+9999999,false
+====
+---- QUERY
+# test insert into ... select *
+# using limit 1 to reduce execution time
+insert into table hbaseinsertalltypesaggbinary
+select * from hbaseinsertalltypesaggbinary limit 1
+---- RESULTS
+: 1
+---- SETUP
+RELOAD hbaseinsertalltypesaggbinary
+====
+---- QUERY
+# test inserting Hive's default text representation of NULL '\N' 
+# and make sure a scan returns the string and not NULL
+insert into table hbaseinsertalltypesaggbinary
+select 9999999, bigint_col, false, "\\N", double_col, float_col, 
+int_col, smallint_col, "\\N", timestamp_col, tinyint_col from alltypesagg limit 1
+---- RESULTS
+: 1
+---- SETUP
+RELOAD hbaseinsertalltypesaggbinary
+====
+---- QUERY
+select id, date_string_col, string_col from hbaseinsertalltypesaggbinary 
+where id = 9999999
+---- TYPES
+int, string, string
+---- RESULTS
+9999999,'\N','\N'
+====

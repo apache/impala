@@ -335,6 +335,11 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestBinaryHBaseTable() {
+    AnalyzesOk("select * from functional.hbasealltypessmallbinary");
+  }
+
+  @Test
   public void TestUnsupportedSerde() {
     AnalysisError("select * from functional.bad_serde",
                   "Failed to load metadata for table: functional.bad_serde");

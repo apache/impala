@@ -75,6 +75,12 @@ TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<int64_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(
       static_cast<int64_t>(0x1122334455667788)), 0x8877665544332211);
+
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<int16_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<int16_t>(0x1122)), 0x2211);
+
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0x1122)), 0x2211);
 }
 
 TEST(BitUtil, Log2) {

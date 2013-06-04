@@ -18,10 +18,12 @@
 #include <cstring>
 #include <algorithm>
 
+#include "util/bit-util.h"
 #include "util/jni-util.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
+#include "runtime/tuple.h"
 
 using namespace std;
 using namespace impala;
@@ -299,8 +301,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   // Restrict scan to materialized families/qualifiers.
   for (int i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
-    const string& family = hbase_table->cols()[slots[i]->col_pos()].first;
-    const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].second;
+    const string& family = hbase_table->cols()[slots[i]->col_pos()].family;
+    const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].qualifier;
     // The row key has an empty qualifier.
     if (qualifier.empty()) continue;
     JniLocalFrame jni_frame;
@@ -323,8 +325,8 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
     bool requested = false;
     for (int i = 0; i < slots.size(); ++i) {
       if (!slots[i]->is_materialized()) continue;
-      const string& family = hbase_table->cols()[slots[i]->col_pos()].first;
-      const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].second;
+      const string& family = hbase_table->cols()[slots[i]->col_pos()].family;
+      const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].qualifier;
       if (family == it->family && qualifier == it->qualifier) {
         requested = true;
         break;
@@ -419,7 +421,7 @@ Status HBaseTableScanner::StartScan(JNIEnv* env, const TupleDescriptor* tuple_de
   return InitScanRange(env, scan_range_vector_->at(current_scan_range_idx_));
 }
 
-Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const std::string& s,
+Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const string& s,
     jbyteArray* bytes) {
   if (!s.empty()) {
     *bytes = env->NewByteArray(s.size());
@@ -510,13 +512,26 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   return Status::OK;
 }
 
-Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
+inline void HBaseTableScanner::WriteTupleSlot(const SlotDescriptor* slot_desc,
+    Tuple* tuple, void* data) {
+  void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+  BitUtil::ByteSwap(slot, data, GetByteSize(slot_desc->type()));
+}
+
+inline Status HBaseTableScanner::GetRowKeyLengthAndOffSet(JNIEnv* env, int* length,
+    int* offset) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(env));
   jobject keyvalue = env->GetObjectArrayElement(keyvalues_, 0);
-  *key_length = env->CallShortMethod(keyvalue, keyvalue_get_row_length_id_);
-  int key_offset =
-      env->CallIntMethod(keyvalue, keyvalue_get_row_offset_id_) - result_bytes_offset_;
+  *length = env->CallShortMethod(keyvalue, keyvalue_get_row_length_id_);
+  *offset = env->CallIntMethod(keyvalue, keyvalue_get_row_offset_id_) -
+      result_bytes_offset_;
+  return Status::OK;
+}
+
+Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
+  int key_offset;
+  RETURN_IF_ERROR(GetRowKeyLengthAndOffSet(env, key_length, &key_offset));
   // Allocate one extra byte for null-terminator.
   *key = value_pool_->Allocate(*key_length + 1);
   memcpy(*key, reinterpret_cast<char*>(buffer_) + key_offset, *key_length);
@@ -524,12 +539,21 @@ Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
   return Status::OK;
 }
 
-Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
-    const string& qualifier, void** value, int* value_length) {
+Status HBaseTableScanner::GetRowKey(JNIEnv* env, const SlotDescriptor* slot_desc,
+    Tuple* tuple) {
+  int key_length, key_offset;
+  RETURN_IF_ERROR(GetRowKeyLengthAndOffSet(env, &key_length, &key_offset));
+  DCHECK_EQ(key_length, GetByteSize(slot_desc->type()));
+  WriteTupleSlot(slot_desc, tuple, reinterpret_cast<char*>(buffer_) + key_offset);
+  return Status::OK;
+}
+
+Status HBaseTableScanner::GetValueLengthAndOffset(JNIEnv* env,
+    const string& family, const string& qualifier, int* length, int* offset,
+    bool* is_null) {
   // Current row doesn't have any more keyvalues. All remaining values are NULL.
   if (keyvalue_index_ >= num_keyvalues_) {
-    *value = NULL;
-    *value_length = 0;
+    *is_null = true;
     return Status::OK;
   }
   JniLocalFrame jni_frame;
@@ -541,8 +565,7 @@ Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
         result_bytes_offset_;
     int family_length = env->CallByteMethod(keyvalue, keyvalue_get_family_length_id_);
     if (CompareStrings(family, family_offset, family_length) != 0) {
-      *value = NULL;
-      *value_length = 0;
+      *is_null = true;
       return Status::OK;
     }
     // Check qualifier. If it doesn't match, we have a NULL value.
@@ -552,20 +575,49 @@ Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
     int qualifier_length =
         env->CallIntMethod(keyvalue, keyvalue_get_qualifier_length_id_);
     if (CompareStrings(qualifier, qualifier_offset, qualifier_length) != 0) {
-      *value = NULL;
-      *value_length = 0;
+      *is_null = true;
       return Status::OK;
     }
   }
   // The requested family/qualifier matches the keyvalue at keyvalue_index_.
-  // Copy the cell.
-  *value_length = env->CallIntMethod(keyvalue, keyvalue_get_value_length_id_);
-  int value_offset = env->CallIntMethod(keyvalue, keyvalue_get_value_offset_id_) -
-                     result_bytes_offset_;
+  *length = env->CallIntMethod(keyvalue, keyvalue_get_value_length_id_);
+  *offset = env->CallIntMethod(keyvalue, keyvalue_get_value_offset_id_) -
+      result_bytes_offset_;
+  *is_null = false;
+  return Status::OK;
+}
+
+Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
+    const string& qualifier, void** value, int* value_length) {
+  int value_offset;
+  bool is_null;
+  RETURN_IF_ERROR(GetValueLengthAndOffset(env, family, qualifier, value_length,
+      &value_offset, &is_null));
+  if (is_null) {
+    *value = NULL;
+    *value_length = 0;
+    return Status::OK;
+  }
   // Allocate one extra byte for null-terminator.
   *value = value_pool_->Allocate(*value_length + 1);
   memcpy(*value, reinterpret_cast<char*>(buffer_) + value_offset, *value_length);
   reinterpret_cast<char*>(*value)[*value_length] = '\0';
+  ++keyvalue_index_;
+  return Status::OK;
+}
+
+Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
+    const string& qualifier, const SlotDescriptor* slot_desc, Tuple* tuple) {
+  int value_length, value_offset;
+  bool is_null;
+  RETURN_IF_ERROR(GetValueLengthAndOffset(env, family, qualifier, &value_length,
+      &value_offset, &is_null));
+  if (is_null) {
+    tuple->SetNull(slot_desc->null_indicator_offset());
+    return Status::OK;
+  }
+  DCHECK_EQ(value_length, GetByteSize(slot_desc->type()));
+  WriteTupleSlot(slot_desc, tuple, reinterpret_cast<char*>(buffer_) + value_offset);
   ++keyvalue_index_;
   return Status::OK;
 }
@@ -576,7 +628,7 @@ int HBaseTableScanner::CompareStrings(const string& s, int offset, int length) {
   if (length == 0) return 1;
   if (slength == 0) return -1;
   int result = memcmp(s.data(), reinterpret_cast<char*>(buffer_) + offset,
-      std::min(slength, length));
+      min(slength, length));
   if (result == 0 && slength != length) {
     return (slength < length ? -1 : 1);
   } else {

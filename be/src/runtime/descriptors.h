@@ -239,14 +239,27 @@ class HBaseTableDescriptor : public TableDescriptor {
   HBaseTableDescriptor(const TTableDescriptor& tdesc);
   virtual std::string DebugString() const;
   const std::string table_name() const { return table_name_; }
-  const std::vector<std::pair<std::string, std::string> >& cols() const { return cols_; }
+
+  struct HBaseColumnDescriptor {
+    std::string family;
+    std::string qualifier;
+    bool binary_encoded;
+
+    HBaseColumnDescriptor(const std::string& col_family, const std::string& col_qualifier,
+        bool col_binary_encoded)
+      : family(col_family),
+        qualifier(col_qualifier),
+        binary_encoded(col_binary_encoded){
+    }
+  };
+  const std::vector<HBaseColumnDescriptor>& cols() const { return cols_; }
 
  protected:
   // native name of hbase table
   std::string table_name_;
 
   // List of family/qualifier pairs.
-  std::vector<std::pair<std::string, std::string> > cols_;
+  std::vector<HBaseColumnDescriptor> cols_;
 };
 
 class TupleDescriptor {

@@ -38,7 +38,7 @@ class HBaseTableSink : public DataSink {
   Status Init(RuntimeState* state);
   Status Send(RuntimeState* state, RowBatch* batch);
   Status Close(RuntimeState* state);
-  RuntimeProfile* profile() { return NULL; }
+  RuntimeProfile* profile() { return runtime_profile_; }
 
  private:
   // Turn thrift TExpr into Expr and prepare them to run
