@@ -17,9 +17,6 @@ import csv
 import sys
 from cStringIO import StringIO
 
-# The default csv field size limit is too small to write large result sets.
-csv.field_size_limit(sys.maxint)
-
 
 class PrettyOutputFormatter(object):
   def __init__(self, prettytable):
