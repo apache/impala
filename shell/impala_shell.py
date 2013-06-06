@@ -739,6 +739,7 @@ class ImpalaShell(cmd.Cmd):
     if not self.connected:
       print_to_stderr("Not connected (use CONNECT to establish a connection)")
       rpc_results.put((None, RpcStatus.ERROR))
+      return
     try:
       ret = rpc()
       status = RpcStatus.OK
