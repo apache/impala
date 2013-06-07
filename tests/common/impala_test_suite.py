@@ -154,11 +154,13 @@ class ImpalaTestSuite(BaseTestSuite):
     for row in setup_section.split('\n'):
       row = row.lstrip()
       if row.startswith('RESET'):
-        table_name = row.split('RESET')[1]
-        self.__reset_table(table_name.strip(), table_format)
+        db_name, table_name = QueryTestSectionReader.get_table_name_components(\
+          table_format, row.split('RESET')[1])
+        self.__reset_table(db_name, table_name)
       elif row.startswith('DROP PARTITIONS'):
-        table_name = row.split('DROP PARTITIONS')[1]
-        self.__drop_partitions(table_name.strip(), table_format)
+        db_name, table_name = QueryTestSectionReader.get_table_name_components(\
+          table_format, row.split('DROP PARTITIONS')[1])
+        self.__drop_partitions(db_name, table_name)
       elif row.startswith('RELOAD'):
         self.client.refresh()
       else:
@@ -221,9 +223,8 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def __drop_partitions(self, table_name, table_format):
+  def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""
-    db_name =  QueryTestSectionReader.get_db_name(table_format)
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
@@ -261,9 +262,8 @@ class ImpalaTestSuite(BaseTestSuite):
       assert False, 'Test file not found: %s' % file_name
     return parse_query_test_file(test_file_path)
 
-  def __reset_table(self, table_name, table_format):
+  def __reset_table(self, db_name, table_name):
     """Resets a table (drops and recreates the table)"""
-    db_name =  QueryTestSectionReader.get_db_name(table_format)
     table = self.hive_client.get_table(db_name, table_name)
     assert table is not None
     self.hive_client.drop_table(db_name, table_name, True)
@@ -312,16 +312,3 @@ class ImpalaTestSuite(BaseTestSuite):
         if cls.get_workload() == workload_strategy[0]:
           return workload_strategy[1]
     return default_strategy
-
-  @staticmethod
-  def __get_db_from_table_name(table_name, vector):
-    """
-    Given a fully qualified table name, returns the database name and table name
-
-    If the table name is not fully qualified, then retrieve the appropriate database.
-    """
-    split = table_name.split('.')
-    assert len(split) <= 2, 'Unexpected table format: %s' % table_name
-    db_name = split[0] if len(split) == 2 else QueryTestSectionReader.get_db_name(vector)
-    return (db_name, split[-1])
-

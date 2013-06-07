@@ -31,6 +31,21 @@ class QueryTestSectionReader(object):
     return query_section_text.rstrip(';')
 
   @staticmethod
+  def get_table_name_components(table_format, table_name, scale_factor=''):
+    """
+    Returns a pair (db_name, tbl_name). If the table_name argument is
+    fully qualified, return the database name mentioned there,
+    otherwise get the default db name from the table format and scale
+    factor.
+    """
+    # If table name is fully qualified return the db prefix
+    split = table_name.split('.')
+    assert len(split) <= 2, 'Unexpected table format: %s' % table_name
+    db_name = split[0] if len(split) == 2 else \
+        QueryTestSectionReader.get_db_name(table_format, scale_factor)
+    return (db_name, split[-1])
+
+  @staticmethod
   def get_db_name(table_format, scale_factor=''):
     """
     Get the database name to use.
