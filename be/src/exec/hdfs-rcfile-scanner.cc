@@ -322,8 +322,11 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
     uint8_t* compressed_buffer;
     RETURN_IF_FALSE(stream_->ReadBytes(
         compressed_key_length_, &compressed_buffer, &parse_status_));
-    RETURN_IF_ERROR(decompressor_->ProcessBlock(compressed_key_length_,
-        compressed_buffer, &key_length_, &key_buffer));
+    {
+      SCOPED_TIMER(decompress_timer_);
+      RETURN_IF_ERROR(decompressor_->ProcessBlock(compressed_key_length_,
+          compressed_buffer, &key_length_, &key_buffer));
+    }
   } else {
     uint8_t* buffer;
     RETURN_IF_FALSE(
@@ -433,9 +436,12 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
       RETURN_IF_FALSE(stream_->ReadBytes(
           column.buffer_len, &compressed_input, &parse_status_));
       uint8_t* compressed_output = row_group_buffer_ + column.start_offset;
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(column.buffer_len,
-          compressed_input, &column.uncompressed_buffer_len,
-          &compressed_output));
+      {
+        SCOPED_TIMER(decompress_timer_);
+        RETURN_IF_ERROR(decompressor_->ProcessBlock(column.buffer_len,
+            compressed_input, &column.uncompressed_buffer_len,
+            &compressed_output));
+      }
     } else {
       uint8_t* uncompressed_data;
       RETURN_IF_FALSE(stream_->ReadBytes(

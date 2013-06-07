@@ -147,8 +147,11 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
         stream_->ReadBytes(in_size, &compressed_data, &parse_status_));
 
     int len = 0;
-    RETURN_IF_ERROR(decompressor_->ProcessBlock(in_size, compressed_data,
-        &len, &unparsed_data_buffer_));
+    {
+      SCOPED_TIMER(decompress_timer_);
+      RETURN_IF_ERROR(decompressor_->ProcessBlock(in_size, compressed_data,
+          &len, &unparsed_data_buffer_));
+    }
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = ReadWriteUtil::GetVLong(*record_ptr, record_len);
