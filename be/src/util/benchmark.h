@@ -40,7 +40,11 @@ class Benchmark {
 
   // Add a benchmark with 'name' to the suite.  The first benchmark is assumed to
   // be the baseline.  Reporting will be done relative to that.
-  void AddBenchmark(const std::string& name, BenchmarkFunction fn, void* args);
+  // Returns a unique index for this benchmark.
+  // baseline_idx is the base function to compare this one against.
+  // Specify -1 to not have a baseline.
+  int AddBenchmark(const std::string& name, BenchmarkFunction fn, void* args,
+      int baseline_idx = 0);
 
   // Runs all the benchmarks and returns the result in a formatted string.
   std::string Measure();
@@ -65,6 +69,7 @@ class Benchmark {
     BenchmarkFunction fn; 
     void* args;
     double rate;
+    int baseline_idx;
   };
 
   std::string name_;

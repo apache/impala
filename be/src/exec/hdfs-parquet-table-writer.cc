@@ -19,12 +19,12 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/bit-stream-utils.h"
 #include "util/bit-util.h"
 #include "util/buffer-builder.h"
 #include "util/compress.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
-#include "util/integer-array.h"
 #include "util/rle-encoding.h"
 #include "util/thrift-util.h"
 
@@ -126,7 +126,7 @@ class HdfsParquetTableWriter::ColumnWriter {
 
     // Used to encode bools as single bit values.  This is only allocated if
     // the column type is boolean.
-    IntegerArrayBuilder* bool_values;
+    BitWriter* bool_values;
       
     // Data for buffered values.  For non-bool columns, this is where the output
     // is accumulated.  For bool columns, this is a ptr into bool_values (no
@@ -141,6 +141,9 @@ class HdfsParquetTableWriter::ColumnWriter {
     // If true, this data page has been finalized.  All sizes are computed, header is
     // fully populated and any compression is done.
     bool finalized;
+
+    // Number of non-null values
+    int num_non_null;
   };
 
   HdfsParquetTableWriter* parent_;
@@ -192,6 +195,7 @@ inline int HdfsParquetTableWriter::ColumnWriter::AppendRow(TupleRow* row) {
       // the data page was not updated.
       continue;
     }
+    ++current_page_->num_non_null;
     break;
   }
 
@@ -212,7 +216,7 @@ inline int HdfsParquetTableWriter::ColumnWriter::EncodePlain(void* value) const 
   // Special case bool and string
   switch (expr_->type()) {
     case TYPE_BOOLEAN:
-      if (!current_page_->bool_values->Put(*reinterpret_cast<bool*>(value))) {
+      if (!current_page_->bool_values->PutValue(*reinterpret_cast<bool*>(value), 1)) {
         return -1;
       }
       return 0;
@@ -291,9 +295,9 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
   PageHeader& header = current_page_->header;
   int64_t bytes_added = 0;
   if (expr_->type() == TYPE_BOOLEAN) {
+    current_page_->bool_values->Flush();
     // Compute size of bool bits, they are encoded differently.
-    int num_bools = current_page_->bool_values->count();
-    int num_bytes = BitUtil::Ceil(num_bools, 8);
+    int num_bytes = BitUtil::Ceil(current_page_->num_non_null, 8);
     header.uncompressed_page_size += num_bytes;
     bytes_added += num_bytes;
   }
@@ -373,12 +377,12 @@ void HdfsParquetTableWriter::ColumnWriter::NewPage() {
     header.repetition_level_encoding = Encoding::BIT_PACKED;
     current_page_->def_levels = parent_->state_->obj_pool()->Add(
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),
-            DATA_PAGE_SIZE));
+                       DATA_PAGE_SIZE, 1));
     if (expr_->type() == TYPE_BOOLEAN) {
+      current_page_->values_buffer = 
+          parent_->reusable_col_mem_pool_.get()->Allocate(DATA_PAGE_SIZE);
       current_page_->bool_values = parent_->state_->obj_pool()->Add(
-          new IntegerArrayBuilder(
-              1, DATA_PAGE_SIZE, parent_->reusable_col_mem_pool_.get()));
-      current_page_->values_buffer = current_page_->bool_values->array();
+          new BitWriter(current_page_->values_buffer, DATA_PAGE_SIZE));
     } else {
       current_page_->bool_values = NULL;
       current_page_->values_buffer = 
@@ -387,6 +391,7 @@ void HdfsParquetTableWriter::ColumnWriter::NewPage() {
     current_page_->header.__set_data_page_header(header);
   }
   current_page_->finalized = false;
+  current_page_->num_non_null = 0;
 }
 
 HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeState* state, 

@@ -26,6 +26,7 @@ ADD_BE_BENCHMARK(atoi-benchmark)
 ADD_BE_BENCHMARK(thread-create-benchmark)
 ADD_BE_BENCHMARK(tuple-layout-benchmark)
 ADD_BE_BENCHMARK(string-benchmark)
+ADD_BE_BENCHMARK(rle-benchmark)
 
 add_executable(hash-benchmark hash-benchmark.cc)
 target_link_libraries(hash-benchmark Experiments ${IMPALA_LINK_LIBS})

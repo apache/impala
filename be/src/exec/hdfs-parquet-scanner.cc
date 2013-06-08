@@ -284,7 +284,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
           if (!ReadWriteUtil::Read(&data_, &data_size, &num_definition_bytes, &status)) {
             return status;
           }
-          rle_def_levels_ = RleDecoder(data_, num_definition_bytes);
+          rle_def_levels_ = RleDecoder(data_, num_definition_bytes, 1);
           break;
         case parquet::Encoding::BIT_PACKED:
           num_definition_bytes = BitUtil::Ceil(num_buffered_values_, 8);
@@ -328,9 +328,7 @@ inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
       valid = rle_def_levels_.Get(&definition_level);
       break;
     case parquet::Encoding::BIT_PACKED: {
-      bool v;
-      valid = bit_packed_def_levels_.GetBool(&v);
-      definition_level = v;
+      valid = bit_packed_def_levels_.GetValue(1, &definition_level);
       break;
     }
     default:
@@ -366,8 +364,7 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
   void* slot = tuple->GetSlot(desc_->tuple_offset());
   switch (desc_->type()) {
     case TYPE_BOOLEAN: {
-      bool valid;
-      valid = bool_values_.GetBool(reinterpret_cast<bool*>(slot));
+      bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
       if (!valid) {
         parent_->parse_status_ = Status("Invalid bool column");
         return false;

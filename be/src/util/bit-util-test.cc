@@ -46,6 +46,20 @@ TEST(BitUtil, Popcount) {
   EXPECT_EQ(BitUtil::PopcountNoHw(0), 0);
 }
 
+TEST(BitUtil, TrailingBits) {
+  EXPECT_EQ(BitUtil::TrailingBits(BOOST_BINARY(1 1 1 1 1 1 1 1), 0), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(BOOST_BINARY(1 1 1 1 1 1 1 1), 1), 1);
+  EXPECT_EQ(BitUtil::TrailingBits(BOOST_BINARY(1 1 1 1 1 1 1 1), 64),
+            BOOST_BINARY(1 1 1 1 1 1 1 1));
+  EXPECT_EQ(BitUtil::TrailingBits(BOOST_BINARY(1 1 1 1 1 1 1 1), 100),
+            BOOST_BINARY(1 1 1 1 1 1 1 1));
+  EXPECT_EQ(BitUtil::TrailingBits(0, 1), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(0, 64), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 0), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 63), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 64), 1LL << 63);
+}
+
 TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0x11223344)), 0x44332211);

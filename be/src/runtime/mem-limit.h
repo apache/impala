@@ -16,6 +16,7 @@
 #ifndef IMPALA_RUNTIME_MEM_LIMIT_H
 #define IMPALA_RUNTIME_MEM_LIMIT_H
 
+#include <stdint.h>
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>

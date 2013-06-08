@@ -30,6 +30,11 @@ class BitUtil {
     return value / divisor + (value % divisor != 0);
   }
 
+  // Returns 'value' rounded up to the nearest multiple of 'factor'
+  static inline int RoundUp(int value, int factor) {
+    return (value + (factor - 1)) / factor * factor;
+  }
+
   // Non hw accelerated pop count.
   // TODO: we don't use this in any perf sensitive code paths currently.  There
   // might be a much faster way to implement this.
@@ -46,6 +51,14 @@ class BitUtil {
     } else {
       return PopcountNoHw(x);
     }
+  }
+  
+  // Returns the 'num_bits' least-significant bits of 'v'.
+  static inline uint64_t TrailingBits(uint64_t v, int num_bits) {
+    if (UNLIKELY(num_bits == 0)) return 0;
+    if (UNLIKELY(num_bits >= 64)) return v;
+    int n = 64 - num_bits;
+    return (v << n) >> n;
   }
 
   // Swaps the byte order (i.e. endianess)

@@ -21,11 +21,13 @@
 #include <math.h>
 
 #include "util/rle-encoding.h"
-#include "util/bit-stream-utils.h"
+#include "util/bit-stream-utils.inline.h"
 
 using namespace std;
 
 namespace impala {
+
+const int MAX_WIDTH = 32;
 
 TEST(BitArray, TestBool) {
   const int len = 8;
@@ -35,9 +37,10 @@ TEST(BitArray, TestBool) {
 
   // Write alternating 0's and 1's
   for (int i = 0; i < 8; ++i) {
-    bool result = writer.PutBool(i % 2);
+    bool result = writer.PutValue(i % 2, 1);
     EXPECT_TRUE(result);
   }
+  writer.Flush();
   EXPECT_EQ((int)buffer[0], BOOST_BINARY(1 0 1 0 1 0 1 0));
 
   // Write 00110011
@@ -48,15 +51,16 @@ TEST(BitArray, TestBool) {
       case 1:
       case 4:
       case 5:
-        result = writer.PutBool(false);
+        result = writer.PutValue(false, 1);
         break;
       default:
-        result = writer.PutBool(true);
+        result = writer.PutValue(true, 1);
         break;
     }
     EXPECT_TRUE(result);
   }
-  
+  writer.Flush();
+
   // Validate the exact bit value
   EXPECT_EQ((int)buffer[0], BOOST_BINARY(1 0 1 0 1 0 1 0));
   EXPECT_EQ((int)buffer[1], BOOST_BINARY(1 1 0 0 1 1 0 0));
@@ -65,14 +69,14 @@ TEST(BitArray, TestBool) {
   BitReader reader(buffer, len);
   for (int i = 0; i < 8; ++i) {
     bool val;
-    bool result = reader.GetBool(&val);
+    bool result = reader.GetValue(1, &val);
     EXPECT_TRUE(result);
     EXPECT_EQ(val, i % 2);
   }
   
   for (int i = 0; i < 8; ++i) {
     bool val;
-    bool result = reader.GetBool(&val);
+    bool result = reader.GetValue(1, &val);
     EXPECT_TRUE(result);
     switch (i) {
       case 0:
@@ -88,26 +92,37 @@ TEST(BitArray, TestBool) {
   }
 }
 
-#if 0
-Re-enable these tests when we have support for multiple bit, bit packed
-encoding implemented.
-// Tests writing all bytes
-TEST(BitArray, TestByte) {
-  const int len = 256;
+// Writes 'num_vals' values with width 'bit_width' and reads them back.
+void TestBitArrayValues(int bit_width, int num_vals) {
+  const int len = BitUtil::Ceil(bit_width * num_vals, 8);
+  const uint64_t mod = bit_width == 64? 1 : 1LL << bit_width;
+
   uint8_t buffer[len];
   BitWriter writer(buffer, len);
-  for (int i = 0; i < len; ++i) {
-    bool result = writer.Put<uint8_t>(i);
+  for (int i = 0; i < num_vals; ++i) {
+    bool result = writer.PutValue(i % mod, bit_width);
     EXPECT_TRUE(result);
-    EXPECT_EQ(buffer[i], i);
   }
+  writer.Flush();
+  EXPECT_EQ(writer.bytes_written(), len);
 
   BitReader reader(buffer, len);
-  for (int i = 0; i < 8; ++i) {
-    uint8_t val;
-    bool result = reader.Get<uint8_t>(&val);
+  for (int i = 0; i < num_vals; ++i) {
+    int64_t val;
+    bool result = reader.GetValue(bit_width, &val);
     EXPECT_TRUE(result);
-    EXPECT_EQ(val, i);
+    EXPECT_EQ(val, i % mod);
+  }
+  EXPECT_EQ(reader.bytes_left(), 0);
+}
+
+TEST(BitArray, TestValues) {
+  for (int width = 1; width <= MAX_WIDTH; ++width) {
+    TestBitArrayValues(width, 1);
+    TestBitArrayValues(width, 2);
+    // Don't write too many values
+    TestBitArrayValues(width, (width < 12) ? (1 << width) : 4096);
+    TestBitArrayValues(width, 1024);
   }
 }
 
@@ -121,13 +136,14 @@ TEST(BitArray, TestMixed) {
   for (int i = 0; i < len; ++i) {
     bool result;
     if (i % 2 == 0) {
-      result = writer.Put<bool>(parity);
+      result = writer.PutValue(parity, 1);
       parity = !parity;
     } else {
-      result = writer.Put<uint8_t>(i);
+      result = writer.PutValue(i, 10);
     }
     EXPECT_TRUE(result);
   }
+  writer.Flush();
 
   parity = true;
   BitReader reader(buffer, len);
@@ -135,30 +151,29 @@ TEST(BitArray, TestMixed) {
     bool result;
     if (i % 2 == 0) {
       bool val;
-      result = reader.Get<bool>(&val);
+      result = reader.GetValue(1, &val);
       EXPECT_EQ(val, parity);
       parity = !parity;
     } else {
-      uint8_t val;
-      result = reader.Get<uint8_t>(&val);
-      EXPECT_EQ(val, static_cast<uint8_t>(i));
+      int val;
+      result = reader.GetValue(10, &val);
+      EXPECT_EQ(val, i);
     }
     EXPECT_TRUE(result);
   }
 }
-#endif
 
 // Validates encoding of values by encoding and decoding them.  If 
 // expected_encoding != NULL, also validates that the encoded buffer is 
 // exactly 'expected_encoding'.
 // if expected_len is not -1, it will validate the encoded size is correct.
-void ValidateRle(const vector<int>& values, 
-    uint8_t* expected_encoding, int expected_len) {
+void ValidateRle(const vector<int>& values, int bit_width,
+                 uint8_t* expected_encoding, int expected_len) {
   const int len = 64 * 1024;
   uint8_t buffer[len];
   EXPECT_LE(expected_len, len);
 
-  RleEncoder encoder(buffer, len);
+  RleEncoder encoder(buffer, len, bit_width);
   for (int i = 0; i < values.size(); ++i) {
     bool result = encoder.Put(values[i]);
     EXPECT_TRUE(result);
@@ -173,9 +188,9 @@ void ValidateRle(const vector<int>& values,
   }
 
   // Verify read
-  RleDecoder decoder(buffer, encoded_len);
+  RleDecoder decoder(buffer, len, bit_width);
   for (int i = 0; i < values.size(); ++i) {
-    uint8_t val;
+    uint64_t val;
     bool result = decoder.Get(&val);
     EXPECT_TRUE(result);
     EXPECT_EQ(values[i], val);
@@ -195,11 +210,19 @@ TEST(Rle, SpecificSequences) {
   for (int i = 50; i < 100; ++i) {
     values[i] = 1;
   }
+
+  // expected_buffer valid for bit width <= 1 byte
   expected_buffer[0] = (50 << 1);
   expected_buffer[1] = 0;
   expected_buffer[2] = (50 << 1);
   expected_buffer[3] = 1;
-  ValidateRle(values, expected_buffer, 4);
+  for (int width = 1; width <= 8; ++width) {
+    ValidateRle(values, width, expected_buffer, 4);
+  }
+
+  for (int width = 9; width <= MAX_WIDTH; ++width) {
+    ValidateRle(values, width, NULL, 2 * (1 + BitUtil::Ceil(width, 8)));
+  }
 
   // Test 100 0's and 1's alternating
   for (int i = 0; i < 100; ++i) {
@@ -212,31 +235,31 @@ TEST(Rle, SpecificSequences) {
   }
   // Values for the last 4 0 and 1's
   expected_buffer[1 + 100/8] = BOOST_BINARY(0 0 0 0 1 0 1 0);
-  ValidateRle(values, expected_buffer, 1 + num_groups);
-}
 
-// Tests alternating true/false values.
-TEST(Rle, AlternateTest) { 
-  const int len = 2048;
-  vector<int> values;
-  for (int i = 0; i < len; ++i) {
-    values.push_back(i % 2);
+  // num_groups and expected_buffer only valid for bit width = 1
+  ValidateRle(values, 1, expected_buffer, 1 + num_groups);
+  for (int width = 2; width <= MAX_WIDTH; ++width) {
+    ValidateRle(values, width, NULL, 1 + BitUtil::Ceil(width * 100, 8));
   }
-  ValidateRle(values, NULL, -1);
 }
 
-// Tests all true/false values
-TEST(BitRle, AllSame) {
-  const int len = 1024;
+// ValidateRle on 'num_vals' values with width 'bit_width'. If 'value' != -1, that value
+// is used, otherwise alternating values are used.
+void TestRleValues(int bit_width, int num_vals, int value = -1) {
+  const uint64_t mod = (bit_width == 64) ? 1 : 1LL << bit_width;
   vector<int> values;
+  for (int v = 0; v < num_vals; ++v) {
+    values.push_back((value != -1) ? value : (v % mod));
+  }
+  ValidateRle(values, bit_width, NULL, -1);
+}
 
-  for (int v = 0; v < 2; ++v) {
-    values.clear();
-    for (int i = 0; i < len; ++i) {
-      values.push_back(v);
-    }
-
-    ValidateRle(values, NULL, 3);
+TEST(Rle, TestValues) {
+  for (int width = 1; width <= MAX_WIDTH; ++width) {
+    TestRleValues(width, 1);
+    TestRleValues(width, 1024);
+    TestRleValues(width, 1024, 0);
+    TestRleValues(width, 1024, 1);
   }
 }
 
@@ -246,13 +269,13 @@ TEST(BitRle, Flush) {
   vector<int> values;
   for (int i = 0; i < 16; ++i) values.push_back(1);
   values.push_back(0);
-  ValidateRle(values, NULL, -1);
+  ValidateRle(values, 1, NULL, -1);
   values.push_back(1);
-  ValidateRle(values, NULL, -1);
+  ValidateRle(values, 1, NULL, -1);
   values.push_back(1);
-  ValidateRle(values, NULL, -1);
+  ValidateRle(values, 1, NULL, -1);
   values.push_back(1);
-  ValidateRle(values, NULL, -1);
+  ValidateRle(values, 1, NULL, -1);
 }
 
 // Test some random sequences.
@@ -273,7 +296,7 @@ TEST(BitRle, Random) {
       }
       parity = !parity;
     }
-    ValidateRle(values, NULL, -1);
+    ValidateRle(values, (iters % MAX_WIDTH) + 1, NULL, -1);
   }
 }
 
@@ -299,17 +322,18 @@ TEST(BitRle, RepeatedPattern) {
     }
   }
 
-  ValidateRle(values, NULL, -1);
+  ValidateRle(values, 1, NULL, -1);
 }
 
 TEST(BitRle, Overflow) {
+  // TODO: test overflow
   return;
   const int len = 16;
   uint8_t buffer[len];
   int num_added = 0;
   bool parity = true;
 
-  RleEncoder encoder(buffer, len);
+  RleEncoder encoder(buffer, len, 1);
   // Insert alternating true/false until there is no space left
   while (true) {
     bool result = encoder.Put(parity);
@@ -322,7 +346,7 @@ TEST(BitRle, Overflow) {
   EXPECT_LE(bytes_written, len);
   EXPECT_GT(num_added, 0);
 
-  RleDecoder decoder(buffer, bytes_written);
+  RleDecoder decoder(buffer, bytes_written, 1);
   parity = true;
   for (int i = 0; i < num_added; ++i) {
     uint8_t v;

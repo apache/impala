@@ -32,7 +32,6 @@ add_library(Util
   disk-info.cc
   hdfs-util.cc
   impalad-metrics.cc
-  integer-array.cc
   jni-util.cc
   logging.cc
   mem-info.cc
@@ -67,7 +66,6 @@ target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 
 ADD_BE_TEST(authorization-test)
-ADD_BE_TEST(integer-array-test)
 ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(benchmark-test)
 ADD_BE_TEST(decompress-test)

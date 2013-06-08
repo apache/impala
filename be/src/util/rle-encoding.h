@@ -22,42 +22,44 @@
 namespace impala {
 
 // Utility classes to do run length encoding (RLE) for fixed bit width values.  If runs
-// are sufficiently long, RLE is used, otherwise, the values are just bit-packed 
+// are sufficiently long, RLE is used, otherwise, the values are just bit-packed
 // (literal encoding).
-// For both types of runes, there is a byte aligned indicator which encodes the length
+// For both types of runs, there is a byte-aligned indicator which encodes the length
 // of the run and the type of the run.
 // This encoding has the benefit that when there aren't any long enough runs, values
 // are always decoded at fixed (can be precomputed) bit offsets OR both the value and
-// the run length are byte aligned. This allows for very efficient decoding 
+// the run length are byte aligned. This allows for very efficient decoding
 // implementations.
 // The encoding is:
-//    encoded-block := run *
+//    encoded-block := run*
 //    run := literal-run | repeated-run
 //    literal-run := literal-indicator < literal bytes >
 //    repeated-run := repeated-indicator < repeated value. padded to byte boundary >
 //    literal-indicator := varint_encode( number_of_groups << 1 | 1)
 //    repeated-indicator := varint_encode( number_of_repetitions << 1 )
-// 
-// Each run is preceded by a varint. The varint's least significant bit is 
-// used to indicate whether the run is a literal run or a repeated run. The rest 
-// of the varint is used to determine the length of the run (eg how many times the 
+//
+// Each run is preceded by a varint. The varint's least significant bit is
+// used to indicate whether the run is a literal run or a repeated run. The rest
+// of the varint is used to determine the length of the run (eg how many times the
 // value repeats).
-// 
+//
 // In the case of literal runs, the run length is always a multiple of 8 (i.e. encode
-// in groups of 8), so that no matter the bit-width of the value, the sequence will end 
-// on a byte boundary without padding. 
-// Given that we know it is a multiple of 8, we store the number of 8-groups rather than 
-// the actual number of encoded ints.
-// There is a break-even point when it is more storage efficient to do run length 
+// in groups of 8), so that no matter the bit-width of the value, the sequence will end
+// on a byte boundary without padding.
+// Given that we know it is a multiple of 8, we store the number of 8-groups rather than
+// the actual number of encoded ints. (This means that the total number of encoded values
+// can not be determined from the encoded data, since the number of values in the last
+// group may not be a multiple of 8).
+// There is a break-even point when it is more storage efficient to do run length
 // encoding.  For 1 bit-width values, that point is 8 values.  They require 2 bytes
 // for both the repeated encoding or the literal encoding.  This value can always
 // be computed based on the bit-width.
 // TODO: think about how to use this for strings.  The bit packing isn't quite the same.
-// 
+//
 // Examples with bit-width 1 (eg encoding booleans):
 // ----------------------------------------
 // 100 1s followed by 100 0s:
-// <varint(100 << 1)> <1, padded to 1 byte>  <varint(100 << 1)> <0, padded to 1 byte>   
+// <varint(100 << 1)> <1, padded to 1 byte>  <varint(100 << 1)> <0, padded to 1 byte>  
 //  - (total 4 bytes)
 //
 // alternating 1s and 0s (200 total):
@@ -74,15 +76,16 @@ class RleDecoder {
   // Create a decoder object. buffer/buffer_len is the decoded data.
   // bit_width is the width of each value (before encoding).
   // TODO: support bit_width.  Only 1 is implemented.
-  RleDecoder(uint8_t* buffer, int buffer_len, int bit_width = 1) 
+  RleDecoder(uint8_t* buffer, int buffer_len, int bit_width)
     : bit_reader_(buffer, buffer_len),
-      bit_width_(bit_width), 
+      bit_width_(bit_width),
       current_value_(0),
       repeat_count_(0),
       literal_count_(0) {
-    DCHECK_EQ(bit_width_, 1);
+    DCHECK_GE(bit_width_, 1);
+    DCHECK_LE(bit_width_, 64);
   }
-  
+
   RleDecoder() {}
 
   // Gets the next value.  Returns false if there are no more.
@@ -92,7 +95,7 @@ class RleDecoder {
  private:
   BitReader bit_reader_;
   int bit_width_;
-  uint8_t current_value_;
+  uint64_t current_value_;
   uint32_t repeat_count_;
   uint32_t literal_count_;
 };
@@ -107,20 +110,20 @@ class RleEncoder {
  public:
   // buffer/buffer_len: preallocated output buffer.  
   // bit_width: max number of bits for value.
-  // TODO: we need to make this more general when we supported complex schemas
   // TODO: consider adding a min_repeated_run_length so the caller can control
   // when values should be encoded as repeated runs.  Currently this is derived
   // based on the bit_width, which can determine a storage optimal choice.
-  RleEncoder(uint8_t* buffer, int buffer_len, int bit_width = 1) 
+  RleEncoder(uint8_t* buffer, int buffer_len, int bit_width)
     : bit_width_(bit_width),
       bit_writer_(buffer, buffer_len) {
-    DCHECK_EQ(bit_width_, 1);
+    DCHECK_GE(bit_width_, 1);
+    DCHECK_LE(bit_width_, 64);
     Clear();
   }
 
   // Encode value.  Returns true if the value fits in buffer, false otherwise.
   // This value must be representable with bit_width_ bits.
-  bool Put(int64_t value);
+  bool Put(uint64_t value);
 
   // Flushes any pending vales to the underlying buffer.  Also updates buffer_full_
   // if we can't encode any more values.
@@ -163,6 +166,7 @@ class RleEncoder {
 
   // We need to buffer at most 8 values for literals.  This happens when the
   // bit_width is 1 (so 8 values fit in one byte).
+  // TODO: generalize this to other bit widths
   int64_t buffered_values_[8];
 
   // Number of values in buffered_values_
@@ -201,7 +205,8 @@ inline bool RleDecoder::Get(T* val) {
       literal_count_ = (indicator_value >> 1) * 8;
     } else {
       repeat_count_ = indicator_value >> 1;
-      bool result = bit_reader_.GetAligned<T>(&current_value_);
+      bool result = bit_reader_.GetAligned<T>(
+          BitUtil::Ceil(bit_width_, 8), reinterpret_cast<T*>(&current_value_));
       DCHECK(result);
     }
   }
@@ -211,11 +216,8 @@ inline bool RleDecoder::Get(T* val) {
     --repeat_count_;
   } else {
     DCHECK(literal_count_ > 0);
-    DCHECK_EQ(bit_width_, 1);
-    bool value;
-    bool result = bit_reader_.GetBool(&value);
+    bool result = bit_reader_.GetValue(bit_width_, val);
     DCHECK(result);
-    *val = value;
     --literal_count_;
   }
 
@@ -224,8 +226,8 @@ inline bool RleDecoder::Get(T* val) {
 
 // This function buffers input values 8 at a time.  After seeing all 8 values,
 // it decides whether they should be encoded as a literal or repeated run.
-inline bool RleEncoder::Put(int64_t value) {
-  DCHECK_LT(value, 1 << bit_width_);
+inline bool RleEncoder::Put(uint64_t value) {
+  DCHECK(bit_width_ == 64 || value < (1LL << bit_width_));
   if (UNLIKELY(buffer_full_)) return false;
 
   if (LIKELY(current_value_ == value)) {
@@ -263,10 +265,9 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
   }
   
   // Write all the buffered values as bit packed literals
-  DCHECK_EQ(bit_width_, 1);
   bool result = true;
   for (int i = 0; i < num_buffered_values_; ++i) {
-    result &= bit_writer_.PutBool(buffered_values_[i]);
+    result &= bit_writer_.PutValue(buffered_values_[i], bit_width_);
   }
   DCHECK(result);
   num_buffered_values_ = 0;
@@ -291,7 +292,7 @@ inline void RleEncoder::FlushRepeatedRun() {
   // The lsb of 0 indicates this is a repeated run
   int32_t indicator_value = repeat_count_ << 1 | 0;
   result &= bit_writer_.PutVlqInt(indicator_value);
-  result &= bit_writer_.PutAligned<uint8_t>(current_value_);
+  result &= bit_writer_.PutAligned(current_value_, BitUtil::Ceil(bit_width_, 8));
   DCHECK(result);
   num_buffered_values_ = 0;
   repeat_count_ = 0;
@@ -329,10 +330,8 @@ inline void RleEncoder::FlushBufferedValues(bool done) {
 }
 
 inline int RleEncoder::Flush() {
-  DCHECK_EQ(bit_width_, 1);
-
   if (literal_count_ > 0 || repeat_count_ > 0 || num_buffered_values_ > 0) {
-    bool all_repeat = literal_count_ == 0 && 
+    bool all_repeat = literal_count_ == 0 &&
         (repeat_count_ == num_buffered_values_ || num_buffered_values_ == 0);
     // There is something pending, figure out if it's a repeated or literal run
     if (repeat_count_ > 0 && all_repeat) {
@@ -343,6 +342,7 @@ inline int RleEncoder::Flush() {
       repeat_count_ = 0;
     }
   }
+  bit_writer_.Flush();
   DCHECK_EQ(num_buffered_values_, 0);
   DCHECK_EQ(literal_count_, 0);
   DCHECK_EQ(repeat_count_, 0);

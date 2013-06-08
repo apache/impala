@@ -17,7 +17,6 @@
 #define IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 
 #include "exec/hdfs-scanner.h"
-#include "util/integer-array.h"
 #include "exec/parquet-common.h"
 
 namespace impala {

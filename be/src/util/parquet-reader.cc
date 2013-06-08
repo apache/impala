@@ -350,7 +350,7 @@ int main(int argc, char** argv) {
         uint8_t* definition_data = data_page_data + sizeof(int32_t);
         uint8_t* values = data_page_data + num_definition_bytes + sizeof(int32_t);
     
-        impala::RleDecoder definition_levels(definition_data, num_definition_bytes);
+        impala::RleDecoder definition_levels(definition_data, num_definition_bytes, 1);
 
         switch (col.meta_data.type) {
           case Type::BOOLEAN:
