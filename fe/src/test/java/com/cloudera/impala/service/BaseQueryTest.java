@@ -58,6 +58,7 @@ public abstract class BaseQueryTest {
   private static ImpaladClientExecutor impaladClientExecutor;
 
   //Test dimension values
+  protected static final List<Integer> DEFAULT_BATCH_SIZE_ONLY = ImmutableList.of(0);
   protected static final List<Integer> ALL_BATCH_SIZES = ImmutableList.of(0, 16, 1);
   protected static final List<Integer> SMALL_BATCH_SIZES = ImmutableList.of(16, 1);
   // TODO: IMP-77 only cluster size of 1 and 2 execute correctly; to see incorrect result

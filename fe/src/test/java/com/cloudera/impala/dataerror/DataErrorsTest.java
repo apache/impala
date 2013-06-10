@@ -55,4 +55,10 @@ public class DataErrorsTest extends BaseQueryTest {
     // to run on its own server or all tests need to run with that size.
     runQueryWithTestConfigs(testConfigs, "hdfs-sequence-scan-errors", false, 20);
   }
+
+  @Test
+  public void TestHBaseInsertErrors() {
+    runPairTestFile("hbase-insert-errors", true, 100,
+        TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY, DEFAULT_BATCH_SIZE_ONLY, ALL_NODES_ONLY);
+  }
 }

@@ -98,6 +98,12 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
   for (int idx_batch = 0; idx_batch < limit; idx_batch++) {
     TupleRow* current_row = batch->GetRow(idx_batch);
     jobject put = NULL;
+
+    if (output_exprs_[0]->GetValue(current_row) == NULL) {
+      // HBase row key must not be null.
+      return Status("Cannot insert into HBase with a null row key.");
+    }
+
     for (int j = 0; j < num_cols; j++) {
       void* value = output_exprs_[j]->GetValue(current_row);
       if (value != NULL) {

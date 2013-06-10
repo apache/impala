@@ -1,0 +1,15 @@
+====
+---- QUERY
+insert into hbasealltypessmall values(NULL, true, 90.0, 5.5, 0, 1, 2, 3, "04/02/09", '2',
+  "2009-04-03 00:23:00.930000000")
+---- ERRORS
+Cannot insert into HBase with a null row key.
+====
+---- QUERY
+insert into hbasealltypessmall
+select case when id >= 0 then NULL else 999 end, true, 90.0, 5.5, 0, 1, 2, 3, "04/02/09",
+  '2', "2009-04-03 00:23:00.930000000"
+from alltypessmall
+---- ERRORS
+Cannot insert into HBase with a null row key.
+====
