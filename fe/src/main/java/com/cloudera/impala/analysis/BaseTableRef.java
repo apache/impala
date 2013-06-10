@@ -22,16 +22,21 @@ import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 
 /**
- * An actual table, such as HBase table or a Hive table.
- * BaseTableRef.
+ * Represents an actual table, such as an HBase table or a Hive table,
+ * or an unresolved reference to a view in the catalog or from a WITH clause.
+ *
+ * TODO: Parsing can no longer determine whether an identifier in a FROM clause
+ * should represent a base table or a view. Clean up parsing/analysis of TableRefs
+ * and the replacement of views, e.g., analysis should go through the list
+ * of abstract TableRefs in a SelectStmt and replace them with Views or BaseTableRefs.
  */
 public class BaseTableRef extends TableRef {
   private final TableName name;
 
-  // Indicates whether this table should be considered for view replacement.
-  // Used to disambiguate non-fully-qualified references to base tables
-  // from WITH-clause views.
-  private boolean allowViewReplacement = true;
+  // Indicates whether this table should be considered for view replacement
+  // from WITH-clause views. Used to distinguish non-fully-qualified references
+  // to catalog entries (base table or view) from WITH-clause views.
+  private boolean allowWithViewReplacement = true;
 
   public BaseTableRef(TableName name, String alias) {
     super(alias);
@@ -46,7 +51,7 @@ public class BaseTableRef extends TableRef {
   public BaseTableRef(BaseTableRef other) {
     super(other);
     this.name = other.name;
-    this.allowViewReplacement = other.allowViewReplacement;
+    this.allowWithViewReplacement = other.allowWithViewReplacement;
   }
 
   /**
@@ -105,7 +110,11 @@ public class BaseTableRef extends TableRef {
 
   @Override
   protected String tableRefToSql() {
-    return name.toString() + (alias != null ? " " + alias : "");
+    // Enclose the alias in quotes if Hive cannot parse it without quotes.
+    // This is needed for view compatibility between Impala and Hive.
+    String aliasSql = null;
+    if (alias != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias);
+    return name.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
   }
 
   public String debugString() {
@@ -118,22 +127,10 @@ public class BaseTableRef extends TableRef {
   }
 
   /**
-   * Disable view replacement for this table.
-   * See comment on allowViewReplacement.
+   * Disable/enable WITH-clause view replacement for this table.
+   * See comment on allowWithViewReplacement.
    */
-  public void disableViewReplacement() {
-    allowViewReplacement = false;
-  }
-
-  /**
-   * Enable view replacement for this table.
-   * See comment on allowViewReplacement.
-   */
-  public void enableViewReplacement() {
-    allowViewReplacement = true;
-  }
-
-  public boolean isReplacableByView() {
-    return allowViewReplacement;
-  }
+  public void disableWithViewReplacement() { allowWithViewReplacement = false; }
+  public void enableWithViewReplacement() { allowWithViewReplacement = true; }
+  public boolean isReplaceableByWithView() { return allowWithViewReplacement; }
 }

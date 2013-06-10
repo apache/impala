@@ -4,8 +4,9 @@
 # in the [users] section.
 [groups]
 ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
-          select_functional_alltypesagg, insert_functional_alltypes, insert_parquet,\
-          new_table_uri, tpch_data_uri
+          select_functional_alltypesagg, insert_functional_alltypes,\
+          select_functional_complex_view, select_functional_view_view,\
+          insert_parquet, new_table_uri, tpch_data_uri
 server_admin = all_server
 
 # The [roles] section defines privileges for objects in the authorizeable hierarchy.
@@ -21,6 +22,10 @@ select_tpcds = server=server1->db=tpcds->table=*->action=select
 select_functional_alltypesagg =\
     server=server1->db=functional->table=alltypesagg->action=select
 insert_functional_alltypes = server=server1->db=functional->table=alltypes->action=insert
+select_functional_complex_view =\
+    server=server1->db=functional->table=complex_view->action=select
+select_functional_view_view =\
+    server=server1->db=functional->table=view_view->action=select
 insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
 
 new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table

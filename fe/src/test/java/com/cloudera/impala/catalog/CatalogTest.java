@@ -88,6 +88,8 @@ public class CatalogTest {
     assertEquals(testDb.getName(), "functional_seq");
 
     assertNotNull(defaultDb.getTable("alltypes"));
+    assertNotNull(defaultDb.getTable("alltypes_view"));
+    assertNotNull(defaultDb.getTable("alltypes_view_sub"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
     assertNotNull(defaultDb.getTable("alltypeserrornonulls"));
@@ -95,6 +97,7 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("alltypesnopart"));
     assertNotNull(defaultDb.getTable("alltypesinsert"));
+    assertNotNull(defaultDb.getTable("complex_view"));
     assertNotNull(defaultDb.getTable("testtbl"));
     assertNotNull(defaultDb.getTable("dimtbl"));
     assertNotNull(defaultDb.getTable("jointbl"));
@@ -107,6 +110,7 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("greptiny"));
     assertNotNull(defaultDb.getTable("rankingssmall"));
     assertNotNull(defaultDb.getTable("uservisitssmall"));
+    assertNotNull(defaultDb.getTable("view_view"));
 
     // IMP-163 - table with string partition column does not load if there are partitions
     assertNotNull(defaultDb.getTable("StringPartitionKey"));
@@ -402,14 +406,6 @@ public class CatalogTest {
 
   @Test
   public void testLoadingUnsupportedTableTypes() {
-    try {
-      Table table = getDb(catalog, "functional").getTable("hive_view");
-      fail("Expected TableLoadingException when loading VIRTUAL_VIEW");
-    } catch (TableLoadingException e) {
-      assertEquals("Unsupported table type 'VIRTUAL_VIEW' for: functional.hive_view",
-          e.getMessage());
-    }
-
     try {
       Table table = getDb(catalog, "functional").getTable("hive_index_tbl");
       fail("Expected TableLoadingException when loading INDEX_TABLE");

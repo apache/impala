@@ -63,7 +63,10 @@ public abstract class QueryStmt extends StatementBase {
   protected SortInfo sortInfo;
 
   // True if this QueryStmt is the top level query from an EXPLAIN <query>
-  private boolean isExplain = false;
+  protected boolean isExplain = false;
+
+  // Analyzer that was used to analyze this query statement.
+  protected Analyzer analyzer;
 
   QueryStmt(ArrayList<OrderByElement> orderByElements, long limit) {
     this.orderByElements = orderByElements;
@@ -74,9 +77,9 @@ public abstract class QueryStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (hasWithClause()) {
-      withClause.analyze(analyzer);
-    }
+    this.analyzer = analyzer;
+    if (hasWithClause()) withClause.analyze(analyzer);
+    analyzer.setIsExplain(isExplain);
   }
 
   /**

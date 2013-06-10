@@ -726,6 +726,47 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypes_view
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.alltypes;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_view_sub
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name} (x, y, z)
+AS SELECT int_col, string_col, timestamp_col FROM {db_name}{db_suffix}.alltypes;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complex_view
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.complex_view
+(abc COMMENT 'agg', xyz COMMENT 'gby') AS
+SELECT COUNT(a.bigint_col), b.string_col FROM
+{db_name}{db_suffix}.alltypesagg a INNER JOIN {db_name}{db_suffix}.alltypestiny b
+ON a.id = b.id WHERE a.bigint_col < 50
+GROUP BY b.string_col HAVING COUNT(a.bigint_col) > 1
+ORDER BY b.string_col LIMIT 100;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+view_view
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.alltypes_view;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 escapenoquotes
 ---- COLUMNS
 col1 string

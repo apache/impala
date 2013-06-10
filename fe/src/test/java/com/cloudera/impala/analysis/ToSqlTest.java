@@ -3,26 +3,15 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.fail;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Catalog;
 import com.google.common.base.Preconditions;
 
-public class ToSqlTest {
-
-  private static Catalog catalog;
-  @BeforeClass
-  public static void setUp() throws Exception {
-    catalog = new Catalog();
-  }
-
-  @AfterClass
-  public static void cleanUp() {
-    catalog.close();
-  }
+// TODO: Expand this test, in particular, because view creation relies
+// on producing correct SQL.
+public class ToSqlTest extends AnalyzerTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
@@ -45,6 +34,8 @@ public class ToSqlTest {
     if (!actual.equals(expected)) {
       fail("Expected: " + expected + "\n Actual: " + actual + "\n");
     }
+    // Try to parse and analyze the resulting SQL to ensure its validity.
+    AnalyzesOk(actual);
   }
 
   // Test the toSql() output of select list expressions.
@@ -82,6 +73,34 @@ public class ToSqlTest {
         "bool_col " +
         "FROM functional.alltypes");
     // TODO: test boolean expressions and date literals
+  }
+
+  /**
+   * Tests quoting of identifiers for view compatibility with Hive.
+   */
+  @Test
+  public void TestIdentifierQuoting() {
+    // The quotes of quoted identifiers will be removed if they are unnecessary.
+    testToSql("select 1 as `abc`, 2.0 as `xyz`", "SELECT 1 abc, 2.0 xyz");
+
+    // These identifiers are lexable by Impala but not Hive. For view compatibility
+    // we enclose the idents in quotes.
+    testToSql("select 1 as _c0, 2.0 as $abc", "SELECT 1 `_c0`, 2.0 `$abc`");
+
+    // Quoted identifiers that require quoting in both Impala and Hive.
+    testToSql("select 1 as `???`, 2.0 as `^^^`", "SELECT 1 `???`, 2.0 `^^^`");
+
+    // Test quoting of inline view aliases.
+    testToSql("select a from (select 1 as a) as _t",
+        "SELECT a FROM (SELECT 1 a) `_t`");
+
+    // Test quoting of WITH-clause views.
+    testToSql("with _t as (select 1 as a) select * from _t",
+        "WITH `_t` AS (SELECT 1 a) SELECT * FROM `_t`");
+
+    // Test quoting of auto-generated column names.
+    testToSql("select _c0, _c1 from (select 1 + 10, trim('abc')) as t",
+        "SELECT `_c0`, `_c1` FROM (SELECT 1 + 10, trim('abc')) t");
   }
 
   // Test the toSql() output of the where clause.
@@ -228,6 +247,47 @@ public class ToSqlTest {
         "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
   }
 
+  /**
+   * Tests that toSql() properly handles inline views and their expression substitutions.
+   */
+  @Test
+  public void subqueryTest() {
+    // Test undoing expr substitution in select-list exprs and on clause.
+    testToSql("select t1.int_col, t2.int_col from " +
+        "(select int_col from functional.alltypes) t1 inner join " +
+        "(select int_col from functional.alltypes) t2 on t1.int_col = t2.int_col",
+        "SELECT t1.int_col, t2.int_col FROM " +
+        "(SELECT int_col FROM functional.alltypes) t1 INNER JOIN " +
+        "(SELECT int_col FROM functional.alltypes) t2 ON (t1.int_col = t2.int_col)");
+    // Test undoing expr substitution in aggregates and group by and having clause.
+    testToSql("select count(t1.string_col), sum(t2.float_col) from " +
+        "(select id, string_col from functional.alltypes) t1 inner join " +
+        "(select id, float_col from functional.alltypes) t2 on t1.id = t2.id " +
+        "group by t1.id, t2.id having count(t2.float_col) > 2",
+        "SELECT COUNT(t1.string_col), SUM(t2.float_col) FROM " +
+        "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
+        "(SELECT id, float_col FROM functional.alltypes) t2 ON (t1.id = t2.id) " +
+        "GROUP BY t1.id, t2.id HAVING COUNT(t2.float_col) > 2");
+    // Test undoing expr substitution in order by clause.
+    testToSql("select t1.id, t2.id from " +
+        "(select id, string_col from functional.alltypes) t1 inner join " +
+        "(select id, float_col from functional.alltypes) t2 on t1.id = t2.id " +
+        "order by t1.id, t2.id",
+        "SELECT t1.id, t2.id FROM " +
+        "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
+        "(SELECT id, float_col FROM functional.alltypes) t2 ON (t1.id = t2.id) " +
+        "ORDER BY t1.id ASC, t2.id ASC");
+    // Test undoing expr substitution in where-clause conjuncts.
+    testToSql("select t1.id, t2.id from " +
+        "(select id, string_col from functional.alltypes) t1, " +
+        "(select id, float_col from functional.alltypes) t2 " +
+        "where t1.id = t2.id and t1.string_col = 'abc' and t2.float_col < 10",
+        "SELECT t1.id, t2.id FROM " +
+        "(SELECT id, string_col FROM functional.alltypes) t1, " +
+        "(SELECT id, float_col FROM functional.alltypes) t2 " +
+        "WHERE t1.id = t2.id AND t1.string_col = 'abc' AND t2.float_col < 10.0");
+  }
+
   @Test
   public void withClauseTest() {
     // WITH clause in select stmt.
@@ -237,8 +297,7 @@ public class ToSqlTest {
     testToSql("with t as (select * from functional.alltypes) " +
         "select * from t a inner join t b on (a.int_col = b.int_col)",
         "WITH t AS (SELECT * FROM functional.alltypes) " +
-        "SELECT * FROM t a INNER JOIN t b " +
-        "ON (functional.alltypes.int_col = functional.alltypes.int_col)");
+        "SELECT * FROM t a INNER JOIN t b ON (a.int_col = b.int_col)");
     // WITH clause in select stmt with a join and a USING clause.
     testToSql("with t as (select * from functional.alltypes) " +
         "select * from t a inner join t b using(int_col)",
@@ -258,6 +317,15 @@ public class ToSqlTest {
         "WITH t1 AS (SELECT * FROM functional.alltypes) " +
         "INSERT INTO TABLE functional.alltypes PARTITION (year, month) " +
         "SELECT * FROM t1");
+    // WITH clause in complex query with joins and and order by + limit.
+    testToSql("with t as (select int_col x, bigint_col y from functional.alltypestiny " +
+        "order by id limit 2) " +
+        "select * from t t1 left outer join t t2 on t1.y = t2.x " +
+        "full outer join t t3 on t2.y = t3.x order by t1.x limit 10",
+        "WITH t AS (SELECT int_col x, bigint_col y FROM functional.alltypestiny " +
+        "ORDER BY id ASC LIMIT 2) " +
+        "SELECT * FROM t t1 LEFT OUTER JOIN t t2 ON (t1.y = t2.x) " +
+        "FULL OUTER JOIN t t3 ON (t2.y = t3.x) ORDER BY t1.x ASC LIMIT 10");
   }
 
   // Test the toSql() output of insert queries.
@@ -336,7 +404,5 @@ public class ToSqlTest {
         " partition (year=2009, month) values(1, 12)",
         "INSERT INTO TABLE functional.alltypes(id) " +
         "PARTITION (year=2009, month) VALUES(1, 12)");
-
-
   }
 }

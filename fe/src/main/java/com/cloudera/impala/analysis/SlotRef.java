@@ -77,9 +77,9 @@ public class SlotRef extends Expr {
   @Override
   public String toSql() {
     if (tblName != null) {
-      return tblName.toString() + "." + col;
+      return tblName.toSql() + "." + ToSqlUtils.getHiveIdentSql(col);
     } else if (col != null) {
-      return col;
+      return ToSqlUtils.getHiveIdentSql(col);
     } else {
       return "<slot " + Integer.toString(desc.getId().asInt()) + ">";
     }

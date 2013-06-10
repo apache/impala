@@ -16,6 +16,7 @@ import org.junit.Test;
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.collect.Lists;
 
 public class ParserTest {
 
@@ -1283,16 +1284,18 @@ public class ParserTest {
   }
 
   @Test
-  public void TestAlterTableRename() {
-    ParsesOk("ALTER TABLE TestDb.Foo RENAME TO TestDb.Foo2");
-    ParsesOk("ALTER TABLE Foo RENAME TO TestDb.Foo2");
-    ParsesOk("ALTER TABLE TestDb.Foo RENAME TO Foo2");
-    ParsesOk("ALTER TABLE Foo RENAME TO Foo2");
-    ParserError("ALTER TABLE Foo RENAME TO 'Foo2'");
-    ParserError("ALTER TABLE Foo RENAME Foo2");
-    ParserError("ALTER TABLE Foo RENAME TO");
-    ParserError("ALTER TABLE Foo TO Foo2");
-    ParserError("ALTER TABLE Foo TO Foo2");
+  public void TestAlterTableOrViewRename() {
+    for (String entity: Lists.newArrayList("TABLE", "VIEW")) {
+      ParsesOk(String.format("ALTER %s TestDb.Foo RENAME TO TestDb.Foo2", entity));
+      ParsesOk(String.format("ALTER %s Foo RENAME TO TestDb.Foo2", entity));
+      ParsesOk(String.format("ALTER %s TestDb.Foo RENAME TO Foo2", entity));
+      ParsesOk(String.format("ALTER %s Foo RENAME TO Foo2", entity));
+      ParserError(String.format("ALTER %s Foo RENAME TO 'Foo2'", entity));
+      ParserError(String.format("ALTER %s Foo RENAME Foo2", entity));
+      ParserError(String.format("ALTER %s Foo RENAME TO", entity));
+      ParserError(String.format("ALTER %s Foo TO Foo2", entity));
+      ParserError(String.format("ALTER %s Foo TO Foo2", entity));
+    }
   }
 
   @Test
@@ -1414,10 +1417,88 @@ public class ParserTest {
   }
 
   @Test
+  public void TestCreateView() {
+    ParsesOk("CREATE VIEW Bar AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Bar COMMENT 'test' AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Bar (x, y, z) AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Bar (x, y COMMENT 'foo', z) AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Bar (x, y, z) COMMENT 'test' AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW IF NOT EXISTS Bar AS SELECT a, b, c from t");
+
+    ParsesOk("CREATE VIEW Foo.Bar AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Foo.Bar COMMENT 'test' AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Foo.Bar (x, y, z) AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Foo.Bar (x, y, z COMMENT 'foo') AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW Foo.Bar (x, y, z) COMMENT 'test' AS SELECT a, b, c from t");
+    ParsesOk("CREATE VIEW IF NOT EXISTS Foo.Bar AS SELECT a, b, c from t");
+
+    // Test all valid query statements as view definitions.
+    ParsesOk("CREATE VIEW Bar AS SELECT 1, 2, 3");
+    ParsesOk("CREATE VIEW Bar AS VALUES(1, 2, 3)");
+    ParsesOk("CREATE VIEW Bar AS SELECT 1, 2, 3 UNION ALL select 4, 5, 6");
+    ParsesOk("CREATE VIEW Bar AS WITH t AS (SELECT 1, 2, 3) SELECT * FROM t");
+
+    // Mismatched number of columns in column definition and view definition parses ok.
+    ParsesOk("CREATE VIEW Bar (x, y) AS SELECT 1, 2, 3");
+
+    // No view name.
+    ParserError("CREATE VIEW AS SELECT c FROM t");
+    // Missing AS keyword
+    ParserError("CREATE VIEW Bar SELECT c FROM t");
+    // Empty column definition not allowed.
+    ParserError("CREATE VIEW Foo.Bar () AS SELECT c FROM t");
+    // Column definitions cannot include types.
+    ParserError("CREATE VIEW Foo.Bar (x int) AS SELECT c FROM t");
+    ParserError("CREATE VIEW Foo.Bar (x int COMMENT 'x') AS SELECT c FROM t");
+    // A type does not parse as an identifier.
+    ParserError("CREATE VIEW Foo.Bar (int COMMENT 'x') AS SELECT c FROM t");
+    // Missing view definition.
+    ParserError("CREATE VIEW Foo.Bar (x) AS");
+    // Invalid view definitions. A view definition must be a query statement.
+    ParserError("CREATE VIEW Foo.Bar (x) AS INSERT INTO t select * from t");
+    ParserError("CREATE VIEW Foo.Bar (x) AS CREATE TABLE Wrong (i int)");
+    ParserError("CREATE VIEW Foo.Bar (x) AS ALTER TABLE Foo COLUMNS (i int, s string)");
+    ParserError("CREATE VIEW Foo.Bar (x) AS CREATE VIEW Foo.Bar AS SELECT 1");
+    ParserError("CREATE VIEW Foo.Bar (x) AS ALTER VIEW Foo.Bar AS SELECT 1");
+  }
+
+  @Test
+  public void TestAlterView() {
+    ParsesOk("ALTER VIEW Bar AS SELECT 1, 2, 3");
+    ParsesOk("ALTER VIEW Bar AS SELECT a, b, c FROM t");
+    ParsesOk("ALTER VIEW Bar AS VALUES(1, 2, 3)");
+    ParsesOk("ALTER VIEW Bar AS SELECT 1, 2, 3 UNION ALL select 4, 5, 6");
+
+    ParsesOk("ALTER VIEW Foo.Bar AS SELECT 1, 2, 3");
+    ParsesOk("ALTER VIEW Foo.Bar AS SELECT a, b, c FROM t");
+    ParsesOk("ALTER VIEW Foo.Bar AS VALUES(1, 2, 3)");
+    ParsesOk("ALTER VIEW Foo.Bar AS SELECT 1, 2, 3 UNION ALL select 4, 5, 6");
+    ParsesOk("ALTER VIEW Foo.Bar AS WITH t AS (SELECT 1, 2, 3) SELECT * FROM t");
+
+    // Must be ALTER VIEW not ALTER TABLE.
+    ParserError("ALTER TABLE Foo.Bar AS SELECT 1, 2, 3");
+    // Missing view name.
+    ParserError("ALTER VIEW AS SELECT 1, 2, 3");
+    // Missing AS name.
+    ParserError("ALTER VIEW Foo.Bar SELECT 1, 2, 3");
+    // Missing view definition.
+    ParserError("ALTER VIEW Foo.Bar AS");
+    // Invalid view definitions. A view definition must be a query statement.
+    ParserError("ALTER VIEW Foo.Bar AS INSERT INTO t select * from t");
+    ParserError("ALTER VIEW Foo.Bar AS CREATE TABLE Wrong (i int)");
+    ParserError("ALTER VIEW Foo.Bar AS ALTER TABLE Foo COLUMNS (i int, s string)");
+    ParserError("ALTER VIEW Foo.Bar AS CREATE VIEW Foo.Bar AS SELECT 1, 2, 3");
+    ParserError("ALTER VIEW Foo.Bar AS ALTER VIEW Foo.Bar AS SELECT 1, 2, 3");
+  }
+
+  @Test
   public void TestDrop() {
     ParsesOk("DROP TABLE Foo");
     ParsesOk("DROP TABLE Foo.Bar");
     ParsesOk("DROP TABLE IF EXISTS Foo.Bar");
+    ParsesOk("DROP VIEW Foo");
+    ParsesOk("DROP VIEW Foo.Bar");
+    ParsesOk("DROP VIEW IF EXISTS Foo.Bar");
     ParsesOk("DROP DATABASE Foo");
     ParsesOk("DROP SCHEMA Foo");
     ParsesOk("DROP DATABASE IF EXISTS Foo");
@@ -1433,6 +1514,10 @@ public class ParserTest {
     ParserError("DROP TABLE EXISTS Foo");
     ParserError("DROP IF EXISTS TABLE Foo");
     ParserError("DROP TBL Foo");
+    ParserError("DROP VIEW IF Foo");
+    ParserError("DROP VIEW EXISTS Foo");
+    ParserError("DROP IF EXISTS VIEW Foo");
+    ParserError("DROP VIW Foo");
   }
 
   @Test

@@ -49,6 +49,10 @@ public class SelectStmt extends QueryStmt {
   // set if we have any kind of aggregation operation, include SELECT DISTINCT
   private AggregateInfo aggInfo;
 
+  // SQL string of this SelectStmt before inline-view expression substitution.
+  // Set in analyze().
+  private String sqlString;
+
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
              Expr wherePredicate, ArrayList<Expr> groupingExprs,
@@ -112,8 +116,8 @@ public class SelectStmt extends QueryStmt {
       AuthorizationException {
     super.analyze(analyzer);
 
-    // Replace BaseTableRefs with views from the WITH clause.
-    analyzer.substituteBaseTablesWithMatchingViews(tableRefs);
+    // Replace BaseTableRefs with ViewRefs.
+    substititeViews(analyzer, tableRefs);
 
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
@@ -163,11 +167,42 @@ public class SelectStmt extends QueryStmt {
     createSortInfo(analyzer);
     analyzeAggregation(analyzer);
 
+    // Remember the SQL string before inline-view expression substitution.
+    sqlString = toSql();
+
     // Substitute expressions to the underlying inline view expressions
     substituteInlineViewExprs(analyzer);
 
     if (aggInfo != null) {
       LOG.debug("post-analysis " + aggInfo.debugString());
+    }
+  }
+
+  /**
+   * Replaces BaseTableRefs in tblRefs whose alias matches a view registered in
+   * the given analyzer or its parent analyzers with a clone of the matching inline view.
+   * The cloned inline view inherits the context-dependent attributes such as the
+   * on-clause, join hints, etc. from the original BaseTableRef.
+   *
+   * Matches views from the inside out, i.e., we first look
+   * in this analyzer then in the parentAnalyzer then and its parent, etc.,
+   * and finally consult the catalog for matching views (the global scope).
+   *
+   * This method is used for substituting views from WITH clauses
+   * and views from the catalog.
+   */
+  public void substititeViews(Analyzer analyzer, List<TableRef> tblRefs)
+      throws AuthorizationException, AnalysisException {
+    for (int i = 0; i < tblRefs.size(); ++i) {
+      if (!(tblRefs.get(i) instanceof BaseTableRef)) continue;
+      BaseTableRef tblRef = (BaseTableRef) tblRefs.get(i);
+      ViewRef viewDefinition = analyzer.findViewDefinition(tblRef, true);
+      if (viewDefinition == null) continue;
+
+      // Instantiate the view to replace the original BaseTableRef.
+      ViewRef viewRef = viewDefinition.instantiate(tblRef);
+      viewRef.getViewStmt().setIsExplain(isExplain);
+      tblRefs.set(i, viewRef);
     }
   }
 
@@ -226,7 +261,7 @@ public class SelectStmt extends QueryStmt {
     }
     // expand in From clause order
     for (TableRef tableRef: tableRefs) {
-      expandStar(analyzer, tableRef.getAlias(), tableRef.getDesc());
+      expandStar(analyzer, tableRef.getAliasAsName(), tableRef.getDesc());
     }
   }
 
@@ -238,11 +273,11 @@ public class SelectStmt extends QueryStmt {
    */
   private void expandStar(Analyzer analyzer, TableName tblName)
       throws AnalysisException {
-    TupleDescriptor d = analyzer.getDescriptor(tblName);
-    if (d == null) {
+    TupleDescriptor tupleDesc = analyzer.getDescriptor(tblName);
+    if (tupleDesc == null) {
       throw new AnalysisException("unknown table: " + tblName.toString());
     }
-    expandStar(analyzer, tblName.toString(), d);
+    expandStar(analyzer, tblName, tupleDesc);
   }
 
   /**
@@ -253,10 +288,10 @@ public class SelectStmt extends QueryStmt {
    * @param desc
    * @throws AnalysisException
    */
-  private void expandStar(Analyzer analyzer, String alias, TupleDescriptor desc)
+  private void expandStar(Analyzer analyzer, TableName tblName, TupleDescriptor desc)
       throws AnalysisException {
     for (Column col: desc.getTable().getColumnsInHiveOrder()) {
-      resultExprs.add(new SlotRef(new TableName(null, alias), col.getName()));
+      resultExprs.add(new SlotRef(tblName, col.getName()));
       colLabels.add(col.getName().toLowerCase());
     }
   }
@@ -512,8 +547,14 @@ public class SelectStmt extends QueryStmt {
     }
   }
 
+  /**
+   * Returns the SQL string corresponding to this SelectStmt.
+   */
   @Override
   public String toSql() {
+    // Return the SQL string before inline-view expression substitution.
+    if (sqlString != null) return sqlString;
+
     StringBuilder strBuilder = new StringBuilder();
     if (withClause != null) {
       strBuilder.append(withClause.toSql());
@@ -559,7 +600,7 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append(" ORDER BY ");
       for (int i = 0; i < orderByElements.size(); ++i) {
         strBuilder.append(orderByElements.get(i).getExpr().toSql());
-        strBuilder.append((sortInfo.getIsAscOrder().get(i)) ? " ASC" : " DESC");
+        strBuilder.append(orderByElements.get(i).getIsAsc() ? " ASC" : " DESC");
         strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
       }
     }

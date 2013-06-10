@@ -251,15 +251,6 @@ public class HdfsTable extends Table {
     }
   }
 
-  /**
-   * Returns true if the Hive table represents an Hdfs table that Impala understands,
-   * by checking the input format for a known data format.
-   */
-  public static boolean isHdfsTable(org.apache.hadoop.hive.metastore.api.Table table) {
-    StorageDescriptor sd = table.getSd();
-    return HdfsFileFormat.isHdfsFormatClass(sd.getInputFormat());
-  }
-
   protected HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl, Db db,
       String name, String owner) {
     super(id, msTbl, db, name, owner);

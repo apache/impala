@@ -58,7 +58,7 @@ public class UnionStmt extends QueryStmt {
 
     public void analyze(Analyzer parent) throws AnalysisException,
         AuthorizationException {
-      analyzer = new Analyzer(parent);
+      analyzer = new Analyzer(parent, parent.getUser());
       queryStmt.analyze(analyzer);
     }
 

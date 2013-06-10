@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +62,11 @@ public abstract class Table {
 
   // The lastDdlTime recorded in the table parameter; -1 if not set
   protected final long lastDdlTime;
+
+  // Set of supported table types.
+  protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES =
+      EnumSet.of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE,
+      TableType.VIRTUAL_VIEW);
 
   protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
@@ -121,21 +127,24 @@ public abstract class Table {
 
       // Check that the Hive TableType is supported
       TableType tableType = TableType.valueOf(msTbl.getTableType());
-      if (tableType != TableType.EXTERNAL_TABLE && tableType != TableType.MANAGED_TABLE) {
+      if (!SUPPORTED_TABLE_TYPES.contains(tableType)) {
         throw new TableLoadingException(String.format(
             "Unsupported table type '%s' for: %s.%s", tableType, db.getName(), tblName));
       }
 
-      // Determine the table type
+      // Create a table of appropriate type and have it load itself.
       Table table = null;
-      if (HBaseTable.isHBaseTable(msTbl)) {
-        table = new HBaseTable(id, msTbl, db, tblName, msTbl.getOwner());
-      } else if (HdfsTable.isHdfsTable(msTbl)) {
-        table = new HdfsTable(id, msTbl, db, tblName, msTbl.getOwner());
-      } else {
-        throw new TableLoadingException("Unrecognized table type for table: " + tblName);
+      if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
+        table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+      } else if (msTbl.getSd().getInputFormat().equals(HBaseTable.getInputFormat())) {
+        table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+      } else if (HdfsFileFormat.isHdfsFormatClass(msTbl.getSd().getInputFormat())) {
+        table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
       }
-      // Have the table load itself.
+      if (table == null) {
+        throw new TableLoadingException(
+            "Unrecognized table type for table: " + msTbl.getTableName());
+      }
       table.load(oldCacheEntry, client, msTbl);
       return table;
     } catch (TableLoadingException e) {
@@ -143,7 +152,8 @@ public abstract class Table {
     } catch (NoSuchObjectException e) {
       throw new TableNotFoundException("Table not found: " + tblName, e);
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for table: " + tblName, e);
+      throw new TableLoadingException(
+          "Failed to load metadata for table: " + tblName, e);
     }
   }
 

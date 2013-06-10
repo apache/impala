@@ -87,6 +87,11 @@ class Frontend {
   // Status object with information on the error will be returned.
   Status AlterTable(const TAlterTableParams& alter_table_params);
 
+  // Modifies an existing view's definition in the metastore metadata.
+  // Returns a non-ok status if the view doesn't exist or if the existing metastore
+  // entry refers to a table and not a view.
+  Status AlterView(const TCreateOrAlterViewParams& alter_view_params);
+
   // Creates a new database in the metastore with the specified name. Returns OK if the
   // database was successfully created, otherwise CANCELLED is returned with details on
   // the specific error. Common errors include creating a database that already exists
@@ -103,13 +108,20 @@ class Frontend {
   // given source table. This is a metadata only operation - no data is copied.
   Status CreateTableLike(const TCreateTableLikeParams& create_table_like_params);
 
+  // Creates a new view in the metastore with the specified name. Returns OK if the
+  // view was created, otherwise a Status detailing the error. Common errors
+  // include creating a view whose name already exists (as another table or view),
+  // creating a view in a database that does not exist,
+  // and metastore connectivity problems.
+  Status CreateView(const TCreateOrAlterViewParams& create_view_params);
+
   // Drops the specified database from the metastore. Returns OK if the database
   // drop was successful, otherwise CANCELLED is returned.
   Status DropDatabase(const TDropDbParams& drop_db_params);
 
-  // Drops the specified table from the metastore. Returns OK if the table drop was
-  // successful, otherwise CANCELLED is returned.
-  Status DropTable(const TDropTableParams& drop_table_params);
+  // Drops the specified table/view from the metastore. Returns OK if the
+  // table/view drop was successful, otherwise a Status with an error message.
+  Status DropTableOrView(const TDropTableOrViewParams& drop_table_or_view_params);
 
   // Reset the metadata
   Status ResetMetadata(const TResetMetadataParams& reset_metadata_params);
@@ -151,11 +163,13 @@ class Frontend {
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID alter_table_id_; // JniFrontend.alterTable
+  jmethodID alter_view_id_; // JniFrontend.alterView
   jmethodID create_database_id_; // JniFrontend.createDatabase
   jmethodID create_table_id_; // JniFrontend.createTable
   jmethodID create_table_like_id_; // JniFrontend.createTableLike
+  jmethodID create_view_id_; // JniFrontend.createView
   jmethodID drop_database_id_; // JniFrontend.dropDatabase
-  jmethodID drop_table_id_; // JniFrontend.dropTable
+  jmethodID drop_table_or_view_id_; // JniFrontend.dropTableOrView
   jmethodID reset_metadata_id_; // JniFrontend.resetMetadata
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;

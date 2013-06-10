@@ -98,7 +98,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select a.*", "unknown table: a");
   }
 
-
   @Test
   public void TestOrdinals() throws AnalysisException {
     // can't group or order on *
@@ -985,6 +984,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "alltypes as (select x a, y b from t1)" +
         "select a, b from alltypes",
         createAnalyzer("functional"));
+    // Recursion is prevented because of scoping rules. The inner 'complex_view'
+    // refers to a view in the catalog.
+    AnalyzesOk("with t1 as (select abc x, xyz y from complex_view), " +
+        "complex_view as (select x a, y b from t1)" +
+        "select a, b from complex_view",
+        createAnalyzer("functional"));
     // Nested WITH clauses. Scoping prevents recursion.
     AnalyzesOk("with t1 as (with t1 as (select int_col x, bigint_col y from alltypes) " +
         "select x, y from t1), " +
@@ -1053,6 +1058,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("with t as (select a.* from (select * from t) as a) " +
         "select x, y from t",
         "Unsupported recursive reference to table 't' in WITH clause.");
+    // Recursive table reference is still recognized as such if a name from
+    // a view in the catalog is used.
+    AnalysisError("with alltypes_view as (select int_col x from alltypes_view) " +
+        "select x from alltypes_view",
+        createAnalyzer("functional"),
+        "Unsupported recursive reference to table 'alltypes_view' in WITH clause.");
     // Recursion in nested WITH clause.
     AnalysisError("with t1 as (with t2 as (select * from t1) select * from t2) " +
         "select * from t1 ",
@@ -1077,6 +1088,48 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
         "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
         "Table does not exist: default.t2");
+  }
+
+  @Test
+  public void TestViews() throws AnalysisException {
+    // Simple selects on our pre-defined views.
+    AnalyzesOk("select * from functional.alltypes_view");
+    AnalyzesOk("select x, y, z from functional.alltypes_view_sub");
+    AnalyzesOk("select abc, xyz from functional.complex_view");
+    // Test a view on a view.
+    AnalyzesOk("select * from functional.view_view");
+    // Aliases of views.
+    AnalyzesOk("select t.x, t.y, t.z from functional.alltypes_view_sub t");
+
+    // Views in a union.
+    AnalyzesOk("select * from functional.alltypes_view_sub union all " +
+        "select * from functional.alltypes_view_sub");
+    // View in a subquery.
+    AnalyzesOk("select t.* from (select * from functional.alltypes_view_sub) t");
+    // View in a WITH-clause view.
+    AnalyzesOk("with t as (select * from functional.complex_view) " +
+        "select abc, xyz from t");
+
+    // Complex query on a complex view with a join and an aggregate.
+    AnalyzesOk("select sum(t1.abc), t2.xyz from functional.complex_view t1 " +
+        "inner join functional.complex_view t2 on t1.abc = t2.abc " +
+        "group by t2.xyz");
+
+    // Cannot insert into a view.
+    AnalysisError("insert into functional.alltypes_view partition(year, month) " +
+        "select * from functional.alltypes",
+        "Impala does not support inserting into views: functional.alltypes_view");
+    // Cannot load into a view.
+    AnalysisError("load data inpath '/test-warehouse/tpch.lineitem/lineitem.tbl' " +
+        "into table functional.alltypes_view",
+        "LOAD DATA only supported for HDFS tables: functional.alltypes_view");
+    // Need to give view-references an explicit alias.
+    AnalysisError("select * from functional.alltypes_view_sub " +
+        "inner join functional.alltypes_view_sub",
+        "Duplicate table alias: 'functional.alltypes_view_sub'");
+    // Column names were redefined in view.
+    AnalysisError("select int_col from functional.alltypes_view_sub",
+        "couldn't resolve column reference: 'int_col'");
   }
 
   @Test
@@ -1651,7 +1704,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void cloneTest() {
-    testNumberOfMembers(QueryStmt.class, 8);
+    testNumberOfMembers(QueryStmt.class, 9);
     testNumberOfMembers(UnionStmt.class, 2);
     testNumberOfMembers(ValuesStmt.class, 0);
 
@@ -1659,7 +1712,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(TableRef.class, 10);
     testNumberOfMembers(BaseTableRef.class, 2);
     testNumberOfMembers(InlineViewRef.class, 5);
-    testNumberOfMembers(VirtualViewRef.class, 1);
+    testNumberOfMembers(ViewRef.class, 2);
   }
 
   @SuppressWarnings("rawtypes")

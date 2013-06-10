@@ -349,8 +349,10 @@ public class AnalyzerTest {
   public void TestResetMetadata() {
     AnalyzesOk("invalidate metadata");
     AnalyzesOk("invalidate metadata functional.alltypessmall");
+    AnalyzesOk("invalidate metadata functional.alltypes_view");
     AnalyzesOk("invalidate metadata functional.bad_serde");
     AnalyzesOk("refresh functional.alltypessmall");
+    AnalyzesOk("refresh functional.alltypes_view");
     AnalyzesOk("refresh functional.bad_serde");
 
     AnalysisError("invalidate metadata functional.unknown_table",

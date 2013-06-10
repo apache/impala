@@ -53,6 +53,9 @@ class TestQueries(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
+  def test_views(self, vector):
+    self.run_test_case('QueryTest/views', vector)
+
   def test_with_clause(self, vector):
     self.run_test_case('QueryTest/with-clause', vector)
 

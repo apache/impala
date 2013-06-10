@@ -182,7 +182,7 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_SCHEMAS, KW_SELECT, KW_SEQUENCEFILE, KW_SET, KW_SHOW, KW_SEMI, KW_SMALLINT,
   KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
   KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_VALUES,
-  KW_WHEN, KW_WHERE, KW_WITH;
+  KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -246,12 +246,12 @@ nonterminal AggregateParamsList aggregate_param_list;
 nonterminal AggregateExpr.Operator aggregate_operator;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
-nonterminal ArrayList<VirtualViewRef> with_table_ref_list;
+nonterminal ArrayList<ViewRef> with_table_ref_list;
 nonterminal WithClause with_clause;
 nonterminal TableRef table_ref;
 nonterminal BaseTableRef base_table_ref;
 nonterminal InlineViewRef inline_view_ref;
-nonterminal VirtualViewRef with_table_ref;
+nonterminal ViewRef with_table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_join_hints;
@@ -268,14 +268,16 @@ nonterminal PartitionKeyValue static_partition_key_value;
 nonterminal Qualifier union_op;
 
 nonterminal AlterTableStmt alter_tbl_stmt;
+nonterminal StatementBase alter_view_stmt;
 nonterminal DropDbStmt drop_db_stmt;
-nonterminal DropTableStmt drop_tbl_stmt;
+nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
-nonterminal ColumnDef column_def;
-nonterminal ArrayList<ColumnDef> column_def_list;
-nonterminal ArrayList<ColumnDef> partition_column_defs;
+nonterminal CreateViewStmt create_view_stmt;
+nonterminal ColumnDef column_def, view_column_def;
+nonterminal ArrayList<ColumnDef> column_def_list, view_column_def_list;
+nonterminal ArrayList<ColumnDef> partition_column_defs, view_column_defs;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal String comment_val;
 nonterminal Boolean external_val;
@@ -330,15 +332,19 @@ stmt ::=
   {: RESULT = describe; :}
   | alter_tbl_stmt:alter_tbl
   {: RESULT = alter_tbl; :}
+  | alter_view_stmt:alter_view
+  {: RESULT = alter_view; :}
   | create_tbl_like_stmt:create_tbl_like
   {: RESULT = create_tbl_like; :}
   | create_tbl_stmt:create_tbl
   {: RESULT = create_tbl; :}
+  | create_view_stmt:create_view
+  {: RESULT = create_view; :}
   | create_db_stmt:create_db
   {: RESULT = create_db; :}
   | drop_db_stmt:drop_db
   {: RESULT = drop_db; :}
-  | drop_tbl_stmt:drop_tbl
+  | drop_tbl_or_view_stmt:drop_tbl
   {: RESULT = drop_tbl; :}
   | explain_stmt: explain
   {: RESULT = explain; :}
@@ -445,7 +451,7 @@ alter_tbl_stmt ::=
     KW_LOCATION STRING_LITERAL:location
   {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsURI(location)); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
-  {: RESULT = new AlterTableRenameStmt(table, new_table); :}
+  {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
   ;
 
 optional_kw_column ::=
@@ -600,14 +606,57 @@ column_def ::=
   {: RESULT = new ColumnDef(col_name, targetType, comment); :}
   ;
 
+create_view_stmt ::=
+  KW_CREATE KW_VIEW if_not_exists_val:if_not_exists table_name:view_name
+  view_column_defs:col_defs comment_val:comment KW_AS query_stmt:view_def
+  {:
+    RESULT = new CreateViewStmt(if_not_exists, view_name, col_defs, comment, view_def);
+  :}
+  ;
+
+view_column_defs ::=
+  LPAREN view_column_def_list:view_col_defs RPAREN
+  {: RESULT = view_col_defs; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+  
+view_column_def_list ::=
+  view_column_def:col_def
+  {:
+    ArrayList<ColumnDef> list = new ArrayList<ColumnDef>();
+    list.add(col_def);
+    RESULT = list;
+  :}
+  | view_column_def_list:list COMMA view_column_def:col_def
+  {:
+    list.add(col_def);
+    RESULT = list;
+  :}
+  ;
+
+view_column_def ::=
+  IDENT:col_name comment_val:comment
+  {: RESULT = new ColumnDef(col_name, null, comment); :}
+  ;
+
+alter_view_stmt ::=
+  KW_ALTER KW_VIEW table_name:table KW_AS query_stmt:view_def
+  {: RESULT = new AlterViewStmt(table, view_def); :}
+  | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
+  {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
+  ;
+  
 drop_db_stmt ::=
   KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name
   {: RESULT = new DropDbStmt(db_name, if_exists); :}
   ;
 
-drop_tbl_stmt ::=
-  | KW_DROP KW_TABLE if_exists_val:if_exists table_name:table
-  {: RESULT = new DropTableStmt(table, if_exists); :}
+drop_tbl_or_view_stmt ::=
+  KW_DROP KW_TABLE if_exists_val:if_exists table_name:table
+  {: RESULT = new DropTableOrViewStmt(table, if_exists, true); :}
+  | KW_DROP KW_VIEW if_exists_val:if_exists table_name:table
+  {: RESULT = new DropTableOrViewStmt(table, if_exists, false); :}
   ;
 
 db_or_schema_kw ::=
@@ -732,13 +781,13 @@ with_clause ::=
 
 with_table_ref ::=
   IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
-  {: RESULT = new VirtualViewRef(alias, query); :}
+  {: RESULT = new ViewRef(alias, query); :}
   ;
 
 with_table_ref_list ::=
   with_table_ref:t
   {:
-    ArrayList<VirtualViewRef> list = new ArrayList<VirtualViewRef>();
+    ArrayList<ViewRef> list = new ArrayList<ViewRef>();
     list.add(t);
     RESULT = list;
   :}

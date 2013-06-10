@@ -53,6 +53,10 @@ public class AnalysisContext {
       return stmt instanceof AlterTableStmt;
     }
 
+    public boolean isAlterViewStmt() {
+      return stmt instanceof AlterViewStmt;
+    }
+
     public boolean isQueryStmt() {
       return stmt instanceof QueryStmt;
     }
@@ -65,12 +69,16 @@ public class AnalysisContext {
       return stmt instanceof DropDbStmt;
     }
 
-    public boolean isDropTableStmt() {
-      return stmt instanceof DropTableStmt;
+    public boolean isDropTableOrViewStmt() {
+      return stmt instanceof DropTableOrViewStmt;
     }
 
     public boolean isCreateTableLikeStmt() {
       return stmt instanceof CreateTableLikeStmt;
+    }
+
+    public boolean isCreateViewStmt() {
+      return stmt instanceof CreateViewStmt;
     }
 
     public boolean isCreateTableStmt() {
@@ -113,9 +121,9 @@ public class AnalysisContext {
 
     public boolean isDdlStmt() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
-          isCreateTableLikeStmt() || isCreateTableStmt() || isCreateDbStmt() ||
-          isDropDbStmt() || isDropTableStmt() || isAlterTableStmt() ||
-          isResetMetadataStmt();
+          isCreateTableLikeStmt() || isCreateTableStmt() || isCreateViewStmt() ||
+          isCreateDbStmt() || isDropDbStmt() || isDropTableOrViewStmt() ||
+          isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt();
     }
 
     public boolean isDmlStmt() {
@@ -127,9 +135,19 @@ public class AnalysisContext {
       return (AlterTableStmt) stmt;
     }
 
+    public AlterViewStmt getAlterViewStmt() {
+      Preconditions.checkState(isAlterViewStmt());
+      return (AlterViewStmt) stmt;
+    }
+
     public CreateTableLikeStmt getCreateTableLikeStmt() {
       Preconditions.checkState(isCreateTableLikeStmt());
       return (CreateTableLikeStmt) stmt;
+    }
+
+    public CreateViewStmt getCreateViewStmt() {
+      Preconditions.checkState(isCreateViewStmt());
+      return (CreateViewStmt) stmt;
     }
 
     public CreateTableStmt getCreateTableStmt() {
@@ -147,9 +165,9 @@ public class AnalysisContext {
       return (DropDbStmt) stmt;
     }
 
-    public DropTableStmt getDropTableStmt() {
-      Preconditions.checkState(isDropTableStmt());
-      return (DropTableStmt) stmt;
+    public DropTableOrViewStmt getDropTableOrViewStmt() {
+      Preconditions.checkState(isDropTableOrViewStmt());
+      return (DropTableOrViewStmt) stmt;
     }
 
     public LoadDataStmt getLoadDataStmt() {

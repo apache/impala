@@ -16,26 +16,32 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableRenameParams;
 import com.cloudera.impala.thrift.TAlterTableType;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents an ALTER TABLE RENAME <table> statement.
+ * Represents an ALTER TABLE/VIEW RENAME statement.
  */
-public class AlterTableRenameStmt extends AlterTableStmt {
-  private final TableName newTableName;
+public class AlterTableOrViewRenameStmt extends AlterTableStmt {
+  protected final TableName newTableName;
 
   // Set during analysis
-  private String newDbName;
+  protected String newDbName;
 
-  public AlterTableRenameStmt(TableName oldTableName, TableName newTableName) {
+  //  True if we are renaming a table. False if we are renaming a view.
+  protected final boolean renameTable;
+
+  public AlterTableOrViewRenameStmt(TableName oldTableName, TableName newTableName,
+      boolean renameTable) {
     super(oldTableName);
     Preconditions.checkState(newTableName != null && !newTableName.isEmpty());
     this.newTableName = newTableName;
+    this.renameTable = renameTable;
   }
 
   public String getNewTbl() {
@@ -50,9 +56,10 @@ public class AlterTableRenameStmt extends AlterTableStmt {
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
-    params.setAlter_type(TAlterTableType.RENAME_TABLE);
-    TAlterTableRenameParams renameParams =
-        new TAlterTableRenameParams(new TTableName(getNewDb(), getNewTbl()));
+    params.setAlter_type(
+        (renameTable) ? TAlterTableType.RENAME_TABLE : TAlterTableType.RENAME_VIEW);
+    TAlterTableOrViewRenameParams renameParams =
+        new TAlterTableOrViewRenameParams(new TTableName(getNewDb(), getNewTbl()));
     params.setRename_params(renameParams);
     return params;
   }
@@ -60,7 +67,15 @@ public class AlterTableRenameStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    super.analyze(analyzer);
+    table = analyzer.getTable(tableName, Privilege.ALTER);
+    if (table instanceof View && renameTable) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on a view: %s", table.getFullName()));
+    }
+    if (!(table instanceof View) && !renameTable) {
+      throw new AnalysisException(String.format(
+          "ALTER VIEW not allowed on a table: %s", table.getFullName()));
+    }
     newDbName = analyzer.getTargetDbName(newTableName);
     if (analyzer.dbContainsTable(newDbName, newTableName.getTbl(), Privilege.CREATE)) {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +

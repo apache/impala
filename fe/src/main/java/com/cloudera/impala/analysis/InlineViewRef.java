@@ -20,7 +20,10 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -64,6 +67,15 @@ public class InlineViewRef extends TableRef {
   }
 
   /**
+   * C'tor for cloning.
+   */
+  public InlineViewRef(InlineViewRef other) {
+    super(other);
+    Preconditions.checkNotNull(other.queryStmt);
+    this.queryStmt = other.queryStmt.clone();
+  }
+
+  /**
    * Create a new analyzer to analyze the inline view query block.
    * Then perform the join clause analysis as usual.
    *
@@ -75,8 +87,13 @@ public class InlineViewRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    analyzeAsUser(analyzer, analyzer.getUser());
+  }
+
+  protected void analyzeAsUser(Analyzer analyzer, User user)
+      throws AuthorizationException, AnalysisException {
     // Analyze the inline view query statement with its own analyzer
-    inlineViewAnalyzer = new Analyzer(analyzer);
+    inlineViewAnalyzer = new Analyzer(analyzer, user);
     queryStmt.analyze(inlineViewAnalyzer);
     queryStmt.getMaterializedTupleIds(materializedTupleIds);
     desc = analyzer.registerInlineViewRef(this);
@@ -93,9 +110,9 @@ public class InlineViewRef extends TableRef {
     // create sMap
     for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
       String colName = queryStmt.getColLabels().get(i);
-      SlotDescriptor slotD = analyzer.registerColumnRef(getAliasAsName(), colName);
       Expr colExpr = queryStmt.getResultExprs().get(i);
-      SlotRef slotRef = new SlotRef(slotD);
+      SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
+      SlotRef slotRef = new SlotRef(slotDesc);
       sMap.lhs.add(slotRef);
       sMap.rhs.add(colExpr);
     }
@@ -107,6 +124,37 @@ public class InlineViewRef extends TableRef {
     } catch (InternalException e) {
       throw new AnalysisException(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Create a non-materialized tuple descriptor in descTbl for this inline view.
+   * This method is called from the analyzer when registering this inline view.
+   */
+  public TupleDescriptor createTupleDescriptor(DescriptorTable descTbl)
+      throws AnalysisException {
+    // Create a fake catalog table for the inline view
+    InlineView inlineView = new InlineView(alias);
+    for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
+      // inline view select statement has been analyzed. Col label should be filled.
+      Expr selectItemExpr = queryStmt.getResultExprs().get(i);
+      String colAlias = queryStmt.getColLabels().get(i);
+
+      // inline view col cannot have duplicate name
+      if (inlineView.getColumn(colAlias) != null) {
+        throw new AnalysisException("duplicated inline view column alias: '" +
+            colAlias + "'" + " in inline view " + "'" + alias + "'");
+      }
+
+      // create a column and add it to the inline view
+      Column col = new Column(colAlias, selectItemExpr.getType(), i);
+      inlineView.addColumn(col);
+    }
+
+    // Create the non-materialized tuple and set the fake table in it.
+    TupleDescriptor result = descTbl.createTupleDescriptor();
+    result.setIsMaterialized(false);
+    result.setTable(inlineView);
+    return result;
   }
 
   /**
@@ -203,7 +251,10 @@ public class InlineViewRef extends TableRef {
 
   @Override
   protected String tableRefToSql() {
-    return "(" + queryStmt.toSql() + ") " + alias;
+    // Enclose the alias in quotes if Hive cannot parse it without quotes.
+    // This is needed for view compatibility between Impala and Hive.
+    String aliasSql = ToSqlUtils.getHiveIdentSql(alias);
+    return "(" + queryStmt.toSql() + ") " + aliasSql;
   }
 
   @Override
@@ -212,7 +263,5 @@ public class InlineViewRef extends TableRef {
   }
 
   @Override
-  public TableRef clone() {
-    return new InlineViewRef(alias, queryStmt.clone());
-  }
+  public TableRef clone() { return new InlineViewRef(this); }
 }

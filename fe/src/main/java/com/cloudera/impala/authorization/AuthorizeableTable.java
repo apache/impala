@@ -19,8 +19,10 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-/*
- * Class used to authorize access to a table.
+/**
+ * Class used to authorize access to a table or view.
+ * Even though Hive's spec includes an authorizable object 'view', we chose
+ * to treat views the same way as tables for the sake of authorization.
  */
 public class AuthorizeableTable implements Authorizeable {
   // Constant to represent privileges in the policy for "ANY" table in a

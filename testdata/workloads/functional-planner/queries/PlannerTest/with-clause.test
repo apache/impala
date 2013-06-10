@@ -27,6 +27,35 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ====
 ---- QUERY
+# Basic test with a single with-clause view that references a catalog view.
+with t as (select int_col x, bigint_col y from functional.alltypes_view)
+select x, y from t
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24 size=478.45KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24 size=478.45KB
+     tuple ids: 0 
+====
+---- QUERY
 # Multiple views in with-clause. Only one view is used.
 with t1 as (select int_col x, bigint_col y from functional.alltypes), 
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))

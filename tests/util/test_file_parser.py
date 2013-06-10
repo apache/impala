@@ -70,17 +70,20 @@ class QueryTestSectionReader(object):
 def remove_comments(section_text):
   return '\n'.join([l for l in section_text.split('\n') if not l.strip().startswith('#')])
 
-def parse_query_test_file(file_name):
+def parse_query_test_file(file_name, valid_section_names=None):
   """
-  Reads the specified query test file
+  Reads the specified query test file accepting the given list of valid section names
+  Uses a default list of valid section names if valid_section_names is None
 
   Returns the result as a list of dictionaries. Each dictionary in the list corresponds
   to a test case and each key in the dictionary maps to a section in that test case.
   """
   # Update the valid section names as we support other test types
   # (ex. planner, data error)
-  VALID_SECTION_NAMES = ['QUERY', 'RESULTS', 'TYPES', 'SETUP']
-  return parse_test_file(file_name, VALID_SECTION_NAMES)
+  if valid_section_names is None:
+    return parse_test_file(file_name, ['QUERY', 'RESULTS', 'TYPES', 'SETUP'])
+  else:
+    return parse_test_file(file_name, valid_section_names)
 
 def parse_table_constraints(constraints_file):
   """Reads a table contraints file, if one exists"""

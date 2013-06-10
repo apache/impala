@@ -165,6 +165,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
     keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP));
     keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));
+    keywordMap.put("view", new Integer(SqlParserSymbols.KW_VIEW));
     keywordMap.put("with", new Integer(SqlParserSymbols.KW_WITH));
   }
     

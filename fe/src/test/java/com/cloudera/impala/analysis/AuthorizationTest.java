@@ -22,16 +22,15 @@ import java.util.List;
 
 import junit.framework.Assert;
 
-import org.apache.access.provider.file.ResourceAuthorizationProvider;
 import org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider;
 import org.apache.access.provider.file.LocalGroupResourceAuthorizationProvider;
+import org.apache.access.provider.file.ResourceAuthorizationProvider;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
@@ -53,6 +52,8 @@ public class AuthorizationTest {
   //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
   //   SELECT permissions on 'functional.alltypesagg' (no INSERT permissions)
+  //   SELECT permissions on 'functional.complex_view' (no INSERT permissions)
+  //   SELECT permissions on 'functional.view_view' (no INSERT permissions)
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
   private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
@@ -76,6 +77,19 @@ public class AuthorizationTest {
     // Can select from table that user has privileges on.
     AuthzOk("select * from functional.alltypesagg");
 
+    // Can select from view that user has privileges on even though he/she doesn't
+    // have privileges on underlying tables.
+    AuthzOk("select * from functional.complex_view");
+
+    // User has permission to select the view but not on the view (alltypes_view)
+    // referenced in its view definition.
+    AuthzOk("select * from functional.view_view");
+
+    // User does not have SELECT privileges on this view.
+    AuthzError("select * from functional.complex_view_sub",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.complex_view_sub");
+
     // Constant select.
     AuthzOk("select 1");
 
@@ -83,10 +97,15 @@ public class AuthorizationTest {
     AuthzError("select * from alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: default.alltypes");
 
-    // Select with no privileges.
+    // Select with no privileges on table.
     AuthzError("select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
+
+    // Select with no privileges on view.
+    AuthzError("select * from functional.complex_view_sub",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.complex_view_sub");
 
     // Select without referencing a column.
     AuthzError("select 1 from functional.alltypes",
@@ -135,6 +154,12 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'INSERT' on: " +
         "functional.alltypesagg");
 
+    // User doesn't have INSERT permissions in the target view.
+    // Inserting into a view is not allowed.
+    AuthzError("insert into functional.alltypes_view select 1",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypes_view");
+
     // User doesn't have SELECT permissions on source table.
     AuthzError("insert into functional.alltypes " +
         "select * from functional.alltypes",
@@ -157,6 +182,8 @@ public class AuthorizationTest {
     AuthzError("with t as (select * from functional.alltypes) select * from t",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
+    // User has SELECT privileges on view in WITH-clause view.
+    AuthzOk("with t as (select * from functional.complex_view) select * from t");
 
     // User has SELECT privileges on table in WITH-clause view in INSERT.
     AuthzOk("with t as (select * from functional_seq_snap.alltypes) " +
@@ -166,6 +193,11 @@ public class AuthorizationTest {
         "insert into functional_parquet.alltypes partition(month,year) select * from t",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
          "functional_parquet.alltypes");
+    // User doesn't have SELECT privileges on view in WITH-clause view in INSERT.
+    AuthzError("with t as (select * from functional.alltypes_view) " +
+        "insert into functional_parquet.alltypes partition(month,year) select * from t",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+         "functional.alltypes_view");
   }
 
   @Test
@@ -184,12 +216,42 @@ public class AuthorizationTest {
         "partition(month,year) select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
-
     // Insert, user doesn't have permissions on source table.
     AuthzError("explain insert into functional.alltypes " +
         "select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
+
+    // Test explain on views. User has permissions on all the underlying tables.
+    AuthzOk("explain select * from functional_seq_snap.alltypes_view");
+    AuthzOk("explain insert into functional_parquet.alltypes " +
+        "partition(month,year) select * from functional_seq_snap.alltypes_view");
+
+    // Select on view without permissions on view.
+    AuthzError("explain select * from functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes_view");
+    // Insert into view without permissions on view.
+    AuthzError("explain insert into functional.alltypes_view " +
+        "select * from functional_seq_snap.alltypes ",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypes_view");
+
+    // User has permission on view, but not on underlying tables.
+    AuthzError("explain select * from functional.complex_view",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
+    // User has permission on view in WITH clause, but not on underlying tables.
+    AuthzError("explain with t as (select * from functional.complex_view) " +
+        "select * from t",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
+    // User has permission on view and on view inside view,
+    // but not on tables in view inside view.
+    AuthzError("explain select * from functional.view_view",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
+    // User doesn't have permission on tables in view inside view.
+    AuthzError("explain insert into functional_seq_snap.alltypes " +
+        "partition(month,year) select * from functional.view_view",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
   }
 
   @Test
@@ -218,9 +280,11 @@ public class AuthorizationTest {
 
   @Test
   public void TestResetMetadata() throws AnalysisException, AuthorizationException {
-    // Positive cases (user has privileges on these tables).
+    // Positive cases (user has privileges on these tables/views).
     AuthzOk("invalidate metadata functional.alltypesagg");
     AuthzOk("refresh functional.alltypesagg");
+    AuthzOk("invalidate metadata functional.view_view");
+    AuthzOk("refresh functional.view_view");
 
     // The admin user should have privileges invalidate the server metadata.
     AnalysisContext adminAc = new AnalysisContext(new Catalog(true, false, authzConfig),
@@ -233,12 +297,16 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to access: unknown_db.alltypessmall");
     AuthzError("invalidate metadata functional_seq.alltypessmall",
         "User '%s' does not have privileges to access: functional_seq.alltypessmall");
+    AuthzError("invalidate metadata functional.alltypes_view",
+        "User '%s' does not have privileges to access: functional.alltypes_view");
     AuthzError("invalidate metadata functional.unknown_table",
         "User '%s' does not have privileges to access: functional.unknown_table");
     AuthzError("invalidate metadata functional.alltypessmall",
         "User '%s' does not have privileges to access: functional.alltypessmall");
     AuthzError("refresh functional.alltypessmall",
         "User '%s' does not have privileges to access: functional.alltypessmall");
+    AuthzError("refresh functional.alltypes_view",
+        "User '%s' does not have privileges to access: functional.alltypes_view");
   }
 
   @Test
@@ -289,6 +357,53 @@ public class AuthorizationTest {
         "'hdfs://localhost:20500/test-warehouse/alltypes'",
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20500/test-warehouse/alltypes");
+  }
+
+  @Test
+  public void TestCreateView() throws AuthorizationException, AnalysisException {
+    AuthzOk("create view tpch.new_view as select * from functional.alltypesagg");
+    AuthzOk("create view tpch.new_view (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg");
+    // Create view IF NOT EXISTS, user has permission and table exists.
+    AuthzOk("create view if not exists tpch.lineitem as " +
+        "select * from functional.alltypesagg");
+    // Create view IF NOT EXISTS, user has permission and table/view exists.
+    try {
+      AuthzOk("create view tpch.lineitem as select * from functional.alltypesagg");
+      fail("Expected analysis error.");
+    } catch (AnalysisException e) {
+      Assert.assertEquals(e.getMessage(), "Table already exists: tpch.lineitem");
+    }
+
+    // Create view IF NOT EXISTS, user does not have permission and table/view exists.
+    AuthzError("create view if not exists functional_seq.alltypes as " +
+        "select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional_seq.alltypes");
+
+    // No permissions on source table.
+    AuthzError("create view tpch.new_view as select * from functional.alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
+
+    // No permissions on target table.
+    AuthzError("create view tpch_rc.new as select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'CREATE' on: tpch_rc.new");
+
+    // Unqualified view name.
+    AuthzError("create view new_view as select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'CREATE' on: default.new_view");
+
+    // Table already exists (user does not have permission).
+    AuthzError("create view functional.alltypes_view as " +
+        "select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.alltypes_view");
+
+    // Database does not exist, user does not have access.
+    AuthzError("create view nodb.alltypes as select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "nodb.alltypes");
   }
 
   @Test
@@ -345,9 +460,12 @@ public class AuthorizationTest {
   public void TestDropTable() throws AnalysisException, AuthorizationException {
     // Drop table (user has permission).
     AuthzOk("drop table tpch.lineitem");
+    AuthzOk("drop table if exists tpch.lineitem");
 
     // Drop table (user does not have permission).
     AuthzError("drop table functional.alltypes",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+    AuthzError("drop table if exists functional.alltypes",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
 
     // Drop table with unqualified table name.
@@ -361,6 +479,39 @@ public class AuthorizationTest {
     // Drop table with non-existent table.
     AuthzError("drop table functional.notbl",
         "User '%s' does not have privileges to execute 'DROP' on: functional.notbl");
+
+    // Using DROP TABLE on a view does not reveal privileged information.
+    AuthzError("drop table functional.view_view",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.view_view");
+  }
+
+  @Test
+  public void TestDropView() throws AnalysisException, AuthorizationException {
+    // Drop view (user has permission).
+    AuthzOk("drop view functional_seq_snap.alltypes_view");
+    AuthzOk("drop view if exists functional_seq_snap.alltypes_view");
+
+    // Drop view (user does not have permission).
+    AuthzError("drop view functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+    AuthzError("drop view if exists functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+
+    // Drop view with unqualified table name.
+    AuthzError("drop view alltypes",
+        "User '%s' does not have privileges to execute 'DROP' on: default.alltypes");
+
+    // Drop view with non-existent database.
+    AuthzError("drop view nodb.alltypes",
+        "User '%s' does not have privileges to execute 'DROP' on: nodb.alltypes");
+
+    // Drop view with non-existent table.
+    AuthzError("drop view functional.notbl",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.notbl");
+
+    // Using DROP VIEW on a table does not reveal privileged information.
+    AuthzError("drop view functional.alltypes",
+        "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
   }
 
   @Test
@@ -414,9 +565,36 @@ public class AuthorizationTest {
     AuthzError("ALTER TABLE functional.alltypes add partition (year=1, month=1)",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
 
-    // No privileges on target.
+    // Trying to ALTER TABLE a view does not reveal any privileged information.
+    AuthzError("ALTER TABLE functional.view_view SET FILEFORMAT PARQUETFILE",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+    AuthzError("ALTER TABLE functional.view_view ADD COLUMNS (c1 int)",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+    AuthzError("ALTER TABLE functional.view_view REPLACE COLUMNS (c1 int)",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+    AuthzError("ALTER TABLE functional.view_view CHANGE int_col c1 int",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+    AuthzError("ALTER TABLE functional.view_view DROP int_col",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+    AuthzError("ALTER TABLE functional.view_views rename to functional_seq_snap.t1",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
+
+    // No privileges on target (existing table).
     AuthzError("ALTER TABLE functional_seq_snap.alltypes rename to functional.alltypes",
-        "User '%s' does not have privileges to execute 'CREATE' on: functional.alltypes");
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.alltypes");
+
+    // No privileges on target (existing view).
+    AuthzError("ALTER TABLE functional_seq_snap.alltypes rename to " +
+        "functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.alltypes");
+
+    // ALTER TABLE on a view does not reveal privileged information.
+    AuthzError("ALTER TABLE functional.alltypes_view rename to " +
+        "functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypes_view");
 
     // Rename table that does not exist (no permissions).
     AuthzError("ALTER TABLE functional.notbl rename to functional_seq_snap.newtbl",
@@ -440,9 +618,66 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestAlterView() throws AnalysisException, AuthorizationException {
+    AuthzOk("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
+        "functional_seq_snap.v1");
+
+    // No privileges on target (existing table).
+    AuthzError("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
+        "functional.alltypes",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.alltypes");
+
+    // No privileges on target (existing view).
+    AuthzError("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
+        "functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional.alltypes_view");
+
+    // ALTER VIEW on a table does not reveal privileged information.
+    AuthzError("ALTER VIEW functional.alltypes rename to " +
+        "functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypes");
+
+    // Rename view that does not exist (no permissions).
+    AuthzError("ALTER VIEW functional.notbl rename to functional_seq_snap.newtbl",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.notbl");
+
+    // Rename view in db that does not exist (no permissions).
+    AuthzError("ALTER VIEW nodb.alltypes rename to functional_seq_snap.newtbl",
+        "User '%s' does not have privileges to execute 'ALTER' on: nodb.alltypes");
+
+    // Alter view that does not exist (no permissions).
+    AuthzError("ALTER VIEW functional.notbl rename to functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.notbl");
+
+    // Alter view in db that does not exist (no permissions).
+    AuthzError("ALTER VIEW nodb.alltypes rename to functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: nodb.alltypes");
+
+    // Unqualified view name.
+    AuthzError("ALTER VIEW alltypes rename to functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
+
+    // No permissions on target view.
+    AuthzError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypes_view");
+
+    // No permissions on source view.
+    AuthzError("alter view functional_seq_snap.alltypes_view " +
+        "as select * from functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes_view");
+  }
+
+  @Test
   public void TestDescribe() throws AuthorizationException, AnalysisException {
     AuthzOk("describe functional.alltypesagg");
     AuthzOk("describe functional.alltypes");
+    AuthzOk("describe functional.complex_view");
 
     // Unqualified table name.
     AuthzError("describe alltypes",
@@ -450,6 +685,12 @@ public class AuthorizationTest {
     // Database doesn't exist.
     AuthzError("describe nodb.alltypes",
         "User '%s' does not have privileges to access: nodb.alltypes");
+    // Insufficient privileges on table.
+    AuthzError("describe functional.alltypestiny",
+        "User '%s' does not have privileges to access: functional.alltypestiny");
+    // Insufficient privileges on view.
+    AuthzError("describe functional.alltypes_view",
+        "User '%s' does not have privileges to access: functional.alltypes_view");
   }
 
   @Test
@@ -485,6 +726,12 @@ public class AuthorizationTest {
         " into table nodb.alltypes",
         "User '%s' does not have privileges to execute 'INSERT' on: " +
         "nodb.alltypes");
+
+    // Trying to LOAD a view does not reveal privileged information.
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+        " into table functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypes_view");
   }
 
   @Test
@@ -528,8 +775,9 @@ public class AuthorizationTest {
 
   @Test
   public void TestShowTableResultsFiltered() throws ImpalaException {
-    // The user only has permission on these tables in the functional databases.
-    List<String> expectedTbls = Lists.newArrayList("alltypes", "alltypesagg");
+    // The user only has permission on these tables/views in the functional databases.
+    List<String> expectedTbls =
+        Lists.newArrayList("alltypes", "alltypesagg", "complex_view", "view_view");
 
     List<String> tables = fe.getTableNames("functional", "*", USER);
     Assert.assertEquals(expectedTbls, tables);
@@ -548,10 +796,14 @@ public class AuthorizationTest {
     // Get all tables
     req.get_tables_req.setTableName("%");
     TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
-    assertEquals(2, resp.results.size());
+    assertEquals(4, resp.results.size());
     assertEquals("alltypes", resp.results.get(0).colVals.get(2).stringVal.toLowerCase());
     assertEquals(
         "alltypesagg", resp.results.get(1).colVals.get(2).stringVal.toLowerCase());
+    assertEquals(
+        "complex_view", resp.results.get(2).colVals.get(2).stringVal.toLowerCase());
+    assertEquals(
+        "view_view", resp.results.get(3).colVals.get(2).stringVal.toLowerCase());
   }
 
   @Test

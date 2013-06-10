@@ -1,0 +1,223 @@
+====
+---- QUERY
+use default
+---- RESULTS
+====
+---- QUERY
+# Make sure the database doesn't exist
+show databases like 'ddl_test_db'
+---- SETUP
+RELOAD
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+create database ddl_test_db
+---- RESULTS
+====
+---- QUERY
+# Create a simple view without renaming the columns.
+create view ddl_test_db.simple_view as
+select * from functional.alltypes
+---- RESULTS
+====
+---- QUERY
+# Test that 'if not exists' swallows the error (view already exists)
+create view if not exists ddl_test_db.simple_view as
+select * from functional.alltypesagg
+---- RESULTS
+====
+---- QUERY
+# Create another simple view with 'if not exists' on a subset of 
+# alltypes' columns using custom column names and comments
+create view if not exists
+ddl_test_db.simple_view_sub (x, y comment 'hello', z) as
+select int_col, string_col, timestamp_col from functional.alltypes
+---- RESULTS
+====
+---- QUERY
+# Create a view on a parquet table (Hive cannot create/read/write parquet)
+create view ddl_test_db.parquet_view as
+select * from functional_parquet.alltypes where id < 20
+---- RESULTS
+====
+---- QUERY
+# Create a complex view with predicates, joins, aggregates and order by
+create view ddl_test_db.complex_view (abc comment 'agg', xyz comment 'gby') as
+select count(a.bigint_col), b.string_col from
+functional.alltypesagg a inner join functional.alltypestiny b
+on a.id = b.id where a.bigint_col < 50
+group by b.string_col having count(a.bigint_col) > 1
+order by b.string_col limit 100
+---- RESULTS
+====
+---- QUERY
+# Create a view on a view
+create view ddl_test_db.view_view (aaa, bbb) as
+select * from ddl_test_db.complex_view
+---- RESULTS
+====
+---- QUERY
+# Test that the views are displayed by 'show tables'
+show tables in ddl_test_db
+---- RESULTS
+'complex_view'
+'parquet_view'
+'simple_view'
+'simple_view_sub'
+'view_view'
+====
+---- QUERY
+# Test that the views can be described
+describe ddl_test_db.simple_view
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe ddl_test_db.simple_view_sub
+---- RESULTS
+'x','int',''
+'y','string','hello'
+'z','timestamp',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe ddl_test_db.complex_view
+---- RESULTS
+'abc','bigint','agg'
+'xyz','string','gby'
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe ddl_test_db.parquet_view
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe ddl_test_db.view_view
+---- RESULTS
+'aaa','bigint',''
+'bbb','string',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Test that the views can be queried.
+select count(*) from ddl_test_db.simple_view
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from ddl_test_db.simple_view_sub
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from ddl_test_db.complex_view
+---- RESULTS
+2
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from ddl_test_db.parquet_view
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from ddl_test_db.view_view
+---- RESULTS
+2
+---- TYPES
+bigint
+====
+---- QUERY
+# Test dropping a view
+drop view ddl_test_db.simple_view_sub
+---- RESULTS
+====
+---- QUERY
+# Test that the view is gone
+show tables in ddl_test_db
+---- RESULTS
+'complex_view'
+'parquet_view'
+'simple_view'
+'view_view'
+====
+---- QUERY
+# Test 'if exists' for dropping a view (view does not exist)
+drop view if exists ddl_test_db.bad_view
+---- RESULTS
+====
+---- QUERY
+# Test renaming a view
+alter view ddl_test_db.view_view rename to ddl_test_db.view_on_view
+---- RESULTS
+====
+---- QUERY
+# Test renaming a parquet view
+alter view ddl_test_db.parquet_view rename to ddl_test_db.new_parquet_view
+---- RESULTS
+====
+---- QUERY
+# Test that the view was renamed
+show tables in ddl_test_db
+---- RESULTS
+'complex_view'
+'new_parquet_view'
+'simple_view'
+'view_on_view'
+====
+---- QUERY
+# Test altering a with a new definition
+alter view ddl_test_db.new_parquet_view as
+select bigint_col, string_col from functional_parquet.alltypesagg
+where bigint_col is null limit 10
+---- RESULTS
+====
+---- QUERY
+# Test querying the alterer view
+select count(bigint_col), count(string_col) from ddl_test_db.new_parquet_view
+---- RESULTS
+0,10
+---- TYPES
+bigint,bigint
+====

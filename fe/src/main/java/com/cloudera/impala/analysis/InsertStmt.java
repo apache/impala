@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
 import com.google.common.base.Joiner;
@@ -98,9 +99,10 @@ public class InsertStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (withClause != null) {
-      withClause.analyze(analyzer);
-    }
+    if (withClause != null) withClause.analyze(analyzer);
+
+    analyzer.setIsExplain(isExplain);
+    if (queryStmt != null) queryStmt.setIsExplain(isExplain);
 
     List<Expr> selectListExprs;
     if (!needsGeneratedQueryStatement) {
@@ -116,6 +118,13 @@ public class InsertStmt extends StatementBase {
     }
 
     table = analyzer.getTable(targetTableName, Privilege.INSERT);
+
+    // We do not support inserting into views.
+    if (table instanceof View) {
+      throw new AnalysisException(
+          String.format("Impala does not support inserting into views: %s",
+          table.getFullName()));
+    }
 
     // Add target table to descriptor table.
     analyzer.getDescTbl().addReferencedTable(table);

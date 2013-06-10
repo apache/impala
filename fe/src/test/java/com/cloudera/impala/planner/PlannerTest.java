@@ -368,6 +368,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testViews() {
+    runPlannerTestFile("views");
+  }
+
+  @Test
   public void testWithClause() {
     runPlannerTestFile("with-clause");
   }

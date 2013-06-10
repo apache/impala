@@ -64,7 +64,11 @@ class SelectListItem {
   public String toSql() {
     if (!isStar) {
       Preconditions.checkNotNull(expr);
-      return expr.toSql() + ((alias != null) ? " " + alias : "");
+      // Enclose aliases in quotes if Hive cannot parse them without quotes.
+      // This is needed for view compatibility between Impala and Hive.
+      String aliasSql = null;
+      if (alias != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias);
+      return expr.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
     } else if (tblName != null) {
       return tblName.toString() + ".*" + ((alias != null) ? " " + alias : "");
     } else {
@@ -81,10 +85,9 @@ class SelectListItem {
    * convention of a "_c" prefix and a column-position suffix (starting from 0), e.g.,
    * "_c0", "_c1", "_c2", etc. Uses the given selectListPos as the label's suffix.
    * Using auto-generated columns that are consistent with Hive is important
-   * for virtual view compatibility between Impala and Hive.
+   * for view compatibility between Impala and Hive.
    */
   public String toHiveColumnLabel(int selectListPos) {
-    Preconditions.checkState(!isStar());
     if (alias != null) return alias.toLowerCase();
     if (expr instanceof SlotRef) {
       SlotRef slotRef = (SlotRef) expr;

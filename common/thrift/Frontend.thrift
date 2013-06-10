@@ -174,6 +174,7 @@ enum TAlterTableType {
   DROP_COLUMN,
   DROP_PARTITION,
   RENAME_TABLE,
+  RENAME_VIEW,
   SET_FILE_FORMAT,
   SET_LOCATION,
 }
@@ -188,7 +189,7 @@ struct TPartitionKeyValue {
 }
 
 // Parameters for ALTER TABLE rename commands
-struct TAlterTableRenameParams {
+struct TAlterTableOrViewRenameParams {
   // The new table name
   1: required TTableName new_table_name
 }
@@ -264,8 +265,8 @@ struct TAlterTableParams {
   // Fully qualified name of the target table being altered
   2: required TTableName table_name
 
-  // Parameters for ALTER TABLE RENAME
-  3: optional TAlterTableRenameParams rename_params
+  // Parameters for ALTER TABLE/VIEW RENAME
+  3: optional TAlterTableOrViewRenameParams rename_params
 
   // Parameters for ALTER TABLE ADD COLUMNS
   4: optional TAlterTableAddReplaceColsParams add_replace_cols_params
@@ -353,6 +354,30 @@ struct TCreateTableParams {
   10: optional string location
 }
 
+// Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command
+struct TCreateOrAlterViewParams {
+  // Fully qualified name of the view to create
+  1: required TTableName view_name
+
+  // List of column definitions for the view
+  2: required list<TColumnDef> columns
+
+  // The owner of the view
+  3: required string owner
+
+  // Original SQL string of view definition
+  4: required string original_view_def
+
+  // Expanded SQL string of view definition used in view substitution
+  5: required string expanded_view_def
+
+  // Optional comment for the view
+  6: optional string comment
+
+  // Do not throw an error if a table or view of the same name already exists
+  7: optional bool if_not_exists
+}
+
 // Parameters of DROP DATABASE commands
 struct TDropDbParams {
   // Name of the database to drop
@@ -362,12 +387,12 @@ struct TDropDbParams {
   2: required bool if_exists
 }
 
-// Parameters of DROP TABLE commands
-struct TDropTableParams {
-  // Fully qualified name of the table to drop
+// Parameters of DROP TABLE/VIEW commands
+struct TDropTableOrViewParams {
+  // Fully qualified name of the table/view to drop
   1: required TTableName table_name
 
-  // If true, no error is raised if the target table does not exist
+  // If true, no error is raised if the target table/view does not exist
   2: required bool if_exists
 }
 
@@ -521,11 +546,14 @@ enum TDdlType {
   USE,
   DESCRIBE,
   ALTER_TABLE,
+  ALTER_VIEW,
   CREATE_DATABASE,
   CREATE_TABLE,
   CREATE_TABLE_LIKE,
+  CREATE_VIEW,
   DROP_DATABASE,
   DROP_TABLE,
+  DROP_VIEW,
   RESET_METADATA
 }
 
@@ -547,6 +575,9 @@ struct TDdlExecRequest {
   // Parameters for ALTER TABLE
   6: optional TAlterTableParams alter_table_params
 
+  // Parameters for ALTER VIEW
+  14: optional TCreateOrAlterViewParams alter_view_params
+
   // Parameters for CREATE DATABASE
   7: optional TCreateDbParams create_db_params
 
@@ -556,12 +587,15 @@ struct TDdlExecRequest {
   // Parameters for CREATE TABLE LIKE
   9: optional TCreateTableLikeParams create_table_like_params
 
+  // Parameters for CREATE VIEW
+  13: optional TCreateOrAlterViewParams create_view_params
+
   // Paramaters for DROP DATABAE
   10: optional TDropDbParams drop_db_params
 
-  // Parameters for DROP TABLE
-  11: optional TDropTableParams drop_table_params
-  
+  // Parameters for DROP TABLE/VIEW
+  11: optional TDropTableOrViewParams drop_table_or_view_params
+
   // Parameters for REFRESH/INVALIDATE METADATA
   12: optional TResetMetadataParams reset_metadata_params
 }

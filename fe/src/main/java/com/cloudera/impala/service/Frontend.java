@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.DropTableOrViewStmt;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.ResetMetadataStmt;
@@ -117,6 +118,10 @@ public class Frontend {
     ddlExecutor = new DdlExecutor(catalog);
   }
 
+  public Catalog getCatalog() {
+    return catalog;
+  }
+
   /**
    * If isRefresh is false, invalidates a specific table's metadata, forcing the
    * metadata to be reloaded on the next access.
@@ -178,6 +183,10 @@ public class Frontend {
       ddl.ddl_type = TDdlType.ALTER_TABLE;
       ddl.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isAlterViewStmt()) {
+      ddl.ddl_type = TDdlType.ALTER_VIEW;
+      ddl.setAlter_view_params(analysis.getAlterViewStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateTableStmt()) {
       ddl.ddl_type = TDdlType.CREATE_TABLE;
       ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
@@ -185,6 +194,10 @@ public class Frontend {
     } else if (analysis.isCreateTableLikeStmt()) {
       ddl.ddl_type = TDdlType.CREATE_TABLE_LIKE;
       ddl.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateViewStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_VIEW;
+      ddl.setCreate_view_params(analysis.getCreateViewStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateDbStmt()) {
       ddl.ddl_type = TDdlType.CREATE_DATABASE;
@@ -194,9 +207,10 @@ public class Frontend {
       ddl.ddl_type = TDdlType.DROP_DATABASE;
       ddl.setDrop_db_params(analysis.getDropDbStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
-    } else if (analysis.isDropTableStmt()) {
-      ddl.ddl_type = TDdlType.DROP_TABLE;
-      ddl.setDrop_table_params(analysis.getDropTableStmt().toThrift());
+    } else if (analysis.isDropTableOrViewStmt()) {
+      DropTableOrViewStmt stmt = analysis.getDropTableOrViewStmt();
+      ddl.ddl_type = (stmt.isDropTable()) ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW;
+      ddl.setDrop_table_or_view_params(stmt.toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isResetMetadataStmt()) {
       ddl.ddl_type = TDdlType.RESET_METADATA;

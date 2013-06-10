@@ -49,6 +49,16 @@ public class TableName {
     return db != null && !db.isEmpty() && !tbl.isEmpty();
   }
 
+  public String toSql() {
+    // Enclose the database and/or table name in quotes if Hive cannot parse them
+    // without quotes. This is needed for view compatibility between Impala and Hive.
+    if (db == null) {
+      return ToSqlUtils.getHiveIdentSql(tbl);
+    } else {
+      return ToSqlUtils.getHiveIdentSql(db) + "." + ToSqlUtils.getHiveIdentSql(tbl);
+    }
+  }
+
   @Override
   public String toString() {
     if (db == null) {

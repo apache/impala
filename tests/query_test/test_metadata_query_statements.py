@@ -41,16 +41,12 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
     # Describe an unpartitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
+    # Describe a view
+    self.exec_and_compare_hive_and_impala_hs2(
+        "describe formatted functional.alltypes_view_sub")
 
   def test_use_table(self, vector):
     self.run_test_case('QueryTest/use', vector)
-
-  def cleanup_db(cls, db_name):
-    # To drop a db, we need to first drop all the tables in that db
-    if db_name in cls.hive_client.get_all_databases():
-      for table_name in cls.hive_client.get_all_tables(db_name):
-        cls.hive_client.drop_table(db_name, table_name, True)
-      cls.hive_client.drop_database(db_name, True, False)
 
   @pytest.mark.execute_serially
   def test_impala_sees_hive_created_tables_and_databases(self, vector):

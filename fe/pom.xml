@@ -179,6 +179,11 @@
       <version>${hive.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
       <version>10.4.2.0</version>
@@ -217,7 +222,7 @@
     <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr-runtime</artifactId>
-      <version>3.0.1</version>
+      <version>3.3</version>
     </dependency>
 
     <dependency>

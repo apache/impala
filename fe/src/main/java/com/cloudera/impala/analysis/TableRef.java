@@ -66,10 +66,11 @@ public abstract class TableRef implements ParseNode {
     super();
     this.alias = other.alias;
     this.joinOp = other.joinOp;
-    this.joinHints = (joinHints != null) ? Lists.newArrayList(other.joinHints) : null;
-    this.onClause = (onClause != null) ? other.onClause.clone(null) : null;
+    this.joinHints =
+        (other.joinHints != null) ? Lists.newArrayList(other.joinHints) : null;
     this.usingColNames =
-        (usingColNames != null) ? Lists.newArrayList(other.usingColNames) : null;
+        (other.usingColNames != null) ? Lists.newArrayList(other.usingColNames) : null;
+    this.onClause = (other.onClause != null) ? other.onClause.clone(null) : null;
     isAnalyzed = false;
   }
 
@@ -132,7 +133,7 @@ public abstract class TableRef implements ParseNode {
   }
 
   public String getExplicitAlias() { return alias; }
-  public Table getTable() { return desc.getTable(); }
+  public Table getTable() { return getDesc().getTable(); }
   public void setJoinOp(JoinOperator op) { this.joinOp = op; }
   public void setOnClause(Expr e) { this.onClause = e; }
   public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }

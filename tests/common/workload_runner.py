@@ -223,7 +223,7 @@ class WorkloadRunner(object):
     query_map = defaultdict(list)
     for query_file_name in WorkloadRunner.__enumerate_query_files(query_dir):
       LOG.debug('Parsing Query Test File: ' + query_file_name)
-      sections = parse_query_test_file(query_file_name)
+      sections = parse_query_test_file(query_file_name, None)
       test_name = re.sub('/', '.', query_file_name.split('.')[0])[1:]
       for section in sections:
         query_map[test_name].append((section['QUERY_NAME'],

@@ -9,6 +9,16 @@ select count(x), count(y) from t
 BIGINT, BIGINT
 ====
 ---- QUERY
+# Basic test with a single with-clause view that references a virtual view.
+with t as (select abc x, xyz y from functional.complex_view)
+select x, y from t order by y limit 10
+---- RESULTS
+2,'0'
+2,'1'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
 # Multiple views in with-clause. Only one view is used.
 with t1 as (select int_col x, bigint_col y from functional.alltypestiny), 
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))

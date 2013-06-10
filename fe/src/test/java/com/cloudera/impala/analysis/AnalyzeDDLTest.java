@@ -85,6 +85,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
           " partition (i=1)", "Database does not exist: db_does_not_exist");
       AnalysisError("alter table functional.table_does_not_exist " + kw +
           " partition (i=1)", "Table does not exist: functional.table_does_not_exist");
+
+      // Cannot ALTER TABLE a view.
+      AnalysisError("alter table functional.alltypes_view " + kw +
+          " partition(year=2050, month=10)",
+          "ALTER TABLE not allowed on a view: functional.alltypes_view");
     }
 
     // IF NOT EXISTS properly checks for partition existence
@@ -138,6 +143,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist add columns (i int)",
         "Table does not exist: functional.table_does_not_exist");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view " +
+        "add columns (c1 string comment 'hi')",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
   }
 
   @Test
@@ -160,6 +170,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist drop column col1",
         "Table does not exist: functional.table_does_not_exist");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view drop column int_col",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
   }
 
   @Test
@@ -187,6 +201,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: db_does_not_exist");
     AnalysisError("alter table functional.table_does_not_exist change c1 c2 double",
         "Table does not exist: functional.table_does_not_exist");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view " +
+        "change column int_col int_col2 int",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
   }
 
   @Test
@@ -274,6 +293,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "URI path cannot be empty.");
     AnalysisError("alter table functional.alltypes set location '      '",
         "URI path cannot be empty.");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view set fileformat sequencefile",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
   }
 
   @Test
@@ -292,28 +315,108 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
         "Database does not exist: db_does_not_exist");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view rename to new_alltypes",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
+  }
+
+  @Test
+  public void TestAlterView() {
+    // View-definition references a table.
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select * from functional.alltypesagg");
+    // View-definition references a view.
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select * from functional.alltypes_view");
+
+    // Cannot ALTER VIEW a table.
+    AnalysisError("alter view functional.alltypes as " +
+        "select * from functional.alltypesagg",
+        "ALTER VIEW not allowed on a table: functional.alltypes");
+    AnalysisError("alter view functional.hbasealltypesagg as " +
+        "select * from functional.alltypesagg",
+        "ALTER VIEW not allowed on a table: functional.hbasealltypesagg");
+    // Target database does not exist.
+    AnalysisError("alter view baddb.alltypes_view as " +
+        "select * from functional.alltypesagg",
+        "Database does not exist: baddb");
+    // Target view does not exist.
+    AnalysisError("alter view functional.badview as " +
+        "select * from functional.alltypesagg",
+        "Table does not exist: functional.badview");
+    // View-definition statement fails to analyze. Database does not exist.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from baddb.alltypesagg",
+        "Database does not exist: baddb");
+    // View-definition statement fails to analyze. Table does not exist.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.badtable",
+        "Table does not exist: functional.badtable");
+  }
+
+  @Test
+  public void TestAlterViewRename() throws AnalysisException {
+    AnalyzesOk("alter view functional.alltypes_view rename to new_view");
+    AnalyzesOk("alter view functional.alltypes_view rename to functional.new_view");
+    AnalysisError("alter view functional.alltypes_view rename to functional.alltypes",
+        "Table already exists: functional.alltypes");
+    AnalysisError("alter view functional.alltypes_view rename to functional.alltypesagg",
+        "Table already exists: functional.alltypesagg");
+
+    AnalysisError("alter view functional.view_does_not_exist rename to new_view",
+        "Table does not exist: functional.view_does_not_exist");
+    AnalysisError("alter view db_does_not_exist.alltypes_view rename to new_view",
+        "Database does not exist: db_does_not_exist");
+
+    AnalysisError("alter view functional.alltypes_view " +
+        "rename to db_does_not_exist.new_view",
+        "Database does not exist: db_does_not_exist");
+
+    // Cannot ALTER VIEW a able.
+    AnalysisError("alter view functional.alltypes rename to new_alltypes",
+        "ALTER VIEW not allowed on a table: functional.alltypes");
   }
 
   @Test
   public void TestDrop() throws AnalysisException {
     AnalyzesOk("drop database functional");
     AnalyzesOk("drop table functional.alltypes");
+    AnalyzesOk("drop view functional.alltypes_view");
 
     // If the database does not exist, and the user hasn't specified "IF EXISTS",
     // an analysis error should be thrown
     AnalysisError("drop database db_does_not_exist",
         "Database does not exist: db_does_not_exist");
     AnalysisError("drop table db_does_not_exist.alltypes",
-        "Table does not exist: db_does_not_exist.alltypes");
+        "Database does not exist: db_does_not_exist");
+    AnalysisError("drop view db_does_not_exist.alltypes_view",
+        "Database does not exist: db_does_not_exist");
+
+    // If the database exist but the table doesn't, and the user hasn't specified
+    // "IF EXISTS", an analysis error should be thrown
+    AnalysisError("drop table functional.badtable",
+        "Table does not exist: functional.badtable");
+    AnalysisError("drop view functional.badview",
+        "Table does not exist: functional.badview");
 
     // No error is thrown if the user specifies IF EXISTS
     AnalyzesOk("drop database if exists db_does_not_exist");
 
     // No error is thrown if the database does not exist
     AnalyzesOk("drop table if exists db_does_not_exist.alltypes");
+    AnalyzesOk("drop view if exists db_does_not_exist.alltypes");
     // No error is thrown if the database table does not exist and IF EXISTS
     // is true
     AnalyzesOk("drop table if exists functional.notbl");
+    AnalyzesOk("drop view if exists functional.notbl");
+
+    // Cannot drop a view with DROP TABLE.
+    AnalysisError("drop table functional.alltypes_view",
+        "DROP TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot drop a table with DROP VIEW.
+    AnalysisError("drop view functional.alltypes",
+        "DROP VIEW not allowed on a table: functional.alltypes");
   }
 
   @Test
@@ -375,6 +478,69 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'file://test-warehouse/new_table' must point to an HDFS file system.");
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'  '", "URI path cannot be empty.");
+  }
+
+  @Test
+  public void TestCreateView() throws AnalysisException {
+    AnalyzesOk("create view foo as select int_col, string_col from functional.alltypes");
+    AnalyzesOk("create view functional.foo as select * from functional.alltypes");
+    AnalyzesOk("create view if not exists foo as select * from functional.alltypes");
+    AnalyzesOk("create view foo (a, b) as select int_col, string_col " +
+        "from functional.alltypes");
+    AnalyzesOk("create view functional.foo (a, b) as select int_col x, double_col y " +
+        "from functional.alltypes");
+
+    // Creating a view on a view is ok (alltypes_view is a view on alltypes).
+    AnalyzesOk("create view foo as select * from functional.alltypes_view");
+    AnalyzesOk("create view foo (aaa, bbb) as select * from functional.complex_view");
+
+    // Creating a view on an HBase table is ok.
+    AnalyzesOk("create view foo as select * from functional.hbasealltypesagg");
+
+    // Complex view definition with joins and aggregates.
+    AnalyzesOk("create view foo (cnt) as " +
+        "select count(distinct x.int_col) from functional.alltypessmall x " +
+        "inner join functional.alltypessmall y on x.id = y.id group by x.bigint_col");
+
+    // Test different query-statement types as view definition.
+    AnalyzesOk("create view foo (a, b) as values(1, 'a'), (2, 'b')");
+    AnalyzesOk("create view foo (a, b) as select 1, 'a' union all select 2, 'b'");
+
+    // Mismatching number of columns in column definition and view-definition statement.
+    AnalysisError("create view foo (a) as select int_col, string_col " +
+        "from functional.alltypes",
+        "Column-definition list has fewer columns (1) than the " +
+        "view-definition query statement returns (2).");
+    AnalysisError("create view foo (a, b, c) as select int_col " +
+        "from functional.alltypes",
+        "Column-definition list has more columns (3) than the " +
+        "view-definition query statement returns (1).");
+    // Duplicate columns in the column definition.
+    AnalysisError("create view foo (a, b, a) as select int_col, int_col, int_col " +
+        "from functional.alltypes",
+        "Duplicate column name: a");
+    // Table/view already exists.
+    AnalysisError("create view functional.alltypes as " +
+        "select * from functional.alltypessmall ",
+        "Table already exists: functional.alltypes");
+    // Target database does not exist.
+    AnalysisError("create view wrongdb.test as " +
+        "select * from functional.alltypessmall ",
+        "Database does not exist: wrongdb");
+    // Source database does not exist,
+    AnalysisError("create view foo as " +
+        "select * from wrongdb.alltypessmall ",
+        "Database does not exist: wrongdb");
+    // Source table does not exist,
+    AnalysisError("create view foo as " +
+        "select * from wrongdb.alltypessmall ",
+        "Database does not exist: wrongdb");
+    // Analysis error in view-definition statement.
+    AnalysisError("create view foo as " +
+        "select int_col from functional.alltypessmall union all " +
+        "select string_col from functional.alltypes",
+        "Incompatible return types 'INT' and 'STRING' of exprs " +
+        "'int_col' and 'string_col'.");
   }
 
   @Test

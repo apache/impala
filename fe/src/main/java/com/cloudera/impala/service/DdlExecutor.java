@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
@@ -36,6 +37,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
@@ -54,17 +56,18 @@ import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableChangeColParams;
 import com.cloudera.impala.thrift.TAlterTableDropColParams;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
+import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableRenameParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateDbParams;
+import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TDropDbParams;
-import com.cloudera.impala.thrift.TDropTableParams;
+import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -121,8 +124,9 @@ public class DdlExecutor {
             dropPartParams.getPartition_spec(), dropPartParams.isIf_exists());
         break;
       case RENAME_TABLE:
-        TAlterTableRenameParams renameParams = params.getRename_params();
-        alterTableRename(TableName.fromThrift(params.getTable_name()),
+      case RENAME_VIEW:
+        TAlterTableOrViewRenameParams renameParams = params.getRename_params();
+        alterTableOrViewRename(TableName.fromThrift(params.getTable_name()),
             TableName.fromThrift(renameParams.getNew_table_name()));
         // Renamed table can't be fast refreshed anyway. Return now.
         return;
@@ -157,6 +161,40 @@ public class DdlExecutor {
     if (db != null) {
       db.refreshTable(params.getTable_name().getTable_name());
     }
+  }
+
+  /**
+   * Alters an existing view's definition in the metastore. Throws an exception
+   * if the view does not exist or if the existing metadata entry is
+   * a table instead of a a view.
+   */
+  public void alterView(TCreateOrAlterViewParams params)
+      throws CatalogException, MetaException, TException {
+    TableName tableName = TableName.fromThrift(params.getView_name());
+    Preconditions.checkState(tableName != null && tableName.isFullyQualified());
+    Preconditions.checkState(params.getColumns() != null &&
+        params.getColumns().size() > 0,
+          "Null or empty column list given as argument to DdlExecutor.alterView");
+
+    synchronized (metastoreDdlLock) {
+      // Operate on a copy of the metastore table to avoid prematurely applying the
+      // alteration to our cached table in case the actual alteration fails.
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      if (!msTbl.getTableType().equalsIgnoreCase((TableType.VIRTUAL_VIEW.toString()))) {
+        throw new InvalidObjectException(
+            String.format("ALTER VIEW not allowed on a table: %s",
+                tableName.toString()));
+      }
+
+      // Set the altered view attributes and update the metastore.
+      setViewAttributes(params, msTbl);
+      LOG.info(String.format("Altering view %s", tableName));
+      applyAlterTable(msTbl);
+    }
+
+    // refresh metadata after ALTER VIEW
+    Db db = catalog.getDb(tableName.getDb(), internalUser, Privilege.ALTER);
+    if (db != null) db.refreshTable(tableName.getTbl());
   }
 
   /**
@@ -240,19 +278,14 @@ public class DdlExecutor {
   }
 
   /**
-   * Creates a new table in the metastore and adds the table name to the internal
-   * metadata cache, marking its metadata to be lazily loaded on the next access.
-   * Re-throws any Hive Meta Store exceptions encountered during the drop.
-   *
-   * @param tableName - The fully qualified name of the table to drop.
-   * @param ifExists - If true, no errors will be thrown if the table does not exist.
+   * Drop a table or view from the metastore and remove it from our cache.
    */
-  public void dropTable(TDropTableParams params)
+  public void dropTableOrView(TDropTableOrViewParams params)
       throws MetaException, NoSuchObjectException, InvalidOperationException,
       org.apache.thrift.TException, AuthorizationException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    LOG.info(String.format("Dropping table %s", tableName));
+    LOG.info(String.format("Dropping table/view %s", tableName));
     synchronized (metastoreDdlLock) {
       MetaStoreClient msClient = catalog.getMetaStoreClient();
       try {
@@ -334,6 +367,34 @@ public class DdlExecutor {
 
     LOG.info(String.format("Creating table %s", tableName));
     createTable(tbl, params.if_not_exists);
+  }
+
+  /**
+   * Creates a new view in the metastore and adds an entry to the metadata cache to
+   * lazily load the new metadata on the next access. Re-throws any Metastore
+   * exceptions encountered during the create.
+   */
+  public void createView(TCreateOrAlterViewParams params)
+      throws AuthorizationException, MetaException, NoSuchObjectException,
+      AlreadyExistsException, InvalidObjectException, org.apache.thrift.TException {
+    TableName tableName = TableName.fromThrift(params.getView_name());
+    Preconditions.checkState(tableName != null && tableName.isFullyQualified());
+    Preconditions.checkState(params.getColumns() != null &&
+        params.getColumns().size() > 0,
+          "Null or empty column list given as argument to DdlExecutor.createView");
+    if (params.if_not_exists && catalog.containsTable(tableName.getDb(),
+        tableName.getTbl(), internalUser, Privilege.CREATE)) {
+      LOG.info(String.format("Skipping view creation because %s already exists and " +
+          "ifNotExists is true.", tableName));
+      return;
+    }
+
+    // Create new view.
+    org.apache.hadoop.hive.metastore.api.Table view =
+        new org.apache.hadoop.hive.metastore.api.Table();
+    setViewAttributes(params, view);
+    LOG.info(String.format("Creating view %s", tableName));
+    createTable(view, params.if_not_exists);
   }
 
   /**
@@ -429,10 +490,32 @@ public class DdlExecutor {
         msClient.release();
       }
       Db db = catalog.getDb(newTable.getDbName(), internalUser, Privilege.CREATE);
-      if (db != null) {
-        db.addTable(newTable.getTableName());
-      }
+      if (db != null) db.addTable(newTable.getTableName());
     }
+  }
+
+  /**
+   * Sets the given params in the metastore table as appropriate for a view.
+   */
+  private void setViewAttributes(TCreateOrAlterViewParams params,
+      org.apache.hadoop.hive.metastore.api.Table view) {
+    view.setTableType(TableType.VIRTUAL_VIEW.toString());
+    view.setViewOriginalText(params.getOriginal_view_def());
+    view.setViewExpandedText(params.getExpanded_view_def());
+    view.setDbName(params.getView_name().getDb_name());
+    view.setTableName(params.getView_name().getTable_name());
+    view.setOwner(params.getOwner());
+    if (view.getParameters() == null) view.setParameters(new HashMap<String, String>());
+    if (params.isSetComment() &&  params.getComment() != null) {
+      view.getParameters().put("comment", params.getComment());
+    }
+
+    // Add all the columns to a new storage descriptor.
+    StorageDescriptor sd = new StorageDescriptor();
+    sd.setCols(buildFieldSchemaList(params.getColumns()));
+    // Set a dummy SerdeInfo for Hive.
+    sd.setSerdeInfo(new SerDeInfo());
+    view.setSd(sd);
   }
 
   /**
@@ -612,10 +695,10 @@ public class DdlExecutor {
   }
 
   /**
-   * Renames an existing table. After renaming the table, the metadata is marked as
-   * invalid and will be reloaded on the next access.
+   * Renames an existing table or view. After renaming the table/view,
+   * its metadata is marked as invalid and will be reloaded on the next access.
    */
-  private void alterTableRename(TableName tableName, TableName newTableName)
+  private void alterTableOrViewRename(TableName tableName, TableName newTableName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, TableLoadingException,
       AuthorizationException {
@@ -633,13 +716,9 @@ public class DdlExecutor {
 
       // Remove the old table name from the cache and add the new table.
       Db db = catalog.getDb(tableName.getDb(), internalUser, Privilege.ALTER);
-      if (db != null) {
-        db.removeTable(tableName.getTbl());
-      }
+      if (db != null) db.removeTable(tableName.getTbl());
       db = catalog.getDb(newTableName.getDb(), internalUser, Privilege.ALTER);
-      if (db != null) {
-        db.addTable(newTableName.getTbl());
-      }
+      if (db != null) db.addTable(newTableName.getTbl());
     }
   }
 

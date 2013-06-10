@@ -437,10 +437,6 @@ public class HBaseTable extends Table {
     return 100;
   }
 
-  public static boolean isHBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    return msTbl.getSd().getInputFormat().equals(hbaseInputFormat);
-  }
-
   @Override
   public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
     // Partition clause doesn't make sense for an HBase table.
@@ -482,5 +478,12 @@ public class HBaseTable extends Table {
     } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
              (endKeyIsEndOfTable || Bytes.compareTo(currentKey, endKey) < 0));
     return regionList;
+  }
+
+  /**
+   * Returns the input-format class string for HBase tables read by Hive.
+   */
+  public static String getInputFormat() {
+    return hbaseInputFormat;
   }
 }

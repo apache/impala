@@ -95,6 +95,13 @@ class ImpalaTestSuite(BaseTestSuite):
     client.connect()
     return client
 
+  def cleanup_db(self, db_name):
+    # To drop a db, we need to first drop all the tables in that db
+    if db_name in self.hive_client.get_all_databases():
+      for table_name in self.hive_client.get_all_tables(db_name):
+        self.hive_client.drop_table(db_name, table_name, True)
+      self.hive_client.drop_database(db_name, True, False)
+
   def run_test_case(self, test_file_name, vector):
     """
     Runs the queries in the specified test based on the vector values
@@ -106,7 +113,7 @@ class ImpalaTestSuite(BaseTestSuite):
     exec_options = vector.get_value('exec_option')
     # Change the database to reflect the file_format, compression codec etc.
     self.change_database(self.client, table_format_info)
-    sections = self.__load_query_test_file(self.get_workload(), test_file_name)
+    sections = self.load_query_test_file(self.get_workload(), test_file_name)
     updated_sections = list()
     for test_section in sections:
       if 'QUERY' not in test_section:
@@ -243,6 +250,16 @@ class ImpalaTestSuite(BaseTestSuite):
     for impala, hive in zip(impala_results, hive_results):
       assert impala == hive
 
+  def load_query_test_file(self, workload, file_name, valid_section_names=None):
+    """
+    Loads/Reads the specified query test file. Accepts the given section names as valid.
+    Uses a default list of valid section names if valid_section_names is None.  
+    """
+    test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
+    if not os.path.isfile(test_file_path):
+      assert False, 'Test file not found: %s' % file_name
+    return parse_query_test_file(test_file_path, valid_section_names)
+
   def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
@@ -274,13 +291,6 @@ class ImpalaTestSuite(BaseTestSuite):
 
     # TODO: Remove this in the future for negative testing
     self.client.set_query_option('allow_unsupported_formats', True)
-
-  def __load_query_test_file(self, workload, file_name):
-    """Loads/Reads the specified query test file"""
-    test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
-    if not os.path.isfile(test_file_path):
-      assert False, 'Test file not found: %s' % file_name
-    return parse_query_test_file(test_file_path)
 
   def __reset_table(self, db_name, table_name):
     """Resets a table (drops and recreates the table)"""

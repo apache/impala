@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TTableName;
@@ -26,10 +27,10 @@ import com.google.common.base.Preconditions;
  * Base class for all ALTER TABLE statements.
  */
 public abstract class AlterTableStmt extends StatementBase {
-  private final TableName tableName;
+  protected final TableName tableName;
 
   // Set during analysis.
-  private Table table;
+  protected Table table;
 
   protected AlterTableStmt(TableName tableName) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
@@ -68,5 +69,9 @@ public abstract class AlterTableStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     table = analyzer.getTable(tableName, Privilege.ALTER);
+    if (table instanceof View) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on a view: %s", table.getFullName()));
+    }
   }
 }

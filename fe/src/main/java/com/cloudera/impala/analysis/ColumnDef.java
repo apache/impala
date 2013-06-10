@@ -14,20 +14,22 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-import com.google.common.collect.Lists;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnDef;
+import com.cloudera.impala.thrift.TColumnDesc;
 
 /**
- * Represents a column definition in a CREATE/ALTER TABLE statement (column name +
- * data type) and optional comment.
+ * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
+ * Column definitions in CREATE/ALTER TABLE statements require a column type,
+ * whereas column definitions in CREATE/ALTER VIEW statements infer the column type from
+ * the corresponding view definition.
+ * All column definitions have an optional comment.
  */
 public class ColumnDef {
   private final String colName;
   private final String comment;
-  private final PrimitiveType colType;
+  // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
+  private PrimitiveType colType;
 
   public ColumnDef(String colName, PrimitiveType colType, String comment) {
     this.colName = colName;
@@ -35,23 +37,16 @@ public class ColumnDef {
     this.comment = comment;
   }
 
-  public PrimitiveType getColType() {
-    return colType;
-  }
+  public void setColType(PrimitiveType colType) { this.colType = colType; }
+  public PrimitiveType getColType() { return colType; }
+  public String getColName() { return colName; }
+  public String getComment() { return comment; }
 
-  public String getColName() {
-    return colName;
-  }
-
-  public String getComment() {
-    return comment;
-  }
-
+  @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder(colName + " " + colType.toString());
-    if (comment != null) {
-      sb.append(String.format(" COMMENT '%s'", comment));
-    }
+    StringBuilder sb = new StringBuilder(colName);
+    if (colType != null) sb.append(" " + colType.toString());
+    if (comment != null) sb.append(String.format(" COMMENT '%s'", comment));
     return sb.toString();
   }
 

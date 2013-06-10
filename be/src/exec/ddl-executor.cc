@@ -80,6 +80,8 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
     }
     case TDdlType::ALTER_TABLE:
       return frontend_->AlterTable(exec_request.alter_table_params);
+    case TDdlType::ALTER_VIEW:
+      return frontend_->AlterView(exec_request.alter_view_params);
     case TDdlType::CREATE_DATABASE:
       return frontend_->CreateDatabase(exec_request.create_db_params);
     case TDdlType::CREATE_TABLE_LIKE:
@@ -87,10 +89,13 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
           exec_request.create_table_like_params);
     case TDdlType::CREATE_TABLE:
       return frontend_->CreateTable(exec_request.create_table_params);
+    case TDdlType::CREATE_VIEW:
+      return frontend_->CreateView(exec_request.create_view_params);
     case TDdlType::DROP_DATABASE:
       return frontend_->DropDatabase(exec_request.drop_db_params);
     case TDdlType::DROP_TABLE:
-      return frontend_->DropTable(exec_request.drop_table_params);
+    case TDdlType::DROP_VIEW:
+      return frontend_->DropTableOrView(exec_request.drop_table_or_view_params);
     case TDdlType::RESET_METADATA:
       return frontend_->ResetMetadata(exec_request.reset_metadata_params);
     default: {
