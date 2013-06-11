@@ -20,12 +20,17 @@
 #include <sstream>
 #include "common/logging.h"
 #include "common/status.h"
+#include "util/bit-util.h"
 
 namespace impala {
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
 // Class for reading and writing various data types.
+// Note: be very careful using *signed* ints.  Casting from a signed int to
+// an unsigned is not a problem.  However, bit shifts will do sign extension
+// on unsigned ints, which is rarely the right thing to do for byte level
+// operations.
 class ReadWriteUtil {
  public:
   // Maximum length for Writeable VInt
@@ -42,9 +47,8 @@ class ReadWriteUtil {
   static int PutZLong(int64_t longint, uint8_t* buf);
 
   // Get a big endian integer from a buffer.  The buffer does not have to be word aligned.
-  static int32_t GetInt(const uint8_t* buffer);
-  static int16_t GetSmallInt(const uint8_t* buffer);
-  static int64_t GetLongInt(const uint8_t* buffer);
+  template<typename T>
+  static T GetInt(const uint8_t* buffer);
 
   // Get a variable-length Long or int value from a byte buffer.
   // Returns the length of the long/int
@@ -56,9 +60,11 @@ class ReadWriteUtil {
   // byte offset.
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
-  // Put an Integer into a buffer in big endian order .  The buffer must be at least
-  // 4 bytes long.
-  static void PutInt(uint8_t* buf, int32_t integer);
+  // Put an Integer into a buffer in big endian order .  The buffer must be big
+  // enough.
+  static void PutInt(uint8_t* buf, uint16_t integer);
+  static void PutInt(uint8_t* buf, uint32_t integer);
+  static void PutInt(uint8_t* buf, uint64_t integer);
 
   // Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const uint8_t* buf, int64_t length);
@@ -91,27 +97,36 @@ class ReadWriteUtil {
   static bool SkipBytes(uint8_t** buf, int* buf_len, int num_bytes, Status* status);
 };
 
-inline int16_t ReadWriteUtil::GetSmallInt(const uint8_t* buf) {
+template<>
+inline uint16_t ReadWriteUtil::GetInt(const uint8_t* buf) {
   return (buf[0] << 8) | buf[1];
 }
 
-inline int32_t ReadWriteUtil::GetInt(const uint8_t* buf) {
+template<>
+inline uint32_t ReadWriteUtil::GetInt(const uint8_t* buf) {
   return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
 }
 
-inline int64_t ReadWriteUtil::GetLongInt(const uint8_t* buf) {
-  return (static_cast<int64_t>(buf[0]) << 56) |
-      (static_cast<int64_t>(buf[1]) << 48) |
-      (static_cast<int64_t>(buf[2]) << 40) |
-      (static_cast<int64_t>(buf[3]) << 32) |
-      (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
+template<>
+inline uint64_t ReadWriteUtil::GetInt(const uint8_t* buf) {
+  uint64_t upper_half = GetInt<uint32_t>(buf);
+  uint64_t lower_half = GetInt<uint32_t>(buf + 4);
+  return lower_half | upper_half << 32;
 }
 
-inline void ReadWriteUtil::PutInt(uint8_t* buf, int32_t integer) {
-  buf[0] = integer >> 24;
-  buf[1] = integer >> 16;
-  buf[2] = integer >> 8;
-  buf[3] = integer;
+inline void ReadWriteUtil::PutInt(uint8_t* buf, uint16_t integer) {
+  buf[0] = integer >> 8;
+  buf[1] = integer;
+}
+
+inline void ReadWriteUtil::PutInt(uint8_t* buf, uint32_t integer) {
+  uint32_t big_endian = BitUtil::ByteSwap(integer);
+  memcpy(buf, &big_endian, sizeof(uint32_t));
+}
+
+inline void ReadWriteUtil::PutInt(uint8_t* buf, uint64_t integer) {
+  uint64_t big_endian = BitUtil::ByteSwap(integer);
+  memcpy(buf, &big_endian, sizeof(uint64_t));
 }
 
 inline int ReadWriteUtil::GetVInt(uint8_t* buf, int32_t* vint) {

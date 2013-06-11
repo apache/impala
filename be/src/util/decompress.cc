@@ -247,9 +247,9 @@ static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_onl
   
   int uncompressed_total_len = 0;
   while (input_len > 0) {
-    size_t uncompressed_block_len = ReadWriteUtil::GetInt(input);
-    input += sizeof(int32_t);
-    input_len -= sizeof(int32_t);
+    uint32_t uncompressed_block_len = ReadWriteUtil::GetInt<uint32_t>(input);
+    input += sizeof(uint32_t);
+    input_len -= sizeof(uint32_t);
 
     if (uncompressed_block_len > Codec::MAX_BLOCK_SIZE || uncompressed_block_len == 0) {
       if (uncompressed_total_len == 0) {
@@ -269,9 +269,9 @@ static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_onl
 
     while (uncompressed_block_len > 0) {
       // Read the length of the next snappy compressed block.
-      size_t compressed_len = ReadWriteUtil::GetInt(input);
-      input += sizeof(int32_t);
-      input_len -= sizeof(int32_t);
+      size_t compressed_len = ReadWriteUtil::GetInt<uint32_t>(input);
+      input += sizeof(uint32_t);
+      input_len -= sizeof(uint32_t);
 
       if (compressed_len == 0 || compressed_len > input_len) {
         if (uncompressed_total_len == 0) {

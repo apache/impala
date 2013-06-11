@@ -47,6 +47,20 @@ class BitUtil {
       return PopcountNoHw(x);
     }
   }
+
+  // Swaps the byte order (i.e. endianess)
+  static inline int64_t ByteSwap(int64_t value) {
+    return __builtin_bswap64(value);
+  }
+  static inline uint64_t ByteSwap(uint64_t value) {
+    return static_cast<uint64_t>(__builtin_bswap64(value));
+  }
+  static inline int32_t ByteSwap(int32_t value) {
+    return __builtin_bswap32(value);
+  }
+  static inline int32_t ByteSwap(uint32_t value) {
+    return static_cast<uint32_t>(__builtin_bswap32(value));
+  }
 };
 
 }

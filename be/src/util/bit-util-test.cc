@@ -46,6 +46,22 @@ TEST(BitUtil, Popcount) {
   EXPECT_EQ(BitUtil::PopcountNoHw(0), 0);
 }
 
+TEST(BitUtil, ByteSwap) {
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0x11223344)), 0x44332211);
+
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<int32_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<int32_t>(0x11223344)), 0x44332211);
+
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint64_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(
+      static_cast<uint64_t>(0x1122334455667788)), 0x8877665544332211);
+  
+  EXPECT_EQ(BitUtil::ByteSwap(static_cast<int64_t>(0)), 0);
+  EXPECT_EQ(BitUtil::ByteSwap(
+      static_cast<int64_t>(0x1122334455667788)), 0x8877665544332211);
+}
+
 }
 
 int main(int argc, char **argv) {

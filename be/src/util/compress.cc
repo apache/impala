@@ -166,7 +166,7 @@ int SnappyBlockCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
 }
 
 Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
-                                      int *output_length, uint8_t** output) {
+                                           int *output_length, uint8_t** output) {
 
   // Hadoop uses a block compression scheme on top of snappy.  First there is
   // an integer which is the size of the decompressed data followed by a
@@ -188,7 +188,7 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
 
   uint8_t* outp = out_buffer_;
   uint8_t* sizep;
-  ReadWriteUtil::PutInt(outp, input_length);
+  ReadWriteUtil::PutInt(outp, static_cast<uint32_t>(input_length));
   outp += sizeof (int32_t);
   do {
     // Point at the spot to store the compressed size.
@@ -198,7 +198,7 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
     snappy::RawCompress(reinterpret_cast<const char*>(input),
         static_cast<size_t>(block_size), reinterpret_cast<char*>(outp), &size);
 
-    ReadWriteUtil::PutInt(sizep, size);
+    ReadWriteUtil::PutInt(sizep, static_cast<uint32_t>(size));
     input += block_size;
     input_length -= block_size;
     outp += size;

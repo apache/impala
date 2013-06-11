@@ -112,8 +112,8 @@ inline bool ScannerContext::Stream::ReadBoolean(bool* b, Status* status) {
 
 inline bool ScannerContext::Stream::ReadInt(int32_t* val, Status* status) {
   uint8_t* bytes;
-  RETURN_IF_FALSE(ReadBytes(sizeof(int32_t), &bytes, status));
-  *val = ReadWriteUtil::GetInt(bytes);
+  RETURN_IF_FALSE(ReadBytes(sizeof(uint32_t), &bytes, status));
+  *val = ReadWriteUtil::GetInt<uint32_t>(bytes);
   return true;
 }
 

@@ -65,3 +65,4 @@ add_library(Exec STATIC
 ADD_BE_TEST(zigzag-test)
 ADD_BE_TEST(hash-table-test)
 ADD_BE_TEST(delimited-text-parser-test)
+ADD_BE_TEST(read-write-util-test)
