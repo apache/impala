@@ -57,6 +57,8 @@ struct TQueryOptions {
   13: optional bool abort_on_default_limit_exceeded = 0
   14: optional Descriptors.THdfsCompression parquet_compression_codec =
       Descriptors.THdfsCompression.SNAPPY
+  15: optional i32 hbase_caching = 0
+  16: optional bool hbase_cache_blocks = 0
 }
 
 // A scan range plus the parameters needed to execute that scan.

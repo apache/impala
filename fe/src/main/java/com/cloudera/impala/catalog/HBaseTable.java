@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HBaseTableSink;
 import com.cloudera.impala.thrift.THBaseTable;
@@ -229,9 +230,9 @@ public class HBaseTable extends Table {
   }
 
   /**
-   * Get an estimate of the number of rows in regions between startRowKey and
-   * endRowKey. The more store files there are the more this will be off.  Also
-   * this does not take into account any rows that are in the memstore.
+   * Get an estimate of the number of rows and bytes per row in regions between
+   * startRowKey and endRowKey. The more store files there are the more this will be off.
+   * Also, this does not take into account any rows that are in the memstore.
    *
    * The values computed here should be cached so that in high qps workloads
    * the nn is not overwhelmed.  Could be done in load(); Synchronized to make
@@ -239,10 +240,11 @@ public class HBaseTable extends Table {
    *
    * @param startRowKey First row key in the range
    * @param endRowKey Last row key in the range
-   * @return The estimated number of rows in the regions between the row keys.
+   * @return The estimated number of rows in the regions between the row keys (first) and
+   * the estimated row size in bytes (second).
    */
-  public synchronized long getEstimatedRowCount(byte[] startRowKey, byte[] endRowKey) {
-
+  public synchronized Pair<Long, Long> getEstimatedStats(byte[] startRowKey,
+      byte[] endRowKey) {
     Preconditions.checkNotNull(startRowKey);
     Preconditions.checkNotNull(endRowKey);
 
@@ -322,14 +324,16 @@ public class HBaseTable extends Table {
     }
 
     // If there are no rows then no need to estimate.
-    if (rowCount == 0) return 0;
+    if (rowCount == 0) return new Pair<Long, Long>(0L, 0L);
 
     // if something went wrong then set a signal value.
-    if (rowSize <= 0 || hdfsSize <= 0) return -1;
+    if (rowSize <= 0 || hdfsSize <= 0) return new Pair<Long, Long>(-1L, -1L);
 
     // estimate the number of rows.
     double bytesPerRow = rowSize / (double) rowCount;
-    return (long) ((isCompressed ? 2 : 1) * (hdfsSize / bytesPerRow));
+    long estimatedRowCount = (long) ((isCompressed ? 2 : 1) * (hdfsSize / bytesPerRow));
+
+    return new Pair<Long, Long>(estimatedRowCount, (long) bytesPerRow);
   }
 
   /**

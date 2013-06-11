@@ -41,6 +41,7 @@ import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
@@ -78,6 +79,17 @@ public class HBaseScanNode extends ScanNode {
 
   // List of HBase Filters for generating thrift message. Filled in finalize().
   private final List<THBaseFilter> filters = new ArrayList<THBaseFilter>();
+
+  // The suggested value for "hbase.client.scan.setCaching", which batches maxCaching
+  // rows per fetch request to the HBase region server. If the value is too high,
+  // then the hbase region server will have a hard time (GC pressure and long response
+  // times). If the value is too small, then there will be extra trips to the hbase
+  // region server.
+  // Default to 1024 and update it based on row size estimate such that each batch size
+  // won't exceed 500MB.
+  private final static int MAX_HBASE_FETCH_BATCH_SIZE = 500 * 1024 * 1024;
+  private final static int DEFAULT_SUGGESTED_CACHING = 1024;
+  private int suggestedCaching = DEFAULT_SUGGESTED_CACHING;
 
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf = HBaseConfiguration.create();
@@ -122,14 +134,21 @@ public class HBaseScanNode extends ScanNode {
         stopKey = convertToBytes(((StringLiteral) rowRange.upperBound).getValue(),
                                   rowRange.upperBoundInclusive);
       }
-      if (rowRange.isEqRange()) {
-        cardinality = 1;
-      } else {
-        cardinality = tbl.getEstimatedRowCount(startKey, stopKey);
-      }
-    } else {
-      cardinality = tbl.getEstimatedRowCount(startKey, stopKey);
     }
+
+    if (rowRange != null && rowRange.isEqRange()) {
+      cardinality = 1;
+    } else {
+     // Set maxCaching so that each fetch from hbase won't return a batch of more than
+     // MAX_HBASE_FETCH_BATCH_SIZE bytes.
+      Pair<Long, Long> estimate = tbl.getEstimatedStats(startKey, stopKey);
+      cardinality = estimate.first.longValue();
+      if (estimate.second.longValue() > 0) {
+        suggestedCaching = (int)
+            Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second.longValue(), 1);
+      }
+    }
+
     cardinality *= computeSelectivity();
     cardinality = Math.max(0, cardinality);
     LOG.info("finalize HbaseScan: cardinality=" + Long.toString(cardinality));
@@ -203,6 +222,7 @@ public class HBaseScanNode extends ScanNode {
     if (!filters.isEmpty()) {
       msg.hbase_scan_node.setFilters(filters);
     }
+    msg.hbase_scan_node.setSuggested_max_caching(suggestedCaching);
   }
 
   /**

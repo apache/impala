@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "exec/hbase-table-scanner.h"
+#include "exec/hbase-scan-node.h"
 
 #include <cstring>
 #include <algorithm>
@@ -38,6 +39,7 @@ jclass HBaseTableScanner::compare_op_cl_ = NULL;
 jmethodID HBaseTableScanner::scan_ctor_ = NULL;
 jmethodID HBaseTableScanner::scan_set_max_versions_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_caching_id_ = NULL;
+jmethodID HBaseTableScanner::scan_set_cache_blocks_id_ = NULL;
 jmethodID HBaseTableScanner::scan_add_column_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_filter_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_start_row_id_ = NULL;
@@ -77,7 +79,7 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
 }
 
 HBaseTableScanner::HBaseTableScanner(
-    ScanNode* scan_node, HBaseTableFactory* htable_factory, RuntimeState* state)
+    HBaseScanNode* scan_node, HBaseTableFactory* htable_factory, RuntimeState* state)
   : scan_node_(scan_node),
     htable_factory_(htable_factory),
     htable_(NULL),
@@ -93,9 +95,18 @@ HBaseTableScanner::HBaseTableScanner(
     all_keyvalues_present_(false),
     value_pool_(new MemPool(state->mem_limits())),
     buffer_pool_(new MemPool(state->mem_limits())),
-    rows_cached_(DEFAULT_ROWS_CACHED),
     scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
       "HBaseTableScanner.ScanSetup")) {
+  const TQueryOptions& query_option = state->query_options();
+  if (query_option.__isset.hbase_caching && query_option.hbase_caching > 0) {
+    rows_cached_ = query_option.hbase_caching;
+  } else {
+    int max_caching = scan_node_->suggested_max_caching();
+    rows_cached_ = (max_caching > 0 && max_caching < DEFAULT_ROWS_CACHED) ?
+        max_caching : DEFAULT_ROWS_CACHED;
+  }
+  cache_blocks_ = query_option.__isset.hbase_cache_blocks &&
+      query_option.hbase_cache_blocks;
 }
 
 Status HBaseTableScanner::Init() {
@@ -147,6 +158,8 @@ Status HBaseTableScanner::Init() {
       "(I)Lorg/apache/hadoop/hbase/client/Scan;");
   RETURN_ERROR_IF_EXC(env);
   scan_set_caching_id_ = env->GetMethodID(scan_cl_, "setCaching", "(I)V");
+  RETURN_ERROR_IF_EXC(env);
+  scan_set_cache_blocks_id_ = env->GetMethodID(scan_cl_, "setCacheBlocks", "(Z)V");
   RETURN_ERROR_IF_EXC(env);
   scan_add_column_id_ = env->GetMethodID(scan_cl_, "addColumn",
       "([B[B)Lorg/apache/hadoop/hbase/client/Scan;");
@@ -276,6 +289,10 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
 
   // scan_.setCaching(rows_cached_);
   env->CallObjectMethod(scan_, scan_set_caching_id_, rows_cached_);
+  RETURN_ERROR_IF_EXC(env);
+
+  // scan_.setCacheBlocks(cache_blocks_);
+  env->CallObjectMethod(scan_, scan_set_cache_blocks_id_, cache_blocks_);
   RETURN_ERROR_IF_EXC(env);
 
   const vector<SlotDescriptor*>& slots = tuple_desc->slots();

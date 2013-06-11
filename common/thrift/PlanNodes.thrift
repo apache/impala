@@ -116,6 +116,9 @@ struct THBaseScanNode {
   2: required string table_name
 
   3: optional list<THBaseFilter> filters
+  
+  // Suggested max value for "hbase.client.scan.setCaching"
+  4: optional i32 suggested_max_caching
 }
 
 struct TEqJoinCondition {

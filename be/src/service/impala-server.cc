@@ -1488,6 +1488,13 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_abort_on_default_limit_exceeded(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::HBASE_CACHING:
+        query_options->__set_hbase_caching(atoi(value.c_str()));
+        break;
+      case TImpalaQueryOptions::HBASE_CACHE_BLOCKS:
+        query_options->__set_hbase_cache_blocks(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1750,6 +1757,12 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::PARQUET_COMPRESSION_CODEC:
         val << query_option.parquet_compression_codec;
+        break;
+      case TImpalaQueryOptions::HBASE_CACHING:
+        val << query_option.hbase_caching;
+        break;
+      case TImpalaQueryOptions::HBASE_CACHE_BLOCKS:
+        val << query_option.hbase_cache_blocks;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

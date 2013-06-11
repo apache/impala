@@ -191,6 +191,12 @@ public class ImpaladClientExecutor {
         case PARQUET_COMPRESSION_CODEC:
           optionValue = String.valueOf(queryOptions.getParquet_compression_codec());
           break;
+        case HBASE_CACHING:
+          optionValue = String.valueOf(queryOptions.getHbase_caching());
+          break;
+        case HBASE_CACHE_BLOCKS:
+          optionValue = String.valueOf(queryOptions.isHbase_cache_blocks());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

@@ -48,6 +48,8 @@ class HBaseScanNode : public ScanNode {
 
   virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
 
+  const int suggested_max_caching() const { return suggested_max_caching_; }
+
  protected:
   // Write debug string of this into out.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
@@ -111,6 +113,10 @@ class HBaseScanNode : public ScanNode {
 
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
+
+  // Max value for "setCaching" suggested by FE. If no value was suggested by the FE, this
+  // will be 0.
+  int suggested_max_caching_;
 
   // Writes a slot in tuple_ from an HBase value containing text data.
   // The HBase value is converted into the appropriate target type.

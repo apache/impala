@@ -96,6 +96,22 @@ enum TImpalaQueryOptions {
   // Valid values are "snappy", "gzip" and "none"
   // Leave blank to use default.
   PARQUET_COMPRESSION_CODEC,
+  
+  // HBase scan query option. If set and > 0, HBASE_CACHING is the value for 
+  // "hbase.client.Scan.setCaching()" when querying HBase table. Otherwise, use backend
+  // default.
+  // If the value is too high, then the hbase region server will have a hard time (GC
+  // pressure and long response times). If the value is too small, then there will be
+  // extra trips to the hbase region server.
+  HBASE_CACHING,
+  
+  // HBase scan query option. If set, HBase scan will always set
+  // "hbase.client.setCacheBlocks" to CACHE_BLOCKS. Default is false.
+  // If the table is large and the query is doing big scan, set it to false to
+  // avoid polluting the cache in the hbase region server.
+  // If the table is small and the table is used several time, set it to true to improve
+  // performance. 
+  HBASE_CACHE_BLOCKS,
 }
 
 // Default values for each query option in ImpalaService.TImpalaQueryOptions
@@ -113,6 +129,8 @@ const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   TImpalaQueryOptions.DEBUG_ACTION : ""
   TImpalaQueryOptions.MEM_LIMIT : "0"
   TImpalaQueryOptions.PARQUET_COMPRESSION_CODEC : ""
+  TImpalaQueryOptions.HBASE_CACHING : "0"
+  TImpalaQueryOptions.HBASE_CACHE_BLOCKS: "false"
 }
 
 // The summary of an insert.

@@ -41,7 +41,11 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_errors_(0),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
-      text_converter_(new TextConverter('\\', "", false)) {
+      text_converter_(new TextConverter('\\', "", false)),
+      suggested_max_caching_(0) {
+  if (tnode.hbase_scan_node.__isset.suggested_max_caching) {
+    suggested_max_caching_ = tnode.hbase_scan_node.suggested_max_caching;
+  }
 }
 
 HBaseScanNode::~HBaseScanNode() {

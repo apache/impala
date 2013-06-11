@@ -31,6 +31,7 @@ class TupleDescriptor;
 class RuntimeState;
 class MemPool;
 class Status;
+class HBaseScanNode;
 
 // JNI wrapper class implementing minimal functionality for scanning an HBase table.
 // Note: When none of the requested family/qualifiers exist in a particular row,
@@ -46,7 +47,7 @@ class HBaseTableScanner {
   // Initialize all members to NULL, except ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
-  HBaseTableScanner(ScanNode* scan_node, HBaseTableFactory* htable_factory,
+  HBaseTableScanner(HBaseScanNode* scan_node, HBaseTableFactory* htable_factory,
                     RuntimeState* state);
 
   // JNI setup. Create global references to classes,
@@ -107,8 +108,8 @@ class HBaseTableScanner {
  private:
   static const int DEFAULT_ROWS_CACHED = 1024;
 
-  // The enclosing ScanNode; it is used to update performance counters.
-  ScanNode* scan_node_;
+  // The enclosing HBaseScanNode.
+  HBaseScanNode* scan_node_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass scan_cl_;
@@ -125,6 +126,7 @@ class HBaseTableScanner {
   static jmethodID scan_ctor_;
   static jmethodID scan_set_max_versions_id_;
   static jmethodID scan_set_caching_id_;
+  static jmethodID scan_set_cache_blocks_id_;
   static jmethodID scan_add_column_id_;
   static jmethodID scan_set_filter_id_;
   static jmethodID scan_set_start_row_id_;
@@ -207,6 +209,9 @@ class HBaseTableScanner {
   // Number of rows for caching that will be passed to scanners.
   // Set in the HBase call Scan.setCaching();
   int rows_cached_;
+
+  // True if the scanner should set Scan.setCacheBlocks to true.
+  bool cache_blocks_;
 
   // HBase specific counters
   RuntimeProfile::Counter* scan_setup_timer_;
