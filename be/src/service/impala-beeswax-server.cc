@@ -139,13 +139,13 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   }
 
   shared_ptr<QueryExecState> exec_state;
-  ThriftServer::SessionKey* session_key = ThriftServer::GetThreadSessionKey();
   shared_ptr<SessionState> session;
-  GetSessionState(*session_key, &session);
+  GetSessionState(ThriftServer::GetThreadSessionKey(), &session);
   DCHECK(session != NULL);  // We made these keys...
   {
-    // The session is created when it connects.  We don't know the user until
-    // something is run.
+    // The session is created when the client connects. Depending on the underlying
+    // transport, the username may be known at that time. If the username hasn't been set
+    // yet, set it now.
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;
     query_request.sessionState.user = session->user;
@@ -179,13 +179,13 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   }
 
   shared_ptr<QueryExecState> exec_state;
-  ThriftServer::SessionKey* session_key = ThriftServer::GetThreadSessionKey();
   shared_ptr<SessionState> session;
-  GetSessionState(*session_key, &session);
+  GetSessionState(ThriftServer::GetThreadSessionKey(), &session);
   DCHECK(session != NULL);  // We made these keys...
   {
-    // The session is created when it connects.  We don't know the user until
-    // something is run.
+    // The session is created when the client connects. Depending on the underlying
+    // transport, the username may be known at that time. If the username hasn't been set
+    // yet, set it now.
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;
   }
@@ -416,23 +416,27 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
   ResetTableInternal(request.db_name, request.table_name).ToThrift(&status);
 }
 
-void ImpalaServer::SessionStart(const ThriftServer::SessionKey& session_key) {
-  // Currently Kerberos uses only one session id, so there can be dups.
-  // TODO: Re-enable this check once IMP-391 is resolved
-  // DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
+void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {
+  // Session should not exist.
+  const ThriftServer::SessionKey& session_key = session_context.session_key;
+  DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
   shared_ptr<SessionState> state;
   state.reset(new SessionState);
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->database = "default";
   state->session_type = BEESWAX;
+  // If the username was set by a lower-level transport, use it.
+  if (!session_context.username.empty()) {
+    state->user = session_context.username;
+  }
 
   lock_guard<mutex> l(session_state_map_lock_);
   session_state_map_.insert(make_pair(session_key, state));
 }
 
-void ImpalaServer::SessionEnd(const ThriftServer::SessionKey& session_key) {
-  CloseSessionInternal(session_key);
+void ImpalaServer::SessionEnd(const ThriftServer::SessionContext& session_context) {
+  CloseSessionInternal(session_context.session_key);
 }
 
 Status ImpalaServer::QueryToTClientRequest(const Query& query,
@@ -442,7 +446,7 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
-    RETURN_IF_ERROR(GetSessionState(*ThriftServer::GetThreadSessionKey(), &session));
+    RETURN_IF_ERROR(GetSessionState(ThriftServer::GetThreadSessionKey(), &session));
     session->ToThrift(&request->sessionState);
   }
 

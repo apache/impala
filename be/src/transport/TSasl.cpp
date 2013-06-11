@@ -21,6 +21,8 @@
 #include "config.h"
 #ifdef HAVE_SASL_SASL_H
 
+#include <cstring>
+#include <sstream>
 #include <transport/TSasl.h>
 
 using namespace std;
@@ -56,8 +58,22 @@ uint8_t* TSasl::wrap(const uint8_t* outgoing,
   return output;
 }
 
+string TSasl::getUsername() {
+  const char* username;
+  int result =
+      sasl_getprop(conn, SASL_USERNAME, reinterpret_cast<const void **>(&username));
+  if (result != SASL_OK) {
+    stringstream ss;
+    ss << "Error getting SASL_USERNAME property: " << sasl_errstring(result, NULL, NULL);
+    throw SaslException(ss.str().c_str());
+  }
+  // Copy the username and return it to the caller. There is no cleanup/delete call for
+  // calls to sasl_getprops, the sasl layer handles the cleanup internally.
+  return string(username, strlen(username));
+}
+
 TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationId,
-    const string& protocol, const string& serverName, const map<string,string>& props, 
+    const string& protocol, const string& serverName, const map<string,string>& props,
     sasl_callback_t* callbacks) {
   conn = NULL;
   if (!props.empty()) {

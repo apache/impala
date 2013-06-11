@@ -40,18 +40,26 @@ class ThriftServer {
   // An opaque identifier for the current session, which identifies a client connection.
   typedef std::string SessionKey;
 
+  // Username
+  typedef std::string Username;
+
+  // Per-connection session information.
+  struct SessionContext {
+    SessionKey session_key;
+    Username username;
+  };
+
   // Interface class for receiving session creation / termination events.
   class SessionHandlerIf {
    public:
     // Called when a session is established (when a client connects).
-    virtual void SessionStart(const SessionKey& session_key) = 0;
+    virtual void SessionStart(const SessionContext& session_context) = 0;
 
     // Called when a session is terminated (when a client closes the connection).
-    // After this callback returns, the memory session_key references is no longer valid
-    // and clients must not refer to it again.
-    virtual void SessionEnd(const SessionKey& session_key) = 0;
+    // After this callback returns, the memory session_context references is no longer
+    // valid and clients must not refer to it again.
+    virtual void SessionEnd(const SessionContext& session_context) = 0;
   };
-
 
   static const int DEFAULT_WORKER_THREADS = 2;
 
@@ -100,7 +108,15 @@ class ThriftServer {
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static SessionKey* GetThreadSessionKey();
+  static const SessionKey& GetThreadSessionKey();
+
+  // Returns the username provided by the underlying transport for the current session
+  // or an empty string if the transport did not provide a username. Currently, only the
+  // TSasl transport provides this information.
+  // It is only safe to call this method during a Thrift processor RPC
+  // implementation. Otherwise, the result of calling this method is undefined.
+  // It is also only safe to reference the returned value during an RPC method.
+  static const Username& GetThreadUsername();
 
  private:
   // True if the server has been successfully started, for internal use only
@@ -129,13 +145,14 @@ class ThriftServer {
   // If not NULL, called when session events happen. Not owned by us.
   SessionHandlerIf* session_handler_;
 
-  // Protects session_keys_
-  boost::mutex session_keys_lock_;
+  // Protects session_contexts_
+  boost::mutex session_contexts_lock_;
 
-  // Map of active session keys to shared_ptr containing that key; when a key is
-  // removed it is automatically freed.
-  typedef boost::unordered_map<SessionKey*, boost::shared_ptr<SessionKey> > SessionKeySet;
-  SessionKeySet session_keys_;
+  // Map of active session context to a shared_ptr containing that context; when an item
+  // is removed from the map, it is automatically freed.
+  typedef boost::unordered_map<SessionContext*, boost::shared_ptr<SessionContext> >
+      SessionContextSet;
+  SessionContextSet session_contexts_;
 
   // True if using a secure transport
   bool kerberos_enabled_;

@@ -227,7 +227,6 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
 
   // Generate session id and the secret
-
   {
     lock_guard<mutex> l(uuid_lock_);
     uuid sessionid = uuid_generator_();
@@ -245,7 +244,14 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->session_type = HIVESERVER2;
-  state->user = request.username;
+
+  // If the username was set by a lower-level transport, use it.
+  const ThriftServer::Username& username = ThriftServer::GetThreadUsername();
+  if (!username.empty()) {
+    state->user = username;
+  } else {
+    state->user = request.username;
+  }
 
   // TODO: request.configuration might specify database.
   state->database = "default";

@@ -60,6 +60,10 @@ namespace apache { namespace thrift { namespace transport {
     return (transport_->peek());
   }
 
+  string TSaslTransport::getUsername() {
+    return sasl_->getUsername();
+  }
+
   void TSaslTransport::sendSaslMessage(const NegotiationStatus status,
       const uint8_t* payload, const uint32_t length, bool flush) {
     uint8_t messageHeader[STATUS_BYTES + PAYLOAD_LENGTH_BYTES];

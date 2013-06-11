@@ -218,11 +218,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // SessionHandlerIf methods
   // Called when a Beeswax session starts. Registers a new SessionState with the provided
   // key.
-  virtual void SessionStart(const ThriftServer::SessionKey& session_key);
+  virtual void SessionStart(const ThriftServer::SessionContext& session_context);
 
   // Called when a Beeswax session terminates. Unregisters the SessionState associated
   // with the provided key.
-  virtual void SessionEnd(const ThriftServer::SessionKey& session_key);
+  virtual void SessionEnd(const ThriftServer::SessionContext& session_context);
 
   // Called when a membership update is received from the state-store. Looks for
   // active nodes that have failed, and cancels any queries running on them.

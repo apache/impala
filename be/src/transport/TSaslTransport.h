@@ -137,6 +137,13 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
     return transport_;
   }
 
+  /**
+   * Returns the username associated with the underlying sasl connection.
+   *
+   * @throws TTransportException if an error occurs
+   */
+  std::string getUsername();
+
  protected:
   // Underlying transport
   boost::shared_ptr<TTransport> transport_;

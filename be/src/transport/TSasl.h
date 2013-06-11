@@ -102,6 +102,9 @@ class TSasl {
   /* Determines whether this mechanism has an optional initial response. */
   virtual bool hasInitialResponse() { return false; }
 
+  /* Returns the username from the underlying sasl connection. */
+  std::string getUsername();
+
   protected:
    /* Authorization is complete. */
    bool authComplete;
@@ -139,7 +142,7 @@ class TSaslClient : public sasl::TSasl {
 
     /* Retrieves the negotiated property */
     std::string     getNegotiatedProperty(const std::string& propName);
-     
+
     /* Determines whether this mechanism has an optional initial response. */
     virtual bool hasInitialResponse();
 
