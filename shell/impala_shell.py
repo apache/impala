@@ -347,6 +347,7 @@ class ImpalaShell(cmd.Cmd):
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
         self.cmdqueue.append('invalidate metadata' + ImpalaShell.CMD_DELIM)
+        print_to_stderr("Invalidating Metadata")
       if self.current_db:
         self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
@@ -677,9 +678,9 @@ class ImpalaShell(cmd.Cmd):
     # just checking the first token is insufficient.
     tokens = list(lexer)
     if filter(self.INSERT_REGEX.match, tokens):
-      return self.__handle_insert_query(query)    
+      return self.__handle_insert_query(query)
     return self.__execute_query(query)
-      
+
   def do_use(self, args):
     """Executes a USE... query"""
     query = self.__create_beeswax_query_handle()
