@@ -27,6 +27,7 @@ from random import choice
 from sys import exit
 from time import sleep
 from tests.common.workload_runner import WorkloadRunner, QueryExecutionDetail
+from tests.util.plugin_runner import PluginRunner
 
 # Options
 # TODO: Find ways to reduce the number of options.
@@ -82,6 +83,9 @@ parser.add_option("-V", "--verify_results", dest="verify_results", action="store
                   default=False, help="If set, verifies query results")
 parser.add_option("-c", "--client_type", dest="client_type", default='beeswax',
                   help="Client type. Valid options are 'beeswax' or 'jdbc'")
+parser.add_option("--plugin_names", dest="plugin_names", default=None,
+                  help=("Set of comma-separated plugin names; "
+                        "plugin names are case sensitive"))
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -207,22 +211,16 @@ if __name__ == "__main__":
   VALID_CLIENT_TYPES = ['beeswax', 'jdbc']
   if options.client_type not in VALID_CLIENT_TYPES:
     LOG.error("Invalid client type %s" % options.client_type)
-    sys.exit(1);
+    sys.exit(1)
 
-  workload_runner = WorkloadRunner(
-    client_type=options.client_type,
-    hive_cmd=options.hive_cmd,
-    impalad=options.impalad,
-    iterations=options.iterations,
-    num_clients=options.num_clients,
-    compare_with_hive=options.compare_with_hive,
-    skip_impala=options.skip_impala,
-    exec_options=options.exec_options,
-    profiler=options.profiler,
-    verbose=options.verbose,
-    prime_cache=options.prime_cache,
-    use_kerberos=options.use_kerberos,
-    verify_results=options.verify_results)
+  plugin_runner = None
+  if options.plugin_names:
+    plugin_runner = PluginRunner(options.plugin_names.split(','))
+
+  # create a dictionary for the configuration.
+  workload_config = vars(options)
+  workload_config['plugin_runner'] = plugin_runner
+  workload_runner = WorkloadRunner(**workload_config)
 
   failure_injector = None
   if options.failure_frequency > 0:

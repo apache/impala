@@ -70,6 +70,7 @@ class ImpalaQueryExecOptions(QueryExecOptions):
   def __init__(self, iterations, **kwargs):
     QueryExecOptions.__init__(self, iterations, **kwargs)
     self.impalad = self.options.get('impalad', 'localhost:21000')
+    self.plugin_runner = self.options.get('plugin_runner', None)
 
 
 class JdbcQueryExecOptions(QueryExecOptions):
@@ -173,6 +174,7 @@ def execute_using_impala_beeswax(query, query_options):
   """
   # Create a client object to talk to impalad
   exec_result = QueryExecutionResult()
+  plugin_runner = query_options.plugin_runner
   (success, client) = establish_beeswax_connection(query, query_options)
   if not success:
     return exec_result
@@ -182,15 +184,20 @@ def execute_using_impala_beeswax(query, query_options):
     client.execute(use_query)
   # execute the query
   results = []
+  # create a map for query options and the query names to send to the plugin
+  context = vars(query_options)
+  context['query_name'] = query
   for i in xrange(query_options.iterations):
     LOG.debug("Running iteration %d" % (i+1))
     result = QueryResult()
+    if plugin_runner: plugin_runner.run_plugins_pre(context=context)
     try:
       result = client.execute(query)
     except Exception, e:
       LOG.error(e)
       client.close_connection()
       return exec_result
+    if plugin_runner: plugin_runner.run_plugins_post(context=context)
     results.append(result)
   # We only need to print the results for a successfull run, not all.
   LOG.debug('Result:\n%s\n' % results[0])

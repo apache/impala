@@ -76,6 +76,7 @@ class WorkloadRunner(object):
     self.use_kerberos = kwargs.get('use_kerberos', False)
     self.run_using_hive = kwargs.get('compare_with_hive', False) or self.skip_impala
     self.verify_results = kwargs.get('verify_results', False)
+    self.plugin_runner = kwargs.get('plugin_runner', None)
     # TODO: Need to find a way to get this working without runquery
     #self.gprof_cmd = 'google-pprof --text ' + self.runquery_path + ' %s | head -n 60'
     self.__summary = str()
@@ -130,10 +131,12 @@ class WorkloadRunner(object):
           )),
         'impala_beeswax': lambda: (execute_using_impala_beeswax,
           ImpalaBeeswaxExecOptions(self.iterations,
+          plugin_runner=self.plugin_runner,
           exec_options=self.exec_options,
           use_kerberos=self.use_kerberos,
           db_name=db_name,
-          impalad=choice(self.TARGET_IMPALADS))),
+          impalad=choice(self.TARGET_IMPALADS)),
+          ),
         'jdbc': lambda: (execute_using_jdbc,
           JdbcQueryExecOptions(self.iterations,
           impalad=choice(self.TARGET_IMPALADS),
