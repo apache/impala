@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "util/webserver.h"
+
 #include <stdio.h>
 #include <signal.h>
 #include <string>
@@ -21,19 +23,20 @@
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
 
 #include "common/logging.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/mem-info.h"
 #include "util/url-coding.h"
-#include "util/webserver.h"
 #include "util/logging.h"
 #include "util/debug-util.h"
 #include "util/thrift-util.h"
 
 using namespace std;
 using namespace boost;
+using namespace boost::filesystem;
 using namespace google;
 
 const char* GetDefaultDocumentRoot();
@@ -53,6 +56,9 @@ DEFINE_string(webserver_certificate_file, "",
     "empty, webserver SSL support is not enabled");
 DEFINE_string(webserver_authentication_domain, "",
     "Domain used for debug webserver authentication");
+DEFINE_string(webserver_password_file, "",
+    "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
+    " debug webserver authentication");
 
 // Mongoose requires a non-null return from the callback to signify successful processing
 static void* PROCESSING_COMPLETE = reinterpret_cast<void*>(1);
@@ -165,6 +171,20 @@ Status Webserver::Start() {
     options.push_back("authentication_domain");
     options.push_back(FLAGS_webserver_authentication_domain.c_str());
   }
+
+  if (!FLAGS_webserver_password_file.empty()) {
+    // Mongoose doesn't log anything if it can't stat the password file (but will if it
+    // can't open it, which it tries to do during a request)
+    if (!exists(FLAGS_webserver_password_file)) {
+      stringstream ss;
+      ss << "Webserver: Password file does not exist: " << FLAGS_webserver_password_file;
+      return Status(ss.str());
+    }
+    LOG(INFO) << "Webserver: Password file is " << FLAGS_webserver_password_file;
+    options.push_back("global_passwords_file");
+    options.push_back(FLAGS_webserver_password_file.c_str());
+  }
+
   options.push_back("listening_ports");
   options.push_back(listening_str.c_str());
 
