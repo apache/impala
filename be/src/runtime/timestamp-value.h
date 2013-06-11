@@ -177,6 +177,11 @@ class  TimestampValue {
     return TimestampValue(boost::posix_time::second_clock::local_time());
   }
 
+  // Returns the local time with microsecond accuracy
+  static TimestampValue local_time_micros() {
+    return TimestampValue(boost::posix_time::microsec_clock::local_time());
+  }
+
  private:
   friend class UnusedClass;
 

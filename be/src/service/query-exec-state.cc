@@ -45,7 +45,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     current_batch_row_(0),
     num_rows_fetched_(0),
     impala_server_(server),
-    start_time_(TimestampValue::local_time()) {
+    start_time_(TimestampValue::local_time_micros()) {
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
   client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
   query_events_ = summary_profile_.AddEventSequence("Query Timeline");
@@ -158,7 +158,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest() {
 }
 
 void ImpalaServer::QueryExecState::Done() {
-  end_time_ = TimestampValue::local_time();
+  end_time_ = TimestampValue::local_time_micros();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
