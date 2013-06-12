@@ -1164,6 +1164,28 @@ void Coordinator::ReportQuerySummary() {
       fragment_profiles_[i].averaged_profile->AddInfoString(
           "num instances", lexical_cast<string>(fragment_profiles_[i].num_instances));
     }
+
+    // Add per node peak memory usage as InfoString
+    // Map from Impalad address to peak memory usage of this query
+    typedef boost::unordered_map<TNetworkAddress, int64_t> PerNodePeakMemoryUsage;
+    PerNodePeakMemoryUsage per_node_peak_mem_usage;
+    for (int i = 0; i < backend_exec_states_.size(); ++i) {
+      int64_t initial_usage = 0;
+      int64_t* mem_usage = FindOrInsert(&per_node_peak_mem_usage,
+          backend_exec_states_[i]->backend_address, initial_usage);
+      RuntimeProfile::Counter* mem_usage_counter =
+          backend_exec_states_[i]->profile->GetCounter("PeakMemoryUsage");
+      if (mem_usage_counter != NULL && mem_usage_counter->value() > *mem_usage) {
+        per_node_peak_mem_usage[backend_exec_states_[i]->backend_address] =
+            mem_usage_counter->value();
+      }
+    }
+    stringstream info;
+    BOOST_FOREACH(PerNodePeakMemoryUsage::value_type entry, per_node_peak_mem_usage) {
+      info << entry.first << "("
+           << PrettyPrinter::Print(entry.second, TCounterType::BYTES) << ") ";
+    }
+    query_profile_->AddInfoString("Per Node Peak Memory Usage", info.str());
   }
 
   if (VLOG_QUERY_IS_ON) {

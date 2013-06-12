@@ -91,11 +91,16 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     // we have a global limit
     runtime_state_->mem_limits()->push_back(exec_env_->mem_limit());
   }
-  if (request.query_options.mem_limit > 0) {
-    // we have a per-query limit
-    int64_t bytes_limit = request.query_options.mem_limit;
-    mem_limit_ = MemLimit::GetMemLimit(query_id_, bytes_limit);
-    runtime_state_->SetQueryMemLimit(mem_limit_.get());
+
+  // Set mem_limit_ to per query limit, or to unlimited if per query limit is not set.
+  // mem_limit_ also tracks peak mem usage of this node.
+  bool has_query_mem_limit = request.query_options.__isset.mem_limit &&
+      request.query_options.mem_limit > 0;
+  int64_t bytes_limit = has_query_mem_limit ?
+      request.query_options.mem_limit : numeric_limits<int64_t>::max();
+  mem_limit_ = MemLimit::GetMemLimit(query_id_, bytes_limit);
+  runtime_state_->SetQueryMemLimit(mem_limit_.get());
+  if (has_query_mem_limit) {
     if (bytes_limit > MemInfo::physical_mem()) {
       LOG(WARNING) << "Memory limit "
                    << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
@@ -170,6 +175,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set up profile counters
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
+  peak_mem_usage_ = ADD_COUNTER(profile(), "PeakMemoryUsage", TCounterType::BYTES);
 
   row_batch_.reset(new RowBatch(
       plan_->row_desc(), runtime_state_->batch_size(), *runtime_state_->mem_limits()));
@@ -336,6 +342,11 @@ void PlanFragmentExecutor::SendReport(bool done) {
     lock_guard<mutex> l(status_lock_);
     status = status_;
   }
+
+  if (mem_limit_.get() != NULL && peak_mem_usage_ != NULL) {
+    peak_mem_usage_->Set(mem_limit_->peak_consumption());
+  }
+
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.

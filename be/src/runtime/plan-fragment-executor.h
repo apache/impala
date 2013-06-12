@@ -195,6 +195,9 @@ class PlanFragmentExecutor {
   // of the execution.
   RuntimeProfile::Counter* average_thread_tokens_;
 
+  // Peak memory consumed
+  RuntimeProfile::Counter* peak_mem_usage_;
+
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
   // typedef for TPlanFragmentExecParams.per_node_scan_ranges

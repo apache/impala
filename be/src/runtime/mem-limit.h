@@ -23,6 +23,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "common/logging.h"
+#include "common/atomic.h"
 #include "util/debug-util.h"
 
 #include "gen-cpp/Types_types.h" // for TUniqueId
@@ -31,10 +32,13 @@ namespace impala {
 
 // A MemLimit tracks memory consumption against a particular limit.
 // Thread-safe.
-// TODO: track peak allocation?
 class MemLimit {
  public:
-  MemLimit(int64_t byte_limit): limit_(byte_limit), consumption_(0) {}
+  MemLimit(int64_t byte_limit)
+    : limit_(byte_limit),
+      consumption_(0),
+      peak_consumption_(0) {
+  }
 
   ~MemLimit();
 
@@ -49,8 +53,9 @@ class MemLimit {
       const TUniqueId& id, int64_t byte_limit);
 
   void Consume(int64_t bytes) {
-    __sync_fetch_and_add(&consumption_, bytes);
+    int64_t newval = __sync_add_and_fetch(&consumption_, bytes);
     DCHECK_GE(consumption_, 0);
+    peak_consumption_.UpdateMax(newval);
   }
 
   void Release(int64_t bytes) {
@@ -64,6 +69,7 @@ class MemLimit {
 
   int64_t limit() const { return limit_; }
   int64_t consumption() const { return consumption_; }
+  int64_t peak_consumption() const { return peak_consumption_; }
 
   static void UpdateLimits(int64_t bytes, std::vector<MemLimit*>* limits) {
     for (std::vector<MemLimit*>::iterator i = limits->begin(); i != limits->end(); ++i) {
@@ -97,6 +103,7 @@ class MemLimit {
   TUniqueId id_;
   int64_t limit_;  // in bytes
   int64_t consumption_;  // in bytes
+  AtomicInt<int64_t> peak_consumption_; // in bytes
 };
 
 }
