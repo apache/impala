@@ -28,3 +28,5 @@ add_library(Common STATIC
 add_library(GlobalFlags STATIC
   global-flags.cc
 )
+
+ADD_BE_TEST(atomic-test)

@@ -34,7 +34,7 @@ void ProgressUpdater::Update(int64_t delta) {
   DCHECK_GE(delta, 0);
   if (delta == 0) return;
 
-  __sync_fetch_and_add(&num_complete_, delta);
+  num_complete_ += delta;
 
   // Cache some shared variables to avoid locking.  It's possible the progress
   // update is out of order (e.g. prints 1 out of 10 after 2 out of 10) 
