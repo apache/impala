@@ -547,11 +547,10 @@ void ImpalaServer::CancelQueryPathHandler(const Webserver::ArgumentMap& args,
     (*output) << "Invalid query id";
     return;
   }
-  Status status = CancelInternal(unique_id);
-  if (status.ok()) {
+  if (UnregisterQuery(unique_id)) {
     (*output) << "Query cancellation successful";
   } else {
-    (*output) << "Error canceling query: " << status.GetErrorMsg();
+    (*output) << "Error cancelling query: " << unique_id << " not found";
   }
 }
 

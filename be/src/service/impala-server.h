@@ -355,6 +355,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status ResetTableInternal(const std::string& db_name, const std::string& table_name);
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
+  // Queries still need to be unregistered, usually via Close, after cancellation.
   // Caller should not hold any locks when calling this function.
   Status CancelInternal(const TUniqueId& query_id);
 

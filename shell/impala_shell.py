@@ -453,7 +453,7 @@ class ImpalaShell(cmd.Cmd):
 
     if self.is_interrupted.isSet():
       if status == RpcStatus.OK:
-        self.__cancel_query(handle)
+        self.__cancel_and_close_query(handle)
       return False
     if status != RpcStatus.OK:
       return False
@@ -473,7 +473,7 @@ class ImpalaShell(cmd.Cmd):
         else:
           return False
       elif self.is_interrupted.isSet():
-        return self.__cancel_query(handle)
+        return self.__cancel_and_close_query(handle)
       time.sleep(self.__get_sleep_interval(loop_start))
 
     # impalad does not support the fetching of metadata for certain types of queries.
@@ -499,13 +499,12 @@ class ImpalaShell(cmd.Cmd):
     num_rows_fetched = 0
     while True:
       # Fetch rows in batches of at most fetch_batch_size
-      (results, status) = self.__do_rpc(lambda: self.imp_service.fetch(
-                                                  handle, False, self.fetch_batch_size))
+      (results, status) = self.__do_rpc(\
+        lambda: self.imp_service.fetch(handle, False, self.fetch_batch_size))
 
       if self.is_interrupted.isSet() or status != RpcStatus.OK:
         # Worth trying to cleanup the query even if fetch failed
-        if self.connected:
-          self.__close_query_handle(handle)
+        self.__cancel_and_close_query(handle)
         return False
       num_rows_fetched += len(results.data)
       result_rows.extend(results.data)
@@ -524,10 +523,17 @@ class ImpalaShell(cmd.Cmd):
     self.last_query_handle = handle
     return self.__close_query_handle(handle)
 
+  def __cancel_and_close_query(self, handle):
+    """Cancel a query and immediately close it"""
+    if self.__cancel_query(handle):
+      return self.__close_query_handle(handle)
+    else:
+      return False
+
   def __close_query_handle(self, handle):
     """Close the query handle"""
-    self.__do_rpc(lambda: self.imp_service.close(handle))
-    return True
+    (_, status) = self.__do_rpc(lambda: self.imp_service.close(handle))
+    return status == RpcStatus.OK
 
   def __print_runtime_profile_if_enabled(self, handle):
     if self.show_profiles:
@@ -665,7 +671,7 @@ class ImpalaShell(cmd.Cmd):
         else:
           return False
       elif self.is_interrupted.isSet():
-        return self.__cancel_query(handle)
+        return self.__cancel_and_close_query(handle)
       time.sleep(0.05)
 
     (insert_result, status) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
@@ -686,10 +692,7 @@ class ImpalaShell(cmd.Cmd):
     # Cancel sets query_state to EXCEPTION before calling cancel() in the
     # co-ordinator, so we don't need to wait.
     (_, status) = self.__do_rpc(lambda: self.imp_service.Cancel(handle))
-    if status != RpcStatus.OK:
-      return False
-
-    return True
+    return status == RpcStatus.OK
 
   def __get_query_state(self, handle):
     state, status = self.__do_rpc(lambda : self.imp_service.get_state(handle))
