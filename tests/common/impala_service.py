@@ -19,6 +19,7 @@
 import json
 import logging
 import os
+import re
 import sys
 import urllib
 
@@ -83,21 +84,12 @@ class ImpaladService(BaseImpalaService):
     super(ImpaladService, self).__init__(hostname, webserver_port)
     self.beeswax_port = beeswax_port
 
-  def get_num_known_live_backends(self, timeout=10, interval=1):
+  def get_num_known_live_backends(self, timeout=30, interval=1):
     LOG.info("Getting num_known_live_backends from %s:%s" %\
         (self.hostname, self.webserver_port))
-
-    # TODO: Move to using Metrics once live backends are exposed on that page
-    class LiveBackendHtmlParser(HTMLParser):
-      def handle_data(self, data):
-        self.backends = [host.strip() for host in data.split('\n') if host]
-
-      def get_data(self):
-        return self.backends
-
-    parser = LiveBackendHtmlParser()
-    parser.feed(self.read_debug_webpage('backends', timeout, interval))
-    return len(parser.get_data())
+    result = self.read_debug_webpage('backends?raw', timeout, interval)
+    match = re.match(r'Known Backends \((\d+)\)', result)
+    return None if match is None else int(match.group(1))
 
   def wait_for_num_known_live_backends(self, expected_value, timeout=30):
     start_time = time()

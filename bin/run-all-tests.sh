@@ -67,9 +67,7 @@ ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1
 ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
     --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
-# Disable failure tests.
-# TODO: Investigate instability to get failure tests back online.
-#${IMPALA_HOME}/tests/run-process-failure-tests.sh
+${IMPALA_HOME}/tests/run-process-failure-tests.sh
 
 # Run JUnit frontend tests
 # Requires a running impalad cluster because some tests (such as DataErrorTest and
