@@ -188,6 +188,9 @@ public class ImpaladClientExecutor {
         case ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
           optionValue = String.valueOf(queryOptions.isAbort_on_default_limit_exceeded());
           break;
+        case PARQUET_COMPRESSION_CODEC:
+          optionValue = String.valueOf(queryOptions.getParquet_compression_codec());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

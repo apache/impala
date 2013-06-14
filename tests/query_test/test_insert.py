@@ -8,6 +8,8 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 
+PARQUET_CODECS = ['none', 'gzip', 'snappy']
+
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -23,14 +25,24 @@ class TestInsertQueries(ImpalaTestSuite):
     # tables for each test case to resolve the concurrency problems.
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
+    
+    cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
+        
     # Insert is currently only supported for text and parquet
+    # For parquet, we want to iterate through all the compression codecs
+    # TODO: each column in parquet can have a different codec.  We could
+    # test all the codecs in one table/file with some additional flags.
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['text', 'parquet'])
+        v.get_value('table_format').file_format == 'parquet' or \
+          (v.get_value('table_format').file_format == 'text' and \
+           v.get_value('compression_codec') == 'none'))
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
   @pytest.mark.execute_serially
   def test_insert1(self, vector):
+    vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
+        vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector)
 
   @pytest.mark.execute_serially

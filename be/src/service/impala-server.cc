@@ -1473,6 +1473,21 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
+      case TImpalaQueryOptions::PARQUET_COMPRESSION_CODEC: {
+        if (value.empty()) break;
+        if (iequals(value, "none")) {
+          query_options->__set_parquet_compression_codec(THdfsCompression::NONE);
+        } else if (iequals(value, "gzip")) {
+          query_options->__set_parquet_compression_codec(THdfsCompression::GZIP);
+        } else if (iequals(value, "snappy")) {
+          query_options->__set_parquet_compression_codec(THdfsCompression::SNAPPY);
+        } else {
+          stringstream ss;
+          ss << "Invalid parquet compression codec: " << value;
+          return Status(ss.str());
+        }
+        break;
+      }
       case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
         query_options->__set_abort_on_default_limit_exceeded(
             iequals(value, "true") || iequals(value, "1"));
@@ -1736,6 +1751,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
         val << query_option.abort_on_default_limit_exceeded;
+        break;
+      case TImpalaQueryOptions::PARQUET_COMPRESSION_CODEC:
+        val << query_option.parquet_compression_codec;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

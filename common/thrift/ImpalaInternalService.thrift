@@ -55,6 +55,8 @@ struct TQueryOptions {
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
   13: optional bool abort_on_default_limit_exceeded = 0
+  14: optional Descriptors.THdfsCompression parquet_compression_codec =
+      Descriptors.THdfsCompression.SNAPPY
 }
 
 // A scan range plus the parameters needed to execute that scan.

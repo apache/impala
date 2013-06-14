@@ -79,6 +79,7 @@ class RuntimeState {
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
+  const TQueryOptions& query_options() const { return query_options_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   int batch_size() const { return query_options_.batch_size; }
   bool abort_on_error() const { return query_options_.abort_on_error; }

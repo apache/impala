@@ -57,14 +57,14 @@ using namespace apache::thrift;
 class HdfsParquetTableWriter::ColumnWriter {
  public:
   // expr - the expression to generate output values for this column.
-  ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr) 
+  ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr, 
+      const THdfsCompression::type& codec) 
     : parent_(parent), expr_(expr), 
+      codec_(codec),
       num_data_pages_(0), current_page_(NULL),
       num_values_(0),
       total_byte_size_(0) {
-    // Default to snappy compressed
-    Codec::CreateCompressor(parent_->state_, NULL, false, THdfsCompression::SNAPPY,
-      &compressor_);
+    Codec::CreateCompressor(parent_->state_, NULL, false, codec, &compressor_);
   }
 
   // Append the row to this column.  This buffers the value into a data page.
@@ -92,7 +92,7 @@ class HdfsParquetTableWriter::ColumnWriter {
   uint64_t num_values() const { return num_values_; }
   uint64_t total_size() const { return total_byte_size_; }
   parquet::CompressionCodec::type codec() const { 
-    return parquet::CompressionCodec::SNAPPY; 
+    return IMPALA_TO_PARQUET_CODEC[codec_];
   }
  
  private:
@@ -146,6 +146,7 @@ class HdfsParquetTableWriter::ColumnWriter {
   HdfsParquetTableWriter* parent_;
   Expr* expr_;
 
+  THdfsCompression::type codec_;
   // Compression codec for this column.  If NULL, this column is will not be compressed.
   scoped_ptr<Codec> compressor_;
   
@@ -409,9 +410,19 @@ Status HdfsParquetTableWriter::Init() {
   // Initialize file metadata
   file_metadata_.version = PARQUET_CURRENT_VERSION;
 
+  // Default to snappy compressed
+  THdfsCompression::type codec = THdfsCompression::SNAPPY;
+
+  const TQueryOptions& query_options = state_->query_options();
+  if (query_options.__isset.parquet_compression_codec) {
+    codec = query_options.parquet_compression_codec;
+  }
+  VLOG_FILE << "Using compression codec: " << codec;
+
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
-    columns_[i] = state_->obj_pool()->Add(new ColumnWriter(this, output_exprs_[i]));
+    columns_[i] = state_->obj_pool()->Add(
+        new ColumnWriter(this, output_exprs_[i], codec));
   }
   RETURN_IF_ERROR(CreateSchema());
   return Status::OK;

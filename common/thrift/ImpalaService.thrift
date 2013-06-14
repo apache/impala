@@ -91,6 +91,11 @@ enum TImpalaQueryOptions {
   
   // If true, raise an error when the DEFAULT_ORDER_BY_LIMIT has been reached.
   ABORT_ON_DEFAULT_LIMIT_EXCEEDED,
+
+  // Compression codec for parquet when inserting into parquet tables.
+  // Valid values are "snappy", "gzip" and "none"
+  // Leave blank to use default.
+  PARQUET_COMPRESSION_CODEC,
 }
 
 // Default values for each query option in ImpalaService.TImpalaQueryOptions
@@ -107,6 +112,7 @@ const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
   TImpalaQueryOptions.DEBUG_ACTION : ""
   TImpalaQueryOptions.MEM_LIMIT : "0"
+  TImpalaQueryOptions.PARQUET_COMPRESSION_CODEC : ""
 }
 
 // The summary of an insert.

@@ -40,12 +40,23 @@ const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BYTE_ARRAY,
 };
 
-// Mapping of parquet codec enums to Impala enums
+// Mapping of Parquet codec enums to Impala enums
 const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::NONE,
   THdfsCompression::SNAPPY,
   THdfsCompression::GZIP,
   THdfsCompression::LZO
+};
+
+// Mapping of Impala codec enums to Parquet enums
+const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
+  parquet::CompressionCodec::UNCOMPRESSED,
+  parquet::CompressionCodec::SNAPPY,  // DEFAULT
+  parquet::CompressionCodec::GZIP,    // GZIP
+  parquet::CompressionCodec::GZIP,    // DEFLATE
+  parquet::CompressionCodec::SNAPPY,
+  parquet::CompressionCodec::SNAPPY,  // SNAPPY_BLOCKED
+  parquet::CompressionCodec::LZO,
 };
 
 }
