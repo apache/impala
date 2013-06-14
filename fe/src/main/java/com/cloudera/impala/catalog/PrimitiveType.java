@@ -244,7 +244,7 @@ public enum PrimitiveType {
     compatibilityMatrix[INT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
 
     compatibilityMatrix[BIGINT.ordinal()][BIGINT.ordinal()] = BIGINT;
-    compatibilityMatrix[BIGINT.ordinal()][FLOAT.ordinal()] = DOUBLE;
+    compatibilityMatrix[BIGINT.ordinal()][FLOAT.ordinal()] = FLOAT;
     compatibilityMatrix[BIGINT.ordinal()][DOUBLE.ordinal()] = DOUBLE;
     compatibilityMatrix[BIGINT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[BIGINT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
