@@ -121,6 +121,8 @@ functions = [
   ['String_Lower', 'STRING', ['STRING'], 'StringFunctions::Lower', ['lower', 'lcase']],
   ['String_Upper', 'STRING', ['STRING'], 'StringFunctions::Upper', ['upper', 'ucase']],
   ['String_Reverse', 'STRING', ['STRING'], 'StringFunctions::Reverse', ['reverse']],
+  ['String_Translate', 'STRING', ['STRING', 'STRING', 'STRING'], 
+        'StringFunctions::Translate', ['translate']],
   ['String_Trim', 'STRING', ['STRING'], 'StringFunctions::Trim', ['trim']],
   ['String_Ltrim', 'STRING', ['STRING'], 'StringFunctions::Ltrim', ['ltrim']],
   ['String_Rtrim', 'STRING', ['STRING'], 'StringFunctions::Rtrim', ['rtrim']],

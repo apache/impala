@@ -272,6 +272,41 @@ void* StringFunctions::Reverse(Expr* e, TupleRow* row) {
   return (&e->result_.string_val);
 }
 
+void* StringFunctions::Translate(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  if (str == NULL) return NULL;
+  StringValue* src = reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
+  if (src == NULL) return NULL;
+  StringValue* dst = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
+  if (dst == NULL) return NULL;
+
+  e->result_.string_data.resize(str->len);
+  e->result_.SyncStringVal();
+
+  // TODO: if we know src and dst are constant, we can prebuild a conversion
+  // table to remove the inner loop.
+  int result_len = 0;
+  for (int i = 0; i < str->len; ++i) {
+    bool matched_src = false;
+    for (int j = 0; j < src->len; ++j) {
+      if (str->ptr[i] == src->ptr[j]) {
+        if (j < dst->len) {
+          e->result_.string_val.ptr[result_len++] = dst->ptr[j];
+        } else {
+          // src[j] doesn't map to any char in dst, the char is dropped.
+        }
+        matched_src = true;
+        break;
+      } 
+    }
+    if (!matched_src) e->result_.string_val.ptr[result_len++] = str->ptr[i];
+  }
+
+  e->result_.string_val.len = result_len;
+  return &e->result_.string_val;
+}
+
 void* StringFunctions::Trim(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   StringValue* str = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));

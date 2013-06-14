@@ -1186,6 +1186,22 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("strright('abcdefg', NULL)", TYPE_STRING);
   TestIsNull("strright(NULL, NULL)", TYPE_STRING);
 
+  TestStringValue("translate('', '', '')", "");
+  TestStringValue("translate('abcd', '', '')", "abcd");
+  TestStringValue("translate('abcd', 'xyz', '')", "abcd");
+  TestStringValue("translate('abcd', 'a', '')", "bcd");
+  TestStringValue("translate('abcd', 'aa', '')", "bcd");
+  TestStringValue("translate('abcd', 'aba', '')", "cd");
+  TestStringValue("translate('abcd', 'cd', '')", "ab");
+  TestStringValue("translate('abcd', 'cd', 'xy')", "abxy");
+  TestStringValue("translate('abcdabcd', 'cd', 'xy')", "abxyabxy");
+  TestStringValue("translate('abcd', 'abc', 'xy')", "xyd");
+  TestStringValue("translate('abcd', 'abc', 'wxyz')", "wxyd");
+  TestStringValue("translate('x', 'xx', 'ab')", "a");
+  TestIsNull("translate(NULL, '', '')", TYPE_STRING);
+  TestIsNull("translate('', NULL, '')", TYPE_STRING);
+  TestIsNull("translate('', '', NULL)", TYPE_STRING);
+
   TestStringValue("trim('')", "");
   TestStringValue("trim('      ')", "");
   TestStringValue("trim('   abcdefg   ')", "abcdefg");
