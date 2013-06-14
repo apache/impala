@@ -1192,23 +1192,19 @@ Status ImpalaServer::DropTable(const TDropTableParams& params) {
   return Status::OK;
 }
 
-Status ImpalaServer::DescribeTable(const string& db, const string& table,
-    TDescribeTableResult* columns) {
+Status ImpalaServer::DescribeTable(const TDescribeTableParams& params,
+    TDescribeTableResult* response) {
   JNIEnv* jni_env = getJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   jbyteArray request_bytes;
-  TDescribeTableParams params;
-  params.__set_db(db);
-  params.__set_table_name(table);
 
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
   jbyteArray result_bytes = static_cast<jbyteArray>(
       jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
   RETURN_ERROR_IF_EXC(jni_env);
 
-  TDescribeTableResult result;
-  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, columns));
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
   return Status::OK;
 }
 

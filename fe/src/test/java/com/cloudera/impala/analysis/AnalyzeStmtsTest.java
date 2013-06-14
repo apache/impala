@@ -319,6 +319,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestDescribe() throws AnalysisException {
+    AnalyzesOk("describe formatted functional.alltypes");
+    AnalyzesOk("describe functional.alltypes");
+    AnalysisError("describe formatted nodb.alltypes",
+        "Database does not exist: nodb");
+    AnalysisError("describe functional.notbl",
+        "Table does not exist: functional.notbl");
+  }
+
+  @Test
   public void TestUsingClause() throws AnalysisException {
     AnalyzesOk("select a.int_col, b.int_col from functional.alltypes a join " +
         "functional.alltypes b using (int_col)");

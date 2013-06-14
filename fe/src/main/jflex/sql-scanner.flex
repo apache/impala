@@ -93,6 +93,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("fileformat", new Integer(SqlParserSymbols.KW_FILEFORMAT));
     keywordMap.put("float", new Integer(SqlParserSymbols.KW_FLOAT));
     keywordMap.put("format", new Integer(SqlParserSymbols.KW_FORMAT));
+    keywordMap.put("formatted", new Integer(SqlParserSymbols.KW_FORMATTED));
     keywordMap.put("from", new Integer(SqlParserSymbols.KW_FROM));
     keywordMap.put("full", new Integer(SqlParserSymbols.KW_FULL));
     keywordMap.put("group", new Integer(SqlParserSymbols.KW_GROUP));

@@ -377,8 +377,9 @@ public class JniFrontend {
   public byte[] describeTable(byte[] thriftDescribeTableParams) throws ImpalaException {
     TDescribeTableParams params = new TDescribeTableParams();
     deserializeThrift(params, thriftDescribeTableParams);
-    TDescribeTableResult result = new TDescribeTableResult();
-    result.setColumns(frontend.describeTable(params.getDb(), params.getTable_name()));
+
+    TDescribeTableResult result = frontend.describeTable(
+        params.getDb(), params.getTable_name(), params.getOutput_style());
 
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

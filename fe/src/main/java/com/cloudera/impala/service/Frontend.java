@@ -45,7 +45,6 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.FileFormat;
@@ -70,6 +69,8 @@ import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
+import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
+import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
@@ -169,10 +170,17 @@ public class Frontend {
     } else if (analysis.isDescribeStmt()) {
       ddl.ddl_type = TDdlType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
-      metadata.setColumnDescs(Arrays.asList(
-          new TColumnDesc("name", TPrimitiveType.STRING),
-          new TColumnDesc("type", TPrimitiveType.STRING),
-          new TColumnDesc("comment", TPrimitiveType.STRING)));
+      // DESCRIBE FORMATTED commands return all all results in a single column.
+      if (analysis.getDescribeStmt().getOutputStyle() ==
+          TDescribeTableOutputStyle.FORMATTED) {
+        metadata.setColumnDescs(Arrays.asList(
+            new TColumnDesc("describe_formatted", TPrimitiveType.STRING)));
+      } else {
+        metadata.setColumnDescs(Arrays.asList(
+            new TColumnDesc("name", TPrimitiveType.STRING),
+            new TColumnDesc("type", TPrimitiveType.STRING),
+            new TColumnDesc("comment", TPrimitiveType.STRING)));
+      }
     } else if (analysis.isAlterTableStmt()) {
       ddl.ddl_type = TDdlType.ALTER_TABLE;
       ddl.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
@@ -421,37 +429,15 @@ public class Frontend {
   }
 
   /**
-   * Returns a list of column descriptors describing a the columns in the
-   * specified table. Throws an AnalysisException if the table or db is not
-   * found.
+   * Returns table metadata, such as the column descriptors, in the specified table.
+   * Throws an exception if the table or db is not found or if there is an error
+   * loading the table metadata.
    */
-  public List<TColumnDef> describeTable(String dbName, String tableName)
-      throws ImpalaException {
-    Db db = catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
-    if (db == null) {
-      throw new AnalysisException("Unknown database: " + dbName);
-    }
-
-    Table table = null;
-    try {
-      table = db.getTable(tableName);
-    } catch (TableLoadingException e) {
-      throw new AnalysisException("Failed to load table metadata for: " + tableName, e);
-    }
-
-    if (table == null) {
-      throw new AnalysisException("Unknown table: " + db.getName() + "." + tableName);
-    }
-
-    List<TColumnDef> columns = Lists.newArrayList();
-    for (Column column: table.getColumnsInHiveOrder()) {
-      TColumnDef colDef = new TColumnDef(
-          new TColumnDesc(column.getName(), column.getType().toThrift()));
-      colDef.setComment(column.getComment());
-      columns.add(colDef);
-    }
-
-    return columns;
+  public TDescribeTableResult describeTable(String dbName, String tableName,
+      TDescribeTableOutputStyle outputStyle) throws ImpalaException {
+    Table table = catalog.getTable(dbName, tableName,
+        ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
+    return DescribeResultFactory.buildDescribeTableResult(table, outputStyle);
   }
 
   /**

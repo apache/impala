@@ -25,6 +25,7 @@ from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
+from tests.util.shell_util import exec_shell_cmd
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
@@ -222,6 +223,18 @@ class ImpalaTestSuite(BaseTestSuite):
     result = self.__execute_query(IMPALAD, query, query_exec_options)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
+
+
+  def exec_and_compare_hive_and_impala(self, exec_stmt):
+    """Executes the same statement in Hive and Impala and compares the results"""
+    rc, stdout, stderr =\
+        exec_shell_cmd("hive -e \"%s\"" % exec_stmt)
+    assert rc == 0, "stdout: %s\nstderr: %s" % (stdout, stderr)
+    result = self.client.execute(exec_stmt)
+
+    # Compare line-by-line (hive results go to stdout).
+    for impala, hive in zip(result.data, stdout.split('\n')):
+      assert impala.rstrip() == hive.rstrip()
 
   def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""

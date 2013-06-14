@@ -19,6 +19,7 @@ import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
+import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -172,15 +173,15 @@ terminal KW_ADD, KW_AND, KW_ALL, KW_ALTER, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW
   KW_COUNT, KW_CREATE, KW_DATABASE, KW_DATABASES, KW_DATA, KW_DATE, KW_DATETIME,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
-  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FROM, KW_FULL, KW_GROUP,
-  KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,KW_INTERVAL, KW_INTO,
-  KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MIN,
-  KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE,
-  KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RIGHT,
-  KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEQUENCEFILE, KW_SET, KW_SHOW,
-  KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED,
-  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE,
-  KW_USING, KW_VALUES, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
+  KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,KW_INTERVAL,
+  KW_INTO, KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION,
+  KW_MIN, KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
+  KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REGEXP, KW_RENAME,
+  KW_REPLACE, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT,
+  KW_SEQUENCEFILE, KW_SET, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
+  KW_TABLE, KW_TABLES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
+  KW_TO, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_VALUES, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -212,6 +213,7 @@ nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
+nonterminal TDescribeTableOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
@@ -871,8 +873,15 @@ show_pattern ::=
   ;
 
 describe_stmt ::=
-  KW_DESCRIBE table_name:table
-  {: RESULT = new DescribeStmt(table); :}
+  KW_DESCRIBE describe_output_style:style table_name:table
+  {: RESULT = new DescribeStmt(table, style); :}
+  ;
+
+describe_output_style ::=
+  KW_FORMATTED
+  {: RESULT = TDescribeTableOutputStyle.FORMATTED; :}
+  | /* empty */
+  {: RESULT = TDescribeTableOutputStyle.MINIMAL; :}
   ;
 
 select_stmt ::=

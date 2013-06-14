@@ -85,16 +85,33 @@ struct TColumnDef {
   2: optional string comment
 }
 
-// Arguments to DescribeTable, which returns a list of column descriptors for a
-// given table
+// Used by DESCRIBE <table> statements to control what information is returned and how to
+// format the output.
+enum TDescribeTableOutputStyle {
+  // The default output style if no options are specified for DESCRIBE <table>.
+  MINIMAL,
+  // Output additional information on the table in formatted style.
+  // Set for DESCRIBE FORMATTED statements.
+  FORMATTED
+}
+
+// Arguments to DescribeTable, which returns a list of column descriptors and additional
+// metadata for a given table. What information is returned is controlled by the
+// given TDescribeTableOutputStyle.
+// NOTE: This struct should only be used for intra-process communication.
 struct TDescribeTableParams {
-  1: optional string db
+  1: required string db
   2: required string table_name
+
+  // Controls the output style for this describe command.
+  3: required TDescribeTableOutputStyle output_style
 }
 
 // Results of a call to describeTable()
+// NOTE: This struct should only be used for intra-process communication.
 struct TDescribeTableResult {
-  1: required list<TColumnDef> columns
+  // Output from a DESCRIBE TABLE command.
+  1: required list<Data.TResultRow> results
 }
 
 // Parameters of CREATE DATABASE commands

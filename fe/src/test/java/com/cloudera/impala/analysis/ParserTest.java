@@ -1021,10 +1021,15 @@ public class ParserTest {
   public void TestDescribe() {
     // Missing argument
     ParserError("DESCRIBE");
+    ParserError("DESCRIBE FORMATTED");
+
     // Unqualified table ok
     ParsesOk("DESCRIBE tablename");
+    ParsesOk("DESCRIBE FORMATTED tablename");
+
     // Fully-qualified table ok
     ParsesOk("DESCRIBE databasename.tablename");
+    ParsesOk("DESCRIBE FORMATTED databasename.tablename");
   }
 
   @Test

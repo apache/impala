@@ -69,22 +69,12 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       return Status::OK;
     }
     case TDdlType::DESCRIBE: {
-      TDescribeTableResult table_columns;
-      const TDescribeTableParams* params = &exec_request.describe_table_params;
-      RETURN_IF_ERROR(impala_server_->DescribeTable(params->db,
-          params->table_name, &table_columns));
+      TDescribeTableResult response;
+      RETURN_IF_ERROR(impala_server_->DescribeTable(exec_request.describe_table_params,
+          &response));
 
       // Set the result set
-      result_set_.resize(table_columns.columns.size());
-      for (int i = 0; i < table_columns.columns.size(); ++i) {
-        TColumnDesc* columnDesc = &table_columns.columns[i].columnDesc;
-        result_set_[i].__isset.colVals = true;
-        result_set_[i].colVals.resize(3);
-        result_set_[i].colVals[0].__set_stringVal(columnDesc->columnName);
-        result_set_[i].colVals[1].__set_stringVal(
-            TypeToOdbcString(ThriftToType(columnDesc->columnType)));
-        result_set_[i].colVals[2].__set_stringVal(table_columns.columns[i].comment);
-      }
+      result_set_ = response.results;
       return Status::OK;
     }
     case TDdlType::ALTER_TABLE:

@@ -440,10 +440,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status GetDbNames(const std::string* pattern, const TSessionState* session,
       TGetDbsResult* table_names);
 
-  // Returns (in the output parameter) a list of columns for the specified table
-  // in the specified database.
-  Status DescribeTable(const std::string& db, const std::string& table,
-      TDescribeTableResult* columns);
+  // Returns (in the output parameter) the result of a DESCRIBE table command. This
+  // command retrieves table metadata, such as the column definitions. The metadata
+  // that is returned is controlled by setting the 'output_style' field. If this
+  // field is set to MINIMAL, only the column definitions are returned. If set to
+  // FORMATTED, extended metadata is returned (in addition to the column defs).
+  // This includes info about the table properties, SerDe properties, StorageDescriptor
+  // properties, and more.
+  Status DescribeTable(const TDescribeTableParams& params,
+      TDescribeTableResult* response);
 
   // Modifies an existing table's metastore metadata. The specific type of operation is
   // defined by the TAlterTableType field in TAlterTableParams. Some supported operations
