@@ -133,6 +133,9 @@ class PlanFragmentExecutor {
   // Profile information for plan and output sink.
   RuntimeProfile* profile();
 
+  // Name for peak memory usage counter
+  static const std::string PEAK_MEMORY_USAGE;
+
  private:
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()

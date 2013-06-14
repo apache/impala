@@ -50,6 +50,8 @@ using namespace apache::thrift::transport;
 
 namespace impala {
 
+const string PlanFragmentExecutor::PEAK_MEMORY_USAGE = "PeakMemoryUsage";
+
 PlanFragmentExecutor::PlanFragmentExecutor(
     ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
   : exec_env_(exec_env),
@@ -175,7 +177,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set up profile counters
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
-  peak_mem_usage_ = ADD_COUNTER(profile(), "PeakMemoryUsage", TCounterType::BYTES);
+  peak_mem_usage_ = ADD_COUNTER(profile(), PEAK_MEMORY_USAGE, TCounterType::BYTES);
 
   row_batch_.reset(new RowBatch(
       plan_->row_desc(), runtime_state_->batch_size(), *runtime_state_->mem_limits()));
@@ -335,16 +337,16 @@ void PlanFragmentExecutor::ReportProfile() {
 }
 
 void PlanFragmentExecutor::SendReport(bool done) {
+  if (mem_limit_.get() != NULL && peak_mem_usage_ != NULL) {
+    peak_mem_usage_->Set(mem_limit_->peak_consumption());
+  }
+
   if (report_status_cb_.empty()) return;
 
   Status status;
   {
     lock_guard<mutex> l(status_lock_);
     status = status_;
-  }
-
-  if (mem_limit_.get() != NULL && peak_mem_usage_ != NULL) {
-    peak_mem_usage_->Set(mem_limit_->peak_consumption());
   }
 
   // This will send a report even if we are cancelled.  If the query completed correctly

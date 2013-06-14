@@ -1169,12 +1169,22 @@ void Coordinator::ReportQuerySummary() {
     // Map from Impalad address to peak memory usage of this query
     typedef boost::unordered_map<TNetworkAddress, int64_t> PerNodePeakMemoryUsage;
     PerNodePeakMemoryUsage per_node_peak_mem_usage;
+    if (executor_.get() != NULL) {
+      // Coordinator fragment is not included in backend_exec_states_.
+      RuntimeProfile::Counter* mem_usage_counter =
+          executor_->profile()->GetCounter(PlanFragmentExecutor::PEAK_MEMORY_USAGE);
+      if (mem_usage_counter != NULL) {
+        TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
+        per_node_peak_mem_usage[coord] = mem_usage_counter->value();
+      }
+    }
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       int64_t initial_usage = 0;
       int64_t* mem_usage = FindOrInsert(&per_node_peak_mem_usage,
           backend_exec_states_[i]->backend_address, initial_usage);
       RuntimeProfile::Counter* mem_usage_counter =
-          backend_exec_states_[i]->profile->GetCounter("PeakMemoryUsage");
+          backend_exec_states_[i]->profile->GetCounter(
+              PlanFragmentExecutor::PEAK_MEMORY_USAGE);
       if (mem_usage_counter != NULL && mem_usage_counter->value() > *mem_usage) {
         per_node_peak_mem_usage[backend_exec_states_[i]->backend_address] =
             mem_usage_counter->value();
