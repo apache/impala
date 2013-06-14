@@ -2167,6 +2167,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("day(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 22);
   TestValue("dayofyear(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 356);
   TestValue("weekofyear(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 51);
+  TestValue("dayofweek(cast('2011-12-18 09:10:11.000000' as timestamp))", TYPE_INT, 1);
+  TestValue("dayofweek(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 5);
+  TestValue("dayofweek(cast('2011-12-24 09:10:11.000000' as timestamp))", TYPE_INT, 7);
   TestValue("hour(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 9);
   TestValue("minute(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 10);
   TestValue("second(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 11);
@@ -2176,6 +2179,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("day(cast('2011-12-22' as timestamp))", TYPE_INT, 22);
   TestValue("dayofyear(cast('2011-12-22' as timestamp))", TYPE_INT, 356);
   TestValue("weekofyear(cast('2011-12-22' as timestamp))", TYPE_INT, 51);
+  TestValue("dayofweek(cast('2011-12-18' as timestamp))", TYPE_INT, 1);
+  TestValue("dayofweek(cast('2011-12-22' as timestamp))", TYPE_INT, 5);
+  TestValue("dayofweek(cast('2011-12-24' as timestamp))", TYPE_INT, 7);
   TestValue("hour(cast('09:10:11.000000' as timestamp))", TYPE_INT, 9);
   TestValue("minute(cast('09:10:11.000000' as timestamp))", TYPE_INT, 10);
   TestValue("second(cast('09:10:11.000000' as timestamp))", TYPE_INT, 11);
@@ -2190,6 +2196,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("dayofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT);
+  TestIsNull("dayofweek(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
       "cast('2012-12-22' as timestamp))", TYPE_INT);
@@ -2198,6 +2205,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("month(NULL)", TYPE_INT);
   TestIsNull("dayofmonth(NULL)", TYPE_INT);
   TestIsNull("day(NULL)", TYPE_INT);
+  TestIsNull("dayofweek(NULL)", TYPE_INT);
   TestIsNull("dayofyear(NULL)", TYPE_INT);
   TestIsNull("weekofyear(NULL)", TYPE_INT);
   TestIsNull("datediff(NULL, '2011-12-22 09:10:11.12345678')", TYPE_INT);

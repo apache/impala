@@ -164,6 +164,8 @@ functions = [
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
   ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], \
         'TimestampFunctions::DayOfMonth', ['day', 'dayofmonth']],
+  ['Timestamp_dayofweek', 'INT', ['TIMESTAMP'], \
+        'TimestampFunctions::DayOfWeek', ['dayofweek']],
   ['Timestamp_dayofyear', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::DayOfYear', ['dayofyear']],
   ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], \
