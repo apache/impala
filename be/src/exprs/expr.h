@@ -22,6 +22,7 @@
 #include "common/status.h"
 #include "gen-cpp/Opcodes_types.h"
 #include "runtime/descriptors.h"
+#include "runtime/raw-value.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "runtime/string-value.h"
@@ -243,10 +244,18 @@ class Expr {
 
   // Convenience functions: print value into 'str' or 'stream'.
   // NULL turns into "NULL".
-  void PrintValue(TupleRow* row, std::string* str);
-  void PrintValue(void* value, std::string* str);
-  void PrintValue(TupleRow* value, std::stringstream* stream);
-  void PrintValue(void* value, std::stringstream* stream);
+  void PrintValue(TupleRow* row, std::string* str) {
+    RawValue::PrintValue(GetValue(row), type(), output_scale_, str);
+  }
+  void PrintValue(void* value, std::string* str) {
+    RawValue::PrintValue(value, type(), output_scale_, str);
+  }
+  void PrintValue(void* value, std::stringstream* stream) {
+    RawValue::PrintValue(value, type(), output_scale_, stream);
+  }
+  void PrintValue(TupleRow* row, std::stringstream* stream) {
+    RawValue::PrintValue(GetValue(row), type(), output_scale_, stream);
+  }
 
   // Get the number of digits after the decimal that should be displayed for this
   // value. Returns -1 if no scale has been specified (currently the scale is only set for

@@ -117,7 +117,7 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
       return *reinterpret_cast<const TimestampValue*>(v1) ==
           *reinterpret_cast<const TimestampValue*>(v2);
     default:
-      DCHECK(false) << "invalid type: " << TypeToString(type);
+      DCHECK(false);
       return 0;
   };
 }
@@ -156,7 +156,7 @@ inline uint32_t RawValue::GetHashValue(const void* v, PrimitiveType type, uint32
     case TYPE_TIMESTAMP:
       return HashUtil::Hash(v, 12, seed);
     default:
-      DCHECK(false) << "invalid type: " << TypeToString(type);
+      DCHECK(false);
       return 0;
   }
 }
@@ -192,10 +192,68 @@ inline uint32_t RawValue::GetHashValueFvn(const void* v, PrimitiveType type,
     case TYPE_TIMESTAMP:
       return HashUtil::FvnHash(v, 12, seed);
     default:
-      DCHECK(false) << "invalid type: " << TypeToString(type);
+      DCHECK(false);
       return 0;
   }
 }
+
+inline void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
+    std::stringstream* stream) {
+  if (value == NULL) {
+    *stream << "NULL";
+    return;
+  }
+
+  int old_precision = stream->precision();
+  std::ios_base::fmtflags old_flags = stream->flags();
+  if (scale > -1) {
+    stream->precision(scale);
+    // Setting 'fixed' causes precision to set the number of digits printed after the
+    // decimal (by default it sets the maximum number of digits total).
+    *stream << std::fixed;
+  }
+
+  const StringValue* string_val = NULL;
+  switch (type) {
+    case TYPE_BOOLEAN: {
+      bool val = *reinterpret_cast<const bool*>(value);
+      *stream << (val ? "true" : "false");
+      return;
+    }
+    case TYPE_TINYINT:
+      // Extra casting for chars since they should not be interpreted as ASCII.
+      *stream << static_cast<int>(*reinterpret_cast<const int8_t*>(value));
+      break;
+    case TYPE_SMALLINT:
+      *stream << *reinterpret_cast<const int16_t*>(value);
+      break;
+    case TYPE_INT:
+      *stream << *reinterpret_cast<const int32_t*>(value);
+      break;
+    case TYPE_BIGINT:
+      *stream << *reinterpret_cast<const int64_t*>(value);
+      break;
+    case TYPE_FLOAT:
+      *stream << *reinterpret_cast<const float*>(value);
+      break;
+    case TYPE_DOUBLE:
+      *stream << *reinterpret_cast<const double*>(value);
+      break;
+    case TYPE_STRING:
+      string_val = reinterpret_cast<const StringValue*>(value);
+      stream->write(string_val->ptr, string_val->len);
+      break;
+    case TYPE_TIMESTAMP:
+      *stream << *reinterpret_cast<const TimestampValue*>(value);
+      break;
+    default:
+      DCHECK(false);
+  }
+  stream->precision(old_precision);
+  // Undo setting stream to fixed
+  stream->flags(old_flags);
+}
+
 
 }
 

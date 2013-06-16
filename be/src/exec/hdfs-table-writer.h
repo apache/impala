@@ -49,10 +49,10 @@ class HdfsTableWriter {
   // The sequence of calls to this object are:
   // 1. Init()
   // 2. InitNewFile()
-  // 3. AppendRowBatch() - called repeatdly
+  // 3. AppendRowBatch() - called repeatedly
   // 4. Finalize()
   // For files formats that are splittable (and therefore can be written to an 
-  // arbitraryly large file), 1-4 is called once.
+  // arbitrarily large file), 1-4 is called once.
   // For files formats that are not splittable (i.e. columnar formats, compressed
   // text), 1) is called once and 2-4) is called repeatedly for each file.
 
@@ -84,7 +84,9 @@ class HdfsTableWriter {
   virtual uint64_t default_block_size() = 0;
 
  protected:
-  // Write to the current hdfs file.
+  // Write to the current hdfs file. 
+  // Note: there is a noticeable overhead with this call.  Callers should buffer
+  // writes.
   Status Write(const char* data, int32_t len) {
     return Write(reinterpret_cast<const uint8_t*>(data), len);
   }

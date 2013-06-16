@@ -485,22 +485,6 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   }
 }
 
-void Expr::PrintValue(TupleRow* row, string* str) {
-  RawValue::PrintValue(GetValue(row), type(), output_scale_, str);
-}
-
-void Expr::PrintValue(void* value, string* str) {
-  RawValue::PrintValue(value, type(), output_scale_, str);
-}
-
-void Expr::PrintValue(void* value, stringstream* stream) {
-  RawValue::PrintValue(value, type(), output_scale_, stream);
-}
-
-void Expr::PrintValue(TupleRow* row, stringstream* stream) {
-  RawValue::PrintValue(GetValue(row), type(), output_scale_, stream);
-}
-
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK(type_ != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {

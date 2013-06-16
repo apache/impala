@@ -18,6 +18,8 @@
 
 #include <hdfs.h>
 
+#include <sstream>
+
 #include "runtime/descriptors.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/hdfs-table-writer.h"
@@ -61,6 +63,10 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   // Escape character. TODO: Escape output.
   char escape_char_;
+  
+  // Stringstream to buffer output.  The stream is cleared between HDFS
+  // Write calls to allow for the internal buffers to be reused.
+  std::stringstream rowbatch_stringstream_;
 };
 
 }

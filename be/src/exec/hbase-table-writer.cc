@@ -21,6 +21,7 @@
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "exprs/expr.h"
+#include "runtime/raw-value.h"
 
 using namespace boost;
 using namespace std;
