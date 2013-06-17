@@ -66,6 +66,12 @@ class DiskInfo {
     DCHECK_LT(disk_id, disks_.size());
     return disks_[disk_id].name;
   }
+
+  static bool is_rotational(int disk_id) {
+    DCHECK_GE(disk_id, 0);
+    DCHECK_LT(disk_id, disks_.size());
+    return disks_[disk_id].is_rotational;
+  }
   
   static std::string DebugString();
 
@@ -80,7 +86,10 @@ class DiskInfo {
     // our structures
     int id;
 
-    Disk(const std::string& name = "", int id = -1) : name(name), id(id) {}
+    bool is_rotational;
+
+    Disk(const std::string& name = "", int id = -1, bool is_rotational = true) 
+      : name(name), id(id), is_rotational(is_rotational) {}
   };
 
   // All disks
