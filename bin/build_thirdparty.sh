@@ -125,6 +125,6 @@ if [ -z "$USE_PIC_LIB_PATH" ]; then
 fi
 
 # Build Avro
-cd $IMPALA_HOME/thirdparty/avro-${IMPALA_AVRO_VERSION}/lang/c++
+cd $IMPALA_HOME/thirdparty/avro-cpp-${IMPALA_AVRO_VERSION}
 cmake -G "Unix Makefiles"
 make -j4

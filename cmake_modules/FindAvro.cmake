@@ -6,11 +6,11 @@
 #  AVRO_FOUND, whether Avro has been found
 
 set(AVRO_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-$ENV{IMPALA_AVRO_VERSION}/lang/c++/api
+  ${CMAKE_SOURCE_DIR}/thirdparty/avro-cpp-$ENV{IMPALA_AVRO_VERSION}/api
 )
 
 set(AVRO_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-$ENV{IMPALA_AVRO_VERSION}/lang/c++
+  ${CMAKE_SOURCE_DIR}/thirdparty/avro-cpp-$ENV{IMPALA_AVRO_VERSION}
 )
 
 find_path(AVRO_INCLUDE_DIR AvroSerialize.hh PATHS
