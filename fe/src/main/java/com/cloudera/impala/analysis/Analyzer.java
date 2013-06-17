@@ -331,15 +331,12 @@ public class Analyzer {
    * registered tables. Creates and returns an empty SlotDescriptor if the
    * column hasn't previously been registered, otherwise returns the existing
    * descriptor.
-   * @param tblName
-   * @param colName
-   * @throws AnalysisException
    */
   public SlotDescriptor registerColumnRef(TableName tblName, String colName)
       throws AnalysisException {
     String alias;
     if (tblName == null) {
-      alias = resolveColumnRef(colName);
+      alias = resolveColumnRef(colName, null);
       if (alias == null) {
         throw new AnalysisException("couldn't resolve column reference: '" +
             colName + "'");
@@ -347,12 +344,21 @@ public class Analyzer {
     } else {
       alias = tblName.toString().toLowerCase();
     }
-    TupleDescriptor d = aliasMap.get(alias);
-    if (d == null) {
+
+    TupleDescriptor tupleDesc = aliasMap.get(alias);
+    // Try to resolve column references ("table.col") that do not refer to an explicit
+    // alias, and that do not use a fully-qualified table name.
+    String tmpAlias = alias;
+    if (tupleDesc == null && tblName != null) {
+      tmpAlias = resolveColumnRef(colName, tblName.getTbl());
+      tupleDesc = aliasMap.get(tmpAlias);
+    }
+    if (tupleDesc == null) {
       throw new AnalysisException("unknown table alias: '" + alias + "'");
     }
+    alias = tmpAlias;
 
-    Column col = d.getTable().getColumn(colName);
+    Column col = tupleDesc.getTable().getColumn(colName);
     if (col == null) {
       throw new AnalysisException("unknown column '" + colName +
           "' (table alias '" + alias + "')");
@@ -363,7 +369,7 @@ public class Analyzer {
     if (result != null) {
       return result;
     }
-    result = descTbl.addSlotDescriptor(d);
+    result = descTbl.addSlotDescriptor(tupleDesc);
     result.setColumn(col);
     slotRefMap.put(alias + "." + col.getName(), result);
     return result;
@@ -373,12 +379,17 @@ public class Analyzer {
    * Resolves column name in context of any of the registered table aliases.
    * Returns null if not found or multiple bindings to different tables exist,
    * otherwise returns the table alias.
+   * If a specific table name was given (tableName != null) then only
+   * columns from registered tables with a matching name are considered.
    */
-  private String resolveColumnRef(String colName) throws AnalysisException {
+  private String resolveColumnRef(String colName, String tableName)
+      throws AnalysisException {
     String result = null;
     for (Map.Entry<String, TupleDescriptor> entry: aliasMap.entrySet()) {
-      Column col = entry.getValue().getTable().getColumn(colName);
-      if (col != null) {
+      Table table = entry.getValue().getTable();
+      Column col = table.getColumn(colName);
+      if (col != null &&
+          (tableName == null || tableName.equalsIgnoreCase(table.getName()))) {
         if (result != null) {
           throw new AnalysisException(
               "Unqualified column reference '" + colName + "' is ambiguous");

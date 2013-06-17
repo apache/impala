@@ -130,13 +130,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return "";
   }
 
-  /**
-   * Return a column label for the expression
-   */
-  public String toColumnLabel() {
-    return toSql();
-  }
-
   // Convert this expr, including all children, to its Thrift representation.
   public TExpr treeToThrift() {
     TExpr result = new TExpr();
@@ -191,8 +184,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return "(" + Joiner.on(" ").join(strings) + ")";
   }
 
-  /* We use clone() instead of defining our own deepCopy() in order to take advantage
-   * of having Java generate the field-by-field copy c'tors for the Expr subclasses.
+  /**
+   * Creates a shallow copy of this Expr. If a deep copy is desired, use clone(null)
+   * instead of this method.
+   * This clone method takes advantage of having Java generate the field-by-field copy
+   * c'tors for the Expr subclasses.
    * @see java.lang.Object#clone()
    */
   @Override

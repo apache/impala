@@ -124,7 +124,8 @@ public class SelectStmt extends QueryStmt {
     }
 
     // populate selectListExprs, aliasSMap, and colNames
-    for (SelectListItem item: selectList.getItems()) {
+    for (int i = 0; i < selectList.getItems().size(); ++i) {
+      SelectListItem item = selectList.getItems().get(i);
       if (item.isStar()) {
         TableName tblName = item.getTblName();
         if (tblName == null) {
@@ -134,7 +135,7 @@ public class SelectStmt extends QueryStmt {
         }
       } else {
         resultExprs.add(item.getExpr());
-        SlotRef aliasRef = new SlotRef(null, item.toColumnLabel());
+        SlotRef aliasRef = new SlotRef(null, item.toHiveColumnLabel(i));
         if (aliasSMap.lhs.contains(aliasRef)) {
           // If we have already seen this alias, it refers to more than one column and
           // therefore is ambiguous.
@@ -142,7 +143,7 @@ public class SelectStmt extends QueryStmt {
         }
         aliasSMap.lhs.add(aliasRef);
         aliasSMap.rhs.add(item.getExpr().clone(null));
-        colLabels.add(item.toColumnLabel());
+        colLabels.add(item.toHiveColumnLabel(i));
       }
     }
 
@@ -428,16 +429,16 @@ public class SelectStmt extends QueryStmt {
       CastExpr inCastExpr = null;
       if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
         inCastExpr =
-            new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(), false);
+            new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(null), false);
       }
 
       AggregateExpr sumExpr =
           new AggregateExpr(AggregateExpr.Operator.SUM, false, aggExpr.isDistinct(),
                 Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
-                  inCastExpr : aggExpr.getChild(0).clone()));
+                  inCastExpr : aggExpr.getChild(0).clone(null)));
       AggregateExpr countExpr =
           new AggregateExpr(AggregateExpr.Operator.COUNT, false, aggExpr.isDistinct(),
-                            Lists.newArrayList(aggExpr.getChild(0).clone()));
+                            Lists.newArrayList(aggExpr.getChild(0).clone(null)));
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
 

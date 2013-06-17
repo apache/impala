@@ -245,7 +245,7 @@ public class UnionStmt extends QueryStmt {
             + expr.toSql());
       }
       // Create copy to protect against accidentally shared state.
-      i.set(resultExprs.get((int)pos - 1).clone());
+      i.set(resultExprs.get((int) pos - 1).clone(null));
     }
   }
 

@@ -221,9 +221,11 @@ LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
 
-IdentifierOrKwContents = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
-
-IdentifierOrKw = \`{IdentifierOrKwContents}\` | {IdentifierOrKwContents}
+// Quoted identifiers may contain UTF-8 chars x21-x5f and x61-x7e.
+// Those ranges exclude control sequences and the "`" quote (UTF-8 char x60).
+QuotedIdentifierLetter = [\x20-\x5f] | [\x61-\x7e]
+QuotedIdentifier = \`{QuotedIdentifierLetter}*\`
+IdentifierOrKw = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
 IntegerLiteral = [:digit:][:digit:]*
 SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
 DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
@@ -264,11 +266,17 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "'" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 "`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
-{IdentifierOrKw} {
-  if (yytext().startsWith("`")) {
-    return newToken(SqlParserSymbols.IDENT, yytext().substring(1, yytext().length() - 1));
+{QuotedIdentifier} {
+  // Remove the quotes and trim whitespace.
+  String trimmedIdent = yytext().substring(1, yytext().length() - 1).trim();
+  if (trimmedIdent.isEmpty()) {
+    throw new java.io.IOException(
+        "Identifier consisting of only whitespace not allowed.");
   }
+  return newToken(SqlParserSymbols.IDENT, trimmedIdent);
+}
 
+{IdentifierOrKw} {  
   String text = yytext();
   Integer kw_id = keywordMap.get(text.toLowerCase());
   if (kw_id != null) {

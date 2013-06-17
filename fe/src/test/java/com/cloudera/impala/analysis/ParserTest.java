@@ -500,11 +500,39 @@ public class ParserTest {
 
     // Mixed quoting
     ParsesOk("select `db`.tbl.`a` from default.t");
-    ParserError("select `db.table.a` from default.t");
+    ParsesOk("select `db.table.a` from default.t");
 
-    // Invalid identifiers in table names
-    ParserError("select a from `all types`");
-    ParserError("select a from `default`.`all types`");
+    // Identifiers consisting of only whitespace not allowed.
+    ParserError("select a from ` `");
+    ParserError("select a from `    `");
+    // Empty quoted identifier doesn't parse.
+    ParserError("select a from ``");
+
+    // Whitespace can be interspersed with other characters.
+    // Whitespace is trimmed from the beginning and end of an identifier.
+    ParsesOk("select a from `a a a    `");
+    ParsesOk("select a from `    a a a`");
+    ParsesOk("select a from `    a a a    `");
+
+    // Quoted identifiers can contain any printable (non-control)
+    // characters except a quote "`".
+    ParsesOk("select a from `all types`");
+    ParsesOk("select a from `default`.`all types`");
+    ParsesOk("select a from `~!@#$%^&*()-_=+|;:'\",<.>/?`");
+    // Quoted identifiers can contain keywords.
+    ParsesOk("select `select`, `insert` from `table` where `where` = 10");
+
+    // Quoted identifiers cannot contain control sequences or "`"
+    ParserError("select a from `abcde`abcde`");
+    ParserError("select a from `abcde\nabcde`");
+    ParserError("select a from `ab\rabc`");
+    ParserError("select a from `ab\tabc`");
+    ParserError("select a from `ab\fabc`");
+    ParserError("select a from `ab\babc`");
+    // Test characters just out of supported range.
+    ParserError("select a from `abc\u0019abc`");
+    ParserError("select a from `abc\u0060abc`");
+    ParserError("select a from `abc\u007fabc`");
 
     // Wrong quotes
     ParserError("select a from 'default'.'t'");
@@ -513,9 +541,6 @@ public class ParserTest {
     ParsesOk(
         "select `db`.`tbl`.`a` from `default`.`t` `alias` where `alias`.`col` = 'string'"
         + " group by `alias`.`col`");
-
-    // Quoting keywords should fail
-    ParserError("select `col` `from` tbl");
   }
 
   @Test

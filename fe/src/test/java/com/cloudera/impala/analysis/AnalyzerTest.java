@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
+import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
@@ -167,6 +168,7 @@ public class AnalyzerTest {
    * is non-null.
    */
   public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
+    Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
     this.analyzer = analyzer;
     LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
@@ -182,12 +184,10 @@ public class AnalyzerTest {
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
-      if (expectedErrorString != null) {
-        String errorString = e.getMessage();
-        Assert.assertTrue(
-            "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
-            errorString.startsWith(expectedErrorString));
-      }
+      String errorString = e.getMessage();
+      Assert.assertTrue(
+          "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
+          errorString.startsWith(expectedErrorString));
       return;
     } catch (AuthorizationException e) {
       fail("Authorization error: " + e.getMessage());

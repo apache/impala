@@ -30,11 +30,22 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("SELECT INT_COL FROM FUNCTIONAL.alltypes");
     AnalyzesOk("select functional.AllTypes.Int_Col from functional.alltypes");
 
-    // aliases work
+    // explicit aliases work
     AnalyzesOk("select a.int_col from functional.alltypes a");
-    // implicit aliases
-    // This does not work
+    // columns without table alias can be resolved if they are not ambiguous
     AnalyzesOk("select int_col, zip from functional.alltypes, functional.testtbl");
+    // implicit fully-qualified table name as alias works
+    AnalyzesOk("select functional.alltypes.int_col from functional.alltypes");
+    // implicit non-fully-qualified table name as alias works
+    AnalyzesOk("select alltypes.int_col from functional.alltypes");
+
+    // implicit fully-qualified table name on non-fully qualified table reference
+    AnalyzesOk("select functional.alltypes.int_col from alltypes",
+        createAnalyzer("functional"));
+    // implicit non-fully-qualified table name on non-fully qualified table reference
+    AnalyzesOk("select alltypes.int_col from alltypes",
+        createAnalyzer("functional"));
+
     // duplicate alias
     AnalysisError("select a.int_col, a.id " +
         "          from functional.alltypes a, functional.testtbl a",
@@ -213,6 +224,33 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // test NULLs
     AnalyzesOk("select * from (select NULL) a");
+
+    // test auto-generated column labels assigned to non-SlotRef expressions
+    // using Hive's convention
+    AnalyzesOk("select _c0, a, int_col, _c3 from " +
+        "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
+        "from functional.alltypes) t");
+    // test auto-generated column labels in group by and order by
+    AnalyzesOk("select _c0, count(a), count(int_col), _c3 from " +
+        "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
+        "from functional.alltypes) t group by _c0, _c3 order by _c0 limit 10");
+    // test auto-generated column labels in multiple scopes
+    AnalyzesOk("select x.front, x._c1, x._c2 from " +
+        "(select y.back as front, y._c0 * 10, y._c2 + 2 from " +
+        "(select int_col * 10, int_col as back, int_col + 2 from " +
+        "functional.alltypestiny) y) x");
+
+    // ambiguous reference to an auto-generated column
+    AnalysisError("select _c0 from " +
+        "(select int_col * 2, id from functional.alltypes) a inner join " +
+        "(select int_col + 6, id from functional.alltypes) b " +
+        "on a.id = b.id",
+        "Unqualified column reference '_c0' is ambiguous");
+    // auto-generated column doesn't exist
+    AnalysisError("select _c0, a, _c2, _c3 from " +
+        "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
+        "from functional.alltypes) t",
+        "couldn't resolve column reference: '_c2'");
   }
 
   @Test
@@ -975,6 +1013,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select t1.x, t2.x, t.x from t as t1, t as t2, t " +
         "where t1.x = t2.x and t2.x = t.x");
 
+    // Test auto-generated column labels in WITH-clause view.
+    AnalyzesOk("with t as (select int_col + 2, !bool_col from functional.alltypes) " +
+        "select _c0, _c1 from t");
+
     // Conflicting table aliases in WITH clause.
     AnalysisError("with t1 as (select 1), t1 as (select 2) select * from t1",
         "Duplicate table alias: 't1'");
@@ -1299,7 +1341,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     if (!qualifier.contains("OVERWRITE")) {
       AnalyzesOk(hbaseQuery);
     } else {
-      AnalysisError(hbaseQuery);
+      AnalysisError(hbaseQuery, "HBase doesn't have a way to perform INSERT OVERWRITE");
     }
 
     // Unpartitioned table with partition clause
@@ -1432,7 +1474,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "partition (year=\"should be an int\", month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
-        "from functional.alltypes");
+        "from functional.alltypes",
+        "Target table 'functional.alltypessmall' is incompatible with " +
+        "SELECT / PARTITION expressions.");
     // Arbitrary exprs as partition key values. Non-constant exprs should fail.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=-1, month=int_col)" +

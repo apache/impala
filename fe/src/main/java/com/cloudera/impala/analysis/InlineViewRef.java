@@ -127,7 +127,7 @@ public class InlineViewRef extends TableRef {
     // Map for substituting SlotRefs with NullLiterals.
     Expr.SubstitutionMap nullSMap = new Expr.SubstitutionMap();
     for (SlotRef rhsSlotRef: rhsSlotRefs) {
-      nullSMap.lhs.add(rhsSlotRef.clone());
+      nullSMap.lhs.add(rhsSlotRef.clone(null));
       nullSMap.rhs.add(new NullLiteral());
     }
 

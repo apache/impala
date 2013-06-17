@@ -67,7 +67,7 @@ public abstract class TableRef implements ParseNode {
     this.alias = other.alias;
     this.joinOp = other.joinOp;
     this.joinHints = (joinHints != null) ? Lists.newArrayList(other.joinHints) : null;
-    this.onClause = (onClause != null) ? other.onClause.clone() : null;
+    this.onClause = (onClause != null) ? other.onClause.clone(null) : null;
     this.usingColNames =
         (usingColNames != null) ? Lists.newArrayList(other.usingColNames) : null;
     isAnalyzed = false;

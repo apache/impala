@@ -257,7 +257,6 @@ nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
 nonterminal StatementBase explain_stmt;
-nonterminal List<String> col_list;
 nonterminal PartitionSpec partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
