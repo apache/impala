@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -21,6 +22,9 @@ import java.util.List;
 
 import junit.framework.Assert;
 
+import org.apache.hive.service.cli.thrift.TGetColumnsReq;
+import org.apache.hive.service.cli.thrift.TGetSchemasReq;
+import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
@@ -31,13 +35,17 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
+import com.cloudera.impala.thrift.TMetadataOpRequest;
+import com.cloudera.impala.thrift.TMetadataOpResponse;
+import com.cloudera.impala.thrift.TMetadataOpcode;
+import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class AuthorizationTest {
   // Policy file has defined current user to have:
   //   ALL permission on 'tpch' database and 'newdb' database
-  //   ALL permission on 'functional_rc_snap' database
+  //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
   //   SELECT permissions on 'functional.alltypesagg' (no INSERT permissions)
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
@@ -470,6 +478,70 @@ public class AuthorizationTest {
 
     tables = fe.getTableNames("functional", null, USER);
     Assert.assertEquals(expectedTbls, tables);
+  }
+
+  @Test
+  public void TestHs2GetTables() throws ImpalaException {
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    TSessionState sessionState = new TSessionState("default", USER.getName());
+    req.setSession(sessionState);
+
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    // Get all tables
+    req.get_tables_req.setTableName("%");
+    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(2, resp.results.size());
+    assertEquals("alltypes", resp.results.get(0).colVals.get(2).stringVal.toLowerCase());
+    assertEquals(
+        "alltypesagg", resp.results.get(1).colVals.get(2).stringVal.toLowerCase());
+  }
+
+  @Test
+  public void TestHs2GetSchema() throws ImpalaException {
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    TSessionState sessionState = new TSessionState("default", USER.getName());
+    req.setSession(sessionState);
+
+    req.opcode = TMetadataOpcode.GET_SCHEMAS;
+    req.get_schemas_req = new TGetSchemasReq();
+    // Get all schema (databases).
+    req.get_schemas_req.setSchemaName("%");
+    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
+    List<String> expectedDbs = Lists.newArrayList("functional",
+        "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
+    assertEquals(expectedDbs.size(), resp.results.size());
+    for (int i = 0; i < resp.results.size(); ++i) {
+      assertEquals(expectedDbs.get(i),
+          resp.results.get(i).colVals.get(0).stringVal.toLowerCase());
+    }
+  }
+
+  @Test
+  public void TestHs2GetColumns() throws ImpalaException {
+    // It should return one column: alltypes.string_col.
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_COLUMNS;
+    req.setSession(new TSessionState("default", USER.getName()));
+    req.get_columns_req = new TGetColumnsReq();
+    req.get_columns_req.setSchemaName("functional");
+    req.get_columns_req.setTableName("alltypes");
+    req.get_columns_req.setColumnName("stri%");
+    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(1, resp.results.size());
+
+    // User does not have permission to access the table, no results should be returned.
+    req.get_columns_req.setTableName("alltypesnopart");
+    resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(0, resp.results.size());
+
+    // User does not have permission to access db or table, no results should be
+    // returned.
+    req.get_columns_req.setSchemaName("functional_seq_gzip");
+    req.get_columns_req.setTableName("alltypes");
+    resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(0, resp.results.size());
   }
 
   @Test

@@ -110,8 +110,8 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
 };
 
 void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
-    const TMetadataOpRequest& request,
-    TOperationHandle* handle, apache::hive::service::cli::thrift::TStatus* status) {
+    TMetadataOpRequest* request, TOperationHandle* handle,
+    apache::hive::service::cli::thrift::TStatus* status) {
   shared_ptr<SessionState> session;
   GetSessionState(session_key, &session);
   if (session == NULL) {
@@ -121,6 +121,9 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
+  TSessionState session_state;
+  session->ToThrift(&session_state);
+  request->__set_session(session_state);
 
   shared_ptr<QueryExecState> exec_state;
   // There is no query text available because this metadata operation
@@ -137,7 +140,7 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key
   }
 
   // start execution of metadata first;
-  Status exec_status = exec_state->Exec(request);
+  Status exec_status = exec_state->Exec(*request);
   if (!exec_status.ok()) {
     status->__set_statusCode(
         apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
@@ -361,7 +364,7 @@ void ImpalaServer::GetTypeInfo(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TYPE_INFO);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -380,7 +383,7 @@ void ImpalaServer::GetCatalogs(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_CATALOGS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -399,7 +402,7 @@ void ImpalaServer::GetSchemas(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_SCHEMAS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -418,7 +421,7 @@ void ImpalaServer::GetTables(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TABLES);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -437,7 +440,7 @@ void ImpalaServer::GetTableTypes(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_TABLE_TYPES);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -457,7 +460,7 @@ void ImpalaServer::GetColumns(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_COLUMNS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
@@ -476,7 +479,7 @@ void ImpalaServer::GetFunctions(
 
   TOperationHandle handle;
   apache::hive::service::cli::thrift::TStatus status;
-  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, req, &handle, &status);
+  ExecuteMetadataOp(request.sessionHandle.sessionId.guid, &req, &handle, &status);
   handle.__set_operationType(TOperationType::GET_FUNCTIONS);
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);

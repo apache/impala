@@ -580,10 +580,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Starts the synchronous execution of a HiverServer2 metadata operation.
   // If the execution succeeds, an QueryExecState will be created and registered in
   // query_exec_state_map_. Otherwise, nothing will be registered in query_exec_state_map_
-  // and an error status will be returned.
+  // and an error status will be returned. As part of this call, the TMetadataOpRequest
+  // struct will be populated with the requesting user's session state.
   // Returns a TOperationHandle and TStatus.
   void ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
-      const TMetadataOpRequest& request,
+      TMetadataOpRequest* request,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
 
