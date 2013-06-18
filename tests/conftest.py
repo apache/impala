@@ -20,8 +20,16 @@ def pytest_addoption(parser):
   parser.addoption("--impalad", default="localhost:21000", help=\
                    "The impalad host:port to run tests against.")
 
+  parser.addoption("--impalad_hs2_port", default="21050", help=\
+                   "The impalad HiveServer2 port.")
+
+  # TODO: Migrate test infrastructure to HiveServer2 and remove the need for this
+  # parameter.
   parser.addoption("--hive_server", default="localhost:10000", help=\
                    "The hive server host:port to connect to.")
+
+  parser.addoption("--hive_server2", default="localhost:11050", help=\
+                   "Hive's HiveServer2 host:port to connect to.")
 
   parser.addoption("--update_results", action="store_true", default=False, help=\
                    "If set, will generate new results for all tests run instead of "\

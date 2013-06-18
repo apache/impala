@@ -170,17 +170,10 @@ public class Frontend {
     } else if (analysis.isDescribeStmt()) {
       ddl.ddl_type = TDdlType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
-      // DESCRIBE FORMATTED commands return all all results in a single column.
-      if (analysis.getDescribeStmt().getOutputStyle() ==
-          TDescribeTableOutputStyle.FORMATTED) {
-        metadata.setColumnDescs(Arrays.asList(
-            new TColumnDesc("describe_formatted", TPrimitiveType.STRING)));
-      } else {
-        metadata.setColumnDescs(Arrays.asList(
-            new TColumnDesc("name", TPrimitiveType.STRING),
-            new TColumnDesc("type", TPrimitiveType.STRING),
-            new TColumnDesc("comment", TPrimitiveType.STRING)));
-      }
+      metadata.setColumnDescs(Arrays.asList(
+          new TColumnDesc("name", TPrimitiveType.STRING),
+          new TColumnDesc("type", TPrimitiveType.STRING),
+          new TColumnDesc("comment", TPrimitiveType.STRING)));
     } else if (analysis.isAlterTableStmt()) {
       ddl.ddl_type = TDdlType.ALTER_TABLE;
       ddl.setAlter_table_params(analysis.getAlterTableStmt().toThrift());

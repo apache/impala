@@ -38,9 +38,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
-    self.exec_and_compare_hive_and_impala("describe formatted functional.alltypes")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
     # Describe an unpartitioned table.
-    self.exec_and_compare_hive_and_impala("describe formatted tpch.lineitem")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
 
   def test_use_table(self, vector):
     self.run_test_case('QueryTest/use', vector)

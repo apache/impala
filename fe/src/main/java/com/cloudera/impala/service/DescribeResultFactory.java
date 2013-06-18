@@ -29,6 +29,9 @@ import com.google.common.collect.Lists;
  * TDescribeTableResult object.
  */
 public class DescribeResultFactory {
+  // Number of columns in each row of the DESCRIBE FORMATTED result set.
+  private final static int NUM_DESC_FORMATTED_RESULT_COLS = 3;
+
   public static TDescribeTableResult buildDescribeTableResult(Table table,
       TDescribeTableOutputStyle outputFormat) {
     switch (outputFormat) {
@@ -64,8 +67,8 @@ public class DescribeResultFactory {
   /*
    * Builds a TDescribeTableResult that contains the result of a DESCRIBE FORMATTED
    * <table> command. For the formatted describe output the goal is to be exactly the
-   * same as what Hive outputs, for compatibility reasons. To do this, Hive's
-   * MetadataFormatUtils class is used to build the results.
+   * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
+   * Hive's MetadataFormatUtils class is used to build the results.
    */
   private static TDescribeTableResult describeTableFormatted(Table table) {
     TDescribeTableResult descResult = new TDescribeTableResult();
@@ -82,9 +85,20 @@ public class DescribeResultFactory {
     sb.append(MetaDataFormatUtils.getTableInformation(hiveTable));
 
     for (String line: sb.toString().split("\n")) {
-      TColumnValue descFormattedEntry = new TColumnValue();
-      descFormattedEntry.setStringVal(line);
-      descResult.results.add(new TResultRow(Lists.newArrayList(descFormattedEntry)));
+      // To match Hive's HiveServer2 output, split each line into multiple column
+      // values based on the field delimiter.
+      String[] columns = line.split(MetaDataFormatUtils.FIELD_DELIM);
+      TResultRow resultRow = new TResultRow();
+      for (int i = 0; i < NUM_DESC_FORMATTED_RESULT_COLS; ++i) {
+        TColumnValue colVal = new TColumnValue();
+        colVal.setStringVal(null);
+        if (columns.length > i) {
+          // Add the column value.
+          colVal.setStringVal(columns[i]);
+        }
+        resultRow.addToColVals(colVal);
+      }
+      descResult.results.add(resultRow);
     }
     return descResult;
   }

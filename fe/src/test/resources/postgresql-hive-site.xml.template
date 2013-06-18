@@ -100,4 +100,8 @@
   <name>dfs.replication</name>
   <value>3</value>
 </property>
+<property>
+  <name>hive.server2.authentication</name>
+  <value>NOSASL</value>
+</property>
 </configuration>

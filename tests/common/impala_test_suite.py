@@ -29,6 +29,7 @@ from tests.util.shell_util import exec_shell_cmd
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
+from tests.common.query_executor import JdbcQueryExecOptions, execute_using_jdbc
 
 # Imports required for Hive Metastore Client
 from hive_metastore import ThriftHiveMetastore
@@ -38,6 +39,9 @@ from thrift.protocol import TBinaryProtocol
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_test_suite')
 IMPALAD = pytest.config.option.impalad
+IMPALAD_HS2_HOST_PORT = pytest.config.option.impalad.split(':')[0] + ":" + \
+    pytest.config.option.impalad_hs2_port
+HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
 # Base class for Impala tests. All impala test cases should inherit from this class
@@ -224,17 +228,20 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
+  def exec_and_compare_hive_and_impala_hs2(self, stmt):
+    """Compare Hive and Impala results when executing the same statment over HS2"""
+    # Run the statement targeting Hive
+    exec_opts = JdbcQueryExecOptions(iterations=1, impalad=HIVE_HS2_HOST_PORT)
+    hive_results = execute_using_jdbc(stmt, exec_opts).data
 
-  def exec_and_compare_hive_and_impala(self, exec_stmt):
-    """Executes the same statement in Hive and Impala and compares the results"""
-    rc, stdout, stderr =\
-        exec_shell_cmd("hive -e \"%s\"" % exec_stmt)
-    assert rc == 0, "stdout: %s\nstderr: %s" % (stdout, stderr)
-    result = self.client.execute(exec_stmt)
+    # Run the statement targeting Impala
+    exec_opts = JdbcQueryExecOptions(iterations=1, impalad=IMPALAD_HS2_HOST_PORT)
+    impala_results = execute_using_jdbc(stmt, exec_opts).data
 
-    # Compare line-by-line (hive results go to stdout).
-    for impala, hive in zip(result.data, stdout.split('\n')):
-      assert impala.rstrip() == hive.rstrip()
+    # Compare the results
+    assert (impala_results is not None) and (hive_results is not None)
+    for impala, hive in zip(impala_results, hive_results):
+      assert impala == hive
 
   def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""
