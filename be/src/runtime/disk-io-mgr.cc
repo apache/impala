@@ -37,13 +37,18 @@ DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // There is a trade off of latency and throughout, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
 // io and sequential io perform similarly.
-DEFINE_int32(num_threads_per_disk, 1, "number of threads per disk");
+DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
 
 // Defaults to constrain the queue size.  These constants don't matter much since
 // the io mgr will dynamically find the optimal number.
 static const int MAX_QUEUE_CAPACITY = 256;
 static const int MIN_QUEUE_CAPACITY = 4;
+
+// Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotaional
+// don't have this penalty and benefit from multiple concurrent IO requests.
+static const int THREADS_PER_ROTATIONAL_DISK = 1;
+static const int THREADS_PER_FLASH_DISK = 8;
 
 using namespace boost;
 using namespace impala;
@@ -644,6 +649,13 @@ Status DiskIoMgr::Init(ThreadResourceMgr* thread_mgr, MemLimit* process_mem_limi
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
+    if (num_threads_per_disk_ == 0) {
+      if (DiskInfo::is_rotational(i)) {
+        num_threads_per_disk_ = THREADS_PER_ROTATIONAL_DISK;
+      } else {
+        num_threads_per_disk_ = THREADS_PER_FLASH_DISK;
+      }
+    }
     for (int j = 0; j < num_threads_per_disk_; ++j) {
       disk_thread_group_.add_thread(
           new thread(&DiskIoMgr::ReadLoop, this, disk_queues_[i]));
