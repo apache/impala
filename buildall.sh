@@ -74,6 +74,9 @@ do
     -codecoverage_release)
       TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
       ;;
+    -asan)
+      TARGET_BUILD_TYPE=ADDRESS_SANITIZER
+      ;;
     -testpairwise)
       EXPLORATION_STRATEGY=pairwise
       ;;
@@ -93,6 +96,7 @@ do
       echo "[-noformat_metastore] : prevents formatting the metastore db"
       echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the"\
            "cost of performance"
+      echo "[-asan] : build with address sanitizer"
       echo "[-skiptests] : skips execution of all tests"
       echo "[-testpairwise] : run tests in 'pairwise' mode (increases"\
            "test execution time)"
@@ -130,9 +134,6 @@ fi
 # option to clean everything first
 if [ $CLEAN_ACTION -eq 1 ]
 then
-  # clean selected files from the root
-  rm -f CMakeCache.txt
-
   # clean fe
   # don't use git clean because we need to retain Eclipse conf files
   cd $IMPALA_FE_DIR
@@ -170,7 +171,10 @@ fi
 
 # build common and backend
 cd $IMPALA_HOME
+rm -f CMakeCache.txt
+bin/gen_build_version.py
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
+
 cd $IMPALA_HOME/common/function-registry
 make
 cd $IMPALA_HOME/common/thrift
