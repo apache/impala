@@ -358,6 +358,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (size_t i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
     int col_idx = slots[i]->col_pos();
+    DCHECK_LT(col_idx, column_idx_to_materialized_slot_idx_.size());
     DCHECK_EQ(column_idx_to_materialized_slot_idx_[col_idx], SKIP_COLUMN);
     all_materialized_slots[col_idx] = slots[i];
   }

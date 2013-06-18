@@ -70,41 +70,66 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
     *output = out_buffer_;
     *output_length = buffer_length_;
   }
+  
+  // Reset the stream for this block
+  if (inflateReset(&stream_) != Z_OK) {
+    return Status("zlib inflateReset failed: " + string(stream_.msg));
+  }
 
   int ret = 0;
+  // gzip can run in streaming mode or non-streaming mode.  We only
+  // support the non-streaming use case where we present it the entire
+  // compressed input and a buffer big enough to contain the entire
+  // compressed output.  In the case where we don't know the output,
+  // we just make a bigger buffer and try the non-streaming mode
+  // from the beginning again.
+  // TODO: support streaming, especially for compressed text.
   while (ret != Z_STREAM_END) {
     stream_.next_in = reinterpret_cast<Bytef*>(input);
     stream_.avail_in = input_length;
     stream_.next_out = reinterpret_cast<Bytef*>(*output);
     stream_.avail_out = *output_length;
 
-    ret = inflate(&stream_, 1);
-
-    if (ret != Z_STREAM_END) {
-      if (ret == Z_OK) {
-        // Not enough output space.  If the user didn't supply the buffer, double
-        // the buffer and try again.
-        if (!use_temp) return Status("Too small a buffer passed to GzipDecompressor");
-        temp_memory_pool_.Clear();
-        buffer_length_ *= 2;
-        if (buffer_length_ > MAX_BLOCK_SIZE) {
-          return Status("Decompressor: block size is too big");
-        }
-        out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
-        *output = out_buffer_;
-        *output_length = buffer_length_;
-        if (inflateReset(&stream_) != Z_OK) {
-          return Status("zlib inflateEnd failed: " + string(stream_.msg));
-        }
-        continue;
-      }
-      return Status("zlib inflate failed: " + string(stream_.msg));
+    if (use_temp) {
+      // We don't know the output size, so this might fail.
+      ret = inflate(&stream_, Z_PARTIAL_FLUSH);
+    } else {
+      // We know the output size.  In this case, we can use Z_FINISH
+      // which is more efficient.
+      ret = inflate(&stream_, Z_FINISH);
     }
-  }
-  if (inflateReset(&stream_) != Z_OK) {
-    return Status("zlib inflateEnd failed: " + string(stream_.msg));
+    if (ret == Z_STREAM_END || ret != Z_OK) break;
+
+    // Not enough output space.  
+    if (!use_temp) {
+      stringstream ss;
+      ss << "Too small a buffer passed to GzipDecompressor. InputLength=" 
+        << input_length << " OutputLength=" << *output_length;
+      return Status(ss.str());
+    }
+    
+    // User didn't supply the buffer, double the buffer and try again.
+    temp_memory_pool_.Clear();
+    buffer_length_ *= 2;
+    if (buffer_length_ > MAX_BLOCK_SIZE) {
+      stringstream ss;
+      ss << "GzipDecompressor: block size is too big: " << buffer_length_;
+      return Status(ss.str());
+    }
+
+    out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
+    *output = out_buffer_;
+    *output_length = buffer_length_;
+    ret = inflateReset(&stream_);
   }
 
+  if (ret != Z_STREAM_END) {
+    stringstream ss;
+    ss << "GzipDecompressor failed: ";
+    if (stream_.msg != NULL) ss << stream_.msg;
+    return Status(ss.str());
+  }
+  
   // stream_.avail_out is the number of bytes *left* in the out buffer, but
   // we're interested in the number of bytes used.
   *output_length = *output_length - stream_.avail_out;

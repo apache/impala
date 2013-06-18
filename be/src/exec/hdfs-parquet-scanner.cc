@@ -344,7 +344,10 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
   if (num_buffered_values_ == 0) {
     parent_->assemble_rows_timer_.Stop();
     parent_->parse_status_ = ReadDataPage();
-    if (num_buffered_values_ == 0) return false;
+    // We don't return Status objects as parameters because they are too
+    // expensive for per row/per col calls.  If ReadDataPage failed,
+    // return false to indicate this column reader is done.
+    if (num_buffered_values_ == 0 || !parent_->parse_status_.ok()) return false;
     parent_->assemble_rows_timer_.Start();
   }
   
