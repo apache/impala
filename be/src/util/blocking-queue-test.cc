@@ -29,9 +29,9 @@ namespace impala {
 TEST(BlockingQueueTest, TestBasic) {
   int32_t i;
   BlockingQueue<int32_t> test_queue(5);
-  test_queue.BlockingPut(1);
-  test_queue.BlockingPut(2);
-  test_queue.BlockingPut(3);
+  ASSERT_TRUE(test_queue.BlockingPut(1));
+  ASSERT_TRUE(test_queue.BlockingPut(2));
+  ASSERT_TRUE(test_queue.BlockingPut(3));
   ASSERT_TRUE(test_queue.BlockingGet(&i));
   ASSERT_EQ(1, i);
   ASSERT_TRUE(test_queue.BlockingGet(&i));
@@ -43,7 +43,7 @@ TEST(BlockingQueueTest, TestBasic) {
 TEST(BlockingQueueTest, TestGetFromShutdownQueue) {
   int64_t i;
   BlockingQueue<int64_t> test_queue(2);
-  test_queue.BlockingPut(123);
+  ASSERT_TRUE(test_queue.BlockingPut(123));
   test_queue.Shutdown();
   ASSERT_FALSE(test_queue.BlockingPut(456));
   ASSERT_TRUE(test_queue.BlockingGet(&i));
@@ -137,4 +137,3 @@ TEST(BlockingQueueTest, TestMultipleThreads) {
 }
 
 }
-

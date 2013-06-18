@@ -54,7 +54,7 @@ class BlockingQueue {
         return true;
       }
       if (shutdown_) return false;
-      
+
       timer.Start();
       get_cv_.wait(unique_lock);
       timer.Stop();
@@ -80,15 +80,16 @@ class BlockingQueue {
     list_.push_back(val);
     unique_lock.unlock();
     get_cv_.notify_one();
+    return true;
   }
-  
+
   // Shut down the queue. Wakes up all threads waiting on BlockingGet or BlockingPut.
   void Shutdown() {
     {
       boost::lock_guard<boost::mutex> guard(lock_);
       shutdown_ = true;
     }
-    
+
     get_cv_.notify_all();
     put_cv_.notify_all();
   }
