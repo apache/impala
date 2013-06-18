@@ -14,6 +14,7 @@
 
 #include "service/query-exec-state.h"
 #include "service/impala-server.h"
+#include "service/frontend.h"
 
 #include "exec/ddl-executor.h"
 #include "exprs/expr.h"
@@ -28,7 +29,7 @@ using namespace beeswax;
 namespace impala {
 
 ImpalaServer::QueryExecState::QueryExecState(
-    ExecEnv* exec_env, ImpalaServer* server,
+    ExecEnv* exec_env, Frontend* frontend,
     shared_ptr<SessionState> session,
     const TSessionState& query_session_state, const string& sql_stmt)
   : sql_stmt_(sql_stmt),
@@ -44,7 +45,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     current_batch_(NULL),
     current_batch_row_(0),
     num_rows_fetched_(0),
-    impala_server_(server),
+    frontend_(frontend),
     start_time_(TimestampValue::local_time_micros()) {
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
   client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
@@ -95,7 +96,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         parent_session_->database = exec_request_.ddl_exec_request.use_db_params.db;
         return Status::OK;
       }
-      ddl_executor_.reset(new DdlExecutor(impala_server_));
+      ddl_executor_.reset(new DdlExecutor(frontend_));
       Status status = ddl_executor_->Exec(exec_request_.ddl_exec_request,
           query_session_state_);
       {
@@ -107,7 +108,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       DCHECK(exec_request_.__isset.load_data_request);
       TLoadDataResp response;
       RETURN_IF_ERROR(
-          impala_server_->LoadData(exec_request_.load_data_request, &response));
+          frontend_->LoadData(exec_request_.load_data_request, &response));
       request_result_set_.reset(new vector<TResultRow>);
       request_result_set_->push_back(response.load_summary);
       return Status::OK;
@@ -174,7 +175,7 @@ void ImpalaServer::QueryExecState::Done() {
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
-  ddl_executor_.reset(new DdlExecutor(impala_server_));
+  ddl_executor_.reset(new DdlExecutor(frontend_));
   RETURN_IF_ERROR(ddl_executor_->Exec(exec_request));
   result_metadata_ = ddl_executor_->result_set_metadata();
   return Status::OK;
@@ -341,7 +342,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
 
     catalog_update.target_table = finalize_params.table_name;
     catalog_update.db_name = finalize_params.table_db;
-    RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
+    RETURN_IF_ERROR(frontend_->UpdateMetastore(catalog_update));
   }
   return Status::OK;
 }

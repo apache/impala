@@ -226,7 +226,7 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 
-  status = GetExplainPlan(query_request, &query_explanation.textual);
+  status = frontend_->GetExplainPlan(query_request, &query_explanation.textual);
   if (!status.ok()) {
     // raise Syntax error or access violation; this is the closest.
     RaiseBeeswaxException(
@@ -413,7 +413,7 @@ void ImpalaServer::ResetCatalog(impala::TStatus& status) {
 }
 
 void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& request) {
-  ResetTableInternal(request).ToThrift(&status);
+  frontend_->ResetTable(request).ToThrift(&status);
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {

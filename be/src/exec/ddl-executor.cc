@@ -23,9 +23,9 @@
 using namespace std;
 using namespace impala;
 
-DdlExecutor::DdlExecutor(ImpalaServer* impala_server)
-    : impala_server_(impala_server) {
-  DCHECK(impala_server != NULL);
+DdlExecutor::DdlExecutor(Frontend* frontend)
+    : frontend_(frontend) {
+  DCHECK(frontend != NULL);
 }
 
 Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
@@ -40,7 +40,7 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
           params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
       TGetTablesResult table_names;
-      RETURN_IF_ERROR(impala_server_->GetTableNames(params->db, table_name,
+      RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
           &session, &table_names));
 
       // Set the result set
@@ -57,7 +57,8 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       TGetDbsResult db_names;
       const string* db_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
-      RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &session, &db_names));
+      RETURN_IF_ERROR(
+          frontend_->GetDbNames(db_pattern, &session, &db_names));
 
       // Set the result set
       result_set_.resize(db_names.dbs.size());
@@ -70,7 +71,7 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
     }
     case TDdlType::DESCRIBE: {
       TDescribeTableResult response;
-      RETURN_IF_ERROR(impala_server_->DescribeTable(exec_request.describe_table_params,
+      RETURN_IF_ERROR(frontend_->DescribeTable(exec_request.describe_table_params,
           &response));
 
       // Set the result set
@@ -78,17 +79,18 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       return Status::OK;
     }
     case TDdlType::ALTER_TABLE:
-      return impala_server_->AlterTable(exec_request.alter_table_params);
+      return frontend_->AlterTable(exec_request.alter_table_params);
     case TDdlType::CREATE_DATABASE:
-      return impala_server_->CreateDatabase(exec_request.create_db_params);
+      return frontend_->CreateDatabase(exec_request.create_db_params);
     case TDdlType::CREATE_TABLE_LIKE:
-      return impala_server_->CreateTableLike(exec_request.create_table_like_params);
+      return frontend_->CreateTableLike(
+          exec_request.create_table_like_params);
     case TDdlType::CREATE_TABLE:
-      return impala_server_->CreateTable(exec_request.create_table_params);
+      return frontend_->CreateTable(exec_request.create_table_params);
     case TDdlType::DROP_DATABASE:
-      return impala_server_->DropDatabase(exec_request.drop_db_params);
+      return frontend_->DropDatabase(exec_request.drop_db_params);
     case TDdlType::DROP_TABLE:
-      return impala_server_->DropTable(exec_request.drop_table_params);
+      return frontend_->DropTable(exec_request.drop_table_params);
     default: {
       stringstream ss;
       ss << "Unknown DDL exec request type: " << exec_request.ddl_type;
@@ -100,10 +102,10 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
 // TODO: This is likely a superset of GetTableNames/GetDbNames. Coalesce these different
 // code paths.
 Status DdlExecutor::Exec(const TMetadataOpRequest& exec_request) {
-  TMetadataOpResponse metdata_op_result_;
-  RETURN_IF_ERROR(impala_server_->ExecHiveServer2MetadataOp(exec_request,
-      &metdata_op_result_));
-  result_set_metadata_ = metdata_op_result_.result_set_metadata;
-  result_set_ = metdata_op_result_.results;
+  TMetadataOpResponse metadata_op_result_;
+  RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
+      &metadata_op_result_));
+  result_set_metadata_ = metadata_op_result_.result_set_metadata;
+  result_set_ = metadata_op_result_.results;
   return Status::OK;
 }

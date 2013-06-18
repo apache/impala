@@ -24,7 +24,7 @@ namespace impala {
 class ExecEnv;
 class RowBatch;
 class Status;
-class ImpalaServer;
+class Frontend;
 
 // The DdlExecutor is responsible for executing statements that modify or query table
 // metadata explicitly. These include SHOW and DESCRIBE statements, HiveServer2 metadata
@@ -34,7 +34,7 @@ class ImpalaServer;
 // All rows are available to be read after Exec() returns.
 class DdlExecutor {
  public:
-  DdlExecutor(ImpalaServer* impala_server);
+  DdlExecutor(Frontend* frontend);
 
   // Runs a DDL query to completion. Once Exec() returns, all rows are available in
   // result_set().
@@ -60,7 +60,7 @@ class DdlExecutor {
   TResultSetMetadata result_set_metadata_;
 
   // Used to execute catalog queries to the Frontend via JNI. Not owned here.
-  ImpalaServer* impala_server_;
+  Frontend* frontend_;
 };
 
 }

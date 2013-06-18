@@ -20,6 +20,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 
 add_library(Service
+  frontend.cc
   fe-support.cc
   impala-server.cc
   impala-hs2-server.cc

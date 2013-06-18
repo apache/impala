@@ -16,8 +16,6 @@
 #ifndef IMPALA_SERVICE_IMPALA_SERVER_H
 #define IMPALA_SERVICE_IMPALA_SERVER_H
 
-#include <jni.h>
-
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -32,6 +30,7 @@
 #include "gen-cpp/Frontend_types.h"
 #include "util/thrift-server.h"
 #include "common/status.h"
+#include "service/frontend.h"
 #include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
@@ -86,6 +85,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
+
+  Frontend* frontend() { return frontend_.get(); }
 
   // ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
@@ -231,12 +232,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicUpdate>* topic_updates);
 
-  // Reads a configuration value from Hadoop's configuration in the
-  // front-end. If the configuration key is not found, returns the
-  // empty string.
-  // Returns Status::OK unless there is a JNI error.
-  Status GetHadoopConfigValue(const std::string& key, std::string* output);
-
  private:
   class FragmentExecState;
 
@@ -307,18 +302,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
 
-  // Call FE to get TClientRequestResult.
-  Status GetExecRequest(const TClientRequest& request, TExecRequest* result);
-
   // Updates the number of databases / tables metrics from the FE catalog
   Status UpdateCatalogMetrics();
-
-  // Make any changes required to the metastore as a result of an
-  // INSERT query, e.g. newly created partitions.
-  Status UpdateMetastore(const TCatalogUpdate& catalog_update);
-
-  // Call FE to get explain plan
-  Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
 
   // Starts asynchronous execution of query. Creates QueryExecState (returned
   // in exec_state), registers it and calls Coordinator::Execute().
@@ -351,8 +336,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
-  // Non-thrift callable version of ResetTable
-  Status ResetTableInternal(const TResetTableReq& reset_table_request);
 
   // Initiates query cancellation. Returns OK unless query_id is not found.
   // Queries still need to be unregistered, usually via Close, after cancellation.
@@ -411,80 +394,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // "support_start_over/false" to indicate that Impala does not support start over
   // in the fetch call.
   void InitializeConfigVariables();
-
-  // Validate Hadoop config; requires FE
-  Status ValidateSettings();
-
-  // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
-  // table name returned is unqualified.
-  // If pattern is NULL, match all tables otherwise match only those tables that
-  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
-  // and each pN may contain wildcards denoted by '*' which match all strings.
-  // The TSessionState parameter is used to filter results of metadata operations when
-  // authorization is enabled. If this is a user initiated request, it should
-  // be set to the user's current session. If this is an Impala internal request,
-  // the session should be set to NULL which will skip privilege checks returning all
-  // results.
-  Status GetTableNames(const std::string& db, const std::string* pattern,
-      const TSessionState* session, TGetTablesResult* table_names);
-
-  // Return all databases matching the optional argument 'pattern'.
-  // If pattern is NULL, match all databases otherwise match only those databases that
-  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
-  // and each pN may contain wildcards denoted by '*' which match all strings.
-  // The TSessionState parameter is used to filter results of metadata operations when
-  // authorization is enabled. If this is a user initiated request, it should
-  // be set to the user's current session. If this is an Impala internal request,
-  // the session should be set to NULL which will skip privilege checks returning all
-  // results.
-  Status GetDbNames(const std::string* pattern, const TSessionState* session,
-      TGetDbsResult* table_names);
-
-  // Returns (in the output parameter) the result of a DESCRIBE table command. This
-  // command retrieves table metadata, such as the column definitions. The metadata
-  // that is returned is controlled by setting the 'output_style' field. If this
-  // field is set to MINIMAL, only the column definitions are returned. If set to
-  // FORMATTED, extended metadata is returned (in addition to the column defs).
-  // This includes info about the table properties, SerDe properties, StorageDescriptor
-  // properties, and more.
-  Status DescribeTable(const TDescribeTableParams& params,
-      TDescribeTableResult* response);
-
-  // Modifies an existing table's metastore metadata. The specific type of operation is
-  // defined by the TAlterTableType field in TAlterTableParams. Some supported operations
-  // include renaming tables, adding/dropping columns/partitions from tables, and changing
-  // a table's file format. Returns OK if the operation was successfull, otherwise a
-  // Status object with information on the error will be returned.
-  Status AlterTable(const TAlterTableParams& alter_table_params);
-
-  // Creates a new database in the metastore with the specified name. Returns OK if the
-  // database was successfully created, otherwise CANCELLED is returned with details on
-  // the specific error. Common errors include creating a database that already exists
-  // and metastore connectivity problems.
-  Status CreateDatabase(const TCreateDbParams& create_db_params);
-
-  // Creates a new table in the metastore with the specified name. Returns OK if the
-  // table was successfully created, otherwise CANCELLED is returned. Common errors
-  // include creating a table that already exists, creating a table in a database that
-  // does not exist, and metastore connectivity problems.
-  Status CreateTable(const TCreateTableParams& create_table_params);
-
-  // Creates a new table in the metastore that is a based on the table definition of a
-  // given source table. This is a metadata only operation - no data is copied.
-  Status CreateTableLike(const TCreateTableLikeParams& create_table_like_params);
-
-  // Drops the specified database from the metastore. Returns OK if the database
-  // drop was successful, otherwise CANCELLED is returned.
-  Status DropDatabase(const TDropDbParams& drop_db_params);
-
-  // Drops the specified table from the metastore. Returns OK if the table drop was
-  // successful, otherwise CANCELLED is returned.
-  Status DropTable(const TDropTableParams& drop_table_params);
-
-  // Loads a single file or set of files into a table or partition. Saves the RPC
-  // response in the TLoadDataResp output parameter. Returns OK if the operation
-  // completed successfully.
-  Status LoadData(const TLoadDataReq& load_data_request, TLoadDataResp* response);
 
   // Checks settings for profile logging, including whether the output
   // directory exists and is writeable. Calls OpenProfileLogFile to
@@ -593,10 +502,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
 
-  // Calls FE to execute HiveServer2 metadata operation.
-  Status ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
-      TMetadataOpResponse* result);
-
   // Executes the fetch logic for HiveServer2 FetchResults.
   // Doesn't clean up the exec state if an error occurs.
   Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
@@ -659,27 +564,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // If profile logging is enabled, wakes once every 5s to flush query profiles to disk
   boost::scoped_ptr<boost::thread> profile_log_file_flush_thread_;
 
+  // A Frontend proxy, used both for planning and for catalog requests.
+  boost::scoped_ptr<Frontend> frontend_;
+
   // global, per-server state
-  jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
-  jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
-  jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
-  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
-  jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
-  jmethodID check_hadoop_config_id_; // JniFrontend.checkHadoopConfig()
-  jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
-  jmethodID reset_table_id_; // JniFrontend.resetTable
-  jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
-  jmethodID get_table_names_id_; // JniFrontend.getTableNames
-  jmethodID describe_table_id_; // JniFrontend.describeTable
-  jmethodID get_db_names_id_; // JniFrontend.getDbNames
-  jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
-  jmethodID alter_table_id_; // JniFrontend.alterTable
-  jmethodID create_database_id_; // JniFrontend.createDatabase
-  jmethodID create_table_id_; // JniFrontend.createTable
-  jmethodID create_table_like_id_; // JniFrontend.createTableLike
-  jmethodID drop_database_id_; // JniFrontend.dropDatabase
-  jmethodID drop_table_id_; // JniFrontend.dropTable
-  jmethodID load_table_data_id_; // JniFrontend.loadTableData
   ExecEnv* exec_env_;  // not owned
 
   // map from query id to exec state; QueryExecState is owned by us and referenced

@@ -34,6 +34,7 @@ class RuntimeState;
 class RowBatch;
 class Expr;
 class TupleRow;
+class Frontend;
 
 // Execution state of a query. This captures everything necessary
 // to convert row batches received by the coordinator into results
@@ -46,7 +47,7 @@ class TupleRow;
 // TODO: Consider renaming to RequestExecState for consistency.
 class ImpalaServer::QueryExecState {
  public:
-  QueryExecState(ExecEnv* exec_env, ImpalaServer* server,
+  QueryExecState(ExecEnv* exec_env, Frontend* frontend,
                  boost::shared_ptr<ImpalaServer::SessionState> session,
                  const TSessionState& query_session_state,
                  const std::string& sql_stmt);
@@ -180,8 +181,8 @@ class ImpalaServer::QueryExecState {
   int current_batch_row_; // number of rows fetched within the current batch
   int num_rows_fetched_; // number of rows fetched by client for the entire query
 
-  // To get access to UpdateMetastore
-  ImpalaServer* impala_server_;
+  // To get access to UpdateMetastore, LOAD and DDL methods
+  Frontend* frontend_;
 
   // Start/end time of the query
   TimestampValue start_time_, end_time_;

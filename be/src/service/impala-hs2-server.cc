@@ -129,7 +129,8 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionId& session_id,
   // There is no query text available because this metadata operation
   // comes from an RPC which does not provide the query text.
   // TODO: Consider reconstructing the query text from the metadata operation.
-  exec_state.reset(new QueryExecState(exec_env_, this, session, TSessionState(), "N/A"));
+  exec_state.reset(
+      new QueryExecState(exec_env_, frontend_.get(), session, TSessionState(), "N/A"));
   Status register_status = RegisterQuery(session, exec_state);
   if (!register_status.ok()) {
     status->__set_statusCode(
@@ -157,20 +158,6 @@ void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionId& session_id,
   TUniqueIdToTHandleIdentifier(operation_id, operation_id, &(handle->operationId));
   status->__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
-}
-
-Status ImpalaServer::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
-    TMetadataOpResponse* result) {
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jbyteArray request_bytes;
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
-  jbyteArray result_bytes = static_cast<jbyteArray>(
-      jni_env->CallObjectMethod(fe_, exec_hs2_metadata_op_id_, request_bytes));
-  RETURN_ERROR_IF_EXC(jni_env);
-  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-  return Status::OK;
 }
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
@@ -656,7 +643,7 @@ void ImpalaServer::ResetCatalog(TResetCatalogResp& return_val) {
 void ImpalaServer::ResetTable(TResetTableResp& return_val,
     const TResetTableReq& request) {
   VLOG_RPC << "ResetTable(): request=" << ThriftDebugString(request);
-  ResetTableInternal(request).ToThrift(&return_val.status);
+  frontend_->ResetTable(request).ToThrift(&return_val.status);
   VLOG_RPC << "ResetTable(): return_val=" << ThriftDebugString(return_val);
 }
 
