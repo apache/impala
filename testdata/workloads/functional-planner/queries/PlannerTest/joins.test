@@ -126,6 +126,129 @@ PLAN FRAGMENT 2
 NODE 0:
 NODE 1:
 ====
+# test that on-clause predicates referring to multiple tuple ids
+# get registered as eq join conjuncts
+select t1.* from (select * from functional.alltypestiny) t1
+inner join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
+join functional.alltypestiny t3 on (coalesce(t1.id, t2.id) = t3.id)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    coalesce(functional.alltypestiny.id, functional.alltypestiny.id) = t3.id
+  |  tuple ids: 0 2 4 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |       tuple ids: 4 
+  |    
+  2:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    functional.alltypestiny.id = functional.alltypestiny.id
+  |  tuple ids: 0 2 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |       tuple ids: 2 
+  |    
+  0:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  8:EXCHANGE
+     tuple ids: 0 2 4 
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: functional.alltypestiny.id
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    coalesce(functional.alltypestiny.id, functional.alltypestiny.id) = t3.id
+  |  tuple ids: 0 2 4 
+  |  
+  |----7:EXCHANGE
+  |       tuple ids: 4 
+  |    
+  2:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    functional.alltypestiny.id = functional.alltypestiny.id
+  |  tuple ids: 0 2 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  5:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B compact
+     tuple ids: 4 
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: functional.alltypestiny.id
+
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B compact
+     tuple ids: 2 
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: functional.alltypestiny.id
+
+  0:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 0 
+---- SCANRANGELOCATIONS
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+NODE 0:
+NODE 1:
+NODE 3:
+====
+# test that our join inference recognizes that we cannot do a hash join
+select t1.* from (select * from functional.alltypestiny) t1
+inner join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
+join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
+---- PLAN
+not implemented: Join between 't2' and 't3' requires at least one conjunctive equality predicate between the two tables
+====
 # multiple join predicates;
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node

@@ -445,11 +445,8 @@ public class Analyzer {
   private void registerConjunct(Expr e) {
     // this conjunct would already have an id assigned if it is being re-registered
     // in a subqery analyzer
-    if (e.getId() == null) {
-      e.setId(new ExprId(conjunctIdGenerator));
-    }
+    if (e.getId() == null) e.setId(new ExprId(conjunctIdGenerator));
     conjuncts.put(e.getId(), e);
-    //LOG.info("registered conjunct " + p.getId().toString() + ": " + p.toSql());
 
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     ArrayList<SlotId> slotIds = Lists.newArrayList();
@@ -480,16 +477,11 @@ public class Analyzer {
     // check whether this is an equi-join predicate, ie, something of the
     // form <expr1> = <expr2> where at least one of the exprs is bound by
     // exactly one tuple id
-    if (!(e instanceof BinaryPredicate)) {
-      return;
-    }
+    if (!(e instanceof BinaryPredicate)) return;
     BinaryPredicate binaryPred = (BinaryPredicate) e;
-    if (binaryPred.getOp() != BinaryPredicate.Operator.EQ) {
-      return;
-    }
-    if (tupleIds.size() != 2) {
-      return;
-    }
+    if (binaryPred.getOp() != BinaryPredicate.Operator.EQ) return;
+    // the binary predicate must refer to at least two tuples to be an eqJoinConjunct
+    if (tupleIds.size() < 2) return;
 
     // examine children and update eqJoinConjuncts
     for (int i = 0; i < 2; ++i) {
