@@ -40,7 +40,7 @@ done
 
 cd $IMPALA_HOME
 bin/gen_build_version.py
-rm ./CMakeCache.txt
+rm -f ./CMakeCache.txt
 
 rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
 rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
