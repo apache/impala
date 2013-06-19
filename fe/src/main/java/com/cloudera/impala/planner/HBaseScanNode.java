@@ -141,7 +141,7 @@ public class HBaseScanNode extends ScanNode {
     } else {
      // Set maxCaching so that each fetch from hbase won't return a batch of more than
      // MAX_HBASE_FETCH_BATCH_SIZE bytes.
-      Pair<Long, Long> estimate = tbl.getEstimatedStats(startKey, stopKey);
+      Pair<Long, Long> estimate = tbl.getEstimatedRowStats(startKey, stopKey);
       cardinality = estimate.first.longValue();
       if (estimate.second.longValue() > 0) {
         suggestedCaching = (int)

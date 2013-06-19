@@ -34,6 +34,23 @@ class Status;
 class HBaseScanNode;
 
 // JNI wrapper class implementing minimal functionality for scanning an HBase table.
+// Caching behavior is tuned by setting hbase.client.Scan.setCaching() and
+// hbase.client.setCacheBlocks().
+//
+// hbase.client.setCacheBlocks() is controlled by query option hbase_cache_blocks. When
+// set to true, HBase region server will cache the blocks. Subsequent retrieval of the
+// same data will be faster. If the table is large and the query is doing big scan, it
+// should be set to false to avoid polluting the cache in the hbase region server. On the
+// other hand, if the table is small and will be used several time, set it to true
+// to improve query performance.
+//
+// hbase.client.Scan.setCaching() is DEFAULT_ROWS_CACHED by default. This value controls
+// the number of rows batched together when fetching from a HBase region server. Having a
+// high value will put more memory pressure on the HBase region server and having a small
+// value will cause extra round trips to the HBase region server. This value can
+// be overridden by the query option hbase_caching. FE will also suggest a max value such
+// that it won't put too much memory pressure on the region server.
+
 // Note: When none of the requested family/qualifiers exist in a particular row,
 // HBase will not return the row at all, leading to "missing" NULL values.
 // TODO: Related to filtering, there is a special filter that allows only selecting the

@@ -243,7 +243,7 @@ public class HBaseTable extends Table {
    * @return The estimated number of rows in the regions between the row keys (first) and
    * the estimated row size in bytes (second).
    */
-  public synchronized Pair<Long, Long> getEstimatedStats(byte[] startRowKey,
+  public synchronized Pair<Long, Long> getEstimatedRowStats(byte[] startRowKey,
       byte[] endRowKey) {
     Preconditions.checkNotNull(startRowKey);
     Preconditions.checkNotNull(endRowKey);
