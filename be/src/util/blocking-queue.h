@@ -73,7 +73,6 @@ class BlockingQueue {
       timer.Stop();
     }
     total_put_wait_time_ += timer.ElapsedTime();
-
     if (shutdown_) return false;
 
     DCHECK_LT(list_.size(), max_elements_);
@@ -92,6 +91,11 @@ class BlockingQueue {
 
     get_cv_.notify_all();
     put_cv_.notify_all();
+  }
+
+  uint32_t GetSize() const {
+    boost::unique_lock<boost::mutex> l(lock_);
+    return list_.size();
   }
 
   // Returns the total amount of time threads have blocked in BlockingGet.

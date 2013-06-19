@@ -22,15 +22,16 @@
 
 namespace impala {
 
-// This is a class that executes multiple functions in parallel with different arguments 
-// using a thread pool.  
+// This is a class that executes multiple functions in parallel with different arguments
+// using a thread pool.
 // TODO: look into an API for this.  Boost has one that is in review but not yet official.
-// TODO: use a shared pool?  Thread creation is pretty cheap so this might not be 
+// TODO: use a shared pool?  Thread creation is pretty cheap so this might not be
 // worth it
+// TODO: Consider rewriting in terms of ThreadPool
 class ParallelExecutor {
  public:
   // Typedef for the underlying function for the work.
-  // The function must be thread safe.  
+  // The function must be thread safe.
   // The function must return a Status indicating if it was successful or not.
   // An example of how this function should be defined would be:
   //    static Status Foo::IssueRpc(void* arg);
@@ -38,7 +39,7 @@ class ParallelExecutor {
   // type safe.
   typedef boost::function<Status (void* arg)> Function;
 
-  // Calls function(args[i]) num_args times in parallel using num_args threads. 
+  // Calls function(args[i]) num_args times in parallel using num_args threads.
   // If any of the work item fails, returns the Status of the first failed work item.
   // Otherwise, returns Status::OK when all work items have been executed.
   static Status Exec(Function function, void** args, int num_args);
