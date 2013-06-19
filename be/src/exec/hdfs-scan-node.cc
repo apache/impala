@@ -326,7 +326,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   // TODO: this is a somewhat random heuristic.  Allow queueing up to 2 buffers
   // per scanner.  This should take into account mem limits.
-  max_queued_io_buffers_ = state->num_scanner_threads() * 2;
+  max_queued_io_buffers_ = CpuInfo::num_cores() * 2;
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
   // Initialize HdfsScanNode specific counters
@@ -336,8 +336,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
   scan_ranges_complete_counter_ =
       ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
-  num_disks_accessed_counter_ =
-      ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
+  if (DiskInfo::num_disks() < 64) {
+    num_disks_accessed_counter_ =
+        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
+  } else {
+    num_disks_accessed_counter_ = 0;
+  }
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
@@ -466,8 +470,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
-      hdfs_connection_, runtime_state_->resource_pool(),
-      &reader_context_, state->query_mem_limit()));
+      hdfs_connection_, &reader_context_, state->query_mem_limit()));
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
   runtime_state_->io_mgr()->set_active_read_thread_counter(reader_context_,
@@ -475,9 +478,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   runtime_state_->io_mgr()->set_disks_access_bitmap(reader_context_,
       &disks_accessed_bitmap_);
 
-  average_io_mgr_queue_capacity_ = runtime_profile()->AddSamplingCounter(
-      AVERAGE_IO_MGR_QUEUE_CAPACITY, bind<int64_t>(mem_fn(
-          &DiskIoMgr::queue_capacity), runtime_state_->io_mgr(), reader_context_));
   average_io_mgr_queue_size_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_IO_MGR_QUEUE_SIZE, bind<int64_t>(mem_fn(
           &DiskIoMgr::queue_size), runtime_state_->io_mgr(), reader_context_));
@@ -706,8 +706,9 @@ void HdfsScanNode::DiskThread() {
       if (done_) break;
     }
 
-    Status status = 
-        runtime_state_->io_mgr()->GetNext(reader_context_, &buffer_desc, &eos);
+
+    Status status;
+        //runtime_state_->io_mgr()->GetNext(reader_context_, &buffer_desc, &eos);
 
     ScannerContext::Stream* stream = NULL;
     {
@@ -928,7 +929,9 @@ void HdfsScanNode::UpdateCounters() {
   // Convert disk access bitmap to num of disk accessed
   uint64_t num_disk_bitmap = disks_accessed_bitmap_.value();
   int64_t num_disk_accessed = BitUtil::Popcount(num_disk_bitmap);
-  num_disks_accessed_counter_->Set(num_disk_accessed);
+  if (num_disks_accessed_counter_ != NULL) {
+    num_disks_accessed_counter_->Set(num_disk_accessed);
+  }
 
   // output completed file types and counts to info string
   if (!file_type_counts_.empty()) {

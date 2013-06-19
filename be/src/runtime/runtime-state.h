@@ -88,7 +88,6 @@ class RuntimeState {
   }
   int max_errors() const { return query_options_.max_errors; }
   int max_io_buffers() const { return query_options_.max_io_buffers; }
-  int num_scanner_threads() const { return query_options_.num_scanner_threads; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }

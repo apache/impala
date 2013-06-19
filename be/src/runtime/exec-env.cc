@@ -91,7 +91,7 @@ ExecEnv::ExecEnv()
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
 
-  Status status = disk_io_mgr_->Init(thread_mgr());
+  Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
 
   client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -132,7 +132,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
 
-  Status status = disk_io_mgr_->Init(thread_mgr());
+  Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
 
   client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");

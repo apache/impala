@@ -94,9 +94,6 @@ Status RuntimeState::Init(
     // TODO: how to tune this?
     query_options_.max_io_buffers = 5 * DiskInfo::num_disks();
   }
-  if (query_options_.num_scanner_threads <= 0) {
-    query_options_.num_scanner_threads = DiskIoMgr::default_parallel_scan_ranges();
-  }
 
   // Register with the thread mgr 
   if (exec_env != NULL) {

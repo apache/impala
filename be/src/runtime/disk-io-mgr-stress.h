@@ -53,8 +53,6 @@ class DiskIoMgrStress {
   // during the test
   std::vector<File> files_;
 
-  boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
-
   // io manager
   boost::scoped_ptr<DiskIoMgr> io_mgr_;
 

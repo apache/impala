@@ -19,6 +19,19 @@
 
 namespace impala {
 
+class AtomicUtil {
+ public:
+  // Issues instruction to have the CPU wait, this is less busy (bus traffic
+  // etc) than just spinning.
+  // For example:
+  //  while (1);
+  // should be:
+  //  while (1) CpuWait();
+  static inline void CpuWait() {
+    asm volatile("pause\n": : :"memory");
+  }
+};
+
 // Wrapper for atomic integers.  This should be switched to c++ 11 when
 // we can switch.
 // This class overloads operators to behave like a regular integer type
@@ -57,6 +70,17 @@ class AtomicInt {
     __sync_add_and_fetch(&value_, -1);
     return *this;
   }
+  
+  // This is post increment, which needs to return a new object.
+  AtomicInt<T> operator++(int) {
+    T prev = __sync_fetch_and_add(&value_, 1);
+    return AtomicInt<T>(prev);
+  }
+  AtomicInt<T> operator--(int) {
+    T prev = __sync_fetch_and_add(&value_, -1);
+    return AtomicInt<T>(prev);
+  }
+
 
   // Updates the int to 'value' if value is larger
   void UpdateMax(T value) {
@@ -73,11 +97,6 @@ class AtomicInt {
       if (LIKELY(__sync_bool_compare_and_swap(&value_, old_value, new_value))) break;
     }
   }
-
-  // This is post increment, which needs to return a new object.  Leave these
-  // undefined for now.
-  AtomicInt<T> operator++(int);
-  AtomicInt<T> operator--(int);
 
  private:
   T value_;

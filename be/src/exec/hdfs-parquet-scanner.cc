@@ -657,8 +657,8 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   int num_partition_keys = scan_node_->num_partition_keys();
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
-  DiskIoMgr::ScanRangeGroup* scan_range_group = 
-      scan_node_->runtime_state()->obj_pool()->Add(new DiskIoMgr::ScanRangeGroup);
+  //DiskIoMgr::ScanRangeGroup* scan_range_group = 
+  //    scan_node_->runtime_state()->obj_pool()->Add(new DiskIoMgr::ScanRangeGroup);
 
   // Walk over the materialized columns
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
@@ -714,9 +714,9 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range_->file(), col_len, col_start, i, metadata_range_->disk_id(),
         stream);
-    scan_range_group->ranges.push_back(col_range);
+    //scan_range_group->ranges.push_back(col_range);
   }
-  DCHECK_EQ(scan_node_->materialized_slots().size(), scan_range_group->ranges.size());
+  //DCHECK_EQ(scan_node_->materialized_slots().size(), scan_range_group->ranges.size());
   DCHECK_EQ(scan_node_->materialized_slots().size(), column_readers_.size());
 
   // The super class stream is not longer valid/used.  It was used
@@ -724,10 +724,10 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   stream_ = NULL;  
 
   // Issue all the column chunks to the io mgr.
-  vector<DiskIoMgr::ScanRangeGroup*> groups;
-  groups.push_back(scan_range_group);
-  RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRangeGroups(
-      scan_node_->reader_context(), groups));
+  //vector<DiskIoMgr::ScanRangeGroup*> groups;
+  //groups.push_back(scan_range_group);
+  //RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRangeGroups(
+  //    scan_node_->reader_context(), groups));
 
   return Status::OK;
 }

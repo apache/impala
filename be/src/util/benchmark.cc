@@ -102,12 +102,15 @@ string Benchmark::Measure() {
   }
   ss << endl;
 
+  int previous_baseline_idx = -1;
   for (int i = 0; i < benchmarks_.size(); ++i) {
     double base_line = benchmarks_[benchmarks_[i].baseline_idx].rate;
+    if (previous_baseline_idx != benchmarks_[i].baseline_idx && i > 0) ss << endl;
     ss << setw(function_out_width) << benchmarks_[i].name 
        << setw(rate_out_width) << setprecision(4) << benchmarks_[i].rate 
        << setw(comparison_out_width - 1) << setprecision(4) 
        << (benchmarks_[i].rate / base_line) << "X" << endl;
+    previous_baseline_idx = benchmarks_[i].baseline_idx;
   }
   
   return ss.str();

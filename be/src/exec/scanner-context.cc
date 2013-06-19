@@ -250,7 +250,7 @@ Status ScannerContext::Stream::GetBytesInternal(int requested_len,
 
       DiskIoMgr::BufferDescriptor* buffer_desc;
       Status status = parent_->state_->io_mgr()->Read(
-          parent_->scan_node_->hdfs_connection(), &range, &buffer_desc);
+          parent_->scan_node_->reader_context(), &range, &buffer_desc);
       if (!status.ok()) {
         if (buffer_desc != NULL) buffer_desc->Return();
         return status;
