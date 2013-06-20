@@ -19,6 +19,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "util/bit-stream-utils.h"
 #include "util/bit-util.h"
 #include "util/buffer-builder.h"
