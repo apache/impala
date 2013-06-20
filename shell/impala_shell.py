@@ -678,7 +678,7 @@ class ImpalaShell(cmd.Cmd):
     tokens = list(lexer)
     if filter(self.INSERT_REGEX.match, tokens):
       return self.__handle_insert_query(query)    
-    return self.__query_with_results(query)
+    return self.__execute_query(query)
       
   def do_use(self, args):
     """Executes a USE... query"""
