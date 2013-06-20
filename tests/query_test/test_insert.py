@@ -8,7 +8,8 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 
-PARQUET_CODECS = ['none', 'gzip', 'snappy']
+# TODO: Add Gzip back.  IMPALA-424
+PARQUET_CODECS = ['none', 'snappy']
 
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod
