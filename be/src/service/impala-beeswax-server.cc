@@ -417,9 +417,7 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {
-  // Session should not exist.
   const ThriftServer::SessionKey& session_key = session_context.session_key;
-  DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
   shared_ptr<SessionState> state;
   state.reset(new SessionState);
   state->closed = false;
@@ -432,7 +430,9 @@ void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_cont
   }
 
   lock_guard<mutex> l(session_state_map_lock_);
-  session_state_map_.insert(make_pair(session_key, state));
+  bool success = session_state_map_.insert(make_pair(session_key, state)).second;
+  // The session should not have already existed.
+  DCHECK(success);
 }
 
 void ImpalaServer::SessionEnd(const ThriftServer::SessionContext& session_context) {
