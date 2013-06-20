@@ -88,6 +88,11 @@ bool TNetworkAddress::operator<(const TNetworkAddress& that) const {
   return false;
 };
 
+// Comparator for TUniqueIds
+bool TUniqueId::operator<(const TUniqueId& that) const {
+  return (hi < that.hi) || (hi == that.hi &&  lo < that.lo);
+}
+
 static void ThriftOutputFunction(const char* output) {
   VLOG_QUERY << output;
 }

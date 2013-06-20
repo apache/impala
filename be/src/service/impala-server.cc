@@ -111,6 +111,9 @@ DEFINE_string(profile_log_dir, "", "The directory in which profile log files are
 DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
     "profile log file before a new one is created");
 
+DEFINE_int32(cancellation_thread_pool_size, 5,
+    "(Advanced) Size of the thread-pool processing cancellations due to node failure");
+
 namespace impala {
 
 ThreadManager* fe_tm;
@@ -121,6 +124,8 @@ ThreadManager* be_tm;
 // be changed only when the file format changes.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
 const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
+
+const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
 // Execution state of a single plan fragment.
 class ImpalaServer::FragmentExecState {
@@ -380,6 +385,13 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   EXIT_IF_ERROR(UpdateCatalogMetrics());
+
+  // Initialise the cancellation thread pool with 5 (by default) threads. The max queue
+  // size is deliberately set so high that it should never fill; if it does the
+  // cancellations will get ignored and retried on the next statestore heartbeat.
+  cancellation_thread_pool_.reset(new ThreadPool<TUniqueId>(
+      FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
+      bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
 }
 
 Status ImpalaServer::InitProfileLogging() {
@@ -1447,6 +1459,14 @@ void ImpalaServer::SessionState::ToThrift(const ThriftServer::SessionId& session
   state->network_address = network_address;
 }
 
+void ImpalaServer::CancelFromThreadPool(uint32_t thread_id, const TUniqueId& query_id) {
+  Status status = CancelInternal(query_id);
+  if (!status.ok()) {
+    VLOG_QUERY << "Query cancellation (" << query_id << ") did not succeed: "
+               << status.GetErrorMsg();
+  }
+}
+
 void ImpalaServer::MembershipCallback(
     const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
     vector<TTopicUpdate>* topic_updates) {
@@ -1465,7 +1485,7 @@ void ImpalaServer::MembershipCallback(
                                << "(seen " << google::COUNTER << " deltas)";
       return;
     }
-    vector<TNetworkAddress> current_membership(delta.topic_entries.size());
+    set<TNetworkAddress> current_membership;
 
     BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
       uint32_t len = item.value.size();
@@ -1476,35 +1496,45 @@ void ImpalaServer::MembershipCallback(
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      current_membership.push_back(backend_descriptor.address);
+      current_membership.insert(backend_descriptor.address);
     }
 
-    vector<TNetworkAddress> difference;
-    sort(current_membership.begin(), current_membership.end());
-    set_difference(last_membership_.begin(), last_membership_.end(),
-                   current_membership.begin(), current_membership.end(),
-                   std::inserter(difference, difference.begin()));
-    vector<TUniqueId> to_cancel;
+    set<TUniqueId> queries_to_cancel;
     {
+      // Build a list of queries that are running on failed hosts (as evidenced by their
+      // absence from the membership list).
+      // TODO: crash-restart failures can give false negatives for failed Impala demons.
       lock_guard<mutex> l(query_locations_lock_);
-      // Build a list of hosts that have currently executing queries but aren't
-      // in the membership list. Cancel them in a separate loop to avoid holding
-      // on to the location map lock too long.
-      BOOST_FOREACH(const TNetworkAddress& hostport, difference) {
-        QueryLocations::iterator it = query_locations_.find(hostport);
-        if (it != query_locations_.end()) {
-          to_cancel.insert(to_cancel.begin(), it->second.begin(), it->second.end());
+      QueryLocations::const_iterator backend = query_locations_.begin();
+      while (backend != query_locations_.end()) {
+        if (current_membership.find(backend->first) == current_membership.end()) {
+          queries_to_cancel.insert(backend->second.begin(), backend->second.end());
+          exec_env_->client_cache()->CloseConnections(backend->first);
+          // We can remove the location wholesale once we know backend's failed. To do so
+          // safely during iteration, we have to be careful not in invalidate the current
+          // iterator, so copy the iterator to do the erase(..) and advance the original.
+          QueryLocations::const_iterator failed_backend = backend;
+          ++backend;
+          query_locations_.erase(failed_backend);
+        } else {
+          ++backend;
         }
-        // We can remove the location wholesale once we know it's failed.
-        query_locations_.erase(hostport);
-        exec_env_->client_cache()->CloseConnections(hostport);
       }
     }
 
-    BOOST_FOREACH(const TUniqueId& query_id, to_cancel) {
-      CancelInternal(query_id);
+    if (cancellation_thread_pool_->GetQueueSize() + queries_to_cancel.size() >
+        MAX_CANCELLATION_QUEUE_SIZE) {
+      // Ignore the cancellations - we'll be able to process them on the next heartbeat
+      // instead.
+      LOG_EVERY_N(WARNING, 60) << "Cancellation queue is full";
+    } else {
+      // Since we are the only producer for this pool, we know that this cannot block
+      // indefinitely since the queue is large enough to accept all new cancellation
+      // requests.
+      BOOST_FOREACH(const TUniqueId& query_id, queries_to_cancel) {
+        cancellation_thread_pool_->Offer(query_id);
+      }
     }
-    last_membership_.swap(current_membership);
   }
 }
 

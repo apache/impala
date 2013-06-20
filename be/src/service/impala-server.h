@@ -34,6 +34,7 @@
 #include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
+#include "util/thread-pool.h"
 #include "util/uid-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
@@ -532,6 +533,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   static apache::hive::service::cli::thrift::TOperationState::type
       QueryStateToTOperationState(const beeswax::QueryState::type& query_state);
 
+  // Helper method to process cancellations that result from failed backends, called from
+  // the cancellation thread pool. Calls CancelInternal directly, but has a signature
+  // compatible with the thread pool.
+  void CancelFromThreadPool(uint32_t thread_id, const TUniqueId& query_id);
+
   // For access to GetTableNames and DescribeTable
   friend class DdlExecutor;
 
@@ -569,6 +575,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // global, per-server state
   ExecEnv* exec_env_;  // not owned
+
+  // Thread pool to process cancellation requests that come from failed Impala demons to
+  // avoid blocking the statestore callback.
+  boost::scoped_ptr<ThreadPool<TUniqueId> > cancellation_thread_pool_;
 
   // map from query id to exec state; QueryExecState is owned by us and referenced
   // as a shared_ptr to allow asynchronous deletion
@@ -662,9 +672,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId> >
       QueryLocations;
   QueryLocations query_locations_;
-
-  // The set of backends last reported by the state-store, used for failure detection.
-  std::vector<TNetworkAddress> last_membership_;
 
   // Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;
