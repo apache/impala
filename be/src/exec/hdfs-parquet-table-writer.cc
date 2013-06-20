@@ -40,6 +40,16 @@ using namespace impala;
 using namespace parquet;
 using namespace apache::thrift;
 
+// Managing file sizes: We need to estimate how big the files being buffered
+// are in order to split them correctly in HDFS. Having a file that is too big
+// will cause remote reads (parquet files are non-splittable).
+// It's too expensive to compute the exact file sizes as the rows are buffered
+// since the values in the current pages are only encoded/compressed when the page
+// is full. Once the page is full, we encode and compress it, at which point we know
+// the exact on file size.
+// The current buffered pages (one for each column) can have a very poor estimate.
+// To adjust for this, we aim for a slightly smaller file size than the ideal.
+
 // The maximum entries in the dictionary before giving up and switching to
 // plain encoding.
 // TODO: more complicated heuristic?
@@ -73,7 +83,7 @@ class HdfsParquetTableWriter::ColumnWriter {
   }
 
   // Append the row to this column.  This buffers the value into a data page.
-  // Returns the number of bytes added for this row.
+  // Returns the (estimated) delta in file size in bytes. 
   // TODO: this needs to be batch based, instead of row based for better
   // performance.  This is a bit trickier to handle the case where only a
   // partial row batch can be output to the current file because it reaches
@@ -247,7 +257,6 @@ inline int HdfsParquetTableWriter::ColumnWriter::AppendRow(TupleRow* row) {
   }
 
   DCHECK_GE(encoded_len, 0);
-  bytes_added += encoded_len;
   ++current_page_->header.data_page_header.num_values;
   current_page_->header.uncompressed_page_size += encoded_len;
   return bytes_added;
@@ -269,15 +278,12 @@ inline int HdfsParquetTableWriter::ColumnWriter::EncodePlain(void* value) const 
       return 0;
     case TYPE_STRING: {
       StringValue* sv = reinterpret_cast<StringValue*>(value);
-      len = sv->len + sizeof(uint32_t);
-      if (current_page_->header.uncompressed_page_size + len > DATA_PAGE_SIZE) {
+      int bytes_added = ParquetPlainEncoder::ByteSize<StringValue>(*sv);
+      if (current_page_->header.uncompressed_page_size + bytes_added > DATA_PAGE_SIZE) {
         return -1;
       }
-      uint32_t str_len = sv->len;
-      memcpy(dst_ptr, &str_len, sizeof(uint32_t));
-      dst_ptr += sizeof(uint32_t);
-      memcpy(dst_ptr, sv->ptr, sv->len);
-      return len;
+      ParquetPlainEncoder::Encode<StringValue>(dst_ptr, *sv);
+      return bytes_added;
     }
     case TYPE_TIMESTAMP:
       ptr = value;
@@ -460,6 +466,7 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
         &header.compressed_page_size, &compressed_data);
     current_page_->data = compressed_data;
   }
+  bytes_added += header.compressed_page_size;
     
   // Add the size of the data page header
   uint8_t* header_buffer;

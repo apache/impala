@@ -75,11 +75,11 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // Default data page size.  In bytes.
   static const int DATA_PAGE_SIZE = 64 * 1024;
 
-  // Default row group size.  In bytes.
-  static const int ROW_GROUP_SIZE = 1024 * 1024 * 1024;
-
   // Default hdfs block size.  In Bytes.
   static const int HDFS_BLOCK_SIZE = 1024 * 1024 * 1024;
+
+  // Default row group size.  In bytes.
+  static const int ROW_GROUP_SIZE = HDFS_BLOCK_SIZE;
 
   // Minimum file size.  If the configured size is less, fail.
   static const int HDFS_MIN_FILE_SIZE = 8 * 1024 * 1024;
