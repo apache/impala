@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 
 #include "util/dict-encoding.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 
 using namespace std;
