@@ -26,12 +26,15 @@ using namespace impala;
 
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
 
-// Authorization related flags. Both must be set to valid values to properly configure
+// Authorization related flags. Must be set to valid values to properly configure
 // authorization.
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
               "server during authorization. If set, authorization will be enabled.");
 DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
               "file. If set, authorization will be enabled.");
+DEFINE_string(authorization_policy_provider_class,
+    "org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider",
+    "Advanced: The authorization policy provider class name.");
 
 // Describes one method to look up in a Frontend object
 struct Frontend::FrontendMethodDescriptor {
@@ -47,7 +50,7 @@ struct Frontend::FrontendMethodDescriptor {
 
 Frontend::Frontend() {
   FrontendMethodDescriptor methods[] = {
-    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;)V", &fe_ctor_},
+    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
@@ -82,8 +85,11 @@ Frontend::Frontend() {
       jni_env->NewStringUTF(FLAGS_authorization_policy_file.c_str());
   jstring server_name =
       jni_env->NewStringUTF(FLAGS_server_name.c_str());
-  jobject fe =
-      jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name, policy_file_path);
+  jstring policy_provider_class_name =
+      jni_env->NewStringUTF(FLAGS_authorization_policy_provider_class.c_str());
+
+  jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
+      policy_file_path, policy_provider_class_name);
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }

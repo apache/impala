@@ -92,12 +92,12 @@ public class JniFrontend {
   /**
    * Create a new instance of the Jni Frontend.
    */
-  public JniFrontend(boolean lazy, String serverName,
-      String authorizationPolicyFile) throws InternalException {
+  public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
+      String policyProviderClassName) throws InternalException {
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.
-    AuthorizationConfig authorizationConfig =
-        new AuthorizationConfig(serverName, authorizationPolicyFile);
+    AuthorizationConfig authorizationConfig = new AuthorizationConfig(serverName,
+        authorizationPolicyFile, policyProviderClassName);
     authorizationConfig.validateConfig();
     frontend = new Frontend(lazy, authorizationConfig);
   }

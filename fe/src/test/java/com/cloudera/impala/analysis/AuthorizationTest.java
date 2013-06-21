@@ -22,6 +22,9 @@ import java.util.List;
 
 import junit.framework.Assert;
 
+import org.apache.access.provider.file.ResourceAuthorizationProvider;
+import org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider;
+import org.apache.access.provider.file.LocalGroupResourceAuthorizationProvider;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
@@ -45,7 +48,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class AuthorizationTest {
-  // Policy file has defined current user to have:
+  // Policy file has defined current user and 'test_user' have:
   //   ALL permission on 'tpch' database and 'newdb' database
   //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
@@ -53,18 +56,18 @@ public class AuthorizationTest {
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
   private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
-  private final static User USER = new User(System.getProperty("user.name"));
+  private final static User USER = new User("test_user");
+  // The admin_user has ALL privileges on the server.
+  private final static User ADMIN_USER = new User("admin_user");
   private final AnalysisContext analysisContext;
-  private final AnalysisContext adminUserAnalysisContext;
+  private final AuthorizationConfig authzConfig;
   private final Frontend fe;
 
   public AuthorizationTest() throws IOException {
-    AuthorizationConfig authzConfig =
-        new AuthorizationConfig("server1", AUTHZ_POLICY_FILE);
+    authzConfig = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        LocalGroupResourceAuthorizationProvider.class.getName());
     Catalog catalog = new Catalog(true, false, authzConfig);
     analysisContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
-    adminUserAnalysisContext = new AnalysisContext(catalog,
-        Catalog.DEFAULT_DB, ImpalaInternalAdminUser.getInstance());
     fe = new Frontend(true, authzConfig);
   }
 
@@ -219,9 +222,10 @@ public class AuthorizationTest {
     AuthzOk("invalidate metadata functional.alltypesagg");
     AuthzOk("refresh functional.alltypesagg");
 
-    // TODO: Use a real user to run this positive test case once
-    // AuthorizationChecker supports LocalGroupAuthorizationProvider.
-    adminUserAnalysisContext.analyze("invalidate metadata");
+    // The admin user should have privileges invalidate the server metadata.
+    AnalysisContext adminAc = new AnalysisContext(new Catalog(true, false, authzConfig),
+        Catalog.DEFAULT_DB, ADMIN_USER);
+    AuthzOk(adminAc, "invalidate metadata");
 
     AuthzError("invalidate metadata",
         "User '%s' does not have privileges to access: server");
@@ -595,23 +599,61 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestHadoopGroupPolicyProvider() throws AnalysisException,
+      AuthorizationException {
+    // Create an AnalysisContext using the current user. The HadoopGroupPolicyProvider
+    // should work with the current user, the LocalGroupPolicyProvider will not work
+    // with the current user.
+    User currentUser = new User(System.getProperty("user.name"));
+    AuthorizationConfig config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        HadoopGroupResourceAuthorizationProvider.class.getName());
+    Catalog catalog = new Catalog(true, false, config);
+    AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
+        currentUser);
+
+    // Can select from table that user has privileges on.
+    AuthzOk(context, "select * from functional.alltypesagg");
+
+    // Unqualified table name.
+    AuthzError(context, "select * from alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: default.alltypes",
+        currentUser);
+  }
+
+  @Test
   public void TestServerNameAuthorized() throws AnalysisException {
     // Authorization config that has a different server name from policy file.
-    TestWithIncorrectConfig(
-        new AuthorizationConfig("differentServerName", AUTHZ_POLICY_FILE));
+    TestWithIncorrectConfig(new AuthorizationConfig("differentServerName",
+        AUTHZ_POLICY_FILE, HadoopGroupResourceAuthorizationProvider.class.getName()),
+        new User(System.getProperty("user.name")));
  }
 
   @Test
   public void TestNoPermissionsWhenPolicyFileDoesNotExist() throws AnalysisException {
     // Validate a non-existent policy file.
+    // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
+    // resolved in the absence of the policy file.
     TestWithIncorrectConfig(
-        new AuthorizationConfig("server1", AUTHZ_POLICY_FILE + "_does_not_exist"));
+        new AuthorizationConfig("server1", AUTHZ_POLICY_FILE + "_does_not_exist",
+        HadoopGroupResourceAuthorizationProvider.class.getName()),
+        new User(System.getProperty("user.name")));
   }
 
   @Test
   public void TestConfigValidation() throws InternalException {
+    // Valid configs pass validation.
+    AuthorizationConfig config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        LocalGroupResourceAuthorizationProvider.class.getName());
+    Assert.assertTrue(config.isEnabled());
+    config.validateConfig();
+
+    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        HadoopGroupResourceAuthorizationProvider.class.getName());
+    config.validateConfig();
+    Assert.assertTrue(config.isEnabled());
+
     // Empty / null server name.
-    AuthorizationConfig config = new AuthorizationConfig("", AUTHZ_POLICY_FILE);
+    config = new AuthorizationConfig("", AUTHZ_POLICY_FILE, "");
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -621,7 +663,7 @@ public class AuthorizationTest {
           "Authorization is enabled but the server name is null or empty. Set the " +
           "server name using the impalad --server_name flag.");
     }
-    config = new AuthorizationConfig(null, AUTHZ_POLICY_FILE);
+    config = new AuthorizationConfig(null, AUTHZ_POLICY_FILE, null);
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -633,7 +675,7 @@ public class AuthorizationTest {
     }
 
     // Empty/null policy file.
-    config = new AuthorizationConfig("server1", null);
+    config = new AuthorizationConfig("server1", null, "");
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -644,7 +686,7 @@ public class AuthorizationTest {
           "Set the policy file using the --authorization_policy_file impalad flag.");
     }
 
-    config = new AuthorizationConfig("server1", "");
+    config = new AuthorizationConfig("server1", "", "");
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -653,38 +695,68 @@ public class AuthorizationTest {
       Assert.assertEquals(e.getMessage(),
           "Authorization is enabled but the policy file path was null or empty. " +
           "Set the policy file using the --authorization_policy_file impalad flag.");
+    }
+
+    // Invalid ResourcePolicyProvider class name.
+    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, "ClassDoesNotExist");
+    Assert.assertTrue(config.isEnabled());
+    try {
+      config.validateConfig();
+      fail("Expected configuration to fail.");
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(),
+          "The authorization policy provider class 'ClassDoesNotExist' was not found.");
+    }
+
+    // Valid class name, but class is not derived from ResourcePolicyProvider
+    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        this.getClass().getName());
+    Assert.assertTrue(config.isEnabled());
+    try {
+      config.validateConfig();
+      fail("Expected configuration to fail.");
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(), String.format("The authorization policy " +
+          "provider class '%s' must be a subclass of '%s'.", this.getClass().getName(),
+          ResourceAuthorizationProvider.class.getName()));
     }
 
     // Config validations skipped if authorization disabled
-    config = new AuthorizationConfig("", "");
+    config = new AuthorizationConfig("", "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, "");
+    config = new AuthorizationConfig(null, "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig("", null);
+    config = new AuthorizationConfig("", null, null);
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, null);
+    config = new AuthorizationConfig(null, null, null);
     Assert.assertFalse(config.isEnabled());
   }
 
-  private void TestWithIncorrectConfig(AuthorizationConfig authzConfig)
+  private static void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws AnalysisException {
     AnalysisContext ac = new AnalysisContext(new Catalog(true, false, authzConfig),
-        Catalog.DEFAULT_DB, USER);
+        Catalog.DEFAULT_DB, user);
     AuthzError(ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
-        "functional.alltypesagg");
+        "functional.alltypesagg", user);
     AuthzError(ac, "ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
-        "functional_seq_snap.alltypes");
+        "functional_seq_snap.alltypes", user);
     AuthzError(ac, "drop table tpch.lineitem",
-        "User '%s' does not have privileges to execute 'DROP' on: tpch.lineitem");
+        "User '%s' does not have privileges to execute 'DROP' on: tpch.lineitem",
+        user);
     AuthzError(ac, "show tables in functional",
-        "User '%s' does not have privileges to access: functional.*");
+        "User '%s' does not have privileges to access: functional.*", user);
   }
 
   private void AuthzOk(String stmt) throws AuthorizationException,
       AnalysisException {
-    analysisContext.analyze(stmt);
+    AuthzOk(analysisContext, stmt);
+  }
+
+  private static void AuthzOk(AnalysisContext context, String stmt)
+      throws AuthorizationException, AnalysisException {
+    context.analyze(stmt);
   }
 
   /**
@@ -693,18 +765,17 @@ public class AuthorizationTest {
    */
   private void AuthzError(String stmt, String expectedErrorString)
       throws AnalysisException {
-    AuthzError(analysisContext, stmt, expectedErrorString);
+    AuthzError(analysisContext, stmt, expectedErrorString, USER);
   }
 
-
   private static void AuthzError(AnalysisContext analysisContext,
-      String stmt, String expectedErrorString) throws AnalysisException {
+      String stmt, String expectedErrorString, User user) throws AnalysisException {
     Preconditions.checkNotNull(expectedErrorString);
     try {
       analysisContext.analyze(stmt);
     } catch (AuthorizationException e) {
       // Insert the username into the error.
-      expectedErrorString = String.format(expectedErrorString, USER.getName());
+      expectedErrorString = String.format(expectedErrorString, user.getName());
       String errorString = e.getMessage();
       Assert.assertTrue(
           "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,

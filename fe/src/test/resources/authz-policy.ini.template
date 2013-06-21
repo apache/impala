@@ -1,8 +1,12 @@
-# The [groups] section maps roles to (hadoop) user groups.
+# The [groups] section maps roles to user groups. If using a HadoopGroupPolicyProvider,
+# the group names must correspond to valid Hadoop user groups. If using a
+# LocalGroupPolicyProvider, the groups defined in this section are mapped to users
+# in the [users] section.
 [groups]
 ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           select_functional_alltypesagg, insert_functional_alltypes, insert_parquet,\
           new_table_uri, tpch_data_uri
+server_admin = all_server
 
 # The [roles] section defines privileges for objects in the authorizeable hierarchy.
 # Each role must start at the server-level and go down. If no "action" is specified, the
@@ -22,7 +26,10 @@ insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
 new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table
 tpch_data_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/tpch.lineitem
 
-# This section is not currently used by Impala. It allows for a admin specified mapping of
-# users -> roles rather than using the built-in hadoop group mapping.
+# This section allows for an admin specified mapping of users -> groups rather than using
+# the built-in hadoop group mapping. This section is only applicable if using the
+# LocalGroupResourcePolicyProvider, it is ignored by the
+# HadoopGroupResourcePolicyProvider.
 [users]
-${USER} = ${USER}
+test_user = ${USER}
+admin_user = server_admin

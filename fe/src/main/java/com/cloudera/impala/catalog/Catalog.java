@@ -258,7 +258,7 @@ public class Catalog {
     this.nextTableId = 0;
     this.lazy = lazy;
     this.authzConfig = authzConfig;
-    this.authzChecker = createAuthorizationChecker(authzConfig);
+    this.authzChecker = new AuthorizationChecker(authzConfig);
 
     // If authorization is enabled, reload the policy on a regular basis.
     if (authzConfig.isEnabled()) {
@@ -312,23 +312,10 @@ public class Catalog {
       LOG.info("Reloading authorization policy file from: " + config.getPolicyFile());
       authzCheckerLock.writeLock().lock();
       try {
-        authzChecker = createAuthorizationChecker(config);
+        authzChecker = new AuthorizationChecker(config);
       } finally {
         authzCheckerLock.writeLock().unlock();
       }
-    }
-  }
-
-  private static AuthorizationChecker createAuthorizationChecker(
-      AuthorizationConfig config) {
-    try {
-      return new AuthorizationChecker(config);
-    } catch (IOException e) {
-      // The Hive Access code doesn't actually ever throw an IOException, but it does
-      // contain a throws declaration. If the file doesn't exist the current
-      // behavior is to fail to give access to any user request. Leaving this here
-      // in case that behavior changes.
-      throw new IllegalStateException(e);
     }
   }
 

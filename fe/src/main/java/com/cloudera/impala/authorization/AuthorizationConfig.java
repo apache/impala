@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.authorization;
 
+import org.apache.access.provider.file.ResourceAuthorizationProvider;
+import com.google.common.base.Preconditions;
 
 /*
  * Class that contains configuration details for Impala authorization.
@@ -21,10 +23,13 @@ package com.cloudera.impala.authorization;
 public class AuthorizationConfig {
   private final String serverName;
   private final String policyFile;
+  private final String policyProviderClassName;
 
-  public AuthorizationConfig(String serverName, String policyFile) {
+  public AuthorizationConfig(String serverName, String policyFile,
+      String policyProviderClassName) {
     this.serverName = serverName;
     this.policyFile = policyFile;
+    this.policyProviderClassName = policyProviderClassName;
   }
 
   /*
@@ -47,11 +52,32 @@ public class AuthorizationConfig {
           " path was null or empty. Set the policy file using the " +
           "--authorization_policy_file impalad flag.");
     }
+    if (policyProviderClassName == null || policyProviderClassName.isEmpty()) {
+      throw new IllegalArgumentException("Authorization is enabled but the " +
+          "authorization policy provider class name is null or empty. Set the class " +
+          "name using the --authorization_policy_provider_class impalad flag.");
+    }
+    Class<?> providerClass = null;
+    try {
+      // Get the Class object without performing any initialization.
+      providerClass = Class.forName(policyProviderClassName, false,
+          this.getClass().getClassLoader());
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(String.format("The authorization policy " +
+          "provider class '%s' was not found.", policyProviderClassName), e);
+    }
+    Preconditions.checkNotNull(providerClass);
+    if (!ResourceAuthorizationProvider.class.isAssignableFrom(providerClass)) {
+      throw new IllegalArgumentException(String.format("The authorization policy " +
+          "provider class '%s' must be a subclass of '%s'.",
+          policyProviderClassName,
+          ResourceAuthorizationProvider.class.getName()));
+    }
   }
 
   /*
    * Returns true if authorization is enabled.
-   * If any of the authorization config values is set to a non-empty value authorization
+   * If either serverName or policyFile is set (not null or empty), authorization
    * is considered enabled.
    */
   public boolean isEnabled() {
@@ -74,9 +100,17 @@ public class AuthorizationConfig {
   }
 
   /*
+   * The full class name of the authorization policy provider. For example:
+   * org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider.
+   */
+  public String getPolicyProviderClassName() {
+    return policyProviderClassName;
+  }
+
+  /*
    * Returns an AuthorizationConfig object that has authorization disabled.
    */
   public static AuthorizationConfig createAuthDisabledConfig() {
-    return new AuthorizationConfig(null, null);
+    return new AuthorizationConfig(null, null, null);
   }
 }

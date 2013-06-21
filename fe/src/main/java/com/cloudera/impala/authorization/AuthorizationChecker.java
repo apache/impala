@@ -21,6 +21,7 @@ import java.util.List;
 import org.apache.access.core.Authorizable;
 import org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider;
 import org.apache.access.provider.file.ResourceAuthorizationProvider;
+import org.apache.commons.lang.reflect.ConstructorUtils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -33,18 +34,34 @@ public class AuthorizationChecker {
   private final AuthorizationConfig config;
 
   /*
-   * Creates a new AuthorizationChecker from the given config. If authorization is
-   * enabled, it will authorize based on the Hadoop Group the user belongs to.
-   * TODO: Support a LocalGroupAuthorizationProvider as well.
+   * Creates a new AuthorizationChecker based on the config values.
    */
-  public AuthorizationChecker(AuthorizationConfig config) throws IOException {
+  public AuthorizationChecker(AuthorizationConfig config) {
     Preconditions.checkNotNull(config);
     this.config = config;
     if (config.isEnabled()) {
-      this.provider = new HadoopGroupResourceAuthorizationProvider(
-          config.getPolicyFile(), config.getServerName());
+      this.provider = createAuthorizationProvider(config);
+      Preconditions.checkNotNull(provider);
     } else {
       this.provider = null;
+    }
+  }
+
+  /*
+   * Creates a new ResourceAuthorizationProvider based on the given configuration.
+   */
+  private static ResourceAuthorizationProvider
+      createAuthorizationProvider(AuthorizationConfig config) {
+    try {
+      // Try to create an instance of the specified policy provider class.
+      // Re-throw any exceptions that are encountered.
+      return (ResourceAuthorizationProvider) ConstructorUtils.invokeConstructor(
+          Class.forName(config.getPolicyProviderClassName()),
+          new Object[] {config.getPolicyFile(), config.getServerName()});
+    } catch (Exception e) {
+      // Re-throw as unchecked exception.
+      throw new IllegalStateException(
+          "Error creating ResourceAuthorizationProvider: " + e.getMessage(), e);
     }
   }
 
