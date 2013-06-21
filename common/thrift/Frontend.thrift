@@ -33,6 +33,12 @@ struct TSessionState {
 
   // The user to whom this session belongs
   2: required string user
+
+  // A unique identifier for this session
+  3: required string session_id
+
+  // Client network address
+  4: required Types.TNetworkAddress network_address
 }
 
 // Arguments to getTableNames, which returns a list of tables that match an

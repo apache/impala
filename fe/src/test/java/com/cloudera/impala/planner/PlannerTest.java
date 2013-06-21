@@ -158,7 +158,7 @@ public class PlannerTest {
 
     options.setNum_nodes(1);
     TSessionState sessionState =
-        new TSessionState("default", System.getProperty("user.name"));
+        new TSessionState("default", System.getProperty("user.name"), null, null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
     StringBuilder explainBuilder = new StringBuilder();
 

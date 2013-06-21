@@ -109,20 +109,20 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
   TRowSet* result_set_;
 };
 
-void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
+void ImpalaServer::ExecuteMetadataOp(const ThriftServer::SessionId& session_id,
     TMetadataOpRequest* request, TOperationHandle* handle,
     apache::hive::service::cli::thrift::TStatus* status) {
   shared_ptr<SessionState> session;
-  GetSessionState(session_key, &session);
+  GetSessionState(session_id, &session);
   if (session == NULL) {
     status->__set_statusCode(
         apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
-    status->__set_errorMessage("Invalid session key");
+    status->__set_errorMessage("Invalid session ID");
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
   TSessionState session_state;
-  session->ToThrift(&session_state);
+  session->ToThrift(session_id, &session_state);
   request->__set_session(session_state);
 
   shared_ptr<QueryExecState> exec_state;
@@ -207,7 +207,8 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
     shared_ptr<SessionState> session_state;
     RETURN_IF_ERROR(GetSessionState(execute_request.sessionHandle.sessionId.guid,
         &session_state));
-    session_state->ToThrift(&client_request->sessionState);
+    session_state->ToThrift(execute_request.sessionHandle.sessionId.guid,
+        &client_request->sessionState);
     lock_guard<mutex> l(session_state->lock);
     client_request->queryOptions = session_state->default_query_options;
   }
@@ -229,7 +230,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {
   VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
 
-  // Generate session id and the secret
+  // Generate session ID and the secret
   {
     lock_guard<mutex> l(uuid_lock_);
     uuid sessionid = uuid_generator_();
@@ -247,9 +248,11 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->session_type = HIVESERVER2;
+  state->network_address = ThriftServer::GetThreadSessionContext()->network_address;
 
   // If the username was set by a lower-level transport, use it.
-  const ThriftServer::Username& username = ThriftServer::GetThreadUsername();
+  const ThriftServer::Username& username =
+      ThriftServer::GetThreadSessionContext()->username;
   if (!username.empty()) {
     state->user = username;
   } else {
@@ -328,7 +331,7 @@ void ImpalaServer::ExecuteStatement(
   GetSessionState(request.sessionHandle.sessionId.guid, &session);
   if (session == NULL) {
     HS2_RETURN_IF_ERROR(
-        return_val, Status("Invalid session key"), SQLSTATE_GENERAL_ERROR);
+        return_val, Status("Invalid session ID"), SQLSTATE_GENERAL_ERROR);
   }
 
   status = Execute(query_request, session, query_request.sessionState, &exec_state);

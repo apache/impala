@@ -140,8 +140,8 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
   shared_ptr<QueryExecState> exec_state;
   shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadSessionKey(), &session);
-  DCHECK(session != NULL);  // We made these keys...
+  GetSessionState(ThriftServer::GetThreadSessionId(), &session);
+  DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
     // transport, the username may be known at that time. If the username hasn't been set
@@ -180,8 +180,8 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   shared_ptr<QueryExecState> exec_state;
   shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadSessionKey(), &session);
-  DCHECK(session != NULL);  // We made these keys...
+  GetSessionState(ThriftServer::GetThreadSessionId(), &session);
+  DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
     // transport, the username may be known at that time. If the username hasn't been set
@@ -417,26 +417,27 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {
-  const ThriftServer::SessionKey& session_key = session_context.session_key;
+  const ThriftServer::SessionId& session_id = session_context.session_id;
   shared_ptr<SessionState> state;
   state.reset(new SessionState);
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->database = "default";
   state->session_type = BEESWAX;
+  state->network_address = session_context.network_address;
   // If the username was set by a lower-level transport, use it.
   if (!session_context.username.empty()) {
     state->user = session_context.username;
   }
 
   lock_guard<mutex> l(session_state_map_lock_);
-  bool success = session_state_map_.insert(make_pair(session_key, state)).second;
+  bool success = session_state_map_.insert(make_pair(session_id, state)).second;
   // The session should not have already existed.
   DCHECK(success);
 }
 
 void ImpalaServer::SessionEnd(const ThriftServer::SessionContext& session_context) {
-  CloseSessionInternal(session_context.session_key);
+  CloseSessionInternal(session_context.session_id);
 }
 
 Status ImpalaServer::QueryToTClientRequest(const Query& query,
@@ -446,8 +447,9 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
-    RETURN_IF_ERROR(GetSessionState(ThriftServer::GetThreadSessionKey(), &session));
-    session->ToThrift(&request->sessionState);
+    const ThriftServer::SessionId& session_id = ThriftServer::GetThreadSessionId();
+    RETURN_IF_ERROR(GetSessionState(session_id, &session));
+    session->ToThrift(session_id, &request->sessionState);
   }
 
   // Override default query options with Query.Configuration

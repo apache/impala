@@ -39,6 +39,7 @@ import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TSessionState;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -483,9 +484,7 @@ public class AuthorizationTest {
   @Test
   public void TestHs2GetTables() throws ImpalaException {
     TMetadataOpRequest req = new TMetadataOpRequest();
-    TSessionState sessionState = new TSessionState("default", USER.getName());
-    req.setSession(sessionState);
-
+    req.setSession(createSessionState("default", USER));
     req.opcode = TMetadataOpcode.GET_TABLES;
     req.get_tables_req = new TGetTablesReq();
     req.get_tables_req.setSchemaName("functional");
@@ -501,9 +500,7 @@ public class AuthorizationTest {
   @Test
   public void TestHs2GetSchema() throws ImpalaException {
     TMetadataOpRequest req = new TMetadataOpRequest();
-    TSessionState sessionState = new TSessionState("default", USER.getName());
-    req.setSession(sessionState);
-
+    req.setSession(createSessionState("default", USER));
     req.opcode = TMetadataOpcode.GET_SCHEMAS;
     req.get_schemas_req = new TGetSchemasReq();
     // Get all schema (databases).
@@ -523,7 +520,7 @@ public class AuthorizationTest {
     // It should return one column: alltypes.string_col.
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_COLUMNS;
-    req.setSession(new TSessionState("default", USER.getName()));
+    req.setSession(createSessionState("default", USER));
     req.get_columns_req = new TGetColumnsReq();
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
@@ -662,5 +659,9 @@ public class AuthorizationTest {
       return;
     }
     fail("Stmt didn't result in authorization error: " + stmt);
+  }
+
+  private static TSessionState createSessionState(String defaultDb, User user) {
+    return new TSessionState(defaultDb, user.getName(), "", new TNetworkAddress("", 0));
   }
 }

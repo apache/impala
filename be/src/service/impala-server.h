@@ -361,7 +361,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Close the session and release all resource used by this session.
   // Caller should not hold any locks when calling this function.
-  Status CloseSessionInternal(const ThriftServer::SessionKey& session_key);
+  Status CloseSessionInternal(const ThriftServer::SessionId& session_id);
 
   // Gets the runtime profile string for a given query_id and writes it to the output
   // stream. First searches for the query id in the map of in-flight queries. If no
@@ -588,7 +588,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // and an error status will be returned. As part of this call, the TMetadataOpRequest
   // struct will be populated with the requesting user's session state.
   // Returns a TOperationHandle and TStatus.
-  void ExecuteMetadataOp(const ThriftServer::SessionKey& session_key,
+  void ExecuteMetadataOp(const ThriftServer::SessionId& session_id,
       TMetadataOpRequest* request,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
@@ -718,6 +718,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // User for this session
     std::string user;
 
+    // Client network address
+    TNetworkAddress network_address;
+
     // Protects all fields below
     // If this lock has to be taken with query_exec_state_map_lock, take this lock first.
     boost::mutex lock;
@@ -736,20 +739,21 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Builds a Thrift representation of the default database for serialisation to
     // the frontend.
-    void ToThrift(TSessionState* session_state);
+    void ToThrift(const ThriftServer::SessionId& session_id,
+        TSessionState* session_state);
   };
 
   // Protects session_state_map_
   boost::mutex session_state_map_lock_;
 
   // A map from session identifier to a structure containing per-session information
-  typedef boost::unordered_map<ThriftServer::SessionKey, boost::shared_ptr<SessionState> >
+  typedef boost::unordered_map<ThriftServer::SessionId, boost::shared_ptr<SessionState> >
     SessionStateMap;
   SessionStateMap session_state_map_;
 
   // Return session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.
-  inline Status GetSessionState(const ThriftServer::SessionKey& session_id,
+  inline Status GetSessionState(const ThriftServer::SessionId& session_id,
       boost::shared_ptr<SessionState>* session_state) {
     boost::lock_guard<boost::mutex> l(session_state_map_lock_);
     SessionStateMap::iterator i = session_state_map_.find(session_id);

@@ -15,6 +15,8 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 #include <thrift/concurrency/PosixThreadFactory.h>
 #include <thrift/concurrency/Thread.h>
 #include <thrift/concurrency/ThreadManager.h>
@@ -29,11 +31,13 @@
 
 #include "util/thrift-server.h"
 #include "util/authorization.h"
+#include "util/network-util.h"
 
 #include <sstream>
 
 using namespace std;
 using namespace boost;
+using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
 using namespace apache::thrift::protocol;
@@ -182,12 +186,12 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
 __thread ThriftServer::SessionContext* __session_context__;
 
 
-const ThriftServer::SessionKey& ThriftServer::GetThreadSessionKey() {
-  return __session_context__->session_key;
+const ThriftServer::SessionId& ThriftServer::GetThreadSessionId() {
+  return __session_context__->session_id;
 }
 
-const ThriftServer::Username& ThriftServer::GetThreadUsername() {
-  return __session_context__->username;
+const ThriftServer::SessionContext* ThriftServer::GetThreadSessionContext() {
+  return __session_context__;
 }
 
 void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtocol> input,
@@ -217,11 +221,11 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   }
 
   {
-    stringstream ss;
-    ss << socket->getPeerAddress() << ":" << socket->getPeerPort();
+    session_ptr->network_address =
+        MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 
     lock_guard<mutex> l(thrift_server_->session_contexts_lock_);
-    session_ptr->session_key = ss.str();
+    session_ptr->session_id = to_string(thrift_server_->uuid_generator_());
 
     // Add the session to the session map.
     __session_context__ = session_ptr.get();

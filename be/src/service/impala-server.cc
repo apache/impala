@@ -756,16 +756,17 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
             << "<table class='table table-bordered table-hover'>"
             << "<tr><th>Session Type</th>"
             << "<th>User</th>"
-            << "<th>Session Key</th>"
+            << "<th>Session ID</th>"
+            << "<th>Network Address</th>"
             << "<th>Default Database</th>"
             << "<th>Start Time</th></tr>"
             << endl;
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
     string session_type;
-    string session_key;
+    string session_id;
     if (session.second->session_type == BEESWAX) {
       session_type = "Beeswax";
-      session_key = session.first;
+      session_id = session.first;
     } else {
       session_type = "HiveServer2";
       // Print HiveServer2 session key as TUniqueId
@@ -774,12 +775,13 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
       memcpy(&(tmp_key.hi), session.first.c_str(), 8);
       memcpy(&(tmp_key.lo), session.first.c_str() + 8, 8);
       result << tmp_key.hi << ":" << tmp_key.lo;
-      session_key = result.str();
+      session_id = result.str();
     }
     (*output) << "<tr>"
               << "<td>" << session_type << "</td>"
               << "<td>" << session.second->user << "</td>"
-              << "<td>" << session_key << "</td>"
+              << "<td>" << session_id << "</td>"
+              << "<td>" << session.second->network_address << "</td>"
               << "<td>" << session.second->database << "</td>"
               << "<td>" << session.second->start_time.DebugString() << "</td>"
               << "</tr>";
@@ -1354,17 +1356,17 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   return Status::OK;
 }
 
-Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionKey& session_key) {
+Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionId& session_id) {
   // Find the session_state and remove it from the map.
   shared_ptr<SessionState> session_state;
   {
     lock_guard<mutex> l(session_state_map_lock_);
-    SessionStateMap::iterator entry = session_state_map_.find(session_key);
+    SessionStateMap::iterator entry = session_state_map_.find(session_id);
     if (entry == session_state_map_.end()) {
-      return Status("Invalid session key");
+      return Status("Invalid session ID");
     }
     session_state = entry->second;
-    session_state_map_.erase(session_key);
+    session_state_map_.erase(session_id);
   }
   DCHECK(session_state != NULL);
 
@@ -1773,10 +1775,13 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
   }
 }
 
-void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
+void ImpalaServer::SessionState::ToThrift(const ThriftServer::SessionId& session_id,
+    TSessionState* state) {
   lock_guard<mutex> l(lock);
   state->database = database;
   state->user = user;
+  state->session_id = session_id;
+  state->network_address = network_address;
 }
 
 void ImpalaServer::MembershipCallback(

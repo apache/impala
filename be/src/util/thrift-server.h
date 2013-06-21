@@ -20,6 +20,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 #include <thrift/server/TNonblockingServer.h>
 #include <thrift/TProcessor.h>
 
@@ -38,15 +39,16 @@ namespace impala {
 class ThriftServer {
  public:
   // An opaque identifier for the current session, which identifies a client connection.
-  typedef std::string SessionKey;
+  typedef std::string SessionId;
 
-  // Username
+  // Username.
   typedef std::string Username;
 
   // Per-connection session information.
   struct SessionContext {
-    SessionKey session_key;
+    SessionId session_id;
     Username username;
+    TNetworkAddress network_address;
   };
 
   // Interface class for receiving session creation / termination events.
@@ -108,15 +110,19 @@ class ThriftServer {
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static const SessionKey& GetThreadSessionKey();
+  static const SessionId& GetThreadSessionId();
 
-  // Returns the username provided by the underlying transport for the current session
-  // or an empty string if the transport did not provide a username. Currently, only the
-  // TSasl transport provides this information.
+  // Returns a pointer to a struct that contains information about the current
+  // session. This includes:
+  //   - A unique identifier for the session.
+  //   - The username provided by the underlying transport for the current session, or an
+  //     empty string if the transport did not provide a username. Currently, only the
+  //     TSasl transport provides this information.
+  //   - The client connection network address.
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static const Username& GetThreadUsername();
+  static const SessionContext* GetThreadSessionContext();
 
  private:
   // True if the server has been successfully started, for internal use only
@@ -165,6 +171,9 @@ class ThriftServer {
 
   // Total connections made over the lifetime of this server
   Metrics::IntMetric* total_connections_metric_;
+
+  // Used to generate a unique session id for every connection
+  boost::uuids::random_generator uuid_generator_;
 
   // Helper class which monitors starting servers. Needs access to internal members, and
   // is not used outside of this class.
