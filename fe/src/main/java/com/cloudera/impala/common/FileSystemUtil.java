@@ -16,8 +16,10 @@ package com.cloudera.impala.common;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -131,6 +133,19 @@ public class FileSystemUtil {
         "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
     // Move (rename) the file.
     fs.rename(sourceFile, destFile);
+  }
+
+  /*
+   * Reads the file at path and returns the contents.
+   */
+  public static String readFile(Path file) throws IOException {
+    FileSystem fs = file.getFileSystem(CONF);
+    InputStream fileStream = fs.open(file);
+    try {
+      return IOUtils.toString(fileStream);
+    } finally {
+      IOUtils.closeQuietly(fileStream);
+    }
   }
 
   /*

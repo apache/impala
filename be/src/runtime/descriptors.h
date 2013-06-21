@@ -204,9 +204,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   const std::string& null_partition_key_value() const {
     return null_partition_key_value_;
   }
-  const std::string& null_column_value() const {
-    return null_column_value_;
-  }
+  const std::string& null_column_value() const { return null_column_value_; }
+  const std::string& avro_schema() const { return avro_schema_; }
 
   typedef std::map<int64_t, HdfsPartitionDescriptor*> PartitionIdToDescriptorMap;
 
@@ -230,6 +229,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   // Special string to indicate NULL values in text-encoded columns.
   std::string null_column_value_;
   PartitionIdToDescriptorMap partition_descriptors_;
+  // Set to the table's Avro schema if this is an Avro table, empty string otherwise
+  std::string avro_schema_;
   // Owned by DescriptorTbl
   ObjectPool* object_pool_;
 };

@@ -93,6 +93,9 @@ struct THdfsTable {
   // String to indicate a NULL column value in text files
   5: required string nullColumnValue
 
+  // Set to the table's Avro schema if this is an Avro table
+  6: optional string avroSchema
+
   // map from partition id to partition metadata
   4: required map<i64, THdfsPartition> partitions
 }

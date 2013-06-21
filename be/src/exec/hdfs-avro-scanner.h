@@ -41,13 +41,27 @@
 //
 // This implementation reads one data block at a time, using the schema from the
 // file header to decode the serialized objects. If possible, non-materialized
-// columns are skipped without being read. The Avro C++ library is used to parse
-// the JSON schema into a ValidSchema object, which is then transformed into our
-// own schema representation.
+// columns are skipped without being read.
+//
+// The Avro C++ library is used to parse the file's schema and the table's schema into
+// ValidSchema objects, which are then resolved according to the Avro spec and transformed
+// into our own schema representation. Schema resolution allows users to evolve the table
+// schema and file schema(s) independently. The spec goes over all the rules for schema
+// resolution, but in summary:
+//
+// - Record fields are matched by name (and thus can be reordered; the table schema
+//   determines the order of the columns)
+// - Fields in the file schema not present in the table schema are ignored
+// - Fields in the table schema not present in the file schema must have a default value
+//   specified (not yet implemented)
+// - Types can be "promoted" as follows:
+//   int -> long -> float -> double (not yet implemented)
 //
 // TODO:
 // - implement SkipComplex()
 // - codegen
+// - default field values
+// - type promotion
 
 #include "exec/base-sequence-scanner.h"
 
@@ -56,6 +70,7 @@
 
 namespace avro {
   class Node;
+  class ValidSchema;
 }
 
 namespace impala {
@@ -111,6 +126,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     // UNION. null_union_position is set to 0 or 1 accordingly if this type is a
     // union between a primitive type and "null", and -1 otherwise.
     int null_union_position;
+
+    // The slot descriptor corresponding to this element. NULL if this element does not
+    // correspond to a materialized column.
+    const SlotDescriptor* slot_desc;
   };
 
   struct AvroFileHeader : public BaseSequenceScanner::FileHeader {
@@ -128,12 +147,13 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const std::string AVRO_SNAPPY_CODEC;
   static const std::string AVRO_DEFLATE_CODEC;
 
-  // Vector of slot descriptors indexed by table column number, not including partition
-  // columns. Non-materialized columns have NULL descriptors.
-  std::vector<const SlotDescriptor*> slot_descs_;
-
   // Utility function for decoding and parsing file header metadata
   Status ParseMetadata();
+
+  // Populates avro_header_->schema with the result of resolving the the table's schema
+  // with the file's schema.
+  Status ResolveSchemas(const avro::ValidSchema& table_schema,
+                        const avro::ValidSchema& file_schema);
 
   // Utility function that maps the Avro library's type representation to our
   // own. Used to convert a ValidSchema to a vector of SchemaElements.

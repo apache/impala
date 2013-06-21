@@ -123,4 +123,22 @@ hadoop fs -put ${IMPALA_HOME}/testdata/tinytable_rc/rc_tinytable_extra_col /test
 hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
                   /test-warehouse/tinytable_seq_snap
 
+# Replace functional_avro.tinytable's file to test schema resolution.
+# tinytable_schema_test.avro's schema includes an extra field ("c"), an extra "comment"
+# parameter, and uses the {"type": "string"} alternate type specification. The data for
+# columns "a" and "b" is the same as the original file so this should not affect test
+# results.
+# The new schema stored in tinytable_schema_test.avro looks like this:
+# {"type": "record",
+#  "name": "a",
+#  "fields": [
+#      {"type": "string", "name": "c", "comment": "extra field"},
+#      {"type": {"type": "string"}, "name": "a"},
+#      {"type": "string", "name": "b"}
+#  ]
+# }
+hadoop fs -rm /test-warehouse/tinytable_avro/*
+hadoop fs -put ${IMPALA_HOME}/testdata/tinytable_avro/tinytable_schema_test.avro \
+               /test-warehouse/tinytable_avro/
+
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh

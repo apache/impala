@@ -15,6 +15,8 @@
 package com.cloudera.impala.catalog;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +85,9 @@ public class HdfsTable extends Table {
 
   // hive uses this string for NULL partition keys. Set in load().
   private String nullPartitionKeyValue;
+
+  // Avro schema of this table if this is an Avro table, otherwise null. Set in load().
+  private String avroSchema = null;
 
   private static boolean hasLoggedDiskIdFormatWarning = false;
 
@@ -667,6 +674,12 @@ public class HdfsTable extends Table {
       // load table stats
       numRows = getRowCount(msTbl.getParameters());
       LOG.info("table #rows=" + Long.toString(numRows));
+
+      // populate Avro schema if necessary
+      String inputFormat = msTbl.getSd().getInputFormat();
+      if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
+        avroSchema = getAvroSchema(msTbl.getParameters());
+      }
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
@@ -692,6 +705,49 @@ public class HdfsTable extends Table {
     return msPartitions;
   }
 
+  /**
+   * Gets an Avro table's JSON schema. tableParams may store the schema directly
+   * or provide an HDFS/http URL. This function does not perform any validation
+   * on the returned string (e.g., it may not be a valid schema).
+   */
+  private String getAvroSchema(Map<String, String> tableParams)
+      throws TableLoadingException {
+    String literal = tableParams.get(AvroSerdeUtils.SCHEMA_LITERAL);
+    if (literal != null && !literal.equals(AvroSerdeUtils.SCHEMA_NONE)) return literal;
+
+    String url = tableParams.get(AvroSerdeUtils.SCHEMA_URL).trim();
+    if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
+      throw new TableLoadingException("No Avro schema provided for table " + name);
+    }
+
+    if (!url.toLowerCase().startsWith("hdfs://") &&
+        !url.toLowerCase().startsWith("http://")) {
+      throw new TableLoadingException("avro.schema.url must be of form " +
+          "\"http://path/to/schema/file\" or " +
+          "\"hdfs://namenode:port/path/to/schema/file\", got " + url);
+    }
+
+    if (url.toLowerCase().startsWith("hdfs://")) {
+      try {
+        return FileSystemUtil.readFile(new Path(url));
+      } catch (IOException e) {
+        throw new TableLoadingException(
+            "Problem reading Avro schema at: " + url, e);
+      }
+    } else {
+      Preconditions.checkState(url.toLowerCase().startsWith("http://"));
+      InputStream urlStream = null;
+      try {
+        urlStream = new URL(url).openStream();
+        return IOUtils.toString(urlStream);
+      } catch (IOException e) {
+        throw new TableLoadingException("Problem reading Avro schema from: " + url, e);
+      } finally {
+        IOUtils.closeQuietly(urlStream);
+      }
+    }
+  }
+
   @Override
   public TTableDescriptor toThrift() {
     TTableDescriptor TTableDescriptor =
@@ -711,6 +767,9 @@ public class HdfsTable extends Table {
     }
     THdfsTable tHdfsTable = new THdfsTable(hdfsBaseDir,
         colNames, nullPartitionKeyValue, nullColumnValue, idToValue);
+    if (avroSchema != null) {
+      tHdfsTable.setAvroSchema(avroSchema);
+    }
 
     TTableDescriptor.setHdfsTable(tHdfsTable);
     return TTableDescriptor;

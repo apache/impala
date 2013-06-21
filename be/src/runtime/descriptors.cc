@@ -139,6 +139,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     object_pool_->Add(partition);
     partition_descriptors_[it->first] =  partition;
   }
+  avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
 }
 
 string HdfsTableDescriptor::DebugString() const {

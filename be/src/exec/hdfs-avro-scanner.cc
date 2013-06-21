@@ -51,17 +51,6 @@ HdfsAvroScanner::~HdfsAvroScanner() {
 
 Status HdfsAvroScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
-  slot_descs_.resize(scan_node_->num_cols() - scan_node_->num_partition_keys(), NULL);
-  const vector<SlotDescriptor*>& materialized_slots = scan_node_->materialized_slots();
-  vector<SlotDescriptor*>::const_iterator it;
-  // Populate slot_descs_ with slot descriptors of materialized columns (entries for
-  // non-materialized columns are left NULL)
-  for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
-    const SlotDescriptor* slot_desc = *it;
-    int column = slot_desc->col_pos() - scan_node_->num_partition_keys();
-    DCHECK_LT(column, slot_descs_.size());
-    slot_descs_[column] = slot_desc;
-  }
   scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
 }
@@ -126,29 +115,25 @@ Status HdfsAvroScanner::ParseMetadata() {
 
       if (key == AVRO_SCHEMA_KEY) {
         found_schema = true;
-        avro::ValidSchema schema;
+        avro::ValidSchema file_schema;
         try {
-          schema = avro::compileJsonSchemaFromMemory(value, value_len);
+          file_schema = avro::compileJsonSchemaFromMemory(value, value_len);
         } catch (exception& e) {
           stringstream ss;
-          ss << "Failed to parse schema: '" << e.what();
+          ss << "Failed to parse file schema: " << e.what();
           return Status(ss.str());
         }
-        const avro::NodePtr& root = schema.root();
-        if (root->type() != avro::AVRO_RECORD) {
+        const string& table_schema_str = scan_node_->hdfs_table()->avro_schema();
+        DCHECK_GT(table_schema_str.size(), 0);
+        avro::ValidSchema table_schema;
+        try {
+          table_schema = avro::compileJsonSchemaFromString(table_schema_str);
+        } catch (exception& e) {
           stringstream ss;
-          ss << "Expected record type, got " << root->type();
+          ss << "Failed to parse table schema: " << e.what();
           return Status(ss.str());
         }
-        for (int i = 0; i < root->leaves(); ++i) {
-          SchemaElement element = ConvertSchemaNode(*(root->leafAt(i).get()));
-          if (element.type >= SchemaElement::COMPLEX_TYPE) {
-            stringstream ss;
-            ss << "Complex Avro types unsupported: " << element.type;
-            return Status(ss.str());
-          }
-          avro_header_->schema.push_back(element);
-        }
+        RETURN_IF_ERROR(ResolveSchemas(table_schema, file_schema));
       } else if (key == AVRO_CODEC_KEY) {
         string avro_codec(reinterpret_cast<char*>(value), value_len);
         if (avro_codec != AVRO_NULL_CODEC) {
@@ -176,6 +161,77 @@ Status HdfsAvroScanner::ParseMetadata() {
   if (header_->is_compressed) VLOG_FILE << header_->codec;
   if (!found_schema) return Status("Schema not found in file header metadata");
   // TODO: check that schema matches table column types
+  return Status::OK;
+}
+
+Status HdfsAvroScanner::ResolveSchemas(const avro::ValidSchema& table_schema,
+                                       const avro::ValidSchema& file_schema) {
+  const avro::NodePtr& table_root = table_schema.root();
+  const avro::NodePtr& file_root = file_schema.root();
+  DCHECK_EQ(table_root->type(), avro::AVRO_RECORD);
+  DCHECK_EQ(file_root->type(), avro::AVRO_RECORD);
+
+  // Maps table field index -> if a matching file field was found
+  bool file_field_found[table_root->leaves()];
+  memset(&file_field_found, 0, table_root->leaves());
+
+  for (int i = 0; i < file_root->leaves(); ++i) {
+    const avro::NodePtr& file_field = file_root->leafAt(i);
+    SchemaElement element = ConvertSchemaNode(*(file_field.get()));
+    if (element.type >= SchemaElement::COMPLEX_TYPE) {
+      stringstream ss;
+      ss << "Complex Avro types unsupported: " << element.type;
+      return Status(ss.str());
+    }
+
+    const string& field_name = file_root->nameAt(i);
+    size_t table_field_idx;
+    if (!table_root->nameIndex(field_name, table_field_idx)) {
+      // File has extra field, ignore
+      element.slot_desc = NULL;
+      avro_header_->schema.push_back(element);
+      continue;
+    }
+    const avro::NodePtr& table_field = table_root->leafAt(table_field_idx);
+
+    // Compare SchemaElement types (rather than NodePtr types) so that e.g. types "int"
+    // and "[int, null]" compare as equal (since we don't distinguish between nullable and
+    // non-nullable types)
+    // TODO: this check will need to be updated when we support nested types
+    SchemaElement table_element = ConvertSchemaNode(*(table_field.get()));
+    if (element.type != table_element.type) {
+      stringstream ss;
+      ss << "Field " << field_name << " has type " << table_element.type
+         << " in table schema and type " << element.type << " in file "
+         << stream_->filename();
+      return Status(ss.str());
+    }
+    file_field_found[table_field_idx] = true;
+
+    // The table schema's fields define the table column ordering
+    int col_idx = table_field_idx + scan_node_->num_partition_keys();
+    int slot_idx = scan_node_->GetMaterializedSlotIdx(col_idx);
+    if (slot_idx != -1) {
+      element.slot_desc = scan_node_->materialized_slots()[slot_idx];
+    } else {
+      element.slot_desc = NULL;
+    }
+    avro_header_->schema.push_back(element);
+  }
+  DCHECK_EQ(avro_header_->schema.size(), file_root->leaves());
+
+  // Check that all materialized fields in the table schema appear in the file schema
+  // TODO: support default values in the table schema
+  for (int i = 0; i < table_root->leaves(); ++i) {
+    if (file_field_found[i]) continue;
+    int col_idx = i + scan_node_->num_partition_keys();
+    int slot_idx = scan_node_->GetMaterializedSlotIdx(col_idx);
+    if (slot_idx != -1) {
+      stringstream ss;
+      ss << "File is missing column: " << table_root->nameAt(i);
+      return Status(ss.str());
+    }
+  }
   return Status::OK;
 }
 
@@ -348,12 +404,12 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
     InitTuple(template_tuple_, tuple);
 
     // Decode record
-    for (int j = 0; j < slot_descs_.size(); ++j) {
-      const SlotDescriptor* slot_desc = slot_descs_[j];
+    for (int j = 0; j < avro_header_->schema.size(); ++j) {
       const SchemaElement& element = avro_header_->schema[j];
-      if (slot_desc != NULL) {
+      if (element.slot_desc != NULL) {
         DCHECK_LE(element.type, SchemaElement::COMPLEX_TYPE);
-        RETURN_IF_FALSE(ReadPrimitive(element, *slot_desc, pool, data, data_len, tuple));
+        RETURN_IF_FALSE(
+            ReadPrimitive(element, *element.slot_desc, pool, data, data_len, tuple));
       } else {
         // Non-materialized column, skip
         if (LIKELY(element.type < SchemaElement::COMPLEX_TYPE)) {
