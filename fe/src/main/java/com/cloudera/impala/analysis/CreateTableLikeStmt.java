@@ -32,7 +32,7 @@ public class CreateTableLikeStmt extends StatementBase {
   private final boolean isExternal;
   private final String comment;
   private final FileFormat fileFormat;
-  private final String location;
+  private final HdfsURI location;
   private final boolean ifNotExists;
 
   // Set during analysis
@@ -51,7 +51,7 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String comment, FileFormat fileFormat, String location,
+      boolean isExternal, String comment, FileFormat fileFormat, HdfsURI location,
       boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
@@ -106,7 +106,7 @@ public class CreateTableLikeStmt extends StatementBase {
     return fileFormat;
   }
 
-  public String getLocation() {
+  public HdfsURI getLocation() {
     return location;
   }
 
@@ -160,7 +160,7 @@ public class CreateTableLikeStmt extends StatementBase {
     if (fileFormat != null) {
       params.setFile_format(fileFormat.toThrift());
     }
-    params.setLocation(location);
+    params.setLocation(location == null ? null : location.toString());
     params.setIf_not_exists(getIfNotExists());
     return params;
   }

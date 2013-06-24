@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
@@ -26,7 +25,7 @@ import com.cloudera.impala.thrift.TCreateDbParams;
  */
 public class CreateDbStmt extends StatementBase {
   private final String dbName;
-  private final String location;
+  private final HdfsURI location;
   private final String comment;
   private final boolean ifNotExists;
 
@@ -43,7 +42,7 @@ public class CreateDbStmt extends StatementBase {
    * storage location. Create database will throw an error if the database already exists
    * unless the ifNotExists is true.
    */
-  public CreateDbStmt(String dbName, String comment, String location,
+  public CreateDbStmt(String dbName, String comment, HdfsURI location,
       boolean ifNotExists) {
     this.dbName = dbName;
     this.comment = comment;
@@ -63,7 +62,7 @@ public class CreateDbStmt extends StatementBase {
     return ifNotExists;
   }
 
-  public String getLocation() {
+  public HdfsURI getLocation() {
     return location;
   }
 
@@ -94,7 +93,7 @@ public class CreateDbStmt extends StatementBase {
     TCreateDbParams params = new TCreateDbParams();
     params.setDb(getDb());
     params.setComment(getComment());
-    params.setLocation(getLocation());
+    params.setLocation(location == null ? null : location.toString());
     params.setIf_not_exists(getIfNotExists());
     return params;
   }
@@ -111,9 +110,6 @@ public class CreateDbStmt extends StatementBase {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }
 
-    if (location != null) {
-      analyzer.getCatalog().checkAccess(analyzer.getUser(),
-          new PrivilegeRequestBuilder().onURI(location).all().toRequest());
-    }
+    if (location != null) location.analyze(analyzer, Privilege.ALL);
   }
 }

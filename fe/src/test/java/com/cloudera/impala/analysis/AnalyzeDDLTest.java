@@ -264,6 +264,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Table does not exist: functional.no_tbl");
     AnalysisError("alter table no_db.alltypes partition(i=1) set fileformat textfile",
         "Database does not exist: no_db");
+
+    // Invalid location
+    AnalysisError("alter table functional.alltypes set location 'test/warehouse'",
+        "URI path must be absolute: test/warehouse");
+    AnalysisError("alter table functional.alltypes set location 'blah:///warehouse/'",
+        "No FileSystem for scheme: blah");
+    AnalysisError("alter table functional.alltypes set location ''",
+        "URI path cannot be empty.");
+    AnalysisError("alter table functional.alltypes set location '      '",
+        "URI path cannot be empty.");
   }
 
   @Test
@@ -358,6 +368,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Type 'DATE' is not supported as partition-column type in column: d");
     AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
         "Type 'DATETIME' is not supported as partition-column type in column: d");
+
+    // Invalid URI values.
+    AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'file://test-warehouse/new_table'", "URI location " +
+        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+    AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'  '", "URI path cannot be empty.");
   }
 
   @Test

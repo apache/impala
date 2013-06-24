@@ -26,12 +26,12 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE ADD PARTITION statement.
  */
 public class AlterTableAddPartitionStmt extends AlterTableStmt {
-  private final String location;
+  private final HdfsURI location;
   private final boolean ifNotExists;
   private final PartitionSpec partitionSpec;
 
   public AlterTableAddPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec, String location, boolean ifNotExists) {
+      PartitionSpec partitionSpec, HdfsURI location, boolean ifNotExists) {
     super(tableName);
     Preconditions.checkState(partitionSpec != null);
     this.location = location;
@@ -44,7 +44,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     return ifNotExists;
   }
 
-  public String getLocation() {
+  public HdfsURI getLocation() {
     return location;
   }
 
@@ -73,7 +73,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     params.setAlter_type(TAlterTableType.ADD_PARTITION);
     TAlterTableAddPartitionParams addPartParams = new TAlterTableAddPartitionParams();
     addPartParams.setPartition_spec(partitionSpec.toThrift());
-    addPartParams.setLocation(getLocation());
+    addPartParams.setLocation(location == null ? null : location.toString());
     addPartParams.setIf_not_exists(ifNotExists);
     params.setAdd_partition_params(addPartParams);
     return params;
@@ -88,5 +88,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     }
     partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
     partitionSpec.analyze(analyzer);
+
+    if (location != null) location.analyze(analyzer, Privilege.ALL);
   }
 }

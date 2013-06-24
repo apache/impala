@@ -32,10 +32,6 @@ public class AuthorizeableURI implements Authorizeable {
 
   @Override
   public List<org.apache.access.core.Authorizable> getHiveAuthorizeableHierarchy() {
-    if(!uriName.toLowerCase().startsWith("hdfs://")) {
-      throw new IllegalArgumentException(
-          "URI '" + uriName + "' is invalid. Must start with hdfs://");
-    }
     org.apache.access.core.AccessURI accessURI =
         new org.apache.access.core.AccessURI(uriName);
     return Lists.newArrayList((org.apache.access.core.Authorizable) accessURI);

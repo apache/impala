@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
@@ -40,7 +39,7 @@ public class CreateTableStmt extends StatementBase {
   private final boolean isExternal;
   private final boolean ifNotExists;
   private final FileFormat fileFormat;
-  private final String location;
+  private final HdfsURI location;
   private final ArrayList<ColumnDef> partitionColumnDefs;
   private final RowFormat rowFormat;
   private final TableName tableName;
@@ -64,7 +63,7 @@ public class CreateTableStmt extends StatementBase {
    */
   public CreateTableStmt(TableName tableName, List<ColumnDef> columnDefs,
       List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
-      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists) {
+      RowFormat rowFormat, FileFormat fileFormat, HdfsURI location, boolean ifNotExists) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
@@ -115,7 +114,7 @@ public class CreateTableStmt extends StatementBase {
     return ifNotExists;
   }
 
-  public String getLocation() {
+  public HdfsURI getLocation() {
     return location;
   }
 
@@ -195,7 +194,7 @@ public class CreateTableStmt extends StatementBase {
     params.setOwner(getOwner());
     params.setIs_external(isExternal());
     params.setComment(comment);
-    params.setLocation(location);
+    params.setLocation(location == null ? null : location.toString());
     params.setRow_format(rowFormat.toThrift());
     params.setFile_format(fileFormat.toThrift());
     params.setIf_not_exists(getIfNotExists());
@@ -219,10 +218,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException("A table requires at least 1 column");
     }
 
-    if (location != null) {
-      analyzer.getCatalog().checkAccess(analyzer.getUser(),
-          new PrivilegeRequestBuilder().onURI(location).all().toRequest());
-    }
+    if (location != null) location.analyze(analyzer, Privilege.ALL);
 
     analyzeRowFormatValue(rowFormat.getFieldDelimiter());
     analyzeRowFormatValue(rowFormat.getLineDelimiter());

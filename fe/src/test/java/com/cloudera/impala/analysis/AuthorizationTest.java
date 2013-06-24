@@ -39,8 +39,8 @@ import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TMetadataOpcode;
-import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -296,6 +296,11 @@ public class AuthorizationTest {
     AuthzOk("create database newdb location " +
         "'hdfs://localhost:20500/test-warehouse/new_table'");
 
+    // Create database with location specified explicitly (user does not have permission).
+    AuthzError("create database newdb location '/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+
     // Database already exists (no permissions).
     AuthzError("create database functional",
         "User '%s' does not have privileges to execute 'CREATE' on: functional");
@@ -364,13 +369,31 @@ public class AuthorizationTest {
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes RENAME TO functional_seq_snap.t1");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET FILEFORMAT PARQUETFILE");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20500/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
+        "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
 
     // Alter table and set location to a path the user does not have access to.
     AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20500/test-warehouse/no_access'",
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20500/test-warehouse/no_access");
+    AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+    AuthzError("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
+        "SET LOCATION '/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+
+    // Different file system, user has permission to base path.
+    AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'hdfs://localhost:20510/test-warehouse/new_table'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20510/test-warehouse/new_table");
 
     AuthzError("ALTER TABLE functional.alltypes SET FILEFORMAT PARQUETFILE",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
@@ -383,6 +406,8 @@ public class AuthorizationTest {
     AuthzError("ALTER TABLE functional.alltypes DROP int_col",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
     AuthzError("ALTER TABLE functional.alltypes rename to functional_seq_snap.t1",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
+    AuthzError("ALTER TABLE functional.alltypes add partition (year=1, month=1)",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
 
     // No privileges on target.

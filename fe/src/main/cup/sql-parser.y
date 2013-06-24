@@ -284,7 +284,7 @@ nonterminal FileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
 nonterminal Boolean replace_existing_cols_val;
-nonterminal String location_val;
+nonterminal HdfsURI location_val;
 nonterminal RowFormat row_format_val;
 nonterminal String field_terminator_val;
 nonterminal String line_terminator_val;
@@ -351,7 +351,7 @@ stmt ::=
 load_stmt ::=
   KW_LOAD KW_DATA KW_INPATH STRING_LITERAL:path overwrite_val:overwrite KW_INTO KW_TABLE
   table_name:table partition_spec:partition
-  {: RESULT = new LoadDataStmt(table, path, overwrite, partition); :}
+  {: RESULT = new LoadDataStmt(table, new HdfsURI(path), overwrite, partition); :}
   ;
 
 overwrite_val ::=
@@ -427,7 +427,8 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
     partition_spec:partition location_val:location
   {:
-    RESULT = new AlterTableAddPartitionStmt(table, partition, location, if_not_exists);
+    RESULT = new AlterTableAddPartitionStmt(table, partition,
+        location, if_not_exists);
   :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP optional_kw_column IDENT:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
@@ -442,7 +443,7 @@ alter_tbl_stmt ::=
   {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
   | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
     KW_LOCATION STRING_LITERAL:location
-  {: RESULT = new AlterTableSetLocationStmt(table, partition, location); :}
+  {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsURI(location)); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableRenameStmt(table, new_table); :}
   ;
@@ -502,7 +503,7 @@ comment_val ::=
 
 location_val ::=
   KW_LOCATION STRING_LITERAL:location
-  {: RESULT = location; :}
+  {: RESULT = new HdfsURI(location); :}
   | /* empty */
   {: RESULT = null; :}
   ;

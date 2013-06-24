@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -50,14 +49,14 @@ import com.google.common.base.Preconditions;
  */
 public class LoadDataStmt extends StatementBase {
   private final TableName tableName;
-  private final String sourceDataPath;
+  private final HdfsURI sourceDataPath;
   private final PartitionSpec partitionSpec;
   private final boolean overwrite;
 
   // Set during analysis
   private String dbName;
 
-  public LoadDataStmt(TableName tableName, String sourceDataPath, boolean overwrite,
+  public LoadDataStmt(TableName tableName, HdfsURI sourceDataPath, boolean overwrite,
       PartitionSpec partitionSpec) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(sourceDataPath);
@@ -124,26 +123,18 @@ public class LoadDataStmt extends StatementBase {
             "specified: " + dbName + "." + getTbl());
       }
     }
-
-    if (sourceDataPath.isEmpty()) {
-      throw new AnalysisException("INPATH location cannot be an empty string.");
-    }
-
-    // The user must have permission to access the source location. Since the files will
-    // be moved from this location, the user needs to have all permission.
-    analyzer.getCatalog().checkAccess(analyzer.getUser(),
-        new PrivilegeRequestBuilder().onURI(sourceDataPath).all().toRequest());
-    analyzeSourcePath((HdfsTable) table);
+    analyzeSourcePath(analyzer, (HdfsTable) table);
   }
 
-  private void analyzeSourcePath(HdfsTable hdfsTable) throws AnalysisException {
+  private void analyzeSourcePath(Analyzer analyzer, HdfsTable hdfsTable)
+      throws AnalysisException, AuthorizationException {
+    // The user must have permission to access the source location. Since the files will
+    // be moved from this location, the user needs to have all permission.
+    sourceDataPath.analyze(analyzer, Privilege.ALL);
+
     try {
-      Path source = new Path(sourceDataPath);
+      Path source = sourceDataPath.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
-      if (!(fs instanceof DistributedFileSystem)) {
-        throw new AnalysisException(String.format("INPATH location '%s' " +
-            "must point to an HDFS file system.", source.toString()));
-      }
       DistributedFileSystem dfs = (DistributedFileSystem) fs;
       if (!dfs.exists(source)) {
         throw new AnalysisException(String.format(
@@ -194,7 +185,7 @@ public class LoadDataStmt extends StatementBase {
   public TLoadDataReq toThrift() {
     TLoadDataReq loadDataReq = new TLoadDataReq();
     loadDataReq.setTable_name(new TTableName(getDb(), getTbl()));
-    loadDataReq.setSource_path(sourceDataPath);
+    loadDataReq.setSource_path(sourceDataPath.toString());
     loadDataReq.setOverwrite(overwrite);
     if (partitionSpec != null) {
       loadDataReq.setPartition_spec(partitionSpec.toThrift());

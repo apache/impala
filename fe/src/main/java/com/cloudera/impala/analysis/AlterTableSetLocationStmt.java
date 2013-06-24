@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
@@ -27,15 +26,11 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET LOCATION statement.
  */
 public class AlterTableSetLocationStmt extends AlterTableStmt {
-  private final String location;
+  private final HdfsURI location;
   private final PartitionSpec partitionSpec;
 
-  // The value Hive is configured to use for NULL partition key values.
-  // Set during analysis.
-  private String nullPartitionKeyValue;
-
   public AlterTableSetLocationStmt(TableName tableName,
-      PartitionSpec partitionSpec, String location) {
+      PartitionSpec partitionSpec, HdfsURI location) {
     super(tableName);
     Preconditions.checkNotNull(location);
     this.location = location;
@@ -45,7 +40,7 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     }
   }
 
-  public String getLocation() {
+  public HdfsURI getLocation() {
     return location;
   }
 
@@ -58,7 +53,7 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_LOCATION);
     TAlterTableSetLocationParams locationParams =
-        new TAlterTableSetLocationParams(location);
+        new TAlterTableSetLocationParams(location.toString());
     if (partitionSpec != null) {
       locationParams.setPartition_spec(partitionSpec.toThrift());
     }
@@ -70,10 +65,7 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (location != null) {
-      analyzer.getCatalog().checkAccess(analyzer.getUser(),
-          new PrivilegeRequestBuilder().onURI(location).all().toRequest());
-    }
+    if (location != null) location.analyze(analyzer, Privilege.ALL);
 
     // Altering the table rather than the partition.
     if (partitionSpec == null) {

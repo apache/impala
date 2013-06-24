@@ -29,14 +29,14 @@ import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 
-/*
+/**
  * Common utility functions for operating on FileSystem objects.
  */
 public class FileSystemUtil {
   private static final Configuration CONF = new Configuration();
   private static final Logger LOG = Logger.getLogger(FileSystemUtil.class);
 
-  /*
+  /**
    * Performs a non-recursive delete of all visible (non-hidden) files in a given
    * directory. Returns the number of files deleted as part of this operation.
    */
@@ -56,7 +56,7 @@ public class FileSystemUtil {
     return numFilesDeleted;
   }
 
-  /*
+  /**
    * Returns the total number of visible (non-hidden) files in a directory.
    */
   public static int getTotalNumVisibleFiles(Path directory) throws IOException {
@@ -72,7 +72,7 @@ public class FileSystemUtil {
     return numFiles;
   }
 
-  /*
+  /**
    * Moves all visible (non-hidden) files from a source directory to a destination
    * directory. Any sub-directories within the source directory are skipped.
    * Returns the number of files moved as part of this operation.
@@ -109,7 +109,7 @@ public class FileSystemUtil {
     return numFilesMoved;
   }
 
-  /*
+  /**
    * Moves (renames) the given file to a new location (either another directory or a
    * file. If renameIfAlreadyExists is true, no error will be thrown if a file with the
    * same name already exists in the destination location. Instead, a UUID will be
@@ -135,7 +135,7 @@ public class FileSystemUtil {
     fs.rename(sourceFile, destFile);
   }
 
-  /*
+  /**
    * Reads the file at path and returns the contents.
    */
   public static String readFile(Path file) throws IOException {
@@ -148,7 +148,7 @@ public class FileSystemUtil {
     }
   }
 
-  /*
+  /**
    * Builds a new file name based on a base file name. This is done by inserting
    * the given appendStr into the base file name, preserving the file extension (if
    * one exists).
@@ -168,7 +168,7 @@ public class FileSystemUtil {
     return sb.toString();
   }
 
-  /*
+  /**
    * Returns true if the given Path contains any sub directories, otherwise false.
    */
   public static boolean containsSubdirectory(Path directory)
@@ -183,7 +183,7 @@ public class FileSystemUtil {
     return false;
   }
 
-  /*
+  /**
    * Makes a temporary unique directory within the given directory.
    */
   public static Path makeTmpSubdirectory(Path directory) throws IOException {
@@ -205,7 +205,16 @@ public class FileSystemUtil {
     return (DistributedFileSystem) fs;
   }
 
-  /*
+  /**
+   * Fully-qualifies the given path based on the FileSystem configuration. If the given
+   * path is already fully qualified, a new Path object with the same location will be
+   * returned.
+   */
+  public static Path createFullyQualifiedPath(Path location) {
+    return location.makeQualified(FileSystem.getDefaultUri(CONF), location);
+  }
+
+  /**
    * Returns the configuration.
    */
   public static Configuration getConfiguration() {

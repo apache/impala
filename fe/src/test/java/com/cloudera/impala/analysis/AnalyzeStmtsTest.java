@@ -1098,30 +1098,33 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       // Source directory cannot contain subdirs.
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/", overwrite),
-          "INPATH location '/test-warehouse/' cannot contain subdirectories.");
+          "INPATH location 'hdfs://localhost:20500/test-warehouse' cannot " +
+          "contain subdirectories.");
 
       // Source directory cannot be empty.
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/emptytable", overwrite),
-          "INPATH location '/test-warehouse/emptytable' contains no visible files.");
+          "INPATH location 'hdfs://localhost:20500/test-warehouse/emptytable' " +
+          "contains no visible files.");
 
       // Cannot load a hidden files.
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/alltypessmall/year=2009/month=1/.hidden", overwrite),
-          "INPATH location '/test-warehouse/alltypessmall/year=2009/month=1/.hidden'" +
-          " points to a hidden file.");
+          "INPATH location 'hdfs://localhost:20500/test-warehouse/alltypessmall/" +
+          "year=2009/month=1/.hidden' points to a hidden file.");
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/alltypessmall/year=2009/month=1/_hidden", overwrite),
-          "INPATH location '/test-warehouse/alltypessmall/year=2009/month=1/_hidden'" +
-          " points to a hidden file.");
+          "INPATH location 'hdfs://localhost:20500/test-warehouse/alltypessmall/" +
+          "year=2009/month=1/_hidden' points to a hidden file.");
 
       // Source directory does not exist.
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/does_not_exist", overwrite),
-          "INPATH location '/test-warehouse/does_not_exist' does not exist.");
+          "INPATH location 'hdfs://localhost:20500/test-warehouse/does_not_exist' " +
+          "does not exist.");
       // Empty source directory string
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
-          "", overwrite), "INPATH location cannot be an empty string.");
+          "", overwrite), "URI path cannot be empty.");
 
       // Partition spec does not exist in table.
       AnalysisError(String.format("load data inpath '%s' %s into table " +
@@ -1153,9 +1156,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "Table does not exist: functional.notbl");
 
       AnalysisError(String.format("load data inpath '%s' %s into table " +
-          "tpch.lineitem",
-          "file:///test-warehouse/test.out", overwrite),
-          "INPATH location 'file:/test-warehouse/test.out' must point to an " +
+          "tpch.lineitem", "file:///test-warehouse/test.out", overwrite),
+          "URI location 'file:/test-warehouse/test.out' must point to an " +
           "HDFS file system");
 
       // File type / table type mismatch.
