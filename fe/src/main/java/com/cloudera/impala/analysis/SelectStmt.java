@@ -576,7 +576,12 @@ public class SelectStmt extends QueryStmt {
     // If select statement has an aggregate, then the aggregate tuple id is materialized.
     // Otherwise, all referenced tables are materialized.
     if (aggInfo != null) {
-      tupleIdList.add(aggInfo.getAggTupleId());
+      // Return the tuple id produced in the final aggregation step.
+      if (aggInfo.isDistinctAgg()) {
+        tupleIdList.add(aggInfo.getSecondPhaseDistinctAggInfo().getAggTupleId());
+      } else {
+        tupleIdList.add(aggInfo.getAggTupleId());
+      }
     } else {
       for (TableRef tblRef: tableRefs) {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());

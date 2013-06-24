@@ -272,3 +272,15 @@ tinyint, bigint
 9,0
 NULL,0
 ====
+---- QUERY
+# test join on inline views containing distinct aggregates to make sure
+# the aggregation info reports the correct tuple ids (from the 2nd phase
+# distinct aggregation) for the inline-view expression substitution
+select t1.c, t2.c from
+(select count(distinct int_col) as c from functional.alltypestiny) t1 inner join
+(select count(distinct bigint_col) as c from functional.alltypestiny) t2 on (t1.c = t2.c)
+---- TYPES
+bigint, bigint
+---- RESULTS
+2,2
+====

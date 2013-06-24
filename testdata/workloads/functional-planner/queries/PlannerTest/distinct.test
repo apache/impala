@@ -468,3 +468,159 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
+# test join on inline views containing distinct aggregates to make sure
+# the aggregation info reports the correct tuple ids (from the 2nd phase
+# distinct aggregation) for the inline-view expression substitution
+select t1.c, t2.c from
+(select count(distinct int_col) as c from functional.alltypestiny) t1 inner join
+(select count(distinct bigint_col) as c from functional.alltypestiny) t2 on (t1.c = t2.c)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  6:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    <slot 2> = <slot 6>
+  |  tuple ids: 2 6 
+  |  
+  |----5:AGGREGATE
+  |    |  output: COUNT(<slot 5>)
+  |    |  group by: 
+  |    |  tuple ids: 6 
+  |    |  
+  |    4:AGGREGATE
+  |    |  group by: bigint_col
+  |    |  tuple ids: 5 
+  |    |  
+  |    3:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4 size=460B
+  |       tuple ids: 4 
+  |    
+  2:AGGREGATE
+  |  output: COUNT(<slot 1>)
+  |  group by: 
+  |  tuple ids: 2 
+  |  
+  1:AGGREGATE
+  |  group by: int_col
+  |  tuple ids: 1 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  6:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    <slot 2> = <slot 6>
+  |  tuple ids: 2 6 
+  |  
+  |----15:EXCHANGE
+  |       tuple ids: 6 
+  |    
+  10:AGGREGATE
+  |  output: SUM(<slot 2>)
+  |  group by: 
+  |  tuple ids: 2 
+  |  
+  9:EXCHANGE
+     tuple ids: 2 
+
+PLAN FRAGMENT 1
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 15
+    UNPARTITIONED
+
+  14:AGGREGATE
+  |  output: SUM(<slot 6>)
+  |  group by: 
+  |  tuple ids: 6 
+  |  
+  13:EXCHANGE
+     tuple ids: 6 
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: <slot 5>
+
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  5:AGGREGATE
+  |  output: COUNT(<slot 5>)
+  |  group by: 
+  |  tuple ids: 6 
+  |  
+  12:AGGREGATE
+  |  group by: <slot 5>
+  |  tuple ids: 5 
+  |  
+  11:EXCHANGE
+     tuple ids: 5 
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    HASH_PARTITIONED: <slot 5>
+
+  4:AGGREGATE
+  |  group by: bigint_col
+  |  tuple ids: 5 
+  |  
+  3:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 4 
+
+PLAN FRAGMENT 4
+  PARTITION: HASH_PARTITIONED: <slot 1>
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  2:AGGREGATE
+  |  output: COUNT(<slot 1>)
+  |  group by: 
+  |  tuple ids: 2 
+  |  
+  8:AGGREGATE
+  |  group by: <slot 1>
+  |  tuple ids: 1 
+  |  
+  7:EXCHANGE
+     tuple ids: 1 
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: <slot 1>
+
+  1:AGGREGATE
+  |  group by: int_col
+  |  tuple ids: 1 
+  |  
+  0:SCAN HDFS
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 0 
+---- SCANRANGELOCATIONS
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+NODE 0:
+NODE 3:
+====
