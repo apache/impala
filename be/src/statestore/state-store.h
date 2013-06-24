@@ -29,8 +29,10 @@
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
 #include "util/thrift-client.h"
+#include "util/thread-pool.h"
 #include "util/webserver.h"
 #include "runtime/client-cache.h"
+#include "runtime/timestamp-value.h"
 #include "statestore/failure-detector.h"
 
 namespace impala {
@@ -94,12 +96,7 @@ class StateStore {
 
   void RegisterWebpages(Webserver* webserver);
 
-  // The main processing loop. Starts a number of threads to send
-  // heartbeats to subscribers, and coordinates handing work to them
-  // until told to exit via SetExitFlag. This method blocks until the
-  // exit flag is set.
-  //
-  // Acquires both subscribers_lock_ and worker_lock_, in that order.
+  // The main processing loop. Blocks until the exit flag is set.
   //
   // Returns OK unless there is an unrecoverable error.
   Status MainLoop();
@@ -206,14 +203,12 @@ class StateStore {
     TopicEntry::Version last_version_;
   };
 
-  // Note on locking: Subscribers and Topics should be accessed under
-  // their own coarse locks, and worker threads will use worker_lock_
-  // to ensure safe access to the subscriber work queue.
-  // Only MainLoop needs to hold two locks at once, to copy between
-  // subscribers_ and subscriber_work_queue_.
+  // Note on locking: Subscribers and Topics should be accessed under their own coarse
+  // locks, and worker threads will use worker_lock_ to ensure safe access to the
+  // subscriber work queue.
 
-  // Protects access to exit_flag_, but is used mostly to ensure
-  // visibility of updates between threads..
+  // Protects access to exit_flag_, but is used mostly to ensure visibility of updates
+  // between threads..
   boost::mutex exit_flag_lock_;
   bool exit_flag_;
 
@@ -285,6 +280,32 @@ class StateStore {
   typedef boost::unordered_map<SubscriberId, Subscriber> SubscriberMap;
   SubscriberMap subscribers_;
 
+  // Work item passed to subscriber heartbeat threads. First entry is the *earliest* time
+  // (in ns since epoch) that the next heartbeat should be sent, the second entry is the
+  // subscriber to send it to.
+  typedef std::pair<int64_t, SubscriberId> ScheduledSubscriberUpdate;
+
+  // Pool of threads that send heartbeats to subscribers one-by-one. Each subscriber has a
+  // time that the next heartbeat is scheduled, and each heartbeat thread will sleep until
+  // that time has passed to rate limit heartbeats. Subscribers are placed back into the
+  // queue once they have been processed, which guarantees that a) each subscriber is in
+  // the queue at most once and b) therefore there may be at most subscribers_.size() - 1
+  // subscribers ahead of any subscriber in the queue. Heartbeats may be delayed for any
+  // number of reasons, including scheduler interference, lock unfairness when submitting
+  // to the thread pool and head-of-line blocking when threads are occupied sending
+  // heartbeats to slow subscribers (subscribers are not guaranteed to be in the queue in
+  // next-heartbeat order). This does not affect correctness until the failure timeout in
+  // the subscriber is exceeded.
+  //
+  // To mitigate this risk, 'sufficiently' many threads should be allocated to this thread
+  // pool via --statestore_num_heartbeat_threads. The failure timeout for each subscriber
+  // process may also be increased.
+  //
+  // Subscribers are therefore not processed in lock-step, and one subscriber may have
+  // seen many more heartbeats than another during the same interval (if the second
+  // subscriber runs slow for any reason).
+  ThreadPool<ScheduledSubscriberUpdate> subscriber_heartbeat_threadpool_;
+
   // Cache of subscriber clients. Only one client per subscriber
   // should be used, but the cache helps with the client lifecycle on
   // failure.
@@ -303,36 +324,11 @@ class StateStore {
   Metrics::IntMetric* num_subscribers_metric_;
   SetMetric<std::string>* subscriber_set_metric_;
 
-  // Metric to track time spent performing a full set of heartbeats to all subscribers
-  StatsMetric<double>* last_heartbeat_loop_time_metric_;
-
-  // Shared mutex that protects all subsequent members, which are used
-  // to coordinate work between the master thread and the worker
-  // threads that send heartbeats to subscribers.
-  boost::mutex worker_lock_;
-
-  // Shared work queue between all worker threads. Each entry is a
-  // subscriber to which to send a heartbeat.
-  std::vector<Subscriber*> subscriber_work_queue_;
-
-  // number of subscribers remaining to be processed
-  uint32_t num_subscribers_remaining_;
-
-  // Both subsequent condition variables should be wait()'ed on whilst
-  // worker_lock_ is held.
-
-  // Condition variable that indicates more work to do on the queue
-  boost::condition_variable work_available_;
-
-  // Condition variable that indicates the last subscriber has been
-  // processed, so the main loop should wake up to re-fill the
-  // subscriber queue.
-  boost::condition_variable last_subscriber_processed_;
-
-  // This method is executed by several worker threads, which
-  // collectively read a list of active subscribers and send
-  // heartbeats to each one (by calling ProcessOneSubscriber).
-  void SubscriberUpdateLoop();
+  // Called by the subscriber heartbeat threadpool to process a single subscriber. Sends a
+  // heartbeat to one subscriber (by calling ProcessOneSubscriber) and updates the failure
+  // detector state with the result. Once complete, the subscriber is re-added to the
+  // heartbeat queue with a new scheduled time for its next heartbeat.
+  void UpdateSubscriber(int thread_id, const ScheduledSubscriberUpdate& update);
 
   // Does the work of updating a single subscriber. Tries to call
   // UpdateState on the client. If that fails, informs the failure

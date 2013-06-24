@@ -43,10 +43,17 @@ DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running")
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
 const string STATESTORE_LIVE_SUBSCRIBERS = "statestore.live-backends";
 const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
-const string STATESTORE_LAST_UPDATE_LOOP_TIME =
-    "statestore.last-update-loop-time.seconds";
 
 const StateStore::TopicEntry::Value StateStore::TopicEntry::NULL_VALUE = "";
+
+// Used to control the maximum size of the heartbeat input queue, in which there is at
+// most one entry per subscriber.
+const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
+
+// The minimum frequency with which to attempt heartbeats to each subscriber. Subscribers
+// may experience larger delays between heartbeats, but will not receive them more
+// frequently.
+const int32_t MIN_HEARTBEAT_DELTA_MS = 500;
 
 typedef ClientConnection<StateStoreSubscriberClient> StateStoreSubscriberConnection;
 
@@ -113,19 +120,21 @@ void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
 
 StateStore::StateStore(Metrics* metrics)
   : exit_flag_(false),
+    subscriber_heartbeat_threadpool_(FLAGS_statestore_num_heartbeat_threads,
+        STATESTORE_MAX_SUBSCRIBERS,
+        bind<void>(mem_fn(&StateStore::UpdateSubscriber), this, _1, _2)),
     client_cache_(new ClientCache<StateStoreSubscriberClient>()),
     thrift_iface_(new StateStoreThriftIf(this)),
     failure_detector_(
-    new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats,
-                                       FLAGS_statestore_suspect_heartbeats)) {
+        new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats,
+                                           FLAGS_statestore_suspect_heartbeats)) {
+
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_LIVE_SUBSCRIBERS, 0L);
   subscriber_set_metric_ =
       metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
                                                     set<string>()));
-  last_heartbeat_loop_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_LAST_UPDATE_LOOP_TIME));
   client_cache_->InitMetrics(metrics, "subscriber");
 }
 
@@ -193,8 +202,19 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     lock_guard<mutex> l(subscribers_lock_);
     SubscriberMap::iterator subscriber_it = subscribers_.find(subscriber_id);
     if (subscriber_it != subscribers_.end()) {
-      LOG(INFO) << "Re-registering subscriber: " << subscriber_id
-                << ", possible duplicate subscriber IDs";
+      // To avoid having to deal with ownership of a Subscriber that would be replaced by
+      // a new registration from the same client while the update loop is processing it,
+      // we disallow duplicate registrations. What this usually means is that the client
+      // has failed and recovered, but the statestore has not yet detected the
+      // failure. Since the statestore is probably in the middle of trying to contact the
+      // old subscriber, it won't try and contact the new one until it detects the
+      // failure, so it's ok to ignore the request. The subscriber will retry until
+      // successful anyhow.
+      stringstream ss;
+      ss << "Duplicate registration of subscriber: " << subscriber_id;
+      LOG(WARNING) << "Duplicate registration of subscriber: " << subscriber_id
+                   << ", possible duplicate subscriber IDs or recovering subscriber";
+      return Status(ss.str());
     }
 
     subscribers_.insert(make_pair(subscriber_id,
@@ -204,6 +224,19 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     subscriber_set_metric_->Add(subscriber_id);
   }
 
+  if (subscriber_heartbeat_threadpool_.GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS) {
+    stringstream ss;
+    ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
+    lock_guard<mutex> l(subscribers_lock_);
+    SubscriberMap::iterator subscriber_it = subscribers_.find(subscriber_id);
+    DCHECK(subscriber_it != subscribers_.end());
+    subscribers_.erase(subscriber_it);
+    LOG(ERROR) << ss.str();
+    return Status(ss.str());
+  }
+
+  // Add the subscriber to the update queue, with an immediate schedule.
+  subscriber_heartbeat_threadpool_.Offer(make_pair(0L, subscriber_id));
   return Status::OK;
 }
 
@@ -270,7 +303,6 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
       }
 
       Topic* topic = &topic_it->second;
-
       BOOST_FOREACH(const TTopicItem& item, update.topic_updates) {
         TopicEntry::Version version = topic->Put(item.key, item.value);
         subscriber->AddTransientUpdate(update.topic_name, item.key, version);
@@ -294,136 +326,69 @@ bool StateStore::ShouldExit() {
 void StateStore::SetExitFlag() {
   lock_guard<mutex> l(exit_flag_lock_);
   exit_flag_ = true;
+  subscriber_heartbeat_threadpool_.Shutdown();
 }
 
-void StateStore::SubscriberUpdateLoop() {
-  while (!ShouldExit()) {
-    Subscriber* subscriber = NULL;
-    {
-      // Wait for work. Not all threads will necessarily exit this
-      // loop on every main-loop iteration, if the other threads are
-      // quick and process the entire queue before this thread can
-      // take the lock.
-      unique_lock<mutex> l(worker_lock_);
-      while (subscriber_work_queue_.empty() && !ShouldExit()) {
-        work_available_.wait(l);
-      }
+void StateStore::UpdateSubscriber(int thread_id,
+    const ScheduledSubscriberUpdate& update) {
+  // Wait until update time
+  int64_t now = TimestampValue::local_time_micros();
+  int64_t diff = update.first - now;
+  while (diff > 0) {
+    usleep(diff * 1000L);
+    now = TimestampValue::local_time_micros();
+    diff = now - update.first;
+  }
 
-      if (ShouldExit()) break;
+  Subscriber* subscriber = NULL;
+  {
+    lock_guard<mutex> l(subscribers_lock_);
+    SubscriberMap::iterator it = subscribers_.find(update.second);
+    if (it == subscribers_.end()) return;
+    subscriber = &(it->second);
+  }
 
-      subscriber = subscriber_work_queue_.back();
-      subscriber_work_queue_.pop_back();
+  // Give up the lock here so that others can get to the queue
+  Status status = ProcessOneSubscriber(subscriber);
+  if (!status.ok()) {
+    if (failure_detector_->GetPeerState(subscriber->id()) == FailureDetector::OK) {
+      LOG(INFO) << "Unable to update subscriber at " << subscriber->network_address()
+                << ",  received error " << status.GetErrorMsg();
     }
-    DCHECK(subscriber != NULL);
+  }
 
-    // Give up the lock here so that others can get to the queue
-    Status status = ProcessOneSubscriber(subscriber);
-    if (!status.ok()) {
-      if (failure_detector_->GetPeerState(subscriber->id()) == FailureDetector::OK) {
-        LOG(INFO) << "Unable to update subscriber at " << subscriber->network_address()
-                  << ",  received error " << status.GetErrorMsg();
-      }
+  if (failure_detector_->UpdateHeartbeat(subscriber->id(), status.ok()) ==
+      FailureDetector::FAILED) {
+    // TODO: Consider if a metric to track the number of failures would be useful.
+    lock_guard<mutex> l(subscribers_lock_);
+    // TODO: Make clear that 'failure' isn't necessarily an error
+    LOG(INFO) << "Subscriber: " << subscriber->id()
+              << " has either failed or disconnected.";
+    // Close all active clients so that the next attempt to use them causes a Reopen
+    client_cache_->CloseConnections(subscriber->network_address());
+
+    // Delete all transient entries
+    lock_guard<mutex> topic_lock(topic_lock_);
+    BOOST_FOREACH(StateStore::Subscriber::TransientEntryMap::value_type entry,
+                  subscriber->transient_entries()) {
+      StateStore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
+      DCHECK(topic_it != topics_.end());
+      topic_it->second.DeleteIfVersionsMatch(entry.second, // version
+                                             entry.first.second); // key
     }
-
-    if (failure_detector_->UpdateHeartbeat(subscriber->id(), status.ok()) ==
-        FailureDetector::FAILED) {
-      lock_guard<mutex> l(subscribers_lock_);
-      // TODO: Make clear that 'failure' isn't necessarily an error
-      LOG(INFO) << "Subscriber: " << subscriber->id()
-                << " has either failed or disconnected.";
-      // Close all active clients so that the next attempt to use them causes a Reopen
-      client_cache_->CloseConnections(subscriber->network_address());
-
-      // Delete all transient entries
-      lock_guard<mutex> topic_lock(topic_lock_);
-      BOOST_FOREACH(StateStore::Subscriber::TransientEntryMap::value_type entry,
-          subscriber->transient_entries()) {
-        StateStore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
-        DCHECK(topic_it != topics_.end());
-        topic_it->second.DeleteIfVersionsMatch(entry.second, // version
-                                               entry.first.second); // key
-      }
-      num_subscribers_metric_->Increment(-1L);
-      subscriber_set_metric_->Remove(subscriber->id());
-      subscribers_.erase(subscriber->id());
-    }
-
-    {
-      unique_lock<mutex> l(worker_lock_);
-      if (--num_subscribers_remaining_ == 0) {
-        // Wake up the master loop. Only one thread will ever set
-        // num_subscribers_remaining_ to 0, and only then when all
-        // subscribers have been correctly processed.
-        last_subscriber_processed_.notify_one();
-      }
-    }
+    num_subscribers_metric_->Increment(-1L);
+    subscriber_set_metric_->Remove(subscriber->id());
+    subscribers_.erase(subscriber->id());
+  } else {
+    // TODO: Consider changing heartbeat frequency dynamically; if e.g. last heartbeat was
+    // a failure may want to send another heartbeat more quickly to confirm.
+    int64_t now = TimestampValue::local_time_micros();
+    subscriber_heartbeat_threadpool_.Offer(
+        make_pair(now + MIN_HEARTBEAT_DELTA_MS, subscriber->id()));
   }
 }
 
 Status StateStore::MainLoop() {
-  // We create some number of worker threads to process subscriber
-  // connections in parallel.
-  vector<thread*> worker_threads;
-
-  for (int i = 0; i < FLAGS_statestore_num_heartbeat_threads; ++i) {
-    worker_threads.push_back(
-        new thread(&StateStore::SubscriberUpdateLoop, this));
-  }
-
-  // The main loop works as follows. This method puts a single loop's
-  // worth of work in subscriber_work_queue_, and then notifies all
-  // worker threads to start processing. The loop then waits for the
-  // threads to collectively process the entire queue, then the last
-  // worker thread notifies this master thread, which then wakes up
-  // and re-populates the queue. In this way, new subscribers are
-  // picked up on the first loop after they are registered.
-
-  // The work queue is protected by a shared lock, so all the worker
-  // threads are idle while work is being added to it. The idea here
-  // is not to avoid idleness, but to make sure that the minimal
-  // amount of time is spent waiting for socket communication. It is
-  // cheap to contend for a mutex compared to the cost of opening and
-  // writing to a socket.
-
-  // subscribers_lock_ is also held while the work queue is being
-  // built, to avoid concurrent modification of the subscriber set.
-
-  while (!ShouldExit()) {
-    MonotonicStopWatch loop_timer;
-    loop_timer.Start();
-    {
-      unique_lock<mutex> subscriber_lock(subscribers_lock_);
-      unique_lock<mutex> worker_lock(worker_lock_);
-      BOOST_FOREACH(SubscriberMap::value_type& subscriber, subscribers_) {
-        subscriber_work_queue_.push_back(&subscriber.second);
-      }
-      // Initial condition - num_subscribers_remaining_ is the number
-      // of subscribers to process.
-      num_subscribers_remaining_ = subscriber_work_queue_.size();
-    }
-
-    // Wind 'em up and let them go
-    work_available_.notify_all();
-
-    {
-      // Wait until all subscribers have been processed.
-      unique_lock<mutex> l(worker_lock_);
-      while (num_subscribers_remaining_ > 0) {
-        last_subscriber_processed_.wait(l);
-      }
-    }
-    loop_timer.Stop();
-    last_heartbeat_loop_time_metric_->Update(
-        loop_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-    // TODO: configure this
-    usleep(500 * 1000);
-  }
-
-  work_available_.notify_all();
-
-  BOOST_FOREACH(thread* worker_thread, worker_threads) {
-    worker_thread->join();
-  }
-
+  subscriber_heartbeat_threadpool_.Join();
   return Status::OK;
 }

@@ -83,9 +83,9 @@ class ThreadPool {
     work_queue_.Shutdown();
   }
 
-  // Blocks until all threads are finished
+  // Blocks until all threads are finished. Shutdown does not need to have been called,
+  // since it may be called on a separate thread.
   void Join() {
-    DCHECK(shutdown_);
     threads_.join_all();
   }
 
