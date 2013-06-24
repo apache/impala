@@ -14,6 +14,7 @@
 
 #include "exec/hdfs-parquet-table-writer.h"
 
+#include "common/version.h"
 #include "exprs/expr.h"
 #include "runtime/primitive-type.h"
 #include "runtime/raw-value.h"
@@ -537,6 +538,11 @@ Status HdfsParquetTableWriter::Init() {
 
   // Initialize file metadata
   file_metadata_.version = PARQUET_CURRENT_VERSION;
+
+  stringstream created_by;
+  created_by << "impala version " << IMPALA_BUILD_VERSION
+             << " (build " << IMPALA_BUILD_HASH << ")";
+  file_metadata_.__set_created_by(created_by.str());
 
   // Default to snappy compressed
   THdfsCompression::type codec = THdfsCompression::SNAPPY;
