@@ -141,7 +141,9 @@ TEST_F(MetricsTest, NonfiniteDoubles) {
   EXPECT_NE(metrics()->DebugStringJson().find("\"inf_double\": null"), string::npos);
 
   inf_metric_->Update(0.0 / 0.0);
-  EXPECT_NE(metrics()->DebugString().find("inf_double:-nan"), string::npos);
+  // 0.0 / 0.0 can either be nan or -nan (compiler dependant)
+  EXPECT_TRUE(metrics()->DebugString().find("inf_double:-nan") != string::npos ||
+              metrics()->DebugString().find("inf_double:nan") != string::npos);
   EXPECT_NE(metrics()->DebugStringJson().find("\"inf_double\": null"), string::npos);
 }
 
