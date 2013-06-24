@@ -102,7 +102,6 @@ Status RuntimeState::Init(
   }
   
   DCHECK_GT(query_options_.max_io_buffers, 0);
-  DCHECK_GT(query_options_.num_scanner_threads, 0);
   return Status::OK;
 }
 

@@ -209,6 +209,10 @@ class DiskIoMgr {
     // Only one thread can be in GetNext() at any time. 
     Status GetNext(BufferDescriptor** buffer);
 
+    // Cancel this scan range. This cleans up all queued buffers and
+    // wakes up any threads blocked on GetNext().
+    void Cancel();
+
     std::string DebugString() const;
 
    private:
@@ -220,10 +224,6 @@ class DiskIoMgr {
     // Enqueues a buffer for this range. This does not block.
     // Returns true if this scan range has hit the queue capacity, false otherwise.
     bool EnqueueBuffer(BufferDescriptor* buffer);
-
-    // Cancel this scan range. This cleans up all queued buffers and
-    // wakes up any threads blocked on GetNext().
-    void Cancel();
 
     // Cleanup any queued buffers (i.e. due to cancellation). This must
     // be called with lock_ taken.

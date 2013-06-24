@@ -569,7 +569,3 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
   }
 }
 
-void HdfsScanner::IssueFileRanges(const char* filename) {
-  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename);
-  scan_node_->AddDiskIoRange(file_desc);
-}

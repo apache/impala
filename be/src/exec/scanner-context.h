@@ -18,9 +18,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "common/compiler-util.h"
 #include "common/status.h"
@@ -39,29 +36,29 @@ class StringBuffer;
 class Tuple;
 class TupleRow;
 
-// This class abstracts over getting buffers from the disk io mgr, providing an interface
-// between the push model of the io mgr and the pull model of the scanners.  Buffers are
-// pushed to this object from another thread and queued in this object.  The scanners call
-// a GetBytes() API which handles blocking if bytes are not yet ready and copying bytes
-// that are split across buffers.  Scanners don't have to worry about either.  This is
-// done via the ScannerContext::Stream interface.  A stream is a contiguous byte range
-// that is read end to end.  For row based files, there is just a single stream per
-// context.  For columnar files, there is one stream per column.
+// This class abstracts over getting buffers from the IoMgr. Each ScannerContext is 1:1 
+// a HdfsScanner. ScannerContexts contain Streams, which are 1:1 with a ScanRange.
+// Columnar formats have multiple streams per context object.
+// This class handles stitching data split across IO buffers and providing
+// some basic parsing utilities.
+// This class it *not* thread safe. It is designed to have a single scanner thread
+// reading from it.
 //
 // Each scanner context maps to a single hdfs split.  There are three threads that
 // are interacting with the context.
-//   1. Disk thread that reads buffers from the disk io mgr and enqueues them to
-//      the context's streams.
+//   1. IoMgr threads that read io buffers from the disk and enqueue them to the
+//      stream's underlying ScanRange object. This is the producer.
 //   2. Scanner thread that calls GetBytes (which can block), materializing tuples
-//      from processing the bytes.
+//      from processing the bytes. This is the consumer.
 //   3. The scan node/main thread which calls into the context to trigger cancellation
 //      or other end of stream conditions.
 class ScannerContext {
  public:
   // Create a scanner context with the parent scan_node (where materialized row batches
-  // get pushed to) and the initial io buffer.  
+  // get pushed to) and the scan range to process.
+  // This context starts with 1 stream.
   ScannerContext(RuntimeState*, HdfsScanNode*, HdfsPartitionDescriptor*,
-      DiskIoMgr::BufferDescriptor* initial_buffer);
+      DiskIoMgr::ScanRange* scan_range);
 
   // Encapsulates a stream (continuous byte range) that can be read.  A context
   // can contain one or more streams.  For non-columnar files, there is only
@@ -92,13 +89,6 @@ class ScannerContext {
     // If the buffer is the last one in the scan range, *eos will be set to true.
     // If we are past the end of the scan range, *out_len will be 0 and *eos will be true.
     Status GetRawBytes(uint8_t** buffer, int* out_len, bool* eos);
-  
-    // Enqueue a buffer for this stream.  This will wake up the thread in GetBytes() if
-    // it is blocked.
-    // This can be called from multiple threads but the buffers must be added in order 
-    // (can't have the buffers be queued in non-sequential order).
-    // If this is called after Close(), the buffer is returned right away.
-    void AddBuffer(DiskIoMgr::BufferDescriptor*);
   
     // Sets whether of not the resulting tuples have a compact format.  If not, the
     // io buffers must be attached to the row batch, otherwise they can be returned
@@ -171,7 +161,7 @@ class ScannerContext {
    private:
     friend class ScannerContext;
     ScannerContext* parent_;
-    const DiskIoMgr::ScanRange* scan_range_;
+    DiskIoMgr::ScanRange* scan_range_;
     const HdfsFileDesc* file_desc_;
   
     // Byte offset for this scan range
@@ -181,18 +171,6 @@ class ScannerContext {
     // recycled immediately.  
     bool compact_data_;
 
-    // Condition variable (with parent_->lock_) for waking up the scanner thread in 
-    // Read(). This condition variable is signaled from AddBuffer() and Cancel()
-    boost::condition_variable read_ready_cv_;
-
-    // If true, this stream is blocked on io.  This means that the scanner thread has
-    // asked for more bytes and the buffer queue is empty.
-    bool is_blocked_;
-  
-    // Fields below are protected by parent_->lock
-    // TODO: we could make this more fine grain and have per stream locks but there's
-    // not really a good reason to need to read from multiple streams in parallel (yet)
-    
     // Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_;
 
@@ -214,9 +192,6 @@ class ScannerContext {
     // Set to true when a buffer returns the end of the scan range.
     bool read_eosr_;
   
-    // Buffers that are ready for the reader
-    std::list<DiskIoMgr::BufferDescriptor*> buffers_;
-
     // Pool for allocating boundary buffers.  
     boost::scoped_ptr<MemPool> boundary_pool_;
     boost::scoped_ptr<StringBuffer> boundary_buffer_;
@@ -227,24 +202,21 @@ class ScannerContext {
     // buffers are either returned to the io mgr or attached to the current row batch.
     std::list<DiskIoMgr::BufferDescriptor*> completed_buffers_;
     
-    // The current buffer (buffers_.front()) or NULL if there are none available.  This
-    // is used for the fast GetBytes path.
+    // The current io buffer. This starts as NULL before we've read any bytes
+    // and then becomes NULL when we've finished the scan range.
     DiskIoMgr::BufferDescriptor* current_buffer_;
   
     Stream(ScannerContext* parent);
 
-    // This must be called once when the rest buffer arrives.  This initializes
-    // some tracking state for this stream.
-    void SetInitialBuffer(DiskIoMgr::BufferDescriptor* buffer);
-
     // GetBytes helper to handle the slow path 
     // If peek is set then return the data but do not move the current offset.
+    // Updates current_buffer_.
     Status GetBytesInternal(int requested_len, uint8_t** buffer,
                             bool peek, int* out_len, bool* eos);
 
-    // Removes the first buffer from the queue of ready buffers and updates the current
-    // buffer to the next one.
-    void RemoveFirstBuffer();
+    // Gets (and blocks) for the next io buffer.
+    // Updates current_buffer_.
+    Status GetNextBuffer();
 
     // Attach all completed io buffers and the boundary mem pool to batch.
     void AttachCompletedResources(RowBatch* batch, bool done);
@@ -267,15 +239,12 @@ class ScannerContext {
   // also passed to the row batch.
   void AttachCompletedResources(RowBatch* batch, bool done);
 
-  // Creates streams for this context.  Any previous streams are now invalid.
-  void CreateStreams(int num_streams);
+  // Closes any existing streams, returning all their resources.
+  void CloseStreams();
 
-  // Close() and Cancel() are used together to coordinate proper cleanup.
-  // Valid call orders are:
-  //  - Close(): normal case when the scanner finishes
-  //  - Cancel() -> Close(): scanner is cancelled asynchronously
-  //  - Close() -> Cancel(): cancel() is ignored, scan range is already complete.
-  // Note that Close() must always called exactly once for each context object.
+  // Add a stream to this ScannerContext for 'range'. Returns the added stream.
+  // The stream is created in the runtime state's object pool
+  Stream* AddStream(DiskIoMgr::ScanRange* range);
 
   // This function must be called when the scanner is complete and no longer needs
   // any resources (e.g. tuple memory, io buffers, etc) returned from the scan range
@@ -283,16 +252,8 @@ class ScannerContext {
   // This must be called even in the error path to clean up any pending resources.
   void Close();
 
-  // This function can be called to terminate the scanner thread asynchronously.
-  // This can be called from any thread.
-  void Cancel();
-
-  // If true, the scanner is cancelled and the scanner thread should finish up
-  bool cancelled() const { return cancelled_; }
-
-  // Returns the number of buffers added to the any of the streams since the last time
-  // CreateStreams was called.
-  int64_t num_buffers_added() const { return buffers_added_; }
+  // If true, the ScanNode has been cancelled and the scanner thread should finish up
+  bool cancelled() const;
 
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
 
@@ -304,21 +265,8 @@ class ScannerContext {
 
   HdfsPartitionDescriptor* partition_desc_;
 
-  // Lock to protect fields below.  
-  boost::mutex lock_;
-
   // Vector of streams.  Non-columnar formats will always have one stream per context.
   std::vector<Stream*> streams_;
-
-  // If true, flush has been called.
-  bool done_;
-
-  // If true, the scan range has been cancelled and the scanner thread should abort
-  bool cancelled_;
-
-  // Number of buffers added to the scanner context object.  This is reset if the
-  // child streams are recreated.
-  int64_t buffers_added_;
 };
 
 }

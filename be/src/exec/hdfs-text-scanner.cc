@@ -52,7 +52,7 @@ void HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const vector<HdfsFileDesc*>& files) {
   // Text just issues all ranges at once
   for (int i = 0; i < files.size(); ++i) {
-    scan_node->AddDiskIoRange(files[i]);
+    scan_node->AddDiskIoRanges(files[i]);
   }
 }
 

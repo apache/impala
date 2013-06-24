@@ -53,6 +53,7 @@ class ProgressUpdater {
 
   int64_t total() const { return total_; }
   int64_t num_complete() const { return num_complete_; }
+  int64_t remaining() const { return total() - num_complete(); }
 
   // Returns a string representation of the current progress
   std::string ToString() const;

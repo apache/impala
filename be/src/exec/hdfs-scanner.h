@@ -325,9 +325,6 @@ class HdfsScanner {
   // parse_status_ to the error message.
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
   
-  // Utility function to issue all splits for 'filename' as a single range per split.
-  void IssueFileRanges(const char* filename);
-
   // Initialize a tuple.
   // TODO: only copy over non-null slots.
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {

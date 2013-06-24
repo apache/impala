@@ -22,6 +22,7 @@ using namespace std;
 // A very large max value to prevent things from going out of control. Not
 // expected to ever hit this value (1GB of buffered data per range).
 const int MAX_QUEUE_CAPACITY = 128;
+const int MIN_QUEUE_CAPACITY = 2;
 
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
@@ -51,7 +52,7 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
     eosr_queued_ = buffer->eosr();
   
     blocked_on_queue_ = ready_buffers_.size() >= ready_buffers_capacity_;
-    if (blocked_on_queue_ && ready_buffers_capacity_ > 1) {
+    if (blocked_on_queue_ && ready_buffers_capacity_ > MIN_QUEUE_CAPACITY) {
       // We have filled the queue, indicating we need back pressure on
       // the producer side (i.e. we are pushing buffers faster than they
       // are pulled off, throttle this range more).

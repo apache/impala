@@ -39,8 +39,6 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-// Issue just the footer range for each file.  We'll then parse the footer and pick out
-// the columns we want.
 void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   for (int i = 0; i < files.size(); ++i) {
@@ -504,13 +502,9 @@ Status HdfsParquetScanner::ProcessSplit() {
   // However, having multiple row groups per file should be seen as an edge case and
   // we can do better parallelizing across files instead.
   for (int i = 0; i < file_metadata_.row_groups.size(); ++i) {
-    // Release the token that was used to process the previous range(s).  This thread
-    // will be reused to assemble the cols for this row group.
-    scan_node_->runtime_state()->resource_pool()->ReleaseThreadToken(false);
-
-    // Tell the context the number of streams (aka cols) there will be and initialize
-    // column_readers_ to the correct stream objects
-    context_->CreateStreams(scan_node_->materialized_slots().size());
+    // Close the streams before starting a new row group. These streams could either be
+    // just the footer stream or streams for the previous row group.
+    context_->CloseStreams();
 
     // TODO: better error handling
     RETURN_IF_ERROR(InitColumns(i));
@@ -620,6 +614,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
 
     metadata_range_ = stream_->scan_range();
     RETURN_IF_ERROR(ValidateFileMetadata());
+  
+    // Tell the scan node this file has been taken care of.
+    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+    scan_node_->MarkFileDescIssued(desc);
 
     if (scan_node_->materialized_slots().empty()) {
       // No materialized columns.  We can serve this query from just the metadata.  We
@@ -657,8 +655,8 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   int num_partition_keys = scan_node_->num_partition_keys();
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
-  //DiskIoMgr::ScanRangeGroup* scan_range_group = 
-  //    scan_node_->runtime_state()->obj_pool()->Add(new DiskIoMgr::ScanRangeGroup);
+  // All the scan ranges (one for each col).
+  vector<DiskIoMgr::ScanRange*> col_ranges;
 
   // Walk over the materialized columns
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
@@ -696,9 +694,13 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     if (!col_chunk.file_path.empty()) {
       DCHECK_EQ(col_chunk.file_path, string(metadata_range_->file()));
     }
+    
+    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
+        metadata_range_->file(), col_len, col_start, i, metadata_range_->disk_id());
+    col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column
-    ScannerContext::Stream* stream = context_->GetStream(i);
+    ScannerContext::Stream* stream = context_->AddStream(col_range);
     DCHECK(stream != NULL);
     RETURN_IF_ERROR(column_readers_[i]->Reset(&schema_element, 
         &col_chunk.meta_data, stream));
@@ -710,25 +712,20 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
       // to true and recycle buffers more promptly.
       stream->set_compact_data(true);
     }
-
-    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
-        metadata_range_->file(), col_len, col_start, i, metadata_range_->disk_id(),
-        stream);
-    //scan_range_group->ranges.push_back(col_range);
   }
-  //DCHECK_EQ(scan_node_->materialized_slots().size(), scan_range_group->ranges.size());
+  DCHECK_EQ(col_ranges.size(), column_readers_.size());
   DCHECK_EQ(scan_node_->materialized_slots().size(), column_readers_.size());
 
   // The super class stream is not longer valid/used.  It was used
   // just to parse the file header.
   stream_ = NULL;  
 
-  // Issue all the column chunks to the io mgr.
-  //vector<DiskIoMgr::ScanRangeGroup*> groups;
-  //groups.push_back(scan_range_group);
-  //RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRangeGroups(
-  //    scan_node_->reader_context(), groups));
-
+  // Issue all the column chunks to the io mgr and have them scheduled immediately.
+  // This means these ranges aren't returned via DiskIoMgr::GetNextRange and
+  // instead are scheduled to be read immediately.
+  RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRanges(
+      scan_node_->reader_context(), col_ranges, true));
+  
   return Status::OK;
 }
 

@@ -24,7 +24,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "exec/scan-node.h"
@@ -62,23 +61,15 @@ struct HdfsFileDesc {
   HdfsFileDesc(const std::string& filename) : filename(filename) {}
 };
 
-// Struct to map scan ranges to the ScannerContext/Stream that would be processing it.
-// The buffers coming back from the io mgr are tagged with the scan range it is
-// part of, which is tagged with this metadata.  This lets us figure out which 
-// ScannerContext::Stream the buffer is for.
+// Struct for additional metadata for scan ranges. This contains the partition id
+// that this scan range is for.
 struct ScanRangeMetadata {
   // The partition id that this range is part of.
   int64_t partition_id;
 
-  // The stream that this scan range is for.  It can be NULL meaning that a new
-  // ScannerContext (and therefore stream) needs to be created.  If this is set,
-  // this is where the buffer should be pushed to.
-  ScannerContext::Stream* stream;
-
-  ScanRangeMetadata(int64_t partition_id, ScannerContext::Stream* stream) 
-    : partition_id(partition_id), stream(stream) { }
+  ScanRangeMetadata(int64_t partition_id) 
+    : partition_id(partition_id) { }
 };
-
 
 // A ScanNode implementation that is used for all tables read directly from 
 // HDFS-serialised data. 
@@ -90,9 +81,10 @@ struct ScanRangeMetadata {
 // 2. The scanner issues the initial byte ranges for each of those files.  For text
 //    this is simply the entire range but for rc files, this would just be the header
 //    byte range.  The scan node doesn't care either way.
-// 3. Buffers for the issued ranges return and the scan node enqueues them to the
-//    scanner's ready buffer queue.  
-// 4. The scanner processes the buffers, issuing more byte ranges if necessary.
+// 3. The scan node spins up a number of scanner threads. Each of those threads 
+//    pulls the next scan range to work on from the IoMgr and then processes the
+//    range end to end.
+// 4. The scanner processes the buffers, issuing more scan ranges if necessary.
 // 5. The scanner finishes the scan range and informs the scan node so it can track
 //    end of stream.
 // TODO: this class allocates a bunch of small utility objects that should be
@@ -148,6 +140,8 @@ class HdfsScanNode : public ScanNode {
  
   DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
 
+  const static int SKIP_COLUMN = -1;
+
   // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
   // that column is not materialized.
   int GetMaterializedSlotIdx(int col_idx) const {
@@ -161,12 +155,12 @@ class HdfsScanNode : public ScanNode {
   // Each call to GetCodegenFn must call ReleaseCodegenFn.
   void ReleaseCodegenFn(THdfsFileFormat::type type, llvm::Function* fn);
 
-  void IncNumScannersCodegenEnabled() {
-    __sync_fetch_and_add(&num_scanners_codegen_enabled_, 1);
+  inline void IncNumScannersCodegenEnabled() {
+    ++num_scanners_codegen_enabled_;
   }
   
-  void IncNumScannersCodegenDisabled() {
-    __sync_fetch_and_add(&num_scanners_codegen_disabled_, 1);
+  inline void IncNumScannersCodegenDisabled() {
+    ++num_scanners_codegen_disabled_;
   }
 
   // Adds a materialized row batch for the scan node.  This is called from scanner
@@ -174,22 +168,24 @@ class HdfsScanNode : public ScanNode {
   // This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
-  // Allocate a new scan range object.  This is thread safe.
-  // If stream is non-null, then this scan range is associated with the stream otherwise
-  // the stream will be created on demand when this scan range is read.
+  // Allocate a new scan range object, stored in the runtime state's object pool.  
+  // This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
-      int64_t partition_id, int disk_id, ScannerContext::Stream* stream = NULL);
+      int64_t partition_id, int disk_id);
 
   // Adds a scan range to the disk io mgr queue.  Scanners should queue to the io
   // mgr using this if possible so the ranges are sent to the io mgr in batches.
   void AddDiskIoRange(DiskIoMgr::ScanRange* range);
 
   // Adds all splits for file_desc to the io mgr queue.
-  void AddDiskIoRange(const HdfsFileDesc* file_desc);
+  void AddDiskIoRanges(const HdfsFileDesc* file_desc);
 
-  // Scanners must call this when an entire file is queued.  This is used to track
-  // when all the work for this scan node has been submitted.
-  void FileQueued(const char* filename);
+  // Indicates that this file_desc's scan ranges have all been issued to the IoMgr.
+  // For each file, the scanner must call MarkFileDescIssued() or AddDiskIoRanges().
+  // Issuing ranges happens asynchronously. For many of the file formats we synchronously
+  // issue the file header/footer in Open() but the rest of the splits for the file are
+  // issued asynchronously.
+  void MarkFileDescIssued(const HdfsFileDesc* file_desc);
 
   // Allocates and initialises template_tuple_ with any values from
   // the partition columns for the current scan range
@@ -229,8 +225,6 @@ class HdfsScanNode : public ScanNode {
   // order set to conjuncts.size()
   void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
   
-  const static int SKIP_COLUMN = -1;
-
   // map from volume id to <number of split, per volume split lengths>
   typedef boost::unordered_map<int32_t, std::pair<int, int64_t> > PerVolumnStats;
 
@@ -257,7 +251,7 @@ class HdfsScanNode : public ScanNode {
   RuntimeState* runtime_state_;
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
-  int tuple_id_;
+  const int tuple_id_;
 
   // Copy strings to tuple memory pool if true.
   // We try to avoid the overhead copying strings if the data will just
@@ -287,7 +281,7 @@ class HdfsScanNode : public ScanNode {
   SplitsMap per_file_splits_;
   
   // Number of files that have not been issued from the scanners.
-  int num_unqueued_files_;
+  AtomicInt<int> num_unqueued_files_;
 
   // Connection to hdfs, established in Open() and closed in Close().
   hdfsFS hdfs_connection_;
@@ -314,17 +308,6 @@ class HdfsScanNode : public ScanNode {
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
-
-  // This is the number of io buffers that are owned by the scan node and the scanners.
-  // This is used just to help debug leaked io buffers to determine if the leak is
-  // happening in the scanners vs other parts of the execution.
-  // Updates to this variable should use interlocked operations.
-  int num_owned_io_buffers_;
-
-  // Counters which track the number of scanners that have codegen enabled for the
-  // materialize and conjuncts evaluation code paths.
-  int num_scanners_codegen_enabled_;
-  int num_scanners_codegen_disabled_;
 
   // Vector containing indices into materialized_slots_.  The vector is indexed by
   // the slot_desc's col_pos.  Non-materialized slots and partition key slots will 
@@ -368,35 +351,39 @@ class HdfsScanNode : public ScanNode {
   // Maximum size of materialized_row_batches_.
   int max_materialized_row_batches_;
 
+  // This is the number of io buffers that are owned by the scan node and the scanners.
+  // This is used just to help debug leaked io buffers to determine if the leak is
+  // happening in the scanners vs other parts of the execution.
+  AtomicInt<int> num_owned_io_buffers_;
+
+  // Counters which track the number of scanners that have codegen enabled for the
+  // materialize and conjuncts evaluation code paths.
+  AtomicInt<int> num_scanners_codegen_enabled_;
+  AtomicInt<int> num_scanners_codegen_disabled_;
+
+  // Disk accessed bitmap
+  RuntimeProfile::Counter disks_accessed_bitmap_;
+  
+  // Total number of bytes read locally
+  RuntimeProfile::Counter* bytes_read_local_;
+
+  // Total number of bytes read via short circuit read
+  RuntimeProfile::Counter* bytes_read_short_circuit_;
+  
+  // Lock protects access between scanner thread and main query thread (the one calling
+  // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
+  // together, this lock must be taken first.
+  boost::mutex lock_;
+  
   // Flag signaling that all scanner threads are done.  This could be because they
   // are finished, an error/cancellation occurred, or the limit was reached.
   // Setting this to true triggers the scanner threads to clean up.
   bool done_;
 
-  // Lock protects access between scanner thread and main query thread (the one calling
-  // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
-  // together, this lock must be taken first.
-  // This lock is recursive since some of the functions provided to the scanner are
-  // also called from internal functions.
-  // TODO: we can split out 'external' functions for internal functions and make this
-  // lock non-recursive.
-  boost::recursive_mutex lock_;
-  
-  // Lock and condition variable for 'num_queued_io_buffers_' and 'num_blocked_scanners_'
-  // This condition variable and counters are used to gate when the disk thread reads
-  // from the io mgr.  If we are below the max queued limit or any of the scanner threads
-  // are blocked, read from the io mgr.
-  // If this lock and 'lock_' need to be taken together, take 'lock_' first.
-  boost::mutex disk_thread_resource_lock_;
-  boost::condition_variable disk_thread_resource_cv_;
-
-  // The total number of buffers queued in all scanner threads.  If this is at the 
-  // max_queued_io_buffers_, the disk thread will be throttled.
-  int num_queued_io_buffers_;
-  int max_queued_io_buffers_;
-  
-  // The number of scanner threads that are blocked on io buffers.
-  int num_blocked_scanners_;
+  // Set to true if a new scanner thread should be started when a token is available.
+  // This is set to true when ranges are issued to the IoMgr and set to false when
+  // the IoMgr returns NULL for GetNextRange.
+  bool should_start_scanner_thread_;
 
   // Pool for allocating partition key tuple and string buffers
   boost::scoped_ptr<MemPool> partition_key_pool_;
@@ -404,14 +391,9 @@ class HdfsScanNode : public ScanNode {
   // The queue of all ranges that have not been sent to the io mgr.
   std::vector<DiskIoMgr::ScanRange*> queued_ranges_;
 
-  // Scanners that are currently still running.
-  // While the scan node is not done (done_ == false), the disk_thread_resource_lock_
-  // needs to be taken before updating this.
-  boost::unordered_set<ScannerContext*> active_scanners_;
-
-  // Status of failed operations.  This is set asynchronously in DiskThread and
-  // ScannerThread.  Returned in GetNext() if an error occurred.  An non-ok
-  // status triggers cleanup of the disk and scanner threads.
+  // Status of failed operations.  This is set in the ScannerThreads
+  // Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup 
+  // scanner threads.
   Status status_;
 
   // Mapping of file formats (file type, compression type) to the number of
@@ -425,68 +407,27 @@ class HdfsScanNode : public ScanNode {
   // If true, counters have already been reported in the runtime profile.
   bool counters_reported_;
 
+  // Called when scanner threads are available for this scan node. This will
+  // try to spin up as many scanner threads as the quota allows.
+  void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
+
   // Issue all queued ranges to the io mgr.
   Status IssueQueuedRanges();
 
-  // Disk accessed bitmap
-  RuntimeProfile::Counter disks_accessed_bitmap_;
-  
-  // Average queue capacity in io mgr.
-  RuntimeProfile::Counter* average_io_mgr_queue_capacity_;
-  
-  // Average queue size in io mgr.
-  RuntimeProfile::Counter* average_io_mgr_queue_size_;
-
-  // Total number of bytes read locally
-  RuntimeProfile::Counter* bytes_read_local_;
-
-  // Total number of bytes read via short circuit read
-  RuntimeProfile::Counter* bytes_read_short_circuit_;
-  
   // Create a new scanner for this partition type.
   // If the scanner cannot be created return NULL.
   HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);
 
-  // Main function for disk thread which reads from the io mgr and pushes read
-  // buffers to the scan range context.  This thread spawns new scanner threads
-  // for each new context.
-  void DiskThread();
-
-  // Start a new scanner thread for this range with the initial 'buffer'.
-  void StartNewScannerThread(DiskIoMgr::BufferDescriptor* buffer);
-
-  // Main function for scanner thread.  This simply delegates to the scanner
-  // to process the range.  This thread terminates when the scan range is complete
-  // or an error occurred.
-  void ScannerThread(HdfsScanner* scanner, ScannerContext*);
+  // Main function for scanner thread. This thread pulls the next range to be
+  // processed from the IoMgr and then processes the entire range end to end.
+  // This thread terminates when all scan ranges are complete or an error occurred.
+  void ScannerThread();
+  void ScannerThreadHelper();
 
   // Updates the counters for the entire scan node.  This should be called as soon
   // as the scan node is complete (before all the spawned threads terminate) to get
   // the most accurate results.
   void UpdateCounters();
-
-  // Updates the number of queued buffers in the scanner threads
-  void UpdateNumQueuedBuffers(int delta) {
-    if (delta == 0) return;
-    boost::unique_lock<boost::mutex> l(disk_thread_resource_lock_);
-    num_queued_io_buffers_ += delta;
-    DCHECK_GE(num_queued_io_buffers_, 0);
-    if (num_queued_io_buffers_ < max_queued_io_buffers_) {
-      disk_thread_resource_cv_.notify_one();
-    }
-  }
-
-  // Update the number of scanner threads that are blocked on io
-  void UpdateNumBlockedScanners(int delta) {
-    DCHECK(delta == -1 || delta == 1);
-    boost::unique_lock<boost::mutex> l(disk_thread_resource_lock_);
-    num_blocked_scanners_ += delta;
-    DCHECK_GE(num_blocked_scanners_, 0);
-    if (!done_) DCHECK_LE(num_blocked_scanners_, active_scanners_.size());
-    if (num_blocked_scanners_ > 0) {
-      disk_thread_resource_cv_.notify_one();
-    }
-  }
 };
 
 }

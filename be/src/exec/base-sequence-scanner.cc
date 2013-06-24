@@ -97,7 +97,8 @@ Status BaseSequenceScanner::ProcessSplit() {
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
     scan_node_->SetFileMetadata(stream_->filename(), header_);
-    IssueFileRanges(stream_->filename());
+    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+    scan_node_->AddDiskIoRanges(desc);
     return Status::OK;
   }
   
