@@ -963,6 +963,7 @@ if __name__ == "__main__":
 
   if options.use_kerberos:
     # The sasl module is bundled with the shell.
+    print_to_stderr("Starting Impala Shell in secure mode (using Kerberos)")
     try:
       import sasl
     except ImportError:
@@ -973,10 +974,9 @@ if __name__ == "__main__":
     # The service name defaults to 'impala' if not specified by the user.
     if not options.kerberos_service_name:
       options.kerberos_service_name = 'impala'
-    print_to_stderr("Using service name '%s' for kerberos" \
-                    % options.kerberos_service_name)
-  elif options.kerberos_service_name:
-     print_to_stderr('Kerberos not enabled, ignoring service name')
+    print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
+  else:
+     print_to_stderr("Starting Impala Shell in unsecure mode")
 
   if options.output_file:
     try:
