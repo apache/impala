@@ -97,6 +97,8 @@ class TestImpalaShell(object):
     assert len(result_rows) == 3
 
   @pytest.mark.execute_serially
+  @pytest.mark.xfail(run=False,
+      reason='kerberos options not working as expected on all machines')
   def test_kerberos_option(self):
     args = "-k -q '%s'" % DEFAULT_QUERY
     # The command with fail because we're trying to connect to a kerberized impalad.
