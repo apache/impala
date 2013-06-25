@@ -187,16 +187,19 @@ public class HdfsPartition {
 
   /**
    * Returns the metastore.api.Partition object this HdfsPartition represents. Returns
-   * null if this is the default partition.
+   * null if this is the default partition, or if this belongs to a unpartitioned
+   * table.
    */
   public org.apache.hadoop.hive.metastore.api.Partition getMetaStorePartition() {
     return msPartition;
   }
 
-  /*
-   * Returns the storage location (HDFS path) of this partition.
+  /**
+   * Returns the storage location (HDFS path) of this partition. Should only be called
+   * for partitioned tables.
    */
   public String getLocation() {
+    Preconditions.checkNotNull(msPartition);
     return msPartition.getSd().getLocation();
   }
 

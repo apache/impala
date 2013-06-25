@@ -440,6 +440,7 @@ public class HdfsTable extends Table {
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
+      Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
       HdfsPartition part = addPartition(msTbl.getSd(), null,
           new ArrayList<LiteralExpr>(), oldFileDescMap, newFileDescs);
     } else {
@@ -693,6 +694,9 @@ public class HdfsTable extends Table {
   private List<org.apache.hadoop.hive.metastore.api.Partition> getMetaStorePartitions() {
     List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
         Lists.newArrayList();
+    // Return an empty partition list for an unpartitioned table.
+    if (numClusteringCols == 0) return msPartitions;
+
     for (HdfsPartition part: partitions) {
       // Skip the default partition.
       if (part.getId() != ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {

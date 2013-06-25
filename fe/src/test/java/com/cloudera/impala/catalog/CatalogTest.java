@@ -453,6 +453,19 @@ public class CatalogTest {
     // case where we we have a few failure/retries and then a success.
   }
 
+  @Test
+  public void TestReload() throws CatalogException {
+    // Exercise the internal logic of reloading a partitioned table, an unpartitioned
+    // table and an HBase table.
+    String[] tableNames = {"alltypes", "alltypesnopart", "hbasealltypessmall"};
+    for (String tableName: tableNames) {
+      Table table = getDb(catalog, "functional").getTable(tableName);
+      table = Table.load(catalog.getNextTableId(),
+          catalog.getMetaStoreClient().getHiveClient(),
+          getDb(catalog, "functional"), tableName, table);
+    }
+  }
+
   private static Db getDb(Catalog catalog, String dbName) {
     try {
       return catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ANY);
