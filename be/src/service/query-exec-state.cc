@@ -52,7 +52,6 @@ ImpalaServer::QueryExecState::QueryExecState(
   query_events_ = summary_profile_.AddEventSequence("Query Timeline");
   query_events_->Start();
   profile_.AddChild(&summary_profile_);
-  profile_.AddChild(&server_profile_);
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a
@@ -63,6 +62,7 @@ ImpalaServer::QueryExecState::QueryExecState(
   query_id_.hi = *reinterpret_cast<uint64_t*>(&query_uuid.data[0]);
   query_id_.lo = *reinterpret_cast<uint64_t*>(&query_uuid.data[8]);
 
+  profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_.AddInfoString("Start Time", start_time().DebugString());
   summary_profile_.AddInfoString("End Time", "");
   summary_profile_.AddInfoString("Query Type", "N/A");
@@ -76,8 +76,8 @@ ImpalaServer::QueryExecState::QueryExecState(
 
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
-  profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
 
+  profile_.AddChild(&server_profile_);
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
 
