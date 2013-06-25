@@ -63,6 +63,10 @@ inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status*
     *status = Status("Negative length");
     return false;
   }
+  if (UNLIKELY(length == 0)) {
+    *status = Status::OK;
+    return true;
+  }
   int bytes_read;
   bool dummy_eos;
   RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, &dummy_eos, status));
@@ -80,6 +84,10 @@ inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status*
 // TODO: consider implementing a Skip in the context/stream object that's more 
 // efficient than GetBytes.
 inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
+  if (UNLIKELY(length == 0)) {
+    *status = Status::OK;
+    return true;
+  }
   uint8_t* dummy_buf;
   int bytes_read;
   bool dummy_eos;
