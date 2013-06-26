@@ -163,7 +163,7 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad_node%s" % i
     port_args = build_impalad_port_args(i)
     logging_args = build_impalad_logging_args(i, service_name)
-    args = logging_args + ' ' + port_args
+    args = logging_args + ' ' + port_args + ' ' + options.impalad_args
     exec_impala_process(IMPALAD_PATH, args)
 
 def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
