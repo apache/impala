@@ -160,7 +160,7 @@ class Frontend {
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;
 
-  class FrontendMethodDescriptor;
+  struct FrontendMethodDescriptor;
 
   // Utility method to load a method whose signature is in the supplied descriptor; if
   // successful descriptor->method_id is set to a JNI method handle.
