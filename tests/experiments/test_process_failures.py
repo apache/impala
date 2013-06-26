@@ -105,6 +105,10 @@ class TestProcessFailures(ImpalaTestSuite):
     statestored.kill()
     impalad.service.wait_for_metric_value(
         'statestore-subscriber.connected', 0, timeout=30)
+
+    # impalad should still see the same number of live backends
+    assert impalad.service.get_num_known_live_backends() == CLUSTER_SIZE
+
     self.execute_query_using_client(client, QUERY, vector)
     # Reconnect
     statestored.start()
@@ -112,6 +116,12 @@ class TestProcessFailures(ImpalaTestSuite):
     impalad.service.wait_for_metric_value(
         'statestore-subscriber.connected', 1, timeout=30)
     statestored.service.wait_for_live_backends(CLUSTER_SIZE, timeout=15)
+
+    # Wait for the number of live backends to reach the cluster size. Even though
+    # all backends have subscribed to the statestore, this impalad may not have
+    # received the update yet.
+    impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=30)
+
     self.execute_query_using_client(client, QUERY, vector)
 
   @pytest.mark.execute_serially
