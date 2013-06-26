@@ -82,13 +82,11 @@ MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME,
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d")
-IMPALAD_LOGGING = "-log_filename=%s -log_dir=%s"
+# Setting -logbuflevel to -1 to make the be logs stream to the logfile.
+# -v=1 generates more output in the be logs (runtime profiles etc.)
+BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=1 --logbuflevel=-1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 LOG4J_PROPERTIES_DIR = os.path.join(options.log_dir, 'log4j_properties_%d')
-STATE_STORE_ARGS = ' -log_filename=%s -log_dir=%s ' + options.state_store_args
-
-def get_log_file_name(service_name):
-  return os.path.join(options.log_dir, '%s.INFO' % service_name)
 
 def setup_log4j(log4j_text, log4j_dir):
   """Create a custom log4j.properties file for each impalad
@@ -106,10 +104,13 @@ def setup_log4j(log4j_text, log4j_dir):
   finally:
     f.close()
 
-def exec_impala_process(cmd, args):
+def exec_impala_process(cmd, args, stderr_log_file_path):
+  redirect_output = str()
   if options.verbose:
-    args += ' -logtostderr=1 '
-  cmd = '%s %s 2>&1 &' % (cmd, args)
+    args += ' -logtostderr=1'
+  else:
+    redirect_output = "1>>%s" % stderr_log_file_path
+  cmd = '%s %s %s 2>&1 &' % (cmd, args, redirect_output)
   os.system(cmd)
 
 def kill_all(force=False):
@@ -122,17 +123,19 @@ def kill_all(force=False):
   sleep(1)
 
 def start_statestore():
-  log_file_name = get_log_file_name('statestored')
-  print "Starting State Store with logging to %s" % (log_file_name)
-  args = STATE_STORE_ARGS % ('statestored.INFO', options.log_dir)
-  exec_impala_process(STATE_STORE_PATH, args)
+  print "Starting State Store logging to %s/statestored.INFO" % options.log_dir
+  stderr_log_file_path = os.path.join(options.log_dir, "statestore-error.log")
+  args = "%s %s" % (build_impalad_logging_args(0, "statestored"),
+                    options.state_store_args)
+  exec_impala_process(STATE_STORE_PATH, args, stderr_log_file_path)
 
 def start_mini_impala_cluster(cluster_size):
-  log_file_name = get_log_file_name('mini-impala-cluster')
-  print "Starting in-process Impala Cluster logging to %s" % (log_file_name)
-  args = build_impalad_logging_args(0, "mini-impala-cluster")
-  args += " -num_backends=%s" % cluster_size
-  exec_impala_process(MINI_IMPALA_CLUSTER_PATH, args)
+  print ("Starting in-process Impala Cluster logging "
+         "to %s/mini-impala-cluster.INFO" % options.log_dir)
+  args = "-num_backends=%s" % (cluster_size)
+  args += ' ' + build_impalad_logging_args(0, 'mini-impala-cluster')
+  stderr_log_file_path = os.path.join(options.log_dir, 'mini-impala-cluster-error.log')
+  exec_impala_process(MINI_IMPALA_CLUSTER_PATH, args, stderr_log_file_path)
 
 def build_impalad_port_args(instance_num):
   BASE_BEESWAX_PORT = 21000
@@ -146,11 +149,13 @@ def build_impalad_port_args(instance_num):
                           BASE_WEBSERVER_PORT +instance_num)
 
 def build_impalad_logging_args(instance_num, service_name):
-  log_file_name = get_log_file_name(service_name)
+  log_file_path = os.path.join(options.log_dir, "%s.INFO" % service_name)
+  args = BE_LOGGING_ARGS % (service_name, options.log_dir)
+  if service_name == 'statestored' or options.verbose:
+    return args
   log4j_impala_prop = LOG4J_IMPALA_PROPERTIES % (options.log_dir, service_name)
   log4j_prop_dir = LOG4J_PROPERTIES_DIR % instance_num
   setup_log4j(log4j_impala_prop, log4j_prop_dir)
-  args = IMPALAD_LOGGING % (log_file_name, options.log_dir)
   return  '-classpath_prefix=%s ' % log4j_prop_dir + args
 
 def start_impalad_instances(cluster_size):
@@ -161,10 +166,10 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad"
     else:
       service_name = "impalad_node%s" % i
-    port_args = build_impalad_port_args(i)
-    logging_args = build_impalad_logging_args(i, service_name)
-    args = logging_args + ' ' + port_args + ' ' + options.impalad_args
-    exec_impala_process(IMPALAD_PATH, args)
+    args = build_impalad_logging_args(i, service_name)
+    args += ' ' + build_impalad_port_args(i) +  ' ' + options.impalad_args
+    stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
+    exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
 def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
