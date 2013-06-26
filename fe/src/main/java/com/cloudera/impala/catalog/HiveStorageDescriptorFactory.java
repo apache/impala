@@ -22,14 +22,14 @@ import com.cloudera.impala.hive.serde.ParquetInputFormat;
 import com.cloudera.impala.hive.serde.ParquetOutputFormat;
 import com.google.common.base.Preconditions;
 
-class HiveStorageDescriptorFactory {
+public class HiveStorageDescriptorFactory {
   /**
    * Creates and returns a Hive StoreDescriptor for the given FileFormat and RowFormat.
    * Currently supports creating StorageDescriptors for Parquet, Text, Sequence, and
    * RC file.
    * TODO: Add support for Avro and HBase
    */
-  static StorageDescriptor createSd(FileFormat fileFormat, RowFormat rowFormat) {
+  public static StorageDescriptor createSd(FileFormat fileFormat, RowFormat rowFormat) {
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
 

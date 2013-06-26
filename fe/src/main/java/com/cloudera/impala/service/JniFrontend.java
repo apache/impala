@@ -46,12 +46,9 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.FileFormat;
-import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -144,7 +141,7 @@ public class JniFrontend {
       InvalidObjectException, ImpalaException, TableLoadingException {
     TAlterTableParams params = new TAlterTableParams();
     deserializeThrift(params, thriftAlterTableParams);
-    frontend.alterTable(params);
+    frontend.getDdlExecutor().alterTable(params);
   }
 
   public void createDatabase(byte[] thriftCreateDbParams)
@@ -152,8 +149,7 @@ public class JniFrontend {
       AlreadyExistsException, InvalidObjectException {
     TCreateDbParams params = new TCreateDbParams();
     deserializeThrift(params, thriftCreateDbParams);
-    frontend.createDatabase(params.getDb(), params.getComment(), params.getLocation(),
-        params.isIf_not_exists());
+    frontend.getDdlExecutor().createDatabase(params);
   }
 
   /**
@@ -181,12 +177,7 @@ public class JniFrontend {
       InvalidObjectException {
     TCreateTableParams params = new TCreateTableParams();
     deserializeThrift(params, thriftCreateTableParams);
-    frontend.createTable(TableName.fromThrift(params.getTable_name()),
-        params.getColumns(), params.getPartition_columns(), params.getOwner(),
-        params.isIs_external(), params.getComment(),
-        RowFormat.fromThrift(params.getRow_format()),
-        FileFormat.fromThrift(params.getFile_format()),
-        params.getLocation(), params.isIf_not_exists());
+    frontend.getDdlExecutor().createTable(params);
   }
 
   public void createTableLike(byte[] thriftCreateTableLikeParams)
@@ -195,18 +186,7 @@ public class JniFrontend {
       TableLoadingException {
     TCreateTableLikeParams params = new TCreateTableLikeParams();
     deserializeThrift(params, thriftCreateTableLikeParams);
-    FileFormat fileFormat = null;
-    if (params.isSetFile_format()) {
-      fileFormat = FileFormat.fromThrift(params.getFile_format());
-    }
-    String comment = null;
-    if (params.isSetComment()) {
-      comment = params.getComment();
-    }
-    frontend.createTableLike(TableName.fromThrift(params.getTable_name()),
-        TableName.fromThrift(params.getSrc_table_name()), params.getOwner(),
-        params.isIs_external(), comment, fileFormat, params.getLocation(),
-        params.isIf_not_exists());
+    frontend.getDdlExecutor().createTableLike(params);
   }
 
   public void dropDatabase(byte[] thriftDropDbParams)
@@ -215,7 +195,7 @@ public class JniFrontend {
       InvalidObjectException {
     TDropDbParams params = new TDropDbParams();
     deserializeThrift(params, thriftDropDbParams);
-    frontend.dropDatabase(params.getDb(), params.isIf_exists());
+    frontend.getDdlExecutor().dropDatabase(params);
   }
 
   public void dropTable(byte[] thriftDropTableParams)
@@ -224,8 +204,7 @@ public class JniFrontend {
       InvalidObjectException {
     TDropTableParams params = new TDropTableParams();
     deserializeThrift(params, thriftDropTableParams);
-    frontend.dropTable(TableName.fromThrift(params.getTable_name()),
-        params.isIf_exists());
+    frontend.getDdlExecutor().dropTable(params);
   }
 
   /**

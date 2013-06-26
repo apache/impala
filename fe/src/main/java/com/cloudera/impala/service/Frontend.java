@@ -24,10 +24,6 @@ import java.util.Map;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
@@ -49,11 +45,8 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
@@ -64,10 +57,8 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
-import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
-import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
@@ -103,12 +94,18 @@ public class Frontend {
   private final boolean lazyCatalog;
 
   private Catalog catalog;
+  private DdlExecutor ddlExecutor;
   private final AuthorizationConfig authzConfig;
 
   public Frontend(boolean lazy, AuthorizationConfig authorizationConfig) {
     this.lazyCatalog = lazy;
     this.authzConfig = authorizationConfig;
     this.catalog = new Catalog(lazy, false, authzConfig);
+    ddlExecutor = new DdlExecutor(catalog);
+  }
+
+  public DdlExecutor getDdlExecutor() {
+    return ddlExecutor;
   }
 
   /**
@@ -117,6 +114,7 @@ public class Frontend {
   private void resetCatalog() {
     catalog.close();
     catalog = new Catalog(lazyCatalog, true, authzConfig);
+    ddlExecutor = new DdlExecutor(catalog);
   }
 
   /**
@@ -209,66 +207,6 @@ public class Frontend {
 
     result.setResult_set_metadata(metadata);
     result.setDdl_exec_request(ddl);
-  }
-
-  /**
-   * Executes the ALTER TABLE command according to the TAlterTableParams
-   */
-  public void alterTable(TAlterTableParams params) throws ImpalaException, MetaException,
-      org.apache.thrift.TException, InvalidObjectException, ImpalaException,
-      TableLoadingException {
-    catalog.alterTable(params);
-  }
-
-  /**
-   * Creates a new database in the metastore.
-   */
-  public void createDatabase(String dbName, String comment, String locationUri,
-      boolean ifNotExists) throws MetaException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException {
-    catalog.createDatabase(dbName, comment, locationUri, ifNotExists);
-  }
-
-  /**
-   * Creates a new table in the metastore.
-   */
-  public void createTable(TableName tableName, List<TColumnDef> columns,
-      List<TColumnDef> partitionColumns, String owner, boolean isExternal, String comment,
-      RowFormat rowFormat, FileFormat fileFormat, String location, boolean ifNotExists)
-      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException {
-    catalog.createTable(tableName, columns, partitionColumns, owner, isExternal, comment,
-        rowFormat, fileFormat, location, ifNotExists);
-  }
-
-  /**
-   * Creates a new table in the metastore.
-   */
-  public void createTableLike(TableName tableName, TableName oldTableName, String owner,
-      boolean isExternal, String comment, FileFormat fileFormat, String location,
-      boolean ifNotExists) throws MetaException, NoSuchObjectException,
-      org.apache.thrift.TException, AlreadyExistsException, InvalidObjectException,
-      ImpalaException, TableLoadingException {
-    catalog.createTableLike(tableName, oldTableName, owner, isExternal, comment,
-        fileFormat, location, ifNotExists);
-  }
-
-  /**
-   * Drops the specified table.
-   */
-  public void dropTable(TableName tableName, boolean ifExists)
-      throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
-      AlreadyExistsException, InvalidObjectException, InvalidOperationException {
-    catalog.dropTable(tableName, ifExists);
-  }
-
-  /**
-   * Drops the specified database.
-   */
-  public void dropDatabase(String dbName, boolean ifExists)
-    throws MetaException, NoSuchObjectException, org.apache.thrift.TException,
-    AlreadyExistsException, InvalidObjectException, InvalidOperationException {
-    catalog.dropDatabase(dbName, ifExists);
   }
 
   /**
@@ -595,7 +533,7 @@ public class Frontend {
           // Update the last DDL time of the table.
           org.apache.hadoop.hive.metastore.api.Table msTbl =
               table.getMetaStoreTable().deepCopy();
-          Catalog.updateLastDdlTime(msTbl, msClient);
+          DdlExecutor.updateLastDdlTime(msTbl, msClient);
         } catch (Exception e) {
           throw new InternalException("Error updating lastDdlTime", e);
         }
