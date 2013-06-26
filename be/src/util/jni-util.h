@@ -112,6 +112,7 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
+      (env)->ExceptionClear(); \
       DCHECK((JniUtil::throwable_to_string_id()) != NULL); \
       jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
           (JniUtil::throwable_to_string_id()), exc); \
@@ -124,6 +125,7 @@
           reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
       VLOG(1) << std::string(c_stack); \
       (env)->ExceptionClear(); \
+      (env)->DeleteLocalRef(exc); \
       return Status(c_msg); \
     } \
   } while (false)
