@@ -22,6 +22,7 @@ import java.io.InvalidObjectException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.rmi.NoSuchObjectException;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -38,6 +39,8 @@ import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.log4j.Appender;
+import org.apache.log4j.FileAppender;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -395,14 +398,16 @@ public class JniFrontend {
   /**
    * Returns an error string describing all configuration issues. If no config issues are
    * found, returns an empty string.
-   * Checks are run only if Impala can determine that it is running on CDH.
+   * Short circuit read checks and block location tracking checks are run only if Impala
+   * can determine that it is running on CDH.
    */
-  public String checkHadoopConfig() {
+  public String checkConfiguration() {
     CdhVersion guessedCdhVersion = guessCdhVersionFromNnWebUi();
     CdhVersion cdh41 = new CdhVersion("4.1");
     CdhVersion cdh42 = new CdhVersion("4.2");
     StringBuilder output = new StringBuilder();
 
+    output.append(checkLogFilePermission());
     output.append(checkFileSystem(CONF));
 
     if (guessedCdhVersion == null) {
@@ -422,6 +427,28 @@ public class JniFrontend {
     output.append(checkBlockLocationTracking(CONF));
 
     return output.toString();
+  }
+
+  /**
+   * Returns an empty string if Impala has permission to write to FE log files. If not,
+   * returns an error string describing the issues.
+   */
+  private String checkLogFilePermission() {
+    org.apache.log4j.Logger l4jRootLogger = org.apache.log4j.Logger.getRootLogger();
+    Enumeration appenders = l4jRootLogger.getAllAppenders();
+    while (appenders.hasMoreElements()) {
+      Appender appender = (Appender) appenders.nextElement();
+      if (appender instanceof FileAppender) {
+        if (((FileAppender) appender).getFile() == null) {
+          // If Impala does not have permission to write to the log file, the
+          // FileAppender will fail to initialize and logFile will be null.
+          // Unfortunately, we can't get the log file name here.
+          return "Impala does not have permission to write to the log file specified " +
+              "in log4j.properties.";
+        }
+      }
+    }
+    return "";
   }
 
   /**

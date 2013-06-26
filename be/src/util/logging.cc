@@ -15,8 +15,13 @@
 #include "util/logging.h"
 
 #include <boost/thread/mutex.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 #include <sstream>
-
+#include <stdio.h>
+#include <iostream>
+#include <fstream>
 #include "common/logging.h"
 
 DEFINE_string(log_filename, "", 
@@ -27,6 +32,7 @@ bool logging_initialized = false;
 
 using namespace boost;
 using namespace std;
+using namespace boost::uuids;
 
 mutex logging_mutex;
 
@@ -45,6 +51,24 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
   // complex logic that glog uses to guess at a temporary dir.
   if (FLAGS_log_dir.empty()) {
     FLAGS_log_dir = "/tmp";
+  }
+
+  if (!FLAGS_logtostderr) {
+    // Verify that a log file can be created in log_dir by creating a tmp file.
+    stringstream ss;
+    random_generator uuid_generator;
+    ss << FLAGS_log_dir << "/" << "impala_test_log." << uuid_generator();
+    const string file_name = ss.str(); 
+    ofstream test_file(file_name.c_str());
+    if (!test_file.is_open()) {
+      stringstream error_msg;
+      error_msg << "Could not open file in log_dir " << FLAGS_log_dir;
+      perror(error_msg.str().c_str());
+      // Unlock the mutex before exiting the program to avoid mutex d'tor assert.
+      logging_mutex.unlock();
+      exit(1);
+    }
+    remove(file_name.c_str());
   }
 
   google::InitGoogleLogging(arg);

@@ -144,7 +144,7 @@ class Frontend {
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
   jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
-  jmethodID check_hadoop_config_id_; // JniFrontend.checkHadoopConfig()
+  jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable

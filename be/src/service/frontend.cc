@@ -56,7 +56,7 @@ Frontend::Frontend() {
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
     {"getHadoopConfigValue", "(Ljava/lang/String;)Ljava/lang/String;",
          &get_hadoop_config_value_id_},
-    {"checkHadoopConfig", "()Ljava/lang/String;", &check_hadoop_config_id_},
+    {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateMetastore", "([B)V", &update_metastore_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
@@ -237,7 +237,7 @@ Status Frontend::ValidateSettings() {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   jstring error_string =
-      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_));
+      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_config_id_));
   RETURN_ERROR_IF_EXC(jni_env);
   jboolean is_copy;
   const char *str = jni_env->GetStringUTFChars(error_string, &is_copy);
