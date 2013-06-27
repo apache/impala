@@ -98,6 +98,9 @@ export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
 
 export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
+
+GPERFTOOLS_HOME=${IMPALA_HOME}/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}/
+export PPROF_PATH="${PPROF_PATH:-${GPERFTOOLS_HOME}/src/pprof}"
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
@@ -149,6 +152,7 @@ echo "HIVE_HOME              = $HIVE_HOME"
 echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
+echo "PPROF_PATH             = $PPROF_PATH"
 echo "THRIFT_HOME            = $THRIFT_HOME"
 echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
