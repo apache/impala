@@ -84,6 +84,12 @@ class TestImpalaShell(object):
     assert 'Invalidating Metadata' in result.stderr, result.stderr
 
   @pytest.mark.execute_serially
+  def test_unsecure_message(self):
+    args = '-q "%s"' % DEFAULT_QUERY
+    results = run_impala_shell_cmd(args)
+    assert "Starting Impala Shell in unsecure mode" in results.stderr
+
+  @pytest.mark.execute_serially
   def test_print_header(self):
     args = '--print_header -B --output_delim="," -q "select * from %s.%s"' % (TEST_DB,
                                                                               TEST_TBL)
@@ -97,18 +103,17 @@ class TestImpalaShell(object):
     assert len(result_rows) == 3
 
   @pytest.mark.execute_serially
-  @pytest.mark.xfail(run=False,
-      reason='kerberos options not working as expected on all machines')
   def test_kerberos_option(self):
     args = "-k -q '%s'" % DEFAULT_QUERY
     # The command with fail because we're trying to connect to a kerberized impalad.
     results = run_impala_shell_cmd(args, expect_success=False)
     # Check that impala is using the right service name.
-    assert "Using service name 'impala' for kerberos" in results.stderr
+    assert "Using service name 'impala'" in results.stderr
+    assert "Starting Impala Shell in secure mode (using Kerberos)" in results.stderr
     # Change the service name
     args += " -s foobar"
     results = run_impala_shell_cmd(args, expect_success=False)
-    assert "Using service name 'foobar' for kerberos" in results.stderr
+    assert "Using service name 'foobar'" in results.stderr
 
   @pytest.mark.execute_serially
   def test_continue_on_error(self):
