@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
@@ -24,8 +25,6 @@ public class ParserTest {
 
   /**
    * Asserts in case of parser error.
-   * @param stmt
-   * @return parse result
    */
   public Object ParsesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
@@ -42,9 +41,27 @@ public class ParserTest {
   }
 
   /**
+   * Attempts to parse the given select statement, and asserts in case of parser error.
+   * Also asserts that the first select-list expression is of given class.
+   */
+  public <C extends Expr> Object ParsesOk(String selectStmtSql, Class<C> cl) {
+    Object parseNode = ParsesOk(selectStmtSql);
+    if (!(parseNode instanceof SelectStmt)) {
+      fail(String.format("Statement parsed ok but it is not a select stmt: %s",
+          selectStmtSql));
+    }
+    SelectStmt selectStmt = (SelectStmt) parseNode;
+    Expr firstExpr = selectStmt.getSelectList().getItems().get(0).getExpr();
+    // Check the class of the first select-list expression.
+    assertTrue(String.format(
+        "Expression is of class '%s'. Expected class '%s'",
+          firstExpr.getClass().getSimpleName(), cl.getSimpleName()),
+        firstExpr.getClass().equals(cl));
+    return parseNode;
+  }
+
+  /**
    * Asserts if stmt parses fine or the error string doesn't match and it is non-null.
-   * @param stmt
-   * @param expectedErrorString
    */
   public void ParserError(String stmt, String expectedErrorString) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
@@ -498,6 +515,11 @@ public class ParserTest {
     ParsesOk("select `db`.`tbl`.`a` from default.t");
     ParsesOk("select `12db`.`tbl`.`12_a` from default.t");
 
+    // Make sure quoted float literals are identifiers.
+    ParsesOk("select `8e6`", SlotRef.class);
+    ParsesOk("select `4.5e2`", SlotRef.class);
+    ParsesOk("select `.7e9`", SlotRef.class);
+
     // Mixed quoting
     ParsesOk("select `db`.tbl.`a` from default.t");
     ParsesOk("select `db.table.a` from default.t");
@@ -546,33 +568,54 @@ public class ParserTest {
   @Test
   public void TestLiteralExprs() {
     // negative integer literal
-    ParsesOk("select -1 from t where -1");
-    ParsesOk("select - 1 from t where - 1");
-    ParsesOk("select a - - 1 from t where a - - 1");
-    ParsesOk("select a - - - 1 from t where a - - - 1");
+    ParsesOk("select -1 from t where -1", IntLiteral.class);
+    ParsesOk("select - 1 from t where - 1", IntLiteral.class);
+    ParsesOk("select a - - 1 from t where a - - 1", ArithmeticExpr.class);
+    ParsesOk("select a - - - 1 from t where a - - - 1", ArithmeticExpr.class);
 
     // positive integer literal
-    ParsesOk("select +1 from t where +1");
-    ParsesOk("select + 1 from t where + 1");
-    ParsesOk("select a + + 1 from t where a + + 1");
-    ParsesOk("select a + + + 1 from t where a + + + 1");
+    ParsesOk("select +1 from t where +1", IntLiteral.class);
+    ParsesOk("select + 1 from t where + 1", IntLiteral.class);
+    ParsesOk("select a + + 1 from t where a + + 1", ArithmeticExpr.class);
+    ParsesOk("select a + + + 1 from t where a + + + 1", ArithmeticExpr.class);
 
-    // Float literals
-    ParsesOk("select +1.0 from t where +1.0");
-    ParsesOk("select +-1.0 from t where +-1.0");
-    ParsesOk("select +1.-0 from t where +1.-0");
+    // float literals
+    ParsesOk("select +1.0 from t where +1.0", FloatLiteral.class);
+    ParsesOk("select +-1.0 from t where +-1.0", FloatLiteral.class);
+    ParsesOk("select +1.-0 from t where +1.-0", ArithmeticExpr.class);
+    // test scientific notation
+    ParsesOk("select 8e6 from t where 8e6", FloatLiteral.class);
+    ParsesOk("select +8e6 from t where +8e6", FloatLiteral.class);
+    ParsesOk("select 8e+6 from t where 8e+6", FloatLiteral.class);
+    ParsesOk("select -8e6 from t where -8e6", FloatLiteral.class);
+    ParsesOk("select 8e-6 from t where 8e-6", FloatLiteral.class);
+    ParsesOk("select -8e-6 from t where -8e-6", FloatLiteral.class);
+    // with a decimal point
+    ParsesOk("select 4.5e2 from t where 4.5e2", FloatLiteral.class);
+    ParsesOk("select +4.5e2 from t where +4.5e2", FloatLiteral.class);
+    ParsesOk("select 4.5e+2 from t where 4.5e+2", FloatLiteral.class);
+    ParsesOk("select -4.5e2 from t where -4.5e2", FloatLiteral.class);
+    ParsesOk("select 4.5e-2 from t where 4.5e-2", FloatLiteral.class);
+    ParsesOk("select -4.5e-2 from t where -4.5e-2", FloatLiteral.class);
+    // with a decimal point but without a number before the decimal
+    ParsesOk("select .7e9 from t where .7e9", FloatLiteral.class);
+    ParsesOk("select +.7e9 from t where +.7e9", FloatLiteral.class);
+    ParsesOk("select .7e+9 from t where .7e+9", FloatLiteral.class);
+    ParsesOk("select -.7e9 from t where -.7e9", FloatLiteral.class);
+    ParsesOk("select .7e-9 from t where .7e-9", FloatLiteral.class);
+    ParsesOk("select -.7e-9 from t where -.7e-9", FloatLiteral.class);
 
     // mixed signs
-    ParsesOk("select -+-1 from t where -+-1");
-    ParsesOk("select - +- 1 from t where - +- 1");
-    ParsesOk("select 1 + -+ 1 from t where 1 + -+ 1");
+    ParsesOk("select -+-1 from t where -+-1", IntLiteral.class);
+    ParsesOk("select - +- 1 from t where - +- 1", IntLiteral.class);
+    ParsesOk("select 1 + -+ 1 from t where 1 + -+ 1", ArithmeticExpr.class);
 
     // Boolean literals
-    ParsesOk("select true from t where true");
-    ParsesOk("select false from t where false");
+    ParsesOk("select true from t where true", BoolLiteral.class);
+    ParsesOk("select false from t where false", BoolLiteral.class);
 
     // Null literal
-    ParsesOk("select NULL from t where NULL");
+    ParsesOk("select NULL from t where NULL", NullLiteral.class);
 
     // -- is parsed as a comment starter
     ParserError("select --1");
@@ -588,10 +631,10 @@ public class ParserTest {
     ParserError("select =1 from t");
 
     // test string literals with and without quotes in the literal
-    ParsesOk("select 5, 'five', 5.0, i + 5 from t");
-    ParsesOk("select \"\\\"five\\\"\" from t\n");
-    ParsesOk("select \"\'five\'\" from t\n");
-    ParsesOk("select \"\'five\" from t\n");
+    ParsesOk("select 'five', 5, 5.0, i + 5 from t", StringLiteral.class);
+    ParsesOk("select \"\\\"five\\\"\" from t\n", StringLiteral.class);
+    ParsesOk("select \"\'five\'\" from t\n", StringLiteral.class);
+    ParsesOk("select \"\'five\" from t\n", StringLiteral.class);
 
     // missing quotes
     ParserError("select \'5 from t");
@@ -630,8 +673,8 @@ public class ParserTest {
   private void testStringLiteral(String s) {
     String singleQuoteQuery = "select " + "'" + s + "'" + " from t";
     String doubleQuoteQuery = "select " + "\"" + s + "\"" + " from t";
-    ParsesOk(singleQuoteQuery);
-    ParsesOk(doubleQuoteQuery);
+    ParsesOk(singleQuoteQuery, StringLiteral.class);
+    ParsesOk(doubleQuoteQuery, StringLiteral.class);
   }
 
   @Test

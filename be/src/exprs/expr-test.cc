@@ -643,7 +643,9 @@ TEST_F(ExprTest, LiteralConstruction) {
   int32_t i_val = 234;
   int64_t l_val = 1234;
   float f_val = 3.14f;
-  double d_val = 1.23;
+  double d_val_1 = 1.23;
+  double d_val_2 = 7e6d;
+  double d_val_3 = 5.9e-3d;
   string str_input = "Hello";
   StringValue str_val(const_cast<char*>(str_input.data()), str_input.length());
 
@@ -656,8 +658,12 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "+1234");
   TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "3.14");
   TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "+3.14");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "+1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_1, "1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_1, "+1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_2, "7e6");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_2, "+7e6");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "5.9e-3");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "+5.9e-3");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
   TestSingleLiteralConstruction(TYPE_NULL, NULL, "NULL");
 

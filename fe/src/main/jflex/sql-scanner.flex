@@ -224,20 +224,25 @@ LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
 
-// Quoted identifiers may contain UTF-8 chars x21-x5f and x61-x7e.
-// Those ranges exclude control sequences and the "`" quote (UTF-8 char x60).
-QuotedIdentifierLetter = [\x20-\x5f] | [\x61-\x7e]
-QuotedIdentifier = \`{QuotedIdentifierLetter}*\`
-IdentifierOrKw = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
+// Order of rules to resolve ambiguity:
+// The rule for recognizing integer literals must come before the rule for
+// double literals to, e.g., recognize "1234" as an integer literal.
+// The rule for recognizing double literals must come before the rule for
+// identifiers to, e.g., recognize "1e6" as a double literal.
 IntegerLiteral = [:digit:][:digit:]*
-SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
-DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
-
 FLit1 = [0-9]+ \. [0-9]*
 FLit2 = \. [0-9]+
 FLit3 = [0-9]+
 Exponent = [eE] [+-]? [0-9]+
 DoubleLiteral = ({FLit1}|{FLit2}|{FLit3}) {Exponent}?
+
+// Quoted identifiers may contain UTF-8 chars x21-x5f and x61-x7e.
+// Those ranges exclude control sequences and the "`" quote (UTF-8 char x60).
+QuotedIdentifierLetter = [\x20-\x5f] | [\x61-\x7e]
+QuotedIdentifier = \`{QuotedIdentifierLetter}*\`
+IdentifierOrKw = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
+SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
+DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
 
 Comment = {TraditionalComment} | {EndOfLineComment}
 TraditionalComment = "/*" [^*] ~"*/" | "/*" "*"+ "/"
@@ -269,6 +274,30 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "'" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 "`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
+{IntegerLiteral} {
+  BigInteger val = null;
+  try {
+    val = new BigInteger(yytext());
+  } catch (NumberFormatException e) {
+    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
+  }
+  return newToken(SqlParserSymbols.INTEGER_LITERAL, val);
+}
+
+{DoubleLiteral} {
+  Double val = null;
+  try {
+    val = new Double(yytext());
+  } catch (NumberFormatException e) {
+    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
+  }
+  // conversion succeeded but literal is infinity or not a number
+  if (val.isInfinite() || val.isNaN()) {
+   return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
+  }
+  return newToken(SqlParserSymbols.FLOATINGPOINT_LITERAL, val);
+}
+
 {QuotedIdentifier} {
   // Remove the quotes and trim whitespace.
   String trimmedIdent = yytext().substring(1, yytext().length() - 1).trim();
@@ -295,30 +324,6 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 
 {DoubleQuoteStringLiteral} {
   return newToken(SqlParserSymbols.STRING_LITERAL, yytext().substring(1, yytext().length()-1));
-}
-
-{IntegerLiteral} {
-  BigInteger val = null;
-  try {
-    val = new BigInteger(yytext());
-  } catch (NumberFormatException e) {
-    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
-  }
-  return newToken(SqlParserSymbols.INTEGER_LITERAL, val);
-}
-
-{DoubleLiteral} {
-  Double val = null;
-  try {
-    val = new Double(yytext());
-  } catch (NumberFormatException e) {
-    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
-  }
-  // conversion succeeded but literal is infinity or not a number
-  if (val.isInfinite() || val.isNaN()) {
-   return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
-  }
-  return newToken(SqlParserSymbols.FLOATINGPOINT_LITERAL, val);
 }
 
 {Comment} { /* ignore */ }
