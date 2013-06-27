@@ -51,6 +51,8 @@ class BaseSequenceScanner : public HdfsScanner {
   // Data that is shared between scan ranges of the same file.  The subclass is 
   // responsible for filling in all these fields in ReadFileHeader
   struct FileHeader {
+    virtual ~FileHeader() {}
+
     // The sync hash for this file.
     uint8_t sync[SYNC_HASH_SIZE];
 
