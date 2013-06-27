@@ -54,8 +54,6 @@ Frontend::Frontend() {
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
-    {"getHadoopConfigValue", "(Ljava/lang/String;)Ljava/lang/String;",
-         &get_hadoop_config_value_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateMetastore", "([B)V", &update_metastore_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
@@ -259,24 +257,6 @@ Status Frontend::ValidateSettings() {
   if (ss.str().size() > 0) {
     return Status(ss.str());
   }
-  return Status::OK;
-}
-
-Status Frontend::GetHadoopConfigValue(const string& key, string* output) {
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jstring value_arg = jni_env->NewStringUTF(key.c_str());
-  RETURN_ERROR_IF_EXC(jni_env);
-  jstring java_config_value = static_cast<jstring>(
-      jni_env->CallObjectMethod(fe_, get_hadoop_config_value_id_, value_arg));
-  RETURN_ERROR_IF_EXC(jni_env);
-  const char *str = jni_env->GetStringUTFChars(java_config_value, NULL);
-  RETURN_ERROR_IF_EXC(jni_env);
-  *output = str;
-  jni_env->ReleaseStringUTFChars(java_config_value, str);
-  RETURN_ERROR_IF_EXC(jni_env);
-
   return Status::OK;
 }
 

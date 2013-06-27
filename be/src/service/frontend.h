@@ -129,12 +129,6 @@ class Frontend {
   // Validate Hadoop config; requires FE
   Status ValidateSettings();
 
-  // Reads a configuration value from Hadoop's configuration in the
-  // front-end. If the configuration key is not found, returns the
-  // empty string.
-  // Returns Status::OK unless there is a JNI error.
-  Status GetHadoopConfigValue(const std::string& key, std::string* output);
-
   // Calls FE to execute HiveServer2 metadata operation.
   Status ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
                                    TMetadataOpResponse* result);
@@ -155,7 +149,6 @@ class Frontend {
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
-  jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames

@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -53,6 +54,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAlterTableParams;
@@ -377,15 +379,6 @@ public class JniFrontend {
     return output.toString();
   }
 
-  /**
-   * Returns a string representation of a config value. If the config
-   * can't be found, the empty string is returned. (This method is
-   * called from JNI, and so NULL handling is easier to avoid.)
-   */
-  public String getHadoopConfigValue(String confName) {
-    return CONF.get(confName, "");
-  }
-
   public class CdhVersion implements Comparable<CdhVersion> {
     private final int major;
     private final int minor;
@@ -704,21 +697,29 @@ public class JniFrontend {
 
   /**
    * Return an empty string if the FileSystem configured in CONF refers to a
-   * DistributedFileSystem (the only one supported by Impala). Otherwise, return an error
-   * string describing the issues.
+   * DistributedFileSystem (the only one supported by Impala) and Impala can list the root
+   * directory "/". Otherwise, return an error string describing the issues.
    */
   private String checkFileSystem(Configuration conf) {
     try {
       FileSystem fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem)) {
         return "Unsupported file system. Impala only supports DistributedFileSystem " +
-        		"but the " + fs.getClass().getSimpleName() + " was found. " +
+            "but the configured filesystem is: " + fs.getClass().getSimpleName() + "." +
             CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
             "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
             " might be set incorrectly";
       }
     } catch (IOException e) {
       return "couldn't retrieve FileSystem:\n" + e.getMessage();
+    }
+
+    try {
+      FileSystemUtil.getTotalNumVisibleFiles(new Path("/"));
+    } catch (IOException e) {
+      return "Could not read the HDFS root directory at " +
+          CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) +
+          ". Error was: \n" + e.getMessage();
     }
     return "";
   }

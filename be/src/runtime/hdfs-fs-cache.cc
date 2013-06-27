@@ -21,13 +21,6 @@
 using namespace std;
 using namespace boost;
 
-// TODO: Consider retiring these altogether once reading from Hadoop
-// config has proven itself
-DEFINE_string(nn, "", "hostname or ip address of HDFS namenode. If not explicitly set, "
-              "Impala will read the value from its Hadoop configuration files.");
-DEFINE_int32(nn_port, 0, "namenode port. If -nn is not explicitly set, Impala will read "
-             "the value from its Hadoop configuration files");
-
 namespace impala {
 
 HdfsFsCache::~HdfsFsCache() {
@@ -45,7 +38,10 @@ hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
   lock_guard<mutex> l(lock_);
   HdfsFsMap::iterator i = fs_map_.find(make_pair(host, port));
   if (i == fs_map_.end()) {
-    hdfsFS conn = hdfsConnect(host.c_str(), port);
+    hdfsBuilder* hdfs_builder = hdfsNewBuilder();
+    hdfsBuilderSetNameNode(hdfs_builder, host.c_str());
+    hdfsBuilderSetNameNodePort(hdfs_builder, port);
+    hdfsFS conn = hdfsBuilderConnect(hdfs_builder);
     DCHECK(conn != NULL);
     fs_map_.insert(make_pair(make_pair(host, port), conn));
     return conn;
@@ -55,7 +51,8 @@ hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
 }
 
 hdfsFS HdfsFsCache::GetDefaultConnection() {
-  return GetConnection(FLAGS_nn, FLAGS_nn_port);
+  // "default" uses the default NameNode configuration from the XML configuration files.
+  return GetConnection("default", 0);
 }
 
 }

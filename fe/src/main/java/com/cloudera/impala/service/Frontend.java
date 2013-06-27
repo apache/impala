@@ -306,8 +306,7 @@ public class Frontend {
    * Returns all database names that match the specified database and pattern that
    * are accessible to the given user. If pattern is null, matches all dbs.
    */
-  public List<String> getDbNames(String dbPattern, User user)
-      throws ImpalaException {
+  public List<String> getDbNames(String dbPattern, User user) {
     return catalog.getDbNames(dbPattern, user);
   }
 
