@@ -30,9 +30,11 @@ class TScanRange;
 // Includes ScanNode common counters:
 //   BytesRead - total bytes read by this scan node
 //
-//   TotalRawHdfsReadTime - it measures the total time spent in the disk-io-mgr's reading
-//     threads for this node. For example, if we have 3 reading threads and each spent
+//   TotalRawReadTime - it measures the total time spent in underlying reads.
+//     For HDFS files, this is the time in the disk-io-mgr's reading threads for 
+//     this node. For example, if we have 3 reading threads and each spent
 //     1 sec, this counter will report 3 sec.
+//     For HBase, this is the time spent in the region server.
 //
 //   TotalReadThroughput - BytesRead divided by the total time spent in this node
 //     (from Open to Close). For IO bounded queries, this should be very close to the

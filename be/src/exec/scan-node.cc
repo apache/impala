@@ -23,7 +23,7 @@ namespace impala {
 
 const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
 const string ScanNode::ROWS_READ_COUNTER = "RowsRead";
-const string ScanNode::TOTAL_READ_TIMER = "TotalRawHdfsReadTime(*)";
+const string ScanNode::TOTAL_READ_TIMER = "TotalRawReadTime(*)";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
 const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime(*)";
 const string ScanNode::PER_READ_THREAD_THROUGHPUT_COUNTER =
@@ -44,7 +44,7 @@ const string ScanNode::AVERAGE_HDFS_READ_THREAD_CONCURRENCY =
 
 Status ScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-
+  
   scanner_thread_counters_ =
       ADD_THREAD_COUNTERS(runtime_profile(), SCANNER_THREAD_COUNTERS_PREFIX);
   bytes_read_counter_ =
@@ -56,14 +56,6 @@ Status ScanNode::Prepare(RuntimeState* state) {
       TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
   materialize_tuple_timer_ = ADD_CHILD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER,
       SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
-  per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
-       PER_READ_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
-       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
-  scan_ranges_complete_counter_ =
-      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
-  num_disks_accessed_counter_ =
-      ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
-
   return Status::OK;
 }
 

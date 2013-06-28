@@ -329,6 +329,15 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   max_queued_io_buffers_ = state->num_scanner_threads() * 2;
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
+  // Initialize HdfsScanNode specific counters
+  per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
+      PER_READ_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
+  scan_ranges_complete_counter_ =
+      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
+  num_disks_accessed_counter_ =
+      ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
+
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
 

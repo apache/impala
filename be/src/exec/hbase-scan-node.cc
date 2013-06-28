@@ -136,6 +136,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   // but there's still some considerable time inside here.
   // TODO: need to understand how the time is spent inside this function.
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -248,6 +249,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     }
     COUNTER_UPDATE(rows_read_counter_, 1);
   }
+
+  return Status::OK;
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {
@@ -256,6 +259,7 @@ Status HBaseScanNode::Close(RuntimeState* state) {
   if (memory_used_counter() != NULL) {
     COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
   }
+  runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
 
   if (hbase_scanner_.get() != NULL) {
     JNIEnv* env = getJNIEnv();
