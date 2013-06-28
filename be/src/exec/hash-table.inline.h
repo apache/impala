@@ -24,7 +24,7 @@ inline HashTable::Iterator HashTable::Find(TupleRow* probe_row) {
   bool has_nulls = EvalProbeRow(probe_row);
   if (!stores_nulls_ && has_nulls) return End();
   uint32_t hash = HashCurrentRow();
-  int64_t bucket_idx = hash % num_buckets_;
+  int64_t bucket_idx = hash & (num_buckets_ - 1);
 
   Bucket* bucket = &buckets_[bucket_idx];
   int64_t node_idx = bucket->node_idx_;
@@ -62,7 +62,7 @@ inline void HashTable::InsertImpl(TupleRow* row) {
   if (!stores_nulls_ && has_null) return;
 
   uint32_t hash = HashCurrentRow();
-  int64_t bucket_idx = hash % num_buckets_;
+  int64_t bucket_idx = hash & (num_buckets_ - 1);
   if (num_nodes_ == nodes_capacity_) GrowNodeArray();
   Node* node = GetNode(num_nodes_);
   TupleRow* data = node->data();
@@ -76,6 +76,20 @@ inline void HashTable::AddToBucket(Bucket* bucket, int64_t node_idx, Node* node)
   if (bucket->node_idx_ == -1) ++num_filled_buckets_;
   node->next_idx_ = bucket->node_idx_;
   bucket->node_idx_ = node_idx;
+}
+
+inline void HashTable::MoveNode(Bucket* from_bucket, Bucket* to_bucket,
+    int64_t node_idx, Node* node, Node* previous_node) {
+  int64_t next_idx = node->next_idx_;
+  if (previous_node != NULL) {
+    previous_node->next_idx_ = next_idx;
+  } else {
+    // Update bucket directly
+    from_bucket->node_idx_ = next_idx;
+    if (next_idx == -1) --num_filled_buckets_;
+  }
+
+  AddToBucket(to_bucket, node_idx, node);
 }
 
 template<bool check_match>

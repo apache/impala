@@ -240,19 +240,19 @@ TEST_F(HashTableTest, ScanTest) {
   EXPECT_EQ(hash_table.num_buckets(), 128);
   ProbeTest(&hash_table, probe_rows, 15, true);
 
-  ResizeTable(&hash_table, 20);
-  EXPECT_EQ(hash_table.num_buckets(), 20);
+  ResizeTable(&hash_table, 16);
+  EXPECT_EQ(hash_table.num_buckets(), 16);
   ProbeTest(&hash_table, probe_rows, 15, true);
 
-  ResizeTable(&hash_table, 1);
-  EXPECT_EQ(hash_table.num_buckets(), 1);
+  ResizeTable(&hash_table, 2);
+  EXPECT_EQ(hash_table.num_buckets(), 2);
   ProbeTest(&hash_table, probe_rows, 15, true);
 }
 
 // This test continues adding to the hash table to trigger the resize code paths
 TEST_F(HashTableTest, GrowTableTest) {
   int build_row_val = 0;
-  int num_to_add = 5;
+  int num_to_add = 4;
   int expected_size = 0;
   MemLimit mem_limit(1024 * 1024);
   vector<MemLimit*> mem_limits;

@@ -896,6 +896,10 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     }
     DCHECK_EQ(num_bytes, 0);
 
+    Value* shift_16 = GetIntConstant(TYPE_INT, 16);
+    Value* upper_bits = builder.CreateShl(result, shift_16);
+    Value* lower_bits = builder.CreateLShr(result, shift_16);
+    result = builder.CreateOr(upper_bits, lower_bits);
     builder.CreateRet(result);
 
     fn = FinalizeFunction(fn);

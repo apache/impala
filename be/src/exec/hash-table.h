@@ -56,8 +56,14 @@ class MemLimit;
 // are stored as nodes (in the order they are inserted).  The buckets (indexed by the
 // mod of the hash) contain pointers to the node vector.  Nodes that fall in the same
 // bucket are linked together (the bucket pointer gets you the head of that linked list).
-// For growing the hash table, new buckets are allocated but the node vector is modified
-// in place.
+// When growing the hash table, the number of buckets is doubled, and nodes from a
+// particular bucket either stay in place or move to an analogous bucket in the second
+// half of buckets. This behavior allows us to avoid moving about half the nodes each 
+// time, and maintains good cache properties by only accessing 2 buckets at a time.
+// The node vector is modified in place.
+// Due to the doubling nature of the buckets, we require that the number of buckets is a
+// power of 2. This allows us to determine if a node needs to move by simply checking a
+// single bit, and further allows us to initially hash nodes using a bitmask.
 //
 // TODO: this is not a fancy hash table in terms of memory access patterns (cuckoo-hashing
 // or something that spills to disk). We will likely want to invest more time into this.
@@ -94,7 +100,7 @@ class HashTable {
     }
     InsertImpl(row);
   }
-  
+
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
   // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End() 
   // to find all the matching rows.
@@ -105,7 +111,7 @@ class HashTable {
   // rows are evaluated lazily (i.e. computed as the Iterator is moved).   
   // Returns HashTable::End() if there is no match.
   Iterator Find(TupleRow* probe_row);
-  
+
   // Returns number of elements in the hash table
   int64_t size() { return num_nodes_; }
 
@@ -263,6 +269,11 @@ class HashTable {
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.
   void AddToBucket(Bucket* bucket, int64_t node_idx, Node* node);
+
+  // Moves a node from one bucket to another. 'previous_node' refers to the
+  // node (if any) that's chained before this node in from_bucket's linked list.
+  void MoveNode(Bucket* from_bucket, Bucket* to_bucket, int64_t node_idx, Node* node,
+                Node* previous_node);
 
   // Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
   // Returns whether any expr evaluated to NULL

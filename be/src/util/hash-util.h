@@ -38,6 +38,7 @@ class HashUtil {
   // the current hash/seed value.
   // This should only be called if SSE is supported.
   // This is ~4x faster than Fvn/Boost Hash.
+  // NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
   // TODO: crc32 hashes with different seeds do not result in different hash functions.  The
   // resulting hashes are correlated.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
@@ -57,6 +58,9 @@ class HashUtil {
       ++s;
     }
 
+    // The lower half of the CRC hash has has poor uniformity, so swap the halves
+    // for anyone who only uses the first several bits of the hash.
+    hash = (hash << 16) | (hash >> 16);
     return hash;
   } 
 #endif

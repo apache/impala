@@ -44,6 +44,7 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
     mem_limits_(mem_limits),
     exceeded_limit_(false) {
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
+  DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   buckets_.resize(num_buckets);
   num_buckets_ = num_buckets;
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
@@ -278,8 +279,11 @@ Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
 
 uint32_t HashTable::HashVariableLenRow() {
   uint32_t hash = initial_seed_;
-  // Hash the non-var length portions
-  hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
+  // Hash the non-var length portions (if there are any)
+  if (var_result_begin_ != 0) {
+    hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
+  }
+
   for (int i = 0; i < build_exprs_.size(); ++i) {
     // non-string and null slots are already part of expr_values_buffer
     if (build_exprs_[i]->type() != TYPE_STRING) continue;
@@ -587,34 +591,56 @@ Function* HashTable::CodegenEquals(LlvmCodeGen* codegen) {
 }
 
 void HashTable::ResizeBuckets(int64_t num_buckets) {
-  vector<Bucket> new_buckets;
+  DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
 
-  new_buckets.resize(num_buckets);
-  num_filled_buckets_ = 0;
+  int64_t old_num_buckets = num_buckets_;
+  buckets_.resize(num_buckets);
 
-  Iterator iter = Begin();
-  while (iter.HasNext()) {
-    int64_t node_idx = iter.node_idx_;
-    // Advance to next node before modifying the node's next link
-    iter.Next<false>();
+  // If we're doubling the number of buckets, all nodes in a particular bucket
+  // either remain there, or move down to an analogous bucket in the other half.
+  // In order to efficiently check which of the two buckets a node belongs in, the number
+  // of buckets must be a power of 2.
+  bool doubled_buckets = (num_buckets == old_num_buckets * 2);
+  for (int i = 0; i < num_buckets_; ++i) {
+    Bucket* bucket = &buckets_[i];
+    Bucket* sister_bucket = &buckets_[i + old_num_buckets];
+    Node* last_node = NULL;
+    int node_idx = bucket->node_idx_;
+    
+    while (node_idx != -1) {
+      Node* node = GetNode(node_idx);
+      int64_t next_idx = node->next_idx_;
+      uint32_t hash = node->hash_;
 
-    Node* node = GetNode(node_idx);
+      bool node_must_move;
+      Bucket* move_to;
+      if (doubled_buckets) {
+        node_must_move = ((hash & old_num_buckets) != 0);
+        move_to = sister_bucket;
+      } else {
+        int64_t bucket_idx = hash & (num_buckets - 1);
+        node_must_move = (bucket_idx != i);
+        move_to = &buckets_[bucket_idx];
+      }
 
-    // Assign it to a new bucket
-    uint32_t hash = node->hash_;
-    int64_t bucket_idx = hash % num_buckets;
-    AddToBucket(&new_buckets[bucket_idx], node_idx, node);
+      if (node_must_move) {
+        MoveNode(bucket, move_to, node_idx, node, last_node);
+      } else {
+        last_node = node;
+      }
+
+      node_idx = next_idx;
+    }
   }
 
-  int64_t delta_bytes = (new_buckets.size() - buckets_.size()) * sizeof(Bucket);
+  int64_t delta_bytes = (num_buckets - old_num_buckets) * sizeof(Bucket);
   MemLimit::UpdateLimits(delta_bytes, &mem_limits_);
   exceeded_limit_ = MemLimit::LimitExceeded(mem_limits_);
 
-  buckets_.swap(new_buckets);
-  num_buckets_ = buckets_.size();
+  num_buckets_ = num_buckets;
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
 }
-  
+
 void HashTable::GrowNodeArray() {
   int64_t old_size = nodes_capacity_ * node_byte_size_;
   nodes_capacity_ = nodes_capacity_ + nodes_capacity_ / 2;
