@@ -168,6 +168,10 @@ class ImpalaShell(cmd.Cmd):
     # semi-colons and strip them from the end of the command.
     args = args.strip()
     tokens = args.split(' ')
+    if not interactive:
+      tokens[0] = tokens[0].lower()
+      # Strip all the non-interactive commands of the delimiter.
+      return ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
     # The first token is converted into lower case to route it to the
     # appropriate command handler. This only applies to the first line of user input.
     # Modifying tokens in subsequent lines may change the semantics of the command,
@@ -179,13 +183,18 @@ class ImpalaShell(cmd.Cmd):
         return 'quit'
       else:
         tokens[0] = tokens[0].lower()
-    if interactive:
-      args = self.__check_for_command_completion(' '.join(tokens).strip())
-      args = args.rstrip(ImpalaShell.CMD_DELIM)
-    else:
-      # Strip all the non-interactive commands of the delimiter.
-      args = ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
-    return args
+    elif tokens[0] == "EOF":
+      # If a command is in progress and the user hits a Ctrl-D, clear its state
+      # and reset the prompt.
+      self.prompt = self.cached_prompt
+      self.partial_cmd = str()
+      # The print statement makes the new prompt appear in a new line.
+      # Also print an extra newline to indicate that the current command has
+      # been cancelled.
+      print '\n'
+      return str()
+    args = self.__check_for_command_completion(' '.join(tokens).strip())
+    return args.rstrip(ImpalaShell.CMD_DELIM)
 
   def __check_for_command_completion(self, cmd):
     """Check for a delimiter at the end of user input.
