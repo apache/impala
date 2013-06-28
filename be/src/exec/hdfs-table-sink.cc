@@ -183,8 +183,9 @@ Status HdfsTableSink::Init(RuntimeState* state) {
 // repeatedly to give the same answer.
 static void MakeTmpHdfsDirectoryName(const string& base_dir, const string& unique_id,
                                      stringstream* ss) {
-  // Append "_dir" at the end of directory to avoid name clashes for unpartitioned tables.
-  (*ss) << base_dir << "/" << unique_id << "_" << rand() << "_dir/";
+  // Prefix the directory name with "." to make it hidden and append "_dir" at the end
+  // of the directory to avoid name clashes for unpartitioned tables.
+  (*ss) << base_dir << "/." << unique_id << "_" << rand() << "_dir/";
 }
 
 void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
