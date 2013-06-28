@@ -644,8 +644,8 @@ TEST_F(ExprTest, LiteralConstruction) {
   int64_t l_val = 1234;
   float f_val = 3.14f;
   double d_val_1 = 1.23;
-  double d_val_2 = 7e6d;
-  double d_val_3 = 5.9e-3d;
+  double d_val_2 = 7e6;
+  double d_val_3 = 5.9e-3;
   string str_input = "Hello";
   StringValue str_val(const_cast<char*>(str_input.data()), str_input.length());
 
