@@ -122,7 +122,8 @@ class ScanNode : public ExecNode {
   // names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
   static const std::string ROWS_READ_COUNTER;
-  static const std::string TOTAL_READ_TIMER;
+  static const std::string TOTAL_HDFS_READ_TIMER;
+  static const std::string TOTAL_HBASE_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
   static const std::string PER_READ_THREAD_THROUGHPUT_COUNTER;
   static const std::string NUM_DISKS_ACCESSED_COUNTER;

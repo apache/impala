@@ -21,9 +21,11 @@ using namespace boost;
 
 namespace impala {
 
+// Changing these names have compatibility concerns.
 const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
 const string ScanNode::ROWS_READ_COUNTER = "RowsRead";
-const string ScanNode::TOTAL_READ_TIMER = "TotalRawReadTime(*)";
+const string ScanNode::TOTAL_HDFS_READ_TIMER = "TotalRawHdfsReadTime(*)";
+const string ScanNode::TOTAL_HBASE_READ_TIMER = "TotalRawHBaseReadTime(*)";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
 const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime(*)";
 const string ScanNode::PER_READ_THREAD_THROUGHPUT_COUNTER =
@@ -51,7 +53,6 @@ Status ScanNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TCounterType::BYTES);
   rows_read_counter_ =
       ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TCounterType::UNIT);
-  read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_READ_TIMER);
   total_throughput_counter_ = runtime_profile()->AddRateCounter(
       TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
   materialize_tuple_timer_ = ADD_CHILD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER,

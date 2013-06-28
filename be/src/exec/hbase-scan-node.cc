@@ -59,6 +59,7 @@ bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) 
 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
+  read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
 
   tuple_pool_.reset(new MemPool(state->mem_limits())),
   hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
