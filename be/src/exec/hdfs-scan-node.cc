@@ -498,6 +498,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     int64_t partition_id = metadata->partition_id;
     HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
     if (partition == NULL) {
+      LOG(INFO) << hdfs_table_->DebugString();
       stringstream ss;
       ss << "Could not find partition with id: " << partition_id;
       return Status(ss.str());
