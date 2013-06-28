@@ -67,15 +67,12 @@ namespace impala {
 // <varint((25 << 1) | 1)> <25 bytes of values, bitpacked>  
 // (total 26 bytes, 1 byte overhead)
 //
-// TODO: this implementation is tailored to bit-width 1 and will need more work to
-// make it general.
 
 // Decoder class for RLE encoded data.
 class RleDecoder {
  public:
   // Create a decoder object. buffer/buffer_len is the decoded data.
   // bit_width is the width of each value (before encoding).
-  // TODO: support bit_width.  Only 1 is implemented.
   RleDecoder(uint8_t* buffer, int buffer_len, int bit_width)
     : bit_reader_(buffer, buffer_len),
       bit_width_(bit_width),
