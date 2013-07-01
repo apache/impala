@@ -15,6 +15,8 @@
 #
 # Runs the Impala process failure tests.
 
+# Disable HEAPCHECK for the process failure tests because they can cause false positives.
+export HEAPCHECK=
 set -u
 
 RESULTS_DIR=${IMPALA_HOME}/tests/results
