@@ -759,7 +759,7 @@ public class Analyzer {
     return queryGlobals;
   }
 
-  /*
+  /**
    * If the table name is fully qualified, the database from the TableName object will
    * be returned. Otherwise the default analyzer database will be returned.
    */

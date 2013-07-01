@@ -86,6 +86,8 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
           "Column '%s' does not exist in table: %s", colName, tableName));
     }
 
+    // Check that the new column def's name is valid.
+    newColDef.analyze();
     // Verify that if the column name is being changed, the new name doesn't conflict
     // with an existing column.
     if (!colName.toLowerCase().equals(newColDef.getColName().toLowerCase()) &&

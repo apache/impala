@@ -14,9 +14,19 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
+/**
+ * Represents a table/view name that optionally includes its database (a fully qualified
+ * table name). Analysis of this table name checks for validity of the database and
+ * table name according to the Metastore's policy (see @MetaStoreUtils).
+ * According to that definition, we can still use "invalid" table names for tables/views
+ * that are not stored in the Metastore, e.g., for Inline Views or WITH-clause views.
+ */
 public class TableName {
   private final String db;
   private final String tbl;
@@ -39,6 +49,21 @@ public class TableName {
 
   public boolean isEmpty() {
     return tbl.isEmpty();
+  }
+
+  /**
+   * Checks whether the db and table name meet the Metastore's requirements.
+   */
+  public void analyze() throws AnalysisException {
+    if (db != null) {
+      if (!MetaStoreUtils.validateName(db)) {
+        throw new AnalysisException("Invalid database name: " + db);
+      }
+    }
+    Preconditions.checkNotNull(tbl);
+    if (!MetaStoreUtils.validateName(tbl)) {
+      throw new AnalysisException("Invalid table/view name: " + tbl);
+    }
   }
 
   /**

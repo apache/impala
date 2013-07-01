@@ -67,6 +67,7 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    newTableName.analyze();
     table = analyzer.getTable(tableName, Privilege.ALTER);
     if (table instanceof View && renameTable) {
       throw new AnalysisException(String.format(

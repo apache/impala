@@ -205,7 +205,8 @@ public class CreateTableStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = tableName.isFullyQualified() ? tableName.getDb() : analyzer.getDefaultDb();
+    tableName.analyze();
+    dbName = analyzer.getTargetDbName(tableName);
     owner = analyzer.getUser().getName();
 
     if (analyzer.dbContainsTable(dbName, tableName.getTbl(), Privilege.CREATE) &&
@@ -224,14 +225,16 @@ public class CreateTableStmt extends StatementBase {
     analyzeRowFormatValue(rowFormat.getLineDelimiter());
     analyzeRowFormatValue(rowFormat.getEscapeChar());
 
-    // Check that all the column names are unique.
+    // Check that all the column names are valid and unique.
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef colDef: columnDefs) {
+      colDef.analyze();
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
     }
     for (ColumnDef colDef: partitionColumnDefs) {
+      colDef.analyze();
       if (!colDef.getColType().supportsTablePartitioning()) {
         throw new AnalysisException(
             String.format("Type '%s' is not supported as partition-column type " +

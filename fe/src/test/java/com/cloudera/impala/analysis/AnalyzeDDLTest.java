@@ -124,6 +124,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Add a column with same name as a partition column
     AnalysisError("alter table functional.alltypes add columns (year int)",
         "Column name conflicts with existing partition column: year");
+    // Invalid column name.
+    AnalysisError("alter table functional.alltypes add columns (`???` int)",
+        "Invalid column name: ???");
+    AnalysisError("alter table functional.alltypes replace columns (`???` int)",
+        "Invalid column name: ???");
 
     // Replace should not throw an error if the column already exists
     AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
@@ -134,7 +139,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Duplicate column names
     AnalysisError("alter table functional.alltypes add columns (c1 int, c1 int)",
         "Duplicate column name: c1");
-
     AnalysisError("alter table functional.alltypes replace columns (c1 int, C1 int)",
         "Duplicate column name: c1");
 
@@ -195,6 +199,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     AnalysisError("alter table functional.alltypes change column int_col Tinyint_col int",
         "Column already exists: Tinyint_col");
+
+    // Invalid column name.
+    AnalysisError("alter table functional.alltypes change column int_col `???` int",
+        "Invalid column name: ???");
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
@@ -313,6 +321,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table db_does_not_exist.alltypes rename to new_table",
         "Database does not exist: db_does_not_exist");
 
+    // Invalid database/table name.
+    AnalysisError("alter table functional.alltypes rename to `???`.new_table",
+        "Invalid database name: ???");
+    AnalysisError("alter table functional.alltypes rename to functional.`%^&`",
+        "Invalid table/view name: %^&");
+
     AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
         "Database does not exist: db_does_not_exist");
 
@@ -353,6 +367,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter view functional.alltypes_view as " +
         "select * from functional.badtable",
         "Table does not exist: functional.badtable");
+    // Invalid column name.
+    AnalysisError("alter view functional.alltypes_view as select 'abc' as `???`",
+        "Invalid column name: ???");
   }
 
   @Test
@@ -373,6 +390,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "rename to db_does_not_exist.new_view",
         "Database does not exist: db_does_not_exist");
 
+    // Invalid database/table name.
+    AnalysisError("alter view functional.alltypes_view rename to `???`.new_view",
+        "Invalid database name: ???");
+    AnalysisError("alter view functional.alltypes_view rename to functional.`%^&`",
+        "Invalid table/view name: %^&");
+
     // Cannot ALTER VIEW a able.
     AnalysisError("alter view functional.alltypes rename to new_alltypes",
         "ALTER VIEW not allowed on a table: functional.alltypes");
@@ -392,6 +415,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: db_does_not_exist");
     AnalysisError("drop view db_does_not_exist.alltypes_view",
         "Database does not exist: db_does_not_exist");
+    // Invalid name reports non-existence instead of invalidity.
+    AnalysisError("drop database `???`",
+        "Database does not exist: ???");
+    AnalysisError("drop table functional.`%^&`",
+        "Table does not exist: functional.%^&");
+    AnalysisError("drop view functional.`@#$%`",
+        "Table does not exist: functional.@#$%");
 
     // If the database exist but the table doesn't, and the user hasn't specified
     // "IF EXISTS", an analysis error should be thrown
@@ -424,6 +454,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create database some_new_database");
     AnalysisError("create database functional", "Database already exists: functional");
     AnalyzesOk("create database if not exists functional");
+    // Invalid database name,
+    AnalysisError("create database `%^&`", "Invalid database name: %^&");
   }
 
   @Test
@@ -472,6 +504,23 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
         "Type 'DATETIME' is not supported as partition-column type in column: d");
 
+    // Invalid database name.
+    AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",
+        "Invalid database name: ???");
+    // Invalid table/view name.
+    AnalysisError("create table functional.`^&*` (x int) PARTITIONED BY (y int)",
+        "Invalid table/view name: ^&*");
+    // Invalid column names.
+    AnalysisError("create table new_table (`???` int) PARTITIONED BY (i int)",
+        "Invalid column name: ???");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
+        "Invalid column name: ^&*");
+    // Invalid source database/table name reports non-existence instead of invalidity.
+    AnalysisError("create table functional.foo like `???`.alltypes",
+        "Database does not exist: ???");
+    AnalysisError("create table functional.foo like functional.`%^&`",
+        "Table does not exist: functional.%^&");
+
     // Invalid URI values.
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'file://test-warehouse/new_table'", "URI location " +
@@ -519,6 +568,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create view foo (a, b, a) as select int_col, int_col, int_col " +
         "from functional.alltypes",
         "Duplicate column name: a");
+
+    // Invalid database/view/column names.
+    AnalysisError("create view `???`.new_view as select 1, 2, 3",
+        "Invalid database name: ???");
+    AnalysisError("create view `^%&` as select 1, 2, 3",
+        "Invalid table/view name: ^%&");
+    AnalysisError("create view foo as select 1 as `???`",
+        "Invalid column name: ???");
+    AnalysisError("create view foo(`%^&`) as select 1",
+        "Invalid column name: %^&");
+
     // Table/view already exists.
     AnalysisError("create view functional.alltypes as " +
         "select * from functional.alltypessmall ",

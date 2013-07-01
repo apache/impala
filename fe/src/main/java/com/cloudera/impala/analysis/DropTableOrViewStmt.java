@@ -65,6 +65,8 @@ public class DropTableOrViewStmt extends StatementBase {
    * 1. Checks that the user has privileges to DROP the given table/view
    * 2. Checks that the database and table exists
    * 3. Checks that the table type (TABLE/VIEW) matches the DROP TABLE/VIEW statement
+   * Note: Do not analyze tableName because we prefer to report an error indicating
+   * that the table/view does not exist even if the table/view name is invalid.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,

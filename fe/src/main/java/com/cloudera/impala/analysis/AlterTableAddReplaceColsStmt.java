@@ -80,9 +80,11 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     }
 
     // Make sure the new columns don't already exist in the table, that the names
-    // are all unique, and that none of the columns conflict with partition columns.
+    // are all valid and unique, and that none of the columns conflict with
+    // partition columns.
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef c: columnDefs) {
+      c.analyze();
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
         throw new AnalysisException(

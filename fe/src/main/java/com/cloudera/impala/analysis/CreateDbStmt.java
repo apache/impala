@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
@@ -101,6 +103,11 @@ public class CreateDbStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    // Check whether the db name meets the Metastore's requirements.
+    if (!MetaStoreUtils.validateName(dbName)) {
+      throw new AnalysisException("Invalid database name: " + dbName);
+    }
+
     // Note: It is possible that a database with the same name was created external to
     // this Impala instance. If that happens, the caller will not get an
     // AnalysisException when creating the database, they will get a Hive

@@ -114,6 +114,11 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       }
     }
 
+    // Check that the column definitions have valid names.
+    for (ColumnDef colDef: finalColDefs) {
+      colDef.analyze();
+    }
+
     // Set original and expanded view-definition SQL strings.
     originalViewDef = viewDefStmt.toSql();
 

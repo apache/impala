@@ -35,6 +35,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    tableName.analyze();
     viewDefStmt.analyze(analyzer);
 
     Preconditions.checkState(tableName != null && !tableName.isEmpty());

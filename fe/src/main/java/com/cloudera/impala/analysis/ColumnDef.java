@@ -14,7 +14,10 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 
@@ -22,8 +25,9 @@ import com.cloudera.impala.thrift.TColumnDesc;
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
  * Column definitions in CREATE/ALTER TABLE statements require a column type,
  * whereas column definitions in CREATE/ALTER VIEW statements infer the column type from
- * the corresponding view definition.
- * All column definitions have an optional comment.
+ * the corresponding view definition. All column definitions have an optional comment.
+ * Since a column definition refers a column stored in the Metastore, the column name
+ * must be valid according to the Metastore's rules (see @MetaStoreUtils).
  */
 public class ColumnDef {
   private final String colName;
@@ -41,6 +45,13 @@ public class ColumnDef {
   public PrimitiveType getColType() { return colType; }
   public String getColName() { return colName; }
   public String getComment() { return comment; }
+
+  public void analyze() throws AnalysisException {
+    // Check whether the column name meets the Metastore's requirements.
+    if (!MetaStoreUtils.validateName(colName)) {
+      throw new AnalysisException("Invalid column name: " + colName);
+    }
+  }
 
   @Override
   public String toString() {
