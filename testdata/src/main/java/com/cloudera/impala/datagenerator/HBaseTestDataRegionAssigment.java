@@ -98,18 +98,18 @@ class HBaseTestDataRegionAssigment {
       throw new TableNotFoundException("Table " + tableName + " not found.");
     }
 
-    // Split into regions
-    // The table should have one region only to begin with. The logic of
-    // blockUntilRegionSplit requires that the input regionName has performed a split. 
-    // If the table has already been split (i.e. regions count > 1), the same split
-    // call will be a no-op and this will cause blockUntilRegionSplit to break.
-    Preconditions.checkArgument(
-        hbaseAdmin.getTableRegions(tableName.getBytes()).size() == 1);    
-    for (int i = 0; i < splitPoints.length; ++i) {
-      List<HRegionInfo> regions = hbaseAdmin.getTableRegions(tableName.getBytes());
-      HRegionInfo splitRegion = regions.get(regions.size() - 1);
-      hbaseAdmin.split(splitRegion.getRegionNameAsString(), splitPoints[i]);
-      blockUntilRegionSplit(conf, 50000, splitRegion.getRegionName(), true);
+    if (hbaseAdmin.getTableRegions(tableName.getBytes()).size() == 1) {
+      // Split into regions
+      // The table has one region only to begin with. The logic of
+      // blockUntilRegionSplit requires that the input regionName has performed a split. 
+      // If the table has already been split (i.e. regions count > 1), the same split
+      // call will be a no-op and this will cause blockUntilRegionSplit to break.
+      for (int i = 0; i < splitPoints.length; ++i) {
+        List<HRegionInfo> regions = hbaseAdmin.getTableRegions(tableName.getBytes());
+        HRegionInfo splitRegion = regions.get(regions.size() - 1);
+        hbaseAdmin.split(splitRegion.getRegionNameAsString(), splitPoints[i]);
+        blockUntilRegionSplit(conf, 50000, splitRegion.getRegionName(), true);
+      }
     }
     
     // Sort the region by start key
