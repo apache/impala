@@ -1579,7 +1579,7 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, " +
+        "DISTINCTPCSA, FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, " +
         "IDENTIFIER\n");
 
     // missing from
@@ -1606,7 +1606,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -1615,7 +1615,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, INTERVAL, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
