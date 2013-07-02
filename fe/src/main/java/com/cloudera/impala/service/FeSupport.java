@@ -48,6 +48,19 @@ public class FeSupport {
   public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
       byte[] thriftQueryGlobals);
 
+  // Writes a log message to glog
+  public native static void NativeLogger(
+      int severity, String msg, String filename, int line);
+
+  public static void LogToGlog(int severity, String msg, String filename, int line) {
+    try {
+      NativeLogger(severity, msg, filename, line);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+      NativeLogger(severity, msg, filename, line);
+    }
+  }
+
   public static TColumnValue EvalConstExpr(Expr expr, TQueryGlobals queryGlobals)
       throws InternalException {
     Preconditions.checkState(expr.isConstant());
@@ -116,4 +129,3 @@ public class FeSupport {
     }
   }
 }
-

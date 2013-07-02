@@ -40,6 +40,7 @@
 #include "util/thrift-server.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/Frontend_types.h"
 
 using namespace impala;
 using namespace std;
@@ -75,6 +76,45 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   return result_bytes;
 }
 
+// Called by the frontend to log messages to Glog
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeLogger(
+    JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
+    int line_number) {
+
+  // Mimic the behaviour of VLOG(1) by ignoring verbose log messages when appropriate.
+  if (severity == TLogSeverity::VERBOSE && !VLOG_IS_ON(1)) return;
+
+  // Unused required argument to GetStringUTFChars
+  jboolean is_copy;
+  const char* filename = env->GetStringUTFChars(file, &is_copy);
+  const char* str = env->GetStringUTFChars(msg, &is_copy);
+  int log_level;
+  switch (severity) {
+    case TLogSeverity::VERBOSE:
+      log_level = google::INFO;
+      break;
+    case TLogSeverity::INFO:
+      log_level = google::INFO;
+      break;
+    case TLogSeverity::WARN:
+      log_level = google::WARNING;
+      break;
+    case TLogSeverity::ERROR:
+      log_level = google::ERROR;
+      break;
+    case TLogSeverity::FATAL:
+      log_level = google::FATAL;
+      break;
+    default:
+      DCHECK(false) << "Unrecognised TLogSeverity: " << log_level;
+  }
+  google::LogMessage(filename, line_number, log_level).stream() << string(str);
+  env->ReleaseStringUTFChars(msg, str);
+  env->ReleaseStringUTFChars(file, filename);
+}
+
 namespace impala {
 
 void InitFeSupport() {
@@ -86,6 +126,14 @@ void InitFeSupport() {
   nm.fnPtr = reinterpret_cast<void*>(
       ::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr);
   env->RegisterNatives(native_backend_cl, &nm, 1);
+  EXIT_IF_EXC(env);
+
+  nm.name = const_cast<char*>("NativeLogger");
+  nm.signature = const_cast<char*>("(ILjava/lang/String;Ljava/lang/String;I)V");
+  nm.fnPtr = reinterpret_cast<void*>(
+      ::Java_com_cloudera_impala_service_FeSupport_NativeLogger);
+  env->RegisterNatives(native_backend_cl, &nm, 1);
+  EXIT_IF_EXC(env);
 }
 
 }

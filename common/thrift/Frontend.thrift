@@ -665,3 +665,12 @@ struct TExecRequest {
   // Request for LOAD DATA statements.
   7: optional TLoadDataReq load_data_request
 }
+
+// Convenience type to map between log4j levels and glog severity
+enum TLogSeverity {
+  VERBOSE,
+  INFO,
+  WARN,
+  ERROR,
+  FATAL
+}

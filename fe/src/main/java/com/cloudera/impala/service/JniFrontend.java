@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -49,6 +50,7 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.log4j.PropertyConfigurator;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -97,12 +99,28 @@ public class JniFrontend {
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
       String policyProviderClassName) throws InternalException {
+    InitLogging();
+
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.
     AuthorizationConfig authorizationConfig = new AuthorizationConfig(serverName,
         authorizationPolicyFile, policyProviderClassName);
     authorizationConfig.validateConfig();
     frontend = new Frontend(lazy, authorizationConfig);
+  }
+
+  /**
+   * Manually override Log4j root logger configuration. Any values in log4j.properties not
+   * overridden (that is, anything but the root logger and the base threshhold) will
+   * continue to have effect.
+   */
+  private static void InitLogging() {
+    Properties properties = new Properties();
+    properties.setProperty("log4j.appender.glog",
+                           GlogAppender.class.getName());
+    properties.setProperty("log4j.rootLogger", "info,glog");
+    properties.setProperty("log4j.threshhold", "INFO");
+    PropertyConfigurator.configure(properties);
   }
 
   /**
