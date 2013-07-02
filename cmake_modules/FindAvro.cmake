@@ -6,25 +6,25 @@
 #  AVRO_FOUND, whether Avro has been found
 
 set(AVRO_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-cpp-$ENV{IMPALA_AVRO_VERSION}/api
+  ${CMAKE_SOURCE_DIR}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src
 )
 
 set(AVRO_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-cpp-$ENV{IMPALA_AVRO_VERSION}
+  ${CMAKE_SOURCE_DIR}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src
 )
 
-find_path(AVRO_INCLUDE_DIR AvroSerialize.hh PATHS
+find_path(AVRO_INCLUDE_DIR schema.h PATHS
   ${AVRO_SEARCH_HEADER_PATHS}
   # make sure we don't accidentally pick up a different version
   NO_DEFAULT_PATH
 )
 
-find_library(AVRO_LIB_PATH NAMES avrocpp PATHS ${AVRO_SEARCH_LIB_PATH})
+find_library(AVRO_LIB_PATH NAMES avro PATHS ${AVRO_SEARCH_LIB_PATH})
 
 if (AVRO_LIB_PATH)
   set(AVRO_FOUND TRUE)
   set(AVRO_LIBS ${AVRO_SEARCH_LIB_PATH})
-  set(AVRO_STATIC_LIB ${AVRO_SEARCH_LIB_PATH}/libavrocpp_s.a)
+  set(AVRO_STATIC_LIB ${AVRO_SEARCH_LIB_PATH}/libavro.a)
 else ()
   set(AVRO_FOUND FALSE)
 endif ()

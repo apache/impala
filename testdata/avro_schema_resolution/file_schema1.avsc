@@ -1,0 +1,7 @@
+{"name": "a",
+ "type": "record",
+ "comment": "Contains a field not in the table and none of the table fields",
+ "fields": [
+    {"name":"boolean2", "type": {"type": "boolean", "note": "alternate primitive syntax"}}
+]
+}

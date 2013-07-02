@@ -1,0 +1,10 @@
+This folder contains the files necessary to test Impala support for Avro schema resolution
+(along with the TestAvroSchemaResolution query test).
+
+create_table.sql creates a functional_avro_snap.schema_resolution_test table and loads
+records1.avro and records2.avro. The .avro files were created via the following commands:
+
+java -jar ~/avro-tools-1.7.4.jar fromjson --schema-file file_schema1.avsc --codec snappy records1.json > records1.avro
+java -jar ~/avro-tools-1.7.4.jar fromjson --schema-file file_schema2.avsc --codec snappy records2.json > records2.avro
+
+create_table.sql, file_schema1.avsc and file_schema2.avsc contain the relevant schema definitions.

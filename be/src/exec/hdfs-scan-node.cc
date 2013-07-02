@@ -433,9 +433,7 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
   // TODO: we can push the lock to the mempool and exprs_values should not
   // use internal memory.
   unique_lock<recursive_mutex> l(lock_);
-  Tuple* template_tuple = 
-      reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
-  memset(template_tuple, 0, tuple_desc_->byte_size());
+  Tuple* template_tuple = InitEmptyTemplateTuple();
 
   for (int i = 0; i < partition_key_slots_.size(); ++i) {
     const SlotDescriptor* slot_desc = partition_key_slots_[i];
@@ -444,6 +442,14 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
     void* value = expr_values[slot_desc->col_pos()]->GetValue(NULL);
     RawValue::Write(value, template_tuple, slot_desc, NULL);
   }
+  return template_tuple;
+}
+
+Tuple* HdfsScanNode::InitEmptyTemplateTuple() {
+  unique_lock<recursive_mutex> l(lock_);
+  Tuple* template_tuple =
+      reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
+  memset(template_tuple, 0, tuple_desc_->byte_size());
   return template_tuple;
 }
 

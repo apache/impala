@@ -1,0 +1,10 @@
+====
+---- QUERY
+# see testdata/avro_schema_resolution
+select * from schema_resolution_test
+---- TYPES
+boolean, int, long, float, double, string, string, string
+---- RESULTS
+true,1,1,1,1,'default string','','NULL'
+false,2,2,2,2,'serialized string','','NULL'
+====

@@ -197,6 +197,11 @@ class HdfsScanNode : public ScanNode {
   // TODO: cache the tuple template in the partition object.
   Tuple* InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
 
+  // Allocates and return an empty template tuple (i.e. with no values filled in).
+  // Scanners can use this method to initialize a template tuple even if there are no
+  // materialized partition keys (e.g. to hold Avro default values).
+  Tuple* InitEmptyTemplateTuple();
+
   // Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
   HdfsFileDesc* GetFileDesc(const std::string& filename);
 

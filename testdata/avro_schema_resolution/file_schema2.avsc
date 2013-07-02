@@ -1,0 +1,13 @@
+{"name": "a",
+ "type": "record",
+ "comment": "Contains several of the table fields in reverse order plus an extra",
+ "fields": [
+    {"name":"boolean2", "type":"boolean"},
+    {"name":"string1",  "type":"string"},
+    {"name":"double1",  "type":"int", "comment": "type promotion"},
+    {"name":"float1",   "type":"int", "comment": "type promotion"},
+    {"name":"long1",    "type":"int", "comment": "type promotion"},
+    {"name":"int1",     "type":"int", "comment": "type promotion"},
+    {"name":"boolean1", "type":"boolean"}
+]
+}
