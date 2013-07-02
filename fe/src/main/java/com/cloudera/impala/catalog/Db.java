@@ -24,8 +24,8 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
+import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;

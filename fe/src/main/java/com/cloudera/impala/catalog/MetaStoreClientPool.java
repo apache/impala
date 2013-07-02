@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.cloudera.impala.common;
+package com.cloudera.impala.catalog;
 
 import java.util.Random;
 import java.util.UUID;

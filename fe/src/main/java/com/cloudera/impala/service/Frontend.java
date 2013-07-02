@@ -47,13 +47,13 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
@@ -544,7 +544,8 @@ public class Frontend {
       }
       if (addedNewPartition) {
         try {
-          // Update the last DDL time of the table.
+          // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
+          // if the alteration fails in the metastore.
           org.apache.hadoop.hive.metastore.api.Table msTbl =
               table.getMetaStoreTable().deepCopy();
           DdlExecutor.updateLastDdlTime(msTbl, msClient);

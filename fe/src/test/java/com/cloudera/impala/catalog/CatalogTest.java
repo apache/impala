@@ -24,7 +24,6 @@ import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.common.MetaStoreClientPool;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
