@@ -21,7 +21,7 @@ using namespace std;
 const string HdfsLzoTextScanner::LIB_IMPALA_LZO = "libimpalalzo.so";
 
 namespace impala {
-bool HdfsLzoTextScanner::library_load_attempted_;
+Status HdfsLzoTextScanner::library_load_status_;
 
 mutex HdfsLzoTextScanner::lzo_load_lock_;
 
@@ -47,32 +47,50 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
     HdfsScanNode* scan_node, const vector<HdfsFileDesc*>& files) {
   if (LzoIssueInitialRanges == NULL) {
     lock_guard<mutex> l(lzo_load_lock_);
-    if (!library_load_attempted_) {
-      library_load_attempted_ = true;
-      void* handle;
-      RETURN_IF_ERROR(DynamicOpen(state, LIB_IMPALA_LZO, RTLD_NOW, &handle));
-      RETURN_IF_ERROR(DynamicLookup(state, handle,
-          "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
-
-      if (strcmp((*GetImpalaBuildVersion)(), IMPALA_BUILD_VERSION) != 0) {
+    if (library_load_status_.ok()) {
+      // LzoIssueInitialRanges && library_load_status_.ok() means we haven't tried loading
+      // the library yet.
+      library_load_status_ = LoadLzoLibrary(state);
+      if (!library_load_status_.ok()) {
         stringstream ss;
-        ss << "Impala LZO library was built against Impala version "
-           << (*GetImpalaBuildVersion)() << ", but the running Impala version is "
-           << IMPALA_BUILD_VERSION << ". Make sure both packages are up to date.";
-        return Status(ss.str());
+        ss << "Error loading impala-lzo library. Check that the impala-lzo library "
+           << "is at version " << IMPALA_BUILD_VERSION;
+        library_load_status_.AddErrorMsg(ss.str());
+        return library_load_status_;
       }
-
-      RETURN_IF_ERROR(DynamicLookup(state, handle,
-          "CreateLzoTextScanner", reinterpret_cast<void**>(&CreateLzoTextScanner)));
-      RETURN_IF_ERROR(DynamicLookup(state, handle,
-          "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges)));
-      LOG(INFO) << "Loaded impala-lzo library: " << LIB_IMPALA_LZO;
+    } else {
+      // We only try to load the library once.
+      return library_load_status_;
     }
   }
-  // We only try to load the library once.  Just return status to
-  // avoid flooding the log.
-  if (LzoIssueInitialRanges == NULL) return Status("Lzo scanner load error");
+
   (*LzoIssueInitialRanges)(scan_node, files);
   return Status::OK;
 }
+
+Status HdfsLzoTextScanner::LoadLzoLibrary(RuntimeState* state) {
+  void* handle;
+  RETURN_IF_ERROR(DynamicOpen(state, LIB_IMPALA_LZO, RTLD_NOW, &handle));
+  RETURN_IF_ERROR(DynamicLookup(state, handle,
+      "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
+
+  if (strcmp((*GetImpalaBuildVersion)(), IMPALA_BUILD_VERSION) != 0) {
+    stringstream ss;
+    ss << "Impala LZO library was built against Impala version "
+       << (*GetImpalaBuildVersion)() << ", but the running Impala version is "
+       << IMPALA_BUILD_VERSION;
+    return Status(ss.str());
+  }
+
+  RETURN_IF_ERROR(DynamicLookup(state, handle,
+      "CreateLzoTextScanner", reinterpret_cast<void**>(&CreateLzoTextScanner)));
+  RETURN_IF_ERROR(DynamicLookup(state, handle,
+      "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges)));
+
+  DCHECK(CreateLzoTextScanner != NULL);
+  DCHECK(LzoIssueInitialRanges != NULL);
+  LOG(INFO) << "Loaded impala-lzo library: " << LIB_IMPALA_LZO;
+  return Status::OK;
+}
+
 }

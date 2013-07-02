@@ -26,8 +26,8 @@ class HdfsLzoTextScanner {
   // Impala LZO library name -- GPL code.
   const static std::string LIB_IMPALA_LZO;
 
-  // If true, then we have tried to load the LZO library.
-  static bool library_load_attempted_;
+  // If non-OK, then we have tried and failed to load the LZO library.
+  static Status library_load_status_;
 
   // Lock to protect loading of the lzo file library.
   static boost::mutex lzo_load_lock_;
@@ -39,6 +39,10 @@ class HdfsLzoTextScanner {
   // Dynamically linked function to set the initial scan ranges.
   static void (*LzoIssueInitialRanges)(
       HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
+
+  // Dynamically loads CreateLzoTextScanner and LzoIssueInitialRanges.
+  // lzo_load_lock_ should be taken before calling this method.
+  static Status LoadLzoLibrary(RuntimeState* state);
 };
 }
 #endif
