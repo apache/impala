@@ -21,10 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -41,14 +38,12 @@ import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -68,6 +63,20 @@ public class Catalog {
   private final boolean lazy;
   private int nextTableId;
   private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
+  // Cache of database metadata.
+  private final CatalogObjectCache<Db> dbCache = new CatalogObjectCache<Db>(
+      new CacheLoader<String, Db>() {
+        @Override
+        public Db load(String dbName) {
+          MetaStoreClient msClient = getMetaStoreClient();
+          try {
+            return Db.loadDb(Catalog.this, msClient.getHiveClient(),
+                dbName.toLowerCase(), lazy);
+          } finally {
+            msClient.release();
+          }
+        }
+      });
 
   private final ScheduledExecutorService policyReader =
       Executors.newScheduledThreadPool(1);
@@ -75,152 +84,6 @@ public class Catalog {
   // Lock used to synchronize refreshing the AuthorizationChecker.
   private final ReentrantReadWriteLock authzCheckerLock = new ReentrantReadWriteLock();
   private AuthorizationChecker authzChecker;
-
-  // map from db name to DB
-  private final LazyDbMap dbs = new LazyDbMap();
-
-  // Tracks whether a Table/Db has all of its metadata loaded.
-  enum MetadataLoadState {
-    LOADED,
-    UNINITIALIZED,
-  }
-
-  /**
-   * Lazily loads database metadata on read (through 'get') and tracks the valid/known
-   * database names. This class is thread safe.
-   *
-   * If a database has not yet been loaded successfully, get() will attempt to load it.
-   * It is only possible to load metadata for databases that are in the known db name
-   * map.
-   *
-   * Getting all the metadata is a heavy-weight operation, but Impala still needs
-   * to know what databases exist (one use case is for SHOW commands). To support this,
-   * there is a parallel mapping of known database names to their metadata load state.
-   * When Impala starts up (and on refresh commands) the database name map is populated
-   * with all database names available.
-   *
-   * Before loading any metadata, the database name map is checked to ensure the given
-   * database is "known". If it is not, no metadata is loaded and an exception
-   * is thrown.
-   */
-  private class LazyDbMap {
-    // Cache of Db metadata with a key of lower-case database name
-    private final LoadingCache<String, Db> dbMetadataCache =
-        CacheBuilder.newBuilder()
-            // TODO: Increase concurrency level once HIVE-3521 is resolved.
-            .concurrencyLevel(1)
-            .build(new CacheLoader<String, Db>() {
-              @Override
-              public Db load(String dbName) throws DatabaseNotFoundException {
-                return loadDb(dbName);
-              }
-            });
-
-    // Map of lower-case database names to their metadata load state. It is only possible
-    // to load metadata for databases that exist in this map.
-    private final ConcurrentMap<String, MetadataLoadState> dbNameMap = new MapMaker()
-        .makeMap();
-
-    /**
-     * Initializes the class without any database.
-     */
-    public LazyDbMap() {}
-
-    /**
-     * Add the database to the map and mark the metadata as uninitialized
-     */
-    public void add(String dbName) {
-      dbName = dbName.toLowerCase();
-      Preconditions.checkArgument(!dbNameMap.containsKey(dbName));
-      dbNameMap.put(dbName, MetadataLoadState.UNINITIALIZED);
-    }
-
-    /**
-     * Add the databases to the map and mark the metadata as uninitialized
-     */
-    public void add(List<String> dbNames) {
-      for (String dbName: dbNames) {
-        add(dbName);
-      }
-    }
-
-    /**
-     * Removes the database from the metadata cache
-     */
-    public void remove(String dbName) {
-      dbName = dbName.toLowerCase();
-      dbNameMap.remove(dbName);
-      dbMetadataCache.invalidate(dbName);
-    }
-
-    /**
-     * Returns all known database names.
-     */
-    public Set<String> getAllDbNames() {
-      return dbNameMap.keySet();
-    }
-
-    /**
-     * Returns the Db object corresponding to the supplied database name. The database
-     * name must exist in the database name map for the metadata load to succeed. Returns
-     * null if the database does not exist.
-     *
-     * The exact behavior is:
-     * - If the database already exists in the metadata cache, its value will be returned.
-     * - If the database is not present in the metadata cache AND the database exists in
-     *   the known database map the metadata will be loaded
-     * - If the database is not present the database name map, null is returned.
-     */
-    public Db get(String dbName) {
-      try {
-        return dbMetadataCache.get(dbName.toLowerCase());
-      } catch (ExecutionException e) {
-        // Search for the cause of the exception. If a load failed due to the database
-        // not being found, callers should get 'null' instead of having to handle the
-        // exception.
-        Throwable cause = e.getCause();
-        while(cause != null) {
-          if (cause instanceof DatabaseNotFoundException) {
-            return null;
-          }
-          cause = cause.getCause();
-        }
-        throw new IllegalStateException(e);
-      }
-    }
-
-    private Db loadDb(String dbName) throws DatabaseNotFoundException {
-      dbName = dbName.toLowerCase();
-      MetadataLoadState metadataState = dbNameMap.get(dbName);
-
-      // This database doesn't exist in the database name cache. Throw an exception.
-      if (metadataState == null) {
-        throw new DatabaseNotFoundException("Database not found: " + dbName);
-      }
-
-      // We should never have a case where we make it here and the metadata is marked
-      // as already loaded.
-      Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
-      MetaStoreClient msClient = getMetaStoreClient();
-      Db db = null;
-      try {
-        db = Db.loadDb(Catalog.this, msClient.getHiveClient(), dbName, lazy);
-      } finally {
-        msClient.release();
-      }
-
-      // Mark the metadata as loaded. If the database was removed while loading then
-      // throw a DatbaseNotFoundException.
-      if (dbNameMap.replace(dbName, MetadataLoadState.LOADED) == null) {
-        throw new DatabaseNotFoundException("Database not found: " + dbName);
-      }
-      return db;
-    }
-  }
-
-  public Catalog() {
-    this(true, true, AuthorizationConfig.createAuthDisabledConfig());
-  }
 
   /**
    * If lazy is true, tables are loaded on read, otherwise they are loaded eagerly in
@@ -233,7 +96,6 @@ public class Catalog {
     this.lazy = lazy;
     this.authzConfig = authzConfig;
     this.authzChecker = new AuthorizationChecker(authzConfig);
-
     // If authorization is enabled, reload the policy on a regular basis.
     if (authzConfig.isEnabled()) {
       // Stagger the reads across nodes
@@ -250,15 +112,15 @@ public class Catalog {
       MetaStoreClient msClient = metaStoreClientPool.getClient();
 
       try {
-        dbs.add(msClient.getHiveClient().getAllDatabases());
+        dbCache.add(msClient.getHiveClient().getAllDatabases());
       } finally {
         msClient.release();
       }
 
       if (!lazy) {
         // Load all the metadata
-        for (String dbName: dbs.getAllDbNames()) {
-          dbs.get(dbName);
+        for (String dbName: dbCache.getAllNames()) {
+          dbCache.get(dbName);
         }
       }
     } catch (Exception e) {
@@ -273,6 +135,10 @@ public class Catalog {
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
+  }
+
+  public Catalog() {
+    this(true, true, AuthorizationConfig.createAuthDisabledConfig());
   }
 
   private class AuthorizationPolicyReader implements Runnable {
@@ -298,14 +164,14 @@ public class Catalog {
    * uninitialized. Used by CREATE DATABASE statements.
    */
   public void addDb(String dbName) {
-    dbs.add(dbName);
+    dbCache.add(dbName);
   }
 
   /**
    * Removes a database from the metadata cache. Used by DROP DATABASE statements.
    */
   public void removeDb(String dbName) {
-    dbs.remove(dbName);
+    dbCache.remove(dbName);
   }
 
   /**
@@ -369,7 +235,11 @@ public class Catalog {
   private Db getDbInternal(String dbName) {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
-    return dbs.get(dbName);
+    try {
+      return dbCache.get(dbName);
+    } catch (ImpalaException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   /**
@@ -387,7 +257,7 @@ public class Catalog {
     } else {
       checkAccess(user, pb.allOf(privilege).onDb(dbName).toRequest());
     }
-    return dbs.get(dbName);
+    return getDbInternal(dbName);
   }
 
   /**
@@ -436,7 +306,7 @@ public class Catalog {
    * metadata requests (for example, populating the debug webpage Catalog view).
    */
   public List<String> getDbNames(String dbPattern, User user) {
-    List<String> matchingDbs = filterStringsByPattern(dbs.getAllDbNames(), dbPattern);
+    List<String> matchingDbs = filterStringsByPattern(dbCache.getAllNames(), dbPattern);
 
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
