@@ -305,17 +305,17 @@ functions = [
         'ConditionalFunctions::IfTimestamp', ['if']],
 
   ['Conditional_IsNull', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   ['Conditional_IsNull', 'INT', ['INT', 'INT'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   ['Conditional_IsNull', 'BIGINT', ['BIGINT', 'BIGINT'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   ['Conditional_IsNull', 'DOUBLE', ['DOUBLE', 'DOUBLE'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull','ifnull', 'nvl']],
   ['Conditional_IsNull', 'STRING', ['STRING', 'STRING'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   ['Conditional_IsNull', 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], \
-        'ConditionalFunctions::IsNull', ['isnull']],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   
   ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], \
         'ConditionalFunctions::CoalesceBool', ['coalesce']],
