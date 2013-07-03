@@ -48,6 +48,7 @@
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
+#include "util/hdfs-bulk-ops.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -490,12 +491,14 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   return query_status_;
 }
 
+
 Status Coordinator::FinalizeQuery() {
   // All backends must have reported their final statuses before finalization,
   // which is a post-condition of Wait.
   DCHECK(has_called_wait_);
   DCHECK(needs_finalization_);
 
+  VLOG_QUERY << "Finalizing query: " << query_id_;
   SCOPED_TIMER(finalization_timer_);
   hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
 
@@ -506,11 +509,15 @@ Status Coordinator::FinalizeQuery() {
   // INSERT finalization happens in the four following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
+  HdfsOperationSet partition_create_ops(&hdfs_connection);
   BOOST_FOREACH(const PartitionRowCount::value_type& partition,
       partition_row_counts_) {
-    stringstream ss;
+    SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
+          "FinalizationTimer"));
+    stringstream part_path_ss;
     // Fully-qualified partition path
-    ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
+    part_path_ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
+    const string part_path = part_path_ss.str();
     if (finalize_params_.is_overwrite) {
       if (partition.first.empty()) {
         // If the root directory is written to, then the table must not be partitioned
@@ -522,65 +529,88 @@ Status Coordinator::FinalizeQuery() {
         // be used to store permanent non-table data by other applications).
         int num_files = 0;
         hdfsFileInfo* existing_files =
-            hdfsListDirectory(hdfs_connection, ss.str().c_str(), &num_files);
+            hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
         if (existing_files == NULL) {
-          return AppendHdfsErrorMessage("Could not list directory: ", ss.str());
+          return AppendHdfsErrorMessage("Could not list directory: ", part_path);
         }
         Status delete_status = Status::OK;
         for (int i = 0; i < num_files; ++i) {
           if (existing_files[i].mKind == kObjectKindFile) {
-            VLOG(2) << "Deleting: " << string(existing_files[i].mName);
-            if (hdfsDelete(hdfs_connection, existing_files[i].mName, 1) == -1) {
-              delete_status = Status(AppendHdfsErrorMessage("Failed to delete existing "
-                  "HDFS file as part of INSERT OVERWRITE query: ",
-                  string(existing_files[i].mName)));
-              break;
-            }
+            partition_create_ops.Add(DELETE, string(existing_files[i].mName));
           }
         }
         hdfsFreeFileInfo(existing_files, num_files);
         RETURN_IF_ERROR(delete_status);
       } else {
         // This is a partition directory, not the root directory; we can delete
-        // recursively with abandon, after checking it was ever created.
-        if (hdfsExists(hdfs_connection, ss.str().c_str()) != -1) {
-          // TODO: There's a potential race here between checking for the directory
-          // and a third-party deleting it.
-          if (hdfsDelete(hdfs_connection, ss.str().c_str(), 1) == -1) {
-            return Status(AppendHdfsErrorMessage("Failed to delete partition directory "
-                    "as part of INSERT OVERWRITE query: ", ss.str()));
-          }
+        // recursively with abandon, after checking that it ever existed.
+        // TODO: There's a potential race here between checking for the directory
+        // and a third-party deleting it.
+        if (hdfsExists(hdfs_connection, part_path.c_str()) != -1) {
+          partition_create_ops.Add(DELETE_THEN_CREATE, part_path);
+        } else {
+          // Otherwise just create the directory.
+          partition_create_ops.Add(CREATE_DIR, part_path);
+        }
+      }
+    } else {
+      partition_create_ops.Add(CREATE_DIR, part_path);
+    }
+  }
+
+  {
+    SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
+          "FinalizationTimer"));
+    if (!partition_create_ops.Execute(exec_env_->hdfs_op_thread_pool(), false)) {
+      BOOST_FOREACH(const HdfsOperationSet::Error& err, partition_create_ops.errors()) {
+        // It's ok to ignore errors creating the directories, since they may already
+        // exist. If there are permission errors, we'll run into them later.
+        if (err.first->op() != CREATE_DIR) {
+          stringstream ss;
+          ss << "Error(s) deleting partition directories. First error (of "
+             << partition_create_ops.errors().size() << ") was: " << err.second;
+          return Status(ss.str());
         }
       }
     }
-    // Ignore error if directory already exists
-    hdfsCreateDirectory(hdfs_connection, ss.str().c_str());
   }
 
   // 3. Move all tmp files
-  set<string> tmp_dirs_to_delete;
+  HdfsOperationSet move_ops(&hdfs_connection);
+  HdfsOperationSet dir_deletion_ops(&hdfs_connection);
+
   BOOST_FOREACH(FileMoveMap::value_type& move, files_to_move_) {
-    // Empty destination means delete (which we do in a separate
-    // pass because we may not have processed the contents of this
-    // dir yet)
+    // Empty destination means delete, so this is a directory. These get deleted in a
+    // separate pass to ensure that we have moved all the contents of the directory first.
     if (move.second.empty()) {
-      tmp_dirs_to_delete.insert(move.first);
+      VLOG_ROW << "Deleting file: " << move.first;
+      dir_deletion_ops.Add(DELETE, move.first);
     } else {
       VLOG_ROW << "Moving tmp file: " << move.first << " to " << move.second;
-      if (hdfsRename(hdfs_connection, move.first.c_str(), move.second.c_str()) == -1) {
-        stringstream ss;
-        ss << "Could not move HDFS file: " << move.first << " to desintation: "
-           << move.second;
-        return AppendHdfsErrorMessage(ss.str());
-      }
+      move_ops.Add(RENAME, move.first, move.second);
+    }
+  }
+
+  {
+    SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "FileMoveTimer", "FinalizationTimer"));
+    if (!move_ops.Execute(exec_env_->hdfs_op_thread_pool(), false)) {
+      stringstream ss;
+      ss << "Error(s) moving partition files. First error (of "
+         << move_ops.errors().size() << ") was: " << move_ops.errors()[0].second;
+      return Status(ss.str());
     }
   }
 
   // 4. Delete temp directories
-  BOOST_FOREACH(const string& tmp_path, tmp_dirs_to_delete) {
-    if (hdfsDelete(hdfs_connection, tmp_path.c_str(), 1) == -1) {
-      return Status(AppendHdfsErrorMessage("Failed to delete temporary directory: ",
-          tmp_path));
+  {
+    SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "FileDeletionTimer",
+         "FinalizationTimer"));
+    if (!dir_deletion_ops.Execute(exec_env_->hdfs_op_thread_pool(), false)) {
+      stringstream ss;
+      ss << "Error(s) deleting staging directories. First error (of "
+         << dir_deletion_ops.errors().size() << ") was: "
+         << dir_deletion_ops.errors()[0].second;
+      return Status(ss.str());
     }
   }
 

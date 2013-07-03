@@ -252,6 +252,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
 //TODO: Clean up temporary files on error.
 Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
+  SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
   stringstream filename;
   filename << output_partition->tmp_hdfs_file_name_template
       << "." << output_partition->num_files;
@@ -432,6 +433,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
   if (partition->tmp_hdfs_file == NULL) return Status::OK;
+  SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
   RETURN_IF_ERROR(partition->writer->Finalize());
   // Track total number of appended rows per partition in runtime
   // state. partition->num_rows counts number of rows appended is per-file.

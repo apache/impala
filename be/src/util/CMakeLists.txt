@@ -35,6 +35,7 @@ add_library(Util
   default-path-handlers.cc
   disk-info.cc
   hdfs-util.cc
+  hdfs-bulk-ops.cc
   impalad-metrics.cc
   jni-util.cc
   logging.cc

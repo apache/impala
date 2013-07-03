@@ -357,26 +357,31 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
       exec_request().query_exec_request.stmt_type != TStmtType::DML) {
     return Status::OK;
   }
+
+  query_events_->MarkEvent("DML data written");
+  SCOPED_TIMER(ADD_TIMER(&server_profile_, "MetastoreUpdateTimer"));
+
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
-  if (!query_exec_request.__isset.finalize_params) return Status::OK;
+  if (query_exec_request.__isset.finalize_params) {
+    TFinalizeParams& finalize_params = query_exec_request.finalize_params;
+    TCatalogUpdate catalog_update;
+    if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
+      VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
+                 << query_id() << ")";
+    } else {
+      // TODO: We track partitions written to, not created, which means
+      // that we do more work than is necessary, because written-to
+      // partitions don't always require a metastore change.
+      VLOG_QUERY << "Updating metastore with " << catalog_update.created_partitions.size()
+                 << " altered partitions ("
+                 << join (catalog_update.created_partitions, ", ") << ")";
 
-  TFinalizeParams& finalize_params = query_exec_request.finalize_params;
-  TCatalogUpdate catalog_update;
-  if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
-    VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
-               << query_id() << ")";
-  } else {
-    // TODO: We track partitions written to, not created, which means
-    // that we do more work than is necessary, because written-to
-    // partitions don't always require a metastore change.
-    VLOG_QUERY << "Updating metastore with " << catalog_update.created_partitions.size()
-               << " altered partitions ("
-               << join (catalog_update.created_partitions, ", ") << ")";
-
-    catalog_update.target_table = finalize_params.table_name;
-    catalog_update.db_name = finalize_params.table_db;
-    RETURN_IF_ERROR(frontend_->UpdateMetastore(catalog_update));
+      catalog_update.target_table = finalize_params.table_name;
+      catalog_update.db_name = finalize_params.table_db;
+      RETURN_IF_ERROR(frontend_->UpdateMetastore(catalog_update));
+    }
   }
+  query_events_->MarkEvent("DML Metastore update finished");
   return Status::OK;
 }
 

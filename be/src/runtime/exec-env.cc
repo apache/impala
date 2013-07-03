@@ -44,16 +44,18 @@ using namespace boost;
 DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
-DECLARE_int32(be_port);
-DECLARE_string(mem_limit);
-
 DEFINE_string(state_store_host, "localhost",
-              "hostname where StateStoreService is running");
+    "hostname where StateStoreService is running");
 DEFINE_int32(state_store_subscriber_port, 23000,
-             "port where StateStoreSubscriberService should be exported");
+    "port where StateStoreSubscriberService should be exported");
+DEFINE_int32(num_hdfs_worker_threads, 16,
+    "(Advanced) The number of threads in the global HDFS operation pool");
+
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
+DECLARE_int32(be_port);
+DECLARE_string(mem_limit);
 
 namespace impala {
 
@@ -67,6 +69,8 @@ ExecEnv::ExecEnv()
     metrics_(new Metrics()),
     mem_tracker_(NULL),
     thread_mgr_(new ThreadResourceMgr),
+    hdfs_op_thread_pool_(
+        CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
@@ -105,6 +109,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     metrics_(new Metrics()),
     mem_tracker_(NULL),
     thread_mgr_(new ThreadResourceMgr),
+    hdfs_op_thread_pool_(
+        CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()) {
   if (FLAGS_use_statestore && statestore_port > 0) {
