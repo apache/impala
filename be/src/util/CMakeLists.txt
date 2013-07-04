@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Without this option Mongoose looks up the SSL library at run-time
+# and may not guess the correct name on some distributions
+SET_SOURCE_FILES_PROPERTIES(${MONGOOSE_SRC_DIR}/mongoose.c PROPERTIES
+  COMPILE_FLAGS -DNO_SSL_DL)
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
@@ -57,7 +61,7 @@ add_library(Webserver STATIC
   webserver.cc
 )
 
-target_link_libraries(Webserver pthread dl Util)
+target_link_libraries(Webserver pthread dl Util ssl)
 
 add_executable(network-perf-benchmark network-perf-benchmark.cc)
 add_executable(parquet-reader parquet-reader.cc)
