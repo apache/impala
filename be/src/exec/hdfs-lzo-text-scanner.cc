@@ -30,7 +30,7 @@ const char* (*GetImpalaBuildVersion)();
 HdfsScanner* (*HdfsLzoTextScanner::CreateLzoTextScanner)(
     HdfsScanNode* scan_node, RuntimeState* state);
 
-void (*HdfsLzoTextScanner::LzoIssueInitialRanges)(
+Status (*HdfsLzoTextScanner::LzoIssueInitialRanges)(
     HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
 
 HdfsScanner* HdfsLzoTextScanner::GetHdfsLzoTextScanner(
@@ -64,8 +64,7 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
     }
   }
 
-  (*LzoIssueInitialRanges)(scan_node, files);
-  return Status::OK;
+  return (*LzoIssueInitialRanges)(scan_node, files);
 }
 
 Status HdfsLzoTextScanner::LoadLzoLibrary(RuntimeState* state) {

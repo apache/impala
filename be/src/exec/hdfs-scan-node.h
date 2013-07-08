@@ -173,12 +173,11 @@ class HdfsScanNode : public ScanNode {
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
       int64_t partition_id, int disk_id);
 
-  // Adds a scan range to the disk io mgr queue.  Scanners should queue to the io
-  // mgr using this if possible so the ranges are sent to the io mgr in batches.
-  void AddDiskIoRange(DiskIoMgr::ScanRange* range);
+  // Adds ranges to the io mgr queue and starts up new scanner threads if possible.
+  Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
 
   // Adds all splits for file_desc to the io mgr queue.
-  void AddDiskIoRanges(const HdfsFileDesc* file_desc);
+  Status AddDiskIoRanges(const HdfsFileDesc* file_desc);
 
   // Indicates that this file_desc's scan ranges have all been issued to the IoMgr.
   // For each file, the scanner must call MarkFileDescIssued() or AddDiskIoRanges().
@@ -356,6 +355,10 @@ class HdfsScanNode : public ScanNode {
   // happening in the scanners vs other parts of the execution.
   AtomicInt<int> num_owned_io_buffers_;
 
+  // The number of times a token was offered but no scanner threads started.
+  // This is used for diagnostics only.
+  AtomicInt<int> num_skipped_tokens_;
+
   // Counters which track the number of scanners that have codegen enabled for the
   // materialize and conjuncts evaluation code paths.
   AtomicInt<int> num_scanners_codegen_enabled_;
@@ -380,16 +383,13 @@ class HdfsScanNode : public ScanNode {
   // Setting this to true triggers the scanner threads to clean up.
   bool done_;
 
-  // Set to true if a new scanner thread should be started when a token is available.
-  // This is set to true when ranges are issued to the IoMgr and set to false when
-  // the IoMgr returns NULL for GetNextRange.
-  bool should_start_scanner_thread_;
+  // Set to true if all ranges have started. Some of the ranges may still be in
+  // flight being processed by scanner threads, but no new ScannerThreads 
+  // should be started.
+  bool all_ranges_started_;
 
   // Pool for allocating partition key tuple and string buffers
   boost::scoped_ptr<MemPool> partition_key_pool_;
-
-  // The queue of all ranges that have not been sent to the io mgr.
-  std::vector<DiskIoMgr::ScanRange*> queued_ranges_;
 
   // Status of failed operations.  This is set in the ScannerThreads
   // Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup 
@@ -409,10 +409,9 @@ class HdfsScanNode : public ScanNode {
 
   // Called when scanner threads are available for this scan node. This will
   // try to spin up as many scanner threads as the quota allows.
+  // This is also called whenever a new range is added to the IoMgr to 'pull'
+  // thread tokens if they are available.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
-
-  // Issue all queued ranges to the io mgr.
-  Status IssueQueuedRanges();
 
   // Create a new scanner for this partition type.
   // If the scanner cannot be created return NULL.

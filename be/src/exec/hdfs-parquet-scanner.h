@@ -51,7 +51,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // Issue just the footer range for each file.  We'll then parse the footer and pick
   // out the columns we want.
-  static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
  private:
   // Size of the file footer.  This is a guess.  If this value is too little, we will

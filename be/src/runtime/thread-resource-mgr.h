@@ -135,6 +135,8 @@ class ThreadResourceMgr {
       return num_required_threads() + num_optional_threads();
     }
 
+    int num_reserved_optional_threads() { return num_reserved_optional_threads_; }
+
     // Returns true if the number of optional threads has now exceeded the quota.
     bool optional_exceeded() {
       // Cache this so optional/required are computed based on the same value.

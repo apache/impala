@@ -71,7 +71,10 @@ class DiskIoMgrTest : public testing::Test {
       DiskIoMgr::BufferDescriptor* buffer = NULL;
       Status status = range->GetNext(&buffer);
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
-      if (buffer == NULL || !status.ok()) break;
+      if (buffer == NULL || !status.ok()) {
+        if (buffer != NULL) buffer->Return();
+        break;
+      }
       memcpy(result + range->offset() + buffer->scan_range_offset(), 
           buffer->buffer(), buffer->len());
       buffer->Return();
@@ -395,12 +398,12 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     // Keep reading new ranges without returning buffers. This forces us
     // to go over the limit eventually.
     while (true) {
+      memset(result, 0, strlen(data) + 1);
       DiskIoMgr::ScanRange* range = NULL;
       status = io_mgr.GetNextRange(reader, &range);
       ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
       if (range == NULL) break;
       
-      memset(result, 0, strlen(data) + 1);
       while (true) {
         DiskIoMgr::BufferDescriptor* buffer = NULL;
         Status status = range->GetNext(&buffer);
@@ -410,7 +413,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
             buffer->buffer(), buffer->len());
         buffers.push_back(buffer);
       }
-      ValidateEmptyOrCorrect(result, data, strlen(data));
+      ValidateEmptyOrCorrect(data, result, strlen(data));
     }
 
     for (int i = 0; i < buffers.size(); ++i) {

@@ -106,10 +106,24 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   ++reader_->num_buffers_in_reader_;
   --reader_->num_ready_buffers_;
   --reader_->num_used_buffers_;
-  RETURN_IF_ERROR((*buffer)->status_);
+
+  Status status = (*buffer)->status_;
+  if (!status.ok()) {
+    (*buffer)->Return();
+    *buffer = NULL;
+    return status;
+  }
   
   unique_lock<mutex> reader_lock(reader_->lock_);
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
+  if (reader_->state_ == ReaderContext::Cancelled) {
+    reader_->blocked_ranges_.Remove(this);
+    Cancel();
+    (*buffer)->Return();
+    *buffer = NULL;
+    return reader_->status_;
+  }
+
   bool was_blocked = blocked_on_queue_;
   blocked_on_queue_ = ready_buffers_.size() >= ready_buffers_capacity_;
   if (was_blocked && !blocked_on_queue_ && !eosr_queued_) {
@@ -204,9 +218,10 @@ void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader
   eosr_queued_= false;
   eosr_returned_= false;
   blocked_on_queue_ = false;
-  if (ready_buffers_capacity_ == 0) {
+  if (ready_buffers_capacity_ <= 0) {
     ready_buffers_capacity_ = reader->initial_scan_range_queue_capacity();
-  }
+    DCHECK_GE(ready_buffers_capacity_, MIN_QUEUE_CAPACITY);
+  } 
   DCHECK(Validate()) << DebugString();
 }
 

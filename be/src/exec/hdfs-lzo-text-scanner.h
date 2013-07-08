@@ -37,7 +37,7 @@ class HdfsLzoTextScanner {
       (HdfsScanNode* scan_node, RuntimeState* state);
 
   // Dynamically linked function to set the initial scan ranges.
-  static void (*LzoIssueInitialRanges)(
+  static Status (*LzoIssueInitialRanges)(
       HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
 
   // Dynamically loads CreateLzoTextScanner and LzoIssueInitialRanges.

@@ -36,7 +36,7 @@ class ScannerContext;
 class BaseSequenceScanner : public HdfsScanner {
  public:
   // Issue the initial ranges for all sequence container files.
-  static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
   virtual Status Prepare(ScannerContext* context);
   virtual Status Close();

@@ -116,35 +116,60 @@ TEST(InternalQueue, TestRemove) {
 }
 
 const int VALIDATE_INTERVAL = 10000;
+
+// CHECK() is not thread safe so return the result in *failed.
 void ProducerThread(InternalQueue<IntNode>* queue, int num_inserts, 
-    vector<IntNode>& nodes, AtomicInt<int32_t>* counter) {
-  for (int i = 0; i < num_inserts; ++i) {
+    vector<IntNode>& nodes, AtomicInt<int32_t>* counter, bool* failed) {
+  for (int i = 0; i < num_inserts && !*failed; ++i) {
     // Get the next index to queue.
     AtomicInt<int32_t> value = (*counter)++;
     IntNode* node = &nodes[value];
     node->value = value;
     queue->Enqueue(node);
-    if (i % VALIDATE_INTERVAL == 0) ASSERT_TRUE(queue->Validate());
+    if (i % VALIDATE_INTERVAL == 0) {
+      if (!queue->Validate()) *failed = true;
+    }
   }
 }
 
 void ConsumerThread(InternalQueue<IntNode>* queue, int num_consumes, int delta,
-    vector<int>* results) {
+    vector<int>* results, bool* failed) {
   // Dequeued nodes should be strictly increasing.
   int previous_value = -1;
-  for (int i = 0; i < num_consumes;) {
+  for (int i = 0; i < num_consumes && !*failed;) {
     IntNode* node = queue->Dequeue();
     if (node == NULL) continue;
     ++i;
     if (delta > 0) {
-      ASSERT_EQ(node->value, previous_value + delta);
+      if (node->value != previous_value + delta) *failed = true;
     } else if (delta == 0) {
-      ASSERT_GT(node->value, previous_value);
+      if (node->value <= previous_value) *failed = true;
     }
     results->push_back(node->value);
     previous_value = node->value;
-    if (i % VALIDATE_INTERVAL == 0) ASSERT_TRUE(queue->Validate());
+    if (i % VALIDATE_INTERVAL == 0) {
+      if (!queue->Validate()) *failed = true;
+    }
   }
+}
+
+TEST(InternalQueue, TestClear) {
+  vector<IntNode> nodes;
+  nodes.resize(100);
+  InternalQueue<IntNode> queue;
+  queue.Enqueue(&nodes[0]);
+  queue.Enqueue(&nodes[1]);
+  queue.Enqueue(&nodes[2]);
+  
+  queue.Clear();
+  ASSERT_TRUE(queue.Validate());
+  ASSERT_TRUE(queue.empty());
+  
+  queue.Enqueue(&nodes[0]);
+  queue.Enqueue(&nodes[1]);
+  queue.Enqueue(&nodes[2]);
+  ASSERT_TRUE(queue.Validate());
+  ASSERT_EQ(queue.size(), 3);
 }
 
 TEST(InternalQueue, TestSingleProducerSingleConsumer) {
@@ -154,17 +179,20 @@ TEST(InternalQueue, TestSingleProducerSingleConsumer) {
   vector<int> results;
 
   InternalQueue<IntNode> queue;
-  ProducerThread(&queue, nodes.size(), nodes, &counter);
-  ConsumerThread(&queue, nodes.size(), 1, &results);
+  bool failed = false;
+  ProducerThread(&queue, nodes.size(), nodes, &counter, &failed);
+  ConsumerThread(&queue, nodes.size(), 1, &results, &failed);
+  ASSERT_TRUE(!failed);
   ASSERT_TRUE(queue.empty());
   ASSERT_EQ(results.size(), nodes.size());
 
   counter = 0;
   results.clear();
-  thread producer_thread(ProducerThread, &queue, nodes.size(), nodes, &counter);
-  thread consumer_thread(ConsumerThread, &queue, nodes.size(), 1, &results);
+  thread producer_thread(ProducerThread, &queue, nodes.size(), nodes, &counter, &failed);
+  thread consumer_thread(ConsumerThread, &queue, nodes.size(), 1, &results, &failed);
   producer_thread.join();
   consumer_thread.join();
+  ASSERT_TRUE(!failed);
   ASSERT_TRUE(queue.empty());
   ASSERT_EQ(results.size(), nodes.size());
 }
@@ -173,6 +201,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
   vector<IntNode> nodes;
   nodes.resize(1000000);
 
+  bool failed = false;
   for (int num_producers = 1; num_producers < 5; num_producers += 3) {
     AtomicInt<int32_t> counter;
     const int NUM_CONSUMERS = 4;
@@ -184,37 +213,39 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
     vector<vector<int> > results;
     results.resize(NUM_CONSUMERS);
 
+    int expected_delta = -1;
+    if (NUM_CONSUMERS == 1 && num_producers == 1) {
+      // With one producer and consumer, the queue should have sequential values.
+      expected_delta = 1;
+    } else if (num_producers == 1) {
+      // With one producer, the values added are sequential but can be read off
+      // with gaps in each consumer thread.  E.g. thread1 reads: 1, 4, 5, 7, etc.
+      // but they should be strictly increasing.
+      expected_delta = 0;
+    } else {
+      // With multiple producers there isn't a guarantee on the order values get
+      // enqueued.
+      expected_delta = -1;
+    }
+    
     InternalQueue<IntNode> queue;
     thread_group consumers;
     thread_group producers;
 
     for (int i = 0; i < num_producers; ++i) {
       producers.add_thread(
-          new thread(ProducerThread, &queue, num_per_producer, nodes, &counter));
+          new thread(ProducerThread, &queue, num_per_producer, nodes, &counter, &failed));
     }
 
     for (int i = 0; i < NUM_CONSUMERS; ++i) {
-      int expected_delta = -1;
-      if (NUM_CONSUMERS == 1 && num_producers == 1) {
-        // With one producer and consumer, the queue should have sequential values.
-        expected_delta = 1;
-      } else if (num_producers == 1) {
-        // With one producer, the values added are sequential but can be read off
-        // with gaps in each consumer thread.  E.g. thread1 reads: 1, 4, 5, 7, etc.
-        // but they should be strictly increasing.
-        expected_delta = 0;
-      } else {
-        // With multiple producers there isn't a guarantee on the order values get
-        // enqueued.
-        expected_delta = -1;
-      }
-      consumers.add_thread(new thread(
-          ConsumerThread, &queue, num_per_consumer, expected_delta, &results[i]));
+      consumers.add_thread(new thread(ConsumerThread, 
+          &queue, num_per_consumer, expected_delta, &results[i], &failed));
     }
 
     producers.join_all();
     consumers.join_all();
     ASSERT_TRUE(queue.empty());
+    ASSERT_TRUE(!failed);
 
     vector<int> all_results;
     for (int i = 0; i < NUM_CONSUMERS; ++i) {
@@ -234,6 +265,5 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
-
   return RUN_ALL_TESTS();
 }

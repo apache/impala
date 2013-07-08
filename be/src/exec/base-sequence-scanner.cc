@@ -29,11 +29,12 @@ const int BaseSequenceScanner::SYNC_MARKER = -1;
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-void BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
+Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
     const vector<HdfsFileDesc*>& files) {
   // Issue just the header range for each file.  When the header is complete,
   // we'll issue the splits for that file.  Splits cannot be processed until the
   // header is parsed (the header object is then shared across splits for that file).
+  vector<DiskIoMgr::ScanRange*> header_ranges;
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
         reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
@@ -41,8 +42,10 @@ void BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     // 1 queue for each NIC as well?
     DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(
         files[i]->filename.c_str(), HEADER_SIZE, 0, metadata->partition_id, -1);
-    scan_node->AddDiskIoRange(header_range);
+    header_ranges.push_back(header_range);
   }
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges));
+  return Status::OK;
 }
   
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,

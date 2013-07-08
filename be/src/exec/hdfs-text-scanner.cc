@@ -48,12 +48,13 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
 HdfsTextScanner::~HdfsTextScanner() {
 }
 
-void HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
+Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
     const vector<HdfsFileDesc*>& files) {
   // Text just issues all ranges at once
   for (int i = 0; i < files.size(); ++i) {
-    scan_node->AddDiskIoRanges(files[i]);
+    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(files[i]));
   }
+  return Status::OK;
 }
 
 Status HdfsTextScanner::ProcessSplit() {

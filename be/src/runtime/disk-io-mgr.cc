@@ -212,8 +212,8 @@ DiskIoMgr::~DiskIoMgr() {
     int disk_id = disk_queues_[i]->disk_id;
     for (list<ReaderContext*>::iterator it = disk_queues_[i]->readers.begin();
         it != disk_queues_[i]->readers.end(); ++it) {
-      DCHECK_EQ((*it)->disk_states_[disk_id].num_threads_in_read, 0);
-      DCHECK((*it)->disk_states_[disk_id].done);
+      DCHECK_EQ((*it)->disk_states_[disk_id].num_threads_in_read(), 0);
+      DCHECK((*it)->disk_states_[disk_id].done());
       (*it)->DecrementDiskRefCount();
     }
   }
@@ -382,21 +382,21 @@ Status DiskIoMgr::AddScanRanges(ReaderContext* reader,
       DCHECK_NE(ranges[i]->len(), 0);
       ScanRange* range = ranges[i];
       ReaderContext::PerDiskState& state = reader->disk_states_[range->disk_id_];
-      if (state.done) {
-        DCHECK_EQ(state.num_remaining_ranges, 0);
-        state.done = false;
+      if (state.done()) {
+        DCHECK_EQ(state.num_remaining_ranges(), 0);
+        state.set_done(false);
         ++num_new_disks;
         ++reader->num_disks_with_ranges_;
       }
       if (schedule_immediately) {
         reader->ScheduleScanRange(range);
       } else {
-        state.unstarted_ranges.Enqueue(range);
+        state.unstarted_ranges()->Enqueue(range);
       }
-      if (state.next_range_to_start == NULL) {
-        reader->ScheduleOnDisk(range->disk_id());
+      if (state.next_range_to_start() == NULL) {
+        state.ScheduleReader(reader, range->disk_id());
       }
-      ++state.num_remaining_ranges;
+      ++state.num_remaining_ranges();
     }
     if (!schedule_immediately) reader->num_unstarted_ranges_ += ranges.size();
     DCHECK(reader->Validate()) << endl << reader->DebugString();
@@ -436,10 +436,10 @@ Status DiskIoMgr::GetNextRange(ReaderContext* reader, ScanRange** range) {
       *range = reader->ready_to_start_ranges_.Dequeue();
       DCHECK(*range != NULL);
       int disk_id = (*range)->disk_id();
-      DCHECK(*range == reader->disk_states_[disk_id].next_range_to_start);
+      DCHECK(*range == reader->disk_states_[disk_id].next_range_to_start());
       // Set this to NULL, the next time this disk runs for this reader, it will
       // get another range ready.
-      reader->disk_states_[disk_id].next_range_to_start = NULL;
+      reader->disk_states_[disk_id].set_next_range_to_start(NULL);
       reader->ScheduleScanRange(*range);
       break;
     }
@@ -594,17 +594,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       disk_queue->readers.pop_front();
       DCHECK(*reader != NULL);
       reader_disk_state = &((*reader)->disk_states_[disk_id]);
-
-      // Increment the ref count on reader.  We need to track the number of threads per
-      // reader per disk that are in the unlocked hdfs read code section. This is updated
-      // by multiple threads without a lock so we need to use an atomic int.
-      ++reader_disk_state->num_threads_in_read;
-
-      // Setting is_on_queue = false is what publishes the updates to other threads that
-      // do not have the disk lock. When this flag is flipped, we need to make sure all
-      // prior updates are seen so put a memory barrier here.
-      __sync_synchronize();
-      reader_disk_state->is_on_queue = false;
+      reader_disk_state->IncrementReadThreadAndDequeue();
     }
 
     // NOTE: no locks were taken in between.  We need to be careful about what state
@@ -637,27 +627,21 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
 
     // Check if reader has been cancelled
     if ((*reader)->state_ == ReaderContext::Cancelled) {
-      --reader_disk_state->num_threads_in_read;
-      if (reader_disk_state->num_threads_in_read == 0) {
-        if (!reader_disk_state->done && !reader_disk_state->is_on_queue) {
-          (*reader)->DecrementDiskRefCount();
-          reader_disk_state->done = true;
-        }
-      }
+      reader_disk_state->DecrementReadThreadAndCheckDone(*reader);
       continue;
     }
 
     DCHECK_EQ((*reader)->state_, ReaderContext::Active) << (*reader)->DebugString();
 
-    if (reader_disk_state->next_range_to_start == NULL && 
-        !reader_disk_state->unstarted_ranges.empty()) {
+    if (reader_disk_state->next_range_to_start() == NULL && 
+        !reader_disk_state->unstarted_ranges()->empty()) {
       // We don't have a range queued for this disk for what the caller should
       // read next. Populate that.  We want to have one range waiting to minimize
       // wait time in GetNextRange.
-      ScanRange* new_range = reader_disk_state->unstarted_ranges.Dequeue();
+      ScanRange* new_range = reader_disk_state->unstarted_ranges()->Dequeue();
       --(*reader)->num_unstarted_ranges_;
       (*reader)->ready_to_start_ranges_.Enqueue(new_range);
-      reader_disk_state->next_range_to_start = new_range;
+      reader_disk_state->set_next_range_to_start(new_range);
         
       if ((*reader)->num_unstarted_ranges_ == 0) {
         // All the ranges have been started, notify everyone blocked on GetNextRange.
@@ -669,22 +653,22 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       }
     }
     
-    // Get the next scan range to work on from the reader. Only in_flight_ranges_
+    // Get the next scan range to work on from the reader. Only in_flight_ranges
     // are eligible since the disk threads do not start new ranges on their own.
 
     // There are no inflight ranges, nothing to do.
-    if (reader_disk_state->in_flight_ranges.empty()) {
-      --reader_disk_state->num_threads_in_read;
+    if (reader_disk_state->in_flight_ranges()->empty()) {
+      reader_disk_state->DecrementReadThread();
       continue;
     }
-    DCHECK_GT(reader_disk_state->num_remaining_ranges, 0);
-    *range = reader_disk_state->in_flight_ranges.Dequeue();
+    DCHECK_GT(reader_disk_state->num_remaining_ranges(), 0);
+    *range = reader_disk_state->in_flight_ranges()->Dequeue();
     DCHECK(*range != NULL);
     DCHECK_LT((*range)->bytes_read_, (*range)->len_);
 
     // Now that we've picked a scan range, put the reader back on the queue so
     // another thread can pick up another scan range for this reader.
-    (*reader)->ScheduleOnDisk(disk_id);
+    reader_disk_state->ScheduleReader(*reader, disk_id);
     DCHECK((*reader)->Validate()) << endl << (*reader)->DebugString();
     return true;
   }
@@ -699,20 +683,11 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
 
   ReaderContext::PerDiskState& state = reader->disk_states_[disk_queue->disk_id];
   DCHECK(reader->Validate()) << endl << reader->DebugString();
-  DCHECK_GT(state.num_threads_in_read, 0);
+  DCHECK_GT(state.num_threads_in_read(), 0);
   DCHECK(buffer->buffer_ != NULL);
 
-  // This variable is updated in the disk thread (GetScanRange) without the
-  // reader lock.  Therefore, we need to use an atomic update.
-  --state.num_threads_in_read;
-
   if (reader->state_ == ReaderContext::Cancelled) {
-    if (!state.is_on_queue && state.num_threads_in_read == 0 && !state.done) {
-      // This thread is the last one for this reader on this disk, do final
-      // cleanup
-      reader->DecrementDiskRefCount();
-      state.done = true;
-    }
+    state.DecrementReadThreadAndCheckDone(reader);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
     ReturnFreeBuffer(reader, buffer->buffer_);
     buffer->buffer_ = NULL;
@@ -734,11 +709,11 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     ReturnFreeBuffer(reader, buffer->buffer_);
     buffer->buffer_ = NULL;
     buffer->eosr_ = true;
-    --state.num_remaining_ranges;
+    --state.num_remaining_ranges();
     buffer->scan_range_->Cancel();
   } else if (buffer->eosr_) {
     buffer->scan_range_->CloseScanRange(reader->hdfs_connection_, reader);
-    --state.num_remaining_ranges;
+    --state.num_remaining_ranges();
   } 
 
   bool queue_full = buffer->scan_range_->EnqueueBuffer(buffer);
@@ -749,6 +724,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
       reader->ScheduleScanRange(buffer->scan_range_);
     }
   } 
+  state.DecrementReadThread();
 }
 
 // The thread waits until there is work or the entire system is being shut down.  

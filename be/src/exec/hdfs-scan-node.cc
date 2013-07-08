@@ -72,7 +72,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
-      should_start_scanner_thread_(false),
+      all_ranges_started_(false),
       counters_reported_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
@@ -450,6 +450,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
   }
   
+  // We need at least one scanner thread to make progress. We need to make this
+  // reservation before any ranges are issued.
+  runtime_state_->resource_pool()->ReserveOptionalTokens(1);
+  runtime_state_->resource_pool()->SetThreadAvailableCb(
+      bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
+  
   return Status::OK;
 }
 
@@ -525,41 +531,29 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     done_ = true;
     return Status::OK;
   }
-
+  
   stringstream ss;
   ss << "Splits complete (node=" << id() << "):";
   progress_ = ProgressUpdater(ss.str(), total_splits);
 
   // Issue initial ranges for all file types.
-  HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]);
-  BaseSequenceScanner::IssueInitialRanges(this, 
-      per_type_files[THdfsFileFormat::SEQUENCE_FILE]);
-  BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files[THdfsFileFormat::RC_FILE]);
-  BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files[THdfsFileFormat::AVRO]);
-  HdfsParquetScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::PARQUET]);
+  RETURN_IF_ERROR(
+      HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this, 
+      per_type_files[THdfsFileFormat::SEQUENCE_FILE]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+      per_type_files[THdfsFileFormat::RC_FILE]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+      per_type_files[THdfsFileFormat::AVRO]));
+  RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this, 
+        per_type_files[THdfsFileFormat::PARQUET]));
   if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
     // This will dlopen the lzo binary and can fail if it is not present
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
         this, per_type_files[THdfsFileFormat::LZO_TEXT]));
   }
 
-  if (progress_.done()) {
-    // No scan ranges queued, nothing to do
-    DCHECK_EQ(queued_ranges_.size(), 0);
-    done_ = true;
-    return Status::OK;
-  }
-  
-  // We need at least one scanner thread to make progress.
-  runtime_state_->resource_pool()->ReserveOptionalTokens(1);
-  runtime_state_->resource_pool()->SetThreadAvailableCb(
-      bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
-
-  // scanners have added their initial ranges, issue the first batch to the io mgr.
-  IssueQueuedRanges();
-  
+  done_ = progress_.done();
   return Status::OK;
 }
 
@@ -601,38 +595,25 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   return ExecNode::Close(state);
 }
 
-void HdfsScanNode::AddDiskIoRange(DiskIoMgr::ScanRange* range) {
-  unique_lock<mutex> lock(lock_);
-  queued_ranges_.push_back(range);
+Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges) {
+  RETURN_IF_ERROR(
+      runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
+  ThreadTokenAvailableCb(runtime_state_->resource_pool());
+  return Status::OK;
 }
 
-void HdfsScanNode::AddDiskIoRanges(const HdfsFileDesc* desc) {
-  const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
-  {
-    unique_lock<mutex> lock(lock_);
-    for (int j = 0; j < splits.size(); ++j) {
-      queued_ranges_.push_back(splits[j]);
-    }
-  }
+Status HdfsScanNode::AddDiskIoRanges(const HdfsFileDesc* desc) {
+  const vector<DiskIoMgr::ScanRange*>& ranges = desc->splits;
+  RETURN_IF_ERROR(
+      runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
   MarkFileDescIssued(desc);
+  ThreadTokenAvailableCb(runtime_state_->resource_pool());
+  return Status::OK;
 }
 
 void HdfsScanNode::MarkFileDescIssued(const HdfsFileDesc* desc) {
   DCHECK_GT(num_unqueued_files_, 0);
-  if (--num_unqueued_files_ == 0) IssueQueuedRanges();
-}
-
-Status HdfsScanNode::IssueQueuedRanges() {
-  {
-    unique_lock<mutex> lock(lock_);
-    if (queued_ranges_.empty()) return Status::OK;
-    RETURN_IF_ERROR(
-        runtime_state_->io_mgr()->AddScanRanges(reader_context_, queued_ranges_));
-    queued_ranges_.clear();
-    should_start_scanner_thread_ = true;
-  }
-  ThreadTokenAvailableCb(runtime_state_->resource_pool());
-  return Status::OK;
+  --num_unqueued_files_;
 }
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
@@ -661,14 +642,17 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 
   unique_lock<mutex> lock(lock_);
   if (done_) return;
-  if (!should_start_scanner_thread_) return;
+  if (all_ranges_started_) return;
 
+  bool started_scanner = false;
   while (active_scanner_thread_counter_.value() < progress_.remaining() &&
       pool->TryAcquireThreadToken()) {
     COUNTER_UPDATE(&active_scanner_thread_counter_, 1);
     COUNTER_UPDATE(num_scanner_threads_started_counter_, 1);
     scanner_threads_.add_thread(new thread(&HdfsScanNode::ScannerThread, this));
+    started_scanner = true;
   }
+  if (!started_scanner) ++num_skipped_tokens_;
 }
 
 inline void HdfsScanNode::ScannerThreadHelper() {
@@ -741,12 +725,12 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       return;
     } 
 
-    if (scan_range == NULL) {
-      // GetScanRange returned NULL indicating that every range queued so far
-      // has been started.
-      unique_lock<mutex> l(lock_);
-      should_start_scanner_thread_ = false;
-      return;
+    if (scan_range == NULL && num_unqueued_files_ == 0) {
+      // All ranges have been queued and GetNextRange() returned NULL. This
+      // means that every range is either done or being processed by
+      // another thread.
+      all_ranges_started_ = true;
+      break;
     }
   } 
 }

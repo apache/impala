@@ -39,7 +39,7 @@ class HdfsTextScanner : public HdfsScanner {
   virtual Status Close();
 
   // Issue io manager byte ranges for 'files'
-  static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
+  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
   // Codegen writing tuples and evaluating predicates
   static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);

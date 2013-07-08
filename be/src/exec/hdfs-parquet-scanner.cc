@@ -39,8 +39,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
+Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
+  vector<DiskIoMgr::ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
     for (int j = 0; j < files[i]->splits.size(); ++j) {
       DiskIoMgr::ScanRange* split = files[i]->splits[j];
@@ -68,9 +69,11 @@ void HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
           files[i]->filename.c_str(), FOOTER_SIZE,
           footer_start, metadata->partition_id, files[i]->splits[0]->disk_id());
-      scan_node->AddDiskIoRange(footer_range);
+      footer_ranges.push_back(footer_range);
     }
   }
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges));
+  return Status::OK;
 }
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state) 

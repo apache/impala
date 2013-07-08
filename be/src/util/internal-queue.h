@@ -55,6 +55,7 @@ class InternalQueue {
     DCHECK(node->next == NULL);
     DCHECK(node->prev == NULL);
     DCHECK(node->parent_queue == NULL);
+    node->parent_queue = this;
     {
       ScopedSpinLock lock(&lock_);
       if (tail_ != NULL) tail_->next = node;
@@ -63,7 +64,6 @@ class InternalQueue {
       if (head_ == NULL) head_ = node;
       ++size_;
     }
-    node->parent_queue = this;
   }
 
   // Dequeues an element from the queue's head. Returns NULL if the queue
@@ -82,6 +82,7 @@ class InternalQueue {
         head_->prev = NULL;
       }
     }
+    DCHECK(result != NULL);
     result->next = result->prev = NULL;
     result->parent_queue = NULL;
     return result;
@@ -130,8 +131,9 @@ class InternalQueue {
     Node* cur = head_;
     while (cur != NULL) {
       Node* tmp = cur;
-      tmp->prev = tmp->next = tmp->parent_queue = NULL;
       cur = cur->next;
+      tmp->prev = tmp->next = NULL;
+      tmp->parent_queue = NULL;
     }
     size_ = 0;
     head_ = tail_ = NULL;

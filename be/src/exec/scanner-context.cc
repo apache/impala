@@ -162,7 +162,6 @@ Status ScannerContext::Stream::GetRawBytes(uint8_t** out_buffer, int* len, bool*
 
 Status ScannerContext::Stream::GetBytesInternal(int requested_len,
     uint8_t** out_buffer, bool peek, int* out_len, bool* eos) {
-  ScopedCounter scoped_counter(&parent_->scan_node_->active_scanner_thread_counter_, 1);
   *out_len = 0;
   *out_buffer = NULL;
   *eos = true;

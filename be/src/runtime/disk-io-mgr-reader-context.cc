@@ -43,10 +43,10 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
     for (int i = 0; i < disk_states_.size(); ++i) {
       ReaderContext::PerDiskState& state = disk_states_[i];
       ScanRange* range = NULL;
-      while ((range = state.in_flight_ranges.Dequeue()) != NULL) {
+      while ((range = state.in_flight_ranges()->Dequeue()) != NULL) {
         range->Cancel();
       }
-      while ((range = state.unstarted_ranges.Dequeue()) != NULL) {
+      while ((range = state.unstarted_ranges()->Dequeue()) != NULL) {
         range->Cancel();
       }
     }
@@ -62,7 +62,8 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
     // Schedule reader on all disks. The disks will notice it is cancelled and do any
     // required cleanup
     for (int i = 0; i < disk_states_.size(); ++i) {
-      ScheduleOnDisk(i);
+      ReaderContext::PerDiskState& state = disk_states_[i];
+      state.ScheduleReader(this, i);
     }
   }
   
@@ -100,6 +101,7 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemLimit* limit) {
   num_used_buffers_ = 0;
   num_buffers_in_reader_ = 0;
   num_ready_buffers_ = 0;
+  total_range_queue_capacity_ = 0;
   num_finished_ranges_ = 0;
   bytes_read_local_ = 0;
   bytes_read_short_circuit_ = 0;
@@ -136,12 +138,12 @@ string DiskIoMgr::ReaderContext::DebugString() const {
        << " #disks=" << num_disks_with_ranges_;
     for (int i = 0; i < disk_states_.size(); ++i) {
       ss << endl << "   " << i << ": "
-         << "is_on_queue=" << disk_states_[i].is_on_queue
-         << " done=" << disk_states_[i].done
-         << " #num_remaining_scan_ranges=" << disk_states_[i].num_remaining_ranges
-         << " #in_flight_ranges=" << disk_states_[i].in_flight_ranges.size()
-         << " #unstarted_ranges=" << disk_states_[i].unstarted_ranges.size()
-         << " #reading_threads=" << disk_states_[i].num_threads_in_read;
+         << "is_on_queue=" << disk_states_[i].is_on_queue()
+         << " done=" << disk_states_[i].done()
+         << " #num_remaining_scan_ranges=" << disk_states_[i].num_remaining_ranges()
+         << " #in_flight_ranges=" << disk_states_[i].in_flight_ranges()->size()
+         << " #unstarted_ranges=" << disk_states_[i].unstarted_ranges()->size()
+         << " #reading_threads=" << disk_states_[i].num_threads_in_read();
     }
   }
   ss << ")";
@@ -155,7 +157,6 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   }
 
   int num_disks_with_ranges = 0;
-  int num_reading_threads = 0;
 
   if (num_used_buffers_ < 0) {
     LOG(WARNING) << "num_used_buffers_ < 0: #used=" << num_used_buffers_;
@@ -170,49 +171,63 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   int total_unstarted_ranges = 0;
   for (int i = 0; i < disk_states_.size(); ++i) {
     const PerDiskState& state = disk_states_[i];
-    num_reading_threads += state.num_threads_in_read;
-    total_unstarted_ranges += state.unstarted_ranges.size();
+    bool on_queue = state.is_on_queue();
+    int num_reading_threads = state.num_threads_in_read();
 
-    if (state.num_remaining_ranges > 0) ++num_disks_with_ranges;
-    if (state.num_threads_in_read < 0) {
+    total_unstarted_ranges += state.unstarted_ranges()->size();
+
+    if (state.num_remaining_ranges() > 0) ++num_disks_with_ranges;
+    if (num_reading_threads < 0) {
       LOG(WARNING) << "disk_id=" << i
                    << "state.num_threads_in_read < 0: #threads="
-                   << state.num_threads_in_read;
+                   << num_reading_threads;
       return false;
     }
 
     if (state_ != ReaderContext::Cancelled) {
-      if (state.unstarted_ranges.size() + state.in_flight_ranges.size() >
-          state.num_remaining_ranges) {
+      if (state.unstarted_ranges()->size() + state.in_flight_ranges()->size() >
+          state.num_remaining_ranges()) {
         LOG(WARNING) << "disk_id=" << i
                      << " state.unstarted_ranges.size() + state.in_flight_ranges.size()"
                      << " > state.num_remaining_ranges:"
-                     << " #unscheduled=" << state.unstarted_ranges.size()
-                     << " #in_flight=" << state.in_flight_ranges.size()
-                     << " #remaining=" << state.num_remaining_ranges;
+                     << " #unscheduled=" << state.unstarted_ranges()->size()
+                     << " #in_flight=" << state.in_flight_ranges()->size()
+                     << " #remaining=" << state.num_remaining_ranges();
         return false;
       }
 
       // If we have an in_flight range, the reader must be on the queue or have a
       // thread actively reading for it.
-      if (!state.in_flight_ranges.empty() && !state.is_on_queue && 
-          state.num_threads_in_read == 0) {
+      if (!state.in_flight_ranges()->empty() && !on_queue && num_reading_threads == 0) {
         LOG(WARNING) << "disk_id=" << i
                      << " reader has inflight ranges but is not on the disk queue."
-                     << " #in_flight_ranges=" << state.in_flight_ranges.size()
-                     << " #reading_threads=" << state.num_threads_in_read;
+                     << " #in_flight_ranges=" << state.in_flight_ranges()->size()
+                     << " #reading_threads=" << num_reading_threads
+                     << " on_queue=" << on_queue;
         return false;
       }
 
-      if (state.done && state.num_threads_in_read > 0) {
+      if (state.done() && num_reading_threads > 0) {
         LOG(WARNING) << "disk_id=" << i
                      << " state set to done but there are still threads working."
-                     << " #reading_threads=" << state.num_threads_in_read;
+                     << " #reading_threads=" << num_reading_threads;
+        return false;
+      }
+    } else {
+      // Is Cancelled
+      if (!state.in_flight_ranges()->empty()) {
+        LOG(WARNING) << "disk_id=" << i
+                     << "Reader cancelled but has in flight ranges.";
+        return false;
+      }
+      if (!state.unstarted_ranges()->empty()) {
+        LOG(WARNING) << "disk_id=" << i
+                     << "Reader cancelled but has unstarted ranges.";
         return false;
       }
     }
 
-    if (state.done && state.is_on_queue) {
+    if (state.done() && on_queue) {
       LOG(WARNING) << "disk_id=" << i
                    << " state set to done but the reader is still on the disk queue."
                    << " state.done=true and state.is_on_queue=true";
@@ -223,7 +238,16 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   if (state_ != ReaderContext::Cancelled) {
     if (total_unstarted_ranges != num_unstarted_ranges_) {
       LOG(WARNING) << "total_unstarted_ranges=" << total_unstarted_ranges
-                  << " sum_in_states=" << num_unstarted_ranges_;
+                   << " sum_in_states=" << num_unstarted_ranges_;
+      return false;
+    }
+  } else {
+    if (!ready_to_start_ranges_.empty()) {
+      LOG(WARNING) << "Reader cancelled but has ready to start ranges.";
+      return false;
+    }
+    if (!blocked_ranges_.empty()) {
+      LOG(WARNING) << "Reader cancelled but has blocked ranges.";
       return false;
     }
   }
