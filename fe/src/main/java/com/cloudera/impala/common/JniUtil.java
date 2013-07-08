@@ -19,10 +19,16 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 
+import org.apache.thrift.TBase;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+
 /**
  * Utility class with methods intended for JNI clients
  */
 public class JniUtil {
+
 
   /**
    * Returns a formatted string containing the simple exception name and the
@@ -53,5 +59,20 @@ public class JniUtil {
     Writer output = new StringWriter();
     t.printStackTrace(new PrintWriter(output));
     return output.toString();
+  }
+
+  /**
+   * Deserialize a serialized form of a Thrift data structure to its object form.
+   */
+  public static <T extends TBase<?, ?>> void deserializeThrift(
+      TBinaryProtocol.Factory protocolFactory, T result, byte[] thriftData)
+          throws ImpalaException {
+    // TODO: avoid creating deserializer for each query?
+    TDeserializer deserializer = new TDeserializer(protocolFactory);
+    try {
+      deserializer.deserialize(result, thriftData);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 }

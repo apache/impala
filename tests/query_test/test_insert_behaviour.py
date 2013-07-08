@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-from common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 import time
 import pytest
 

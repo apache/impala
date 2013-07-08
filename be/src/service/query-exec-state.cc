@@ -16,21 +16,27 @@
 #include "service/impala-server.h"
 #include "service/frontend.h"
 
-#include "exec/ddl-executor.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+
+#include "gen-cpp/CatalogService.h"
+#include "gen-cpp/CatalogService_types.h"
 
 using namespace std;
 using namespace boost;
 using namespace boost::uuids;
 using namespace beeswax;
 
+DECLARE_int32(catalog_service_port);
+DECLARE_string(catalog_service_host);
+
 namespace impala {
 
 ImpalaServer::QueryExecState::QueryExecState(
     ExecEnv* exec_env, Frontend* frontend,
+    ImpalaServer* server,
     shared_ptr<SessionState> session,
     const TSessionState& query_session_state, const string& sql_stmt)
   : sql_stmt_(sql_stmt),
@@ -47,6 +53,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     current_batch_row_(0),
     num_rows_fetched_(0),
     frontend_(frontend),
+    parent_server_(server),
     start_time_(TimestampValue::local_time_micros()) {
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
   client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
@@ -96,16 +103,19 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       return Status::OK;
     }
     case TStmtType::DDL: {
-      summary_profile_.AddInfoString("DDL Type", PrintTDdlType(ddl_type()));
-      if (exec_request_.ddl_exec_request.ddl_type == TDdlType::USE) {
-        lock_guard<mutex> l(parent_session_->lock);
-        parent_session_->database = exec_request_.ddl_exec_request.use_db_params.db;
-        return Status::OK;
+      string op_type = catalog_op_type() == TCatalogOpType::DDL ?
+         PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
+      summary_profile_.AddInfoString("DDL Type", op_type);
+
+      if (catalog_op_type() != TCatalogOpType::DDL &&
+          catalog_op_type() != TCatalogOpType::RESET_METADATA) {
+        Status status = ExecLocalCatalogOp(exec_request_.catalog_op_request);
+        lock_guard<mutex> l(lock_);
+        return UpdateQueryStatus(status);
       }
 
-      ddl_executor_.reset(new DdlExecutor(frontend_));
-      Status status = ddl_executor_->Exec(exec_request_.ddl_exec_request,
-          query_session_state_);
+      catalog_op_executor_.reset(new CatalogOpExecutor());
+      Status status = catalog_op_executor_->Exec(exec_request->catalog_op_request);
       {
         lock_guard<mutex> l(lock_);
         RETURN_IF_ERROR(UpdateQueryStatus(status));
@@ -115,15 +125,24 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       // after executing the CREATE TABLE statement (the INSERT portion of the operation).
       // The exception is if the user specified IF NOT EXISTS and the table already
       // existed, in which case we do not execute the INSERT.
-      if (ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
-        if (ddl_executor_->exec_response()->new_table_created) {
+      if (catalog_op_type() == TCatalogOpType::DDL &&
+          ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+        if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
           // At this point, the remainder of the CTAS request executes
-          // like a normal DML request.
+          // like a normal DML request. As with other DML requests, it will
+          // wait for another catalog update if any partitions were altered as a result
+          // of the operation.
           DCHECK(exec_request_.__isset.query_exec_request);
           RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
         } else {
-          DCHECK(exec_request_.ddl_exec_request.create_table_params.if_not_exists);
+          DCHECK(exec_request_.catalog_op_request.
+              ddl_params.create_table_params.if_not_exists);
         }
+      } else {
+        // CREATE TABLE AS SELECT waits for its catalog update once the DML
+        // portion of the operation has completed.
+        parent_server_->WaitForCatalogUpdate(
+            *catalog_op_executor_->update_catalog_result());
       }
       return Status::OK;
     }
@@ -134,12 +153,81 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
           frontend_->LoadData(exec_request_.load_data_request, &response));
       request_result_set_.reset(new vector<TResultRow>);
       request_result_set_->push_back(response.load_summary);
+
+      // Now refresh the table metadata.
+      TCatalogOpRequest reset_req;
+      reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
+      reset_req.__set_reset_metadata_params(TResetMetadataRequest());
+      reset_req.reset_metadata_params.__set_is_refresh(true);
+      reset_req.reset_metadata_params.__set_table_name(
+          exec_request_.load_data_request.table_name);
+      catalog_op_executor_.reset(new CatalogOpExecutor());
+      RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
+      parent_server_->WaitForCatalogUpdate(
+          *catalog_op_executor_->update_catalog_result());
       return Status::OK;
     }
     default:
       stringstream errmsg;
       errmsg << "Unknown  exec request stmt type: " << exec_request->stmt_type;
       return Status(errmsg.str());
+  }
+}
+
+Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
+    const TCatalogOpRequest& catalog_op) {
+  switch (catalog_op.op_type) {
+    case TCatalogOpType::USE: {
+      lock_guard<mutex> l(parent_session_->lock);
+      parent_session_->database = exec_request_.catalog_op_request.use_db_params.db;
+      return Status::OK;
+    }
+    case TCatalogOpType::SHOW_TABLES: {
+      const TShowTablesParams* params = &catalog_op.show_tables_params;
+      // A NULL pattern means match all tables. However, Thrift string types can't
+      // be NULL in C++, so we have to test if it's set rather than just blindly
+      // using the value.
+      const string* table_name =
+          params->__isset.show_pattern ? &(params->show_pattern) : NULL;
+      TGetTablesResult table_names;
+      RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
+          &query_session_state_, &table_names));
+      SetResultSet(table_names.tables);
+      return Status::OK;
+    }
+    case TCatalogOpType::SHOW_DBS: {
+      const TShowDbsParams* params = &catalog_op.show_dbs_params;
+      TGetDbsResult db_names;
+      const string* db_pattern =
+          params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(
+          frontend_->GetDbNames(db_pattern, &query_session_state_, &db_names));
+      SetResultSet(db_names.dbs);
+      return Status::OK;
+    }
+    case TCatalogOpType::SHOW_FUNCTIONS: {
+      const TShowFunctionsParams* params = &catalog_op.show_fns_params;
+      TGetFunctionsResult functions;
+      const string* fn_pattern =
+          params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(frontend_->GetFunctions(
+          params->type, params->db, fn_pattern, &query_session_state_, &functions));
+      SetResultSet(functions.fn_signatures);
+      return Status::OK;
+    }
+    case TCatalogOpType::DESCRIBE: {
+      TDescribeTableResult response;
+      RETURN_IF_ERROR(frontend_->DescribeTable(catalog_op.describe_table_params,
+          &response));
+      // Set the result set
+      request_result_set_.reset(new vector<TResultRow>(response.results));
+      return Status::OK;
+    }
+    default: {
+      stringstream ss;
+      ss << "Unexpected TCatalogOpType: " << catalog_op.op_type;
+      return Status(ss.str());
+    }
   }
 }
 
@@ -197,10 +285,13 @@ void ImpalaServer::QueryExecState::Done() {
   query_events_->MarkEvent("Unregister query");
 }
 
+
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
-  ddl_executor_.reset(new DdlExecutor(frontend_));
-  RETURN_IF_ERROR(ddl_executor_->Exec(exec_request));
-  result_metadata_ = ddl_executor_->result_set_metadata();
+  TMetadataOpResponse metadata_op_result;
+  RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
+      &metadata_op_result));
+  result_metadata_ = metadata_op_result.result_set_metadata;
+  request_result_set_.reset(new vector<TResultRow>(metadata_op_result.results));
   return Status::OK;
 }
 
@@ -264,13 +355,10 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
   if (eos_) return Status::OK;
 
-  if (ddl_executor_ != NULL || request_result_set_ != NULL) {
-    // DDL / EXPLAIN / LOAD
-    DCHECK(ddl_executor_ == NULL || request_result_set_ == NULL);
+  if (request_result_set_ != NULL) {
     query_state_ = QueryState::FINISHED;
     int num_rows = 0;
-    const vector<TResultRow>& all_rows = (ddl_executor_ != NULL) ?
-        ddl_executor_->result_set() : (*(request_result_set_.get()));
+    const vector<TResultRow>& all_rows = (*(request_result_set_.get()));
     // max_rows <= 0 means no limit
     while ((num_rows < max_rows || max_rows <= 0)
         && num_rows_fetched_ < all_rows.size()) {
@@ -364,7 +452,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
     TFinalizeParams& finalize_params = query_exec_request.finalize_params;
-    TCatalogUpdate catalog_update;
+    TUpdateMetastoreRequest catalog_update;
     if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << query_id() << ")";
@@ -378,7 +466,18 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
 
       catalog_update.target_table = finalize_params.table_name;
       catalog_update.db_name = finalize_params.table_db;
-      RETURN_IF_ERROR(frontend_->UpdateMetastore(catalog_update));
+
+      ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
+          FLAGS_catalog_service_port, ThriftServer::ThreadPool);
+      RETURN_IF_ERROR(client.Open());
+
+      LOG(INFO) << "Executing FinalizeDml() using CatalogService";
+      TUpdateMetastoreResponse resp;
+      client.iface()->UpdateMetastore(resp, catalog_update);
+      Status status(resp.result.status);
+      if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
+      RETURN_IF_ERROR(status);
+      parent_server_->WaitForCatalogUpdate(resp.result);
     }
   }
   query_events_->MarkEvent("DML Metastore update finished");
@@ -407,12 +506,22 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   return Status::OK;
 }
 
+void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
+  request_result_set_.reset(new vector<TResultRow>);
+  request_result_set_->resize(results.size());
+  for (int i = 0; i < results.size(); ++i) {
+    (*request_result_set_.get())[i].__isset.colVals = true;
+    (*request_result_set_.get())[i].colVals.resize(1);
+    (*request_result_set_.get())[i].colVals[0].__set_stringVal(results[i]);
+  }
+}
+
 void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   DCHECK(ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
   int total_num_rows_inserted = 0;
   // There will only be rows inserted in the case a new table was created
   // as part of this operation.
-  if (ddl_executor_->exec_response()->new_table_created) {
+  if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
     BOOST_FOREACH(const PartitionRowCount::value_type& p,
         coord_->partition_row_counts()) {
@@ -423,7 +532,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   ss << "Inserted " << total_num_rows_inserted << " row(s)";
   LOG(INFO) << ss.str();
   vector<string> results(1, ss.str());
-  ddl_executor_->SetResultSet(results);
+  SetResultSet(results);
 }
 
 }

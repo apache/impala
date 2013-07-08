@@ -140,8 +140,8 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   // There is no query text available because this metadata operation
   // comes from an RPC which does not provide the query text.
   // TODO: Consider reconstructing the query text from the metadata operation.
-  exec_state.reset(
-      new QueryExecState(exec_env_, frontend_.get(), session, TSessionState(), "N/A"));
+  exec_state.reset(new QueryExecState(exec_env_,
+      frontend_.get(), this, session, TSessionState(), "N/A"));
   Status register_status = RegisterQuery(session, exec_state);
   if (!register_status.ok()) {
     status->__set_statusCode(

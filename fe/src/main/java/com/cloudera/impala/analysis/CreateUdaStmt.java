@@ -21,8 +21,8 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
-import com.cloudera.impala.thrift.TCreateUdaParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TUda;
 
 /**
  * Represents a CREATE AGGREGATE FUNCTION statement.
@@ -55,14 +55,14 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
   @Override
   public TCreateFunctionParams toThrift() {
     TCreateFunctionParams params = super.toThrift();
-    TCreateUdaParams udaParams = new TCreateUdaParams();
-    udaParams.setUpdate_fn_name(uda_.getUpdateFnName());
-    udaParams.setInit_fn_name(uda_.getInitFnName());
-    udaParams.setSerialize_fn_name(uda_.getSerializeFnName());
-    udaParams.setMerge_fn_name(uda_.getMergeFnName());
-    udaParams.setFinalize_fn_name(uda_.getFinalizeFnName());
-    udaParams.setIntermediate_type(uda_.getIntermediateType().toThrift());
-    params.setUda_params(udaParams);
+    TUda udaFn = new TUda();
+    udaFn.setUpdate_fn_name(uda_.getUpdateFnName());
+    udaFn.setInit_fn_name(uda_.getInitFnName());
+    udaFn.setSerialize_fn_name(uda_.getSerializeFnName());
+    udaFn.setMerge_fn_name(uda_.getMergeFnName());
+    udaFn.setFinalize_fn_name(uda_.getFinalizeFnName());
+    udaFn.setIntermediate_type(uda_.getIntermediateType().toThrift());
+    params.getFn().setUda(udaFn);
     return params;
   }
 

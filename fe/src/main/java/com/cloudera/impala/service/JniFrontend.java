@@ -18,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.InvalidObjectException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Enumeration;
@@ -36,12 +35,8 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HAUtil;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Appender;
 import org.apache.log4j.FileAppender;
-import org.apache.log4j.PropertyConfigurator;
-import org.apache.thrift.TBase;
-import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -51,14 +46,11 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TCatalogUpdate;
+import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TClientRequest;
-import com.cloudera.impala.thrift.TDdlExecRequest;
-import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
@@ -68,12 +60,12 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TInternalCatalogUpdateRequest;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
-import com.cloudera.impala.thrift.TResetMetadataParams;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 
@@ -83,10 +75,8 @@ import com.google.common.base.Preconditions;
  */
 public class JniFrontend {
   private final static Logger LOG = LoggerFactory.getLogger(JniFrontend.class);
-
   private final static TBinaryProtocol.Factory protocolFactory =
       new TBinaryProtocol.Factory();
-
   private final Frontend frontend;
 
   /**
@@ -108,22 +98,7 @@ public class JniFrontend {
     AuthorizationConfig authorizationConfig = new AuthorizationConfig(serverName,
         authorizationPolicyFile, policyProviderClassName);
     authorizationConfig.validateConfig();
-    frontend = new Frontend(lazy, authorizationConfig);
-  }
-
-  /**
-   * Deserialized a serialized form of a Thrift data structure to its object form
-   */
-  private <T extends TBase> void deserializeThrift(T result, byte[] thriftData)
-      throws ImpalaException {
-    // TODO: avoid creating deserializer for each query?
-    TDeserializer deserializer = new TDeserializer(protocolFactory);
-
-    try {
-      deserializer.deserialize(result, thriftData);
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
+    frontend = new Frontend(authorizationConfig);
   }
 
   /**
@@ -133,7 +108,7 @@ public class JniFrontend {
   public byte[] createExecRequest(byte[] thriftClientRequest)
       throws ImpalaException {
     TClientRequest request = new TClientRequest();
-    deserializeThrift(request, thriftClientRequest);
+    JniUtil.deserializeThrift(protocolFactory, request, thriftClientRequest);
 
     StringBuilder explainString = new StringBuilder();
     TExecRequest result = frontend.createExecRequest(request, explainString);
@@ -148,15 +123,12 @@ public class JniFrontend {
     }
   }
 
-  public byte[] execDdlRequest(byte[] thriftDdlExecRequest)
-      throws ImpalaException, MetaException, org.apache.thrift.TException,
-      InvalidObjectException, ImpalaException, TableLoadingException {
-    TDdlExecRequest request = new TDdlExecRequest();
-    deserializeThrift(request, thriftDdlExecRequest);
-    TDdlExecResponse response = frontend.getDdlExecutor().execDdlRequest(request);
+  public byte[] updateInternalCatalog(byte[] thriftCatalogUpdate) throws ImpalaException {
+    TInternalCatalogUpdateRequest req = new TInternalCatalogUpdateRequest();
+    JniUtil.deserializeThrift(protocolFactory, req, thriftCatalogUpdate);
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
-      return serializer.serialize(response);
+      return serializer.serialize(frontend.updateInternalCatalog(req));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
@@ -171,7 +143,7 @@ public class JniFrontend {
   public byte[] loadTableData(byte[] thriftLoadTableDataParams)
       throws ImpalaException, IOException {
     TLoadDataReq request = new TLoadDataReq();
-    deserializeThrift(request, thriftLoadTableDataParams);
+    JniUtil.deserializeThrift(protocolFactory, request, thriftLoadTableDataParams);
     TLoadDataResp response = frontend.loadTableData(request);
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
@@ -187,22 +159,12 @@ public class JniFrontend {
    */
   public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
     TClientRequest request = new TClientRequest();
-    deserializeThrift(request, thriftQueryRequest);
+    JniUtil.deserializeThrift(protocolFactory, request, thriftQueryRequest);
     String plan = frontend.getExplainString(request);
     LOG.info("Explain plan: " + plan);
     return plan;
   }
 
-  /**
-   * Process any updates to the metastore required after a query executes.
-   * The argument is a serialized TCatalogUpdate.
-   * @see Frontend#updateMetastore
-   */
-  public void updateMetastore(byte[] thriftCatalogUpdate) throws ImpalaException {
-    TCatalogUpdate update = new TCatalogUpdate();
-    deserializeThrift(update, thriftCatalogUpdate);
-    frontend.updateMetastore(update);
-  }
 
   /**
    * Returns a list of table names matching an optional pattern.
@@ -212,7 +174,7 @@ public class JniFrontend {
    */
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetTablesParams params = new TGetTablesParams();
-    deserializeThrift(params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
         new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
@@ -239,7 +201,7 @@ public class JniFrontend {
    */
   public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetDbsParams params = new TGetDbsParams();
-    deserializeThrift(params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
         new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
@@ -264,7 +226,7 @@ public class JniFrontend {
    */
   public byte[] getFunctions(byte[] thriftGetFunctionsParams) throws ImpalaException {
     TGetFunctionsParams params = new TGetFunctionsParams();
-    deserializeThrift(params, thriftGetFunctionsParams);
+    JniUtil.deserializeThrift(protocolFactory, params, thriftGetFunctionsParams);
 
     TGetFunctionsResult result = new TGetFunctionsResult();
     result.setFn_signatures(
@@ -285,7 +247,7 @@ public class JniFrontend {
    */
   public byte[] describeTable(byte[] thriftDescribeTableParams) throws ImpalaException {
     TDescribeTableParams params = new TDescribeTableParams();
-    deserializeThrift(params, thriftDescribeTableParams);
+    JniUtil.deserializeThrift(protocolFactory, params, thriftDescribeTableParams);
 
     TDescribeTableResult result = frontend.describeTable(
         params.getDb(), params.getTable_name(), params.getOutput_style());
@@ -304,7 +266,7 @@ public class JniFrontend {
   public byte[] execHiveServer2MetadataOp(byte[] metadataOpsParams)
       throws ImpalaException {
     TMetadataOpRequest params = new TMetadataOpRequest();
-    deserializeThrift(params, metadataOpsParams);
+    JniUtil.deserializeThrift(protocolFactory, params, metadataOpsParams);
     TMetadataOpResponse result = frontend.execHiveServer2MetadataOp(params);
 
     TSerializer serializer = new TSerializer(protocolFactory);
@@ -694,12 +656,5 @@ public class JniFrontend {
           ". Error was: \n" + e.getMessage();
     }
     return "";
-  }
-
-  public void resetMetadata(byte[] thriftResetMetadataRequest)
-      throws ImpalaException {
-    TResetMetadataParams request = new TResetMetadataParams();
-    deserializeThrift(request, thriftResetMetadataRequest);
-    frontend.execResetMetadata(request);
   }
 }

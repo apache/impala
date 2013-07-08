@@ -31,10 +31,10 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -71,7 +71,7 @@ public class Analyzer {
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
   private final DescriptorTable descTbl;
-  private final Catalog catalog;
+  private final ImpaladCatalog catalog;
   private final String defaultDb;
   private final User user;
   private final IdGenerator<ExprId> conjunctIdGenerator;
@@ -150,7 +150,7 @@ public class Analyzer {
   // Tracks access to catalog objects for this Analyzer instance
   private List<TAccessEvent> accessEvents = Lists.newArrayList();
 
-  public Analyzer(Catalog catalog, String defaultDb, User user) {
+  public Analyzer(ImpaladCatalog catalog, String defaultDb, User user) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
@@ -572,7 +572,7 @@ public class Analyzer {
     return descTbl;
   }
 
-  public Catalog getCatalog() {
+  public ImpaladCatalog getCatalog() {
     return catalog;
   }
 

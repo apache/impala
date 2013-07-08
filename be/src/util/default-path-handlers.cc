@@ -129,9 +129,10 @@ void impala::AddDefaultPathHandlers(
     Webserver* webserver, MemTracker* process_mem_tracker) {
   webserver->RegisterPathHandler("/logs", LogsHandler);
   webserver->RegisterPathHandler("/varz", FlagsHandler);
-  DCHECK(process_mem_tracker != NULL);
-  webserver->RegisterPathHandler("/memz",
-      bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
+  if (process_mem_tracker != NULL) {
+    webserver->RegisterPathHandler("/memz",
+        bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
+  }
 
 #ifndef ADDRESS_SANITIZER
   // Remote (on-demand) profiling is disabled if the process is already being profiled.

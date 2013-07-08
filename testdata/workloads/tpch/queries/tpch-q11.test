@@ -12,7 +12,6 @@ join partsupp ps
 group by ps_partkey
 ---- SETUP
 RESET q11_sum_tmp
-RELOAD q11_sum_tmp
 ---- RESULTS
 : 29818
 ====
@@ -22,7 +21,6 @@ select round(sum(part_value), 1)
 from q11_part_tmp
 ---- SETUP
 RESET q11_part_tmp
-RELOAD q11_part_tmp
 ---- RESULTS
 : 1
 ====

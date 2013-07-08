@@ -61,10 +61,7 @@ Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global
 Status JniUtil::Init() {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();
-  if (env == NULL) {
-    return Status("Failed to get/create JVM");
-  }
-
+  if (env == NULL) return Status("Failed to get/create JVM");
   // Find JniUtil class and create a global ref.
   jclass local_jni_util_cl = env->FindClass("com/cloudera/impala/common/JniUtil");
   if (local_jni_util_cl == NULL) {

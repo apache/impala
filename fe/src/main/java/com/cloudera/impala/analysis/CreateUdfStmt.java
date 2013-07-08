@@ -21,7 +21,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
-import com.cloudera.impala.thrift.TCreateUdfParams;
+import com.cloudera.impala.thrift.TUdf;
 
 /**
  * Represents a CREATE FUNCTION statement.
@@ -50,9 +50,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   @Override
   public TCreateFunctionParams toThrift() {
     TCreateFunctionParams params = super.toThrift();
-    TCreateUdfParams udfParams = new TCreateUdfParams();
-    udfParams.setSymbol_name(udf_.getSymbolName());
-    params.setUdf_params(udfParams);
+    params.getFn().setUdf(new TUdf(udf_.getSymbolName()));
     return params;
   }
 

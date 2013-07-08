@@ -101,7 +101,7 @@ public class DescriptorTable {
       referencedTbls.add(table);
     }
     for (Table tbl: referencedTbls) {
-      result.addToTableDescriptors(tbl.toThrift());
+      result.addToTableDescriptors(tbl.toThriftDescriptor());
     }
     return result;
   }

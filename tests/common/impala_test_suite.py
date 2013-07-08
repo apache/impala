@@ -130,7 +130,6 @@ class ImpalaTestSuite(BaseTestSuite):
 
       if 'SETUP' in test_section:
         self.execute_test_case_setup(test_section['SETUP'], table_format_info)
-        self.client.refresh()
 
       # TODO: support running query tests against different scale factors
       query = QueryTestSectionReader.build_query( test_section['QUERY'])
@@ -176,10 +175,12 @@ class ImpalaTestSuite(BaseTestSuite):
         db_name, table_name = QueryTestSectionReader.get_table_name_components(\
           table_format, row.split('RESET')[1])
         self.__reset_table(db_name, table_name)
+        self.client.execute("invalidate metadata " + db_name + "." + table_name)
       elif row.startswith('DROP PARTITIONS'):
         db_name, table_name = QueryTestSectionReader.get_table_name_components(\
           table_format, row.split('DROP PARTITIONS')[1])
         self.__drop_partitions(db_name, table_name)
+        self.client.execute("invalidate metadata " + db_name + "." + table_name)
       elif row.startswith('RELOAD'):
         self.client.refresh()
       else:

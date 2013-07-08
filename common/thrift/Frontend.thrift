@@ -22,6 +22,9 @@ include "Planner.thrift"
 include "Descriptors.thrift"
 include "Data.thrift"
 include "cli_service.thrift"
+include "Status.thrift"
+include "CatalogObjects.thrift"
+include "CatalogService.thrift"
 
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
@@ -87,19 +90,6 @@ struct TGetDbsResult {
   1: list<string> dbs
 }
 
-struct TColumnDesc {
-  1: required string columnName
-  2: required Types.TPrimitiveType columnType
-}
-
-// A column definition; used by CREATE TABLE and DESCRIBE <table> statements. A column
-// definition has a different meaning (and additional fields) from a column descriptor,
-// so this is a separate struct from TColumnDesc.
-struct TColumnDef {
-  1: required TColumnDesc columnDesc
-  2: optional string comment
-}
-
 // Used by DESCRIBE <table> statements to control what information is returned and how to
 // format the output.
 enum TDescribeTableOutputStyle {
@@ -127,388 +117,6 @@ struct TDescribeTableParams {
 struct TDescribeTableResult {
   // Output from a DESCRIBE TABLE command.
   1: required list<Data.TResultRow> results
-}
-
-// Parameters of CREATE DATABASE commands
-struct TCreateDbParams {
-  // Name of the database to create
-  1: required string db
-
-  // Optional comment to attach to the database
-  2: optional string comment
-
-  // Optional HDFS path for the database. This will be the default location for all
-  // new tables created in the database.
-  3: optional string location
-
-  // Do not throw an error if a database of the same name already exists.
-  4: optional bool if_not_exists
-}
-
-// Represents a fully qualified function name.
-struct TFunctionName {
-  // Name of the function's parent database. Null to specify an unqualified function name.
-  1: required string db_name
-
-  // Name of the function
-  2: required string function_name
-}
-
-// Arguments for creating Udfs.
-struct TCreateUdfParams {
-  // Name of function in the binary
-  1: required string symbol_name;
-}
-
-struct TCreateUdaParams {
-  1: required string update_fn_name
-  2: required string init_fn_name
-  // This function does not need to be specified by the UDA.
-  3: optional string serialize_fn_name
-  4: required string merge_fn_name
-  5: required string finalize_fn_name
-  6: required Types.TColumnType intermediate_type
-}
-
-// Parameters of CREATE FUNCTION commands
-struct TCreateFunctionParams {
-  // Fully qualified function name of the function to create
-  1: required TFunctionName fn_name
-
-  // Type of the udf. e.g. hive, native, ir
-  2: required Types.TFunctionBinaryType fn_binary_type
-
-  // HDFS path for the function binary. This binary must exist at the time the
-  // function is created.
-  3: required string location
-
-  // The types of the arguments to the function
-  4: required list<Types.TPrimitiveType> arg_types
-
-  // Return type for the function.
-  5: required Types.TPrimitiveType ret_type
-
-  // If true, this function takes var args.
-  6: required bool has_var_args
-
-  // Optional comment to attach to the function
-  7: optional string comment
-
-  // Do not throw an error if a function of the same signature already exists.
-  8: optional bool if_not_exists
-
-  // Only one of the below is set.
-  9: optional TCreateUdfParams udf_params
-  10: optional TCreateUdaParams uda_params
-}
-
-// Valid table file formats
-enum TFileFormat {
-  PARQUETFILE,
-  RCFILE,
-  SEQUENCEFILE,
-  TEXTFILE,
-  AVROFILE,
-}
-
-// Represents a fully qualified table name.
-struct TTableName {
-  // Name of the table's parent database. Null to specify an unqualified table name.
-  1: required string db_name
-
-  // Name of the table
-  2: required string table_name
-}
-
-// The row format specifies how to interpret the fields (columns) and lines (rows) in a
-// data file when creating a new table.
-struct TTableRowFormat {
-  // Optional terminator string used to delimit fields (columns) in the table
-  1: optional string field_terminator
-
-  // Optional terminator string used to delimit lines (rows) in a table
-  2: optional string line_terminator
-
-  // Optional string used to specify a special escape character sequence
-  3: optional string escaped_by
-}
-
-// Types of ALTER TABLE commands supported.
-enum TAlterTableType {
-  ADD_REPLACE_COLUMNS,
-  ADD_PARTITION,
-  CHANGE_COLUMN,
-  DROP_COLUMN,
-  DROP_PARTITION,
-  RENAME_TABLE,
-  RENAME_VIEW,
-  SET_FILE_FORMAT,
-  SET_LOCATION,
-  SET_TBL_PROPERTIES,
-}
-
-// Represents a single item in a partition spec (column name + value)
-struct TPartitionKeyValue {
-  // Partition column name
-  1: required string name,
-
-  // Partition value
-  2: required string value
-}
-
-// Parameters for ALTER TABLE rename commands
-struct TAlterTableOrViewRenameParams {
-  // The new table name
-  1: required TTableName new_table_name
-}
-
-// Parameters for ALTER TABLE ADD|REPLACE COLUMNS commands.
-struct TAlterTableAddReplaceColsParams {
-  // List of columns to add to the table
-  1: required list<TColumnDef> columns
-
-  // If true, replace all existing columns. If false add (append) columns to the table.
-  2: required bool replace_existing_cols
-}
-
-// Parameters for ALTER TABLE ADD PARTITION commands
-struct TAlterTableAddPartitionParams {
-  // The partition spec (list of keys and values) to add.
-  1: required list<TPartitionKeyValue> partition_spec
-
-  // If true, no error is raised if a partition with the same spec already exists.
-  3: required bool if_not_exists
-
-  // Optional HDFS storage location for the Partition. If not specified the
-  // default storage location is used.
-  2: optional string location
-}
-
-// Parameters for ALTER TABLE DROP COLUMN commands.
-struct TAlterTableDropColParams {
-  // Column name to drop.
-  1: required string col_name
-}
-
-// Parameters for ALTER TABLE DROP PARTITION commands
-struct TAlterTableDropPartitionParams {
-  // The partition spec (list of keys and values) to add.
-  1: required list<TPartitionKeyValue> partition_spec
-
-  // If true, no error is raised if no partition with the specified spec exists.
-  2: required bool if_exists
-}
-
-// Parameters for ALTER TABLE CHANGE COLUMN commands
-struct TAlterTableChangeColParams {
-  // Target column to change.
-  1: required string col_name
-
-  // New column definition for the target column.
-  2: required TColumnDef new_col_def
-}
-
-// The table property type.
-enum TTablePropertyType {
-  TBL_PROPERTY,
-  SERDE_PROPERTY
-}
-
-// Parameters for ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES commands.
-struct TAlterTableSetTblPropertiesParams {
-  // The target table property that is being altered.
-  1: required TTablePropertyType target
-
-  // Map of property names to property values.
-  2: required map<string, string> properties
-}
-
-// Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
-struct TAlterTableSetFileFormatParams {
-  // New file format.
-  1: required TFileFormat file_format
-
-  // An optional partition spec, set if modifying the fileformat of a partition.
-  2: optional list<TPartitionKeyValue> partition_spec
-}
-
-// Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
-struct TAlterTableSetLocationParams {
-  // New HDFS storage location of the table.
-  1: required string location
-
-  // An optional partition spec, set if modifying the location of a partition.
-  2: optional list<TPartitionKeyValue> partition_spec
-}
-
-// Parameters for all ALTER TABLE commands.
-struct TAlterTableParams {
-  1: required TAlterTableType alter_type
-
-  // Fully qualified name of the target table being altered
-  2: required TTableName table_name
-
-  // Parameters for ALTER TABLE/VIEW RENAME
-  3: optional TAlterTableOrViewRenameParams rename_params
-
-  // Parameters for ALTER TABLE ADD COLUMNS
-  4: optional TAlterTableAddReplaceColsParams add_replace_cols_params
-
-  // Parameters for ALTER TABLE ADD PARTITION
-  5: optional TAlterTableAddPartitionParams add_partition_params
-
-  // Parameters for ALTER TABLE CHANGE COLUMN
-  6: optional TAlterTableChangeColParams change_col_params
-
-  // Parameters for ALTER TABLE DROP COLUMN
-  7: optional TAlterTableDropColParams drop_col_params
-
-  // Parameters for ALTER TABLE DROP PARTITION
-  8: optional TAlterTableDropPartitionParams drop_partition_params
-
-  // Parameters for ALTER TABLE SET FILEFORMAT
-  9: optional TAlterTableSetFileFormatParams set_file_format_params
-
-  // Parameters for ALTER TABLE SET LOCATION
-  10: optional TAlterTableSetLocationParams set_location_params
-
-  // Parameters for ALTER TABLE SET TBLPROPERTIES
-  11: optional TAlterTableSetTblPropertiesParams set_tbl_properties_params
-}
-
-// Parameters of CREATE TABLE LIKE commands
-struct TCreateTableLikeParams {
-  // Fully qualified name of the table to create
-  1: required TTableName table_name
-
-  // Fully qualified name of the source table
-  2: required TTableName src_table_name
-
-  // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
-  // table data from the file system. If EXTERNAL is not specified, all table data will be
-  // removed when the table is dropped.
-  3: required bool is_external
-
-  // Do not throw an error if a table of the same name already exists.
-  4: required bool if_not_exists
-
-  // Owner of the table
-  5: required string owner
-
-  // Optional file format for this table
-  6: optional TFileFormat file_format
-
-  // Optional comment for the table
-  7: optional string comment
-
-  // Optional storage location for the table
-  8: optional string location
-}
-
-// Parameters of CREATE TABLE commands
-struct TCreateTableParams {
-  // Fully qualified name of the table to create
-  1: required TTableName table_name
-
-  // List of columns to create
-  2: required list<TColumnDef> columns
-
-  // List of partition columns
-  3: optional list<TColumnDef> partition_columns
-
-  // The file format for this table
-  4: required TFileFormat file_format
-
-  // True if the table is an "EXTERNAL" table. Dropping an external table will NOT remove
-  // table data from the file system. If EXTERNAL is not specified, all table data will be
-  // removed when the table is dropped.
-  5: required bool is_external
-
-  // Do not throw an error if a table of the same name already exists.
-  6: required bool if_not_exists
-
-  // The owner of the table
-  7: required string owner
-
-  // Specifies how rows and columns are interpreted when reading data from the table
-  8: optional TTableRowFormat row_format
-
-  // Optional comment for the table
-  9: optional string comment
-
-  // Optional storage location for the table
-  10: optional string location
-
-  // Map of table property names to property values
-  11: optional map<string, string> table_properties
-
-  // Map of serde property names to property values
-  12: optional map<string, string> serde_properties
-}
-
-// Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command
-struct TCreateOrAlterViewParams {
-  // Fully qualified name of the view to create
-  1: required TTableName view_name
-
-  // List of column definitions for the view
-  2: required list<TColumnDef> columns
-
-  // The owner of the view
-  3: required string owner
-
-  // Original SQL string of view definition
-  4: required string original_view_def
-
-  // Expanded SQL string of view definition used in view substitution
-  5: required string expanded_view_def
-
-  // Optional comment for the view
-  6: optional string comment
-
-  // Do not throw an error if a table or view of the same name already exists
-  7: optional bool if_not_exists
-}
-
-// Parameters of DROP DATABASE commands
-struct TDropDbParams {
-  // Name of the database to drop
-  1: required string db
-
-  // If true, no error is raised if the target db does not exist
-  2: required bool if_exists
-}
-
-// Parameters of DROP TABLE/VIEW commands
-struct TDropTableOrViewParams {
-  // Fully qualified name of the table/view to drop
-  1: required TTableName table_name
-
-  // If true, no error is raised if the target table/view does not exist
-  2: required bool if_exists
-}
-
-// Parameters of DROP FUNCTION commands
-struct TDropFunctionParams {
-  // Fully qualified name of the function to drop
-  1: required TFunctionName fn_name
-
-  // The types of the arguments to the function
-  2: required list<Types.TPrimitiveType> arg_types
-
-  // If true, no error is raised if the target fn does not exist
-  3: required bool if_exists
-}
-
-// Parameters of REFRESH/INVALIDATE METADATA commands
-// NOTE: This struct should only be used for intra-process communication.
-struct TResetMetadataParams {
-  // If true, refresh. Otherwise, invalidate metadata
-  1: required bool is_refresh
-
-  // Fully qualified name of the table to refresh or invalidate; not set if invalidating
-  // the entire catalog
-  2: optional TTableName table_name
 }
 
 struct TClientRequest {
@@ -584,20 +192,7 @@ struct TExplainResult {
 }
 
 struct TResultSetMetadata {
-  1: required list<TColumnDesc> columnDescs
-}
-
-// Describes a set of changes to make to the metastore
-struct TCatalogUpdate {
-  // Unqualified name of the table to change
-  1: required string target_table
-
-  // Database that the table belongs to
-  2: required string db_name
-
-  // List of partitions that are new and need to be created. May
-  // include the root partition (represented by the empty string).
-  3: required set<string> created_partitions
+  1: required list<CatalogObjects.TColumnDesc> columnDescs
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.
@@ -619,7 +214,7 @@ struct TFinalizeParams {
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.
 struct TLoadDataReq {
   // Fully qualified table name to load data into.
-  1: required TTableName table_name
+  1: required CatalogObjects.TTableName table_name
 
   // The source data file or directory to load into the table.
   2: required string source_path
@@ -632,7 +227,7 @@ struct TLoadDataReq {
 
   // An optional partition spec. Set if this operation should apply to a specific
   // partition rather than the base table.
-  4: optional list<TPartitionKeyValue> partition_spec
+  4: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 }
 
 // Response of a LOAD DATA statement.
@@ -687,38 +282,18 @@ struct TQueryExecRequest {
   11: optional i16 per_host_vcores
 }
 
-enum TDdlType {
+enum TCatalogOpType {
   SHOW_TABLES,
   SHOW_DBS,
   USE,
   DESCRIBE,
-  ALTER_TABLE,
-  ALTER_VIEW,
-  CREATE_DATABASE,
-  CREATE_TABLE,
-  CREATE_TABLE_AS_SELECT,
-  CREATE_TABLE_LIKE,
-  CREATE_VIEW,
-  DROP_DATABASE,
-  DROP_TABLE,
-  DROP_VIEW,
-  RESET_METADATA
   SHOW_FUNCTIONS,
-  CREATE_FUNCTION,
-  DROP_FUNCTION,
+  RESET_METADATA,
+  DDL,
 }
 
-struct TDdlExecResponse {
-  // Set only for CREATE TABLE AS SELECT statements. Will be true iff the statement
-  // resulted in a new table being created in the Metastore. This is used to
-  // determine if a CREATE TABLE IF NOT EXISTS AS SELECT ... actually creates a new
-  // table or whether creation was skipped because the table already existed, in which
-  // case this flag would be false
-  1: optional bool new_table_created
-}
-
-struct TDdlExecRequest {
-  1: required TDdlType ddl_type
+struct TCatalogOpRequest {
+  1: required TCatalogOpType op_type
 
   // Parameters for USE commands
   2: optional TUseDbParams use_db_params
@@ -732,41 +307,17 @@ struct TDdlExecRequest {
   // Parameters for SHOW TABLES
   5: optional TShowTablesParams show_tables_params
 
-  // Parameters for ALTER TABLE
-  6: optional TAlterTableParams alter_table_params
-
-  // Parameters for ALTER VIEW
-  14: optional TCreateOrAlterViewParams alter_view_params
-
-  // Parameters for CREATE DATABASE
-  7: optional TCreateDbParams create_db_params
-
-  // Parameters for CREATE TABLE
-  8: optional TCreateTableParams create_table_params
-
-  // Parameters for CREATE TABLE LIKE
-  9: optional TCreateTableLikeParams create_table_like_params
-
-  // Parameters for CREATE VIEW
-  13: optional TCreateOrAlterViewParams create_view_params
-
-  // Paramaters for DROP DATABAE
-  10: optional TDropDbParams drop_db_params
-
-  // Parameters for DROP TABLE/VIEW
-  11: optional TDropTableOrViewParams drop_table_or_view_params
-
-  // Parameters for REFRESH/INVALIDATE METADATA
-  12: optional TResetMetadataParams reset_metadata_params
-
   // Parameters for SHOW FUNCTIONS
-  15: optional TShowFunctionsParams show_fns_params
+  6: optional TShowFunctionsParams show_fns_params
 
-  // Parameters for CREATE FUNCTION
-  16: optional TCreateFunctionParams create_fn_params
+  // Parameters for DDL requests executed using the CatalogServer
+  // such as CREATE, ALTER, and DROP. See CatalogService.TDdlExecRequest
+  // for details.
+  7: optional CatalogService.TDdlExecRequest ddl_params
 
-  // Parameters for DROP FUNCTION
-  17: optional TDropFunctionParams drop_fn_params
+  // Parameters for RESET/INVALIDATE METADATA, executed using the CatalogServer.
+  // See CatalogService.TResetMetadataRequest for more details.
+  8: optional CatalogService.TResetMetadataRequest reset_metadata_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
@@ -811,14 +362,6 @@ struct TMetadataOpResponse {
   2: required list<Data.TResultRow> results
 }
 
-// Enum used by TAccessEvent to mark what type of Catalog object was accessed
-// in a query statement
-enum TCatalogObjectType {
-  DATABASE,
-  TABLE,
-  VIEW,
-}
-
 // Tracks accesses to Catalog objects for use during auditing. This information, paired
 // with the current session information, provides a view into what objects a user's
 // query accessed
@@ -826,8 +369,8 @@ struct TAccessEvent {
   // Fully qualified object name
   1: required string name
 
-  // The object type (DATABASE, VIEW, TABLE)
-  2: required TCatalogObjectType object_type
+  // The object type (ex. DATABASE, VIEW, TABLE)
+  2: required CatalogObjects.TCatalogObjectType object_type
 
   // The requested privilege on the object
   // TODO: Create an enum for this?
@@ -846,7 +389,7 @@ struct TExecRequest {
   3: optional TQueryExecRequest query_exec_request
 
   // Set iff stmt_type is DDL
-  4: optional TDdlExecRequest ddl_exec_request
+  4: optional TCatalogOpRequest catalog_op_request
 
   // Metadata of the query result set (not set for DML)
   5: optional TResultSetMetadata result_set_metadata
@@ -871,4 +414,28 @@ enum TLogLevel {
   WARN,
   ERROR,
   FATAL
+}
+
+// Sent to an impalad FE during each CatalogUpdate heartbeat. Contains details on all
+// catalog objects that need to be updated.
+struct TInternalCatalogUpdateRequest {
+  // True if update only contains entries changed from the previous update. Otherwise,
+  // contains the entire topic.
+  1: required bool is_delta
+
+  // The Catalog Service ID this update came from.
+  2: required Types.TUniqueId catalog_service_id
+
+  // New or modified items. Empty list if no items were updated.
+  3: required list<CatalogObjects.TCatalogObject> updated_objects
+
+  // Empty of no items were removed or is_delta is false.
+  4: required list<CatalogObjects.TCatalogObject> removed_objects
+}
+
+// Response from a TCatalogUpdateRequest. Returns the new max catalog version after
+// applying the update.
+struct TInternalCatalogUpdateResponse {
+  // The catalog service id this version is from.
+  1: required Types.TUniqueId catalog_service_id;
 }

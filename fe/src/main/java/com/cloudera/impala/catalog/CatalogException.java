@@ -19,7 +19,7 @@ import com.cloudera.impala.common.ImpalaException;
 /**
  * Base class for exceptions related to accessing objects in the Catalog.
  */
-public abstract class CatalogException extends ImpalaException {
+public class CatalogException extends ImpalaException {
   // Dummy serial UID to avoid Eclipse warnings
   private static final long serialVersionUID = -1273205863485997544L;
 

@@ -47,6 +47,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.THBaseTable;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
@@ -203,23 +204,38 @@ public class HBaseTable extends Table {
   @Override
   public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    try {
-      hbaseTableName = getHBaseTableName(msTbl);
-      hTable = new HTable(hbaseConf, hbaseTableName);
-      Map<String, String> serdeParam = msTbl.getSd().getSerdeInfo().getParameters();
-      String hbaseColumnsMapping = serdeParam.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
+    loadInternal();
+  }
 
+  @Override
+  public void loadFromTTable(TTable table) throws TableLoadingException {
+    super.loadFromTTable(table);
+    loadInternal();
+  }
+
+  /**
+   * Populates the all member variables.
+   */
+  private void loadInternal() throws TableLoadingException {
+    Preconditions.checkNotNull(getMetaStoreTable());
+    try {
+      hbaseTableName = getHBaseTableName(getMetaStoreTable());
+      hTable = new HTable(hbaseConf, hbaseTableName);
+      Map<String, String> serdeParams =
+          getMetaStoreTable().getSd().getSerdeInfo().getParameters();
+      String hbaseColumnsMapping = serdeParams.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
       if (hbaseColumnsMapping == null) {
         throw new MetaException("No hbase.columns.mapping defined in Serde.");
       }
-      String hbaseTableDefaultStorageType =
-          msTbl.getParameters().get(HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE);
+
+      String hbaseTableDefaultStorageType = getMetaStoreTable().getParameters().get(
+          HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE);
       boolean tableDefaultStorageIsBinary = false;
       if (hbaseTableDefaultStorageType != null &&
           !hbaseTableDefaultStorageType.isEmpty()) {
-        if (hbaseTableDefaultStorageType.equals("binary")) {
+        if (hbaseTableDefaultStorageType.equalsIgnoreCase("binary")) {
           tableDefaultStorageIsBinary = true;
-        } else if (!hbaseTableDefaultStorageType.equals("string")) {
+        } else if (!hbaseTableDefaultStorageType.equalsIgnoreCase("string")) {
           throw new SerDeException("Error: " +
               HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE +
               " parameter must be specified as" +
@@ -229,7 +245,7 @@ public class HBaseTable extends Table {
       }
 
       // Parse HBase column-mapping string.
-      List<FieldSchema> fieldSchemas = msTbl.getSd().getCols();
+      List<FieldSchema> fieldSchemas = getMetaStoreTable().getSd().getCols();
       List<String> hbaseColumnFamilies = new ArrayList<String>();
       List<String> hbaseColumnQualifiers = new ArrayList<String>();
       List<Boolean> hbaseColumnBinaryEncodings = new ArrayList<Boolean>();
@@ -246,7 +262,7 @@ public class HBaseTable extends Table {
         FieldSchema s = fieldSchemas.get(i);
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
-            getPrimitiveType(s), s.getComment(), -1);
+            getPrimitiveType(s.getType()), s.getComment(), -1);
         tmpCols.add(col);
       }
 
@@ -254,6 +270,8 @@ public class HBaseTable extends Table {
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.
       Collections.sort(tmpCols);
+      colsByPos.clear();
+      colsByName.clear();
       for (int i = 0; i < tmpCols.size(); ++i) {
         HBaseColumn col = tmpCols.get(i);
         col.setPosition(i);
@@ -262,7 +280,7 @@ public class HBaseTable extends Table {
       }
 
       // Set table stats.
-      numRows = getRowCount(msTbl.getParameters());
+      numRows = getRowCount(super.getMetaStoreTable().getParameters());
 
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
@@ -406,23 +424,11 @@ public class HBaseTable extends Table {
   public ArrayList<Column> getColumnsInHiveOrder() { return colsByPos; }
 
   @Override
-  public TTableDescriptor toThrift() {
-    THBaseTable tHbaseTable = new THBaseTable();
-    tHbaseTable.setTableName(hbaseTableName);
-    for (Column c : colsByPos) {
-      HBaseColumn hbaseCol = (HBaseColumn) c;
-      tHbaseTable.addToFamilies(hbaseCol.getColumnFamily());
-      if (hbaseCol.getColumnQualifier() != null) {
-        tHbaseTable.addToQualifiers(hbaseCol.getColumnQualifier());
-      } else {
-        tHbaseTable.addToQualifiers("");
-      }
-      tHbaseTable.addToBinary_encoded(hbaseCol.isBinaryEncoded());
-    }
+  public TTableDescriptor toThriftDescriptor() {
     TTableDescriptor tableDescriptor =
         new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(),
             numClusteringCols, hbaseTableName, db.getName());
-    tableDescriptor.setHbaseTable(tHbaseTable);
+    tableDescriptor.setHbaseTable(getTHBaseTable());
     return tableDescriptor;
   }
 
@@ -436,6 +442,30 @@ public class HBaseTable extends Table {
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
+
+  @Override
+  public TTable toThrift() throws TableLoadingException {
+    TTable table = super.toThrift();
+    table.setTable_type(TTableType.HBASE_TABLE);
+    table.setHbase_table(getTHBaseTable());
+    return table;
+  }
+
+  private THBaseTable getTHBaseTable() {
+    THBaseTable tHbaseTable = new THBaseTable();
+    tHbaseTable.setTableName(hbaseTableName);
+    for (Column c : colsByPos) {
+      HBaseColumn hbaseCol = (HBaseColumn) c;
+      tHbaseTable.addToFamilies(hbaseCol.getColumnFamily());
+      if (hbaseCol.getColumnQualifier() != null) {
+        tHbaseTable.addToQualifiers(hbaseCol.getColumnQualifier());
+      } else {
+        tHbaseTable.addToQualifiers("");
+      }
+      tHbaseTable.addToBinary_encoded(hbaseCol.isBinaryEncoded());
+    }
+    return tHbaseTable;
+  }
 
   /**
    * This is copied from org.apache.hadoop.hbase.client.HTable. The only difference is

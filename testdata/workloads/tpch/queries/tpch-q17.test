@@ -7,7 +7,6 @@ from lineitem
 group by l_partkey
 ---- SETUP
 RESET lineitem_tmp
-RELOAD lineitem_tmp
 ---- RESULTS
 : 200000
 ====

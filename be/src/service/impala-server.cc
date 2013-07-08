@@ -32,10 +32,10 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "catalog/catalog-server.h"
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/version.h"
-#include "exec/ddl-executor.h"
 #include "exec/exec-node.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/scan-node.h"
@@ -445,6 +445,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     StateStoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&ImpalaServer::MembershipCallback), this, _1, _2);
     exec_env->subscriber()->AddTopic(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
+
+    StateStoreSubscriber::UpdateCallback catalog_cb =
+        bind<void>(mem_fn(&ImpalaServer::CatalogUpdateCallback), this, _1, _2);
+    exec_env->subscriber()->AddTopic(
+        CatalogServer::IMPALA_CATALOG_TOPIC, true, catalog_cb);
   }
 
   EXIT_IF_ERROR(UpdateCatalogMetrics());
@@ -487,7 +492,12 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.Null();
   writer.String("statement_type");
   if (request.stmt_type == TStmtType::DDL) {
-    writer.String(PrintTDdlType(request.ddl_exec_request.ddl_type).c_str());
+    if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
+      writer.String(
+          PrintTDdlType(request.catalog_op_request.ddl_params.ddl_type).c_str());
+    } else {
+      writer.String(PrintTCatalogOpType(request.catalog_op_request.op_type).c_str());
+    }
   } else {
     writer.String(PrintTStmtType(request.stmt_type).c_str());
   }
@@ -977,7 +987,7 @@ Status ImpalaServer::ExecuteInternal(
   *registered_exec_state = false;
 
   exec_state->reset(new QueryExecState(
-      exec_env_, frontend_.get(), session_state, query_session_state, request.stmt));
+      exec_env_, frontend_.get(), this, session_state, query_session_state, request.stmt));
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
 
@@ -1009,7 +1019,6 @@ Status ImpalaServer::ExecuteInternal(
       (*exec_state)->set_result_metadata(result.result_set_metadata);
     }
   }
-
   if (IsAuditEventLoggingEnabled()) {
     LogAuditRecord(*(exec_state->get()), result);
   }
@@ -1033,7 +1042,6 @@ Status ImpalaServer::ExecuteInternal(
       }
     }
   }
-
   return Status::OK;
 }
 
@@ -1199,7 +1207,6 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
 
   return Status::OK;
 }
-
 
 Status ImpalaServer::ParseQueryOptions(const string& options,
     TQueryOptions* query_options) {
@@ -1586,6 +1593,125 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
   if (!status.ok()) {
     VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
                << ") did not succeed: " << status.GetErrorMsg();
+  }
+}
+
+Status ImpalaServer::TCatalogObjectFromEntryKey(const string& key,
+    TCatalogObject* catalog_object) {
+  // Here we must reconstruct the object type based only on the key.
+  size_t pos = key.find(":");
+  DCHECK(pos != string::npos);
+  string object_type = key.substr(0, pos);
+  string object_name = key.substr(pos + 1);
+
+  // The catalog versions for these items do not matter because they will be removed
+  // from the catalog. To simplify things, only the minimum required fields will be filled
+  // in.
+  catalog_object->__set_catalog_version(0L);
+  if (object_type == "DATABASE") {
+    catalog_object->__set_type(TCatalogObjectType::DATABASE);
+    catalog_object->__set_db(TDatabase());
+    catalog_object->db.__set_db_name(object_name);
+  } else if (object_type == "TABLE" || object_type == "VIEW") {
+    catalog_object->__set_type(TCatalogObjectType::TABLE);
+    catalog_object->__set_table(TTable());
+    // Parse the (fully qualified) table name
+    pos = object_name.find(".");
+    DCHECK(pos != string::npos);
+
+    catalog_object->table.__set_db_name(object_name.substr(0, pos));
+    catalog_object->table.__set_tbl_name(object_name.substr(pos + 1));
+  } else if (object_type == "FUNCTION") {
+    catalog_object->__set_type(TCatalogObjectType::FUNCTION);
+    catalog_object->__set_fn(TFunction());
+    // The key only contains the signature string, which is all that is needed to uniquely identify
+    // the function.
+    catalog_object->fn.__set_signature(object_name);
+  } else {
+    stringstream ss;
+    ss << "Unexpected object type: " << object_type;
+    return Status(ss.str());
+  }
+  return Status::OK;
+}
+
+void ImpalaServer::CatalogUpdateCallback(
+    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    vector<TTopicDelta>* subscriber_topic_updates) {
+  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+      incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
+
+  if (topic != incoming_topic_deltas.end()) {
+    const TTopicDelta& delta = topic->second;
+    // No updates or deletions, nothing to do.
+    if (delta.topic_entries.size() == 0 && delta.topic_deletions.size() == 0) return;
+
+    TInternalCatalogUpdateRequest update_req;
+    update_req.__set_is_delta(delta.is_delta);
+    // Process all Catalog updates (new and modified objects) and determine what the
+    // new catalog version will be.
+    long new_catalog_version = current_catalog_version_;
+    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+      uint32_t len = item.value.size();
+      TCatalogObject catalog_object;
+      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
+          item.value.data()), &len, false, &catalog_object);
+      if (!status.ok()) {
+        LOG(ERROR) << "Error deserializing item: " << status.GetErrorMsg();
+        continue;
+      }
+      if (catalog_object.type == TCatalogObjectType::CATALOG) {
+        update_req.__set_catalog_service_id(catalog_object.catalog.catalog_service_id);
+        new_catalog_version = catalog_object.catalog_version;
+        continue;
+      }
+      update_req.updated_objects.push_back(catalog_object);
+    }
+
+    // Process all Catalog deletions (dropped objects). We only know the keys (object
+    // names) so must parse each key to determine the TCatalogObject.
+    BOOST_FOREACH(const string& key, delta.topic_deletions) {
+      LOG(INFO) << "Catalog topic entry deletion: " << key;
+      TCatalogObject catalog_object;
+      Status status = TCatalogObjectFromEntryKey(key, &catalog_object);
+      if (!status.ok()) {
+        LOG(ERROR) << "Error parsing catalog topic entry deletion key: " << key << " "
+                   << "Error: " << status.GetErrorMsg();
+        continue;
+      }
+      update_req.removed_objects.push_back(catalog_object);
+    }
+
+    // Call the FE to apply the changes to the Impalad Catalog.
+    TInternalCatalogUpdateResponse resp;
+    Status s = frontend_->UpdateCatalog(update_req, &resp);
+    if (!s.ok()) {
+      LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
+                 << " a full topic update to recover: " << s.GetErrorMsg();
+      subscriber_topic_updates->push_back(TTopicDelta());
+      TTopicDelta& update = subscriber_topic_updates->back();
+      update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
+      update.__set_from_version(0L);
+    } else {
+      unique_lock<mutex> unique_lock(catalog_version_lock_);
+      current_catalog_version_ = new_catalog_version;
+      current_catalog_service_id_ = resp.catalog_service_id;
+      catalog_version_update_cv_.notify_all();
+      UpdateCatalogMetrics();
+    }
+  }
+}
+
+void ImpalaServer::WaitForCatalogUpdate(
+    const TCatalogUpdateResult& catalog_update_result) {
+  int64_t min_req_catalog_version = catalog_update_result.version;
+  LOG(INFO) << "Waiting for catalog version: " << min_req_catalog_version
+             << " current version: " << current_catalog_version_;
+  unique_lock<mutex> unique_lock(catalog_version_lock_);
+  // TODO: What about query cancellation?
+  while (current_catalog_version_ < min_req_catalog_version &&
+         current_catalog_service_id_ == catalog_update_result.catalog_service_id) {
+    catalog_version_update_cv_.wait(unique_lock);
   }
 }
 

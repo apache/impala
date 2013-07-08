@@ -23,7 +23,6 @@ group by
   substr(c_name, 1, 1)
 ---- SETUP
 RESET q22_customer_tmp1
-RELOAD q22_customer_tmp1
 ---- RESULTS
 : 1
 ====

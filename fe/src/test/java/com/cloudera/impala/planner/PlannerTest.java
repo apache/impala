@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -50,7 +51,7 @@ public class PlannerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    frontend = new Frontend(true,
+    frontend = new Frontend(Catalog.CatalogInitStrategy.LAZY,
         AuthorizationConfig.createAuthDisabledConfig());
   }
 

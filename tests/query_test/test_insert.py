@@ -40,6 +40,11 @@ class TestInsertQueries(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertQueries, cls).setup_class()
+    cls.client.refresh()
+
   @pytest.mark.execute_serially
   def test_insert1(self, vector):
     vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \

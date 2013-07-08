@@ -24,9 +24,9 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.OpcodeRegistry;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TColumnDesc;
@@ -232,7 +232,7 @@ public class MetadataOp {
    * will not be populated.
    * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
-  private static DbsMetadata getDbsMetadata(Catalog catalog, String catalogName,
+  private static DbsMetadata getDbsMetadata(ImpaladCatalog catalog, String catalogName,
       String schemaName, String tableName, String columnName, String functionName,
       User user) throws ImpalaException {
     DbsMetadata result = new DbsMetadata();
@@ -253,7 +253,7 @@ public class MetadataOp {
     Pattern columnPattern = Pattern.compile(convertedColumnPattern);
     Pattern functionPattern = Pattern.compile(convertedFunctionPattern);
 
-    for (String dbName: catalog.getAllDbNames(user)) {
+    for (String dbName: catalog.getDbNames(null, user)) {
       if (!schemaPattern.matcher(dbName).matches()) {
         continue;
       }
@@ -315,8 +315,9 @@ public class MetadataOp {
    * search patterns.
    * catalogName, schemaName, tableName and columnName are JDBC search patterns.
    */
-  public static TMetadataOpResponse getColumns(Catalog catalog, String catalogName,
-      String schemaName, String tableName, String columnName, User user)
+  public static TMetadataOpResponse getColumns(ImpaladCatalog catalog,
+      String catalogName, String schemaName, String tableName, String columnName,
+      User user)
       throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
 
@@ -374,8 +375,8 @@ public class MetadataOp {
    * pattern.
    * catalogName and schemaName are JDBC search patterns.
    */
-  public static TMetadataOpResponse getSchemas(Catalog catalog, String catalogName,
-      String schemaName, User user) throws ImpalaException {
+  public static TMetadataOpResponse getSchemas(ImpaladCatalog catalog,
+      String catalogName, String schemaName, User user) throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.
@@ -402,7 +403,7 @@ public class MetadataOp {
    * catalogName, schemaName and tableName are JDBC search patterns.
    * tableTypes specifies which table types to search for (TABLE, VIEW, etc).
    */
-  public static TMetadataOpResponse getTables(Catalog catalog, String catalogName,
+  public static TMetadataOpResponse getTables(ImpaladCatalog catalog, String catalogName,
       String schemaName, String tableName, List<String> tableTypes, User user)
           throws ImpalaException{
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLES_MD);
@@ -482,8 +483,9 @@ public class MetadataOp {
    * catalogName, schemaName and functionName are JDBC search patterns.
    * @throws ImpalaException
    */
-  public static TMetadataOpResponse getFunctions(Catalog catalog, String catalogName,
-      String schemaName, String functionName, User user) throws ImpalaException {
+  public static TMetadataOpResponse getFunctions(ImpaladCatalog catalog,
+      String catalogName, String schemaName, String functionName,
+      User user) throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_FUNCTIONS_MD);
 
     // Impala's built-in functions do not have a catalog name or schema name.

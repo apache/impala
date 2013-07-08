@@ -112,6 +112,7 @@ if (DOXYGEN_FOUND)
   # Possible to not input the subdirs one by one?
   set(CMAKE_DOXYGEN_INPUT
     ${CMAKE_SOURCE_DIR}/be/src
+    ${CMAKE_SOURCE_DIR}/be/src/catalog/
     ${CMAKE_SOURCE_DIR}/be/src/common/
     ${CMAKE_SOURCE_DIR}/be/src/exec/
     ${CMAKE_SOURCE_DIR}/be/src/exprs/
@@ -174,6 +175,7 @@ endif()
 # for performance reasons.
 set (IMPALA_LINK_LIBS
   -Wl,--start-group
+  Catalog
   CodeGen
   Common
   Exec
@@ -270,6 +272,7 @@ function(COMPILE_TO_IR SRC_FILE)
 endfunction(COMPILE_TO_IR)
 
 # compile these subdirs using their own CMakeLists.txt
+add_subdirectory(src/catalog)
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)
 add_subdirectory(src/exec)
@@ -296,6 +299,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable")
 add_subdirectory(generated-sources/gen-cpp)
 
 link_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/catalog
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs

@@ -30,7 +30,6 @@
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/version.h"
-#include "exec/ddl-executor.h"
 #include "exec/exec-node.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/scan-node.h"

@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -25,7 +26,12 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
+import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumnDef;
+import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TStatus;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -39,26 +45,26 @@ import com.google.common.collect.Maps;
  * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
  * a key range into a fixed number of buckets).
  */
-public abstract class Table {
+public abstract class Table implements CatalogObject {
   protected final TableId id;
-  private final org.apache.hadoop.hive.metastore.api.Table msTable;
   protected final Db db;
   protected final String name;
   protected final String owner;
+  protected TTableDescriptor tableDesc;
+  protected List<FieldSchema> fields;
+  protected TStatus loadStatus_;
 
-  /** Number of clustering columns. */
+  // Number of clustering columns.
   protected int numClusteringCols;
 
-  // estimated number of rows in table; -1: unknown
+  // estimated number of rows in table; -1: unknown.
   protected long numRows = -1;
 
-  /**
-   * colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
-   * the clustering columns.
-   */
+  // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
+  // the clustering columns.
   protected final ArrayList<Column> colsByPos;
 
-  /**  map from lowercase col. name to Column */
+  // map from lowercase column name to Column object.
   protected final Map<String, Column> colsByName;
 
   // The lastDdlTime recorded in the table parameter; -1 if not set
@@ -68,6 +74,9 @@ public abstract class Table {
   protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES =
       EnumSet.of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE,
       TableType.VIRTUAL_VIEW);
+
+  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
+  private final org.apache.hadoop.hive.metastore.api.Table msTable;
 
   protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
@@ -83,8 +92,7 @@ public abstract class Table {
 
   //number of nodes that contain data for this table; -1: unknown
   public abstract int getNumNodes();
-  public abstract TTableDescriptor toThrift();
-
+  public abstract TTableDescriptor toThriftDescriptor();
   public abstract TCatalogObjectType getCatalogObjectType();
 
   /**
@@ -96,6 +104,14 @@ public abstract class Table {
 
   public TableId getId() { return id; }
   public long getNumRows() { return numRows; }
+
+  @Override
+  public long getCatalogVersion() { return catalogVersion_; }
+
+  @Override
+  public void setCatalogVersion(long catalogVersion) {
+    catalogVersion_ = catalogVersion;
+  }
 
   /**
    * Returns the metastore.api.Table object this Table was created from. Returns null
@@ -119,6 +135,7 @@ public abstract class Table {
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
       String tblName, Table oldCacheEntry) throws TableLoadingException,
       TableNotFoundException {
+
     // turn all exceptions into TableLoadingException
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -132,7 +149,7 @@ public abstract class Table {
       }
 
       // Create a table of appropriate type and have it load itself
-      Table table = fromMetastoreTable(id, client, db, msTbl);
+      Table table = fromMetastoreTable(id, db, msTbl);
       if (table == null) {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + msTbl.getTableName());
@@ -140,7 +157,7 @@ public abstract class Table {
       table.load(oldCacheEntry, client, msTbl);
       return table;
     } catch (TableLoadingException e) {
-      throw e;
+      return new IncompleteTable(id, db, tblName, e);
     } catch (NoSuchObjectException e) {
       throw new TableNotFoundException("Table not found: " + tblName, e);
     } catch (Exception e) {
@@ -168,8 +185,7 @@ public abstract class Table {
    * Creates a table of the appropriate type based on the given hive.metastore.api.Table
    * object.
    */
-  public static Table fromMetastoreTable(TableId id,
-      HiveMetaStoreClient client, Db db,
+  public static Table fromMetastoreTable(TableId id, Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     // Create a table of appropriate type
     Table table = null;
@@ -196,6 +212,61 @@ public abstract class Table {
           "column type '%s' in column '%s'", getName(), fs.getType(), fs.getName()));
     }
     return getPrimitiveType(fs.getType());
+  }
+
+  public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
+    List<FieldSchema> tblFields = DdlExecutor.buildFieldSchemaList(
+        thriftTable.getColumns());
+    List<FieldSchema> partKeys =
+        DdlExecutor.buildFieldSchemaList(thriftTable.getPartition_columns());
+
+    fields = new ArrayList<FieldSchema>(partKeys.size() + tblFields.size());
+    fields.addAll(partKeys);
+    fields.addAll(tblFields);
+
+    for (int i = 0; i < fields.size(); ++i) {
+      FieldSchema fs = fields.get(i);
+      Column col = new Column(fs.getName(), getPrimitiveType(fs.getType()),
+          fs.getComment(), i);
+      colsByPos.add(col);
+      colsByName.put(col.getName().toLowerCase(), col);
+      if (thriftTable.isSetColumn_stats() &&
+          thriftTable.getColumn_stats().containsKey(fs.getName().toLowerCase())) {
+        col.updateStats(thriftTable.getColumn_stats().get(fs.getName().toLowerCase()));
+      }
+    }
+
+    // The number of clustering columns is the number of partition keys.
+    numClusteringCols = partKeys.size();
+
+    // Estimated number of rows
+    numRows = thriftTable.isSetTable_stats() ?
+        thriftTable.getTable_stats().getNum_rows() : -1;
+  }
+
+  public TTable toThrift() throws TableLoadingException {
+    TTable table = new TTable(db.getName(), name);
+    table.setId(id.asInt());
+    table.setColumns(fieldSchemaToColumnDef(getMetaStoreTable().getSd().getCols()));
+
+    // populate with both partition keys and regular columns
+    table.setPartition_columns(fieldSchemaToColumnDef(
+        getMetaStoreTable().getPartitionKeys()));
+    table.setMetastore_table(getMetaStoreTable());
+    return table;
+  }
+
+  protected static List<TColumnDef> fieldSchemaToColumnDef(List<FieldSchema> fields) {
+    List<TColumnDef> colDefs = Lists.newArrayList();
+    for (FieldSchema fs: fields) {
+      TColumnDef colDef = new TColumnDef();
+      TColumnDesc colDesc = new TColumnDesc(fs.getName(),
+          getPrimitiveType(fs.getType()).toThrift());
+      colDef.setColumnDesc(colDesc);
+      colDef.setComment(fs.getComment());
+      colDefs.add(colDef);
+    }
+    return colDefs;
   }
 
   protected static PrimitiveType getPrimitiveType(String typeName) {

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.service;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 
 import com.cloudera.impala.catalog.Column;
@@ -74,7 +75,15 @@ public class DescribeResultFactory {
     TDescribeTableResult descResult = new TDescribeTableResult();
     descResult.results = Lists.newArrayList();
 
-    org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
+    org.apache.hadoop.hive.metastore.api.Table msTable =
+        table.getMetaStoreTable().deepCopy();
+    // Fixup the metastore table so the output of DESCRIBE FORMATTED matches Hive's.
+    // This is to distinguish between empty comments and no comments (value is null).
+    for (FieldSchema fs: msTable.getSd().getCols())
+      fs.setComment(table.getColumn(fs.getName()).getComment());
+    for (FieldSchema fs: msTable.getPartitionKeys()) {
+      fs.setComment(table.getColumn(fs.getName()).getComment());
+    }
 
     // To avoid initializing any of the SerDe classes in the metastore table Thrift
     // struct, create the ql.metadata.Table object by calling the empty c'tor and

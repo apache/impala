@@ -53,7 +53,7 @@ class RuntimeState;
 class ImpalaInternalServiceClient;
 class Expr;
 class ExecEnv;
-class TCatalogUpdate;
+class TUpdateMetastoreRequest;
 class TQueryExecRequest;
 class TReportExecStatusParams;
 class TRowBatch;
@@ -155,7 +155,7 @@ class Coordinator {
   // Gathers all updates to the catalog required once this query has completed execution.
   // Returns true if a catalog update is required, false otherwise.
   // Must only be called after Wait()
-  bool PrepareCatalogUpdate(TCatalogUpdate* catalog_update);
+  bool PrepareCatalogUpdate(TUpdateMetastoreRequest* catalog_update);
 
   // Return error log for coord and all the fragments
   std::string GetErrorLog();

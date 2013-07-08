@@ -80,4 +80,10 @@ public class FunctionName {
   private boolean isValidCharacter(char c) {
     return Character.isLetterOrDigit(c) || c == '_';
   }
+
+  public TFunctionName toThrift() { return new TFunctionName(db_, fn_); }
+
+  public static FunctionName fromThrift(TFunctionName fnName) {
+    return new FunctionName(fnName.getDb_name(), fnName.getFunction_name());
+  }
 }

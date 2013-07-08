@@ -25,6 +25,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -248,7 +249,8 @@ public class AuditingTest extends AnalyzerTest {
     // an AuthorizationError
     AuthorizationConfig config = new AuthorizationConfig("server1", "/does/not/exist",
         HadoopGroupResourceAuthorizationProvider.class.getName());
-    Catalog catalog = new Catalog(true, false, config);
+    ImpaladCatalog catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
+        config);
     Analyzer analyzer = new Analyzer(catalog, Catalog.DEFAULT_DB, currentUser);
 
     // Authorization of an object is performed immediately before auditing so

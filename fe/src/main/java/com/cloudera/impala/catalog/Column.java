@@ -18,6 +18,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.thrift.TColumnStatsData;
 import com.google.common.base.Objects;
 
 /**
@@ -72,6 +73,10 @@ public class Column {
     boolean statsDataCompatibleWithColType = stats.update(type, statsData);
     LOG.info("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
     return statsDataCompatibleWithColType;
+  }
+
+  public void updateStats(TColumnStatsData statsData) {
+    stats.update(type, statsData);
   }
 
   @Override

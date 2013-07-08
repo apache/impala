@@ -30,6 +30,11 @@ class TestInsertQueries(ImpalaTestSuite):
           (v.get_value('table_format').file_format == 'text' and \
            v.get_value('table_format').compression_codec == 'none'))
 
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertQueries, cls).setup_class()
+    cls.client.refresh()
+
   @pytest.mark.execute_serially
   def test_insert_null(self, vector):
     self.run_test_case('QueryTest/insert_null', vector)

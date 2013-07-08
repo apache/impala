@@ -179,7 +179,9 @@ class StateStore {
   // delta of changes on every update.
   class Topic {
    public:
-    Topic(const TopicId& topic_id) : topic_id_(topic_id) { }
+    Topic(const TopicId& topic_id)
+        : topic_id_(topic_id),
+          last_version_(0L) { }
 
     // Adds an entry with the given key. If bytes == NULL_VALUE, the entry
     // is considered deleted, and may be garbage collected in the

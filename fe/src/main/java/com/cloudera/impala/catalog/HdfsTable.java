@@ -53,13 +53,16 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumnStatsData;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
@@ -242,8 +245,7 @@ public class HdfsTable extends Table {
         blockMd.setDiskIds(diskIds);
       }
     }
-    LOG.info("loaded disk ids for table " + getFullName());
-    LOG.info(Integer.toString(getNumNodes()));
+    LOG.info("loaded disk ids for table " + getFullName() + ". nodes: " + getNumNodes());
     if (unknownDiskIdCount > 0) {
       LOG.warn("unknown disk id count " + unknownDiskIdCount);
     }
@@ -345,10 +347,6 @@ public class HdfsTable extends Table {
     return null;
   }
 
-  public boolean isClusteringColumn(Column col) {
-    return col.getPosition() < getNumClusteringCols();
-  }
-
   /**
    * Create columns corresponding to fieldSchemas, including column statistics.
    * Throws a TableLoadingException if the metadata is incompatible with what we
@@ -371,6 +369,7 @@ public class HdfsTable extends Table {
       colsByPos.add(col);
       colsByName.put(s.getName(), col);
       ++pos;
+
 
       ColumnStatistics colStats = null;
       try {
@@ -486,7 +485,6 @@ public class HdfsTable extends Table {
     if (newFileDescs.size() > 0) {
       loadBlockMd(newFileDescs);
     }
-
     uniqueHostPortsCount = countUniqueHostPorts(partitions);
   }
 
@@ -498,9 +496,9 @@ public class HdfsTable extends Table {
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (FileBlock blockMd: fileDesc.getFileBlocks()) {
-          String[] hostports = blockMd.getHostPorts();
-          for (int i = 0; i < hostports.length; ++i) {
-            uniqueHostPorts.add(hostports[i]);
+          List<String> hostports = blockMd.getHostPorts();
+          for (int i = 0; i < hostports.size(); ++i) {
+            uniqueHostPorts.add(hostports.get(i));
           }
         }
       }
@@ -600,7 +598,7 @@ public class HdfsTable extends Table {
    */
   public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    LOG.info("load table " + name);
+    LOG.info("load table: " + db.getName() + "." + name);
     // turn all exceptions into TableLoadingException
     try {
       // set nullPartitionKeyValue from the hive conf.
@@ -753,30 +751,72 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThrift() {
-    TTableDescriptor TTableDescriptor =
+  public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
+    super.loadFromTTable(thriftTable);
+    THdfsTable hdfsTable = thriftTable.getHdfs_table();
+    hdfsBaseDir = hdfsTable.getHdfsBaseDir();
+    nullColumnValue = hdfsTable.nullColumnValue;
+    nullPartitionKeyValue = hdfsTable.nullPartitionKeyValue;
+
+    for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
+      partitions.add(HdfsPartition.fromThrift(this, part.getKey(), part.getValue()));
+    }
+    uniqueHostPortsCount = countUniqueHostPorts(partitions);
+    avroSchema = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
+  }
+
+  @Override
+  public TTableDescriptor toThriftDescriptor() {
+    TTableDescriptor tableDesc =
         new TTableDescriptor(
             id.asInt(), TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols, name,
             db.getName());
+    tableDesc.setHdfsTable(getHdfsTable());
+    return tableDesc;
+  }
+
+  @Override
+  public TTable toThrift() throws TableLoadingException {
+    TTable table = super.toThrift();
+    table.setTable_type(TTableType.HDFS_TABLE);
+
+    // populate with both partition keys and regular columns
+    String inputFormat = getMetaStoreTable().getSd().getInputFormat();
+    if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
+      MetaStoreClient client = db.getParentCatalog().getMetaStoreClient();
+      try {
+        table.setColumns(
+            fieldSchemaToColumnDef(client.getHiveClient().getFields(db.getName(), name)));
+      } catch (Exception e) {
+        throw new TableLoadingException("Failed to load metadata for table: " + name, e);
+      } finally {
+        client.release();
+      }
+    }
+
+    table.setHdfs_table(getHdfsTable());
+    Map<String, TColumnStatsData> stats = Maps.newHashMap();
+    table.setColumn_stats(stats);
+    for (Column c: colsByPos) {
+      table.getColumn_stats().put(c.getName().toLowerCase(), c.getStats().toThrift());
+    }
+    return table;
+  }
+
+  private THdfsTable getHdfsTable() {
+    Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
+    for (HdfsPartition partition: partitions) {
+      idToPartition.put(partition.getId(), partition.toThrift(true));
+    }
+
     List<String> colNames = new ArrayList<String>();
     for (int i = 0; i < colsByPos.size(); ++i) {
       colNames.add(colsByPos.get(i).getName());
     }
-
-    // TODO: Remove unused partitions (according to scan node / data sink usage) from
-    // Thrift representation
-    Map<Long, THdfsPartition> idToValue = Maps.newHashMap();
-    for (HdfsPartition partition: partitions) {
-      idToValue.put(partition.getId(), partition.toThrift());
-    }
-    THdfsTable tHdfsTable = new THdfsTable(hdfsBaseDir,
-        colNames, nullPartitionKeyValue, nullColumnValue, idToValue);
-    if (avroSchema != null) {
-      tHdfsTable.setAvroSchema(avroSchema);
-    }
-
-    TTableDescriptor.setHdfsTable(tHdfsTable);
-    return TTableDescriptor;
+    THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir, colNames,
+        nullPartitionKeyValue, nullColumnValue, idToPartition);
+    hdfsTable.setAvroSchema(avroSchema);
+    return hdfsTable;
   }
 
   public String getHdfsBaseDir() { return hdfsBaseDir; }

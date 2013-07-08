@@ -14,12 +14,14 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TUda;
 
 /**
  * Internal representation of a UDA.
@@ -38,7 +40,7 @@ public class Uda extends Function {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public Uda(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
+  public Uda(FunctionName fnName, List<PrimitiveType> argTypes,
       PrimitiveType retType, ColumnType intermediateType,
       HdfsURI location, String updateFnName, String initFnName,
       String serializeFnName, String mergeFnName, String finalizeFnName) {
@@ -65,4 +67,18 @@ public class Uda extends Function {
   public void setMergeFnName(String fn) { mergeFnName_ = fn; }
   public void setFinalizeFnName(String fn) { finalizeFnName_ = fn; }
   public void setIntermediateType(ColumnType t) { intermediateType_ = t; }
+
+  @Override
+  public TFunction toThrift() {
+    TFunction fn = super.toThrift();
+    TUda uda = new TUda();
+    uda.setUpdate_fn_name(updateFnName_);
+    uda.setInit_fn_name(initFnName_);
+    if (serializeFnName_ == null) uda.setSerialize_fn_name(serializeFnName_);
+    uda.setMerge_fn_name(mergeFnName_);
+    uda.setFinalize_fn_name(finalizeFnName_);
+    uda.setIntermediate_type(intermediateType_.toThrift());
+    fn.setUda(uda);
+    return fn;
+  }
 }

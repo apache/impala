@@ -115,8 +115,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
       }
 
       // Create a "temp" table based off the given metastore.api.Table object.
-      Table table = Table.fromMetastoreTable(analyzer.getCatalog().getNextTableId(),
-          client.getHiveClient(), db, msTbl);
+      Table table = Table.fromMetastoreTable(
+          analyzer.getCatalog().getNextTableId(), db, msTbl);
       Preconditions.checkState(table != null && table instanceof HdfsTable);
 
       HdfsTable hdfsTable = (HdfsTable) table;

@@ -27,6 +27,7 @@ import com.cloudera.impala.analysis.SqlParser;
 import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.ViewRef;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 
 /**
@@ -72,41 +73,53 @@ public class View extends Table {
         colsByPos.add(col);
         colsByName.put(s.getName(), col);
       }
-
-      // Set view-definition SQL strings.
-      originalViewDef = msTbl.getViewOriginalText();
-      inlineViewDef = msTbl.getViewExpandedText();
-
       // These fields are irrelevant for views.
       numClusteringCols = 0;
       numRows = -1;
-
-      // Parse the expanded view definition SQL-string into a QueryStmt and
-      // populate a ViewRef to provide as view definition.
-      SqlScanner input = new SqlScanner(new StringReader(inlineViewDef));
-      SqlParser parser = new SqlParser(input);
-      ParseNode node = null;
-      try {
-        node = (ParseNode) parser.parse().value;
-      } catch (Exception e) {
-        // Do not pass e as the exception cause because it might reveal the existence
-        // of tables that the user triggering this load may not have privileges on.
-        throw new TableLoadingException(
-            String.format("Failed to parse view-definition statement of view: " +
-                "%s.%s", db.getName(), name));
-      }
-      // Make sure the view definition parses to a query statement.
-      if (!(node instanceof QueryStmt)) {
-        throw new TableLoadingException(String.format("View definition of %s.%s " +
-            "is not a query statement", db.getName(), name));
-      }
-
-      viewDef = new ViewRef(name, (QueryStmt) node, this);
+      initViewDef();
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for view: " + name, e);
     }
+  }
+
+  @Override
+  public void loadFromTTable(TTable t) throws TableLoadingException {
+    super.loadFromTTable(t);
+    initViewDef();
+  }
+
+  /**
+   * Initializes the originalViewDef, inlineViewDef, and viewDef members
+   * by parsing the expanded view definition SQL-string.
+   * Throws a TableLoadingException if there was any error parsing the
+   * the SQL or if the view definition did not parse into a QueryStmt.
+   */
+  private void initViewDef() throws TableLoadingException {
+    // Set view-definition SQL strings.
+    originalViewDef = getMetaStoreTable().getViewOriginalText();
+    inlineViewDef = getMetaStoreTable().getViewExpandedText();
+    // Parse the expanded view definition SQL-string into a QueryStmt and
+    // populate a ViewRef to provide as view definition.
+    SqlScanner input = new SqlScanner(new StringReader(inlineViewDef));
+    SqlParser parser = new SqlParser(input);
+    ParseNode node = null;
+    try {
+      node = (ParseNode) parser.parse().value;
+    } catch (Exception e) {
+      // Do not pass e as the exception cause because it might reveal the existence
+      // of tables that the user triggering this load may not have privileges on.
+      throw new TableLoadingException(
+          String.format("Failed to parse view-definition statement of view: " +
+              "%s.%s", db.getName(), name));
+    }
+    // Make sure the view definition parses to a query statement.
+    if (!(node instanceof QueryStmt)) {
+      throw new TableLoadingException(String.format("View definition of %s.%s " +
+          "is not a query statement", db.getName(), name));
+    }
+    viewDef = new ViewRef(name, (QueryStmt) node, this);
   }
 
   @Override
@@ -124,7 +137,7 @@ public class View extends Table {
   public boolean isVirtualTable() { return true; }
 
   @Override
-  public TTableDescriptor toThrift() {
+  public TTableDescriptor toThriftDescriptor() {
     throw new IllegalStateException("Cannot call toThrift() on a view.");
   }
 }

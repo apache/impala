@@ -44,6 +44,8 @@ using namespace boost;
 
 DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
+DEFINE_string(catalog_service_host, "localhost",
+    "hostname where CatalogService is running");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DEFINE_string(state_store_host, "localhost",
     "hostname where StateStoreService is running");

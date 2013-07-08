@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "common/status.h"
+
 #define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
   do { \
     Status status = (stmt); \
@@ -207,6 +209,55 @@ class JniUtil {
   // Returns the error message for 'e'. If no exception, returns Status::OK
   // Prefix, if non-empty will be prepended to the error message.
   static Status GetJniExceptionMsg(JNIEnv* env, const std::string& prefx = "");
+
+  // Utility methods to avoid repeating lots of the JNI call boilerplate. It seems these
+  // must be defined in the header to compile properly.
+  template <typename T>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(jni_env));
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
+    jni_env->CallObjectMethod(obj, method, request_bytes);
+    RETURN_ERROR_IF_EXC(jni_env);
+    return Status::OK;
+  }
+
+  template <typename T, typename R>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
+      const T& arg, R* response) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(jni_env));
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(obj, method, request_bytes));
+    RETURN_ERROR_IF_EXC(jni_env);
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
+    return Status::OK;
+  }
+
+  template <typename T>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
+      const T& arg, std::string* response) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(jni_env));
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
+    jstring java_response_string = static_cast<jstring>(
+        jni_env->CallObjectMethod(obj, method, request_bytes));
+    RETURN_ERROR_IF_EXC(jni_env);
+    jboolean is_copy;
+    const char *str = jni_env->GetStringUTFChars(java_response_string, &is_copy);
+    RETURN_ERROR_IF_EXC(jni_env);
+    *response = str;
+    jni_env->ReleaseStringUTFChars(java_response_string, str);
+    RETURN_ERROR_IF_EXC(jni_env);
+    return Status::OK;
+  }
 
  private:
   static jclass jni_util_cl_;

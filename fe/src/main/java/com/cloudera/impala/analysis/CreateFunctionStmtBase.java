@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
+import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TFunctionName;
 import com.cloudera.impala.thrift.TPrimitiveType;
@@ -64,22 +65,22 @@ public class CreateFunctionStmtBase extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
 
   protected TCreateFunctionParams toThrift() {
-    TCreateFunctionParams params = new TCreateFunctionParams();
-    params.setFn_name(new TFunctionName(fn_.dbName(), fn_.functionName()));
-    params.setFn_binary_type(fn_.getBinaryType());
-
-    params.setLocation(fn_.getLocation().toString());
+    TFunction fn = new TFunction();
+    fn.setFn_name(new TFunctionName(fn_.dbName(), fn_.functionName()));
+    fn.setFn_binary_type(fn_.getBinaryType());
+    fn.setLocation(fn_.getLocation().toString());
     List<TPrimitiveType> types = Lists.newArrayList();
     if (fn_.getNumArgs() > 0) {
       for (PrimitiveType t: fn_.getArgs()) {
         types.add(t.toThrift());
       }
     }
-    params.setArg_types(types);
+    fn.setArg_types(types);
+    fn.setRet_type(fn_.getReturnType().toThrift());
+    fn.setHas_var_args(fn_.hasVarArgs());
+    fn.setComment(getComment());
 
-    params.setRet_type(fn_.getReturnType().toThrift());
-    params.setHas_var_args(fn_.hasVarArgs());
-    params.setComment(getComment());
+    TCreateFunctionParams params = new TCreateFunctionParams(fn);
     params.setIf_not_exists(getIfNotExists());
     return params;
   }
@@ -138,11 +139,11 @@ public class CreateFunctionStmtBase extends StatementBase {
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
     // Validate function name is legal
-    fn_.getName().analyze(analyzer);
+    fn_.getFunctionName().analyze(analyzer);
 
     // Validate DB is legal
-    String dbName = analyzer.getTargetDbName(fn_.getName());
-    fn_.getName().setDb(dbName);
+    String dbName = analyzer.getTargetDbName(fn_.getFunctionName());
+    fn_.getFunctionName().setDb(dbName);
     if (analyzer.getCatalog().getDb(
         dbName, analyzer.getUser(), Privilege.CREATE) == null) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);

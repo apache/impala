@@ -21,6 +21,7 @@ namespace java com.cloudera.impala.thrift
 include "Status.thrift"
 include "Types.thrift"
 include "Exprs.thrift"
+include "CatalogObjects.thrift"
 include "Descriptors.thrift"
 include "PlanNodes.thrift"
 include "Planner.thrift"
@@ -56,8 +57,8 @@ struct TQueryOptions {
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
   13: optional bool abort_on_default_limit_exceeded = 0
-  14: optional Descriptors.THdfsCompression parquet_compression_codec =
-      Descriptors.THdfsCompression.SNAPPY
+  14: optional CatalogObjects.THdfsCompression parquet_compression_codec =
+      CatalogObjects.THdfsCompression.SNAPPY
   15: optional i32 hbase_caching = 0
   16: optional bool hbase_cache_blocks = 0
   17: optional i64 parquet_file_size = 0

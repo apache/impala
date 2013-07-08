@@ -65,7 +65,7 @@ public class InlineView extends Table {
    * This should never be called.
    */
   @Override
-  public TTableDescriptor toThrift() {
+  public TTableDescriptor toThriftDescriptor() {
     // An inline view never generate Thrift representation.
     throw new UnsupportedOperationException(
         "Inline View should not generate Thrift representation");

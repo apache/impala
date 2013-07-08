@@ -15,9 +15,9 @@
 package com.cloudera.impala.catalog;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.BlockLocation;
 import org.slf4j.Logger;
@@ -25,8 +25,11 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.THdfsFileBlock;
+import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -39,41 +42,57 @@ import com.google.common.collect.Maps;
  */
 public class HdfsPartition {
   /**
-   * Metadata for a single file in this partition
+   * Metadata for a single file in this partition.
+   * TODO: Do we even need this class? Just get rid of it and use the Thrift version?
    */
   static public class FileDescriptor {
     // TODO: split filePath into dir and file name and reuse the dir string to save
     // memory.
-    private final String filePath;
-    private final long fileLength;
-    private final HdfsCompression fileCompression;
-    private final long modificationTime;
-    private final List<FileBlock> fileBlocks;
+    private final List<FileBlock> fileBlocks_;
+    private final THdfsFileDesc fileDescriptor_;
 
-    public String getFilePath() { return filePath; }
-    public long getFileLength() { return fileLength; }
-    public long getModificationTime() { return modificationTime; }
-    public HdfsCompression getFileCompression() { return fileCompression; }
-    public List<FileBlock> getFileBlocks() { return fileBlocks; }
+    public String getFilePath() { return fileDescriptor_.getPath(); }
+    public long getFileLength() { return fileDescriptor_.getLength(); }
+    public long getModificationTime() {
+      return fileDescriptor_.getLast_modification_time();
+    }
+    public List<FileBlock> getFileBlocks() { return fileBlocks_; }
+    public THdfsFileDesc toThrift() { return fileDescriptor_; }
 
     public FileDescriptor(String filePath, long fileLength, long modificationTime) {
       Preconditions.checkNotNull(filePath);
       Preconditions.checkArgument(fileLength >= 0);
-      this.filePath = filePath;
-      this.fileLength = fileLength;
-      this.modificationTime = modificationTime;
-      fileCompression = HdfsCompression.fromFileName(filePath);
-      fileBlocks = Lists.newArrayList();
+      fileDescriptor_ = new THdfsFileDesc();
+      fileDescriptor_.setPath(filePath);
+      fileDescriptor_.setLength(fileLength);
+      fileDescriptor_.setLast_modification_time(modificationTime);
+      fileDescriptor_.setCompression(
+          HdfsCompression.fromFileName(filePath).toThrift());
+      List<THdfsFileBlock> emptyFileBlockList = Lists.newArrayList();
+      fileDescriptor_.setFile_blocks(emptyFileBlockList);
+      fileBlocks_ = Lists.newArrayList();
+    }
+
+    private FileDescriptor(THdfsFileDesc fileDesc) {
+      this(fileDesc.path, fileDesc.length, fileDesc.last_modification_time);
+      for (THdfsFileBlock block: fileDesc.getFile_blocks()) {
+        fileBlocks_.add(FileBlock.fromThrift(block));
+      }
     }
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this).add("Path", filePath)
-          .add("Length", fileLength).toString();
+      return Objects.toStringHelper(this).add("Path", getFilePath())
+          .add("Length", getFileLength()).toString();
     }
 
     public void addFileBlock(FileBlock blockMd) {
-      fileBlocks.add(blockMd);
+      fileBlocks_.add(blockMd);
+      fileDescriptor_.addToFile_blocks(blockMd.toThrift());
+    }
+
+    public static FileDescriptor fromThrift(THdfsFileDesc desc) {
+      return new FileDescriptor(desc);
     }
   }
 
@@ -81,17 +100,11 @@ public class HdfsPartition {
    * File Block metadata
    */
   public static class FileBlock {
-    private final String fileName;
-    private final long fileSize; // total size of the file holding the block, in bytes
-    private final long offset;
-    private final long length;
+    private final THdfsFileBlock fileBlock_;
 
-    // result of BlockLocation.getNames(): list of (IP:port) hosting this block
-    private final String[] hostPorts;
-
-    // hostPorts[i] stores this block on diskId[i]; the BE uses this information to
-    // schedule scan ranges
-    private int[] diskIds;
+    private FileBlock(THdfsFileBlock fileBlock) {
+      this.fileBlock_ = fileBlock;
+    }
 
     /**
      * Construct a FileBlock from blockLocation and populate hostPorts from
@@ -99,11 +112,13 @@ public class HdfsPartition {
      */
     public FileBlock(String fileName, long fileSize, BlockLocation blockLocation) {
       Preconditions.checkNotNull(blockLocation);
-      this.fileName = fileName;
-      this.fileSize = fileSize;
-      this.offset = blockLocation.getOffset();
-      this.length = blockLocation.getLength();
+      fileBlock_ = new THdfsFileBlock();
+      fileBlock_.setFile_name(fileName);
+      fileBlock_.setFile_size(fileSize);
+      fileBlock_.setOffset(blockLocation.getOffset());
+      fileBlock_.setLength(blockLocation.getLength());
 
+      // result of BlockLocation.getNames(): list of (IP:port) hosting this block
       String[] blockHostPorts;
       try {
         blockHostPorts = blockLocation.getNames();
@@ -114,22 +129,27 @@ public class HdfsPartition {
         throw new IllegalStateException(errorMsg);
       }
 
+      // hostPorts[i] stores this block on diskId[i]; the BE uses this information to
+      // schedule scan ranges
+
       // use String.intern() to reuse string
-      hostPorts = new String[blockHostPorts.length];
+      fileBlock_.host_ports = Lists.newArrayList();
       for (int i = 0; i < blockHostPorts.length; ++i) {
-        hostPorts[i] = blockHostPorts[i].intern();
+        fileBlock_.host_ports.add(blockHostPorts[i].intern());
       }
     }
 
-    public String getFileName() { return fileName; }
-    public long getFileSize() { return fileSize; }
-    public long getOffset() { return offset; }
-    public long getLength() { return length; }
-    public String[] getHostPorts() { return hostPorts; }
-
+    public String getFileName() { return fileBlock_.getFile_name(); }
+    public long getFileSize() { return fileBlock_.getFile_size(); }
+    public long getOffset() { return fileBlock_.getOffset(); }
+    public long getLength() { return fileBlock_.getLength(); }
+    public List<String> getHostPorts() { return fileBlock_.getHost_ports(); }
     public void setDiskIds(int[] diskIds) {
-      Preconditions.checkArgument(diskIds.length == hostPorts.length);
-      this.diskIds = diskIds;
+      Preconditions.checkArgument(diskIds.length == fileBlock_.getHost_ports().size());
+      fileBlock_.setDisk_ids(Lists.newArrayList(diskIds.length));
+      for (int i = 0; i < diskIds.length; ++i) {
+        fileBlock_.disk_ids.add(diskIds[i]);
+      }
     }
 
     /**
@@ -137,18 +157,24 @@ public class HdfsPartition {
      * disk id is not supported.
      */
     public int getDiskId(int hostIndex) {
-      if (diskIds == null) return -1;
+      if (fileBlock_.disk_ids == null) return -1;
       Preconditions.checkArgument(hostIndex >= 0);
-      Preconditions.checkArgument(hostIndex < diskIds.length);
-      return diskIds[hostIndex];
+      Preconditions.checkArgument(hostIndex < fileBlock_.getDisk_idsSize());
+      return fileBlock_.getDisk_ids().get(hostIndex);
+    }
+
+    public THdfsFileBlock toThrift() { return fileBlock_; }
+
+    public static FileBlock fromThrift(THdfsFileBlock thriftFileBlock) {
+      return new FileBlock(thriftFileBlock);
     }
 
     @Override
     public String toString() {
       return Objects.toStringHelper(this)
-          .add("offset", offset)
-          .add("length", length)
-          .add("#disks", diskIds.length)
+          .add("offset", fileBlock_.offset)
+          .add("length", fileBlock_.length)
+          .add("#disks", fileBlock_.getDisk_idsSize())
           .toString();
     }
   }
@@ -162,7 +188,6 @@ public class HdfsPartition {
   // partition-specific stats for each column
   // TODO: fill this
   private final Map<Column, ColumnStats> columnStats = Maps.newHashMap();
-
   private static AtomicLong partitionIdCounter = new AtomicLong();
 
   // A unique ID for each partition, used to identify a partition in the thrift
@@ -176,14 +201,14 @@ public class HdfsPartition {
    * It's easy to add per-file metadata to FileDescriptor if this changes.
    */
   private final HdfsStorageDescriptor fileFormatDescriptor;
-
   private final org.apache.hadoop.hive.metastore.api.Partition msPartition;
-
   private final List<FileDescriptor> fileDescriptors;
-
+  private final String location;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
 
-  public HdfsStorageDescriptor getInputFormatDescriptor() { return fileFormatDescriptor; }
+  public HdfsStorageDescriptor getInputFormatDescriptor() {
+    return fileFormatDescriptor;
+  }
 
   /**
    * Returns the metastore.api.Partition object this HdfsPartition represents. Returns
@@ -198,41 +223,29 @@ public class HdfsPartition {
    * Returns the storage location (HDFS path) of this partition. Should only be called
    * for partitioned tables.
    */
-  public String getLocation() {
-    Preconditions.checkNotNull(msPartition);
-    return msPartition.getSd().getLocation();
-  }
-
+  public String getLocation() { return location; }
   public long getId() { return id; }
-
   public HdfsTable getTable() { return table; }
-
-  public void setNumRows(long numRows) {
-    this.numRows = numRows;
-  }
-
+  public void setNumRows(long numRows) { this.numRows = numRows; }
   public long getNumRows() { return numRows; }
 
   /**
    * Returns an immutable list of partition key expressions
    */
   public List<LiteralExpr> getPartitionValues() { return partitionKeyValues; }
-
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     return fileDescriptors;
-  }
-
-  public List<LiteralExpr> getPartitionKeyValues() {
-    return partitionKeyValues;
   }
 
   private HdfsPartition(HdfsTable table,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
-      List<HdfsPartition.FileDescriptor> fileDescriptors, long id) {
+      List<HdfsPartition.FileDescriptor> fileDescriptors, long id,
+      String location) {
     this.table = table;
     this.msPartition = msPartition;
+    this.location = location;
     this.partitionKeyValues = ImmutableList.copyOf(partitionKeyValues);
     this.fileDescriptors = ImmutableList.copyOf(fileDescriptors);
     this.fileFormatDescriptor = fileFormatDescriptor;
@@ -254,17 +267,17 @@ public class HdfsPartition {
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
-        partitionIdCounter.getAndIncrement());
+        partitionIdCounter.getAndIncrement(), msPartition != null ?
+            msPartition.getSd().getLocation() : null);
   }
 
   public static HdfsPartition defaultPartition(
       HdfsTable table, HdfsStorageDescriptor storageDescriptor) {
     List<LiteralExpr> emptyExprList = Lists.newArrayList();
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
-    HdfsPartition partition = new HdfsPartition(table, null, emptyExprList,
+    return new HdfsPartition(table, null, emptyExprList,
         storageDescriptor, emptyFileDescriptorList,
-        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
-    return partition;
+        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID, null);
   }
 
   /*
@@ -317,16 +330,94 @@ public class HdfsPartition {
       .toString();
   }
 
-  public THdfsPartition toThrift() {
-    List<TExpr> thriftExprs =
-      Expr.treesToThrift(getPartitionValues());
+  public static HdfsPartition fromThrift(HdfsTable table,
+      long id, THdfsPartition thriftPartition) {
+    HdfsStorageDescriptor storageDesc = new HdfsStorageDescriptor(table.getName(),
+        HdfsFileFormat.fromThrift(thriftPartition.getFileFormat()),
+        (char) thriftPartition.lineDelim,
+        (char) thriftPartition.fieldDelim,
+        (char) thriftPartition.collectionDelim,
+        (char) thriftPartition.mapKeyDelim,
+        (char) thriftPartition.escapeChar,
+        '"', // TODO: We should probably add quoteChar to THdfsPartition.
+        (int) thriftPartition.blockSize,
+        thriftPartition.compression);
 
-    return new THdfsPartition((byte)fileFormatDescriptor.getLineDelim(),
+    List<LiteralExpr> literalExpr = Lists.newArrayList();
+    if (id != ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+      List<Column> clusterCols = Lists.newArrayList();
+      for (int i = 0; i < table.getNumClusteringCols(); ++i) {
+        clusterCols.add(table.getColumns().get(i));
+      }
+
+      List<com.cloudera.impala.thrift.TExprNode> exprNodes = Lists.newArrayList();
+      for (com.cloudera.impala.thrift.TExpr expr: thriftPartition.getPartitionKeyExprs()) {
+        for (com.cloudera.impala.thrift.TExprNode node: expr.getNodes()) {
+          exprNodes.add(node);
+        }
+      }
+      Preconditions.checkState(clusterCols.size() == exprNodes.size(),
+          String.format("Number of partition columns (%d) does not match number " +
+              "of partition key expressions (%d)",
+              clusterCols.size(), exprNodes.size()));
+
+      for (int i = 0; i < exprNodes.size(); ++i) {
+        literalExpr.add(TExprNodeToLiteralExpr(
+            exprNodes.get(i), clusterCols.get(i).getType()));
+      }
+    }
+
+    List<HdfsPartition.FileDescriptor> fileDescriptors = Lists.newArrayList();
+    if (thriftPartition.isSetFile_desc()) {
+      for (THdfsFileDesc desc: thriftPartition.getFile_desc()) {
+        fileDescriptors.add(HdfsPartition.FileDescriptor.fromThrift(desc));
+      }
+    }
+    return new HdfsPartition(table, null, literalExpr, storageDesc, fileDescriptors, id,
+        thriftPartition.getLocation());
+  }
+
+  private static LiteralExpr TExprNodeToLiteralExpr(
+      com.cloudera.impala.thrift.TExprNode exprNode, PrimitiveType primitiveType) {
+    try {
+      switch (exprNode.node_type) {
+        case FLOAT_LITERAL:
+          return LiteralExpr.create(Double.toString(exprNode.float_literal.value),
+              primitiveType);
+        case INT_LITERAL:
+          return LiteralExpr.create(Long.toString(exprNode.int_literal.value),
+              primitiveType);
+        case STRING_LITERAL:
+          return LiteralExpr.create(exprNode.string_literal.value, primitiveType);
+        case NULL_LITERAL:
+          return new NullLiteral();
+        default:
+          throw new IllegalStateException("Unsupported partition key type: " +
+              exprNode.node_type);
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("Error creating LiteralExpr: ", e);
+    }
+  }
+
+  public THdfsPartition toThrift(boolean includeFileDescriptorMetadata) {
+    List<TExpr> thriftExprs = Expr.treesToThrift(getPartitionValues());
+
+    THdfsPartition thriftHdfsPart =
+        new THdfsPartition((byte)fileFormatDescriptor.getLineDelim(),
         (byte)fileFormatDescriptor.getFieldDelim(),
         (byte)fileFormatDescriptor.getCollectionDelim(),
         (byte)fileFormatDescriptor.getMapKeyDelim(),
         (byte)fileFormatDescriptor.getEscapeChar(),
         fileFormatDescriptor.getFileFormat().toThrift(), thriftExprs,
         fileFormatDescriptor.getBlockSize(), fileFormatDescriptor.getCompression());
+    thriftHdfsPart.setLocation(location);
+    if (includeFileDescriptorMetadata) {
+      // Add block location information
+      for (FileDescriptor fd: fileDescriptors) {
+        thriftHdfsPart.addToFile_desc(fd.toThrift());
+      }
+    }
+    return thriftHdfsPart;
   }
 }

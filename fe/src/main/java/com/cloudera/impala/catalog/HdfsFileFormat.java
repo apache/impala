@@ -90,20 +90,28 @@ public enum HdfsFileFormat {
     throw new IllegalArgumentException(className);
   }
 
+  public static HdfsFileFormat fromThrift(THdfsFileFormat thriftFormat) {
+    switch (thriftFormat) {
+    case RC_FILE: return HdfsFileFormat.RC_FILE;
+    case TEXT: return HdfsFileFormat.TEXT;
+    case LZO_TEXT: return HdfsFileFormat.LZO_TEXT;
+    case SEQUENCE_FILE: return HdfsFileFormat.SEQUENCE_FILE;
+    case AVRO: return HdfsFileFormat.AVRO;
+    case PARQUET: return HdfsFileFormat.PARQUET;
+    default:
+      throw new RuntimeException("Unknown THdfsFileFormat: "
+          + thriftFormat + " - should never happen!");
+    }
+  }
+
   public THdfsFileFormat toThrift() {
     switch (this) {
-    case RC_FILE:
-      return THdfsFileFormat.RC_FILE;
-    case TEXT:
-      return THdfsFileFormat.TEXT;
-    case LZO_TEXT:
-      return THdfsFileFormat.LZO_TEXT;
-    case SEQUENCE_FILE:
-      return THdfsFileFormat.SEQUENCE_FILE;
-    case AVRO:
-      return THdfsFileFormat.AVRO;
-    case PARQUET:
-      return THdfsFileFormat.PARQUET;
+    case RC_FILE: return THdfsFileFormat.RC_FILE;
+    case TEXT: return THdfsFileFormat.TEXT;
+    case LZO_TEXT: return THdfsFileFormat.LZO_TEXT;
+    case SEQUENCE_FILE: return THdfsFileFormat.SEQUENCE_FILE;
+    case AVRO: return THdfsFileFormat.AVRO;
+    case PARQUET: return THdfsFileFormat.PARQUET;
     default:
       throw new RuntimeException("Unknown HdfsFormat: "
           + this + " - should never happen!");

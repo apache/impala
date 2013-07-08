@@ -19,7 +19,7 @@ import java.util.List;
 
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.google.common.base.Preconditions;
@@ -29,7 +29,7 @@ import com.google.common.base.Preconditions;
  *
  */
 public class AnalysisContext {
-  private final Catalog catalog;
+  private final ImpaladCatalog catalog;
 
   // The name of the database to use if one is not explicitly specified by a query.
   private final String defaultDatabase;
@@ -37,7 +37,7 @@ public class AnalysisContext {
   // The user who initiated the request.
   private final User user;
 
-  public AnalysisContext(Catalog catalog, String defaultDb, User user) {
+  public AnalysisContext(ImpaladCatalog catalog, String defaultDb, User user) {
     this.catalog = catalog;
     this.defaultDatabase = defaultDb;
     this.user = user;

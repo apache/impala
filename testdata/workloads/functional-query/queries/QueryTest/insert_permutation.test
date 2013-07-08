@@ -17,7 +17,6 @@ create table perm_part(int_col1 int, string_col string) partitioned by (p1 int, 
 insert into perm_nopart(int_col1, string_col, int_col2) values(1,'str',2)
 ---- SETUP
 RESET insert_permutation_test.perm_nopart
-RELOAD insert_permutation_test.perm_nopart
 ---- RESULTS
 : 1
 ====
@@ -33,7 +32,6 @@ INT,STRING,INT
 insert into perm_nopart(int_col2, string_col, int_col1) values(1,'str',2)
 ---- SETUP
 RESET insert_permutation_test.perm_nopart
-RELOAD insert_permutation_test.perm_nopart
 ---- RESULTS
 : 1
 ====
@@ -49,7 +47,6 @@ INT,STRING,INT
 insert into perm_nopart(int_col2) values(1)
 ---- SETUP
 RESET insert_permutation_test.perm_nopart
-RELOAD insert_permutation_test.perm_nopart
 ---- RESULTS
 : 1
 ====
@@ -65,7 +62,6 @@ INT,STRING,INT
 insert into perm_part(p1, string_col, int_col1, p2) values(10,'str',1, 'hello')
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=hello/: 1
 ====
@@ -81,7 +77,6 @@ INT,STRING,INT,STRING
 insert into perm_part(p2, string_col, int_col1, p1) values('hello','str',1, 10)
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=hello/: 1
 ====
@@ -97,7 +92,6 @@ INT,STRING,INT,STRING
 insert into perm_part(p2, p1) values('hello', 10)
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=hello/: 1
 ====
@@ -113,7 +107,6 @@ INT,STRING,INT,STRING
 insert into perm_part(p2) PARTITION(p1=10) values('hello')
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=hello/: 1
 ====
@@ -130,7 +123,6 @@ INT,STRING,INT,STRING
 insert into perm_part(int_col1, string_col) PARTITION(p1=10, p2) values(1,'perm_col','part_col')
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=part_col/: 1
 ====
@@ -146,7 +138,6 @@ INT,STRING,INT,STRING
 insert into perm_part() PARTITION(p1=10, p2='foo')
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=10/p2=foo/: 1
 ====
@@ -162,7 +153,6 @@ INT,STRING,INT,STRING
 insert into perm_part() PARTITION(p1, p2='foo') values(5)
 ---- SETUP
 RESET insert_permutation_test.perm_part
-RELOAD insert_permutation_test.perm_part
 ---- RESULTS
 p1=5/p2=foo/: 1
 ====
@@ -178,7 +168,6 @@ INT,STRING,INT,STRING
 insert into perm_nopart()
 ---- SETUP
 RESET insert_permutation_test.perm_nopart
-RELOAD insert_permutation_test.perm_nopart
 ---- RESULTS
 : 1
 ====

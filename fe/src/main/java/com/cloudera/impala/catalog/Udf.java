@@ -14,16 +14,20 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TUdf;
+
 
 /**
  * Internal representation of a UDF.
  * TODO: unify this with builtins.
  */
+
 public class Udf extends Function {
   // The name inside the binary at location_ that contains this particular
   // UDF. e.g. org.example.MyUdf.class.
@@ -33,7 +37,7 @@ public class Udf extends Function {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public Udf(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
+  public Udf(FunctionName fnName, List<PrimitiveType> argTypes,
     PrimitiveType retType, HdfsURI location, String symbolName) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
@@ -42,4 +46,12 @@ public class Udf extends Function {
 
   public void setSymbolName(String s) { symbolName_ = s; }
   public String getSymbolName() { return symbolName_; }
+
+  @Override
+  public TFunction toThrift() {
+    TFunction fn = super.toThrift();
+    fn.setUdf(new TUdf());
+    fn.getUdf().setSymbol_name(symbolName_);
+    return fn;
+  }
 }

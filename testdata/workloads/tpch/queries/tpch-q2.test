@@ -23,7 +23,6 @@ from partsupp ps
     on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
 ---- SETUP
 RESET q2_minimum_cost_supplier_tmp1
-RELOAD q2_minimum_cost_supplier_tmp1
 ---- RESULTS
 : 642
 ====
@@ -36,7 +35,6 @@ from  q2_minimum_cost_supplier_tmp1
 group by p_partkey
 ---- SETUP
 RESET q2_minimum_cost_supplier_tmp2
-RELOAD q2_minimum_cost_supplier_tmp2
 ---- RESULTS
 : 460
 ====

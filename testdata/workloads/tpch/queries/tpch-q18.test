@@ -7,7 +7,6 @@ from lineitem
 group by l_orderkey
 ---- SETUP
 RESET q18_tmp
-RELOAD q18_tmp
 ---- RESULTS
 : 1500000
 ====

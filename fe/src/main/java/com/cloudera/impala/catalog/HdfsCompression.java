@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 package com.cloudera.impala.catalog;
 
+import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -43,4 +44,17 @@ public enum HdfsCompression {
 
     return NONE;
   }
+
+  public THdfsCompression toThrift() {
+    switch (this) {
+    case NONE: return THdfsCompression.NONE;
+    case DEFLATE: return THdfsCompression.DEFLATE;
+    case GZIP: return THdfsCompression.GZIP;
+    case BZIP2: return THdfsCompression.BZIP2;
+    case SNAPPY: return THdfsCompression.SNAPPY_BLOCKED;
+    case LZO: return THdfsCompression.LZO;
+    default: throw new IllegalStateException("Unexpected codec: " + this);
+    }
+  }
+
 }

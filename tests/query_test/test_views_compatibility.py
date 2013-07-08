@@ -51,6 +51,11 @@ class TestViewCompatibility(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
+    if cls.exploration_strategy() == 'core':
+      # Don't run on core.  This test is very slow and we are unlikely
+      # to regress here.
+      cls.TestMatrix.add_constraint(lambda v: False);
+
   def setup_method(self, method):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)

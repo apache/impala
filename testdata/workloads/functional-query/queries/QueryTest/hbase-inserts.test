@@ -3,8 +3,6 @@
 insert into table insertalltypesagg 
 select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- SETUP
-RELOAD insertalltypesagg
 ---- RESULTS
 : 10000
 ====
@@ -23,8 +21,6 @@ INT, BOOLEAN
 insert into table insertalltypesagg
 select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- SETUP
-RELOAD insertalltypesagg
 ---- RESULTS
 : 10000
 ====
@@ -43,8 +39,6 @@ INT, BOOLEAN
 # using limit 1 to reduce execution time
 insert into table insertalltypesagg
 select * from insertalltypesagg limit 1
----- SETUP
-RELOAD insertalltypesagg
 ---- RESULTS
 : 1
 ====
@@ -54,8 +48,6 @@ RELOAD insertalltypesagg
 insert into table insertalltypesagg
 select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
----- SETUP
-RELOAD insertalltypesagg
 ---- RESULTS
 : 1
 ====
@@ -71,8 +63,6 @@ INT, STRING, STRING
 insert into table insertalltypesaggbinary
 select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- SETUP
-RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 10000
 ====
@@ -121,8 +111,6 @@ INT, BOOLEAN
 insert into table insertalltypesaggbinary
 select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- SETUP
-RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 10000
 ====
@@ -141,8 +129,6 @@ INT, BOOLEAN
 # using limit 1 to reduce execution time
 insert into table insertalltypesaggbinary
 select * from insertalltypesaggbinary limit 1
----- SETUP
-RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 1
 ====
@@ -152,8 +138,6 @@ RELOAD insertalltypesaggbinary
 insert into table insertalltypesaggbinary
 select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
----- SETUP
-RELOAD insertalltypesaggbinary
 ---- RESULTS
 : 1
 ====

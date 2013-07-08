@@ -31,10 +31,12 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
@@ -43,7 +45,7 @@ import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-  protected static Catalog catalog;
+  protected static ImpaladCatalog catalog;
 
   protected Analyzer analyzer;
 
@@ -77,7 +79,8 @@ public class AnalyzerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
+        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass

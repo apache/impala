@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import parquet.hive.serde.ParquetHiveSerDe;
 
-import com.cloudera.impala.thrift.DescriptorsConstants;
+import com.cloudera.impala.thrift.CatalogObjectsConstants;
 import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -212,8 +212,8 @@ public class HdfsStorageDescriptor {
     THdfsCompression compression = THdfsCompression.NONE;
     String compressionValue = parameters.get(COMPRESSION);
     if (compressionValue != null) {
-      if (DescriptorsConstants.COMPRESSION_MAP.containsKey(compressionValue)) {
-        compression = DescriptorsConstants.COMPRESSION_MAP.get(compressionValue);
+      if (CatalogObjectsConstants.COMPRESSION_MAP.containsKey(compressionValue)) {
+        compression = CatalogObjectsConstants.COMPRESSION_MAP.get(compressionValue);
       } else {
         LOG.warn("Unknown compression type: " + compressionValue);
       }

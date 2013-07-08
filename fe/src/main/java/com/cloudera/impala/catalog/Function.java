@@ -14,19 +14,24 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.ArrayList;
+import java.util.List;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 
 /**
- * Utility class to describe a function.
+ * Base class for all functions.
  */
-public class Function {
+public class Function implements CatalogObject {
   // Enum for how to compare function signatures.
   public enum CompareMode {
     // Two signatures are identical if the number of arguments and their types match
@@ -61,8 +66,8 @@ public class Function {
   // Absolute path in HDFS for the binary that contains this function.
   // e.g. /udfs/udfs.jar
   private HdfsURI location_;
-
   private TFunctionBinaryType binaryType_;
+  private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
   public Function(FunctionName name, PrimitiveType[] argTypes,
       PrimitiveType retType, boolean varArgs) {
@@ -76,7 +81,7 @@ public class Function {
     this.retType_ = retType;
   }
 
-  public Function(FunctionName name, ArrayList<PrimitiveType> args,
+  public Function(FunctionName name, List<PrimitiveType> args,
       PrimitiveType retType, boolean varArgs) {
     this(name, (PrimitiveType[])null, retType, varArgs);
     if (args.size() > 0) {
@@ -86,7 +91,7 @@ public class Function {
     }
   }
 
-  public FunctionName getName() { return name_; }
+  public FunctionName getFunctionName() { return name_; }
   public String functionName() { return name_.getFunction(); }
   public String dbName() { return name_.getDb(); }
   public PrimitiveType getReturnType() { return retType_; }
@@ -205,5 +210,61 @@ public class Function {
       // Neither has var args and the lengths don't match
       return false;
     }
+  }
+
+  @Override
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.FUNCTION; }
+
+  @Override
+  public long getCatalogVersion() { return catalogVersion_; }
+
+  @Override
+  public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
+
+  @Override
+  public String getName() { return getFunctionName().toString(); }
+
+  public TFunction toThrift() {
+    TFunction fn = new TFunction();
+    fn.setSignature(signatureString());
+    fn.setFn_name(name_.toThrift());
+    fn.setFn_binary_type(binaryType_);
+    fn.setLocation(location_.toString());
+    List<TPrimitiveType> argTypes = Lists.newArrayList();
+    for (PrimitiveType argType: argTypes_) {
+      argTypes.add(argType.toThrift());
+    }
+    fn.setArg_types(argTypes);
+    fn.setRet_type(getReturnType().toThrift());
+    fn.setHas_var_args(hasVarArgs_);
+    // TODO: Comment field is missing?
+    // fn.setComment(comment_)
+    return fn;
+  }
+
+  public static Function fromThrift(TFunction fn) {
+    List<PrimitiveType> argTypes = Lists.newArrayList();
+    for (TPrimitiveType t: fn.getArg_types()) {
+      argTypes.add(PrimitiveType.fromThrift(t));
+    }
+
+    Function function = null;
+    if (fn.isSetUdf()) {
+      function = new Udf(FunctionName.fromThrift(fn.getFn_name()), argTypes,
+          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsURI(fn.getLocation()),
+          fn.getUdf().getSymbol_name());
+    } else if (fn.isSetUda()) {
+      function = new Uda(FunctionName.fromThrift(fn.getFn_name()), argTypes,
+          PrimitiveType.fromThrift(fn.getRet_type()),
+          ColumnType.fromThrift(fn.getUda().getIntermediate_type()),
+          new HdfsURI(fn.getLocation()), fn.getUda().getUpdate_fn_name(),
+          fn.getUda().getInit_fn_name(), fn.getUda().getSerialize_fn_name(),
+          fn.getUda().getMerge_fn_name(), fn.getUda().getFinalize_fn_name());
+    } else {
+      throw new IllegalStateException("Expected function type to be either UDA or UDF.");
+    }
+    function.setBinaryType(fn.getFn_binary_type());
+    function.setHasVarArgs(fn.isHas_var_args());
+    return function;
   }
 }

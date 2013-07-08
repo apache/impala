@@ -8,7 +8,6 @@ from alltypessmall
 where year=2009 and month=04
 ---- SETUP
 RESET alltypesnopart_insert
-RELOAD alltypesnopart_insert
 ---- RESULTS
 : 25
 ====
@@ -415,7 +414,6 @@ bigint
 insert into alltypesinsert partition(year, month) select * from alltypessmall
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2009/month=1/: 25
 year=2009/month=2/: 25
@@ -530,7 +528,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col from alltypessmall where month = 4
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2010/month=4/: 25
 ====
@@ -542,7 +539,6 @@ select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2010/month=4/: 1
 ====
@@ -573,7 +569,6 @@ partition(year=2010, month=4) values
 (3, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", NULL, cast("2009-02-03 00:01:00" as timestamp))
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2010/month=4/: 3
 ====
@@ -607,7 +602,6 @@ with t1 as (select * from alltypestiny)
 insert into alltypesinsert partition(year, month) select * from t1
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2009/month=1/: 2
 year=2009/month=2/: 2
@@ -622,7 +616,6 @@ with t2 as (select * from alltypestiny)
 select * from t1 union all select * from t2
 ---- SETUP
 RESET alltypesinsert
-RELOAD alltypesinsert
 ---- RESULTS
 year=2009/month=1/: 4
 year=2009/month=2/: 4

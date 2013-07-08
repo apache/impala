@@ -20,14 +20,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
@@ -55,7 +50,7 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
@@ -66,7 +61,8 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
-import com.cloudera.impala.thrift.TCatalogUpdate;
+import com.cloudera.impala.thrift.TCatalogOpRequest;
+import com.cloudera.impala.thrift.TCatalogOpType;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -79,6 +75,8 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TInternalCatalogUpdateRequest;
+import com.cloudera.impala.thrift.TInternalCatalogUpdateResponse;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -86,14 +84,13 @@ import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TResetMetadataParams;
+import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Frontend API for the impalad process.
@@ -102,42 +99,21 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
-  private final boolean lazyCatalog;
+  private ImpaladCatalog impaladCatalog_;
+  private final AuthorizationConfig authzConfig_;
 
-  private Catalog catalog;
-  private DdlExecutor ddlExecutor;
-  private final AuthorizationConfig authzConfig;
-
-  // Only applies to partition updates after an INSERT for now.
-  private static final int NUM_CONCURRENT_METASTORE_OPERATIONS = 16;
-
-  // Used to execute metastore updates in parallel
-  ExecutorService executor =
-      Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
-
-  public Frontend(boolean lazy, AuthorizationConfig authorizationConfig) {
-    this.lazyCatalog = lazy;
-    this.authzConfig = authorizationConfig;
-    this.catalog = new Catalog(lazy, false, authzConfig);
-    ddlExecutor = new DdlExecutor(catalog);
+  public Frontend(AuthorizationConfig authorizationConfig) {
+    this(Catalog.CatalogInitStrategy.EMPTY, authorizationConfig);
   }
 
-  public DdlExecutor getDdlExecutor() {
-    return ddlExecutor;
+  // C'tor used by some tests.
+  public Frontend(Catalog.CatalogInitStrategy initStrategy,
+      AuthorizationConfig authorizationConfig) {
+    this.authzConfig_ = authorizationConfig;
+    this.impaladCatalog_ = new ImpaladCatalog(initStrategy, authzConfig_);
   }
 
-  /**
-   * Invalidates all catalog metadata, forcing a reload.
-   */
-  private void resetCatalog() {
-    catalog.close();
-    catalog = new Catalog(lazyCatalog, true, authzConfig);
-    ddlExecutor = new DdlExecutor(catalog);
-  }
-
-  public Catalog getCatalog() {
-    return catalog;
-  }
+  public ImpaladCatalog getCatalog() { return impaladCatalog_; }
 
   /**
    * If isRefresh is false, invalidates a specific table's metadata, forcing the
@@ -146,7 +122,8 @@ public class Frontend {
    */
   private void resetTable(String dbName, String tableName, boolean isRefresh)
       throws CatalogException {
-    Db db = catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ANY);
+    Db db = impaladCatalog_.getDb(dbName, ImpalaInternalAdminUser.getInstance(),
+        Privilege.ANY);
     if (db == null) {
       throw new DatabaseNotFoundException("Database not found: " + dbName);
     }
@@ -163,108 +140,155 @@ public class Frontend {
     }
   }
 
-  public void close() {
-    this.catalog.close();
+  public TInternalCatalogUpdateResponse updateInternalCatalog(
+      TInternalCatalogUpdateRequest req) throws CatalogException {
+    ImpaladCatalog catalog = impaladCatalog_;
+
+    // If this is not a delta, this update should replace the current
+    // Catalog contents so create a new catalog and populate it.
+    if (!req.is_delta) {
+      catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.EMPTY,
+          authzConfig_);
+    }
+    TInternalCatalogUpdateResponse response = catalog.updateCatalog(req);
+    if (!req.is_delta) impaladCatalog_ = catalog;
+    return response;
   }
 
   /**
-   * Constructs a TDdlExecRequest and attaches it, plus any metadata, to the
+   * Constructs a TCatalogOpRequest and attaches it, plus any metadata, to the
    * result argument.
    */
-  private void createDdlExecRequest(AnalysisContext.AnalysisResult analysis,
+  private void createCatalogOpRequest(AnalysisContext.AnalysisResult analysis,
       TExecRequest result) {
-    TDdlExecRequest ddl = new TDdlExecRequest();
+    TCatalogOpRequest ddl = new TCatalogOpRequest();
     TResultSetMetadata metadata = new TResultSetMetadata();
     if (analysis.isUseStmt()) {
-      ddl.ddl_type = TDdlType.USE;
+      ddl.op_type = TCatalogOpType.USE;
       ddl.setUse_db_params(analysis.getUseStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isShowTablesStmt()) {
-      ddl.ddl_type = TDdlType.SHOW_TABLES;
+      ddl.op_type = TCatalogOpType.SHOW_TABLES;
       ddl.setShow_tables_params(analysis.getShowTablesStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isShowDbsStmt()) {
-      ddl.ddl_type = TDdlType.SHOW_DBS;
+      ddl.op_type = TCatalogOpType.SHOW_DBS;
       ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isShowFunctionsStmt()) {
-      ddl.ddl_type = TDdlType.SHOW_FUNCTIONS;
+      ddl.op_type = TCatalogOpType.SHOW_FUNCTIONS;
       ShowFunctionsStmt stmt = (ShowFunctionsStmt)analysis.getStmt();
       ddl.setShow_fns_params(stmt.toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {
-      ddl.ddl_type = TDdlType.DESCRIBE;
+      ddl.op_type = TCatalogOpType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING),
           new TColumnDesc("type", TPrimitiveType.STRING),
           new TColumnDesc("comment", TPrimitiveType.STRING)));
     } else if (analysis.isAlterTableStmt()) {
-      ddl.ddl_type = TDdlType.ALTER_TABLE;
-      ddl.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.ALTER_TABLE);
+      req.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isAlterViewStmt()) {
-      ddl.ddl_type = TDdlType.ALTER_VIEW;
-      ddl.setAlter_view_params(analysis.getAlterViewStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.ALTER_VIEW);
+      req.setAlter_view_params(analysis.getAlterViewStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateTableStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_TABLE;
-      ddl.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_TABLE);
+      req.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateTableAsSelectStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_TABLE_AS_SELECT;
-      ddl.setCreate_table_params(
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_TABLE_AS_SELECT);
+      req.setCreate_table_params(
           analysis.getCreateTableAsSelectStmt().getCreateStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("summary", TPrimitiveType.STRING)));
     } else if (analysis.isCreateTableLikeStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_TABLE_LIKE;
-      ddl.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_TABLE_LIKE);
+      req.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateViewStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_VIEW;
-      ddl.setCreate_view_params(analysis.getCreateViewStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_VIEW);
+      req.setCreate_view_params(analysis.getCreateViewStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateDbStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_DATABASE;
-      ddl.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_DATABASE);
+      req.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateUdfStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_FUNCTION;
-      CreateUdfStmt stmt = (CreateUdfStmt)analysis.getStmt();
-      ddl.setCreate_fn_params(stmt.toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      CreateUdfStmt stmt = (CreateUdfStmt) analysis.getStmt();
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_FUNCTION);
+      req.setCreate_fn_params(stmt.toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isCreateUdaStmt()) {
-      ddl.ddl_type = TDdlType.CREATE_FUNCTION;
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_FUNCTION);
       CreateUdaStmt stmt = (CreateUdaStmt)analysis.getStmt();
-      ddl.setCreate_fn_params(stmt.toThrift());
+      req.setCreate_fn_params(stmt.toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isDropDbStmt()) {
-      ddl.ddl_type = TDdlType.DROP_DATABASE;
-      ddl.setDrop_db_params(analysis.getDropDbStmt().toThrift());
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.DROP_DATABASE);
+      req.setDrop_db_params(analysis.getDropDbStmt().toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isDropTableOrViewStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
       DropTableOrViewStmt stmt = analysis.getDropTableOrViewStmt();
-      ddl.ddl_type = (stmt.isDropTable()) ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW;
-      ddl.setDrop_table_or_view_params(stmt.toThrift());
+      req.setDdl_type(stmt.isDropTable() ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW);
+      req.setDrop_table_or_view_params(stmt.toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isDropFunctionStmt()) {
-      ddl.ddl_type = TDdlType.DROP_FUNCTION;
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.DROP_FUNCTION);
       DropFunctionStmt stmt = (DropFunctionStmt)analysis.getStmt();
-      ddl.setDrop_fn_params(stmt.toThrift());
+      req.setDrop_fn_params(stmt.toThrift());
+      ddl.setDdl_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isResetMetadataStmt()) {
-      ddl.ddl_type = TDdlType.RESET_METADATA;
+      ddl.op_type = TCatalogOpType.RESET_METADATA;
       ResetMetadataStmt resetMetadataStmt = (ResetMetadataStmt) analysis.getStmt();
-      ddl.setReset_metadata_params(resetMetadataStmt.toThrift());
+      TResetMetadataRequest req = resetMetadataStmt.toThrift();
+      ddl.setReset_metadata_params(req);
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     }
-
     result.setResult_set_metadata(metadata);
-    result.setDdl_exec_request(ddl);
+    result.setCatalog_op_request(ddl);
   }
 
   /**
@@ -281,10 +305,10 @@ public class Frontend {
     // this the partition location. Otherwise this is the table location.
     String destPathString = null;
     if (request.isSetPartition_spec()) {
-      destPathString = catalog.getHdfsPartition(tableName.getDb(), tableName.getTbl(),
+      destPathString = impaladCatalog_.getHdfsPartition(tableName.getDb(), tableName.getTbl(),
           request.getPartition_spec()).getLocation();
     } else {
-      destPathString = catalog.getTable(tableName.getDb(), tableName.getTbl(),
+      destPathString = impaladCatalog_.getTable(tableName.getDb(), tableName.getTbl(),
           ImpalaInternalAdminUser.getInstance(), Privilege.INSERT)
           .getMetaStoreTable().getSd().getLocation();
     }
@@ -314,8 +338,6 @@ public class Frontend {
     FileSystemUtil.moveAllVisibleFiles(tmpDestPath, destPath);
     // Cleanup the tmp directory.
     dfs.delete(tmpDestPath, true);
-    resetTable(tableName.getDb(), tableName.getTbl(), true);
-
     TLoadDataResp response = new TLoadDataResp();
     TColumnValue col = new TColumnValue();
     String loadMsg = String.format(
@@ -343,7 +365,7 @@ public class Frontend {
    */
   public List<String> getTableNames(String dbName, String tablePattern, User user)
       throws ImpalaException {
-    return catalog.getTableNames(dbName, tablePattern, user);
+    return impaladCatalog_.getTableNames(dbName, tablePattern, user);
   }
 
   /**
@@ -351,7 +373,7 @@ public class Frontend {
    * are accessible to the given user. If pattern is null, matches all dbs.
    */
   public List<String> getDbNames(String dbPattern, User user) {
-    return catalog.getDbNames(dbPattern, user);
+    return impaladCatalog_.getDbNames(dbPattern, user);
   }
 
   /**
@@ -361,7 +383,7 @@ public class Frontend {
    */
   public List<String> getFunctions(TFunctionType type, String dbName, String fnPattern)
       throws DatabaseNotFoundException {
-    return catalog.getFunctionSignatures(type, dbName, fnPattern);
+    return impaladCatalog_.getFunctionSignatures(type, dbName, fnPattern);
   }
 
   /**
@@ -371,7 +393,7 @@ public class Frontend {
    */
   public TDescribeTableResult describeTable(String dbName, String tableName,
       TDescribeTableOutputStyle outputStyle) throws ImpalaException {
-    Table table = catalog.getTable(dbName, tableName,
+    Table table = impaladCatalog_.getTable(dbName, tableName,
         ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
     return DescribeResultFactory.buildDescribeTableResult(table, outputStyle);
   }
@@ -385,7 +407,7 @@ public class Frontend {
       TClientRequest request, StringBuilder explainString) throws
       AnalysisException, AuthorizationException, NotImplementedException,
       InternalException {
-    AnalysisContext analysisCtxt = new AnalysisContext(catalog,
+    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_,
         request.sessionState.database,
         new User(request.sessionState.user));
     AnalysisContext.AnalysisResult analysisResult = null;
@@ -400,7 +422,7 @@ public class Frontend {
 
     if (analysisResult.isDdlStmt()) {
       result.stmt_type = TStmtType.DDL;
-      createDdlExecRequest(analysisResult, result);
+      createCatalogOpRequest(analysisResult, result);
 
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
@@ -543,18 +565,18 @@ public class Frontend {
       {
         TGetSchemasReq req = request.getGet_schemas_req();
         return MetadataOp.getSchemas(
-            catalog, req.getCatalogName(), req.getSchemaName(), user);
+            impaladCatalog_, req.getCatalogName(), req.getSchemaName(), user);
       }
       case GET_TABLES:
       {
         TGetTablesReq req = request.getGet_tables_req();
-        return MetadataOp.getTables(catalog, req.getCatalogName(), req.getSchemaName(),
+        return MetadataOp.getTables(impaladCatalog_, req.getCatalogName(), req.getSchemaName(),
             req.getTableName(), req.getTableTypes(), user);
       }
       case GET_COLUMNS:
       {
         TGetColumnsReq req = request.getGet_columns_req();
-        return MetadataOp.getColumns(catalog, req.getCatalogName(), req.getSchemaName(),
+        return MetadataOp.getColumns(impaladCatalog_, req.getCatalogName(), req.getSchemaName(),
             req.getTableName(), req.getColumnName(), user);
       }
       case GET_CATALOGS: return MetadataOp.getCatalogs();
@@ -562,135 +584,11 @@ public class Frontend {
       case GET_FUNCTIONS:
       {
         TGetFunctionsReq req = request.getGet_functions_req();
-        return MetadataOp.getFunctions(catalog, req.getCatalogName(), req.getSchemaName(),
-            req.getFunctionName(), user);
+        return MetadataOp.getFunctions(impaladCatalog_, req.getCatalogName(),
+            req.getSchemaName(), req.getFunctionName(), user);
       }
       default:
         throw new NotImplementedException(request.opcode + " has not been implemented.");
-    }
-  }
-
-  /**
-   * Creates a single partition in the metastore.
-   * TODO: Depending how often we do lots of metastore operations at once, might be worth
-   * making this reusable.
-   */
-  private class CreatePartitionRunnable implements Runnable {
-    /**
-     * Constructs a new operation to create a partition in dbName.tblName called
-     * partName. The supplied future is signalled if an error occurs, or if numPartitions
-     * is decremented to 0 after the partition creation has completed. If a partition is
-     * actually created, partitionCreated is set.
-     */
-    public CreatePartitionRunnable(TableName tblName,
-        String partName, AtomicBoolean partitionCreated,
-        SettableFuture<Void> allFinished, AtomicInteger numPartitions) {
-      tblName_ = tblName;
-      partName_ = partName;
-      partitionCreated_ = partitionCreated;
-      allFinished_ = allFinished;
-      numPartitions_ = numPartitions;
-    }
-
-    public void run() {
-      // If there was an exception in another operation, abort
-      if (allFinished_.isDone()) return;
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
-      try {
-        LOG.info("Creating partition: " + partName_ + " in table: " + tblName_);
-        msClient.getHiveClient().appendPartitionByName(tblName_.getDb(),
-            tblName_.getTbl(), partName_);
-        partitionCreated_.set(true);
-      } catch (AlreadyExistsException e) {
-        LOG.info("Ignoring partition " + partName_ + ", since it already exists");
-        // Ignore since partition already exists.
-      } catch (Exception e) {
-        allFinished_.setException(e);
-      } finally {
-        msClient.release();
-      }
-
-      // If this is the last operation to complete, signal the future
-      if (numPartitions_.decrementAndGet() == 0) {
-        allFinished_.set(null);
-      }
-    }
-
-    private final TableName tblName_;
-    private final String partName_;
-    private final AtomicBoolean partitionCreated_;
-    private final AtomicInteger numPartitions_;
-    private final SettableFuture<Void> allFinished_;
-  }
-
-  /**
-   * Create any new partitions required as a result of an INSERT statement.
-   * Updates the lastDdlTime of the table if new partitions were created.
-   */
-  public void updateMetastore(TCatalogUpdate update) throws ImpalaException {
-    // Only update metastore for Hdfs tables.
-    Table table = catalog.getTable(update.getDb_name(), update.getTarget_table(),
-        ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
-    if (!(table instanceof HdfsTable)) {
-      LOG.warn("Unexpected table type in updateMetastore: "
-          + update.getTarget_table());
-      return;
-    }
-
-    TableName tblName = new TableName(table.getDb().getName(), table.getName());
-    AtomicBoolean addedNewPartition = new AtomicBoolean(false);
-
-    if (table.getNumClusteringCols() > 0) {
-      SettableFuture<Void> allFinished = SettableFuture.create();
-      AtomicInteger numPartitions =
-          new AtomicInteger(update.getCreated_partitions().size());
-      // Add all partitions to metastore.
-      for (String partName: update.getCreated_partitions()) {
-        Preconditions.checkState(partName != null && !partName.isEmpty());
-        CreatePartitionRunnable rbl =
-            new CreatePartitionRunnable(tblName, partName, addedNewPartition, allFinished,
-                numPartitions);
-        executor.execute(rbl);
-      }
-
-      try {
-        // Will throw if any operation calls setException
-        allFinished.get();
-      } catch (Exception e) {
-        throw new InternalException("Error updating metastore", e);
-      }
-    }
-    if (addedNewPartition.get()) {
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
-      try {
-        // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
-        // if the alteration fails in the metastore.
-        org.apache.hadoop.hive.metastore.api.Table msTbl =
-            table.getMetaStoreTable().deepCopy();
-        DdlExecutor.updateLastDdlTime(msTbl, msClient);
-      } catch (Exception e) {
-        throw new InternalException("Error updating lastDdlTime", e);
-      } finally {
-        msClient.release();
-      }
-    }
-
-    // Refresh the table metadata.
-    resetTable(tblName.getDb(), tblName.getTbl(), true);
-  }
-
-  /**
-   * Execute a reset metadata statement.
-   */
-  public void execResetMetadata(TResetMetadataParams params)
-      throws CatalogException {
-    if (params.isSetTable_name()) {
-      resetTable(params.getTable_name().getDb_name(),
-          params.getTable_name().getTable_name(), params.isIs_refresh());
-    } else {
-      // Invalidate the catalog if no table name is provided.
-      Preconditions.checkArgument(!params.isIs_refresh());
-      resetCatalog();
     }
   }
 }

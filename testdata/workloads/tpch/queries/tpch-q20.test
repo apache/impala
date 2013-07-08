@@ -7,7 +7,6 @@ from part
 where p_name like 'forest%'
 ---- SETUP
 RESET q20_tmp1
-RELOAD q20_tmp1
 ---- RESULTS
 : 2127
 ====
@@ -26,7 +25,6 @@ group by
   l_suppkey
 ---- SETUP
 RESET q20_tmp2
-RELOAD q20_tmp2
 ---- RESULTS
 : 543210
 ====
@@ -43,7 +41,6 @@ from partsupp ps
     on (ps.ps_partkey = t1.p_partkey)
 ---- SETUP
 RESET q20_tmp3
-RELOAD q20_tmp3
 ---- RESULTS
 : 5843
 ====
@@ -56,7 +53,6 @@ where ps_availqty > sum_quantity
 group by ps_suppkey
 ---- SETUP
 RESET q20_tmp4
-RELOAD q20_tmp4
 ---- RESULTS
 : 4397
 ====

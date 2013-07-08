@@ -107,6 +107,8 @@ set (GENERATES_SRC_FILES
 
 set (SRC_FILES
   beeswax.thrift
+  CatalogObjects.thrift
+  CatalogService.thrift
   cli_service.thrift
   DataSinks.thrift
   Data.thrift

@@ -20,6 +20,7 @@
 #include <string>
 #include <boost/cstdint.hpp>
 
+#include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -56,6 +57,7 @@ std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 std::string PrintTCatalogObjectType(const TCatalogObjectType::type& type);
 std::string PrintTDdlType(const TDdlType::type& type);
+std::string PrintTCatalogOpType(const TCatalogOpType::type& type);
 std::string PrintTSessionType(const TSessionType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);

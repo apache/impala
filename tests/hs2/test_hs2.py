@@ -22,7 +22,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
-from common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 
 def needs_session(fn):
   """Decorator that establishes a session and sets self.session_handle. When the test is

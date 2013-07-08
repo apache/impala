@@ -18,8 +18,8 @@
 #include "util/compress.h"
 #include "util/decompress.h"
 
-#include "gen-cpp/Descriptors_types.h"
-#include "gen-cpp/Descriptors_constants.h"
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/CatalogObjects_constants.h"
 
 using namespace std;
 using namespace boost;
@@ -50,11 +50,11 @@ const Codec::CodecMap Codec::CODEC_MAP = map_list_of
 
 string Codec::GetCodecName(THdfsCompression::type type) {
   map<const string, THdfsCompression::type>::const_iterator im;
-  for (im = g_Descriptors_constants.COMPRESSION_MAP.begin();
-       im != g_Descriptors_constants.COMPRESSION_MAP.end(); ++im) {
+  for (im = g_CatalogObjects_constants.COMPRESSION_MAP.begin();
+       im != g_CatalogObjects_constants.COMPRESSION_MAP.end(); ++im) {
     if (im->second == type) return im->first;
   }
-  DCHECK(im != g_Descriptors_constants.COMPRESSION_MAP.end());
+  DCHECK(im != g_CatalogObjects_constants.COMPRESSION_MAP.end());
   return "INVALID";
 }
 

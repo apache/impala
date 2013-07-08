@@ -26,10 +26,9 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -38,7 +37,7 @@ public class CatalogTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new CatalogServiceCatalog(new TUniqueId(0L, 0L));
   }
 
   @AfterClass
@@ -85,9 +84,9 @@ public class CatalogTest {
 
   @Test
   public void TestColSchema() throws TableLoadingException {
-    Db defaultDb = getDb(catalog, "functional");
-    Db hbaseDb = getDb(catalog, "functional_hbase");
-    Db testDb = getDb(catalog, "functional_seq");
+    Db defaultDb = catalog.getDb("functional");
+    Db hbaseDb = catalog.getDb("functional_hbase");
+    Db testDb = catalog.getDb("functional_seq");
 
     assertNotNull(defaultDb);
     assertEquals(defaultDb.getName(), "functional");
@@ -279,7 +278,8 @@ public class CatalogTest {
   }
 
   @Test public void TestPartitions() throws TableLoadingException {
-    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("AllTypes");
+    HdfsTable table =
+        (HdfsTable) catalog.getDb("functional").getTable("AllTypes");
     List<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
@@ -313,7 +313,8 @@ public class CatalogTest {
   @Test
   public void testStats() throws TableLoadingException {
     // make sure the stats for functional.alltypesagg look correct
-    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("AllTypesAgg");
+    HdfsTable table =
+        (HdfsTable) catalog.getDb("functional").getTable("AllTypesAgg");
 
     Column idCol = table.getColumn("id");
     assertEquals(idCol.getStats().getAvgSerializedSize(),
@@ -388,8 +389,8 @@ public class CatalogTest {
   @Test
   public void testColStatsColTypeMismatch() throws Exception {
     // First load a table that has column stats.
-    getDb(catalog, "functional").invalidateTable("functional");
-    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("alltypesagg");
+    catalog.getDb("functional").invalidateTable("functional");
+    HdfsTable table = (HdfsTable) catalog.getDb("functional").getTable("alltypesagg");
 
     // Now attempt to update a column's stats with mismatched stats data and ensure
     // we get the expected results.
@@ -430,7 +431,7 @@ public class CatalogTest {
       }
     } finally {
       // Make sure to invalidate the metadata so the next test isn't using bad col stats
-      getDb(catalog, "functional").invalidateTable("functional");
+      catalog.getDb("functional").invalidateTable("functional");
       client.release();
     }
   }
@@ -448,56 +449,61 @@ public class CatalogTest {
   @Test
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
-   HBaseTable table =
-        (HBaseTable)getDb(catalog, "functional_hbase").getTable("internal_hbase_table");
+   HBaseTable table = (HBaseTable)
+       catalog.getDb("functional_hbase").getTable("internal_hbase_table");
     assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
 
-  @Test(expected = TableLoadingException.class)
   public void testMapColumnFails() throws TableLoadingException {
-    Table table = getDb(catalog, "functional").getTable("map_table");
+    Table table = catalog.getDb("functional").getTable("map_table");
+    assertTrue(table instanceof IncompleteTable);
+    IncompleteTable incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
   }
 
-  @Test(expected = TableLoadingException.class)
   public void testMapColumnFailsOnHBaseTable() throws TableLoadingException {
-    Table table = getDb(catalog, "functional_hbase").getTable("map_table_hbase");
+    Table table = catalog.getDb("functional_hbase").getTable("map_table_hbase");
+    assertTrue(table instanceof IncompleteTable);
+    IncompleteTable incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
   }
 
-  @Test(expected = TableLoadingException.class)
   public void testArrayColumnFails() throws TableLoadingException {
-    Table table = getDb(catalog, "functional").getTable("array_table");
+    Table table = catalog.getDb("functional").getTable("array_table");
+    assertTrue(table instanceof IncompleteTable);
+    IncompleteTable incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
   }
 
   @Test
   public void testDatabaseDoesNotExist() {
-    Db nonExistentDb = getDb(catalog, "doesnotexist");
+    Db nonExistentDb = catalog.getDb("doesnotexist");
     assertNull(nonExistentDb);
   }
 
   @Test
   public void testCreateTableMetadata() throws TableLoadingException {
-    Table table = getDb(catalog, "functional").getTable("alltypes");
+    Table table = catalog.getDb("functional").getTable("alltypes");
     // Tables are created via Impala so the metadata should have been populated properly.
     // alltypes is an external table.
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.EXTERNAL_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
-    table = getDb(catalog, "functional").getTable("alltypesinsert");
+    table = catalog.getDb("functional").getTable("alltypesinsert");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.MANAGED_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
   }
 
   @Test
-  public void testLoadingUnsupportedTableTypes() {
-    try {
-      Table table = getDb(catalog, "functional").getTable("hive_index_tbl");
-      fail("Expected TableLoadingException when loading INDEX_TABLE");
-    } catch (TableLoadingException e) {
-      assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
-          e.getMessage());
-    }
+  public void testLoadingUnsupportedTableTypes() throws TableLoadingException {
+    Table table = catalog.getDb("functional").getTable("hive_index_tbl");
+    assertTrue(table instanceof IncompleteTable);
+    IncompleteTable incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+    assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
+        incompleteTable.getCause().getMessage());
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
@@ -505,7 +511,7 @@ public class CatalogTest {
   // escape char.
   @Test public void TestTableWithBadEscapeChar() throws TableLoadingException {
     HdfsTable table =
-        (HdfsTable) getDb(catalog, "functional").getTable("escapechartesttable");
+        (HdfsTable) catalog.getDb("functional").getTable("escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();
     for (HdfsPartition p: partitions) {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
@@ -540,16 +546,16 @@ public class CatalogTest {
     // table and an HBase table.
     String[] tableNames = {"alltypes", "alltypesnopart"};
     for (String tableName: tableNames) {
-      Table table = getDb(catalog, "functional").getTable(tableName);
+      Table table = catalog.getDb("functional").getTable(tableName);
       table = Table.load(catalog.getNextTableId(),
           catalog.getMetaStoreClient().getHiveClient(),
-          getDb(catalog, "functional"), tableName, table);
+          catalog.getDb("functional"), tableName, table);
     }
     // Test HBase table
-    Table table = getDb(catalog, "functional_hbase").getTable("alltypessmall");
+    Table table = catalog.getDb("functional_hbase").getTable("alltypessmall");
     table = Table.load(catalog.getNextTableId(),
         catalog.getMetaStoreClient().getHiveClient(),
-        getDb(catalog, "functional_hbase"), "alltypessmall", table);
+        catalog.getDb("functional_hbase"), "alltypessmall", table);
   }
 
   @Test
@@ -566,6 +572,7 @@ public class CatalogTest {
         new Function(new FunctionName("default", "Foo"), args1,
             PrimitiveType.INVALID_TYPE, false));
     fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+
     assertEquals(fnNames.size(), 0);
 
     Udf udf1 = new Udf(new FunctionName("default", "Foo"),
@@ -638,14 +645,5 @@ public class CatalogTest {
         new FunctionName("default", "foo"), args2, PrimitiveType.INVALID_TYPE, false));
     fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 0);
-  }
-
-  private static Db getDb(Catalog catalog, String dbName) {
-    try {
-      return catalog.getDb(dbName, ImpalaInternalAdminUser.getInstance(), Privilege.ANY);
-    } catch (AuthorizationException e) {
-      // Wrap as unchecked exception
-      throw new IllegalStateException(e);
-    }
   }
 }

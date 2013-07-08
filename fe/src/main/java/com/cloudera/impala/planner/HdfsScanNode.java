@@ -164,19 +164,19 @@ public class HdfsScanNode extends ScanNode {
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (HdfsPartition.FileBlock block: fileDesc.getFileBlocks()) {
-          String[] blockHostPorts = block.getHostPorts();
-          if (blockHostPorts.length == 0) {
+          List<String> blockHostPorts = block.getHostPorts();
+          if (blockHostPorts.size() == 0) {
             // we didn't get locations for this block; for now, just ignore the block
             // TODO: do something meaningful with that
             continue;
           }
 
           // record host/ports and volume ids
-          Preconditions.checkState(blockHostPorts.length > 0);
+          Preconditions.checkState(blockHostPorts.size() > 0);
           List<TScanRangeLocation> locations = Lists.newArrayList();
-          for (int i = 0; i < blockHostPorts.length; ++i) {
+          for (int i = 0; i < blockHostPorts.size(); ++i) {
             TScanRangeLocation location = new TScanRangeLocation();
-            String hostPort = blockHostPorts[i];
+            String hostPort = blockHostPorts.get(i);
             location.setServer(addressToTNetworkAddress(hostPort));
             location.setVolume_id(block.getDiskId(i));
             locations.add(location);

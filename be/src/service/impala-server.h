@@ -31,7 +31,6 @@
 #include "rpc/thrift-server.h"
 #include "common/status.h"
 #include "service/frontend.h"
-#include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "util/simple-logger.h"
@@ -235,6 +234,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   //                              Currently unused.
   void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap&
       incoming_topic_deltas, std::vector<TTopicDelta>* subscriber_topic_updates);
+
+  void CatalogUpdateCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
+      std::vector<TTopicDelta>* topic_updates);
 
  private:
   class FragmentExecState;
@@ -565,8 +567,18 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CancelFromThreadPool(uint32_t thread_id,
       const CancellationWork& cancellation_work);
 
-  // For access to GetTableNames and DescribeTable
-  friend class DdlExecutor;
+  // Parses the given IMPALA_CATALOG_TOPIC topic entry key to determine the
+  // TCatalogObjectType and unique object name. Populates catalog_object with the result.
+  // This is used to reconstruct type information when an item is deleted from the
+  // topic. The only context available about the object being deleted is its key,
+  // only the minimal amount of metadata to remove the item from the catalog will be
+  // populated.
+  Status TCatalogObjectFromEntryKey(const std::string& key,
+      TCatalogObject* catalog_object);
+
+  // Waits until the Impalad Catalog has reached a version that includes the specified
+  // update result.
+  void WaitForCatalogUpdate(const TCatalogUpdateResult& catalog_update_result);
 
   // Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
@@ -717,6 +729,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Lock to protect uuid_generator
   boost::mutex uuid_lock_;
+
+  // Lock for current_catalog_version_ and catalog_version_update_cv_
+  boost::mutex catalog_version_lock_;
+
+  // Variable to signal when the catalog version has been modified
+  boost::condition_variable catalog_version_update_cv_;
+
+  // The current max catalog version returned from the last call to UpdateCatalog()
+  // and the CatalogService ID that this version was from.
+  int64_t current_catalog_version_;
+  TUniqueId current_catalog_service_id_;
 };
 
 // Create an ImpalaServer and Thrift servers.

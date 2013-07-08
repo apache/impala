@@ -45,7 +45,7 @@ public class DropFunctionStmt extends StatementBase {
     ifExists_ = ifExists;
   }
 
-  public FunctionName getFunction() { return desc_.getName(); }
+  public FunctionName getFunction() { return desc_.getFunctionName(); }
   public boolean getIfExists() { return ifExists_; }
 
   @Override
@@ -59,8 +59,8 @@ public class DropFunctionStmt extends StatementBase {
 
   public TDropFunctionParams toThrift() {
     TDropFunctionParams params = new TDropFunctionParams();
-    params.setFn_name(
-        new TFunctionName(desc_.getName().getDb(), desc_.getName().getFunction()));
+    params.setFn_name(new TFunctionName(desc_.getFunctionName().getDb(),
+        desc_.getFunctionName().getFunction()));
     List<TPrimitiveType> types = Lists.newArrayList();
     if (desc_.getNumArgs() > 0) {
       for (PrimitiveType t: desc_.getArgs()) {
@@ -75,9 +75,9 @@ public class DropFunctionStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    desc_.getName().analyze(analyzer);
-    String dbName = analyzer.getTargetDbName(desc_.getName());
-    desc_.getName().setDb(dbName);
+    desc_.getFunctionName().analyze(analyzer);
+    String dbName = analyzer.getTargetDbName(desc_.getFunctionName());
+    desc_.getFunctionName().setDb(dbName);
     if (analyzer.getCatalog().getDb(dbName, analyzer.getUser(), Privilege.DROP) == null
         && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);

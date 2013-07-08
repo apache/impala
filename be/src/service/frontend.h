@@ -21,6 +21,7 @@
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/CatalogService_types.h"
 #include "common/status.h"
 
 namespace impala {
@@ -35,9 +36,11 @@ class Frontend {
   // or if there is any further exception, the constructor will terminate the process.
   Frontend();
 
-  // Make any changes required to the metastore as a result of an INSERT query, e.g. newly
-  // created partitions.
-  Status UpdateMetastore(const TCatalogUpdate& catalog_update);
+  // Request to update the Impalad catalog. The TInternalCatalogUpdateRequest contains a
+  // list of objects that should be added/removed from the Catalog. Returns a response
+  // that contains details such as the new max catalog version.
+  Status UpdateCatalog(const TInternalCatalogUpdateRequest& req,
+      TInternalCatalogUpdateResponse *resp);
 
   // Call FE to get explain plan
   Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
@@ -92,16 +95,6 @@ class Frontend {
   Status DescribeTable(const TDescribeTableParams& params,
       TDescribeTableResult* response);
 
-  // Executes the given TDdlExecRequest and returns a response with details on the
-  // result of the operation. Returns OK if the operation was successfull,
-  // otherwise a Status object with information on the error will be returned. Only
-  // supports true DDL operations (CREATE/ALTER/DROP), pseudo-DDL operations such as
-  // SHOW/RESET/USE should be executed using their appropriate executor functions.
-  Status ExecDdlRequest(const TDdlExecRequest& params, TDdlExecResponse* resp);
-
-  // Reset the metadata
-  Status ResetMetadata(const TResetMetadataParams& reset_metadata_params);
-
   // Validate Hadoop config; requires FE
   Status ValidateSettings();
 
@@ -130,32 +123,20 @@ class Frontend {
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
-  jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
+  jmethodID update_internal_catalog_id_; // JniFrontend.updateInternalCatalog()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
-  jmethodID exec_ddl_request_id_; // JniFrontend.execDdlRequest
-  jmethodID reset_metadata_id_; // JniFrontend.resetMetadata
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;
 
-  struct FrontendMethodDescriptor;
+  struct MethodDescriptor;
 
   // Utility method to load a method whose signature is in the supplied descriptor; if
   // successful descriptor->method_id is set to a JNI method handle.
-  void LoadJniFrontendMethod(JNIEnv* jni_env, FrontendMethodDescriptor* descriptor);
-
-  // Utility methods to avoid repeating lots of the JNI call boilerplate.
-  template <typename T>
-  Status CallJniMethod(const jmethodID& method, const T& arg);
-  template <typename T, typename R>
-  Status CallJniMethod(
-      const jmethodID& method, const T& arg, R* response);
-  template <typename T>
-  Status CallJniMethod(
-      const jmethodID& method, const T& arg, std::string* response);
+  void LoadJniFrontendMethod(JNIEnv* jni_env, MethodDescriptor* descriptor);
 };
 
 }

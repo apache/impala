@@ -1115,7 +1115,7 @@ RuntimeState* Coordinator::runtime_state() {
   return executor_.get() == NULL ? NULL : executor_->runtime_state();
 }
 
-bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
+bool Coordinator::PrepareCatalogUpdate(TUpdateMetastoreRequest* catalog_update) {
   // Assume we are called only after all fragments have completed
   DCHECK(has_called_wait_);
 

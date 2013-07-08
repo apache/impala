@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.ListIterator;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -25,7 +26,11 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TTable;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Lists;
@@ -45,16 +50,16 @@ import com.google.common.util.concurrent.SettableFuture;
  *  * if the table has never been loaded
  *  * if the table loading failed on the previous attempt
  */
-public class Db {
+public class Db implements CatalogObject {
   private static final Logger LOG = Logger.getLogger(Db.class);
-  private static final Object tableMapCreationLock = new Object();
-  private final String name;
   private final Catalog parentCatalog;
+  private final TDatabase thriftDb;
+  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
   // This includes both UDFs and UDAs
-  private HashMap<String, List<Function>> functions;
+  private final HashMap<String, List<Function>> functions;
 
   // Table metadata cache.
   private final CatalogObjectCache<Table> tableCache = new CatalogObjectCache<Table>(
@@ -70,7 +75,9 @@ public class Db {
             throws ImpalaException {
           SettableFuture<Table> newValue = SettableFuture.create();
           try {
-            newValue.set(loadTable(tableName, oldValue));
+            Table newTable = loadTable(tableName, oldValue);
+            newTable.setCatalogVersion(Catalog.incrementAndGetCatalogVersion());
+            newValue.set(newTable);
           } catch (ImpalaException e) {
             // Invalidate the table metadata if load fails.
             Db.this.invalidateTable(tableName);
@@ -98,6 +105,7 @@ public class Db {
    * correctly.
    */
   private void forceLoadAllTables() {
+    LOG.info("Force loading all tables for database: " + this.getName());
     for (String tableName: getAllTableNames()) {
       try {
         tableCache.get(tableName);
@@ -109,19 +117,17 @@ public class Db {
 
   private Db(String name, Catalog catalog, HiveMetaStoreClient hiveClient)
       throws MetaException {
-    this.name = name;
-    this.parentCatalog = catalog;
-    // Need to serialize calls to getAllTables() due to HIVE-3521
-    synchronized (tableMapCreationLock) {
-      tableCache.add(hiveClient.getAllTables(name));
-    }
-
-    loadUdfs();
+    this(name, catalog);
+    tableCache.add(hiveClient.getAllTables(name));
+    LOG.info("Added " + tableCache.getAllNames().size() + " " +
+             "tables to Db cache: " + this.getName());
   }
 
-  private void loadUdfs() {
+
+  private Db(String name, Catalog catalog) {
+    thriftDb = new TDatabase(name);
+    this.parentCatalog = catalog;
     functions = new HashMap<String, List<Function>>();
-    // TODO: figure out how to persist udfs.
   }
 
   /**
@@ -154,13 +160,25 @@ public class Db {
     }
   }
 
-  public String getName() { return name; }
+  /**
+   * Creates a Db object with no tables based on the given TDatabase thrift struct.
+   */
+  public static Db fromTDatabase(TDatabase db, Catalog parentCatalog) {
+    return new Db(db.getDb_name(), parentCatalog);
+  }
+
+  public TDatabase toThrift() { return thriftDb; }
+  public String getName() { return thriftDb.getDb_name(); }
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.DATABASE;
   }
 
   public List<String> getAllTableNames() {
     return Lists.newArrayList(tableCache.getAllNames());
+  }
+
+  public boolean containsTable(String tableName) {
+    return tableCache.contains(tableName);
   }
 
   /**
@@ -179,23 +197,37 @@ public class Db {
     }
   }
 
-  public boolean containsTable(String tableName) {
-    return tableCache.contains(tableName);
-  }
-
   /**
    * Adds a table to the table list. Table cache will be populated on the next
    * getTable().
    */
-  public void addTable(String tableName) {
-    tableCache.add(tableName);
+  public long addTable(String tableName) { return tableCache.add(tableName); }
+
+  public void addTable(TTable thriftTable) throws TableLoadingException {
+    // If LoadStatus is not set, or if it is set to OK it indicates loading of the table
+    // was successful.
+    if (!thriftTable.isSetLoad_status() ||
+        thriftTable.getLoad_status().status_code == TStatusCode.OK) {
+
+      Preconditions.checkState(thriftTable.isSetMetastore_table());
+      Table table = Table.fromMetastoreTable(new TableId(thriftTable.getId()), this,
+          thriftTable.getMetastore_table());
+      table.loadFromTTable(thriftTable);
+      tableCache.add(table);
+    } else {
+      TableLoadingException loadingException = new TableLoadingException(
+          Joiner.on("\n").join(thriftTable.getLoad_status().getError_msgs()));
+      IncompleteTable table = new IncompleteTable(parentCatalog.getNextTableId(),
+          this, thriftTable.getTbl_name(), loadingException);
+      tableCache.add(table);
+    }
   }
 
   /**
    * Removes the table name and any cached metadata from the Table cache.
    */
-  public void removeTable(String tableName) {
-    tableCache.remove(tableName);
+  public long removeTable(String tableName) {
+    return tableCache.remove(tableName);
   }
 
   /**
@@ -204,26 +236,20 @@ public class Db {
    * If refreshing the table metadata failed, no exception will be thrown but the
    * existing metadata will be invalidated.
    */
-  public void refreshTable(String tableName) {
-    tableCache.refresh(tableName);
+  public long refreshTable(String tableName) {
+    return tableCache.refresh(tableName);
   }
 
   /**
-   * Marks the table as invalid so the next access will trigger a metadata load.
-   */
-  public void invalidateTable(String tableName) {
-    tableCache.invalidate(tableName);
-  }
-
-  /**
-   * Returns all the function signatures in this DB.
+   * Returns all the function signatures in this DB that match the specified
+   * fuction type. If the function type is null, all function signatures are returned.
    */
   public List<String> getAllFunctionSignatures(TFunctionType type) {
     List<String> names = Lists.newArrayList();
     synchronized (functions) {
       for (List<Function> fns: functions.values()) {
         for (Function f: fns) {
-          if ((type == TFunctionType.SCALAR && f instanceof Udf) ||
+          if (type == null || (type == TFunctionType.SCALAR && f instanceof Udf) ||
                type == TFunctionType.AGGREGATE && f instanceof Uda) {
             names.add(f.signatureString());
           }
@@ -279,6 +305,17 @@ public class Db {
     return null;
   }
 
+  public Function getFunction(String signatureString) {
+    synchronized (functions) {
+      for (List<Function> fns: functions.values()) {
+        for (Function f: fns) {
+          if (f.signatureString().equals(signatureString)) return f;
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * See comment in Catalog.
    */
@@ -293,6 +330,7 @@ public class Db {
         fns = Lists.newArrayList();
         functions.put(fn.functionName(), fns);
       }
+      fn.setCatalogVersion(Catalog.incrementAndGetCatalogVersion());
       fns.add(fn);
     }
     return true;
@@ -315,4 +353,38 @@ public class Db {
       return exists;
     }
   }
+
+  /**
+   * Removes a UDF with the matching signature string. Returns
+   * true if a UDF was removed as a result of this call, false otherwise.
+   */
+  public boolean removeFunction(String signatureStr) {
+    synchronized (functions) {
+      for (List<Function> fns: functions.values()) {
+        ListIterator<Function> itr = fns.listIterator();
+        while (itr.hasNext()) {
+          Function fn = itr.next();
+          if (fn.signatureString().equals(signatureStr)) {
+            itr.remove();
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Marks the table as invalid so the next access will trigger a metadata load.
+   */
+  public long invalidateTable(String tableName) {
+    return tableCache.invalidate(tableName);
+  }
+
+
+  @Override
+  public long getCatalogVersion() { return catalogVersion_; }
+  @Override
+  public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
+  public Catalog getParentCatalog() { return parentCatalog; }
 }

@@ -34,6 +34,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -67,9 +68,10 @@ public class AuthorizationTest {
   public AuthorizationTest() throws IOException {
     authzConfig = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
         LocalGroupResourceAuthorizationProvider.class.getName());
-    Catalog catalog = new Catalog(true, false, authzConfig);
+    ImpaladCatalog catalog = new ImpaladCatalog(
+        Catalog.CatalogInitStrategy.LAZY, authzConfig);
     analysisContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
-    fe = new Frontend(true, authzConfig);
+    fe = new Frontend(Catalog.CatalogInitStrategy.LAZY, authzConfig);
   }
 
   @Test
@@ -287,7 +289,8 @@ public class AuthorizationTest {
     AuthzOk("refresh functional.view_view");
 
     // The admin user should have privileges invalidate the server metadata.
-    AnalysisContext adminAc = new AnalysisContext(new Catalog(true, false, authzConfig),
+    AnalysisContext adminAc = new AnalysisContext(new ImpaladCatalog(
+        Catalog.CatalogInitStrategy.LAZY, authzConfig),
         Catalog.DEFAULT_DB, ADMIN_USER);
     AuthzOk(adminAc, "invalidate metadata");
 
@@ -876,7 +879,8 @@ public class AuthorizationTest {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      Catalog catalog = new Catalog(true, false, authzConfig);
+      ImpaladCatalog catalog =
+          new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY, authzConfig);
       AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
           user);
       // Can select from table that user has privileges on.
@@ -902,7 +906,8 @@ public class AuthorizationTest {
     User currentUser = new User(System.getProperty("user.name"));
     AuthorizationConfig config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
         HadoopGroupResourceAuthorizationProvider.class.getName());
-    Catalog catalog = new Catalog(true, false, config);
+    ImpaladCatalog catalog = new  ImpaladCatalog(
+        Catalog.CatalogInitStrategy.LAZY, config);
     AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
         currentUser);
 
@@ -1029,7 +1034,8 @@ public class AuthorizationTest {
 
   private static void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws AnalysisException {
-    AnalysisContext ac = new AnalysisContext(new Catalog(true, false, authzConfig),
+    AnalysisContext ac = new AnalysisContext(new ImpaladCatalog(
+        Catalog.CatalogInitStrategy.LAZY, authzConfig),
         Catalog.DEFAULT_DB, user);
     AuthzError(ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +

@@ -39,7 +39,7 @@ DEFINE_string(authorization_policy_provider_class,
     "Advanced: The authorization policy provider class name.");
 
 // Describes one method to look up in a Frontend object
-struct Frontend::FrontendMethodDescriptor {
+struct Frontend::MethodDescriptor {
   // Name of the method, case must match
   const string name;
 
@@ -65,20 +65,18 @@ TLogLevel::type FlagToTLogLevel(int flag) {
 }
 
 Frontend::Frontend() {
-  FrontendMethodDescriptor methods[] = {
+  MethodDescriptor methods[] = {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
-    {"updateMetastore", "([B)V", &update_metastore_id_},
+    {"updateInternalCatalog", "([B)[B", &update_internal_catalog_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
-    {"execDdlRequest", "([B)[B", &exec_ddl_request_id_},
-    {"resetMetadata", "([B)V", &reset_metadata_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
@@ -105,95 +103,29 @@ Frontend::Frontend() {
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
 
-void Frontend::LoadJniFrontendMethod(JNIEnv* jni_env,
-    FrontendMethodDescriptor* descriptor) {
+void Frontend::LoadJniFrontendMethod(JNIEnv* jni_env, MethodDescriptor* descriptor) {
   (*descriptor->method_id) = jni_env->GetMethodID(fe_class_, descriptor->name.c_str(),
       descriptor->signature.c_str());
   EXIT_IF_EXC(jni_env);
 }
 
-template <typename T>
-Status Frontend::CallJniMethod(const jmethodID& method, const T& arg) {
-  JNIEnv* jni_env = getJNIEnv();
-  jbyteArray request_bytes;
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-
-  jni_env->CallObjectMethod(fe_, method, request_bytes);
-  RETURN_ERROR_IF_EXC(jni_env);
-
-  return Status::OK;
-}
-
-template <typename T, typename R>
-Status Frontend::CallJniMethod(const jmethodID& method, const T& arg,
-    R* response) {
-  JNIEnv* jni_env = getJNIEnv();
-  jbyteArray request_bytes;
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-
-  jbyteArray result_bytes = static_cast<jbyteArray>(
-      jni_env->CallObjectMethod(fe_, method, request_bytes));
-  RETURN_ERROR_IF_EXC(jni_env);
-  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-
-  return Status::OK;
-}
-
-template <typename T>
-Status Frontend::CallJniMethod(const jmethodID& method, const T& arg,
-    string* response) {
-  JNIEnv* jni_env = getJNIEnv();
-  jbyteArray request_bytes;
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-  jstring java_response_string = static_cast<jstring>(
-      jni_env->CallObjectMethod(fe_, method, request_bytes));
-  RETURN_ERROR_IF_EXC(jni_env);
-  jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(java_response_string, &is_copy);
-  RETURN_ERROR_IF_EXC(jni_env);
-  *response = str;
-  jni_env->ReleaseStringUTFChars(java_response_string, str);
-  RETURN_ERROR_IF_EXC(jni_env);
-  return Status::OK;
-}
-
-Status Frontend::UpdateMetastore(const TCatalogUpdate& catalog_update) {
-  VLOG_QUERY << "UpdateMetastore()";
-  return CallJniMethod(update_metastore_id_, catalog_update);
-}
-
-Status Frontend::ExecDdlRequest(const TDdlExecRequest& params, TDdlExecResponse* resp) {
-  return CallJniMethod(exec_ddl_request_id_, params, resp);
-}
-
-Status Frontend::ResetMetadata(const TResetMetadataParams& params) {
-  return CallJniMethod(reset_metadata_id_, params);
+Status Frontend::UpdateCatalog(const TInternalCatalogUpdateRequest& req,
+    TInternalCatalogUpdateResponse* resp) {
+  return JniUtil::CallJniMethod(fe_, update_internal_catalog_id_, req, resp);
 }
 
 Status Frontend::DescribeTable(const TDescribeTableParams& params,
     TDescribeTableResult* response) {
-  return CallJniMethod(describe_table_id_, params, response);
+  return JniUtil::CallJniMethod(fe_, describe_table_id_, params, response);
 }
 
 Status Frontend::GetTableNames(const string& db, const string* pattern,
     const TSessionState* session, TGetTablesResult* table_names) {
   TGetTablesParams params;
   params.__set_db(db);
-
-  if (pattern != NULL) {
-    params.__set_pattern(*pattern);
-  }
-  if (session != NULL) {
-    params.__set_session(*session);
-  }
-
-  return CallJniMethod(get_table_names_id_, params, table_names);
+  if (pattern != NULL) params.__set_pattern(*pattern);
+  if (session != NULL) params.__set_session(*session);
+  return JniUtil::CallJniMethod(fe_, get_table_names_id_, params, table_names);
 }
 
 Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
@@ -201,7 +133,7 @@ Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
   TGetDbsParams params;
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
-  return CallJniMethod(get_db_names_id_, params, db_names);
+  return JniUtil::CallJniMethod(fe_, get_db_names_id_, params, db_names);
 }
 
 Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
@@ -211,18 +143,17 @@ Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
   params.__set_db(db);
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
-  return CallJniMethod(get_functions_id_, params, functions);
+  return JniUtil::CallJniMethod(fe_, get_functions_id_, params, functions);
 }
 
 Status Frontend::GetExecRequest(
     const TClientRequest& request, TExecRequest* result) {
-  return CallJniMethod(create_exec_request_id_, request, result);
+  return JniUtil::CallJniMethod(fe_, create_exec_request_id_, request, result);
 }
 
 Status Frontend::GetExplainPlan(
     const TClientRequest& query_request, string* explain_string) {
-  return CallJniMethod(
-      get_explain_plan_id_, query_request, explain_string);
+  return JniUtil::CallJniMethod(fe_, get_explain_plan_id_, query_request, explain_string);
 }
 
 Status Frontend::ValidateSettings() {
@@ -250,7 +181,7 @@ Status Frontend::ValidateSettings() {
 
 Status Frontend::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
     TMetadataOpResponse* result) {
-  return CallJniMethod(exec_hs2_metadata_op_id_, request, result);
+  return JniUtil::CallJniMethod(fe_, exec_hs2_metadata_op_id_, request, result);
 }
 
 Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
@@ -270,7 +201,7 @@ Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
 }
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
-  return CallJniMethod(load_table_data_id_, request, response);
+  return JniUtil::CallJniMethod(fe_, load_table_data_id_, request, response);
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {

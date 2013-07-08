@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotRef;
+import com.cloudera.impala.thrift.TColumnStatsData;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -35,6 +36,7 @@ import com.google.common.base.Preconditions;
  */
 public class ColumnStats {
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
+  private TColumnStatsData colStats;
 
   // Set of the currently supported column stats column types.
   private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
@@ -42,7 +44,8 @@ public class ColumnStats {
       PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
       PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TINYINT);
 
-  private float avgSerializedSize;  // in bytes; includes serialization overhead
+  // in bytes; includes serialization overhead. TODO: Should this be a double?
+  private float avgSerializedSize;
   private long maxSize;  // in bytes
   private long numDistinctValues;
   private long numNulls;
@@ -191,6 +194,23 @@ public class ColumnStats {
    */
   public static boolean isSupportedColType(PrimitiveType colType) {
     return SUPPORTED_COL_TYPES.contains(colType);
+  }
+
+  public void update(PrimitiveType colType, TColumnStatsData statsData) {
+    avgSerializedSize =
+        Double.valueOf(statsData.getAvg_serialized_size()).floatValue();
+    maxSize = statsData.getMax_size();
+    numDistinctValues = statsData.getNum_distinct_values();
+    numNulls = statsData.getNum_nulls();
+  }
+
+  public TColumnStatsData toThrift() {
+    TColumnStatsData colStats = new TColumnStatsData();
+    colStats.setAvg_serialized_size(avgSerializedSize);
+    colStats.setMax_size(maxSize);
+    colStats.setNum_distinct_values(numDistinctValues);
+    colStats.setNum_nulls(numNulls);
+    return colStats;
   }
 
   @Override

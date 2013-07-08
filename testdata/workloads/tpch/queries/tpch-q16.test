@@ -7,7 +7,6 @@ from supplier
 where not s_comment like '%Customer%Complaints%'
 ---- SETUP
 RESET supplier_tmp
-RELOAD supplier_tmp
 ---- RESULTS
 : 9996
 ====
@@ -23,7 +22,6 @@ join supplier_tmp s
   on ps.ps_suppkey = s.s_suppkey
 ---- SETUP
 RESET q16_tmp
-RELOAD q16_tmp
 ---- RESULTS
 : 741971
 ====

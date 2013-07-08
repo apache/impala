@@ -16,37 +16,24 @@ package com.cloudera.impala.catalog;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.authorization.AuthorizationChecker;
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
@@ -54,131 +41,263 @@ import com.google.common.collect.Lists;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
- * This class caches db-, table- and column-related metadata. Metadata updates (via DDL
- * operations like CREATE and DROP) are currently serialized for simplicity.
+ * This class caches db-, table- and column-related metadata. Each time one of these
+ * catalog objects is updated/added/removed, the catalogVersion is incremented.
  * Although this class is thread safe, it does not guarantee consistency with the
  * MetaStore. It is important to keep in mind that there may be external (potentially
- * conflicting) concurrent metastore updates occurring at any time. This class does
- * guarantee any MetaStore updates done via this class will be reflected consistently.
+ * conflicting) concurrent metastore updates occurring at any time.
+ * All reads and writes of catalog objects are synchronized using the catalogLock_. To
+ * perform atomic bulk operations on the Catalog, the getReadLock()/getWriteLock()
+ * functions can be leveraged.
  */
-public class Catalog {
+public abstract class Catalog {
+  // Initial catalog version.
+  public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final String DEFAULT_DB = "default";
+
   private static final Logger LOG = Logger.getLogger(Catalog.class);
+
+  // Last assigned catalog version. Atomic to ensure catalog versions are always
+  // sequentially increasing, even when updated from different threads.
+  // TODO: This probably doesn't need to be atomic and be updated while holding
+  // the catalogLock_.
+  private final static AtomicLong catalogVersion =
+      new AtomicLong(INITIAL_CATALOG_VERSION);
   private static final int META_STORE_CLIENT_POOL_SIZE = 5;
-  //TODO: Make the reload interval configurable.
-  private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
-  private final boolean lazy;
-  private final AtomicInteger nextTableId;
-  private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
+  private final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
+  private final CatalogInitStrategy initStrategy_;
+  private final AtomicInteger nextTableId = new AtomicInteger(0);
+
   // Cache of database metadata.
-  private final CatalogObjectCache<Db> dbCache = new CatalogObjectCache<Db>(
+  protected final CatalogObjectCache<Db> dbCache_ = new CatalogObjectCache<Db>(
       new CacheLoader<String, Db>() {
         @Override
         public Db load(String dbName) {
           MetaStoreClient msClient = getMetaStoreClient();
           try {
             return Db.loadDb(Catalog.this, msClient.getHiveClient(),
-                dbName.toLowerCase(), lazy);
+                dbName.toLowerCase(), true);
           } finally {
             msClient.release();
           }
         }
       });
 
-  private final ScheduledExecutorService policyReader =
-      Executors.newScheduledThreadPool(1);
-  private final AuthorizationConfig authzConfig;
-  // Lock used to synchronize refreshing the AuthorizationChecker.
-  private final ReentrantReadWriteLock authzCheckerLock = new ReentrantReadWriteLock();
-  private AuthorizationChecker authzChecker;
+  // Fair lock used to synchronize catalog accesses and updates.
+  protected final ReentrantReadWriteLock catalogLock_ =
+      new ReentrantReadWriteLock(true);
+
+  // Determines how the Catalog should be initialized.
+  public enum CatalogInitStrategy {
+    // Load only db and table names on startup.
+    LAZY,
+    // Load all metadata on startup
+    IMMEDIATE,
+    // Don't load anything on startup (creates an empty catalog).
+    EMPTY,
+  }
 
   /**
-   * If lazy is true, tables are loaded on read, otherwise they are loaded eagerly in
-   * the constructor. If raiseExceptions is false, exceptions will be logged and
-   * swallowed. Otherwise, exceptions are re-raised.
+   * Creates a new instance of the Catalog, initializing it based on
+   * the given CatalogInitStrategy.
    */
-  public Catalog(boolean lazy, boolean raiseExceptions,
-      AuthorizationConfig authzConfig) {
-    this.nextTableId = new AtomicInteger();
-    this.lazy = lazy;
-    this.authzConfig = authzConfig;
-    this.authzChecker = new AuthorizationChecker(authzConfig);
-    // If authorization is enabled, reload the policy on a regular basis.
-    if (authzConfig.isEnabled()) {
-      // Stagger the reads across nodes
-      Random randomGen = new Random(UUID.randomUUID().hashCode());
-      int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
-
-      policyReader.scheduleAtFixedRate(
-          new AuthorizationPolicyReader(authzConfig),
-          delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
-    }
-
-    try {
-      metaStoreClientPool.addClients(META_STORE_CLIENT_POOL_SIZE);
-      MetaStoreClient msClient = metaStoreClientPool.getClient();
-
-      try {
-        dbCache.add(msClient.getHiveClient().getAllDatabases());
-      } finally {
-        msClient.release();
-      }
-
-      if (!lazy) {
-        // Load all the metadata
-        for (String dbName: dbCache.getAllNames()) {
-          dbCache.get(dbName);
-        }
-      }
-    } catch (Exception e) {
-      if (raiseExceptions) {
-        // If exception is already an IllegalStateException, don't wrap it.
-        if (e instanceof IllegalStateException) {
-          throw (IllegalStateException) e;
-        }
-        throw new IllegalStateException(e);
-      }
-
-      LOG.error(e);
-      LOG.error("Error initializing Catalog. Catalog may be empty.");
-    }
+  public Catalog(CatalogInitStrategy initStrategy) {
+    this.initStrategy_ = initStrategy;
+    this.metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
+    reset();
   }
 
-  public Catalog() {
-    this(true, true, AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  private class AuthorizationPolicyReader implements Runnable {
-    private final AuthorizationConfig config;
-
-    public AuthorizationPolicyReader(AuthorizationConfig config) {
-      this.config = config;
-    }
-
-    public void run() {
-      LOG.info("Reloading authorization policy file from: " + config.getPolicyFile());
-      authzCheckerLock.writeLock().lock();
-      try {
-        authzChecker = new AuthorizationChecker(config);
-      } finally {
-        authzCheckerLock.writeLock().unlock();
-      }
-    }
-  }
+  public Catalog() { this(CatalogInitStrategy.LAZY); }
 
   /**
    * Adds a database name to the metadata cache and marks the metadata as
    * uninitialized. Used by CREATE DATABASE statements.
    */
-  public void addDb(String dbName) {
-    dbCache.add(dbName);
+  public long addDb(String dbName) {
+    catalogLock_.writeLock().lock();
+    try {
+      return dbCache_.add(dbName);
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
+   * Returns null if no matching database is found.
+   */
+  public Db getDb(String dbName) {
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+        "Null or empty database name given as argument to Catalog.getDb");
+    try {
+      return dbCache_.get(dbName);
+    } catch (ImpalaException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Returns a list of databases that match dbPattern. See filterStringsByPattern
+   * for details of the pattern match semantics.
+   *
+   * dbPattern may be null (and thus matches everything).
+   */
+  public List<String> getDbNames(String dbPattern) {
+    catalogLock_.readLock().lock();
+    try {
+      return filterStringsByPattern(dbCache_.getAllNames(), dbPattern);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
   }
 
   /**
    * Removes a database from the metadata cache. Used by DROP DATABASE statements.
    */
-  public void removeDb(String dbName) {
-    dbCache.remove(dbName);
+  public long removeDb(String dbName) {
+    catalogLock_.writeLock().lock();
+    try {
+      return dbCache_.remove(dbName);
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Adds a new table to the catalog and marks its metadata as uninitialized.
+   * Returns the catalog version that include this change, or INITIAL_CATALOG_VERSION
+   * if the database does not exist.
+   */
+  public long addTable(String dbName, String tblName) {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db != null) return db.addTable(tblName);
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+    return Catalog.INITIAL_CATALOG_VERSION;
+  }
+
+  /**
+   * Returns the Table object for the given dbName/tableName. This will trigger a
+   * metadata load if the table metadata is not yet cached.
+   */
+  public Table getTable(String dbName, String tableName) throws
+      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database not found: " + dbName);
+      }
+      Table table = db.getTable(tableName);
+      if (table == null) {
+        throw new TableNotFoundException(
+            String.format("Table not found: %s.%s", dbName, tableName));
+      }
+      return table;
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns a list of tables in the supplied database that match
+   * tablePattern. See filterStringsByPattern for details of the pattern match semantics.
+   *
+   * dbName must not be null, but tablePattern may be null (and thus matches
+   * everything).
+   *
+   * Table names are returned unqualified.
+   */
+  public List<String> getTableNames(String dbName, String tablePattern)
+      throws DatabaseNotFoundException {
+    Preconditions.checkNotNull(dbName);
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+      }
+      return filterStringsByPattern(db.getAllTableNames(), tablePattern);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  public boolean containsTable(String dbName, String tableName) {
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      return (db == null) ? false : db.containsTable(tableName);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Renames a table and returns the catalog version that contains the change.
+   * This is equivalent to an atomic drop + add of the table. Returns
+   * the current catalog version if the target parent database does not exist
+   * in the catalog.
+   */
+  public long renameTable(TTableName oldTableName, TTableName newTableName) {
+    // Ensure the removal of the old table and addition of the new table happen
+    // atomically.
+    catalogLock_.writeLock().lock();
+    try {
+      // Remove the old table name from the cache and add the new table.
+      Db db = getDb(oldTableName.getDb_name());
+      if (db != null) db.removeTable(oldTableName.getTable_name());
+      return addTable(newTableName.getDb_name(), newTableName.getTable_name());
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a table from the catalog and returns the catalog version that
+   * contains the change. Returns INITIAL_CATALOG_VERSION if the parent
+   * database or table does not exist in the catalog.
+   */
+  public long removeTable(TTableName tableName) {
+    catalogLock_.writeLock().lock();
+    try {
+      // Remove the old table name from the cache and add the new table.
+      Db db = getDb(tableName.getDb_name());
+      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
+      return db.removeTable(tableName.getTable_name());
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * If isRefresh is false, invalidates a specific table's metadata, forcing the
+   * metadata to be reloaded on the next access.
+   * If isRefresh is true, performs an immediate incremental refresh.
+   * Returns the catalog version that will contain the updated metadata.
+   */
+  public long resetTable(TTableName tableName, boolean isRefresh) {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(tableName.getDb_name());
+      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
+      if (isRefresh) {
+        // TODO: This is not good because refreshes might take a long time we
+        // shouldn't hold the catalog write lock the entire time. Instead,
+        // we could consider making refresh() happen in the background or something
+        // similar.
+        LOG.info("Refreshing table metadata: " + db.getName() + "." + tableName);
+        return db.refreshTable(tableName.getTable_name());
+      } else {
+        LOG.info("Invalidating table metadata: " + db.getName() + "." + tableName);
+        return db.invalidateTable(tableName.getTable_name());
+      }
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
   }
 
   /**
@@ -191,18 +310,14 @@ public class Catalog {
    * resolve first to db.fn().
    */
   public boolean addFunction(Function fn) {
-    Db db = getDbInternal(fn.dbName());
-    if (db == null) return false;
-    return db.addFunction(fn);
-  }
-
-  /**
-   * Removes a function from the catalog. Returns true if the function was removed.
-   */
-  public boolean removeFunction(Function desc) {
-    Db db = getDbInternal(desc.dbName());
-    if (db == null) return false;
-    return db.removeFunction(desc);
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(fn.dbName());
+      if (db == null) return false;
+      return db.addFunction(fn);
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
   }
 
   /**
@@ -211,191 +326,148 @@ public class Catalog {
    * in the catalog, it will return the function with the strictest matching mode.
    */
   public Function getFunction(Function desc, Function.CompareMode mode) {
-    Db db = getDbInternal(desc.dbName());
-    if (db == null) return null;
-    return db.getFunction(desc, mode);
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(desc.dbName());
+      if (db == null) return null;
+      return db.getFunction(desc, mode);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a function from the catalog. Returns true if the UDF was removed.
+   * Returns the catalog version that will reflect this change. Returns a version of
+   * INITIAL_CATALOG_VERSION if the function did not exist.
+   */
+  public long removeFunction(Function desc) {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(desc.dbName());
+      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
+      return db.removeFunction(desc) ? Catalog.incrementAndGetCatalogVersion() :
+        Catalog.INITIAL_CATALOG_VERSION;
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
   }
 
   /**
    * Returns all the function for 'type' in this DB.
-   * @throws DatabaseNotFoundException
    */
   public List<String> getFunctionSignatures(TFunctionType type, String dbName,
       String pattern) throws DatabaseNotFoundException {
-    Db db = getDbInternal(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+      }
+      return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
+    } finally {
+      catalogLock_.readLock().unlock();
     }
-    return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
   }
 
   /**
    * Returns true if there is a function with this function name. Parameters
-   * are ignored
-   * @throws DatabaseNotFoundException
+   * are ignored.
    */
   public boolean functionExists(FunctionName name) {
-    Db db = getDbInternal(name.getDb());
-    if (db == null) return false;
-    return db.functionExists(name);
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(name.getDb());
+      if (db == null) return false;
+      return db.functionExists(name);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
   }
 
   /**
    * Release the Hive Meta Store Client resources. Can be called multiple times
    * (additional calls will be no-ops).
    */
-  public void close() {
-    metaStoreClientPool.close();
-  }
+  public void close() { metaStoreClientPool_.close(); }
 
-  public TableId getNextTableId() {
-    return new TableId(nextTableId.getAndIncrement());
-  }
+  /**
+   * Gets the next table ID and increments the table ID counter.
+   */
+  public TableId getNextTableId() { return new TableId(nextTableId.getAndIncrement()); }
 
   /**
    * Returns a managed meta store client from the client connection pool.
    */
-  public MetaStoreClient getMetaStoreClient() {
-    return metaStoreClientPool.getClient();
+  public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
+
+  /**
+   * Returns the current Catalog version.
+   */
+  public static long getCatalogVersion() { return catalogVersion.get(); }
+
+  /**
+   * Increments the current Catalog version and returns the new value.
+   */
+  public static long incrementAndGetCatalogVersion() {
+    return catalogVersion.incrementAndGet();
   }
 
   /**
-   * Checks whether a given user has sufficient privileges to access an authorizeable
-   * object.
-   * @throws AuthorizationException - If the user does not have sufficient privileges.
+   * Resets this catalog instance by clearing all cached metadata and reloading
+   * it from the metastore. How the metadata is loaded is based on the
+   * CatalogInitStrategy that was set in the c'tor. If the CatalogInitStrategy is
+   * IMMEDIATE, the table metadata will be loaded in parallel.
+   * TODO: Until UDF metadata is persisted, it would be good for this function to
+   * not invalidate UDF metadata.
    */
-  public void checkAccess(User user, PrivilegeRequest privilegeRequest)
-      throws AuthorizationException {
-    Preconditions.checkNotNull(user);
-    Preconditions.checkNotNull(privilegeRequest);
+  public long reset() {
+    catalogLock_.writeLock().lock();
+    try {
+      nextTableId.set(0);
+      dbCache_.clear();
 
-    if (!hasAccess(user, privilegeRequest)) {
-      Privilege privilege = privilegeRequest.getPrivilege();
-      if (EnumSet.of(Privilege.ANY, Privilege.ALL, Privilege.VIEW_METADATA)
-          .contains(privilege)) {
-        throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to access: %s",
-            user.getName(), privilegeRequest.getName()));
-      } else {
-        throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to execute '%s' on: %s",
-            user.getName(), privilege, privilegeRequest.getName()));
+      if (initStrategy_ == CatalogInitStrategy.EMPTY) {
+        return Catalog.getCatalogVersion();
       }
-    }
-  }
+      MetaStoreClient msClient = metaStoreClientPool_.getClient();
 
-  private boolean hasAccess(User user, PrivilegeRequest request) {
-    authzCheckerLock.readLock().lock();
-    try {
-      Preconditions.checkNotNull(authzChecker);
-      return authzChecker.hasAccess(user, request);
-    } finally {
-      authzCheckerLock.readLock().unlock();
-    }
-  }
+      try {
+        dbCache_.add(msClient.getHiveClient().getAllDatabases());
+      } finally {
+        msClient.release();
+      }
 
-  /**
-   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
-   * Returns null if no matching database is found.
-   */
-  private Db getDbInternal(String dbName) {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
-        "Null or empty database name given as argument to Catalog.getDb");
-    try {
-      return dbCache.get(dbName);
-    } catch (ImpalaException e) {
+      if (initStrategy_ == CatalogInitStrategy.IMMEDIATE) {
+        ExecutorService executor = Executors.newFixedThreadPool(32);
+        try {
+          for (String dbName: dbCache_.getAllNames()) {
+            final Db db = dbCache_.get(dbName);
+            for (final String tableName: db.getAllTableNames()) {
+              executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                  try {
+                    db.getTable(tableName);
+                  } catch (ImpalaException e) {
+                    LOG.info("Error: " + e.getMessage());
+                  }
+                }
+              });
+            }
+          }
+        } finally {
+          executor.shutdown();
+        }
+      }
+      return Catalog.getCatalogVersion();
+    } catch (Exception e) {
+      LOG.error(e);
+      LOG.error("Error initializing Catalog. Catalog may be empty.");
       throw new IllegalStateException(e);
+    } finally {
+      catalogLock_.writeLock().unlock();
     }
-  }
-
-  /**
-   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
-   * Returns null if no matching database is found. Throws an AuthorizationException
-   * if the given user doesn't have enough privileges to access the database.
-   */
-  public Db getDb(String dbName, User user, Privilege privilege)
-      throws AuthorizationException {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
-        "Null or empty database name given as argument to Catalog.getDb");
-    PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-    if (privilege == Privilege.ANY) {
-      checkAccess(user, pb.any().onAnyTable(dbName).toRequest());
-    } else {
-      checkAccess(user, pb.allOf(privilege).onDb(dbName).toRequest());
-    }
-    return getDbInternal(dbName);
-  }
-
-  /**
-   * Returns a list of tables in the supplied database that match
-   * tablePattern and the user has privilege to access. See filterStringsByPattern
-   * for details of the pattern match semantics.
-   *
-   * dbName must not be null. tablePattern may be null (and thus matches
-   * everything).
-   *
-   * User is the user from the current session or ImpalaInternalUser for internal
-   * metadata requests (for example, populating the debug webpage Catalog view).
-   *
-   * Table names are returned unqualified.
-   */
-  public List<String> getTableNames(String dbName, String tablePattern, User user)
-      throws DatabaseNotFoundException {
-    Preconditions.checkNotNull(dbName);
-
-    Db db = getDbInternal(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-    }
-
-    List<String> tables = filterStringsByPattern(db.getAllTableNames(), tablePattern);
-    if (authzConfig.isEnabled()) {
-      Iterator<String> iter = tables.iterator();
-      while (iter.hasNext()) {
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
-            .allOf(Privilege.ANY).onTable(dbName, iter.next()).toRequest();
-        if (!hasAccess(user, privilegeRequest)) {
-          iter.remove();
-        }
-      }
-    }
-    return tables;
-  }
-
-  /**
-   * Returns a list of databases that match dbPattern and the user has privilege to
-   * access. See filterStringsByPattern for details of the pattern match semantics.
-   *
-   * dbPattern may be null (and thus matches everything).
-   *
-   * User is the user from the current session or ImpalaInternalUser for internal
-   * metadata requests (for example, populating the debug webpage Catalog view).
-   */
-  public List<String> getDbNames(String dbPattern, User user) {
-    List<String> matchingDbs = filterStringsByPattern(dbCache.getAllNames(), dbPattern);
-
-    // If authorization is enabled, filter out the databases the user does not
-    // have permissions on.
-    if (authzConfig.isEnabled()) {
-      Iterator<String> iter = matchingDbs.iterator();
-      while (iter.hasNext()) {
-        String dbName = iter.next();
-        PrivilegeRequest request = new PrivilegeRequestBuilder()
-            .any().onAnyTable(dbName).toRequest();
-        if (!hasAccess(user, request)) {
-          iter.remove();
-        }
-      }
-    }
-    return matchingDbs;
-  }
-
-  /**
-   * Returns a list of all known databases in the Catalog that the given user
-   * has privileges to access.
-   */
-  public List<String> getAllDbNames(User user) {
-    return getDbNames(null, user);
   }
 
   /**
@@ -438,47 +510,39 @@ public class Catalog {
     return filtered;
   }
 
-  private boolean containsTable(String dbName, String tableName) {
-    Db db = getDbInternal(dbName);
-    return (db == null) ? false : db.containsTable(tableName);
-  }
-
   /**
-   * Returns true if the table and the database exist in the Impala Catalog. Returns
-   * false if either the table or the database do not exist. This will
-   * not trigger a metadata load for the given table name.
-   * @throws AuthorizationException - If the user does not have sufficient privileges.
-   */
-  public boolean containsTable(String dbName, String tableName, User user,
-      Privilege privilege) throws AuthorizationException {
-    // Make sure the user has privileges to check if the table exists.
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-    return containsTable(dbName, tableName);
-  }
-
-  /**
-   * Returns true if the table and the database exist in the Impala Catalog. Returns
-   * false if the database does not exist or the table does not exist. This will
-   * not trigger a metadata load for the given table name.
-   * @throws AuthorizationException - If the user does not have sufficient privileges.
+   * Returns the HdfsPartition object for the given dbName/tableName and partition spec.
+   * This will trigger a metadata load if the table metadata is not yet cached.
    * @throws DatabaseNotFoundException - If the database does not exist.
+   * @throws TableNotFoundException - If the table does not exist.
+   * @throws PartitionNotFoundException - If the partition does not exist.
+   * @throws TableLoadingException - If there is an error loading the table metadata.
    */
-  public boolean dbContainsTable(String dbName, String tableName, User user,
-      Privilege privilege) throws AuthorizationException, DatabaseNotFoundException {
-    // Make sure the user has privileges to check if the table exists.
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-    Db db = getDbInternal(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database not found: " + dbName);
+  public HdfsPartition getHdfsPartition(String dbName, String tableName,
+      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
+      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+    String partitionNotFoundMsg =
+        "Partition not found: " + Joiner.on(", ").join(partitionSpec);
+    catalogLock_.readLock().lock();
+    try {
+      Table table = getTable(dbName, tableName);
+      // This is not an Hdfs table, throw an error.
+      if (!(table instanceof HdfsTable)) {
+        throw new PartitionNotFoundException(partitionNotFoundMsg);
+      }
+      // Get the HdfsPartition object for the given partition spec.
+      HdfsPartition partition =
+          ((HdfsTable) table).getPartitionFromThriftPartitionSpec(partitionSpec);
+      if (partition == null) throw new PartitionNotFoundException(partitionNotFoundMsg);
+      return partition;
+    } finally {
+      catalogLock_.readLock().unlock();
     }
-    return db.containsTable(tableName);
   }
 
   /**
    * Returns true if the table contains the given partition spec, otherwise false.
-   * This may will trigger a metadata load if the table metadata is not yet cached.
+   * This may trigger a metadata load if the table metadata is not yet cached.
    * @throws DatabaseNotFoundException - If the database does not exist.
    * @throws TableNotFoundException - If the table does not exist.
    * @throws TableLoadingException - If there is an error loading the table metadata.
@@ -491,68 +555,6 @@ public class Catalog {
     } catch (PartitionNotFoundException e) {
       return false;
     }
-  }
-
-  /**
-   * Returns the Table object for the given dbName/tableName. This will trigger a
-   * metadata load if the table metadata is not yet cached.
-   * @throws DatabaseNotFoundException - If the database does not exist.
-   * @throws TableNotFoundException - If the table does not exist.
-   * @throws TableLoadingException - If there is an error loading the table metadata.
-   */
-  private Table getTableInternal(String dbName, String tableName) throws
-      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
-    Db db = getDbInternal(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database not found: " + dbName);
-    }
-    Table table = db.getTable(tableName);
-    if (table == null) {
-      throw new TableNotFoundException(
-          String.format("Table not found: %s.%s", dbName, tableName));
-    }
-    return table;
-  }
-
-  /**
-   * Returns the Table object for the given dbName/tableName. This will trigger a
-   * metadata load if the table metadata is not yet cached.
-   * @throws DatabaseNotFoundException - If the database does not exist.
-   * @throws TableNotFoundException - If the table does not exist.
-   * @throws TableLoadingException - If there is an error loading the table metadata.
-   * @throws AuthorizationException - If the user does not have sufficient privileges.
-   */
-  public Table getTable(String dbName, String tableName, User user,
-      Privilege privilege) throws DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException, AuthorizationException {
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-    return getTableInternal(dbName, tableName);
-  }
-
-  /**
-   * Returns the HdfsPartition oject for the given dbName/tableName and partition spec.
-   * This will trigger a metadata load if the table metadata is not yet cached.
-   * @throws DatabaseNotFoundException - If the database does not exist.
-   * @throws TableNotFoundException - If the table does not exist.
-   * @throws PartitionNotFoundException - If the partition does not exist.
-   * @throws TableLoadingException - If there is an error loading the table metadata.
-   */
-  public HdfsPartition getHdfsPartition(String dbName, String tableName,
-      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
-    String partitionNotFoundMsg =
-        "Partition not found: " + Joiner.on(", ").join(partitionSpec);
-    Table table = getTableInternal(dbName, tableName);
-    // This is not an Hdfs table, throw an error.
-    if (!(table instanceof HdfsTable)) {
-      throw new PartitionNotFoundException(partitionNotFoundMsg);
-    }
-    // Get the HdfsPartition object for the given partition spec.
-    HdfsPartition partition =
-        ((HdfsTable) table).getPartitionFromThriftPartitionSpec(partitionSpec);
-    if (partition == null) throw new PartitionNotFoundException(partitionNotFoundMsg);
-    return partition;
   }
 
   /**
@@ -569,32 +571,5 @@ public class Catalog {
       } catch (NumberFormatException e) {}
     }
     return -1;
-  }
-
-  /**
-   * Returns the HDFS path where the metastore would create the given table. If the table
-   * has a "location" set, that will be returned. Otherwise the path will be resolved
-   * based on the location of the parent database. The metastore folder hierarchy is:
-   * <warehouse directory>/<db name>.db/<table name>
-   * Except for items in the default database which will be:
-   * <warehouse directory>/<table name>
-   * This method handles both of these cases.
-   */
-  public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
-      throws NoSuchObjectException, MetaException, TException {
-    MetaStoreClient client = getMetaStoreClient();
-    try {
-      // If the table did not have its path set, build the path based on the the
-      // location property of the parent database.
-      if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
-        String dbLocation =
-            client.getHiveClient().getDatabase(msTbl.getDbName()).getLocationUri();
-        return new Path(dbLocation, msTbl.getTableName().toLowerCase());
-      } else {
-        return new Path(msTbl.getSd().getLocation());
-      }
-    } finally {
-      client.release();
-    }
   }
 }

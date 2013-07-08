@@ -31,6 +31,8 @@ parser.add_option("--impalad_args", dest="impalad_args", default="",
                   help="Additional arguments to pass to each Impalad during startup")
 parser.add_option("--state_store_args", dest="state_store_args", default="",
                   help="Additional arguments to pass to State Store during startup")
+parser.add_option("--catalogd_args", dest="catalogd_args", default="",
+                  help="Additional arguments to pass to the Catalog Service at startup")
 parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true",
                   default=False, help="Instead of starting the cluster, just kill all"\
                   " the running impalads and the statestored.")
@@ -47,6 +49,8 @@ parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_t
                   "queries before returning.")
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
+
+
 options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
@@ -55,6 +59,8 @@ IMPALAD_PATH = os.path.join(IMPALA_HOME,
     'bin/start-impalad.sh -build_type=%s' % options.build_type)
 STATE_STORE_PATH = os.path.join(IMPALA_HOME, 'be/build',
     options.build_type, 'statestore/statestored')
+CATALOGD_PATH = os.path.join(IMPALA_HOME,
+    'bin/start-catalogd.sh -build_type=%s' % options.build_type)
 MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
@@ -68,7 +74,7 @@ def exec_impala_process(cmd, args, stderr_log_file_path):
   if options.verbose:
     args += ' -logtostderr=1'
   else:
-    redirect_output = "1>>%s" % stderr_log_file_path
+    redirect_output = "1>%s" % stderr_log_file_path
   cmd = '%s %s %s 2>&1 &' % (cmd, args, redirect_output)
   os.system(cmd)
 
@@ -76,6 +82,7 @@ def kill_all(force=False):
   kill_cmd = "killall"
   if force:
     kill_cmd += " -9"
+  os.system("%s catalogd" % kill_cmd)
   os.system("%s mini-impala-cluster" % kill_cmd)
   os.system("%s impalad" % kill_cmd)
   os.system("%s statestored" % kill_cmd)
@@ -87,6 +94,13 @@ def start_statestore():
   args = "%s %s" % (build_impalad_logging_args(0, "statestored"),
                     options.state_store_args)
   exec_impala_process(STATE_STORE_PATH, args, stderr_log_file_path)
+
+def start_catalogd():
+  print "Starting Catalog Service logging to %s/catalogd.INFO" % options.log_dir
+  stderr_log_file_path = os.path.join(options.log_dir, "catalogd-error.log")
+  args = "%s %s" % (build_impalad_logging_args(0, "catalogd"),
+                    options.catalogd_args)
+  exec_impala_process(CATALOGD_PATH, args, stderr_log_file_path)
 
 def start_mini_impala_cluster(cluster_size):
   print ("Starting in-process Impala Cluster logging "
@@ -155,11 +169,18 @@ def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECO
   impala_cluster = ImpalaCluster()
   # impalad processes may take a while to come up.
   wait_for_impala_process_count(impala_cluster)
-  statestored = impala_cluster.statestored
-  statestored.service.wait_for_live_backends(options.cluster_size,
-      timeout=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
   for impalad in impala_cluster.impalads:
     impalad.service.wait_for_num_known_live_backends(options.cluster_size, interval=2)
+    start_time = time()
+    while (time() - start_time < 120):
+      try:
+        num_dbs = impalad.service.get_metric_value('catalog.num-databases')
+        sleep(2)
+        if num_dbs != None and int(num_dbs) > 0:
+          break
+        print 'Waiting for Catalog...'
+      except Exception:
+        pass
 
 def wait_for_cluster_cmdline(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready" by executing a simple query in a loop"""
@@ -215,6 +236,7 @@ if __name__ == "__main__":
   else:
     try:
       start_statestore()
+      start_catalogd()
       start_impalad_instances(options.cluster_size)
       wait_for_cluster()
     except Exception, e:

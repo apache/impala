@@ -20,6 +20,11 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 
 set(SRC_FILES
+  CatalogObjects_constants.cpp
+  CatalogObjects_types.cpp
+  CatalogService.cpp
+  CatalogService_constants.cpp
+  CatalogService_types.cpp
   ImpalaInternalService.cpp
   ImpalaInternalService_constants.cpp
   ImpalaInternalService_types.cpp

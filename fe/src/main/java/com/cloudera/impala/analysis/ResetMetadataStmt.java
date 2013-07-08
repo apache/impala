@@ -18,7 +18,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TResetMetadataParams;
+import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
@@ -69,8 +69,8 @@ public class ResetMetadataStmt extends StatementBase {
     return result.toString();
   }
 
-  public TResetMetadataParams toThrift() {
-    TResetMetadataParams params = new TResetMetadataParams();
+  public TResetMetadataRequest toThrift() {
+    TResetMetadataRequest  params = new TResetMetadataRequest();
     params.setIs_refresh(isRefresh);
     if (tableName != null) {
       params.setTable_name(new TTableName(tableName.getDb(), tableName.getTbl()));

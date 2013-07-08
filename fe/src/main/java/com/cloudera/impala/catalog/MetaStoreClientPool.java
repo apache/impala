@@ -77,7 +77,10 @@ public class MetaStoreClientPool {
         if (poolClosed) {
           hiveClient.close();
         } else {
-          clientPool.add(this);
+          // TODO: Currently the pool does not work properly because we cannot
+          // reuse MetastoreClient connections. No reason to add this client back
+          // to the pool. See HIVE-5181.
+          // clientPool.add(this);
         }
       }
     }
@@ -113,6 +116,11 @@ public class MetaStoreClientPool {
     MetaStoreClient client = clientPool.poll();
     // The pool was empty so create a new client and return that.
     if (client == null) {
+      client = new MetaStoreClient(hiveConf);
+    } else {
+      // TODO: Due to Hive Metastore bugs, there is leftover state from previous client
+      // connections so we are unable to reuse the same connection. For now simply
+      // reconnect each time. One possible culprit is HIVE-5181.
       client = new MetaStoreClient(hiveConf);
     }
     client.markInUse();

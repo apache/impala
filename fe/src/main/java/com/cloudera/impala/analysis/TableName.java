@@ -88,4 +88,6 @@ public class TableName {
   public static TableName fromThrift(TTableName tableName) {
     return new TableName(tableName.getDb_name(), tableName.getTable_name());
   }
+
+  public TTableName toThrift() { return new TTableName(db, tbl); }
 }

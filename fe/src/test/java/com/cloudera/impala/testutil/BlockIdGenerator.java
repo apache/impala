@@ -11,15 +11,15 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
-import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.thrift.TUniqueId;
 
 /**
  * Utility to generate an output file with all the block ids for each table
@@ -45,10 +45,9 @@ public class BlockIdGenerator {
       writer = new FileWriter(output);
 
       // Load all tables in the catalog
-      Catalog catalog = new Catalog();
-      ImpalaInternalAdminUser user = ImpalaInternalAdminUser.getInstance();
-      for (String dbName: catalog.getAllDbNames(user)) {
-        Db database = catalog.getDb(dbName, user, Privilege.ANY);
+      Catalog catalog = new CatalogServiceCatalog(new TUniqueId(0, 0));
+      for (String dbName: catalog.getDbNames(null)) {
+        Db database = catalog.getDb(dbName);
         for (String tableName: database.getAllTableNames()) {
           Table table = null;
           try {

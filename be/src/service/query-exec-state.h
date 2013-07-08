@@ -16,6 +16,7 @@
 #define IMPALA_SERVICE_QUERY_EXEC_STATE_H
 
 #include "common/status.h"
+#include "exec/catalog-op-executor.h"
 #include "util/runtime-profile.h"
 #include "runtime/timestamp-value.h"
 #include "gen-cpp/Frontend_types.h"
@@ -29,7 +30,6 @@ namespace impala {
 
 class ExecEnv;
 class Coordinator;
-class DdlExecutor;
 class RuntimeState;
 class RowBatch;
 class Expr;
@@ -48,6 +48,7 @@ class Frontend;
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(ExecEnv* exec_env, Frontend* frontend,
+                 ImpalaServer* server,
                  boost::shared_ptr<ImpalaServer::SessionState> session,
                  const TSessionState& query_session_state,
                  const std::string& sql_stmt);
@@ -61,6 +62,8 @@ class ImpalaServer::QueryExecState {
   Status Exec(TExecRequest* exec_request);
 
   // Execute a HiveServer2 metadata operation
+  // TODO: This is likely a superset of GetTableNames/GetDbNames. Coalesce these different
+  // code paths.
   Status Exec(const TMetadataOpRequest& exec_request);
 
   // Call this to ensure that rows are ready when calling FetchRows().
@@ -111,7 +114,12 @@ class ImpalaServer::QueryExecState {
   const TUniqueId& query_id() const { return query_id_; }
   const TExecRequest& exec_request() const { return exec_request_; }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
-  TDdlType::type ddl_type() const { return exec_request_.ddl_exec_request.ddl_type; }
+  TCatalogOpType::type catalog_op_type() const {
+    return exec_request_.catalog_op_request.op_type;
+  }
+  TDdlType::type ddl_type() const {
+    return exec_request_.catalog_op_request.ddl_params.ddl_type;
+  }
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
   const beeswax::QueryState::type query_state() const { return query_state_; }
@@ -148,12 +156,11 @@ class ImpalaServer::QueryExecState {
   // not set for ddl queries, or queries with "limit 0"
   boost::scoped_ptr<Coordinator> coord_;
 
-  boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
+ // Runs statements that query or modify the catalog via the CatalogService.
+ boost::scoped_ptr<CatalogOpExecutor> catalog_op_executor_;
 
-  // Result set used for requests that return results and are not DML, DDL, or QUERY
-  // statements. For example, EXPLAIN and LOAD use this.
-  // TODO: Move SHOW/DESCRIBE requests out of DdlExecutor (they are not really DDL) and
-  // update them to use this for their result sets.
+  // Result set used for requests that return results and are not QUERY
+  // statements. For example, EXPLAIN, LOAD, and SHOW use this.
   boost::scoped_ptr<std::vector<TResultRow> > request_result_set_;
 
   // local runtime_state_ in case we don't have a coord_
@@ -194,11 +201,19 @@ class ImpalaServer::QueryExecState {
   int current_batch_row_; // number of rows fetched within the current batch
   int num_rows_fetched_; // number of rows fetched by client for the entire query
 
-  // To get access to UpdateMetastore, LOAD and DDL methods
+  // To get access to UpdateMetastore, LOAD, and DDL methods. Not owned.
   Frontend* frontend_;
+
+  // The parent ImpalaServer; called to wait until the the impalad has processed a
+  // catalog update request. Not owned.
+  ImpalaServer* parent_server_;
 
   // Start/end time of the query
   TimestampValue start_time_, end_time_;
+
+  // Executes a local catalog operation (an operation that does not need to execute
+  // against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
+  Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op);
 
   // Core logic of initiating a query or dml execution request.
   // Initiates execution of plan fragments, if there are any, and sets
@@ -228,6 +243,9 @@ class ImpalaServer::QueryExecState {
 
   // Gather and publish all required updates to the metastore
   Status UpdateMetastore();
+
+  // Copies results into request_result_set_
+  void SetResultSet(const std::vector<std::string>& results);
 
   // Sets the result set for a CREATE TABLE AS SELECT statement. The results will not be
   // ready until all BEs complete execution. This can be called as part of Wait(),
