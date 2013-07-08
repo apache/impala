@@ -87,9 +87,14 @@ if __name__ == "__main__":
       (NUM_STRESS_CLIENTS, build_test_args('stress', VALID_TEST_DIRS))
   test_executor.run_tests(args)
 
-  # Finally, run the remaining query tests in parallel
+  # Run the remaining query tests in parallel
   args = '-m "not execute_serially and not stress"  -n %d %s' %\
       (NUM_CONCURRENT_TESTS, build_test_args('parallel', VALID_TEST_DIRS))
+  test_executor.run_tests(args)
+
+  # Finally, validate impalad/statestored metrics.
+  args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR, 'log_name': "verify-metrics"}
+  args += ' verifiers/test_verify_metrics.py'
   test_executor.run_tests(args)
 
   if test_executor.tests_failed:
