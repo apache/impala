@@ -171,6 +171,25 @@ def start_impalad_instances(cluster_size):
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
+def wait_for_impala_process_count(impala_cluster, retries=3):
+  """Checks that the desired number of impalad/statestored processes are running.
+
+  Refresh until the number running impalad/statestored processes reaches the expected
+  number based on CLUSTER_SIZE, or the retry limit is hit. Failing this, raise a
+  RuntimeError.
+  """
+  for i in range(retries):
+    if len(impala_cluster.impalads) < options.cluster_size or \
+        not impala_cluster.statestored:
+          sleep(2)
+          impala_cluster.refresh()
+  if len(impala_cluster.impalads) < options.cluster_size:
+    impalads_found = len(impala_cluster.impalads)
+    msg = "Expected %d impalad(s), only %d found" % (options.cluster_size, impalads_found)
+    raise RuntimeError, msg
+  if not impala_cluster.statestored:
+    raise RuntimeError, "statestored failed to start."
+
 def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
 
@@ -181,6 +200,8 @@ def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECO
   and each individual impalad's metrics webpage.
   """
   impala_cluster = ImpalaCluster()
+  # impalad processes may take a while to come up.
+  wait_for_impala_process_count(impala_cluster)
   statestored = impala_cluster.statestored
   statestored.service.wait_for_live_backends(options.cluster_size,
       timeout=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
@@ -222,7 +243,7 @@ if __name__ == "__main__":
   # Make sure the processes have been killed. We loop till we can't detect a single
   # impald or a statestore process.
   impala_cluster = ImpalaCluster()
-  while len(impala_cluster.impalads) != 0 or len(impala_cluster.statestored) != 0:
+  while len(impala_cluster.impalads) != 0 or impala_cluster.statestored:
     impala_cluster.refresh()
   if options.inprocess:
     # The statestore and the impalads start in the same process. Additionally,
