@@ -84,7 +84,7 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
-    : runtime_state_(TUniqueId(), TQueryOptions(), "", &exec_env_),
+    : runtime_state_(TUniqueId(), TQueryOptions(), "", "", &exec_env_),
       next_val_(0) {}
 
   virtual void SetUp() {

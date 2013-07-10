@@ -111,6 +111,9 @@ struct TPlanFragmentExecParams {
 struct TQueryGlobals {
   // String containing a timestamp set as the current time.
   1: required string now_string
+  
+  // Name of the user executing this query. 
+  2: optional string user
 }
 
 

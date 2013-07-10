@@ -84,6 +84,7 @@ Status ImpaladQueryExecutor::Exec(
   Query query;
   query.query = query_string;
   query.configuration = exec_options_;
+  query.hadoop_user = "impala_test_user";
   query_results_.data.clear();
 
   // TODO: catch exception and return error code

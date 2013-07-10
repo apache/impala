@@ -5,6 +5,7 @@ package com.cloudera.impala.service;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
@@ -214,5 +215,20 @@ public class JdbcTest {
     assertEquals("Incorrect function name", "parse_url", funcName.toLowerCase());
     assertFalse(rs.next());
     rs.close();
+  }
+
+  @Test
+  public void testUtilityFunctions() throws SQLException {
+    ResultSet rs = con.createStatement().executeQuery("select user()");
+    try {
+      // We expect exactly one result row with a NULL inside the first column.
+      // The user() function returns NULL because we currently cannot set the user
+      // when establishing the Jdbc connection.
+      assertTrue(rs.next());
+      assertNull(rs.getString(1));
+      assertFalse(rs.next());
+    } finally {
+      rs.close();
+    }
   }
 }

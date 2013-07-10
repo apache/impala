@@ -49,8 +49,7 @@ public class AnalyzerTest {
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
-    return new Analyzer(catalog, defaultDb, new User(System.getProperty("user.name")),
-        Analyzer.createQueryGlobals());
+    return new Analyzer(catalog, defaultDb, new User(System.getProperty("user.name")));
   }
 
   @BeforeClass
@@ -126,7 +125,7 @@ public class AnalyzerTest {
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt) {
-    return AnalyzesOk(stmt, new Analyzer(catalog));
+    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB));
   }
 
   /**
@@ -160,7 +159,7 @@ public class AnalyzerTest {
    * is non-null.
    */
   public void AnalysisError(String stmt, String expectedErrorString) {
-    AnalysisError(stmt, new Analyzer(catalog), expectedErrorString);
+    AnalysisError(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedErrorString);
   }
 
   /**

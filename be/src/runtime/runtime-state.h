@@ -63,19 +63,19 @@ typedef std::map<std::string, std::string> FileMoveMap;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& fragment_instance_id,
-               const TQueryOptions& query_options,
-               const std::string& now, ExecEnv* exec_env);
+      const TQueryOptions& query_options, const std::string& now,
+      const std::string& user, ExecEnv* exec_env);
 
   // RuntimeState for executing expr in fe-support.
-  RuntimeState(const std::string& now);
+  RuntimeState(const std::string& now, const std::string& user);
 
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
 
   // Set per-query state.
   Status Init(const TUniqueId& fragment_instance_id,
-              const TQueryOptions& query_options,
-              const std::string& now, ExecEnv* exec_env);
+      const TQueryOptions& query_options, const std::string& now,
+      const std::string& user, ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -90,6 +90,7 @@ class RuntimeState {
   int max_io_buffers() const { return query_options_.max_io_buffers; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
+  const std::string& user() const { return user_; }
   const std::vector<std::string>& error_log() const { return error_log_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
@@ -189,6 +190,9 @@ class RuntimeState {
 
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
+
+  // Username of user that is executing the query to which this RuntimeState belongs.
+  std::string user_;
 
   // Query-global timestamp, e.g., for implementing now().
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.

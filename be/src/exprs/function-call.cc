@@ -37,6 +37,10 @@ Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
     DCHECK(state != NULL);
     DCHECK(!state->now()->NotADateTime());
     result_.timestamp_val = *(state->now());
+  } else if (opcode_ == TExprOpcode::UTILITY_USER) {
+    // Set username from runtime state.
+    DCHECK(state != NULL);
+    result_.SetStringVal(state->user());
   }
   return Status::OK;
 }

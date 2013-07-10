@@ -20,7 +20,6 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Preconditions;
 
 /**
@@ -36,13 +35,10 @@ public class AnalysisContext {
   // The user who initiated the request.
   private final User user;
 
-  private final TQueryGlobals queryGlobals;
-
   public AnalysisContext(Catalog catalog, String defaultDb, User user) {
     this.catalog = catalog;
     this.defaultDatabase = defaultDb;
     this.user = user;
-    this.queryGlobals = Analyzer.createQueryGlobals();
   }
 
   static public class AnalysisResult {
@@ -233,7 +229,7 @@ public class AnalysisContext {
       if (result.stmt == null) {
         return null;
       }
-      result.analyzer = new Analyzer(catalog, defaultDatabase, user, queryGlobals);
+      result.analyzer = new Analyzer(catalog, defaultDatabase, user);
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
@@ -244,7 +240,4 @@ public class AnalysisContext {
       throw new AnalysisException(parser.getErrorMsg(stmt), e);
     }
   }
-
-  public TQueryGlobals getQueryGlobals() { return queryGlobals; }
-
 }

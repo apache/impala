@@ -77,9 +77,12 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
              << " instance_id=" << PrintId(params.fragment_instance_id);
   VLOG(2) << "params:\n" << ThriftDebugString(params);
 
+  // The empty string is an illegal username indicating that the user was not set.
+  const string& user =
+      (request.query_globals.__isset.user) ? request.query_globals.user : "";
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
-        request.query_globals.now_string, exec_env_));
+        request.query_globals.now_string, user, exec_env_));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();

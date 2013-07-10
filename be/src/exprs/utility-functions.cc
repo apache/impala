@@ -22,6 +22,13 @@ using namespace std;
 
 namespace impala {
 
+void* UtilityFunctions::User(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 0);
+  // An empty string indicates the user wasn't set in the session
+  // or in the query request.
+  return (e->result_.string_val.len > 0) ? &e->result_.string_val : NULL;
+}
+
 void* UtilityFunctions::Version(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 0);
   e->result_.SetStringVal(GetVersionString());

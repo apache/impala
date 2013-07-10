@@ -618,7 +618,7 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value,
     const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
-  RuntimeState state(TUniqueId(), TQueryOptions(), "", NULL);
+  RuntimeState state(TUniqueId(), TQueryOptions(), "", "", NULL);
 
   Expr* expr = Expr::CreateLiteral(&pool, type, value);
   EXPECT_TRUE(expr != NULL);
@@ -629,7 +629,7 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value,
 TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
-    RuntimeState state(TUniqueId(), TQueryOptions(), "", NULL);
+    RuntimeState state(TUniqueId(), TQueryOptions(), "", "", NULL);
     Status status = Expr::Prepare(&expr, &state, RowDescriptor(), disable_codegen_);
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(expr.GetValue(NULL) == NULL);
@@ -1352,10 +1352,6 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("find_in_set(NULL, 'abc,ad,,ade,cde')", TYPE_INT);
   TestIsNull("find_in_set('abc,def', NULL)", TYPE_INT);
   TestIsNull("find_in_set(NULL, NULL)", TYPE_INT);
-
-  TestStringValue("version()", GetVersionString());
-  TestValue("sleep(100)", TYPE_BOOLEAN, true);
-  TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {
@@ -1679,6 +1675,13 @@ TEST_F(ExprTest, StringParseUrlFunction) {
       "index.html?test=true&name=networking&op=true', 'REF', 'name')", TYPE_STRING);
   TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
       "index.html?test=true&name=networking&op=true', 'XYZ', 'name')", TYPE_STRING);
+}
+
+TEST_F(ExprTest, UtilityFunctions) {
+  TestStringValue("user()", "impala_test_user");
+  TestStringValue("version()", GetVersionString());
+  TestValue("sleep(100)", TYPE_BOOLEAN, true);
+  TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, MathTrigonometricFunctions) {

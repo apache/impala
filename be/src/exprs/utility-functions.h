@@ -24,6 +24,10 @@ class TupleRow;
 
 class UtilityFunctions {
  public:
+  // Implementation of the user() function. Returns the username of the user who executed
+  // this function.
+  static void* User(Expr* e, TupleRow* row);
+
   // Implementation of the version() function. Returns the version string.  
   static void* Version(Expr* e, TupleRow* row);
 

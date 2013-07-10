@@ -405,7 +405,7 @@ public class Frontend {
     }
 
     // Global query parameters to be set in each TPlanExecRequest.
-    queryExecRequest.query_globals = analysisCtxt.getQueryGlobals();
+    queryExecRequest.query_globals = analysisResult.getAnalyzer().getQueryGlobals();
 
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata

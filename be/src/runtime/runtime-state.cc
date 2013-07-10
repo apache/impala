@@ -46,21 +46,22 @@ namespace impala {
 
 RuntimeState::RuntimeState(
     const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
-    const string& now, ExecEnv* exec_env)
+    const string& now, const string& user, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     query_mem_limit_(NULL),
     is_cancelled_(false) {
-  Status status = Init(fragment_instance_id, query_options, now, exec_env);
+  Status status = Init(fragment_instance_id, query_options, now, user, exec_env);
   DCHECK(status.ok());
 }
 
-RuntimeState::RuntimeState(const std::string& now)
+RuntimeState::RuntimeState(const string& now, const string& user)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
+    user_(user),
     profile_(obj_pool_.get(), "<unnamed>"),
     query_mem_limit_(NULL) {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
@@ -72,10 +73,11 @@ RuntimeState::~RuntimeState() {
 
 Status RuntimeState::Init(
     const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
-    const string& now, ExecEnv* exec_env) {
+    const string& now, const std::string& user, ExecEnv* exec_env) {
   fragment_instance_id_ = fragment_instance_id;
   query_options_ = query_options;
   now_.reset(new TimestampValue(now.c_str(), now.size()));
+  user_ = user;
   exec_env_ = exec_env;
   if (!query_options.disable_codegen) {
     RETURN_IF_ERROR(CreateCodegen());

@@ -125,24 +125,18 @@ public class Analyzer {
   // all conjuncts of the Where clause
   private final Set<ExprId> whereClauseConjuncts = Sets.newHashSet();
 
-  /**
-   * Analyzer constructor for AnalyzerTest.
-   * @param catalog
-   */
-  public Analyzer(Catalog catalog) {
-    this(catalog, Catalog.DEFAULT_DB, new User(System.getProperty("user.name")),
-        createQueryGlobals());
-  }
-
-  public Analyzer(Catalog catalog, String defaultDb, User user,
-        TQueryGlobals queryGlobals) {
+  public Analyzer(Catalog catalog, String defaultDb, User user) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
     this.defaultDb = defaultDb;
     this.user = user;
     this.conjunctIdGenerator = new IdGenerator<ExprId>();
-    this.queryGlobals = queryGlobals;
+    // Create query global parameters to be set in each TPlanExecRequest.
+    SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+    queryGlobals = new TQueryGlobals();
+    queryGlobals.setNow_string(formatter.format(Calendar.getInstance().getTime()));
+    queryGlobals.setUser(user.getName());
   }
 
   /**
@@ -744,19 +738,6 @@ public class Analyzer {
     } catch (DatabaseNotFoundException e) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
-  }
-
-  /**
-   * Create query global parameters to be set in each TPlanExecRequest.
-   */
-  public static TQueryGlobals createQueryGlobals() {
-    SimpleDateFormat formatter =
-        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-    TQueryGlobals queryGlobals = new TQueryGlobals();
-    Calendar currentDate = Calendar.getInstance();
-    String nowStr = formatter.format(currentDate.getTime());
-    queryGlobals.setNow_string(nowStr);
-    return queryGlobals;
   }
 
   /**
