@@ -45,11 +45,15 @@ class TestValidateMetrics(ImpalaTestSuite):
   def test_metrics_are_zero(self):
     """Test that all the metric in METRIC_LIST are 0"""
     for metric in METRIC_LIST:
-      assert self.__get_metric_value(metric) == 0, "%s's value should be zero" % metric
+      self.__assert_metric_value(metric, 0)
 
   def test_num_unused_buffers(self):
     """Test that all buffers are unused"""
     buffers = self.__get_metric_value("impala-server.io-mgr.num-buffers")
     unused_buffers = self.__get_metric_value("impala-server.io-mgr.num-unused-buffers")
-    err_msg = "Num Buffers: %s, Unused Buffers: %d" % (buffers, unused_buffers)
-    assert buffers == unused_buffers, err_msg
+    self.__assert_metric_value("impala-server.io-mgr.num-unused-buffers", buffers)
+
+  def __assert_metric_value(self, metric_name, expected_value):
+    actual_value = self.__get_metric_value(metric_name)
+    assert expected_value == actual_value, "Metric '%s' value is: %s Expected: %s" %\
+        (metric_name, actual_value, expected_value)
