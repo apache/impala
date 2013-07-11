@@ -783,6 +783,8 @@ with_clause ::=
 with_table_ref ::=
   IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
   {: RESULT = new ViewRef(alias, query); :}
+  | STRING_LITERAL:alias KW_AS LPAREN query_stmt:query RPAREN
+  {: RESULT = new ViewRef(alias, query); :}
   ;
 
 with_table_ref_list ::=
@@ -1007,6 +1009,10 @@ alias_clause ::=
   {: RESULT = ident; :}
   | IDENT:ident
   {: RESULT = ident; :}
+  | KW_AS STRING_LITERAL:l
+  {: RESULT = l; :}
+  | STRING_LITERAL:l
+  {: RESULT = l; :}
   ;
 
 star_expr ::=

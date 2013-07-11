@@ -127,19 +127,30 @@ public class ParserTest {
     ParserError("select all from tbl");
   }
 
+  /**
+   * Tests table and column aliases which can specified as
+   * identifiers (quoted or unquoted) or string literals (single or double quoted).
+   */
   @Test
   public void TestAlias() {
-    ParsesOk("select a b from tbl");
-    ParsesOk("select a b, c from tbl");
-    ParsesOk("select a as a, b as b, c as c, d as d from tbl");
+    char[] quotes = {'\'', '"', '`', ' '};
+    for (int i = 0; i < quotes.length; ++i) {
+      char quote = quotes[i];
+      // Column aliases.
+      ParsesOk("select a 'b' from tbl".replace('\'', quote));
+      ParsesOk("select a as 'b' from tbl".replace('\'', quote));
+      ParsesOk("select a 'x', b as 'y', c 'z' from tbl".replace('\'', quote));
+      // Table aliases.
+      ParsesOk("select a from tbl 'b'".replace('\'', quote));
+      ParsesOk("select a from tbl as 'b'".replace('\'', quote));
+      ParsesOk("select a from (select * from tbl) 'b'".replace('\'', quote));
+      ParsesOk("select a from (select * from tbl) as 'b'".replace('\'', quote));
+      ParsesOk("select a from (select * from tbl b) as 'b'".replace('\'', quote));
+      // With-clause view aliases.
+      ParsesOk("with 't' as (select 1) select * from t".replace('\'', quote));
+    }
     ParserError("a from tbl");
     ParserError("select a as a, b c d from tbl");
-
-    ParsesOk("select a from tbl b");
-    ParsesOk("select a from tbl as b");
-    ParsesOk("select a from (select * from tbl) b");
-    ParsesOk("select a from (select * from tbl) as b");
-    ParsesOk("select a from (select * from tbl b) as b");
   }
 
   @Test
@@ -434,6 +445,10 @@ public class ParserTest {
     // With clause before insert statement.
     ParsesOk("with t as (select 1) insert into x select * from t");
 
+    // Test quoted identifier or string literal as table alias.
+    ParsesOk("with `t1` as (select 1 a), 't2' as (select 2 a), \"t3\" as (select 3 a)" +
+        "select a from t1 union all select a from t2 union all select a from t3");
+
     // Multiple with clauses. Operands must be in parenthesis to
     // have their own with clause.
     ParsesOk("with t as (select 1) " +
@@ -537,25 +552,27 @@ public class ParserTest {
     ParsesOk("select a from `    a a a`");
     ParsesOk("select a from `    a a a    `");
 
-    // Quoted identifiers can contain any printable (non-control)
-    // characters except a quote "`".
+    // Quoted identifiers can contain any characters except "`".
     ParsesOk("select a from `all types`");
     ParsesOk("select a from `default`.`all types`");
     ParsesOk("select a from `~!@#$%^&*()-_=+|;:'\",<.>/?`");
+    // Quoted identifiers do not unescape escape sequences.
+    ParsesOk("select a from `ab\rabc`");
+    ParsesOk("select a from `ab\tabc`");
+    ParsesOk("select a from `ab\fabc`");
+    ParsesOk("select a from `ab\babc`");
+    ParsesOk("select a from `ab\nabc`");
+    // Test non-printable control characters inside quoted identifiers.
+    ParsesOk("select a from `abc\u0000abc`");
+    ParsesOk("select a from `abc\u0019abc`");
+    ParsesOk("select a from `abc\u007fabc`");
+
     // Quoted identifiers can contain keywords.
     ParsesOk("select `select`, `insert` from `table` where `where` = 10");
 
-    // Quoted identifiers cannot contain control sequences or "`"
+    // Quoted identifiers cannot contain "`"
     ParserError("select a from `abcde`abcde`");
-    ParserError("select a from `abcde\nabcde`");
-    ParserError("select a from `ab\rabc`");
-    ParserError("select a from `ab\tabc`");
-    ParserError("select a from `ab\fabc`");
-    ParserError("select a from `ab\babc`");
-    // Test characters just out of supported range.
-    ParserError("select a from `abc\u0019abc`");
     ParserError("select a from `abc\u0060abc`");
-    ParserError("select a from `abc\u007fabc`");
 
     // Wrong quotes
     ParserError("select a from 'default'.'t'");
