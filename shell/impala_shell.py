@@ -253,9 +253,20 @@ class ImpalaShell(cmd.Cmd):
     self.is_interrupted.set()
 
   def precmd(self, args):
-    # TODO: Add support for multiple commands on the same line.
     self.is_interrupted.clear()
-    return self.sanitise_input(args)
+    args = self.sanitise_input(args)
+    if not args: return args
+    # Split args using sqlparse. If there are multiple queries present in user input,
+    # the length of the returned query list will be greater than one.
+    parsed_cmds = sqlparse.split(args)
+    if len(parsed_cmds) > 1:
+      # The last command needs a delimiter to be successfully executed.
+      parsed_cmds[-1] += ImpalaShell.CMD_DELIM
+      self.cmdqueue.extend(parsed_cmds)
+      # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
+      # input is ignored. Send an empty string as the user input just to be safe.
+      return str()
+    return args
 
   def postcmd(self, status, args):
     """Hack to make non interactive mode work"""
