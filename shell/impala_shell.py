@@ -222,7 +222,7 @@ class ImpalaShell(cmd.Cmd):
         self.prompt = '> '.rjust(len(self.cached_prompt))
       # partial_cmd is already populated, add the current input after a newline.
       if self.partial_cmd and cmd:
-        self.partial_cmd = "%s %s" % (self.partial_cmd, cmd)
+        self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
       else:
         # If the input string is empty or partial_cmd is empty.
         self.partial_cmd = "%s%s" % (self.partial_cmd, cmd)
@@ -235,18 +235,23 @@ class ImpalaShell(cmd.Cmd):
       return str()
     elif self.partial_cmd: # input ends with a delimiter and partial_cmd is not empty
       if cmd != ImpalaShell.CMD_DELIM:
-        completed_cmd = "%s %s" % (self.partial_cmd, cmd)
+        completed_cmd = "%s\n%s" % (self.partial_cmd, cmd)
       else:
         completed_cmd = "%s%s" % (self.partial_cmd, cmd)
       # Reset partial_cmd to an empty string
       self.partial_cmd = str()
       # Replace the most recent history item with the completed command.
+      completed_cmd = sqlparse.format(completed_cmd, strip_comments=True)
       if self.readline and current_history_len > 0:
-        self.readline.replace_history_item(current_history_len - 1, completed_cmd)
+        # Update the history item to replace newlines with spaces. This is needed so
+        # readline can properly restore the history (otherwise it interprets each newline
+        # as a separate history item).
+        self.readline.replace_history_item(current_history_len - 1,\
+          completed_cmd.replace('\n', ' '))
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else: # Input has a delimiter and partial_cmd is empty
-      completed_cmd = cmd
+      completed_cmd = sqlparse.format(cmd, strip_comments=True)
     return completed_cmd
 
   def __signal_handler(self, signal, frame):
