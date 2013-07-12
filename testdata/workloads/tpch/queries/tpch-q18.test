@@ -1,7 +1,7 @@
 ====
 ---- QUERY : TPCH-Q18_QUERY_1
 # Q18 - Large Value Customer Query
-insert overwrite table tpch.q18_tmp
+insert overwrite table q18_tmp
 select l_orderkey, sum(l_quantity) as t_sum_quantity
 from lineitem
 group by l_orderkey
