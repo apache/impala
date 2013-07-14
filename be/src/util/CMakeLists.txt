@@ -43,6 +43,7 @@ add_library(Util
   network-util.cc
   parse-util.cc
   path-builder.cc
+  periodic-counter-updater
   pprof-path-handlers.cc
 # TODO: not supported on RHEL 5
 #  perf-counters.cc

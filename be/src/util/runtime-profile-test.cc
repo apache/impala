@@ -19,8 +19,10 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include "common/object-pool.h"
-#include "util/runtime-profile.h"
 #include "util/cpu-info.h"
+#include "util/periodic-counter-updater.h"
+#include "util/runtime-profile.h"
+#include "util/streaming-sampler.h"
 #include "util/thread.h"
 
 using namespace std;
@@ -300,7 +302,7 @@ TEST(CountersTest, RateCounters) {
   int64_t rate = rate_counter->value();
 
   // Remove the counter so it no longer gets updates
-  profile.StopRateCounterUpdates(rate_counter);
+  PeriodicCounterUpdater::StopRateCounter(rate_counter);
 
   // The rate counter is not perfectly accurate.  Currently updated at 500ms intervals,
   // we should have seen somewhere between 1 and 3 updates (33 - 200 MB/s)
@@ -336,7 +338,7 @@ TEST(CountersTest, BucketCounters) {
   sleep(2);
 
   // Stop sampling
-  profile.StopBucketingCountersUpdates(&buckets, true);
+  PeriodicCounterUpdater::StopBucketingCounters(&buckets, true);
 
   // TODO: change the value to double
   // The value of buckets[0] should be zero and buckets[1] should be 1.
@@ -391,7 +393,54 @@ TEST(CountersTest, EventSequences) {
     EXPECT_TRUE(ev.first > last_string);
     last_string = ev.first;
   }
+}
 
+void ValidateSampler(const StreamingSampler<int, 10>& sampler, int expected_num,
+    int expected_period, int expected_delta) {
+  const int* samples = NULL;
+  int num_samples;
+  int period;
+
+  samples = sampler.GetSamples(&num_samples, &period);
+  EXPECT_TRUE(samples != NULL);
+  EXPECT_EQ(num_samples, expected_num);
+  EXPECT_EQ(period, expected_period);
+
+  for (int i = 0; i < expected_num - 1; ++i) {
+    EXPECT_EQ(samples[i] + expected_delta, samples[i + 1]) << i;
+  }
+}
+
+TEST(CountersTest, StreamingSampler) {
+  StreamingSampler<int, 10> sampler;
+
+  int idx = 0;
+  for (int i = 0; i < 3; ++i) {
+    sampler.AddSample(idx++, 500);
+  }
+  ValidateSampler(sampler, 3, 500, 1);
+
+  for (int i = 0; i < 3; ++i) {
+    sampler.AddSample(idx++, 500);
+  }
+  ValidateSampler(sampler, 6, 500, 1);
+
+  for (int i = 0; i < 3; ++i) {
+    sampler.AddSample(idx++, 500);
+  }
+  ValidateSampler(sampler, 9, 500, 1);
+
+  // Added enough to cause a collapse
+  for (int i = 0; i < 3; ++i) {
+    sampler.AddSample(idx++, 500);
+  }
+  // Added enough to cause a collapse
+  ValidateSampler(sampler, 6, 1000, 2);
+
+  for (int i = 0; i < 3; ++i) {
+    sampler.AddSample(idx++, 500);
+  }
+  ValidateSampler(sampler, 7, 1000, 2);
 }
 
 }

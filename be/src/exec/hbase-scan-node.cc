@@ -23,6 +23,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "util/jni-util.h"
+#include "util/periodic-counter-updater.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/text-converter.inline.h"
@@ -260,7 +261,7 @@ Status HBaseScanNode::Close(RuntimeState* state) {
   if (memory_used_counter() != NULL) {
     COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
   }
-  runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
+  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
 
   if (hbase_scanner_.get() != NULL) {
     JNIEnv* env = getJNIEnv();

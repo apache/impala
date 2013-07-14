@@ -38,6 +38,7 @@
 #include "util/container-util.h"
 #include "util/parse-util.h"
 #include "util/mem-info.h"
+#include "util/periodic-counter-updater.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
@@ -60,7 +61,10 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     done_(false),
     prepared_(false),
     closed_(false),
-    has_thread_token_(false) {
+    has_thread_token_(false),
+    average_thread_tokens_(NULL),
+    mem_usage_sampled_counter_(NULL),
+    thread_usage_sampled_counter_(NULL) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
@@ -83,14 +87,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
         request.query_globals.now_string, user, exec_env_));
-
-  // Reserve one main thread from the pool
-  runtime_state_->resource_pool()->AcquireThreadToken();
-  has_thread_token_ = true;
-
-  average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
-      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
-          runtime_state_->resource_pool()));
 
   if (exec_env_->mem_limit() != NULL) {
     // we have a global limit
@@ -115,6 +111,21 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     VLOG_QUERY << "Using query memory limit: "
                << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
+
+  // Reserve one main thread from the pool
+  runtime_state_->resource_pool()->AcquireThreadToken();
+  has_thread_token_ = true;
+
+  average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
+      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
+          runtime_state_->resource_pool()));
+  mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
+      TCounterType::BYTES,
+      bind<int64_t>(mem_fn(&MemLimit::consumption), mem_limit_.get()));
+  thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
+      TCounterType::UNIT,
+      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
+          runtime_state_->resource_pool()));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;
@@ -439,7 +450,8 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
   if (has_thread_token_) {
     has_thread_token_ = false;
     runtime_state_->resource_pool()->ReleaseThreadToken(true);
-    profile()->StopSamplingCounterUpdates(average_thread_tokens_);
+    PeriodicCounterUpdater::StopSamplingCounter(average_thread_tokens_);
+    PeriodicCounterUpdater::StopTimeSeriesCounter(thread_usage_sampled_counter_);
   }
 }
 
@@ -453,6 +465,10 @@ void PlanFragmentExecutor::Close() {
       sink_->Close(runtime_state());
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
+  }
+  if (mem_usage_sampled_counter_ != NULL) {
+    PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
+    mem_usage_sampled_counter_ = NULL;
   }
   closed_ = true;
 }

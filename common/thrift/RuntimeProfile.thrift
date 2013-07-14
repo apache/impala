@@ -41,6 +41,23 @@ struct TEventSequence {
   3: required list<string> labels
 }
 
+// Struct to contain data sampled at even time intervals (e.g. ram usage every
+// N seconds).
+// values[0] represents the value when the counter stated (e.g. fragment started)
+// values[1] is the value at period_ms (e.g. 500 ms later)
+// values[2] is the value at 2 * period_ms (e.g. 1sec since start)
+// This can be used to reconstruct a time line for a particular counter.
+struct TTimeSeriesCounter {
+  1: required string name
+  2: required TCounterType type
+
+  // Period of intervals in ms
+  3: required i32 period_ms
+
+  // The sampled values.
+  4: required list<i64> values
+}
+
 // A single runtime profile
 struct TRuntimeProfileNode {
   1: required string name
@@ -66,6 +83,9 @@ struct TRuntimeProfileNode {
 
   // List of event sequences that capture ordered events in a query's lifetime
   9: optional list<TEventSequence> event_sequences
+
+  // List of time series counters
+  10: optional list<TTimeSeriesCounter> time_series_counters
 }
 
 // A flattened tree of runtime profiles, obtained by an

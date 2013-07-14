@@ -44,6 +44,7 @@
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
+#include "util/periodic-counter-updater.h"
 #include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -821,10 +822,10 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   if (!counters_running_) return;
   counters_running_ = false;
 
-  runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
-  runtime_profile()->StopSamplingCounterUpdates(average_scanner_thread_concurrency_);
-  runtime_profile()->StopSamplingCounterUpdates(average_hdfs_read_thread_concurrency_);
-  runtime_profile()->StopBucketingCountersUpdates(&hdfs_read_thread_concurrency_bucket_,
+  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
+  PeriodicCounterUpdater::StopSamplingCounter(average_scanner_thread_concurrency_);
+  PeriodicCounterUpdater::StopSamplingCounter(average_hdfs_read_thread_concurrency_);
+  PeriodicCounterUpdater::StopBucketingCounters(&hdfs_read_thread_concurrency_bucket_,
       true);
 
   // Output hdfs read thread concurrency into info string
