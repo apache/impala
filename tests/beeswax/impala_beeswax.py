@@ -20,7 +20,6 @@ import re
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
-from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from tests.util.thrift_util import create_transport
@@ -91,12 +90,6 @@ class ImpalaBeeswaxClient(object):
     self.use_kerberos = use_kerberos
     self.__query_options = {}
     self.query_states = QueryState._NAMES_TO_VALUES
-    self.set_default_query_options()
-
-  def __make_default_options(self):
-    def get_name(option): return TImpalaQueryOptions._VALUES_TO_NAMES[option]
-    for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
-      self.set_query_option(get_name(option), default)
 
   def __options_to_string_list(self):
     return ["%s=%s" % (k,v) for (k,v) in self.__query_options.iteritems()]
@@ -114,10 +107,6 @@ class ImpalaBeeswaxClient(object):
     if len(query_option_dict.keys()) > 0:
       for name in query_option_dict.keys():
         self.set_query_option(name, query_option_dict[name])
-
-  def set_default_query_options(self):
-    self.clear_query_options()
-    self.__make_default_options()
 
   def get_query_option(self, name):
     return self.__query_options.get(name.upper())

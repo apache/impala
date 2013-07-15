@@ -23,6 +23,7 @@ class TestDdlStatements(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
+
   def setup_method(self, method):
     self.cleanup()
     # Get the current number of queries that are in the 'EXCEPTION' state. Used for
@@ -55,12 +56,15 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_create(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/create', vector)
 
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/alter-table', vector)
 
   @pytest.mark.execute_serially
   def test_views_ddl(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/views-ddl', vector)

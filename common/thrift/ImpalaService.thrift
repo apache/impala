@@ -24,7 +24,6 @@ include "cli_service.thrift"
 //     "num_nodes:1", "abort_on_error:false"
 // The valid keys are listed in this enum. They map to TQueryOptions.
 // Note: If you add an option or change the default, you also need to update:
-// - ImpalaService.DEFAULT_QUERY_OPTIONS
 // - ImpalaInternalService.thrift: TQueryOptions
 // - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
 // - ImpalaServer::SetQueryOptions()
@@ -112,25 +111,6 @@ enum TImpalaQueryOptions {
   // If the table is small and the table is used several time, set it to true to improve
   // performance. 
   HBASE_CACHE_BLOCKS,
-}
-
-// Default values for each query option in ImpalaService.TImpalaQueryOptions
-const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
-  TImpalaQueryOptions.ABORT_ON_ERROR : "false",
-  TImpalaQueryOptions.MAX_ERRORS : "0",
-  TImpalaQueryOptions.DISABLE_CODEGEN : "false",
-  TImpalaQueryOptions.BATCH_SIZE : "0",
-  TImpalaQueryOptions.NUM_NODES : "0",
-  TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
-  TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
-  TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
-  TImpalaQueryOptions.ALLOW_UNSUPPORTED_FORMATS : "false"
-  TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
-  TImpalaQueryOptions.DEBUG_ACTION : ""
-  TImpalaQueryOptions.MEM_LIMIT : "0"
-  TImpalaQueryOptions.PARQUET_COMPRESSION_CODEC : ""
-  TImpalaQueryOptions.HBASE_CACHING : "0"
-  TImpalaQueryOptions.HBASE_CACHE_BLOCKS: "false"
 }
 
 // The summary of an insert.
