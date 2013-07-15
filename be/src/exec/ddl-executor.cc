@@ -52,7 +52,6 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       TGetTablesResult table_names;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
           &session, &table_names));
-      // Set the result set
       SetResultSet(table_names.tables);
       return Status::OK;
     }
@@ -63,8 +62,17 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
           frontend_->GetDbNames(db_pattern, &session, &db_names));
-      // Set the result set
       SetResultSet(db_names.dbs);
+      return Status::OK;
+    }
+    case TDdlType::SHOW_FUNCTIONS: {
+      const TShowFunctionsParams* params = &exec_request.show_fns_params;
+      TGetFunctionsResult fn_names;
+      const string* fn_pattern =
+          params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(
+          frontend_->GetFunctionNames(fn_pattern, &session, &fn_names));
+      SetResultSet(fn_names.fns);
       return Status::OK;
     }
     case TDdlType::DESCRIBE: {
@@ -82,14 +90,14 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
     case TDdlType::CREATE_TABLE:
     case TDdlType::CREATE_TABLE_AS_SELECT:
     case TDdlType::CREATE_VIEW:
+    case TDdlType::CREATE_FUNCTION:
     case TDdlType::DROP_DATABASE:
+    case TDdlType::DROP_FUNCTION:
     case TDdlType::DROP_TABLE:
-    case TDdlType::DROP_VIEW: {
+    case TDdlType::DROP_VIEW:
       return frontend_->ExecDdlRequest(exec_request, exec_response_.get());
-    }
-    case TDdlType::RESET_METADATA: {
+    case TDdlType::RESET_METADATA:
       return frontend_->ResetMetadata(exec_request.reset_metadata_params);
-    }
     default: {
       stringstream ss;
       ss << "Unknown DDL exec request type: " << exec_request.ddl_type;

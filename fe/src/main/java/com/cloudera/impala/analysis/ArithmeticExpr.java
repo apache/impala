@@ -117,13 +117,13 @@ public class ArithmeticExpr extends Expr {
     // bitnot is the only unary op, deal with it here
     if (op == Operator.BITNOT) {
       type = getChild(0).getType();
-      OpcodeRegistry.Signature match =
+      OpcodeRegistry.BuiltinFunction match =
         OpcodeRegistry.instance().getFunctionInfo(op.functionOp, true, type);
       if (match == null) {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
             "types: " + toSql());
       }
-      Preconditions.checkState(type == match.returnType || type.isNull());
+      Preconditions.checkState(type == match.getDesc().getReturnType() || type.isNull());
       opcode = match.opcode;
       return;
     }
@@ -170,8 +170,8 @@ public class ArithmeticExpr extends Expr {
     }
 
     type = castBinaryOp(type);
-    OpcodeRegistry.Signature match =
-      OpcodeRegistry.instance().getFunctionInfo(funcOp, true, type, type);
+    OpcodeRegistry.BuiltinFunction match =
+        OpcodeRegistry.instance().getFunctionInfo(funcOp, true, type, type);
     if (match == null) {
       Preconditions.checkState(false, String.format("No match in function registry " +
           "for '%s' with operand types %s and %s", toSql(), type, type));

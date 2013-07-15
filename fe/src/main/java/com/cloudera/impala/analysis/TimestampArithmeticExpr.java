@@ -148,13 +148,13 @@ public class TimestampArithmeticExpr extends Expr {
     String funcOpName = String.format("%sS_%s", timeUnit.toString(),
         (op == ArithmeticExpr.Operator.ADD) ? "ADD" : "SUB");
     FunctionOperator funcOp = OpcodeRegistry.instance().getFunctionOperator(funcOpName);
-    OpcodeRegistry.Signature match =
+    OpcodeRegistry.BuiltinFunction match =
         OpcodeRegistry.instance().getFunctionInfo(funcOp, true, argTypes);
     // We have already done type checking to ensure the function will resolve.
     Preconditions.checkNotNull(match);
-    Preconditions.checkState(match.returnType == PrimitiveType.TIMESTAMP);
+    Preconditions.checkState(match.getDesc().getReturnType() == PrimitiveType.TIMESTAMP);
     opcode = match.opcode;
-    type = match.returnType;
+    type = match.getDesc().getReturnType();
   }
 
   @Override

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Appender;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.PropertyConfigurator;
@@ -65,6 +66,8 @@ import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
+import com.cloudera.impala.thrift.TGetFunctionsParams;
+import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLoadDataReq;
@@ -252,6 +255,30 @@ public class JniFrontend {
     TGetDbsResult result = new TGetDbsResult();
     result.setDbs(dbs);
 
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns a list of function names matching an optional pattern.
+   * The argument is a serialized TGetFunctionsParams object.
+   * The return type is a serialised TGetFunctionsResult object.
+   * @see Frontend#getTableNames
+   */
+  public byte[] getFunctionNames(byte[] thriftGetFunctionsParams) throws ImpalaException {
+    TGetFunctionsParams params = new TGetFunctionsParams();
+    deserializeThrift(params, thriftGetFunctionsParams);
+    // If the session was not set it indicates this is an internal Impala call.
+    User user = params.isSetSession() ?
+        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
+    List<String> fns = frontend.getFunctionNames(params.pattern, user);
+
+    TGetFunctionsResult result = new TGetFunctionsResult();
+    result.setFns(fns);
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
       return serializer.serialize(result);

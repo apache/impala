@@ -175,9 +175,6 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     return owner;
   }
 
-  @Override
-  public String debugString() { return toSql(); }
-
   public List<ColumnDef> getColumnDefs() {return columnDefs; }
   public String getComment() { return comment; }
   public boolean getIfNotExists() { return ifNotExists; }

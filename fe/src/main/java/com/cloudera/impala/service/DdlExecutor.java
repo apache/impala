@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
@@ -43,14 +44,17 @@ import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.FileFormat;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.PartitionNotFoundException;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
@@ -64,14 +68,17 @@ import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateDbParams;
+import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
+import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -116,12 +123,18 @@ public class DdlExecutor {
       case CREATE_VIEW:
         createView(ddlRequest.getCreate_view_params());
         break;
+      case CREATE_FUNCTION:
+        createFunction(ddlRequest.getCreate_fn_params());
+        break;
       case DROP_DATABASE:
         dropDatabase(ddlRequest.getDrop_db_params());
         break;
       case DROP_TABLE:
       case DROP_VIEW:
         dropTableOrView(ddlRequest.getDrop_table_or_view_params());
+        break;
+      case DROP_FUNCTION:
+        dropFunction(ddlRequest.getDrop_fn_params());
         break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type.toString());
@@ -291,6 +304,24 @@ public class DdlExecutor {
     }
   }
 
+  public void createFunction(TCreateFunctionParams params)
+      throws ImpalaException, MetaException, AlreadyExistsException {
+    ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
+    for (TPrimitiveType t: params.arg_types) {
+      argTypes.add(PrimitiveType.fromThrift(t));
+    }
+    PrimitiveType retType = PrimitiveType.fromThrift(params.ret_type);
+    HdfsURI location = new HdfsURI(params.location);
+    Udf udf = new Udf(params.fn_name, argTypes, retType,
+        location, params.binary_name);
+    LOG.info(String.format("Adding UDF %s", udf.getDesc().signatureString()));
+    boolean added = catalog.addUdf(udf, internalUser);
+    if (!added && !params.if_not_exists) {
+      throw new AlreadyExistsException("Function " + udf.getDesc().signatureString() +
+          " already exists.");
+    }
+  }
+
   /**
    * Drops a database from the metastore and removes the database's metadata from the
    * internal cache. The database must be empty (contain no tables) for the drop operation
@@ -341,6 +372,21 @@ public class DdlExecutor {
     }
   }
 
+  public void dropFunction(TDropFunctionParams params)
+      throws ImpalaException, MetaException, NoSuchObjectException {
+    ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
+    for (TPrimitiveType t: params.arg_types) {
+      argTypes.add(PrimitiveType.fromThrift(t));
+    }
+    Function desc = new Function(
+        params.fn_name, argTypes, PrimitiveType.INVALID_TYPE, false);
+    LOG.info(String.format("Dropping UDF %s", desc.signatureString()));
+    boolean removed = catalog.removeUdf(desc, internalUser);
+    if (!removed && !params.if_exists) {
+      throw new NoSuchObjectException(
+          "Function: " + desc.signatureString() + " does not exist.");
+    }
+  }
   /**
    * Creates a new table in the metastore and adds an entry to the metadata cache to
    * lazily load the new metadata on the next access. Re-throws any Hive Meta Store
@@ -902,7 +948,6 @@ public class DdlExecutor {
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     }
   }
-
   /**
    * Utility function that creates a hive.metastore.api.Table object based on the given
    * TCreateTableParams.

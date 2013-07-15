@@ -16,48 +16,44 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TShowDbsParams;
+import com.cloudera.impala.thrift.TShowFunctionsParams;
 
 /**
- * Representation of a SHOW DATABASES [pattern] statement.
+ * Representation of a SHOW FUNCTIONS [pattern] statement.
  * Acceptable syntax:
  *
- * SHOW DATABASES
- * SHOW SCHEMAS
- * SHOW DATABASES LIKE 'pattern'
- * SHOW SCHEMAS LIKE 'pattern'
+ * SHOW FUNCTIONS
+ * SHOW FUNCTIONS LIKE 'pattern'
  *
  */
-public class ShowDbsStmt extends StatementBase {
+public class ShowFunctionsStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
-  private final String pattern;
+  private final String pattern_;
 
   /**
    * Default constructor, which creates a show statement which returns all
-   * databases.
+   * functions.
    */
-  public ShowDbsStmt() {
+  public ShowFunctionsStmt() {
     this(null);
   }
 
   /**
-   * Constructs a show statement which matches all databases against the
+   * Constructs a show statement which matches all functions against the
    * supplied pattern.
    */
-  public ShowDbsStmt(String pattern) {
-    this.pattern = pattern;
+  public ShowFunctionsStmt(String pattern) {
+    this.pattern_ = pattern;
   }
 
-  public String getPattern() {
-    return pattern;
-  }
+  public String getPattern() { return pattern_; }
 
   @Override
   public String toSql() {
-    if (pattern == null) {
-        return "SHOW DATABASES";
+    if (pattern_ == null) {
+        return "SHOW FUNCTIONS";
     } else {
-        return "SHOW DATABASES LIKE '" + pattern + "'";
+        return "SHOW FUNCTIONS LIKE '" + pattern_ + "'";
     }
   }
 
@@ -67,8 +63,8 @@ public class ShowDbsStmt extends StatementBase {
     // Nothing to do here
   }
 
-  public TShowDbsParams toThrift() {
-    TShowDbsParams params = new TShowDbsParams();
+  public TShowFunctionsParams toThrift() {
+    TShowFunctionsParams params = new TShowFunctionsParams();
     params.setShow_pattern(getPattern());
     return params;
   }

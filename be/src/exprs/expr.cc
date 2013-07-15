@@ -357,6 +357,9 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
     }
+    case TExprNodeType::UDF: {
+      return Status("UDFs are not yet implemented.");
+    }
     default:
       stringstream os;
       os << "Unknown expr node type: " << texpr_node.node_type;

@@ -9,6 +9,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -20,10 +21,13 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.User;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
@@ -459,6 +463,93 @@ public class CatalogTest {
           catalog.getMetaStoreClient().getHiveClient(),
           getDb(catalog, "functional"), tableName, table);
     }
+  }
+
+  @Test
+  public void TestUdf() throws CatalogException {
+    User user = ImpalaInternalAdminUser.getInstance();
+    List<String> fnNames = catalog.getUdfNames("", user);
+    assertEquals(fnNames.size(), 0);
+
+    ArrayList<PrimitiveType> args1 = Lists.newArrayList();
+    ArrayList<PrimitiveType> args2 = Lists.newArrayList(PrimitiveType.INT);
+    ArrayList<PrimitiveType> args3 = Lists.newArrayList(PrimitiveType.TINYINT);
+
+    catalog.removeUdf(
+        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 0);
+
+    Udf udf1 = new Udf(
+        "Foo", args1, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf1, user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 1);
+    assertTrue(fnNames.contains("foo()"));
+
+    // Same function name, overloaded arguments
+    Udf udf2 = new Udf(
+        "Foo", args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf2, user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 2);
+    assertTrue(fnNames.contains("foo()"));
+    assertTrue(fnNames.contains("foo(INT)"));
+
+    // Add a function with a new name
+    Udf udf3 = new Udf(
+        "Bar", args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf3, user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 3);
+    assertTrue(fnNames.contains("foo()"));
+    assertTrue(fnNames.contains("foo(INT)"));
+    assertTrue(fnNames.contains("bar(INT)"));
+
+    // Drop Foo()
+    catalog.removeUdf(
+        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 2);
+    assertTrue(fnNames.contains("foo(INT)"));
+    assertTrue(fnNames.contains("bar(INT)"));
+
+    // Drop it again, no-op
+    catalog.removeUdf(
+        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 2);
+    assertTrue(fnNames.contains("foo(INT)"));
+    assertTrue(fnNames.contains("bar(INT)"));
+
+    // Drop bar(), no-op
+    catalog.removeUdf(
+        new Function("Bar", args1, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 2);
+    assertTrue(fnNames.contains("foo(INT)"));
+    assertTrue(fnNames.contains("bar(INT)"));
+
+    // Drop bar(tinyint), no-op
+    catalog.removeUdf(
+        new Function("Bar", args3, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 2);
+    assertTrue(fnNames.contains("foo(INT)"));
+    assertTrue(fnNames.contains("bar(INT)"));
+
+    // Drop bar(int)
+    catalog.removeUdf(
+        new Function("Bar", args2, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 1);
+    assertTrue(fnNames.contains("foo(INT)"));
+
+    // Drop foo(int)
+    catalog.removeUdf(
+        new Function("foo", args2, PrimitiveType.INVALID_TYPE, false), user);
+    fnNames = catalog.getUdfNames(null, user);
+    assertEquals(fnNames.size(), 0);
   }
 
   private static Db getDb(Catalog catalog, String dbName) {

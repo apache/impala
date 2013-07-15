@@ -23,6 +23,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.opcode.FunctionOperator;
@@ -50,29 +51,29 @@ public class OpcodeRegistry {
   private static OpcodeRegistry instance = new OpcodeRegistry();
 
   /**
-   * This is a mapping of Operator,#args to signatures with a fixed number of arguments.
-   * The signature is defined by the operator enum and the arguments
+   * This is a mapping of Operator,#args to builtins with a fixed number of arguments.
+   * The builtin is defined by the operator enum and the arguments
    * and is a one to one mapping to opcodes.
-   * The map is structured this way to more efficiently look for signature matches.
-   * Signatures that have the same number of arguments have a potential to be matches
+   * The map is structured this way to more efficiently look for builtin matches.
+   * Builtins that have the same number of arguments have a potential to be matches
    * by allowing types to be implicitly cast.
    * Functions with a variable number of arguments are put into the varArgOperations map.
    */
-  private final Map<Pair<FunctionOperator, Integer>, List<Signature>> operations;
+  private final Map<Pair<FunctionOperator, Integer>, List<BuiltinFunction>> operations;
 
   /**
-   * This is a mapping of Operator,varArgType to signatures of vararg functions only.
+   * This is a mapping of Operator,varArgType to builtins of vararg functions only.
    * varArgType must be a maximum-resolution type.
-   * We use a separate map to be able to support multiple vararg signatures for the same
+   * We use a separate map to be able to support multiple vararg builtins for the same
    * FunctionOperator.
-   * Contains a special entry mapping from Operator,NULL_TYPE to signatures for each
+   * Contains a special entry mapping from Operator,NULL_TYPE to builtins for each
    * Operator to correctly match varag functions when all args are NULL.
    * Limitations: Since we do not consider the number of arguments, each FunctionOperator
-   * is limited to having one vararg signature per maximum-resolution PrimitiveType.
-   * For example, one can have two signatures func(float, int ...) and func(string ...),
+   * is limited to having one vararg builtin per maximum-resolution PrimitiveType.
+   * For example, one can have two builtins func(float, int ...) and func(string ...),
    * but not func(float, int ...) and func (int ...).
    */
-  private final Map<Pair<FunctionOperator, PrimitiveType>, List<Signature>>
+  private final Map<Pair<FunctionOperator, PrimitiveType>, List<BuiltinFunction>>
       varArgOperations;
 
   /**
@@ -98,83 +99,51 @@ public class OpcodeRegistry {
   }
 
   /**
-   * Contains all the information about a function signature.
+   * Contains all the information about a builtin function.
    */
-  public static class Signature {
+  public static class BuiltinFunction {
     public TExprOpcode opcode;
     public FunctionOperator operator;
-    public PrimitiveType returnType;
-    public PrimitiveType argTypes[];
-    public boolean varArgs;
+    public Function desc;
 
     // Constructor for searching, specifying the op and arguments
-    public Signature(FunctionOperator operator, PrimitiveType[] args) {
+    public BuiltinFunction(FunctionOperator operator, PrimitiveType[] args) {
       this.operator = operator;
-      this.argTypes = args;
+      this.desc = new Function(operator.toString(),
+          args, PrimitiveType.INVALID_TYPE, false);
     }
 
-    private Signature(TExprOpcode opcode, FunctionOperator operator,
+    private BuiltinFunction(TExprOpcode opcode, FunctionOperator operator,
         boolean varArgs, PrimitiveType ret, PrimitiveType[] args) {
       this.operator = operator;
       this.opcode = opcode;
-      this.varArgs = varArgs;
-      this.returnType = ret;
-      this.argTypes = args;
+      this.desc = new Function(opcode.toString(), args, ret, varArgs);
     }
 
     /**
-     * Returns if the 'this' signature is compatible with the 'other' signature. The op
+     * Returns if the 'this' function has a compatible signature with the 'other'. The op
      * and number of arguments must match and it must be allowed to implicitly cast
      * each argument of this signature to the matching argument in 'other'
      */
-    public boolean isCompatible(Signature other) {
-      if (!varArgs && other.argTypes.length != this.argTypes.length) {
-        return false;
-      }
-      if (varArgs && other.argTypes.length < this.argTypes.length) {
-          return false;
-      }
-      for (int i = 0; i < this.argTypes.length; ++i) {
-        if (!PrimitiveType.isImplicitlyCastable(other.argTypes[i], this.argTypes[i])) {
-          return false;
-        }
-      }
-      // Check trailing varargs.
-      if (varArgs) {
-        for (int i = this.argTypes.length; i < other.argTypes.length; ++i) {
-          if (!PrimitiveType.isImplicitlyCastable(other.argTypes[i],
-              this.argTypes[this.argTypes.length - 1])) {
-            return false;
-          }
-        }
-      }
-      return true;
+    public boolean isCompatible(BuiltinFunction other) {
+      return desc.isCompatible(other.getDesc());
     }
 
     @Override
     /**
-     * Signature are equal with C++/Java function signature semantics.  They are
+     * Functions are equal with C++/Java function signature semantics.  They are
      * equal if the operation and all the arguments are the same.
      */
     public boolean equals(Object o) {
-      if (o == null || !(o instanceof Signature)) {
+      if (o == null || !(o instanceof BuiltinFunction)) {
         return false;
       }
-      Signature s = (Signature) o;
-      if (s.argTypes == null && this.argTypes == null) {
-        return true;
-      }
+      BuiltinFunction s = (BuiltinFunction) o;
+      return desc.equals(s.getDesc());
+    }
 
-      if (s.argTypes.length != this.argTypes.length) {
-        return false;
-      }
-
-      for (int i = 0; i < this.argTypes.length; ++i) {
-        if (s.argTypes[i] != this.argTypes[i]) {
-          return false;
-        }
-      }
-      return true;
+    public Function getDesc() {
+      return desc;
     }
   }
 
@@ -206,7 +175,7 @@ public class OpcodeRegistry {
    * If 'allowImplicitCasts' is true the matching signature does not have to match the
    * input identically, implicit type promotion is allowed.
    */
-  public Signature getFunctionInfo(FunctionOperator op, boolean allowImplicitCasts,
+  public BuiltinFunction getFunctionInfo(FunctionOperator op, boolean allowImplicitCasts,
       PrimitiveType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
     // Take the last argument's type as the vararg type.
@@ -215,23 +184,23 @@ public class OpcodeRegistry {
       PrimitiveType varArgMatchType = getRightMostNonNullTypeOrNull(argTypes);
       varArgsLookup = Pair.create(op, varArgMatchType.getMaxResolutionType());
     }
-    List<Signature> signatures = null;
+    List<BuiltinFunction> functions = null;
     if (operations.containsKey(lookup)) {
-      signatures = operations.get(lookup);
+      functions = operations.get(lookup);
     } else if(varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
-      signatures = varArgOperations.get(varArgsLookup);
+      functions = varArgOperations.get(varArgsLookup);
     }
-    if (signatures == null) {
+    if (functions == null) {
       return null;
     }
-    Signature compatibleMatch = null;
-    Signature search = new Signature(op, argTypes);
-    for (Signature signature : signatures) {
-      if (search.equals(signature)) {
-        return signature;
+    BuiltinFunction compatibleMatch = null;
+    BuiltinFunction search = new BuiltinFunction(op, argTypes);
+    for (BuiltinFunction function : functions) {
+      if (search.equals(function)) {
+        return function;
       } else if (allowImplicitCasts && compatibleMatch == null
-          && signature.isCompatible(search)) {
-        compatibleMatch = signature;
+          && function.isCompatible(search)) {
+        compatibleMatch = function;
       }
     }
     return compatibleMatch;
@@ -254,7 +223,7 @@ public class OpcodeRegistry {
    */
   public boolean add(FunctionOperator op, TExprOpcode opcode, boolean varArgs,
       PrimitiveType retType, PrimitiveType ... args) {
-    List<Signature> signatures;
+    List<BuiltinFunction> functions;
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
     // Take the last argument's type as the vararg type.
     Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
@@ -266,25 +235,25 @@ public class OpcodeRegistry {
       varArgsNullLookup = Pair.create(op, PrimitiveType.NULL_TYPE);
     }
     if (operations.containsKey(lookup)) {
-      signatures = operations.get(lookup);
+      functions = operations.get(lookup);
     } else if (varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
-      signatures = varArgOperations.get(varArgsLookup);
+      functions = varArgOperations.get(varArgsLookup);
     } else {
-      signatures = new ArrayList<Signature>();
+      functions = new ArrayList<BuiltinFunction>();
       if (varArgs) {
-        varArgOperations.put(varArgsLookup, signatures);
-        varArgOperations.put(varArgsNullLookup, signatures);
+        varArgOperations.put(varArgsLookup, functions);
+        varArgOperations.put(varArgsNullLookup, functions);
       } else {
-        operations.put(lookup, signatures);
+        operations.put(lookup, functions);
       }
     }
 
-    Signature signature = new Signature(opcode, op, varArgs, retType, args);
-    if (signatures.contains(signature)) {
+    BuiltinFunction function = new BuiltinFunction(opcode, op, varArgs, retType, args);
+    if (functions.contains(function)) {
       LOG.error("OpcodeRegistry: Function already exists: " + opcode);
       return false;
     }
-    signatures.add(signature);
+    functions.add(function);
 
     return true;
   }

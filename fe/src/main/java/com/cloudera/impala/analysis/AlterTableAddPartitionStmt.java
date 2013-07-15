@@ -49,11 +49,6 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" ADD ");

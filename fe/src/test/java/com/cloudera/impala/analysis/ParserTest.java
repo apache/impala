@@ -67,8 +67,9 @@ public class ParserTest {
   public void ParserError(String stmt, String expectedErrorString) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
+    Object result = null; // Save this object to make debugging easier
     try {
-      parser.parse();
+      result = parser.parse().value;
     } catch (java.lang.Exception e) {
       if (expectedErrorString != null) {
         String errorString = parser.getErrorMsg(stmt);
@@ -1105,6 +1106,9 @@ public class ParserTest {
     ParsesOk("SHOW SCHEMAS");
     ParsesOk("SHOW DATABASES LIKE 'pattern'");
     ParsesOk("SHOW SCHEMAS LIKE 'p*ttern'");
+    ParsesOk("SHOW FUNCTIONS");
+    ParsesOk("SHOW FUNCTIONS LIKE 'pattern'");
+    ParsesOk("SHOW FUNCTIONS LIKE 'p*ttern'");
   }
 
   @Test
@@ -1155,6 +1159,54 @@ public class ParserTest {
 
       ParserError(String.format("CREATE %sS Foo", kw));
     }
+  }
+
+  @Test
+  public void TestCreateFunction() {
+    ParsesOk("CREATE FUNCTION Foo() RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParsesOk("CREATE FUNCTION Foo(INT, INT) RETURNS STRING LOCATION " +
+        "'f.jar' 'class.Udf'");
+    ParsesOk("CREATE FUNCTION Foo(INT, DOUBLE) RETURNS STRING LOCATION " +
+        "'f.jar' 'class.Udf'");
+    ParsesOk("CREATE FUNCTION Foo() RETURNS STRING LOCATION " +
+        "'f.jar' 'class.Udf' COMMENT 'hi'");
+    ParsesOk(
+        "CREATE FUNCTION IF NOT EXISTS Foo() RETURNS INT LOCATION 'foo.jar' 'class.Udf'");
+
+    // Try more interesting function names
+    ParsesOk("CREATE FUNCTION User.Foo() RETURNS INT LOCATION 'a' 'b'");
+    ParsesOk("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a' 'b'");
+    ParsesOk("CREATE FUNCTION `Foo`() RETURNS INT LOCATION 'a' 'b'");
+    ParsesOk("CREATE FUNCTION `Foo.Bar`() RETURNS INT LOCATION 'a' 'b'");
+    ParsesOk("CREATE FUNCTION `Foo`.Bar() RETURNS INT LOCATION 'a' 'b'");
+
+    // Bad function name
+    ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a' 'b'");
+    ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a' 'b'");
+    ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a' 'b'");
+
+    // Missing binary function name
+    ParserError("CREATE FUNCTION FOO() RETURNS INT LOCATION 'foo.jar'");
+
+    // Missing location
+    ParserError("CREATE FUNCTION FOO() RETURNS INT");
+
+    // Missing return type
+    ParserError("CREATE FUNCTION FOO() LOCATION 'foo.jar'");
+
+    // Missing arguments
+    ParserError("CREATE FUNCTION Foo RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION Foo(INT,) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION FOO RETURNS INT LOCATION 'foo.jar' 'class.Udf'");
+
+    // NULL return type or argument type.
+    ParserError("CREATE FUNCTION Foo(NULL) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION Foo(NULL, INT) RETURNS INT LOCATION 'f.jar' 'f.class'");
+    ParserError("CREATE FUNCTION Foo(INT, NULL) RETURNS INT LOCATION 'f.jar' 'f.class'");
+    ParserError("CREATE FUNCTION Foo() RETURNS NULL LOCATION 'f.jar' 'class.Udf'");
+
+    // Variadic args not yet supported
+    ParserError("CREATE FUNCTION Foo(...) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
   }
 
   @Test
@@ -1550,6 +1602,12 @@ public class ParserTest {
     ParsesOk("DROP SCHEMA Foo");
     ParsesOk("DROP DATABASE IF EXISTS Foo");
     ParsesOk("DROP SCHEMA IF EXISTS Foo");
+    ParsesOk("DROP FUNCTION Foo()");
+    ParsesOk("DROP FUNCTION Foo(INT)");
+    ParsesOk("DROP FUNCTION Foo.Foo(INT)");
+    ParsesOk("DROP FUNCTION IF EXISTS Foo()");
+    ParsesOk("DROP FUNCTION IF EXISTS Foo(INT)");
+    ParsesOk("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
 
     ParserError("DROP");
     ParserError("DROP Foo");
@@ -1565,6 +1623,16 @@ public class ParserTest {
     ParserError("DROP VIEW EXISTS Foo");
     ParserError("DROP IF EXISTS VIEW Foo");
     ParserError("DROP VIW Foo");
+    ParserError("DROP FUNCTION Foo)");
+    ParserError("DROP FUNCTION Foo(");
+    ParserError("DROP FUNCTION Foo");
+    ParserError("DROP FUNCTION");
+    ParserError("DROP IF EXISTS FUNCTION Foo()");
+    ParserError("DROP FUNCTION Foo(INT) RETURNS INT");
+    ParserError("DROP FUNCTION Foo.(INT) RETURNS INT");
+    ParserError("DROP FUNCTION Foo..(INT) RETURNS INT");
+    ParserError("DROP FUNCTION Foo(NULL) RETURNS INT");
+    ParserError("DROP FUNCTION Foo(INT) RETURNS NULL");
   }
 
   @Test

@@ -103,7 +103,4 @@ public class DropTableOrViewStmt extends StatementBase {
   public String getTbl() { return tableName.getTbl(); }
   public boolean getIfExists() { return this.ifExists; }
   public boolean isDropTable() { return dropTable; }
-
-  @Override
-  public String debugString() { return toSql(); }
 }

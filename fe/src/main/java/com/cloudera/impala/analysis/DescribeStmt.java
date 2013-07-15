@@ -58,11 +58,6 @@ public class DescribeStmt extends StatementBase {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     if (!table.isFullyQualified()) {

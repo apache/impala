@@ -53,8 +53,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public InsertStmt getInsertStmt() { return insertStmt_; }
   public CreateTableStmt getCreateStmt() { return createStmt_; }
   @Override
-  public String debugString() { return toSql(); }
-  @Override
   public String toSql() { return createStmt_.toSql() + " AS " + getQueryStmt().toSql(); }
 
   @Override

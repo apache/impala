@@ -442,13 +442,26 @@ public class MetadataOp {
     return result;
   }
 
+  private static TResultRow createFunctionResultRow(String name) {
+    TResultRow row = new TResultRow();
+    row.colVals = Lists.newArrayList();
+    row.colVals.add(NULL_COL_VAL); // FUNCTION_CAT
+    row.colVals.add(NULL_COL_VAL); // FUNCTION_SCHEM
+    row.colVals.add(createTColumnValue(name)); // FUNCTION_NAME
+    row.colVals.add(EMPTY_COL_VAL); // REMARKS
+    // FUNCTION_TYPE
+    row.colVals.add(createTColumnValue(DatabaseMetaData.functionNoTable));
+    row.colVals.add(createTColumnValue(name)); // SPECIFIC_NAME
+    return row;
+  }
+  
   /**
    * Executes the GetFunctions HiveServer2 operation and returns TMetadataOpResponse.
    * Returns the list of functions that fit the search patterns.
    * catalogName, schemaName and functionName are JDBC search patterns.
    */
-  public static TMetadataOpResponse getFunctions(String catalogName, String schemaName,
-      String functionName) {
+  public static TMetadataOpResponse getFunctions(Catalog catalog, String catalogName, 
+      String schemaName, String functionName, User user) {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_FUNCTIONS_MD);
 
     // Impala's built-in functions do not have a catalog name or schema name.
@@ -459,21 +472,16 @@ public class MetadataOp {
     Pattern functionPattern = Pattern.compile(convertPattern(functionName));
 
     for (String builtinFn: OpcodeRegistry.instance().getFunctionNames()) {
-      if (!functionPattern.matcher(builtinFn).matches()) {
-        continue;
-      }
-
-      TResultRow row = new TResultRow();
-      row.colVals = Lists.newArrayList();
-      row.colVals.add(NULL_COL_VAL); // FUNCTION_CAT
-      row.colVals.add(NULL_COL_VAL); // FUNCTION_SCHEM
-      row.colVals.add(createTColumnValue(builtinFn)); // FUNCTION_NAME
-      row.colVals.add(EMPTY_COL_VAL); // REMARKS
-      // FUNCTION_TYPE
-      row.colVals.add(createTColumnValue(DatabaseMetaData.functionNoTable));
-      row.colVals.add(createTColumnValue(builtinFn)); // SPECIFIC_NAME
-      result.results.add(row);
+      if (!functionPattern.matcher(builtinFn).matches()) continue;
+      result.results.add(createFunctionResultRow(builtinFn));
     }
+    
+    List<String> udfs = catalog.getUdfNames(functionName, user);
+    for (String udf: udfs) {
+      // TODO: does this need to fill out more of the cols in the HS2 result?
+      result.results.add(createFunctionResultRow(udf));
+    }    
+    
     return result;
   }
 

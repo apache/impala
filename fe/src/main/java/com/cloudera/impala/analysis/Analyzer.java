@@ -65,6 +65,8 @@ public class Analyzer {
   public final static String DB_ALREADY_EXISTS_ERROR_MSG = "Database already exists: ";
   public final static String TBL_DOES_NOT_EXIST_ERROR_MSG = "Table does not exist: ";
   public final static String TBL_ALREADY_EXISTS_ERROR_MSG = "Table already exists: ";
+  public final static String FN_DOES_NOT_EXIST_ERROR_MSG = "Function does not exist: ";
+  public final static String FN_ALREADY_EXISTS_ERROR_MSG = "Function already exists: ";
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 

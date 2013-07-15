@@ -39,11 +39,6 @@ public class UseStmt extends StatementBase {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     analyzer.getDb(database, Privilege.ANY);

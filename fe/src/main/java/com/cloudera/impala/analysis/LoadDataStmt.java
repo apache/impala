@@ -93,14 +93,6 @@ public class LoadDataStmt extends StatementBase {
     return sb.toString();
   }
 
-  /*
-   * Print debug string.
-   */
-  @Override
-  public String debugString() {
-    return toSql();
-  }
-
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {

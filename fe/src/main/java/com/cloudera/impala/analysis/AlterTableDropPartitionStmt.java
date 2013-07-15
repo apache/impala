@@ -43,11 +43,6 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" DROP ");

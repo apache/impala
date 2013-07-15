@@ -17,6 +17,7 @@ package com.cloudera.impala.catalog;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +84,10 @@ public class Catalog {
         }
       });
 
+  // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
+  // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
+  private HashMap<String, List<Udf>> udfs;
+
   private final ScheduledExecutorService policyReader =
       Executors.newScheduledThreadPool(1);
   private final AuthorizationConfig authzConfig;
@@ -140,6 +145,8 @@ public class Catalog {
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
+
+    loadUdfs();
   }
 
   public Catalog() {
@@ -177,6 +184,94 @@ public class Catalog {
    */
   public void removeDb(String dbName) {
     dbCache.remove(dbName);
+  }
+
+  /**
+   * Loads the registered UDFs to the catalog. This shouldn't take very long
+   * so we can probably just do this up front.
+   */
+  public void loadUdfs() {
+    udfs = new HashMap<String, List<Udf>>();
+    // TODO: figure out how to persist udfs and load this now.
+  }
+
+  /**
+   * Adds a UDF to the catalog.
+   * Returns true if the UDF was successfully added.
+   * Returns false if the UDF already exists or the user doesn't have create
+   * permissions.
+   */
+  public boolean addUdf(Udf udf, User user) {
+    // TODO: add this to persistent store
+    synchronized (udfs) {
+      Udf fn = getUdf(udf.getDesc(), user, Privilege.CREATE, true);
+      if (fn != null) return false;
+      List<Udf> functions = udfs.get(udf.getDesc().getName());
+      if (functions == null) {
+        functions = Lists.newArrayList();
+        udfs.put(udf.getDesc().getName(), functions);
+      }
+      functions.add(udf);
+    }
+    return true;
+  }
+
+  /**
+   * Removes a UDF from the catalog. Returns true if the UDF was removed.
+   */
+  public boolean removeUdf(Function desc, User user) {
+    // TODO: remove this from persistent store.
+    synchronized (udfs) {
+      Udf udf = getUdf(desc, user, Privilege.DROP, true);
+      if (udf == null) return false;
+      List<Udf> functions = udfs.get(desc.getName());
+      Preconditions.checkNotNull(functions);
+      boolean exists = functions.remove(udf);
+      if (functions.isEmpty()) {
+        udfs.remove(desc.getName());
+      }
+      return exists;
+    }
+  }
+
+  /**
+   * Returns the function that best matches 'desc' that is registered with the
+   * catalog. If exactMatch is true, only function signatures that are identical
+   * will be returned. If exactMatch is false, an arbitrary compatible
+   * (i.e. implicitly castable) function will be returned.
+   */
+  public Udf getUdf(Function desc, User user,
+      Privilege privilege, boolean exactMatch) {
+    // TODO: authorization
+    synchronized (udfs) {
+      List<Udf> functions = udfs.get(desc.getName());
+      if (functions == null) return null;
+      for (Udf f: functions) {
+        if (desc.equals(f.getDesc())) return f;
+      }
+      if (exactMatch) return null;
+      for (Udf f: functions) {
+        if (desc.isCompatible(f.getDesc())) return f;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns all the UDFs visible to this user.
+   */
+  public List<String> getUdfNames(String pattern, User user) {
+    List<String> names = Lists.newArrayList();
+    synchronized (udfs) {
+      for (List<Udf> functions: udfs.values()) {
+        for (Udf f: functions) {
+          names.add(f.getDesc().signatureString());
+        }
+      }
+    }
+    // TODO: authorization
+    names = filterStringsByPattern(names, pattern);
+    return names;
   }
 
   /**

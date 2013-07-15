@@ -37,6 +37,6 @@ abstract class StatementBase implements ParseNode {
    * @see com.cloudera.impala.parser.ParseNode#debugString()
    */
   public String debugString() {
-    return "";
+    return toSql();
   }
 }

@@ -59,6 +59,7 @@ Frontend::Frontend() {
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getFunctionNames", "([B)[B", &get_fn_names_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"execDdlRequest", "([B)[B", &exec_ddl_request_id_},
     {"resetMetadata", "([B)V", &reset_metadata_id_},
@@ -189,6 +190,14 @@ Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
   }
 
   return CallJniMethodWithThriftArgs(get_db_names_id_, params, db_names);
+}
+
+Status Frontend::GetFunctionNames(const string* pattern, const TSessionState* session,
+    TGetFunctionsResult* fn_names) {
+  TGetFunctionsParams params;
+  if (pattern != NULL) params.__set_pattern(*pattern);
+  if (session != NULL) params.__set_session(*session);
+  return CallJniMethodWithThriftArgs(get_fn_names_id_, params, fn_names);
 }
 
 Status Frontend::GetExecRequest(

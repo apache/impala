@@ -68,3 +68,7 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_views_ddl(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/views-ddl', vector)
+  
+  @pytest.mark.execute_serially
+  def test_functions_ddl(self, vector):
+    self.run_test_case('QueryTest/functions-ddl', vector)

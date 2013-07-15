@@ -71,6 +71,10 @@ public class AnalysisContext {
       return stmt instanceof DropTableOrViewStmt;
     }
 
+    public boolean isDropFunctionStmt() {
+      return stmt instanceof DropFunctionStmt;
+    }
+
     public boolean isCreateTableLikeStmt() {
       return stmt instanceof CreateTableLikeStmt;
     }
@@ -91,6 +95,10 @@ public class AnalysisContext {
       return stmt instanceof CreateDbStmt;
     }
 
+    public boolean isCreateFunctionStmt() {
+      return stmt instanceof CreateFunctionStmt;
+    }
+
     public boolean isLoadDataStmt() {
       return stmt instanceof LoadDataStmt;
     }
@@ -105,6 +113,10 @@ public class AnalysisContext {
 
     public boolean isShowDbsStmt() {
       return stmt instanceof ShowDbsStmt;
+    }
+
+    public boolean isShowFunctionsStmt() {
+      return stmt instanceof ShowFunctionsStmt;
     }
 
     public boolean isDescribeStmt() {
@@ -126,6 +138,7 @@ public class AnalysisContext {
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateViewStmt() ||
           isCreateDbStmt() || isDropDbStmt() || isDropTableOrViewStmt() ||
           isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt() ||
+          isCreateFunctionStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
           isCreateTableAsSelectStmt();
     }
 
@@ -168,6 +181,11 @@ public class AnalysisContext {
       return (CreateDbStmt) stmt;
     }
 
+    public CreateFunctionStmt getCreateFunctionStmt() {
+      Preconditions.checkState(isCreateFunctionStmt());
+      return (CreateFunctionStmt) stmt;
+    }
+
     public DropDbStmt getDropDbStmt() {
       Preconditions.checkState(isDropDbStmt());
       return (DropDbStmt) stmt;
@@ -176,6 +194,11 @@ public class AnalysisContext {
     public DropTableOrViewStmt getDropTableOrViewStmt() {
       Preconditions.checkState(isDropTableOrViewStmt());
       return (DropTableOrViewStmt) stmt;
+    }
+
+    public DropFunctionStmt getDropFunctionStmt() {
+      Preconditions.checkState(isDropFunctionStmt());
+      return (DropFunctionStmt) stmt;
     }
 
     public LoadDataStmt getLoadDataStmt() {
@@ -210,6 +233,11 @@ public class AnalysisContext {
     public ShowDbsStmt getShowDbsStmt() {
       Preconditions.checkState(isShowDbsStmt());
       return (ShowDbsStmt) stmt;
+    }
+
+    public ShowFunctionsStmt getShowFunctionsStmt() {
+      Preconditions.checkState(isShowFunctionsStmt());
+      return (ShowFunctionsStmt) stmt;
     }
 
     public DescribeStmt getDescribeStmt() {

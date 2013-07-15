@@ -40,10 +40,10 @@ public class CastExpr extends Expr {
     children.add(e);
     if (isImplicit) {
       type = targetType;
-      OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+      OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
           FunctionOperator.CAST, true, getChild(0).getType(), type);
       Preconditions.checkState(match != null);
-      Preconditions.checkState(match.returnType == type);
+      Preconditions.checkState(match.getDesc().getReturnType() == type);
       this.opcode = match.opcode;
     }
   }
@@ -94,13 +94,13 @@ public class CastExpr extends Expr {
       return;
     }
 
-    OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+    OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
         FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type);
     if (match == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType);
     }
-    Preconditions.checkState(match.returnType == targetType);
+    Preconditions.checkState(match.getDesc().getReturnType() == targetType);
     this.opcode = match.opcode;
   }
 

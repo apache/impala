@@ -71,11 +71,6 @@ public class CreateDbStmt extends StatementBase {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE DATABASE");
     if (ifNotExists) {

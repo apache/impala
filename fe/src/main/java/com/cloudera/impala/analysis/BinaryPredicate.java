@@ -109,10 +109,10 @@ public class BinaryPredicate extends Predicate {
     // Ignore return value because type is always bool for predicates.
     castBinaryOp(compatibleType);
 
-    OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+    OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
         op.toFunctionOp(), true, compatibleType, compatibleType);
     Preconditions.checkState(match != null);
-    Preconditions.checkState(match.returnType == PrimitiveType.BOOLEAN);
+    Preconditions.checkState(match.getDesc().getReturnType() == PrimitiveType.BOOLEAN);
     this.opcode = match.opcode;
 
     // determine selectivity

@@ -59,6 +59,23 @@ public enum PrimitiveType {
     return description;
   }
 
+  public static PrimitiveType fromThrift(TPrimitiveType t) {
+    switch (t) {
+      case INVALID_TYPE: return INVALID_TYPE;
+      case NULL_TYPE: return NULL_TYPE;
+      case BOOLEAN: return BOOLEAN;
+      case TINYINT: return TINYINT;
+      case SMALLINT: return SMALLINT;
+      case INT: return INT;
+      case BIGINT: return BIGINT;
+      case FLOAT: return FLOAT;
+      case DOUBLE: return DOUBLE;
+      case STRING: return STRING;
+      case TIMESTAMP: return TIMESTAMP;
+    }
+    return INVALID_TYPE;
+  }
+
   public TPrimitiveType toThrift() {
     return thriftType;
   }

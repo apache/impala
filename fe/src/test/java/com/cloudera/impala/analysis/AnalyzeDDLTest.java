@@ -653,6 +653,46 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestCreateDropFunction() throws AnalysisException {
+    final String udf_suffix = " LOCATION '/foo' 'foo.class'";
+    // TODO: Add tests for if exists when we can persist functions in the catalog
+    AnalyzesOk("create function foo() RETURNS int" + udf_suffix);
+    AnalyzesOk("create function foo(int, int, string) RETURNS int" + udf_suffix);
+
+    // Try some functions names expressed as paths
+    AnalyzesOk("create function A.B() RETURNS int" + udf_suffix);
+    AnalyzesOk("create function A.B1() RETURNS int" + udf_suffix);
+    AnalyzesOk("create function A.B1.C() RETURNS int" + udf_suffix);
+    AnalyzesOk("create function A.`B1C`() RETURNS int" + udf_suffix);
+
+    // Try to create a function with the same name as a builtin
+    AnalysisError("create function sin(double) RETURNS double" + udf_suffix,
+        "Function cannot have the same name as a builtin: sin");
+    AnalysisError("create function sin() RETURNS double" + udf_suffix,
+        "Function cannot have the same name as a builtin: sin");
+
+    // Try to create with a bad location
+    AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' 'class'",
+        "URI path must be absolute: bad-location");
+
+    // Try creating functions with illegal function names.
+    AnalysisError("create function A_B() RETURNS int" + udf_suffix,
+        "Function names must be all alphanumeric. Invalid name: A_B");
+    AnalysisError("create function 123A() RETURNS int" + udf_suffix,
+        "Function cannot start with a digit: 123A");
+    AnalysisError("create function A.`1A`() RETURNS int" + udf_suffix,
+        "Function cannot start with a digit: 1A");
+    AnalysisError("create function A.`ABC-D`() RETURNS int" + udf_suffix,
+        "Function names must be all alphanumeric. Invalid name: ABC-D");
+
+    // Try dropping functions.
+    // TODO: drop an existent function when we can persist functions in the catalog
+    AnalyzesOk("drop function if exists foo()");
+    AnalysisError("drop function foo()", "Function does not exist: foo()");
+    AnalyzesOk("drop function if exists foo()");
+  }
+
+  @Test
   public void TestUseDb() throws AnalysisException {
     AnalyzesOk("use functional");
     AnalysisError("use db_does_not_exist", "Database does not exist: db_does_not_exist");

@@ -113,10 +113,6 @@ public class CreateTableStmt extends StatementBase {
     return dbName;
   }
 
-  @Override
-  public String debugString() { return toSql(); }
-
-  @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) {

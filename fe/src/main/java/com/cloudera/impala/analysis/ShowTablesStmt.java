@@ -104,11 +104,6 @@ public class ShowTablesStmt extends StatementBase {
   }
 
   @Override
-  public String debugString() {
-    return toSql();
-  }
-
-  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     postAnalysisDb = (parsedDb == null ? analyzer.getDefaultDb() : parsedDb);

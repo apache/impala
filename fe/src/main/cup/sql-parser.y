@@ -169,21 +169,23 @@ parser code {:
 :};
 
 // List of keywords. Please keep them sorted alphabetically.
-terminal KW_ADD, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT,
+terminal 
+  KW_ADD, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT,
   KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_COLUMN, KW_COLUMNS, KW_COMMENT,
   KW_COUNT, KW_CREATE, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA,
   KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
   KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT, KW_FORMATTED,
-  KW_FROM, KW_FULL, KW_GROUP, KW_GROUP_CONCAT, KW_HAVING, KW_IF, KW_IN, KW_INNER,
-  KW_INPATH, KW_INSERT, KW_INT, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN,
-  KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAX, KW_METADATA, KW_MIN,
-  KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE,
-  KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE,
-  KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
-  KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES,
-  KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION,
-  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_GROUP_CONCAT, KW_HAVING, 
+  KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERVAL, KW_INTO, 
+  KW_INVALIDATE, KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, 
+  KW_LOCATION, KW_MAX, KW_METADATA, KW_MIN, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, 
+  KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, 
+  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, 
+  KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SET, KW_SHOW,
+  KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED, 
+  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, 
+  KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -303,6 +305,15 @@ nonterminal String optional_kw_column;
 nonterminal String optional_kw_table;
 nonterminal Boolean overwrite_val;
 
+
+// For Create/Drop/Show function ddl
+nonterminal ArrayList<String> fully_qualified_function_name;
+nonterminal ArrayList<PrimitiveType> function_def_args;
+nonterminal ArrayList<PrimitiveType> function_def_arg_list;
+nonterminal CreateFunctionStmt create_function_stmt;
+nonterminal ShowFunctionsStmt show_functions_stmt;
+nonterminal DropFunctionStmt drop_function_stmt;
+
 precedence left KW_OR;
 precedence left KW_AND;
 precedence left KW_NOT, NOT;
@@ -330,6 +341,8 @@ stmt ::=
   {: RESULT = show_tables; :}
   | show_dbs_stmt:show_dbs
   {: RESULT = show_dbs; :}
+  | show_functions_stmt:show_functions
+  {: RESULT = show_functions; :}
   | describe_stmt:describe
   {: RESULT = describe; :}
   | alter_tbl_stmt:alter_tbl
@@ -346,10 +359,14 @@ stmt ::=
   {: RESULT = create_view; :}
   | create_db_stmt:create_db
   {: RESULT = create_db; :}
+  | create_function_stmt:create_function
+  {: RESULT = create_function; :}
   | drop_db_stmt:drop_db
   {: RESULT = drop_db; :}
   | drop_tbl_or_view_stmt:drop_tbl
   {: RESULT = drop_tbl; :}
+  | drop_function_stmt:drop_function
+  {: RESULT = drop_function; :}
   | explain_stmt: explain
   {: RESULT = explain; :}
   | load_stmt: load
@@ -519,6 +536,18 @@ create_tbl_stmt ::=
   :}
   ;
 
+create_function_stmt ::=
+  KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
+  fully_qualified_function_name:fn_name function_def_args:fn_args
+  KW_RETURNS primitive_type:return_type
+  KW_LOCATION STRING_LITERAL:location STRING_LITERAL:fn_path 
+  comment_val:comment 
+  {:
+    RESULT = new CreateFunctionStmt(fn_name, fn_args, return_type,
+        new HdfsURI(location), fn_path, if_not_exists, comment);
+  :}
+  ;
+
 comment_val ::=
   KW_COMMENT STRING_LITERAL:comment
   {: RESULT = comment; :}
@@ -678,6 +707,12 @@ drop_tbl_or_view_stmt ::=
   {: RESULT = new DropTableOrViewStmt(table, if_exists, false); :}
   ;
 
+drop_function_stmt ::=
+  KW_DROP KW_FUNCTION if_exists_val:if_exists fully_qualified_function_name:fn_name
+  function_def_args:fn_args
+  {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
+  ;
+
 db_or_schema_kw ::=
   KW_DATABASE
   | KW_SCHEMA
@@ -752,6 +787,41 @@ static_partition_key_value ::=
   // Static partition key values.
   IDENT:column EQUAL expr:e
   {: RESULT = new PartitionKeyValue(column, e); :}
+  ;
+
+fully_qualified_function_name ::=
+  IDENT:id
+  {:
+    ArrayList<String> list = new ArrayList<String>();
+    list.add(id);
+    RESULT = list;
+  :}
+  | fully_qualified_function_name:list DOT IDENT:id
+  {:
+    list.add(id);
+    RESULT = list;
+  :}
+  ;
+
+function_def_args ::=
+  LPAREN RPAREN
+  {: RESULT = new ArrayList<PrimitiveType>(); :}
+  | LPAREN function_def_arg_list:args RPAREN
+  {: RESULT = args; :}
+  ;
+
+function_def_arg_list ::=
+  primitive_type:type
+  {:
+    ArrayList<PrimitiveType> list = new ArrayList<PrimitiveType>();
+    list.add(type);
+    RESULT = list;
+  :}
+  | function_def_arg_list:list COMMA primitive_type:type
+  {:
+    list.add(type);
+    RESULT = list;
+  :}
   ;
 
 // Our parsing of UNION is slightly different from MySQL's:
@@ -946,6 +1016,13 @@ show_dbs_stmt ::=
   {: RESULT = new ShowDbsStmt(); :}
   | KW_SHOW dbs_or_schemas_kw show_pattern:showPattern
   {: RESULT = new ShowDbsStmt(showPattern); :}
+  ;
+
+show_functions_stmt ::=
+  KW_SHOW KW_FUNCTIONS
+  {: RESULT = new ShowFunctionsStmt(); :}
+  | KW_SHOW KW_FUNCTIONS show_pattern:showPattern
+  {: RESULT = new ShowFunctionsStmt(showPattern); :}
   ;
 
 show_pattern ::=

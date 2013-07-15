@@ -16,19 +16,26 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TUdfExpr;
 import com.google.common.base.Joiner;
 
 public class FunctionCallExpr extends Expr {
-  private final String functionName;
+  private final String functionName_;
+
+  // The udf function if this function call is for a UDF.
+  private Udf udf_;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     super();
-    this.functionName = functionName.toLowerCase();
+    this.functionName_ = functionName.toLowerCase();
     children.addAll(params);
   }
 
@@ -42,44 +49,69 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   public String toSqlImpl() {
-    return functionName + "(" + Joiner.on(", ").join(childrenToSql()) + ")";
+    return functionName_ + "(" + Joiner.on(", ").join(childrenToSql()) + ")";
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.FUNCTION_CALL;
-    msg.setOpcode(opcode);
+    if (udf_ != null) {
+      msg.node_type = TExprNodeType.UDF;
+      msg.setUdf_expr(new TUdfExpr());
+      msg.udf_expr.location = udf_.getLocation().toString();
+      msg.udf_expr.setBinary_fn_name(udf_.getBinaryName());
+    } else {
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
+      msg.setOpcode(opcode);
+    }
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(functionName);
-    if (op == FunctionOperator.INVALID_OPERATOR) {
-      throw new AnalysisException(functionName + " unknown");
-    }
-
     PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
     for (int i = 0; i < this.children.size(); ++i) {
       this.children.get(i).analyze(analyzer);
       argTypes[i] = this.children.get(i).getType();
     }
-    OpcodeRegistry.Signature match =
-      OpcodeRegistry.instance().getFunctionInfo(op, true, argTypes);
-    if (match == null) {
-      String error = String.format("No matching function with those arguments: %s (%s)",
-          functionName, Joiner.on(", ").join(argTypes));
-      throw new AnalysisException(error);
-    }
-    this.opcode = match.opcode;
-    this.type = match.returnType;
 
-    // Implicitly cast all the children to match the function if necessary
-    for (int i = 0; i < argTypes.length; ++i) {
-      // For varargs, we must compare with the last type in match.argTypes.
-      int ix = Math.min(match.argTypes.length - 1, i);
-      if (argTypes[i] != match.argTypes[ix]) {
-        castChild(match.argTypes[ix], i);
+    Function fnDesc = null;
+
+    // First check if this is a builtin
+    FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(functionName_);
+    if (op != FunctionOperator.INVALID_OPERATOR) {
+      OpcodeRegistry.BuiltinFunction match =
+          OpcodeRegistry.instance().getFunctionInfo(op, true, argTypes);
+      if (match != null) {
+        this.opcode = match.opcode;
+        fnDesc = match.getDesc();
       }
+    } else {
+      // Next check if it is a UDF
+      Function searchDesc = new Function(functionName_,
+          argTypes, PrimitiveType.INVALID_TYPE, false);
+      Udf udf = analyzer.getCatalog().getUdf(
+          searchDesc, analyzer.getUser(), Privilege.SELECT, false);
+      if (udf == null) {
+        throw new AnalysisException(functionName_ + " unknown");
+      }
+      udf_ = udf;
+      fnDesc = udf.getDesc();
+    }
+
+    if (fnDesc != null) {
+      PrimitiveType[] args = fnDesc.getArgs();
+      // Implicitly cast all the children to match the function if necessary
+      for (int i = 0; i < argTypes.length; ++i) {
+        // For varargs, we must compare with the last type in callArgs.argTypes.
+        int ix = Math.min(args.length - 1, i);
+        if (argTypes[i] != args[ix]) {
+          castChild(args[ix], i);
+        }
+      }
+      this.type = fnDesc.getReturnType();
+    } else {
+      String error = String.format("No matching function with those arguments: %s (%s)",
+          functionName_, Joiner.on(", ").join(argTypes));
+      throw new AnalysisException(error);
     }
   }
 }

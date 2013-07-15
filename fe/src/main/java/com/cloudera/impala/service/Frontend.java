@@ -36,10 +36,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.CreateFunctionStmt;
+import com.cloudera.impala.analysis.DropFunctionStmt;
 import com.cloudera.impala.analysis.DropTableOrViewStmt;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.ResetMetadataStmt;
+import com.cloudera.impala.analysis.ShowFunctionsStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -184,6 +187,12 @@ public class Frontend {
       ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
+    } else if (analysis.isShowFunctionsStmt()) {
+      ddl.ddl_type = TDdlType.SHOW_FUNCTIONS;
+      ShowFunctionsStmt stmt = (ShowFunctionsStmt)analysis.getStmt();
+      ddl.setShow_fns_params(stmt.toThrift());
+      metadata.setColumnDescs(Arrays.asList(
+          new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {
       ddl.ddl_type = TDdlType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
@@ -221,6 +230,11 @@ public class Frontend {
       ddl.ddl_type = TDdlType.CREATE_DATABASE;
       ddl.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateFunctionStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_FUNCTION;
+      CreateFunctionStmt stmt = (CreateFunctionStmt)analysis.getStmt();
+      ddl.setCreate_fn_params(stmt.toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isDropDbStmt()) {
       ddl.ddl_type = TDdlType.DROP_DATABASE;
       ddl.setDrop_db_params(analysis.getDropDbStmt().toThrift());
@@ -229,6 +243,11 @@ public class Frontend {
       DropTableOrViewStmt stmt = analysis.getDropTableOrViewStmt();
       ddl.ddl_type = (stmt.isDropTable()) ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW;
       ddl.setDrop_table_or_view_params(stmt.toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isDropFunctionStmt()) {
+      ddl.ddl_type = TDdlType.DROP_FUNCTION;
+      DropFunctionStmt stmt = (DropFunctionStmt)analysis.getStmt();
+      ddl.setDrop_fn_params(stmt.toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isResetMetadataStmt()) {
       ddl.ddl_type = TDdlType.RESET_METADATA;
@@ -321,11 +340,19 @@ public class Frontend {
   }
 
   /**
-   * Returns all database names that match the specified database and pattern that
+   * Returns all database names that match the pattern and
    * are accessible to the given user. If pattern is null, matches all dbs.
    */
   public List<String> getDbNames(String dbPattern, User user) {
     return catalog.getDbNames(dbPattern, user);
+  }
+
+  /**
+   * Returns all function names that match the pattern and
+   * are accessible to the given user. If pattern is null, matches all functions.
+   */
+  public List<String> getFunctionNames(String fnPattern, User user) {
+    return catalog.getUdfNames(fnPattern, user);
   }
 
   /**
@@ -525,8 +552,8 @@ public class Frontend {
       case GET_FUNCTIONS:
       {
         TGetFunctionsReq req = request.getGet_functions_req();
-        return MetadataOp.getFunctions(req.getCatalogName(), req.getSchemaName(),
-            req.getFunctionName());
+        return MetadataOp.getFunctions(catalog, req.getCatalogName(), req.getSchemaName(),
+            req.getFunctionName(), user);
       }
       default:
         throw new NotImplementedException(request.opcode + " has not been implemented.");

@@ -1,0 +1,89 @@
+# Drop the dummy udfs this test uses.
+====
+---- QUERY
+drop function if exists functionddltest.fn()
+====
+---- QUERY
+drop function if exists functionddltest.fn(int)
+====
+---- QUERY
+drop function if exists functionddltest.fn(int, string)
+====
+---- QUERY
+drop function if exists functionddltest.fn(string, int)
+====
+---- QUERY
+drop function if exists functionddltest.fn2(int)
+====
+---- QUERY
+drop function if exists functionddltest.fn2(int, string)
+====
+---- QUERY
+# Verify all the test functions are removed
+show functions like 'functionddltest.*'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Add them and test function overloading.
+create function functionddltest.fn() RETURNS int LOCATION '/test' 'foo.class'
+====
+---- QUERY
+create function functionddltest.fn(int) RETURNS double LOCATION '/test' 'foo.class'
+====
+---- QUERY
+create function functionddltest.fn(int, string) 
+RETURNS int LOCATION '/test' 'foo.class'
+====
+---- QUERY
+create function functionddltest.fn(string, int) 
+RETURNS int LOCATION '/test' 'foo.class'
+====
+---- QUERY
+create function functionddltest.fn2(int) RETURNS int LOCATION '/test' 'foo.class'
+====
+---- QUERY
+create function functionddltest.fn2(int, string) 
+RETURNS int LOCATION '/test' 'foo.class'
+====
+---- QUERY
+show functions like 'functionddltest.*'
+---- RESULTS
+'functionddltest.fn()'
+'functionddltest.fn(INT)'
+'functionddltest.fn(INT, STRING)'
+'functionddltest.fn(STRING, INT)'
+'functionddltest.fn2(INT)'
+'functionddltest.fn2(INT, STRING)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function functionddltest.fn2(int, string)
+====
+---- QUERY
+show functions like 'functionddltest.*'
+---- RESULTS
+'functionddltest.fn()'
+'functionddltest.fn(INT)'
+'functionddltest.fn(INT, STRING)'
+'functionddltest.fn(STRING, INT)'
+'functionddltest.fn2(INT)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function if exists functionddltest.fn2(int, string)
+====
+---- QUERY
+show functions like 'functionddltest.*'
+---- RESULTS
+'functionddltest.fn()'
+'functionddltest.fn(INT)'
+'functionddltest.fn(INT, STRING)'
+'functionddltest.fn(STRING, INT)'
+'functionddltest.fn2(INT)'
+---- TYPES
+STRING
+====

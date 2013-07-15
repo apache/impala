@@ -70,6 +70,17 @@ class Frontend {
   Status GetDbNames(const std::string* pattern, const TSessionState* session,
       TGetDbsResult* table_names);
 
+  // Return all functions matching the optional argument 'pattern'.
+  // If pattern is NULL match all functions, otherwise match only those functions that
+  // match the pattern string.
+  // The TSessionState parameter is used to filter results of metadata operations when
+  // authorization is enabled. If this is a user initiated request, it should
+  // be set to the user's current session. If this is an Impala internal request,
+  // the session should be set to NULL which will skip privilege checks returning all
+  // results.
+  Status GetFunctionNames(const std::string* pattern, const TSessionState* session,
+      TGetFunctionsResult* fn_names);
+
   // Returns (in the output parameter) the result of a DESCRIBE table command. This
   // command retrieves table metadata, such as the column definitions. The metadata
   // that is returned is controlled by setting the 'output_style' field. If this
@@ -108,6 +119,7 @@ class Frontend {
 
   // Returns true if the error returned by the FE was due to an AuthorizationException.
   static bool IsAuthorizationError(const Status& status);
+
  private:
   // Descriptor of Java Frontend class itself, used to create a new instance.
   jclass fe_class_;
@@ -121,6 +133,7 @@ class Frontend {
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
+  jmethodID get_fn_names_id_; // JniFrontend.getFnNames
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID exec_ddl_request_id_; // JniFrontend.execDdlRequest
   jmethodID reset_metadata_id_; // JniFrontend.resetMetadata

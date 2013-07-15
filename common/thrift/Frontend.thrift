@@ -145,6 +145,31 @@ struct TCreateDbParams {
   4: optional bool if_not_exists
 }
 
+// Parameters of CREATE FUNCTION commands
+struct TCreateFunctionParams {
+  // Fully qualified function name of the function to create
+  1: required string fn_name
+
+  // HDFS path for the function binary. This binary must exist at the time the
+  // function is created.
+  2: required string location
+
+  // Name of function in the binary
+  3: required string binary_name;
+
+  // The types of the arguments to the function
+  4: required list<Types.TPrimitiveType> arg_types;
+
+  // Return type for the function.
+  5: required Types.TPrimitiveType ret_type;
+
+  // Optional comment to attach to the function
+  6: optional string comment
+
+  // Do not throw an error if a function of the same signature already exists.
+  7: optional bool if_not_exists
+}
+
 // Valid table file formats
 enum TFileFormat {
   PARQUETFILE,
@@ -405,6 +430,18 @@ struct TDropTableOrViewParams {
   2: required bool if_exists
 }
 
+// Parameters of DROP FUNCTION commands
+struct TDropFunctionParams {
+  // Fully qualified name of the function to drop
+  1: required string fn_name
+  
+  // The types of the arguments to the function
+  2: required list<Types.TPrimitiveType> arg_types;
+
+  // If true, no error is raised if the target fn does not exist
+  3: required bool if_exists
+}
+
 // Parameters of REFRESH/INVALIDATE METADATA commands
 // NOTE: This struct should only be used for intra-process communication.
 struct TResetMetadataParams {
@@ -433,6 +470,12 @@ struct TShowDbsParams {
   1: optional string show_pattern
 }
 
+// Parameters for SHOW FUNCTIONS commands
+struct TShowFunctionsParams {
+  // Optional pattern to match function names. If not set, all functions are returned.
+  1: optional string show_pattern
+}
+
 // Parameters for SHOW TABLES commands
 struct TShowTablesParams {
   // Database to use for SHOW TABLE
@@ -441,6 +484,23 @@ struct TShowTablesParams {
   // Optional pattern to match tables names. If not set, all tables from the given
   // database are returned.
   2: optional string show_pattern
+}
+
+// Arguments to getFunctionNames(), which returns a list of function names that match
+// an optional pattern. Parameters for SHOW FUNCTIONS.
+struct TGetFunctionsParams {
+  // If not set, match every function
+  1: optional string pattern
+
+  // Session state for the user who initiated this request. If authorization is
+  // enabled, only the functions this user has access to will be returned. If not
+  // set, access checks will be skipped (used for internal Impala requests)
+  2: optional TSessionState session
+}
+
+// getFunctionNames() returns a list of function names
+struct TGetFunctionsResult {
+  1: list<string> fns
 }
 
 // Parameters for the USE db command
@@ -567,6 +627,9 @@ enum TDdlType {
   DROP_TABLE,
   DROP_VIEW,
   RESET_METADATA
+  SHOW_FUNCTIONS,
+  CREATE_FUNCTION,
+  DROP_FUNCTION,
 }
 
 struct TDdlExecResponse {
@@ -619,6 +682,15 @@ struct TDdlExecRequest {
 
   // Parameters for REFRESH/INVALIDATE METADATA
   12: optional TResetMetadataParams reset_metadata_params
+
+  // Parameters for SHOW FUNCTIONS
+  15: optional TShowFunctionsParams show_fns_params
+  
+  // Parameters for CREATE FUNCTION
+  16: optional TCreateFunctionParams create_fn_params
+  
+  // Parameters for DROP FUNCTION
+  17: optional TDropFunctionParams drop_fn_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
