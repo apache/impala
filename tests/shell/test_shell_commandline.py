@@ -133,6 +133,19 @@ class TestImpalaShell(object):
     assert output == result.stdout, "Queries with comments not parsed correctly"
 
   @pytest.mark.execute_serially
+  def test_completed_query_errors(self):
+    args = '-q "set abort_on_error=false;' +\
+        'select count(*) from functional_seq_snap.bad_seq_snap" --quiet'
+    result = run_impala_shell_cmd(args)
+    assert 'ERRORS ENCOUNTERED DURING EXECUTION:' in result.stderr
+    assert 'Bad sync hash at file offset' in result.stderr
+    assert 'Expected: ' in result.stderr
+    assert 'Actual: ' in result.stderr
+    assert 'Format error in record or block header at offset: ' in result.stderr
+    assert 'Format error in record or block header at end of file.' in result.stderr
+    assert 'First error while processing:' in result.stderr
+
+  @pytest.mark.execute_serially
   def test_output_format(self):
     expected_output = ['1'] * 3
     args = '-q "select 1,1,1" -B --quiet'

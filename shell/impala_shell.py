@@ -496,8 +496,8 @@ class ImpalaShell(cmd.Cmd):
       elif query_state == self.query_state["EXCEPTION"]:
         print_to_stderr('Query aborted, unable to fetch data')
         if self.connected:
-          log, status = self._ImpalaShell__do_rpc(
-            lambda: self.imp_service.get_log(handle.log_context))
+          log, status = self.__do_rpc(
+              lambda: self.imp_service.get_log(handle.log_context))
           print log
           return self.__close_query_handle(handle)
         else:
@@ -545,9 +545,16 @@ class ImpalaShell(cmd.Cmd):
       if not results.has_more:
         break
 
-    # Don't include the time to get the runtime profile in the query execution time
+    # Don't include the time to get the runtime profile or runtime state log in the query
+    # execution time
     end = time.time()
     self.__print_runtime_profile_if_enabled(handle)
+    # Even though the query completed successfully, there may have been errors
+    # encountered during execution
+    log, status = self.__do_rpc(lambda: self.imp_service.get_log(handle.log_context))
+    if log and log.strip():
+      print_to_stderr('\nERRORS ENCOUNTERED DURING EXECUTION: %s' % log)
+
     self.__print_if_verbose(
       "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end - start))
     self.last_query_handle = handle
