@@ -28,7 +28,7 @@ public interface Authorizeable {
   * [Db] would return [Db]
   * [URI] would return [URI]
   */
-  public List<org.apache.access.core.Authorizable> getHiveAuthorizeableHierarchy();
+  public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy();
 
   // Returns the name of the object.
   public String getName();

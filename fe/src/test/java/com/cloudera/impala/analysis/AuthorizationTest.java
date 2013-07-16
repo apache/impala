@@ -22,12 +22,12 @@ import java.util.List;
 
 import junit.framework.Assert;
 
-import org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider;
-import org.apache.access.provider.file.LocalGroupResourceAuthorizationProvider;
-import org.apache.access.provider.file.ResourceAuthorizationProvider;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
+import org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider;
+import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
+import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;

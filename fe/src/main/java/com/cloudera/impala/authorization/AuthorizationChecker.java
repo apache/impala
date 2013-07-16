@@ -17,9 +17,9 @@ package com.cloudera.impala.authorization;
 import java.util.EnumSet;
 import java.util.List;
 
-import org.apache.access.core.Authorizable;
-import org.apache.access.provider.file.ResourceAuthorizationProvider;
 import org.apache.commons.lang.reflect.ConstructorUtils;
+import org.apache.sentry.core.Authorizable;
+import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -84,11 +84,11 @@ public class AuthorizationChecker {
       return true;
     }
 
-    EnumSet<org.apache.access.core.Action> actions =
+    EnumSet<org.apache.sentry.core.Action> actions =
         request.getPrivilege().getHiveActions();
 
     List<Authorizable> authorizeables = Lists.newArrayList();
-    authorizeables.add(new org.apache.access.core.Server(config.getServerName()));
+    authorizeables.add(new org.apache.sentry.core.Server(config.getServerName()));
     // If request.getAuthorizeable() is null, the request is for server-level permission.
     if (request.getAuthorizeable() != null) {
       authorizeables.addAll(request.getAuthorizeable().getHiveAuthorizeableHierarchy());
@@ -97,15 +97,15 @@ public class AuthorizationChecker {
     // The Hive Access API does not currently provide a way to check if the user
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
-      for (org.apache.access.core.Action action: actions) {
-        if (provider.hasAccess(new org.apache.access.core.Subject(user.getShortName()),
+      for (org.apache.sentry.core.Action action: actions) {
+        if (provider.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
             authorizeables, EnumSet.of(action))) {
           return true;
         }
       }
       return false;
     }
-    return provider.hasAccess(new org.apache.access.core.Subject(user.getShortName()),
+    return provider.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
         authorizeables, actions);
   }
 }

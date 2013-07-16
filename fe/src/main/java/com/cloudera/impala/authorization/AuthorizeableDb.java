@@ -23,16 +23,16 @@ import com.google.common.collect.Lists;
  * Class used to authorize access to a database.
  */
 public class AuthorizeableDb implements Authorizeable {
-  private final org.apache.access.core.Database database;
+  private final org.apache.sentry.core.Database database;
 
   public AuthorizeableDb(String dbName) {
     Preconditions.checkState(dbName != null && !dbName.isEmpty());
-    database = new org.apache.access.core.Database(dbName);
+    database = new org.apache.sentry.core.Database(dbName);
   }
 
   @Override
-  public List<org.apache.access.core.Authorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList((org.apache.access.core.Authorizable) database);
+  public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy() {
+    return Lists.newArrayList((org.apache.sentry.core.Authorizable) database);
   }
 
   @Override

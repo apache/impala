@@ -33,7 +33,7 @@ DEFINE_string(server_name, "", "The name to use for securing this impalad "
 DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
               "file. If set, authorization will be enabled.");
 DEFINE_string(authorization_policy_provider_class,
-    "org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider",
+    "org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider",
     "Advanced: The authorization policy provider class name.");
 
 // Describes one method to look up in a Frontend object

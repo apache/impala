@@ -14,7 +14,8 @@
 
 package com.cloudera.impala.authorization;
 
-import org.apache.access.provider.file.ResourceAuthorizationProvider;
+import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
+
 import com.google.common.base.Preconditions;
 
 /*
@@ -101,7 +102,7 @@ public class AuthorizationConfig {
 
   /*
    * The full class name of the authorization policy provider. For example:
-   * org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider.
+   * org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider.
    */
   public String getPolicyProviderClassName() {
     return policyProviderClassName;
