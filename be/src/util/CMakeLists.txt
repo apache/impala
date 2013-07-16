@@ -61,6 +61,7 @@ add_library(Util
   memory-metrics.cc
   url-parser.cc
   url-coding.cc
+  llama-util.cc
 )
 
 add_library(Webserver STATIC

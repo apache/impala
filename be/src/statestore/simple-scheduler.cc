@@ -21,17 +21,28 @@
 #include <boost/foreach.hpp>
 
 #include "util/metrics.h"
-#include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
+#include "runtime/coordinator.h"
 
 #include "statestore/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 
 #include "util/network-util.h"
+#include "util/uid-util.h"
+#include "util/container-util.h"
+#include "util/debug-util.h"
+#include "util/llama-util.h"
+#include "gen-cpp/ResourceBrokerService_types.h"
 
 using namespace std;
 using namespace boost;
+using namespace boost::algorithm;
+using namespace apache::thrift;
+
+DECLARE_int32(be_port);
+DECLARE_string(hostname);
 
 namespace impala {
 
@@ -44,7 +55,8 @@ const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
-    Metrics* metrics, Webserver* webserver)
+    Metrics* metrics, Webserver* webserver,
+    ResourceBroker* resource_broker)
   : metrics_(metrics),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
@@ -53,13 +65,14 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialised_(NULL),
-    update_count_(0) {
+    update_count_(0),
+    resource_broker_(resource_broker) {
   backend_descriptor_.address = backend_address;
   next_nonlocal_backend_entry_ = backend_map_.begin();
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
-                                 Metrics* metrics, Webserver* webserver)
+    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker)
   : metrics_(metrics),
     webserver_(webserver),
     statestore_subscriber_(NULL),
@@ -67,7 +80,8 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialised_(NULL),
-    update_count_(0) {
+    update_count_(0),
+    resource_broker_(resource_broker) {
   DCHECK(backends.size() > 0);
 
   for (int i = 0; i < backends.size(); ++i) {
@@ -369,6 +383,377 @@ void SimpleScheduler::GetAllKnownBackends(BackendList* backends) {
   BOOST_FOREACH(const BackendMap::value_type& backend_list, backend_map_) {
     backends->insert(backends->end(), backend_list.second.begin(),
                      backend_list.second.end());
+  }
+}
+
+Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
+    QuerySchedule* schedule) {
+  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry;
+  for (entry = exec_request.per_node_scan_ranges.begin();
+      entry != exec_request.per_node_scan_ranges.end(); ++entry) {
+    int fragment_idx = schedule->GetFragmentIdx(entry->first);
+    const TPlanFragment& fragment = exec_request.fragments[fragment_idx];
+    bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
+
+    FragmentScanRangeAssignment* assignment =
+        &schedule->exec_params()[fragment_idx].scan_range_assignment;
+    RETURN_IF_ERROR(ComputeScanRangeAssignment(
+        entry->first, entry->second, exec_at_coord, assignment));
+    schedule->AddScanRanges(entry->second.size());
+  }
+  return Status::OK;
+}
+
+Status SimpleScheduler::ComputeScanRangeAssignment(
+    PlanNodeId node_id, const vector<TScanRangeLocations>& locations, bool exec_at_coord,
+    FragmentScanRangeAssignment* assignment) {
+  // map from datanode host to total assigned bytes;
+  // If the data node does not have a collocated impalad, the actual assigned bytes is
+  // "total assigned - numeric_limits<int64_t>::max()".
+  unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;
+  unordered_set<TNetworkAddress> remote_hosts;
+  int64_t remote_bytes = 0L;
+  int64_t local_bytes = 0L;
+  BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
+    // assign this scan range to the host w/ the fewest assigned bytes
+    uint64_t min_assigned_bytes = numeric_limits<uint64_t>::max();
+    const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
+    int volume_id = -1;
+    BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+      // Deprioritize non-collocated datanodes by assigning a very high initial bytes
+      uint64_t initial_bytes =
+          (!HasLocalBackend(location.server)) ? numeric_limits<int64_t>::max() : 0L;
+      uint64_t* assigned_bytes =
+          FindOrInsert(&assigned_bytes_per_host, location.server, initial_bytes);
+      if (*assigned_bytes < min_assigned_bytes) {
+        min_assigned_bytes = *assigned_bytes;
+        data_host = &location.server;
+        volume_id = location.volume_id;
+      }
+    }
+
+    int64_t scan_range_length = 0;
+    if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
+      scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
+    }
+    bool remote_read = min_assigned_bytes >= numeric_limits<int64_t>::max();
+    if (remote_read) {
+      remote_bytes += scan_range_length;
+      remote_hosts.insert(*data_host);
+    } else {
+      local_bytes += scan_range_length;
+    }
+    assigned_bytes_per_host[*data_host] += scan_range_length;
+
+    // translate data host to backend host
+    DCHECK(data_host != NULL);
+
+    TNetworkAddress exec_hostport;
+    if (!exec_at_coord) {
+      TBackendDescriptor backend;
+      RETURN_IF_ERROR(GetBackend(*data_host, &backend));
+      exec_hostport = backend.address;
+    } else {
+      exec_hostport = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
+    }
+
+    PerNodeScanRanges* scan_ranges =
+        FindOrInsert(assignment, exec_hostport, PerNodeScanRanges());
+    vector<TScanRangeParams>* scan_range_params_list =
+        FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
+    // add scan range
+    TScanRangeParams scan_range_params;
+    scan_range_params.scan_range = scan_range_locations.scan_range;
+    // Volume is optional, so we need to set the value and the is-set bit
+    scan_range_params.__set_volume_id(volume_id);
+    scan_range_params_list->push_back(scan_range_params);
+  }
+
+  if (VLOG_FILE_IS_ON) {
+    VLOG_FILE << "Total remote scan volume = " <<
+        PrettyPrinter::Print(remote_bytes, TCounterType::BYTES);
+    VLOG_FILE << "Total local scan volume = " <<
+        PrettyPrinter::Print(local_bytes, TCounterType::BYTES);
+    if (remote_hosts.size() > 0) {
+      stringstream remote_node_log;
+      remote_node_log << "Remote data node list: ";
+      BOOST_FOREACH(const TNetworkAddress& remote_host, remote_hosts) {
+        remote_node_log << remote_host << " ";
+      }
+    }
+
+    BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
+      VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
+      BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
+        stringstream str;
+        BOOST_FOREACH(TScanRangeParams& params, per_node_scan_ranges.second) {
+          str << ThriftDebugString(params) << " ";
+        }
+        VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
+      }
+    }
+  }
+
+  return Status::OK;
+}
+
+void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
+    QuerySchedule* schedule) {
+  vector<FragmentExecParams>& fragment_exec_params = schedule->exec_params();
+  // assign instance ids
+  int64_t num_backends = 0;
+  BOOST_FOREACH(FragmentExecParams& params, fragment_exec_params) {
+    for (int j = 0; j < params.hosts.size(); ++j) {
+      int instance_num = num_backends + j;
+      // we add instance_num to query_id.lo to create a globally-unique instance id
+      TUniqueId instance_id;
+      instance_id.hi = schedule->query_id().hi;
+      DCHECK_LT(
+          schedule->query_id().lo, numeric_limits<int64_t>::max() - instance_num - 1);
+      instance_id.lo = schedule->query_id().lo + instance_num + 1;
+      params.instance_ids.push_back(instance_id);
+    }
+    num_backends += params.hosts.size();
+  }
+  if (exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED) {
+    // the root fragment is executed directly by the coordinator
+    --num_backends;
+  }
+  schedule->SetNumBackends(num_backends);
+
+  // compute destinations and # senders per exchange node
+  // (the root fragment doesn't have a destination)
+  for (int i = 1; i < fragment_exec_params.size(); ++i) {
+    FragmentExecParams& params = fragment_exec_params[i];
+    int dest_fragment_idx = exec_request.dest_fragment_idx[i - 1];
+    DCHECK_LT(dest_fragment_idx, fragment_exec_params.size());
+    FragmentExecParams& dest_params = fragment_exec_params[dest_fragment_idx];
+
+    // set # of senders
+    DCHECK(exec_request.fragments[i].output_sink.__isset.stream_sink);
+    const TDataStreamSink& sink = exec_request.fragments[i].output_sink.stream_sink;
+    // we can only handle unpartitioned (= broadcast) and hash-partitioned
+    // output at the moment
+    DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
+           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED);
+    PlanNodeId exch_id = sink.dest_node_id;
+    // we might have multiple fragments sending to this exchange node
+    // (distributed MERGE), which is why we need to add up the #senders
+    dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
+
+    // create one TPlanFragmentDestination per destination host
+    params.destinations.resize(dest_params.hosts.size());
+    for (int j = 0; j < dest_params.hosts.size(); ++j) {
+      TPlanFragmentDestination& dest = params.destinations[j];
+      dest.fragment_instance_id = dest_params.instance_ids[j];
+      dest.server = dest_params.hosts[j];
+      VLOG_RPC  << "dest for fragment " << i << ":"
+                << " instance_id=" << dest.fragment_instance_id
+                << " server=" << dest.server;
+    }
+  }
+}
+
+void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request,
+    QuerySchedule* schedule) {
+  vector<FragmentExecParams>& fragment_exec_params = schedule->exec_params();
+  TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
+  DCHECK_EQ(fragment_exec_params.size(), exec_request.fragments.size());
+  vector<TPlanNodeType::type> scan_node_types;
+  scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
+  scan_node_types.push_back(TPlanNodeType::HBASE_SCAN_NODE);
+
+  // compute hosts of producer fragment before those of consumer fragment(s),
+  // the latter might inherit the set of hosts from the former
+  for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
+    const TPlanFragment& fragment = exec_request.fragments[i];
+    FragmentExecParams& params = fragment_exec_params[i];
+    if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
+      // all single-node fragments run on the coordinator host
+      params.hosts.push_back(coord);
+      continue;
+    }
+
+    PlanNodeId leftmost_scan_id = FindLeftmostNode(fragment.plan, scan_node_types);
+    if (leftmost_scan_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
+      // there is no leftmost scan; we assign the same hosts as those of our
+      // leftmost input fragment (so that a partitioned aggregation fragment
+      // runs on the hosts that provide the input data)
+      int input_fragment_idx = FindLeftmostInputFragment(i, exec_request);
+      DCHECK_GE(input_fragment_idx, 0);
+      DCHECK_LT(input_fragment_idx, fragment_exec_params.size());
+      params.hosts = fragment_exec_params[input_fragment_idx].hosts;
+      // TODO: switch to unpartitioned/coord execution if our input fragment
+      // is executed that way (could have been downgraded from distributed)
+      continue;
+    }
+
+    map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry =
+        exec_request.per_node_scan_ranges.find(leftmost_scan_id);
+    if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
+      // this scan node doesn't have any scan ranges; run it on the coordinator
+      // TODO: we'll need to revisit this strategy once we can partition joins
+      // (in which case this fragment might be executing a right outer join
+      // with a large build table)
+      params.hosts.push_back(coord);
+      continue;
+    }
+
+    // Get the list of impalad host from scan_range_assignment_
+    BOOST_FOREACH(const FragmentScanRangeAssignment::value_type scan_range_assignment,
+        params.scan_range_assignment) {
+      params.hosts.push_back(scan_range_assignment.first);
+      schedule->unique_hosts().insert(scan_range_assignment.first);
+    }
+  }
+}
+
+PlanNodeId SimpleScheduler::FindLeftmostNode(
+    const TPlan& plan, const std::vector<TPlanNodeType::type>& types) {
+  // the first node with num_children == 0 is the leftmost node
+  int node_idx = 0;
+  while (node_idx < plan.nodes.size() && plan.nodes[node_idx].num_children != 0) {
+    ++node_idx;
+  }
+  if (node_idx == plan.nodes.size()) {
+    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
+  }
+  const TPlanNode& node = plan.nodes[node_idx];
+
+  for (int i = 0; i < types.size(); ++i) {
+    if (node.node_type == types[i]) return node.node_id;
+  }
+  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
+}
+
+int SimpleScheduler::FindLeftmostInputFragment(
+    int fragment_idx, const TQueryExecRequest& exec_request) {
+  // find the leftmost node, which we expect to be an exchage node
+  vector<TPlanNodeType::type> exch_node_type;
+  exch_node_type.push_back(TPlanNodeType::EXCHANGE_NODE);
+  PlanNodeId exch_id =
+      FindLeftmostNode(exec_request.fragments[fragment_idx].plan, exch_node_type);
+  if (exch_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
+    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
+  }
+
+  // find the fragment that sends to this exchange node
+  for (int i = 0; i < exec_request.dest_fragment_idx.size(); ++i) {
+    if (exec_request.dest_fragment_idx[i] != fragment_idx) continue;
+    const TPlanFragment& input_fragment = exec_request.fragments[i + 1];
+    DCHECK(input_fragment.__isset.output_sink);
+    DCHECK(input_fragment.output_sink.__isset.stream_sink);
+    if (input_fragment.output_sink.stream_sink.dest_node_id == exch_id) return i + 1;
+  }
+  // this shouldn't happen
+  DCHECK(false) << "no fragment sends to exch id " << exch_id;
+  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
+}
+
+// TODO: Get this from some configuration.
+std::string SimpleScheduler::GetYarnPool(const std::string& user,
+    const TQueryOptions& query_options) const {
+  if (query_options.__isset.yarn_pool) return query_options.yarn_pool;
+  return "queue1";
+}
+
+Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
+  ComputeFragmentHosts(schedule->request(), schedule);
+  ComputeFragmentExecParams(schedule->request(), schedule);
+
+  DCHECK(schedule->request().__isset.user);
+  string pool = GetYarnPool(schedule->request().user, schedule->query_options());
+  TResourceBrokerReservationRequest reservation_request;
+  schedule->CreateReservationRequest(
+      pool, resource_broker_->llama_nodes(), &reservation_request);
+  if (resource_broker_ != NULL && !reservation_request.resources.empty()) {
+    LOG(INFO) << "Asking IRB for reservation";
+    RETURN_IF_ERROR(
+        resource_broker_->Reserve(reservation_request, schedule->reservation()));
+    LOG(INFO) << "IRB fullfilled reservation: "
+              << schedule->reservation()->allocated_resources.size();
+    // TODO: Temporarily disabled because we force a single resource to be requested.
+    // The main reason is that the MiniLlama always formats the DFS, so it's difficult to
+    // have data to play with.
+    //RETURN_IF_ERROR(schedule.ValidateReservation());
+    AddToActiveResourceMaps(*schedule->reservation(), coord);
+  }
+  return Status::OK;
+}
+
+Status SimpleScheduler::Release(QuerySchedule* schedule) {
+  if (resource_broker_ != NULL && schedule->HasReservation()) {
+    TResourceBrokerReleaseRequest request;
+    TResourceBrokerReleaseResponse response;
+    request.reservation_id = schedule->reservation()->reservation_id;
+    resource_broker_->Release(request, &response);
+    // Remove the reservation from the active-resource maps even if there was an error
+    // releasing the reservation because the query running in the reservation is done.
+    RemoveFromActiveResourceMaps(*schedule->reservation());
+    if (response.status.status_code != TStatusCode::OK) {
+      return Status(join(response.status.error_msgs, ", "));
+    }
+  }
+  return Status::OK;
+}
+
+void SimpleScheduler::AddToActiveResourceMaps(
+    const TResourceBrokerReservationResponse& reservation, Coordinator* coord) {
+  lock_guard<mutex> l(active_resources_lock_);
+  active_reservations_[reservation.reservation_id] = coord;
+  map<TNetworkAddress, llama::TAllocatedResource>::const_iterator iter;
+  for (iter = reservation.allocated_resources.begin();
+      iter != reservation.allocated_resources.end();
+      ++iter) {
+    TUniqueId client_resource_id;
+    client_resource_id << iter->second.client_resource_id;
+    active_client_resources_[client_resource_id] = coord;
+  }
+}
+
+void SimpleScheduler::RemoveFromActiveResourceMaps(
+    const TResourceBrokerReservationResponse& reservation) {
+  lock_guard<mutex> l(active_resources_lock_);
+  active_reservations_.erase(reservation.reservation_id);
+  map<TNetworkAddress, llama::TAllocatedResource>::const_iterator iter;
+  for (iter = reservation.allocated_resources.begin();
+      iter != reservation.allocated_resources.end();
+      ++iter) {
+    TUniqueId client_resource_id;
+    client_resource_id << iter->second.client_resource_id;
+    active_client_resources_.erase(client_resource_id);
+  }
+}
+
+void SimpleScheduler::HandlePreemptedReservation(const TUniqueId& reservation_id) {
+  Coordinator* coord = NULL;
+  {
+    lock_guard<mutex> l(active_resources_lock_);
+    ActiveReservationsMap::iterator it = active_reservations_.find(reservation_id);
+    if (it != active_reservations_.end()) coord = it->second;
+  }
+  if (coord == NULL) {
+    LOG(WARNING) << "Ignoring preempted reservation id " << reservation_id
+                 << " because no active query using it was found.";
+  } else {
+    coord->Cancel();
+  }
+}
+
+void SimpleScheduler::HandlePreemptedResource(const TUniqueId& client_resource_id) {
+  Coordinator* coord = NULL;
+  {
+    lock_guard<mutex> l(active_resources_lock_);
+    ActiveClientResourcesMap::iterator it =
+        active_client_resources_.find(client_resource_id);
+    if (it != active_client_resources_.end()) coord = it->second;
+  }
+  if (coord == NULL) {
+    LOG(WARNING) << "Ignoring preempted client resource id " << client_resource_id
+                 << " because no active query using it was found.";
+  } else {
+    coord->Cancel();
   }
 }
 

@@ -21,6 +21,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "resourcebroker/resource-broker.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/disk-io-mgr.h"
@@ -64,6 +65,14 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
 
+DEFINE_bool(enable_rm, true, "Whether to enable resource management");
+DEFINE_int32(llama_callback_port, 28000,
+             "Port where Llama notification callback should be started");
+DEFINE_string(llama_host, "127.0.0.1",
+              "Host of Llama service that the resource broker should connect to");
+DEFINE_int32(llama_port, 15000,
+             "Port of Llama service that the resource broker should connect to");
+
 namespace impala {
 
 ExecEnv* ExecEnv::exec_env_ = NULL;
@@ -85,6 +94,14 @@ ExecEnv::ExecEnv()
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false) {
+  if (FLAGS_enable_rm) {
+    TNetworkAddress llama_address =
+        MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
+    TNetworkAddress llama_callback_address =
+        MakeNetworkAddress(FLAGS_hostname, FLAGS_llama_callback_port);
+    resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
+        metrics_.get()));
+  }
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // a standalone single backend)
   if (FLAGS_use_statestore) {
@@ -100,13 +117,15 @@ ExecEnv::ExecEnv()
 
     scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address, metrics_.get(),
-        webserver_.get()));
+        webserver_.get(), resource_broker_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
-    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get(),
+        resource_broker_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
+  resource_broker_->set_scheduler(scheduler_.get());
 }
 
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
@@ -127,6 +146,14 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false) {
+  if (FLAGS_enable_rm) {
+    TNetworkAddress llama_address =
+        MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
+    TNetworkAddress llama_callback_address =
+        MakeNetworkAddress(hostname, FLAGS_llama_callback_port);
+    resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
+        metrics_.get()));
+  }
   if (FLAGS_use_statestore && statestore_port > 0) {
     TNetworkAddress subscriber_address =
         MakeNetworkAddress(hostname, subscriber_port);
@@ -140,14 +167,15 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 
     scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address, metrics_.get(),
-        webserver_.get()));
-
+        webserver_.get(), resource_broker_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
-    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get(),
+        resource_broker_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
+  resource_broker_->set_scheduler(scheduler_.get());
 }
 
 ExecEnv::~ExecEnv() {
@@ -155,6 +183,12 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
+
+  // Initialize the resource broker to make sure the Llama is up and reachable.
+  if (FLAGS_enable_rm) {
+    DCHECK(resource_broker_.get() != NULL);
+    RETURN_IF_ERROR(resource_broker_->Init());
+  }
 
   // Initialize global memory limit.
   int64_t bytes_limit = 0;

@@ -24,6 +24,7 @@
 #include "exprs/timestamp-functions.h"
 #include "runtime/client-cache.h"
 #include "util/hdfs-bulk-ops.h" // For declaration of HdfsOpThreadPool
+#include "resourcebroker/resource-broker.h"
 
 namespace impala {
 
@@ -83,6 +84,7 @@ class ExecEnv {
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
+  ResourceBroker* resource_broker() { return resource_broker_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
@@ -98,6 +100,7 @@ class ExecEnv {
  protected:
   // Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
+  boost::scoped_ptr<ResourceBroker> resource_broker_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
   boost::scoped_ptr<ImpalaInternalServiceClientCache> impalad_client_cache_;

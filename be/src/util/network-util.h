@@ -34,6 +34,11 @@ Status GetHostname(std::string* hostname);
 // Utility method because Thrift does not supply useful constructors
 TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
 
+// Utility method to parse the given string into a network address.
+// Accepted format: "host:port". If the given string address is malformed, returns a
+// network address with an empty hostname and a port of 0.
+TNetworkAddress MakeNetworkAddress(const std::string& address);
+
 // Returns true if the ip address parameter is the wildcard interface (0.0.0.0)
 bool IsWildcardAddress(const std::string& ipaddress);
 

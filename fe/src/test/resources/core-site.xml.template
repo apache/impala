@@ -27,4 +27,13 @@
     <name>io.compression.codec.lzo.class</name>
     <value>com.hadoop.compression.lzo.LzoCodec</value>
   </property>
+
+  <property>
+    <name>hadoop.proxyuser.${USER}.hosts</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.${USER}.groups</name>
+    <value>*</value>
+  </property>
 </configuration>

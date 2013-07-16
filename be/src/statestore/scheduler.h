@@ -19,9 +19,16 @@
 #include <vector>
 #include <string>
 
+#include "common/global-types.h"
 #include "common/status.h"
+#include "statestore/query-schedule.h"
+#include "util/container-util.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/StatestoreService_types.h"
+#include "gen-cpp/PlanNodes_types.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/ResourceBrokerService_types.h"
 
 namespace impala {
 
@@ -54,9 +61,30 @@ class Scheduler {
   // Return a list of all backends known to the scheduler
   virtual void GetAllKnownBackends(BackendList* backends) = 0;
 
+  // Populates given query schedule whose execution is to be coordinated by coord.
+  // Assigns fragments to hosts based on scan ranges in the query exec request.
+  // If resource management is enabled, also reserves resources from the central
+  // resource manager (Yarn via Llama) to run the query in. This function blocks until
+  // the reservation request has been granted or denied.
+  virtual Status Schedule(Coordinator* coord, QuerySchedule* schedule) = 0;
+
+  // Releases the reserved resources (if any) from the given schedule.
+  virtual Status Release(QuerySchedule* schedule) = 0;
+
+  // Notifies this scheduler that a resource reservation has been preempted by the
+  // central scheduler (Yarn via Llama). All affected queries are cancelled
+  // via their coordinator.
+  virtual void HandlePreemptedReservation(const TUniqueId& reservation_id) = 0;
+
+  // Notifies this scheduler that a single resource with the given client resource id
+  // has been preempted by the central scheduler (Yarn via Llama). All affected queries
+  // are cancelled via their coordinator.
+  virtual void HandlePreemptedResource(const TUniqueId& client_resource_id) = 0;
+
   // Initialises the scheduler, acquiring all resources needed to make
   // scheduling decisions once this method returns.
   virtual Status Init() = 0;
+
 };
 
 }

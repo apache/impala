@@ -26,6 +26,9 @@ if [[ $1 ]]; then
 else
   echo "Loading hive builtins"
   ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
+
+  echo "Generating HBase data"
+  ${IMPALA_HOME}/testdata/bin/create-hbase.sh
 fi
 set -u
 
@@ -37,8 +40,6 @@ pushd ${IMPALA_HOME}/bin
 ./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}
 # Use unbuffered logging by executing these data loading steps with 'python -u'
 python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
-echo "Loading data into hbasealltypeserror and hbasealltypeserrononulls"
-${IMPALA_HOME}/testdata/bin/create-hbase.sh
 python -u ./load-data.py --workloads tpcds --exploration_strategy core
 python -u ./load-data.py --workloads tpch --exploration_strategy core
 # Load all the auxiliary workloads (if any exist)

@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <boost/thread.hpp>
 #include <sys/resource.h>
+#include <runtime/timestamp-value.h>
 
 using namespace boost;
 using namespace std;
@@ -49,6 +50,25 @@ TEST(PromiseTest, BasicTest) {
   thread promise_setter(RunThread, &promise);
 
   DCHECK_EQ(promise.Get(), 100);
+}
+
+TEST(PromiseTest, TimeoutTest) {
+  // Test that the promise can be fulfilled by setting a value.
+  bool timed_out = true;
+  Promise<int64_t> fulfilled_promise;
+  thread promise_setter(RunThread, &fulfilled_promise);
+  DCHECK_EQ(fulfilled_promise.Get(10000, &timed_out), 100);
+  DCHECK_EQ(timed_out, false);
+
+  // Test that the promise times out properly.
+  int64_t start_time, end_time;
+  start_time = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
+  timed_out = false;
+  Promise<int64_t> timedout_promise;
+  timedout_promise.Get(1000, &timed_out);
+  DCHECK_EQ(timed_out, true);
+  end_time = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
+  DCHECK_GE(end_time - start_time, 1000);
 }
 
 TEST(PromiseDeathTest, RepeatedSetTest) {

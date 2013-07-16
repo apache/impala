@@ -121,6 +121,17 @@ enum TImpalaQueryOptions {
   // If true, waits for the result of all catalog operations to be processed by all
   // active impalad in the cluster before completing.
   SYNC_DDL,
+
+  // Yarn pool this request should be submitted to. If not set
+  // the pool is determined based on the user (only relevant with RM).
+  YARN_POOL,
+
+  // Per-host virtual CPU cores required for query (only relevant with RM).
+  V_CPU_CORES,
+
+  // Max time in milliseconds the resource broker should wait for
+  // a resource request to be granted by Llama/Yarn (only relevant with RM).
+  RESERVATION_REQUEST_TIMEOUT,
 }
 
 // The summary of an insert.

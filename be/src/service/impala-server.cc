@@ -558,7 +558,7 @@ Status ImpalaServer::ExecuteInternal(
 
   if ((*exec_state)->coord() != NULL) {
     const unordered_set<TNetworkAddress>& unique_hosts =
-        (*exec_state)->coord()->unique_hosts();
+        (*exec_state)->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
       BOOST_FOREACH(const TNetworkAddress& port, unique_hosts) {
@@ -644,7 +644,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
 
   if (exec_state->coord() != NULL) {
     const unordered_set<TNetworkAddress>& unique_hosts =
-        exec_state->coord()->unique_hosts();
+        exec_state->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
       BOOST_FOREACH(const TNetworkAddress& hostport, unique_hosts) {
@@ -926,6 +926,15 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::SYNC_DDL:
         query_options->__set_sync_ddl(iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::YARN_POOL:
+        query_options->__set_yarn_pool(value);
+        break;
+      case TImpalaQueryOptions::V_CPU_CORES:
+        query_options->__set_v_cpu_cores(atoi(value.c_str()));
+        break;
+      case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
+        query_options->__set_reservation_request_timeout(atoi(value.c_str()));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1180,6 +1189,15 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::SYNC_DDL:
         val << query_option.sync_ddl;
+        break;
+      case TImpalaQueryOptions::YARN_POOL:
+        val << query_option.yarn_pool;
+        break;
+      case TImpalaQueryOptions::V_CPU_CORES:
+        val << query_option.v_cpu_cores;
+        break;
+      case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
+        val << query_option.reservation_request_timeout;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

@@ -20,6 +20,8 @@
 #include "util/runtime-profile.h"
 #include "runtime/timestamp-value.h"
 #include "service/child-query.h"
+#include "statestore/query-schedule.h"
+#include "gen-cpp/Frontend_types.h"
 #include "service/impala-server.h"
 #include "gen-cpp/Frontend_types.h"
 
@@ -112,6 +114,7 @@ class ImpalaServer::QueryExecState {
   const std::string& default_db() const { return query_ctxt_.session.database; }
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
+  QuerySchedule* schedule() { return schedule_.get(); }
   int num_rows_fetched() const { return num_rows_fetched_; }
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
@@ -174,6 +177,9 @@ class ImpalaServer::QueryExecState {
 
   // Session that this query is from
   boost::shared_ptr<SessionState> parent_session_;
+
+  // Resource assignment determined by scheduler. Owned by obj_pool_.
+  boost::scoped_ptr<QuerySchedule> schedule_;
 
   // not set for ddl queries, or queries with "limit 0"
   boost::scoped_ptr<Coordinator> coord_;

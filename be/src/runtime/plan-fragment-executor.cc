@@ -39,6 +39,7 @@
 #include "util/parse-util.h"
 #include "util/mem-info.h"
 #include "util/periodic-counter-updater.h"
+#include "util/llama-util.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
@@ -88,6 +89,10 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
   has_thread_token_ = true;
+
+  if (request.__isset.reserved_resource) {
+    VLOG_QUERY << request.reserved_resource;
+  }
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),

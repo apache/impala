@@ -278,12 +278,15 @@ struct TQueryExecRequest {
   // AS SELECT), these may differ.
   9: required Types.TStmtType stmt_type
 
+  // The user executing this query.
+  10: optional string user
+
   // Estimated per-host peak memory consumption in bytes. Used for resource management.
-  10: optional i64 per_host_mem_req
+  11: optional i64 per_host_mem_req
 
   // Estimated per-host CPU requirements in YARN virtual cores.
   // Used for resource management.
-  11: optional i16 per_host_vcores
+  12: optional i16 per_host_vcores
 }
 
 enum TCatalogOpType {

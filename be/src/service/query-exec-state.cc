@@ -45,6 +45,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     ref_count_(0L),
     exec_env_(exec_env),
     parent_session_(session),
+    schedule_(NULL),
     coord_(NULL),
     profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
     server_profile_(&profile_pool_, "ImpalaServer"),
@@ -246,9 +247,11 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     return Status::OK;
   }
 
+  schedule_.reset(
+      new QuerySchedule(query_id_, query_exec_request,  exec_request_.query_options));
   coord_.reset(new Coordinator(exec_env_));
-  Status status = coord_->Exec(
-      query_id_, query_exec_request, exec_request_.query_options, &output_exprs_);
+  RETURN_IF_ERROR(exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get()));
+  Status status = coord_->Exec(*schedule_,  &output_exprs_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
@@ -323,6 +326,15 @@ void ImpalaServer::QueryExecState::Done() {
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
+
+  if (coord_.get() != NULL) {
+    // Release any reserved resources.
+    Status status = exec_env_->scheduler()->Release(schedule_.get());
+    if (!status.ok()) {
+      LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
+            << " because of error: " << status.GetErrorMsg();
+    }
+  }
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {

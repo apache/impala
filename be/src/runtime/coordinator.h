@@ -91,15 +91,14 @@ class Coordinator {
   Coordinator(ExecEnv* exec_env);
   ~Coordinator();
 
-  // Initiate asynchronous execution of query. Returns as soon as all plan fragments
-  // have started executing at their respective backends.
-  // 'Request' must contain at least a coordinator plan fragment (ie, can't
+  // Initiate asynchronous execution of a query with the given schedule. Returns as soon
+  // as all plan fragments have started executing at their respective backends.
+  // 'schedule' must contain at least a coordinator plan fragment (ie, can't
   // be for a query like 'SELECT 1').
   // Populates and prepares output_exprs from the coordinator's fragment if there is one,
   // and LLVM optimizes them together with the fragment's other exprs.
   // A call to Exec() must precede all other member function calls.
-  Status Exec(const TUniqueId& query_id, const TQueryExecRequest& request,
-              const TQueryOptions& query_options, std::vector<Expr*>* output_exprs);
+  Status Exec(QuerySchedule& schedule, std::vector<Expr*>* output_exprs);
 
   // Blocks until result rows are ready to be retrieved via GetNext(), or, if the
   // query doesn't return rows, until the query finishes or is cancelled.
@@ -160,9 +159,6 @@ class Coordinator {
   // Return error log for coord and all the fragments
   std::string GetErrorLog();
 
-  // The set of hosts on which this query will run. Only valid after Exec.
-  const boost::unordered_set<TNetworkAddress>& unique_hosts() { return unique_hosts_; }
-
   const ProgressUpdater& progress() { return progress_; }
 
   // Returns query_status_.
@@ -202,28 +198,6 @@ class Coordinator {
     // Total finished scan ranges per node
     CounterMap scan_ranges_complete_counters;
   };
-
-  // execution parameters for a single fragment; used to assemble the
-  // per-fragment instance TPlanFragmentExecParams;
-  // hosts.size() == instance_ids.size()
-  struct FragmentExecParams {
-    std::vector<TNetworkAddress> hosts; // execution backends
-    std::vector<TUniqueId> instance_ids;
-    std::vector<TPlanFragmentDestination> destinations;
-    std::map<PlanNodeId, int> per_exch_num_senders;
-  };
-  // populated in ComputeFragmentExecParams()
-  std::vector<FragmentExecParams> fragment_exec_params_;
-
-  // map from scan node id to a list of scan ranges
-  typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
-  // map from an impalad host address to the per-node assigned scan ranges;
-  // records scan range assignment for a single fragment
-  typedef boost::unordered_map<TNetworkAddress, PerNodeScanRanges>
-      FragmentScanRangeAssignment;
-  // vector is indexed by fragment index from TQueryExecRequest.fragments;
-  // populated in ComputeScanRangeAssignment()
-  std::vector<FragmentScanRangeAssignment> scan_range_assignment_;
 
   // BackendExecStates owned by obj_pool()
   std::vector<BackendExecState*> backend_exec_states_;
@@ -280,17 +254,9 @@ class Coordinator {
   // Tied to lock_.
   boost::condition_variable backend_completion_cv_;
 
-  // number of backends executing plan fragments on behalf of this query;
-  // set in ComputeFragmentExecParams();
-  // same as backend_exec_states_.size() after Exec()
-  int num_backends_;
-
   // Count of the number of backends for which done != true. When this
   // hits 0, any Wait()'ing thread is notified
   int num_remaining_backends_;
-
-  // total number of scan ranges; set in ComputeScanRangeAssignment()
-  int64_t num_scan_ranges_;
 
   // The following two structures, partition_row_counts_ and files_to_move_ are filled in
   // as the query completes, and track the results of INSERT queries that alter the
@@ -351,37 +317,10 @@ class Coordinator {
   // Total time spent in finalization (typically 0 except for INSERT into hdfs tables)
   RuntimeProfile::Counter* finalization_timer_;
 
-  // Populates fragment_exec_params_.
-  void ComputeFragmentExecParams(const TQueryExecRequest& exec_request);
-
-  // For each fragment in exec_request, computes hosts on which to run the instances
-  // and stores result in fragment_exec_params_.hosts.
-  void ComputeFragmentHosts(const TQueryExecRequest& exec_request);
-
-  // Returns the id of the leftmost node of any of the gives types in 'plan_root',
-  // or INVALID_PLAN_NODE_ID if no such node present.
-  PlanNodeId FindLeftmostNode(
-      const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
-
-  // Returns index (w/in exec_request.fragments) of fragment that sends its output
-  // to exec_request.fragment[fragment_idx]'s leftmost ExchangeNode.
-  // Returns INVALID_PLAN_NODE_ID if the leftmost node is not an exchange node.
-  int FindLeftmostInputFragment(
-      int fragment_idx, const TQueryExecRequest& exec_request);
-
-  // Populates scan_range_assignment_. Unpartitioned fragments are assigned to the coord
-  Status ComputeScanRangeAssignment(const TQueryExecRequest& exec_request);
-
-  // Does a scan range assignment (returned in 'assignment') based on a list of scan
-  // range locations for a particular node.
-  // If exec_at_coord is true, all scan ranges will be assigned to the coord node.
-  Status ComputeScanRangeAssignment(PlanNodeId node_id,
-      const std::vector<TScanRangeLocations>& locations, bool exec_at_coord,
-      const FragmentExecParams& params, FragmentScanRangeAssignment* assignment);
-
   // Fill in rpc_params based on parameters.
-  void SetExecPlanFragmentParams(int backend_num, const TPlanFragment& fragment,
-      int fragment_idx, const FragmentExecParams& params, int instance_idx,
+  void SetExecPlanFragmentParams(QuerySchedule& schedule,
+      int backend_num, const TPlanFragment& fragment,
+      int fragment_idx, FragmentExecParams& params, int instance_idx,
       const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params);
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel

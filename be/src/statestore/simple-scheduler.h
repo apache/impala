@@ -28,8 +28,12 @@
 #include "statestore/statestore.h"
 #include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
+#include "gen-cpp/ResourceBrokerService_types.h"
 
 namespace impala {
+
+class ResourceBroker;
+class Coordinator;
 
 // Performs simple scheduling by matching between a list of backends configured
 // either from the statestore, or from a static list of addresses, and a list
@@ -46,12 +50,13 @@ class SimpleScheduler : public Scheduler {
   //  - backend_id - unique identifier for this Impala backend (usually a host:port)
   //  - backend_address - the address that this backend listens on
   SimpleScheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
-      const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver);
+      const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver,
+      ResourceBroker* resource_broker);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
   SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics,
-      Webserver* webserver);
+      Webserver* webserver, ResourceBroker* resource_broker);
 
   // Returns a list of backends such that the impalad at backends[i] should be used to
   // read data from data_locations[i].
@@ -78,6 +83,11 @@ class SimpleScheduler : public Scheduler {
 
   // Registers with the subscription manager if required
   virtual impala::Status Init();
+
+  virtual Status Schedule(Coordinator* coord, QuerySchedule* schedule);
+  virtual Status Release(QuerySchedule* schedule);
+  virtual void HandlePreemptedReservation(const TUniqueId& reservation_id);
+  virtual void HandlePreemptedResource(const TUniqueId& client_resource_id);
 
  private:
   // Protects access to backend_map_ and backend_ip_map_, which might otherwise be updated
@@ -135,12 +145,79 @@ class SimpleScheduler : public Scheduler {
   // Counts the number of UpdateMembership invocations, to help throttle the logging.
   uint32_t update_count_;
 
+  // Protects active_reservations_ and active_client_resources_.
+  boost::mutex active_resources_lock_;
+
+  // Maps from a Llama reservation id to the coordinator of the query using that reservation.
+  // The map is used to cancel queries whose reservation has been preempted.
+  // Entries are added in Schedule() calls that result in granted resource allocations.
+  // Entries are removed in Release().
+  typedef boost::unordered_map<TUniqueId, Coordinator*> ActiveReservationsMap;
+  ActiveReservationsMap active_reservations_;
+
+  // Maps from client resource id to the coordinator of the query using that resource.
+  // The map is used to cancel queries whose resource(s) have been preempted.
+  // Entries are added in Schedule() calls that result in granted resource allocations.
+  // Entries are removed in Release().
+  typedef boost::unordered_map<TUniqueId, Coordinator*> ActiveClientResourcesMap;
+  ActiveClientResourcesMap active_client_resources_;
+
+  // Resource broker that mediates resource requests between Impala and the Llama.
+  // Set to NULL if resource management is disabled.
+  ResourceBroker* resource_broker_;
+
+  // Adds the granted reservation and resources to the active_reservations_ and
+  // active_client_resources_ maps, respectively.
+  void AddToActiveResourceMaps(
+      const TResourceBrokerReservationResponse& reservation, Coordinator* coord);
+
+  // Removes the given reservation and resources from the active_reservations_ and
+  // active_client_resources_ maps, respectively.
+  void RemoveFromActiveResourceMaps(
+      const TResourceBrokerReservationResponse& reservation);
+
   // Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Webserver callback that prints a list of known backends
   void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+
+  std::string GetYarnPool(const std::string& user,
+      const TQueryOptions& query_options) const;
+
+  // Computes the assignment of scan ranges to hosts for each scan node in schedule.
+  // Unpartitioned fragments are assigned to the coord. Populates the schedule's
+  // fragment_exec_params_ with the resulting scan range assignment.
+  Status ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
+      QuerySchedule* schedule);
+
+  // Does a scan range assignment (returned in 'assignment') based on a list of scan
+  // range locations for a particular scan node.
+  // If exec_at_coord is true, all scan ranges will be assigned to the coord node.
+  Status ComputeScanRangeAssignment(PlanNodeId node_id,
+      const std::vector<TScanRangeLocations>& locations, bool exec_at_coord,
+      FragmentScanRangeAssignment* assignment);
+
+  // Populates fragment_exec_params_ in schedule.
+  void ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
+      QuerySchedule* schedule);
+
+  // For each fragment in exec_request, computes hosts on which to run the instances
+  // and stores result in fragment_exec_params_.hosts.
+  void ComputeFragmentHosts(const TQueryExecRequest& exec_request,
+      QuerySchedule* schedule);
+
+  // Returns the id of the leftmost node of any of the gives types in 'plan_root',
+  // or INVALID_PLAN_NODE_ID if no such node present.
+  PlanNodeId FindLeftmostNode(
+      const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
+
+  // Returns index (w/in exec_request.fragments) of fragment that sends its output
+  // to exec_request.fragment[fragment_idx]'s leftmost ExchangeNode.
+  // Returns INVALID_PLAN_NODE_ID if the leftmost node is not an exchange node.
+  int FindLeftmostInputFragment(
+      int fragment_idx, const TQueryExecRequest& exec_request);
 };
 
 }

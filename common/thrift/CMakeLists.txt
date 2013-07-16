@@ -119,12 +119,14 @@ set (SRC_FILES
   ImpalaInternalService.thrift
   ImpalaService.thrift
   JniCatalog.thrift
+  Llama.thrift
   Logging.thrift
   NetworkTest.thrift
   PlanNodes.thrift
   Planner.thrift
   Partitions.thrift
   parquet.thrift
+  ResourceBrokerService.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift
   Status.thrift

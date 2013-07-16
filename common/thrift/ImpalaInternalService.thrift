@@ -29,6 +29,7 @@ include "DataSinks.thrift"
 include "Data.thrift"
 include "RuntimeProfile.thrift"
 include "ImpalaService.thrift"
+include "Llama.thrift"
 
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
@@ -64,6 +65,17 @@ struct TQueryOptions {
   17: optional i64 parquet_file_size = 0
   18: optional Types.TExplainLevel explain_level
   19: optional bool sync_ddl = 0
+
+  // Yarn pool this request should be submitted to. If not set
+  // the pool is determined based on the user (only relevant with RM).
+  20: optional string yarn_pool
+
+  // Per-host virtual CPU cores required for query (only relevant with RM).
+  21: optional i16 v_cpu_cores
+
+  // Max time in milliseconds the resource broker should wait for
+  // a resource request to be granted by Llama/Yarn (only relevant with RM).
+  22: optional i64 reservation_request_timeout
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -193,6 +205,9 @@ struct TExecPlanFragmentParams {
   // global query parameters needed for consistent expr evaluation (e.g., now()).
   // required in V1
   7: optional TQueryContext query_ctxt
+
+  // Resource reservation to run this plan fragment in.
+  8: optional Llama.TAllocatedResource reserved_resource
 }
 
 struct TExecPlanFragmentResult {

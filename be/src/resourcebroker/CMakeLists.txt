@@ -14,25 +14,14 @@
 
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/resourcebroker")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/resourcebroker")
 
-add_library(Statestore STATIC
-  failure-detector.cc
-  simple-scheduler.cc
-  statestore.cc
-  statestore-subscriber.cc
-  query-schedule.cc
+add_library(ResourceBroker STATIC
+  resource-broker.cc
 )
 
-add_executable(statestored statestored-main.cc)
-target_link_libraries(statestored ${IMPALA_LINK_LIBS})
-
-# Binary used only for testing
-add_executable(statestore-test-client statestore-test-client.cc)
-target_link_libraries(statestore-test-client ${IMPALA_LINK_LIBS})
-
-ADD_BE_TEST(simple-scheduler-test)
-ADD_BE_TEST(statestore-test)
+# TODO: Add resource broker BE test
+# ADD_BE_TEST(resource-broker-test)
