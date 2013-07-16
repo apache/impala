@@ -456,7 +456,7 @@ Status HdfsAvroScanner::InitNewRange() {
 }
 
 Status HdfsAvroScanner::ProcessRange() {
-  while (!finished()) {
+  while (!finished() && !stream_->eof()) {
     // Read new data block
     block_start_ = stream_->file_offset();
 

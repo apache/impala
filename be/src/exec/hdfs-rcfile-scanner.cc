@@ -260,13 +260,11 @@ Status HdfsRCFileScanner::ReadRowGroup() {
     }
     RETURN_IF_ERROR(ReadColumnBuffers());
     if (stream_->eosr()) {
+      if (stream_->eof()) break;
+
       // We must read up to the next sync marker.
       int32_t record_length;
-      bool read_success = stream_->ReadInt(&record_length, &parse_status_);
-      if (!read_success) {
-        // We are at the end of the file, nothing left
-        break;
-      }
+      RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
 
       if (record_length == HdfsRCFileScanner::SYNC_MARKER) {
         // If the marker is there, it's an error not to have a Sync block following the

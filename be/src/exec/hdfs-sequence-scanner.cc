@@ -332,7 +332,7 @@ Status HdfsSequenceScanner::ProcessRange() {
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   
   bool eosr = false;
-  while (!eosr) {
+  while (!eosr && !stream_->eof()) {
     DCHECK_GT(record_locations_.size(), 0);
     // Get the next compressed or uncompressed record.
     RETURN_IF_ERROR(

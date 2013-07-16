@@ -223,6 +223,9 @@ class ScannerContext {
 
     // Returns all buffers queued on this stream to the io mgr.
     void ReturnAllBuffers();
+
+    // Error-reporting function used by ReadBytes and SkipBytes.
+    Status ReportIncompleteRead(int length, int bytes_read);
   };
 
   Stream* GetStream(int idx = 0) { 

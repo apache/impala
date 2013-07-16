@@ -282,3 +282,10 @@ bool ScannerContext::Stream::eof() {
   return file_offset() == file_desc_->file_length;
 }
 
+Status ScannerContext::Stream::ReportIncompleteRead(int length, int bytes_read) {
+  stringstream ss;
+  ss << "Tried to read " << length << " bytes but could only read "
+     << bytes_read << " bytes. This may indicate data file corruption. "
+     << "(file: " << filename() << ", byte offset: " << file_offset() << ")";
+  return Status(ss.str());
+}
