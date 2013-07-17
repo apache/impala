@@ -851,6 +851,32 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestShortUsernameUsed() throws AnalysisException,
+      AuthorizationException {
+    // Different long variations of the same username.
+    List<User> users = Lists.newArrayList(
+        new User(USER.getName() + "/abc.host.com"),
+        new User(USER.getName() + "/abc.host.com@REAL.COM"),
+        new User(USER.getName() + "@REAL.COM"));
+    for (User user: users) {
+      Catalog catalog = new Catalog(true, false, authzConfig);
+      AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
+          user);
+      // Can select from table that user has privileges on.
+      AuthzOk(context, "select * from functional.alltypesagg");
+
+      // Unqualified table name.
+      AuthzError(context, "select * from alltypes",
+          "User '%s' does not have privileges to execute 'SELECT' on: default.alltypes",
+          user);
+    }
+    // If the first character is '/' or '@', the short username should be the same as
+    // the full username.
+    assertEquals("/" + USER.getName(), new User("/" + USER.getName()).getShortName());
+    assertEquals("@" + USER.getName(), new User("@" + USER.getName()).getShortName());
+  }
+
+  @Test
   public void TestHadoopGroupPolicyProvider() throws AnalysisException,
       AuthorizationException {
     // Create an AnalysisContext using the current user. The HadoopGroupPolicyProvider

@@ -14,12 +14,10 @@
 
 package com.cloudera.impala.authorization;
 
-import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.access.core.Authorizable;
-import org.apache.access.provider.file.HadoopGroupResourceAuthorizationProvider;
 import org.apache.access.provider.file.ResourceAuthorizationProvider;
 import org.apache.commons.lang.reflect.ConstructorUtils;
 
@@ -100,14 +98,14 @@ public class AuthorizationChecker {
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
       for (org.apache.access.core.Action action: actions) {
-        if (provider.hasAccess(new org.apache.access.core.Subject(user.getName()),
+        if (provider.hasAccess(new org.apache.access.core.Subject(user.getShortName()),
             authorizeables, EnumSet.of(action))) {
           return true;
         }
       }
       return false;
     }
-    return provider.hasAccess(new org.apache.access.core.Subject(user.getName()),
+    return provider.hasAccess(new org.apache.access.core.Subject(user.getShortName()),
         authorizeables, actions);
   }
 }

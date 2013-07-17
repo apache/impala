@@ -27,4 +27,21 @@ public class User {
   public String getName() {
     return name;
   }
+
+  /*
+   * Get the short version of the user name (the user's name up to the first '/' or '@')
+   * from the full principal name.
+   * Similar to: org.apache.hadoop.security.UserGroupInformation.getShortName()
+   */
+  public String getShortName() {
+    int idx = name.indexOf('/');
+    int idx2 = name.indexOf('@');
+    int endIdx = Math.min(idx, idx2);
+    // At least one of them was not found.
+    if (endIdx == -1) endIdx = Math.max(idx,  idx2);
+
+    // If neither are found (or are found at the beginning of the user name),
+    // return the username.
+    return (endIdx <= 0) ? name : name.substring(0, endIdx);
+  }
 }
