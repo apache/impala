@@ -26,7 +26,7 @@ from lineitem l
     on (o.o_orderkey = l.l_orderkey)
   join customer c
     on (c.c_custkey = o.o_custkey)
-  join tpch.q18_tmp t
+  join q18_tmp t
     on (o.o_orderkey = t.l_orderkey and t.t_sum_quantity > 300)
 group by
   c_name,
