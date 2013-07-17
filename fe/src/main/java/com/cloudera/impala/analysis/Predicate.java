@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 
 public abstract class Predicate extends Expr {
@@ -69,5 +70,13 @@ public abstract class Predicate extends Expr {
     if (slotRefRef != null) slotRefRef.setRef(slotRef);
     if (idxRef != null) idxRef.setRef(Integer.valueOf(i));
     return true;
+  }
+
+  /**
+   * If predicate is of the form "<slotref> = <slotref>", returns both SlotRefs,
+   * otherwise returns null.
+   */
+  public Pair<SlotId, SlotId> getEqSlots() {
+    return null;
   }
 }

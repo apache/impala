@@ -16,7 +16,9 @@ package com.cloudera.impala.analysis;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -40,7 +42,9 @@ import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TQueryGlobals;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -67,6 +71,7 @@ public class Analyzer {
   private final String defaultDb;
   private final User user;
   private final IdGenerator<ExprId> conjunctIdGenerator;
+  private final IdGenerator<EquivalenceClassId> equivClassIdGenerator;
   private final TQueryGlobals queryGlobals;
 
   // True if we are analyzing an explain request. Should be set before starting analysis.
@@ -125,6 +130,16 @@ public class Analyzer {
   // all conjuncts of the Where clause
   private final Set<ExprId> whereClauseConjuncts = Sets.newHashSet();
 
+  // valueTransfer[slotA][slotB] is true if slotB always has the same value as slotA
+  // or the tuple containing slotB is NULL
+  private boolean[][] valueTransfer;
+
+  // map from equivalence class id to the list of its member slots
+  private final Map<EquivalenceClassId, ArrayList<SlotId>> equivClassMembers;
+
+  // map from slot id to its equivalence class id
+  private final Map<SlotId, EquivalenceClassId> equivClassBySlotId = Maps.newHashMap();
+
   public Analyzer(Catalog catalog, String defaultDb, User user) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
@@ -132,6 +147,8 @@ public class Analyzer {
     this.defaultDb = defaultDb;
     this.user = user;
     this.conjunctIdGenerator = new IdGenerator<ExprId>();
+    this.equivClassIdGenerator = new IdGenerator<EquivalenceClassId>();
+    this.equivClassMembers = Maps.newHashMap();
     // Create query global parameters to be set in each TPlanExecRequest.
     SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
     queryGlobals = new TQueryGlobals();
@@ -154,6 +171,8 @@ public class Analyzer {
     this.isExplain = parentAnalyzer.isExplain;
     // make sure we don't create duplicate ids across entire stmt
     this.conjunctIdGenerator = parentAnalyzer.conjunctIdGenerator;
+    this.equivClassIdGenerator = null;  // only needed at top
+    this.equivClassMembers = null;
     this.queryGlobals = parentAnalyzer.queryGlobals;
   }
 
@@ -342,9 +361,7 @@ public class Analyzer {
 
     String key = alias + "." + col.getName();
     SlotDescriptor result = slotRefMap.get(key);
-    if (result != null) {
-      return result;
-    }
+    if (result != null) return result;
     result = descTbl.addSlotDescriptor(tupleDesc);
     result.setColumn(col);
     slotRefMap.put(alias + "." + col.getName(), result);
@@ -472,6 +489,7 @@ public class Analyzer {
           eqJoinConjuncts.get(lhsTupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
+        LOG.info("register: " + Integer.toString(e.getId().asInt()) + " " + e.toSql());
       }
     }
   }
@@ -530,9 +548,7 @@ public class Analyzer {
    */
   public SlotDescriptor getColumnSlot(TupleDescriptor tupleDesc, Column col) {
     for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-      if (slotDesc.getColumn() == col) {
-        return slotDesc;
-      }
+      if (slotDesc.getColumn() == col) return slotDesc;
     }
     return null;
   }
@@ -556,9 +572,7 @@ public class Analyzer {
    */
   public List<Expr> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
     List<ExprId> conjunctIds = eqJoinConjuncts.get(id);
-    if (conjunctIds == null) {
-      return null;
-    }
+    if (conjunctIds == null) return null;
     List<Expr> result = Lists.newArrayList();
     List<ExprId> ojClauseConjuncts = null;
     if (rhsRef != null) {
@@ -569,9 +583,7 @@ public class Analyzer {
       Expr e = conjuncts.get(conjunctId);
       Preconditions.checkState(e != null);
       if (ojClauseConjuncts != null) {
-        if (ojClauseConjuncts.contains(conjunctId)) {
-          result.add(e);
-        }
+        if (ojClauseConjuncts.contains(conjunctId)) result.add(e);
       } else {
         result.add(e);
       }
@@ -579,13 +591,199 @@ public class Analyzer {
     return result;
   }
 
+  private TupleId getTupleId(SlotId slotId) {
+    return descTbl.getSlotDesc(slotId).getParent().getId();
+  }
+
+  /**
+   * Populate valueTransfer based on the registered equi-join predicates
+   * of the form <slotref> = <slotref>.
+   */
+  private void computeValueTransferGraph() {
+    int numSlots = descTbl.getMaxSlotId().asInt() + 1;
+    LOG.info("valuetransfer: #slots=" + Integer.toString(numSlots));
+    valueTransfer = new boolean[numSlots][numSlots];
+    for (int i = 0; i < numSlots; ++i) {
+      Arrays.fill(valueTransfer[i], false);
+      valueTransfer[i][i] = true;
+    }
+    Set<ExprId> analyzedIds = Sets.newHashSet();
+
+    // transform eqJoinConjuncts into a transfer graph;
+    // this doesn't work at all for anything in subqueries, because conjuncts, etc.,
+    // are all registered in separate Analyzers
+    // TODO: fix this with a complete rewrite of how inline views are handled
+    for (Collection<ExprId> ids: eqJoinConjuncts.values()) {
+      for (ExprId id: ids) {
+        LOG.info("check id " + Integer.toString(id.asInt()));
+        if (!analyzedIds.add(id)) continue;
+
+        Predicate p = (Predicate) conjuncts.get(id);
+        Preconditions.checkState(p != null);
+        Pair<SlotId, SlotId> slotIds = p.getEqSlots();
+        if (slotIds == null) continue;
+        // TODO: remove
+        LOG.info("slotIds.first=" + Integer.toString(slotIds.first.asInt()) + " slotIds.second=" + Integer.toString(slotIds.second.asInt()));
+
+        TableRef tblRef = ojClauseByConjunct.get(id);
+        Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
+        if (tblRef == null) {
+          // this eq predicate doesn't involve any outer join, ie, it is true for
+          // each result row
+          valueTransfer[slotIds.first.asInt()][slotIds.second.asInt()] = true;
+          valueTransfer[slotIds.second.asInt()][slotIds.first.asInt()] = true;
+          continue;
+        }
+
+        // this is some form of outer join
+        SlotId outerSlot, innerSlot;
+        if (tblRef.getId() == getTupleId(slotIds.first)) {
+          innerSlot = slotIds.first;
+          outerSlot = slotIds.second;
+        } else if (tblRef.getId() == getTupleId(slotIds.second)) {
+          innerSlot = slotIds.second;
+          outerSlot = slotIds.first;
+        } else {
+          // this eq predicate is part of an OJ clause but doesn't reference
+          // the joined table -> ignore this, we can't reason about when it'll
+          // actually be true
+          continue;
+        }
+
+        if (tblRef.getJoinOp() == JoinOperator.FULL_OUTER_JOIN) {
+          // full outer joins don't guarantee any value transfer
+          continue;
+        }
+        if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
+          valueTransfer[outerSlot.asInt()][innerSlot.asInt()] = true;
+        } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
+          valueTransfer[innerSlot.asInt()][outerSlot.asInt()] = true;
+        }
+      }
+    }
+
+    // compute the transitive closure
+    boolean changed = false;
+    do {
+      changed = false;
+      for (int i = 0; i < numSlots; ++i) {
+        for (int j = 0; j < numSlots; ++j) {
+          for (int k = 0; k < numSlots; ++k) {
+            if (valueTransfer[i][j] && valueTransfer[j][k] && !valueTransfer[i][k]) {
+              valueTransfer[i][k] = true;
+              changed = true;
+            }
+          }
+        }
+      }
+    } while (changed);
+
+    // TODO: remove
+    for (int i = 0; i < numSlots; ++i) {
+      List<String> strings = Lists.newArrayList();
+      for (int j = 0; j < numSlots; ++j) {
+        if (i != j && valueTransfer[i][j]) strings.add(Integer.toString(j));
+      }
+      if (!strings.isEmpty()) {
+        LOG.info("transfer from " + Integer.toString(i) + " to: "
+            + Joiner.on(" ").join(strings));
+      }
+    }
+  }
+
+  public void computeEquivClasses() {
+    computeValueTransferGraph();
+
+    // we start out by assigning each slot to its own equiv class
+    int numSlots = descTbl.getMaxSlotId().asInt() + 1;
+    for (int i = 0; i < numSlots; ++i) {
+      EquivalenceClassId id = new EquivalenceClassId(equivClassIdGenerator);
+      equivClassMembers.put(id, Lists.newArrayList(new SlotId(i)));
+    }
+
+    // merge two classes if there is a value transfer between all members of the
+    // combined class; do this until there's nothing left to merge
+    boolean merged;
+    do {
+      merged = false;
+      for (Map.Entry<EquivalenceClassId, ArrayList<SlotId>> e1:
+          equivClassMembers.entrySet()) {
+        for (Map.Entry<EquivalenceClassId, ArrayList<SlotId>> e2:
+            equivClassMembers.entrySet()) {
+          if (e1.getKey() == e2.getKey()) continue;
+          List<SlotId> class1Members = e1.getValue();
+          if (class1Members.isEmpty()) continue;
+          List<SlotId> class2Members = e2.getValue();
+          if (class2Members.isEmpty()) continue;
+
+          // check whether we can transfer values between all members
+          boolean canMerge = true;
+          for (SlotId class1Slot: class1Members) {
+            for (SlotId class2Slot: class2Members) {
+              if (!valueTransfer[class1Slot.asInt()][class2Slot.asInt()]
+                  && !valueTransfer[class2Slot.asInt()][class1Slot.asInt()]) {
+                canMerge = false;
+                break;
+              }
+            }
+            if (!canMerge) break;
+          }
+          if (!canMerge) continue;
+
+          // merge classes 1 and 2 by transfering 2 into 1
+          class1Members.addAll(class2Members);
+          class2Members.clear();
+          merged = true;
+        }
+      }
+    } while (merged);
+
+    // populate equivClassBySlotId
+    for (EquivalenceClassId id: equivClassMembers.keySet()) {
+      for (SlotId slotId: equivClassMembers.get(id)) {
+        equivClassBySlotId.put(slotId, id);
+      }
+    }
+
+    // TODO: remove
+    for (EquivalenceClassId id: equivClassMembers.keySet()) {
+      List<SlotId> members = equivClassMembers.get(id);
+      if (members.isEmpty()) continue;
+      List<String> strings = Lists.newArrayList();
+      for (SlotId slotId: members) {
+        strings.add(slotId.toString());
+      }
+      LOG.info("equiv class: id=" + id.toString() + " members=("
+          + Joiner.on(" ").join(strings) + ")");
+    }
+  }
+
+  /**
+   * Return in equivSlotIds the ids of slots that are in the same equivalence class
+   * as slotId and are part of a tuple in tupleIds.
+   */
+  public void getEquivSlots(SlotId slotId, List<TupleId> tupleIds,
+      List<SlotId> equivSlotIds) {
+    equivSlotIds.clear();
+    // TODO: remove
+    LOG.info("getequivslots: slotid=" + Integer.toString(slotId.asInt()));
+    EquivalenceClassId classId = equivClassBySlotId.get(slotId);
+    for (SlotId memberId: equivClassMembers.get(classId)) {
+      if (tupleIds.contains(descTbl.getSlotDesc(memberId).getParent().getId())) {
+        equivSlotIds.add(memberId);
+      }
+    }
+  }
+
+  public EquivalenceClassId getEquivClassId(SlotId slotId) {
+    return equivClassBySlotId.get(slotId);
+  }
+
   /**
    * Mark predicates as assigned.
    */
   public void markConjunctsAssigned(List<Expr> conjuncts) {
-    if (conjuncts == null) {
-      return;
-    }
+    if (conjuncts == null) return;
     for (Expr p: conjuncts) {
       assignedConjuncts.add(p.getId());
     }
@@ -717,9 +915,7 @@ public class Analyzer {
   public Db getDb(String dbName, Privilege privilege)
       throws AnalysisException, AuthorizationException {
     Db db = catalog.getDb(dbName, getUser(), privilege);
-    if (db == null) {
-      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
-    }
+    if (db == null) throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     return db;
   }
 

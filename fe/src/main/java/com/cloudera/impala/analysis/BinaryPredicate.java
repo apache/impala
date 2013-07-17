@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
@@ -134,29 +135,22 @@ public class BinaryPredicate extends Predicate {
    * otherwise returns null. Slotref may be wrapped in a CastExpr.
    */
   public Expr getSlotBinding(SlotId id) {
-    SlotRef slotRef = null;
     // check left operand
-    if (getChild(0) instanceof SlotRef) {
-      slotRef = (SlotRef) getChild(0);
-    } else if (getChild(0) instanceof CastExpr
-               && getChild(0).getChild(0) instanceof SlotRef) {
-      slotRef = (SlotRef) getChild(0).getChild(0);
-    }
-    if (slotRef != null && slotRef.getSlotId() == id) {
-      return getChild(1);
-    }
-
+    SlotRef slotRef = getChild(0).unwrapSlotRef();
+    if (slotRef != null && slotRef.getSlotId() == id) return getChild(1);
     // check right operand
-    if (getChild(1) instanceof SlotRef) {
-      slotRef = (SlotRef) getChild(1);
-    } else if (getChild(1) instanceof CastExpr
-               && getChild(1).getChild(0) instanceof SlotRef) {
-      slotRef = (SlotRef) getChild(1).getChild(0);
-    }
-    if (slotRef != null && slotRef.getSlotId() == id) {
-      return getChild(0);
-    }
-
+    slotRef = getChild(1).unwrapSlotRef();
+    if (slotRef != null && slotRef.getSlotId() == id) return getChild(0);
     return null;
+  }
+
+  @Override
+  public Pair<SlotId, SlotId> getEqSlots() {
+    if (op != Operator.EQ) return null;
+    SlotRef lhs = getChild(0).unwrapSlotRef();
+    if (lhs == null) return null;
+    SlotRef rhs = getChild(1).unwrapSlotRef();
+    if (rhs == null) return null;
+    return new Pair(lhs.getSlotId(), rhs.getSlotId());
   }
 }

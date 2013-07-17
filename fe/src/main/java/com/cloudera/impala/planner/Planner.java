@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +29,13 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.EquivalenceClassId;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.QueryStmt;
+import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
@@ -91,6 +94,8 @@ public class Planner {
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
 
+    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
+    analyzer.computeEquivClasses();
     LOG.info("create single-node plan");
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
@@ -1114,6 +1119,9 @@ public class Planner {
    *   clause
    * Returns the conjuncts in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
    * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
+   * If no conjuncts are found, constructs them based on equivalence classes, where
+   * possible. In that case, they are still returned through joinConjuncts, but
+   * joinPredicates would be empty.
    */
   private void getHashLookupJoinConjuncts(
       Analyzer analyzer,
@@ -1136,11 +1144,12 @@ public class Planner {
       return;
     }
 
+    // equivalence classes of eq predicates in joinPredicates
+    Set<EquivalenceClassId> joinEquivClasses = Sets.newHashSet();
+
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
-      if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) {
-        continue;
-      }
+      if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
 
       Expr rhsExpr = null;
       if (e.getChild(0).isBound(rhsIds)) {
@@ -1160,10 +1169,54 @@ public class Planner {
         continue;
       }
 
+      // ignore predicates that express an equivalence relationship if that
+      // relationship is already captured via another predicate; we still
+      // return those predicates in joinPredicates so they get marked as assigned
+      Pair<SlotId, SlotId> joinSlots = ((Predicate) e).getEqSlots();
+      if (joinSlots != null) {
+        EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
+        EquivalenceClassId id2 = analyzer.getEquivClassId(joinSlots.second);
+        // both slots need not be in the same equiv class, due to outer joins
+        // null check: we don't have equiv classes for anything in subqueries
+        if (id1 != null && id2 != null && id1.equals(id2)
+            && joinEquivClasses.contains(id1)) {
+          // record this so it gets marked as assigned later
+          joinPredicates.add(e);
+          continue;
+        }
+        joinEquivClasses.add(id1);
+      }
+
+      // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
       joinPredicates.add(e);
       Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
       joinConjuncts.add(entry);
+    }
+    if (!joinPredicates.isEmpty()) return;
+    Preconditions.checkState(joinConjuncts.isEmpty());
+
+    // construct joinConjunct entries derived from equivalence class membership
+    List<SlotId> lhsSlotIds = Lists.newArrayList();
+    for (SlotDescriptor slotDesc: rhs.getDesc().getSlots()) {
+      analyzer.getEquivSlots(slotDesc.getId(), lhsIds, lhsSlotIds);
+      if (!lhsSlotIds.isEmpty()) {
+        SlotId lhsSlotId = lhsSlotIds.get(0);
+        // construct a BinaryPredicates in order to get correct casting;
+        // we only do this for one of the equivalent slots, all the other implied
+        // equalities are redundant
+        BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
+            new SlotRef(analyzer.getDescTbl().getSlotDesc(lhsSlotId)),
+            new SlotRef(analyzer.getDescTbl().getSlotDesc(slotDesc.getId())));
+        // analyze() creates casts, if needed
+        try {
+          pred.analyze(analyzer);
+        } catch(AnalysisException e) {
+          throw new IllegalStateException(
+              "constructed predicate failed analysis: " + pred.toSql());
+        }
+        joinConjuncts.add(new Pair<Expr, Expr>(pred.getChild(0), pred.getChild(1)));
+      }
     }
   }
 
@@ -1181,7 +1234,7 @@ public class Planner {
     List<Expr> eqJoinPredicates = Lists.newArrayList();
     getHashLookupJoinConjuncts(
         analyzer, outer.getTupleIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
-    if (eqJoinPredicates.isEmpty()) {
+    if (eqJoinConjuncts.isEmpty()) {
       throw new NotImplementedException(
           String.format("Join between '%s' and '%s' requires at least one " +
                         "conjunctive equality predicate between the two tables",

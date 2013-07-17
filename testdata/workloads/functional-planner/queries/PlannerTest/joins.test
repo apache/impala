@@ -984,3 +984,93 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
+# join conjunct is derived from equivalence classes
+# (no explicit join conjunct between t1 and t2)
+select *
+from functional.testtbl t1, functional.testtbl t2, functional.testtbl t3
+where t1.id = t3.id and t2.id = t3.id
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  tuple ids: 0 1 2 
+  |  
+  |----3:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       tuple ids: 2 
+  |    
+  2:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    <slot 0> = <slot 3>
+  |  tuple ids: 0 1 
+  |  
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0 size=0B compact
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+     tuple ids: 0 1 2 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    t1.id = t3.id
+  |  tuple ids: 0 1 2 
+  |  
+  |----6:EXCHANGE
+  |       tuple ids: 2 
+  |    
+  2:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    <slot 0> = <slot 3>
+  |  tuple ids: 0 1 
+  |  
+  |----5:EXCHANGE
+  |       tuple ids: 1 
+  |    
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     tuple ids: 0 
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     tuple ids: 2 
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B compact
+     tuple ids: 1 
+====

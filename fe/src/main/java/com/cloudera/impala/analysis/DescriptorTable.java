@@ -32,6 +32,7 @@ import com.google.common.collect.Sets;
  */
 public class DescriptorTable {
   private final HashMap<TupleId, TupleDescriptor> tupleDescs;
+  private final HashMap<SlotId, SlotDescriptor> slotDescs;
   // List of referenced tables with no associated TupleDescriptor to ship to the BE.
   // For example, the output table of an insert query.
   private final List<Table> referencedTables;
@@ -40,6 +41,7 @@ public class DescriptorTable {
 
   public DescriptorTable() {
     tupleDescs = new HashMap<TupleId, TupleDescriptor>();
+    slotDescs = new HashMap<SlotId, SlotDescriptor>();
     referencedTables = new ArrayList<Table>();
     nextTupleId = 0;
     nextSlotId = 0;
@@ -54,11 +56,16 @@ public class DescriptorTable {
   public SlotDescriptor addSlotDescriptor(TupleDescriptor d) {
     SlotDescriptor result = new SlotDescriptor(nextSlotId++, d);
     d.addSlot(result);
+    slotDescs.put(result.getId(), result);
     return result;
   }
 
   public TupleDescriptor getTupleDesc(TupleId id) {
     return tupleDescs.get(id);
+  }
+
+  public SlotDescriptor getSlotDesc(SlotId id) {
+    return slotDescs.get(id);
   }
 
   public Collection<TupleDescriptor> getTupleDescs() {
@@ -67,6 +74,10 @@ public class DescriptorTable {
 
   public TupleId getMaxTupleId() {
     return new TupleId(nextTupleId - 1);
+  }
+
+  public SlotId getMaxSlotId() {
+    return new SlotId(nextSlotId - 1);
   }
 
   public void addReferencedTable(Table table) {

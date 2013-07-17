@@ -38,14 +38,9 @@ public class Id<IdType extends Id<IdType>> {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj == null) {
-      return false;
-    }
-
+    if (obj == null) return false;
     // only ids of the same subclass are comparable
-    if (obj.getClass() != this.getClass()) {
-      return false;
-    }
+    if (obj.getClass() != this.getClass()) return false;
     return ((Id)obj).id == id;
   }
 
