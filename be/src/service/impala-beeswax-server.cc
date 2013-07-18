@@ -498,11 +498,11 @@ void ImpalaServer::RaiseBeeswaxException(const string& msg, const char* sql_stat
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
   if (exec_state == NULL) return Status("Invalid query handle");
 
-  // make sure we release the lock on exec_state if we see any error
-  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+  lock_guard<mutex> frl(*exec_state->fetch_rows_lock());
+  lock_guard<mutex> l(*exec_state->lock());
 
   if (exec_state->num_rows_fetched() == 0) {
     exec_state->query_events()->MarkEvent("First row fetched");

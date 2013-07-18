@@ -3,7 +3,9 @@
 # Tests query cancellation using the ImpalaService.Cancel API
 #
 import pytest
+import threading
 from time import sleep
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.test_file_parser import QueryTestSectionReader
@@ -21,6 +23,9 @@ CANCEL_DELAY_IN_SECONDS = [0, 1, 2]
 # Number of times to execute/cancel each query under test
 NUM_CANCELATION_ITERATIONS = 1
 
+# Test cancellation on both running and hung queries
+DEBUG_ACTIONS = [None, 'WAIT']
+
 class TestCancellation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -31,6 +36,8 @@ class TestCancellation(ImpalaTestSuite):
     super(TestCancellation, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(TestDimension('query', *QUERIES))
     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
+    cls.TestMatrix.add_dimension(TestDimension('action', *DEBUG_ACTIONS))
+
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
     if cls.exploration_strategy() != 'core':
       NUM_CANCELATION_ITERATIONS = 3
@@ -38,20 +45,52 @@ class TestCancellation(ImpalaTestSuite):
   def test_basic_cancel(self, vector):
     query = vector.get_value('query')
 
+    action = vector.get_value('action')
+    # node ID 0 is the scan node
+    debug_action = '0:GETNEXT:' + action if action != None else ''
+    vector.get_value('exec_option')['debug_action'] = debug_action
+
     # Execute the query multiple times, each time canceling it
     for i in xrange(NUM_CANCELATION_ITERATIONS):
       handle = self.execute_query_async(query, vector.get_value('exec_option'),
                                         table_format=vector.get_value('table_format'))
+
+      def fetch_results():
+        threading.current_thread().fetch_results_error = None
+        try:
+          new_client = self.create_impala_client()
+          new_client.fetch_results(query,handle)
+        except Exception as e:
+          # We expect the RPC to fail only when the query is cancelled.
+          if not (type(e) is ImpalaBeeswaxException and "Cancelled" in str(e)):
+            threading.current_thread().fetch_results_error = e
+        finally:
+          new_client.close_connection()
+
+      thread = threading.Thread(target=fetch_results)
+      thread.start()
+
       sleep(vector.get_value('cancel_delay'))
       assert self.client.get_state(handle) != self.client.query_states['EXCEPTION']
       cancel_result = self.client.cancel_query(handle)
       assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
 
+      thread.join()
+      if thread.fetch_results_error is not None:
+        raise thread.fetch_results_error
+
       # TODO: Add some additional verification to check to make sure the query was
       # actually canceled
 
     # Executing the same query without canceling should work fine. Only do this if the
     # query has a limit or aggregation
-    if 'count' in query or 'limit' in query:
+    if action is None and ('count' in query or 'limit' in query):
       self.execute_query(query, vector.get_value('exec_option'))
+
+  def teardown_method(self, method):
+    # For some reason it takes a little while for the query to get completely torn down
+    # when the debug action is WAIT, causing TestValidateMetrics.test_metrics_are_zero to
+    # fail. Introducing a small delay allows everything to quiesce.
+    # TODO: Figure out a better way to address this
+    sleep(1)

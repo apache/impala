@@ -274,7 +274,14 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   }
 
   // query with a FROM clause
-  RETURN_IF_ERROR(coord_->Wait());
+  lock_.unlock();
+  Status status = coord_->Wait();
+  lock_.lock();
+  if (!status.ok()) return status;
+
+  // Check if query_state_ changed during Wait() call
+  if (query_state_ == QueryState::EXCEPTION) return query_status_;
+
   query_state_ = QueryState::FINISHED;  // results will be ready after this call
   // Fetch the next batch if we've returned the current batch entirely
   if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
@@ -351,7 +358,19 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   DCHECK(!eos_);
   DCHECK(coord_.get() != NULL);
 
-  RETURN_IF_ERROR(coord_->GetNext(&current_batch_, coord_->runtime_state()));
+  // Temporarily release lock so calls to Cancel() are not blocked.  fetch_rows_lock_
+  // ensures that we do not call coord_->GetNext() multiple times concurrently.
+  lock_.unlock();
+  Status status = coord_->GetNext(&current_batch_, coord_->runtime_state());
+  lock_.lock();
+  if (!status.ok()) return status;
+
+  // Check if query_state_ changed during GetNext() call
+  if (query_state_ == QueryState::EXCEPTION) {
+    current_batch_ = NULL;
+    return query_status_;
+  }
+
   current_batch_row_ = 0;
   eos_ = current_batch_ == NULL;
   return Status::OK;

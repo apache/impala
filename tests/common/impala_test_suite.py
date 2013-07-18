@@ -224,9 +224,8 @@ class ImpalaTestSuite(BaseTestSuite):
     client.execute(query)
 
   @execute_wrapper
-  def execute_query_async(self, query, query_exec_options=None, impalad=None):
-    if impalad is not None:
-      return self.__execute_query_new_client(impalad, query, query_exec_options)
+  def execute_query_async(self, query, query_exec_options=None):
+    self.__set_exec_options(query_exec_options)
     return self.client.execute_query_async(query)
 
   @execute_wrapper
@@ -271,11 +270,10 @@ class ImpalaTestSuite(BaseTestSuite):
     self.__set_exec_options(query_exec_options)
     return self.client.execute(query)
 
-  def __execute_query_new_client(self, impalad, query, query_exec_options=None,
+  def __execute_query_new_client(self, query, query_exec_options=None,
       use_kerberos=False):
     """Executes the given query against the specified Impalad"""
-    LOG.info('Targeting: %s Executing Query: \n%s\n' % (impalad, query))
-    new_client = self.create_impala_client(impalad)
+    new_client = self.create_impala_client()
     new_client.clear_query_options()
     if query_exec_options is not None and len(query_exec_options.keys()) > 0:
       for exec_option in query_exec_options.keys():

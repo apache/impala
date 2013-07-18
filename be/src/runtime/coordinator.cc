@@ -274,6 +274,10 @@ static void ProcessQueryOptions(
     debug_options->phase = GetExecNodePhase(components[2]);
     debug_options->action = GetDebugAction(components[3]);
   }
+  DCHECK(!(debug_options->phase == TExecNodePhase::CLOSE &&
+           debug_options->action == TDebugAction::WAIT))
+      << "Do not use CLOSE:WAIT debug actions "
+      << "because nodes cannot be cancelled in Close()";
 }
 
 Status Coordinator::Exec(

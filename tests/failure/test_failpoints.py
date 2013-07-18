@@ -63,6 +63,12 @@ class TestFailpoints(ImpalaTestSuite):
         not (v.get_value('location') in ['PREPARE'] and \
              v.get_value('action') == 'CANCEL'))
 
+    # Don't create CLOSE:WAIT debug actions to avoid leaking plan fragments (there's no
+    # way to cancel a plan fragment once Close() has been called)
+    cls.TestMatrix.add_constraint(
+      lambda v: not (v.get_value('action') == 'CANCEL'
+                     and v.get_value('location') == 'CLOSE'))
+
   def test_failpoints(self, vector):
     query = QUERY
     node_type, node_ids = vector.get_value('target_node')

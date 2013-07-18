@@ -69,12 +69,14 @@ class ImpalaServer::QueryExecState {
 
   // Return at most max_rows from the current batch. If the entire current batch has
   // been returned, fetch another batch first.
+  // Caller needs to hold fetch_rows_lock_ and lock_.
   // Caller should verify that EOS has not be reached before calling.
   // Always calls coord()->Wait() prior to getting a batch.
   // Also updates query_state_/status_ in case of error.
   Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows);
 
   // Update query state if the requested state isn't already obsolete.
+  // Takes lock_.
   void UpdateQueryState(beeswax::QueryState::type query_state);
 
   // Update the query status and the "Query Status" summary profile string.
@@ -88,7 +90,7 @@ class ImpalaServer::QueryExecState {
   Status UpdateQueryStatus(const Status& status);
 
   // Sets state to EXCEPTION and cancels coordinator.
-  // Caller needs to hold lock().
+  // Caller needs to hold lock_.
   // Does nothing if the query has reached EOS.
   void Cancel();
 
@@ -107,6 +109,7 @@ class ImpalaServer::QueryExecState {
   const TExecRequest& exec_request() const { return exec_request_; }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
   boost::mutex* lock() { return &lock_; }
+  boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
   const beeswax::QueryState::type query_state() const { return query_state_; }
   void set_query_state(beeswax::QueryState::type state) { query_state_ = state; }
   const Status& query_status() const { return query_status_; }
@@ -121,6 +124,12 @@ class ImpalaServer::QueryExecState {
  private:
   TUniqueId query_id_;
   const std::string sql_stmt_;
+
+  // Ensures single-threaded execution of FetchRows(). Callers of FetchRows() are
+  // responsible for acquiring this lock. To avoid deadlocks, callers must not hold lock_
+  // while acquiring this lock (since FetchRows() will release and re-acquire lock_ during
+  // its execution).
+  boost::mutex fetch_rows_lock_;
 
   boost::mutex lock_;  // protects all following fields
   ExecEnv* exec_env_;
@@ -198,10 +207,14 @@ class ImpalaServer::QueryExecState {
   Status ExecLoadDataRequest();
 
   // Core logic of FetchRows(). Does not update query_state_/status_.
+  // Caller needs to hold fetch_rows_lock_ and lock_.
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);
 
-  // Fetch the next row batch and store the results in current_batch_. Only
-  // called for non-DDL / DML queries.
+  // Fetch the next row batch and store the results in current_batch_. Only called for
+  // non-DDL / DML queries. current_batch_ is set to NULL if execution is complete or the
+  // query was cancelled.
+  // Caller needs to hold fetch_rows_lock_ and lock_. Blocks, during which time lock_ is
+  // released.
   Status FetchNextBatch();
 
   // Evaluates 'output_exprs_' against 'row' and output the evaluated row in
