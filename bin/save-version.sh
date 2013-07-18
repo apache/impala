@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Generates the impala version and build information.
-VERSION=1.1-INTERNAL
+VERSION=1.2-INTERNAL
 GIT_HASH=$(git rev-parse HEAD)
 BUILD_TIME=`date`
 HEADER="# Generated version information from save-version.sh"
