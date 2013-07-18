@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -440,8 +441,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   public void TestAggregates() throws AnalysisException {
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " +
         "from functional.testtbl");
-    AnalyzesOk("select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL) " +
-        "from functional.testtbl");
+    AnalyzesOk("select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL), " +
+        "group_concat(NULL), group_concat(name, NULL) from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",
         "aggregation function not allowed in WHERE clause");
 
@@ -452,7 +453,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'*' can only be used in conjunction with COUNT");
     AnalysisError("select max(*) from functional.testtbl",
         "'*' can only be used in conjunction with COUNT");
-    AnalysisError("select sum(*) from functional.testtbl",
+    AnalysisError("select group_concat(*) from functional.testtbl",
         "'*' can only be used in conjunction with COUNT");
 
     // multiple args
@@ -466,6 +467,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "SUM requires exactly one parameter");
     AnalysisError("select avg(id, zip) from functional.testtbl",
         "AVG requires exactly one parameter");
+    AnalysisError("select group_concat(name, '-', ',') from functional.testtbl",
+        "GROUP_CONCAT requires one or two parameters");
 
     // nested aggregates
     AnalysisError("select sum(count(*)) from functional.testtbl",
@@ -482,6 +485,30 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // aggregate requires table in the FROM clause
     AnalysisError("select count(*)", "aggregation without a FROM clause is not allowed");
     AnalysisError("select min(1)", "aggregation without a FROM clause is not allowed");
+    AnalysisError("select group_concat('')",
+        "aggregation without a FROM clause is not allowed");
+
+    // test group_concat
+    AnalyzesOk("select group_concat(string_col) from functional.alltypes");
+    AnalyzesOk("select group_concat(string_col, '-') from functional.alltypes");
+    AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
+    // test all types as arguments
+    for (PrimitiveType type: typeToLiteralValue.keySet()) {
+      String literal = typeToLiteralValue.get(type);
+      String query1 = String.format(
+          "select group_concat(%s) from functional.alltypes", literal);
+      String query2 = String.format(
+          "select group_concat(string_col, %s) from functional.alltypes", literal);
+      if (type == PrimitiveType.STRING || type == PrimitiveType.NULL_TYPE) {
+        AnalyzesOk(query1);
+        AnalyzesOk(query2);
+      } else {
+        AnalysisError(query1,
+            "GROUP_CONCAT requires first parameter to be of type STRING");
+        AnalysisError(query2,
+            "GROUP_CONCAT requires second parameter to be of type STRING");
+      }
+    }
   }
 
   @Test
@@ -515,6 +542,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
+    AnalysisError("select group_concat(distinct name) from functional.testtbl",
+            "GROUP_CONCAT does not support DISTINCT");
   }
 
   @Test

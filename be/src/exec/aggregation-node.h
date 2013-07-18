@@ -24,6 +24,7 @@
 #include "runtime/descriptors.h"  // for TupleId
 #include "runtime/free-list.h"
 #include "runtime/mem-pool.h"
+#include "runtime/string-value.h"
 
 namespace llvm {
   class Function;
@@ -47,9 +48,9 @@ class TupleDescriptor;
 //
 // For string aggregation, we need to append additional data to the tuple object
 // to reduce the number of string allocations (since we cannot know the length of
-// the output string beforehand).  For each string slot in the output tuple, a int32 
-// will be appended to the end of the normal tuple data that stores the size of buffer 
-// for that string slot.  This also results in the correct alignment because StringValue 
+// the output string beforehand).  For each string slot in the output tuple, a int32
+// will be appended to the end of the normal tuple data that stores the size of buffer
+// for that string slot.  This also results in the correct alignment because StringValue
 // slots are 8-byte aligned and form the tail end of the tuple.
 class AggregationNode : public ExecNode {
  public:
@@ -64,7 +65,7 @@ class AggregationNode : public ExecNode {
 
  protected:
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
-  
+
  private:
   boost::scoped_ptr<HashTable> hash_tbl_;
   HashTable::Iterator output_iterator_;
@@ -80,6 +81,7 @@ class AggregationNode : public ExecNode {
   AggregationTuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
   FreeList string_buffer_free_list_;
   int num_string_slots_; // number of string slots in the output tuple
+  StringValue default_group_concat_delimiter_;
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 
@@ -101,17 +103,17 @@ class AggregationNode : public ExecNode {
   // Time spent returning the aggregated rows
   RuntimeProfile::Counter* get_results_timer_;
   // Num buckets in hash table
-  RuntimeProfile::Counter* hash_table_buckets_counter_;   
+  RuntimeProfile::Counter* hash_table_buckets_counter_;
   // Load factor in hash table
-  RuntimeProfile::Counter* hash_table_load_factor_counter_;   
+  RuntimeProfile::Counter* hash_table_load_factor_counter_;
 
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
   AggregationTuple* ConstructAggTuple();
 
-  // Allocates a string buffer that is at least the new_size.  The actual size of 
-  // the allocated buffer is returned in allocated_size.  
+  // Allocates a string buffer that is at least the new_size.  The actual size of
+  // the allocated buffer is returned in allocated_size.
   // The function first tries to allocate from the free list.  If there is nothing
   // there, it will allocate from the MemPool.
   char* AllocateStringBuffer(int new_size, int* allocated_size);
@@ -120,18 +122,22 @@ class AggregationNode : public ExecNode {
   // and will allocate a buffer for dst as necessary.
   //  AggregationTuple: Contains the tuple data and the string buffer lengths
   //  string_slot_idx: The i-th string slot in the aggregation tuple
-  //  dst: the target location to update the string.  This is part of the 
+  //  dst: the target location to update the string.  This is part of the
   //          AggregationTuple that's also passed in.
-  //  str: the value to update dst to.  
-  void UpdateStringSlot(AggregationTuple*, int string_slot_idx, StringValue* dst, 
-                           const StringValue* str);
+  //  src: the value to update dst to.
+  void UpdateStringSlot(AggregationTuple* agg_tuple, int string_slot_idx,
+                        StringValue* dst, const StringValue* src);
+
+  void ConcatStringSlot(AggregationTuple* agg_tuple,
+      const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
+      StringValue* dst, const StringValue* src, const StringValue* delimiter);
 
   // Helpers to compute Aggregate.MIN/Aggregate.MAX
-  void UpdateMinStringSlot(AggregationTuple*, const NullIndicatorOffset&, 
+  void UpdateMinStringSlot(AggregationTuple*, const NullIndicatorOffset&,
                            int slot_id, void* slot, void* value);
-  void UpdateMaxStringSlot(AggregationTuple*, const NullIndicatorOffset&, 
+  void UpdateMaxStringSlot(AggregationTuple*, const NullIndicatorOffset&,
                            int slot_id, void* slot, void* value);
-  
+
   // Updates the aggregation output tuple 'tuple' with aggregation values
   // computed over 'row'.
   void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
@@ -145,8 +151,8 @@ class AggregationNode : public ExecNode {
   void ProcessRowBatchWithGrouping(RowBatch* batch);
 
   // Codegen the process row batch loop.  The loop has already been compiled to
-  // IR and loaded into the codegen object.  UpdateAggTuple has also been 
-  // codegen'd to IR.  This function will modify the loop subsituting the 
+  // IR and loaded into the codegen object.  UpdateAggTuple has also been
+  // codegen'd to IR.  This function will modify the loop subsituting the
   // UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
   llvm::Function* CodegenProcessRowBatch(
       LlvmCodeGen* codegen, llvm::Function* update_tuple_fn);

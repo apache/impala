@@ -33,7 +33,8 @@ class TestQueryMemLimit(ImpalaTestSuite):
   """
   # There are a lot of 'unique' comments in lineitem.
   # Almost 80% of the table size.
-  QUERIES = ["select count(distinct l_comment) from lineitem"]
+  QUERIES = ["select count(distinct l_comment) from lineitem",
+             "select group_concat(l_linestatus) from lineitem"]
   # TODO: It will be nice if we can get how much memory a query uses
   # dynamically, even if it is a rough approximation.
   # A mem_limit is expressed in bytes, with values <= 0 signifying no cap.

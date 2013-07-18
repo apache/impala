@@ -64,7 +64,7 @@ class AggregationTuple {
   void Init(int size) {
     bzero(this, size);
   }
-    
+
   Tuple* tuple() { return reinterpret_cast<Tuple*>(this); }
 
   int32_t* BufferLengths(int tuple_size) {
@@ -88,6 +88,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     agg_tuple_desc_(NULL),
     singleton_output_tuple_(NULL),
     num_string_slots_(0),
+    default_group_concat_delimiter_(", "),
     codegen_process_row_batch_fn_(NULL),
     process_row_batch_fn_(NULL),
     needs_finalize_(tnode.agg_node.need_finalize),
@@ -105,13 +106,13 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   tuple_pool_.reset(new MemPool(state->mem_limits()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
-  hash_table_buckets_counter_ = 
+  hash_table_buckets_counter_ =
       ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
-  hash_table_load_factor_counter_ = 
+  hash_table_load_factor_counter_ =
       ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
 
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  
+
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
   RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc(), false));
   RETURN_IF_ERROR(Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc(), false));
@@ -119,7 +120,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   // Construct build exprs from agg_tuple_desc_
   for (int i = 0; i < probe_exprs_.size(); ++i) {
     SlotDescriptor* desc = agg_tuple_desc_->slots()[i];
-    Expr* expr = new SlotRef(desc);      
+    Expr* expr = new SlotRef(desc);
     state->obj_pool()->Add(expr);
     build_exprs_.push_back(expr);
   }
@@ -128,14 +129,14 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   // TODO: how many buckets?
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, true,
       id(), *state->mem_limits()));
-  
+
   // Determine the number of string slots in the output
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
        expr != aggregate_exprs_.end(); ++expr) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
     if (agg_expr->type() == TYPE_STRING) ++num_string_slots_;
   }
-  
+
   if (probe_exprs_.empty()) {
     // create single output tuple now; we need to output something
     // even if our input is empty
@@ -155,12 +156,12 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-      
+
   // Update to using codegen'd process row batch.
   if (codegen_process_row_batch_fn_ != NULL) {
-    void* jitted_process_row_batch = 
+    void* jitted_process_row_batch =
         state->llvm_codegen()->JitFunction(codegen_process_row_batch_fn_);
-    process_row_batch_fn_ = 
+    process_row_batch_fn_ =
         reinterpret_cast<ProcessRowBatchFn>(jitted_process_row_batch);
     AddRuntimeExecOption("Codegen Enabled");
   }
@@ -192,7 +193,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     }
     RETURN_IF_LIMIT_EXCEEDED(state);
     COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
-    COUNTER_SET(memory_used_counter(), 
+    COUNTER_SET(memory_used_counter(),
         tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
     COUNTER_SET(hash_table_load_factor_counter_, hash_tbl_->load_factor());
     num_agg_rows += (hash_tbl_->size() - agg_rows_before);
@@ -201,7 +202,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     batch.Reset();
     if (eos) break;
   }
-  
+
   if (singleton_output_tuple_ != NULL) {
     hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;
@@ -258,8 +259,8 @@ Status AggregationNode::Close(RuntimeState* state) {
 }
 
 AggregationTuple* AggregationNode::ConstructAggTuple() {
-  AggregationTuple* agg_out_tuple = 
-      AggregationTuple::Create(agg_tuple_desc_->byte_size(), 
+  AggregationTuple* agg_out_tuple =
+      AggregationTuple::Create(agg_tuple_desc_->byte_size(),
           num_string_slots_, tuple_pool_.get());
   Tuple* agg_tuple = agg_out_tuple->tuple();
 
@@ -301,13 +302,13 @@ AggregationTuple* AggregationNode::ConstructAggTuple() {
       }
       RawValue::Write(default_value_ptr, agg_tuple, *slot_desc, NULL);
     }
-    
+
     // All aggregate values except for COUNT start out with NULL
     // (so that SUM(<col>) stays NULL if <col> only contains NULL values).
     if ((*slot_desc)->is_nullable()) {
       DCHECK_NE(agg_expr->agg_op(), TAggregationOp::COUNT);
       agg_tuple->SetNull((*slot_desc)->null_indicator_offset());
-    } 
+    }
 
     // Keep track of how many string slots we have seen, in order to know the index of the
     // current slot in the array of string buffer lengths
@@ -348,11 +349,45 @@ inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple,
     string_buffer_free_list_.Add(reinterpret_cast<uint8_t*>(dst->ptr), curr_size);
     dst->ptr = AllocateStringBuffer(src->len, &(string_buffer_lengths[string_slot_idx]));
   }
-  strncpy(dst->ptr, src->ptr, src->len);
+  memcpy(dst->ptr, src->ptr, src->len);
   dst->len = src->len;
 }
 
-inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple, 
+inline void AggregationNode::ConcatStringSlot(AggregationTuple* agg_tuple,
+    const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
+    StringValue* dst, const StringValue* src, const StringValue* delimiter) {
+  DCHECK(delimiter != NULL);
+  Tuple* tuple = agg_tuple->tuple();
+  if (tuple->IsNull(null_indicator_offset)) {
+    // Base case: just copy src to dst.
+    tuple->SetNotNull(null_indicator_offset);
+    UpdateStringSlot(agg_tuple, string_slot_idx, dst, src);
+  } else {
+    int concat_len = dst->len + delimiter->len + src->len;
+
+    // Grow the dst string if necessary.
+    int32_t* string_buffer_lengths = agg_tuple->BufferLengths(
+        agg_tuple_desc_->byte_size());
+    int curr_size = string_buffer_lengths[string_slot_idx];
+    if (curr_size < concat_len) {
+      // At least double the size of the buffer, since the string constantly
+      // grows in size. This also provides a better set of freelist buffers
+      // for future group_concat agg tuples.
+      int new_size = max(curr_size * 2, concat_len);
+      char* concat_buffer = AllocateStringBuffer(new_size,
+          &(string_buffer_lengths[string_slot_idx]));
+      memcpy(concat_buffer, dst->ptr, dst->len);
+      string_buffer_free_list_.Add(reinterpret_cast<uint8_t*>(dst->ptr), curr_size);
+      dst->ptr = concat_buffer;
+    }
+
+    memcpy(dst->ptr + dst->len, delimiter->ptr, delimiter->len);
+    memcpy(dst->ptr + dst->len + delimiter->len, src->ptr, src->len);
+    dst->len = concat_len;
+  }
+}
+
+inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple,
     const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
     void* slot, void* value) {
   DCHECK(value != NULL);
@@ -368,7 +403,7 @@ inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple,
   UpdateStringSlot(agg_tuple, string_slot_idx, dst_value, src_value);
 }
 
-inline void AggregationNode::UpdateMaxStringSlot(AggregationTuple* agg_tuple, 
+inline void AggregationNode::UpdateMaxStringSlot(AggregationTuple* agg_tuple,
     const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
     void* slot, void* value) {
   DCHECK(value != NULL);
@@ -545,6 +580,21 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
         };
         break;
 
+      case TAggregationOp::GROUP_CONCAT: {
+        DCHECK_EQ(agg_expr->type(), TYPE_STRING);
+        StringValue* delimiter = NULL;
+        if (agg_expr->GetNumChildren() > 1) {
+          delimiter = reinterpret_cast<StringValue*>(
+              agg_expr->GetChild(1)->GetValue(row));
+        }
+        if (delimiter == NULL) delimiter = &default_group_concat_delimiter_;
+        StringValue* src = reinterpret_cast<StringValue*>(value);
+        StringValue* dst = reinterpret_cast<StringValue*>(slot);
+        ConcatStringSlot(agg_out_tuple, (*slot_desc)->null_indicator_offset(),
+            string_slot_idx, dst, src, delimiter);
+        break;
+      }
+
       case TAggregationOp::SUM:
         switch (agg_expr->type()) {
           case TYPE_BIGINT:
@@ -629,7 +679,7 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
 //    %src_value = call double @SlotRef(i8** %row, i8* null, i1* %src_null_ptr)
 //    %src_is_null = load i1* %src_null_ptr
 //    br i1 %src_is_null, label %ret, label %src_not_null
-//  
+//
 //  src_not_null:                                     ; preds = %entry
 //    %dst_slot_ptr = getelementptr inbounds { i8, double }* %agg_tuple, i32 0, i32 1
 //    call void @SetNotNull({ i8, double }* %agg_tuple)
@@ -637,7 +687,7 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
 //    %0 = fadd double %dst_val, %src_value
 //    store double %0, double* %dst_slot_ptr
 //    br label %ret
-//  
+//
 //  ret:                                    ; preds = %src_not_null, %entry
 //    ret void
 //  }
@@ -651,7 +701,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
   StructType* tuple_struct = agg_tuple_desc_->GenerateLlvmStruct(codegen);
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
   PointerType* ptr_type = codegen->ptr_type();
-  
+
   // Create UpdateSlot prototype
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr));
@@ -670,30 +720,30 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
   DCHECK_EQ(scratch_buffer_size, 0);
   DCHECK(agg_expr_fn != NULL);
   if (agg_expr_fn == NULL) return NULL;
-  
+
   BasicBlock* src_not_null_block, *ret_block;
   codegen->CreateIfElseBlocks(fn, "src_not_null", "ret", &src_not_null_block, &ret_block);
 
   Value* expr_args[] = { args[1], ConstantPointerNull::get(ptr_type), src_is_null_ptr };
   Value* src_value = agg_expr->CodegenGetValue(codegen, builder.GetInsertBlock(),
       expr_args, ret_block, src_not_null_block);
-  
+
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
   Value* dst_ptr = builder.CreateStructGEP(args[0], field_idx, "dst_slot_ptr");
   Value* result = NULL;
-    
+
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
     Function* clear_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_struct, false);
     builder.CreateCall(clear_null_fn, args[0]);
   }
-    
+
   // Update the slot
   Value* dst_value = builder.CreateLoad(dst_ptr, "dst_val");
   switch (agg_expr->agg_op()) {
     case TAggregationOp::COUNT:
-      result = builder.CreateAdd(dst_value, 
+      result = builder.CreateAdd(dst_value,
           codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
       break;
     case TAggregationOp::MIN: {
@@ -718,7 +768,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
     default:
       DCHECK(false) << "bad aggregate operator: " << agg_expr->agg_op();
   }
-    
+
   builder.CreateStore(result, dst_ptr);
   builder.CreateBr(ret_block);
 
@@ -735,10 +785,10 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
 // select count(*), count(int_col), sum(double_col) the IR looks like:
 //
 // define void @UpdateAggTuple(%"class.impala::AggregationNode"* %this_ptr,
-//                             %"class.impala::AggregationTuple"* %agg_tuple, 
+//                             %"class.impala::AggregationTuple"* %agg_tuple,
 //                             %"class.impala::TupleRow"* %tuple_row) {
 // entry:
-//   %tuple = bitcast %"class.impala::AggregationNode"* %agg_tuple to 
+//   %tuple = bitcast %"class.impala::AggregationNode"* %agg_tuple to
 //                                              { i8, i64, i64, double }*
 //   %row = bitcast %"class.impala::TupleRow"* %tuple_row to i8**
 //   %src_slot = getelementptr inbounds { i8, i64, i64, double }* %tuple, i32 0, i32 2
@@ -751,7 +801,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
 // }
 Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   SCOPED_TIMER(codegen->codegen_timer());
-  
+
   for (int i = 0; i < probe_exprs_.size(); ++i) {
     if (probe_exprs_[i]->codegen_fn() == NULL) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
@@ -768,7 +818,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
                  << "string and timestamp aggregation is not yet supported.";
       return NULL;
     }
-  } 
+  }
 
   for (int i = 0; i < aggregate_exprs_.size(); ++i) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
@@ -786,7 +836,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
       return NULL;
     }
   }
-  
+
   if (agg_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {
     VLOG_QUERY << "Could not codegen UpdateAggTuple because we could"
                << "not generate a  matching llvm struct for the result agg tuple.";
@@ -797,11 +847,11 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   Type* agg_node_type = codegen->GetType(AggregationNode::LLVM_CLASS_NAME);
   Type* agg_tuple_type = codegen->GetType(AggregationTuple::LLVM_CLASS_NAME);
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  
+
   DCHECK(agg_node_type != NULL);
   DCHECK(agg_tuple_type != NULL);
   DCHECK(tuple_row_type != NULL);
-  
+
   PointerType* agg_node_ptr_type = PointerType::get(agg_node_type, 0);
   PointerType* agg_tuple_ptr_type = PointerType::get(agg_tuple_type, 0);
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
@@ -861,12 +911,12 @@ Function* AggregationNode::CodegenProcessRowBatch(
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING :
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING);
   Function* process_batch_fn = codegen->GetFunction(ir_fn);
-  
+
   if (process_batch_fn == NULL) {
     LOG(ERROR) << "Could not find AggregationNode::ProcessRowBatch in module.";
     return NULL;
   }
-    
+
   int replaced = 0;
   if (singleton_output_tuple_ == NULL) {
     // Aggregation w/o grouping does not use a hash table.
@@ -874,11 +924,11 @@ Function* AggregationNode::CodegenProcessRowBatch(
     // Codegen for hash
     Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(codegen);
     if (hash_fn == NULL) return NULL;
-    
+
     // Codegen HashTable::Equals
     Function* equals_fn = hash_tbl_->CodegenEquals(codegen);
     if (equals_fn == NULL) return NULL;
-    
+
     // Codegen for evaluating build rows
     Function* eval_build_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, true);
     if (eval_build_row_fn == NULL) return NULL;
@@ -891,7 +941,7 @@ Function* AggregationNode::CodegenProcessRowBatch(
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         eval_build_row_fn, "EvalBuildRow", &replaced);
     DCHECK_EQ(replaced, 1);
-    
+
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         eval_probe_row_fn, "EvalProbeRow", &replaced);
     DCHECK_EQ(replaced, 1);
@@ -904,10 +954,10 @@ Function* AggregationNode::CodegenProcessRowBatch(
         equals_fn, "Equals", &replaced);
     DCHECK_EQ(replaced, 1);
   }
-  
-  process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false, 
-      update_tuple_fn, "UpdateAggTuple", &replaced); 
-  DCHECK_EQ(replaced, 1) << "One call site should be replaced."; 
+
+  process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
+      update_tuple_fn, "UpdateAggTuple", &replaced);
+  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
   DCHECK(process_batch_fn != NULL);
 
   return codegen->OptimizeFunctionWithExprs(process_batch_fn);

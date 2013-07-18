@@ -50,6 +50,7 @@ enum TAggregationOp {
   MERGE_PCSA,
   MIN,
   SUM,
+  GROUP_CONCAT,
 }
 
 struct TAggregateExpr {

@@ -842,6 +842,10 @@ public class ParserTest {
     ParserError("select distinctpc() from t");
     ParsesOk("select distinctpcsa(a), distinctpcsa(distinct a) from t");
     ParserError("select distinctpcsa() from t");
+    ParsesOk("select group_concat(a) from t");
+    ParsesOk("select group_concat(a, ', ') from t");
+    ParsesOk("select group_concat(a, ', ', c) from t");
+    ParserError("select group_concat() from t");
   }
 
   @Test
@@ -1622,8 +1626,8 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, " +
-        "IDENTIFIER\n");
+        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, " +
+        "TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -1648,8 +1652,8 @@ public class ParserTest {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -1657,8 +1661,8 @@ public class ParserTest {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",

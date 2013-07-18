@@ -31,7 +31,7 @@ namespace impala {
 // overlays the node data over the caller-provided memory.
 //
 // Since the free list does not allocate or acquire any allocations, it needs to have
-// the same lifetime as whereever the allocations came from (i.e MemPool).  If, for
+// the same lifetime as wherever the allocations came from (i.e MemPool).  If, for
 // example, the underlying MemPool is deallocated, if there are any blocks in the 
 // free list from that pool, the free list is corrupt.
 

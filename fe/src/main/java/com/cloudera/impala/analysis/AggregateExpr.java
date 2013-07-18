@@ -35,7 +35,8 @@ public class AggregateExpr extends Expr {
     DISTINCT_PCSA("DISTINCT_PCSA", TAggregationOp.DISTINCT_PCSA,true),
     MERGE_PCSA("MERGE_PCSA", TAggregationOp.MERGE_PCSA, true),
     SUM("SUM", TAggregationOp.SUM, false),
-    AVG("AVG", TAggregationOp.INVALID, false);
+    AVG("AVG", TAggregationOp.INVALID, false),
+    GROUP_CONCAT("GROUP_CONCAT", TAggregationOp.GROUP_CONCAT, false);
 
     private final String description;
     private final TAggregationOp thriftOp;
@@ -163,24 +164,54 @@ public class AggregateExpr extends Expr {
       return;
     }
 
-    // only COUNT can contain multiple exprs
+    if (op == Operator.GROUP_CONCAT) {
+      if (children.size() > 2 || children.isEmpty()) {
+        throw new AnalysisException(
+            op.toString() + " requires one or two parameters: " + this.toSql());
+      }
+
+      if (isDistinct) {
+        throw new AnalysisException(op.toString() + " does not support DISTINCT");
+      }
+
+      Expr arg0 = getChild(0);
+      if (!arg0.type.isStringType() && !arg0.type.isNull()) {
+        throw new AnalysisException(
+            op.toString() + " requires first parameter to be of type STRING: "
+            + this.toSql());
+      }
+
+      if (children.size() == 2) {
+        Expr arg1 = getChild(1);
+        if (!arg1.type.isStringType() && !arg1.type.isNull()) {
+          throw new AnalysisException(
+              op.toString() + " requires second parameter to be of type STRING: "
+              + this.toSql());
+        }
+      }
+
+      type = PrimitiveType.STRING;
+      return;
+    }
+
+    // only COUNT and GROUP_CONCAT can contain multiple exprs
     if (children.size() != 1) {
       throw new AnalysisException(
           op.toString() + " requires exactly one parameter: " + this.toSql());
     }
 
     // determine type
-    Expr arg = (Expr) getChild(0);
+    Expr arg = getChild(0);
 
     // SUM and AVG cannot be applied to non-numeric types
     if (op == Operator.SUM && !arg.type.isNumericType() && !arg.type.isNull()) {
         throw new AnalysisException(
-                      "SUM requires a numeric parameter: " + this.toSql());
+            "SUM requires a numeric parameter: " + this.toSql());
     }
     if (op == Operator.AVG && !arg.type.isNumericType()
         && arg.type != PrimitiveType.TIMESTAMP && !arg.type.isNull()) {
       throw new AnalysisException(
-                    "AVG requires a numeric or timestamp parameter: " + this.toSql());
+          "AVG requires a numeric or timestamp parameter: " + this.toSql());
     }
 
     if ((op == Operator.MERGE_PC || op == Operator.MERGE_PCSA)

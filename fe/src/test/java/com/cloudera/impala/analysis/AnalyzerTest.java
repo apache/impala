@@ -43,9 +43,10 @@ public class AnalyzerTest {
     typeToLiteralValue.put(PrimitiveType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
     typeToLiteralValue.put(PrimitiveType.FLOAT, "1.0");
     typeToLiteralValue.put(PrimitiveType.DOUBLE, (Float.MAX_VALUE + 1) + "");
-    typeToLiteralValue.put(PrimitiveType.DATE, "'2012-12-21'");
-    typeToLiteralValue.put(PrimitiveType.DATETIME, "'2012-12-21 00:00:00'");
-    typeToLiteralValue.put(PrimitiveType.TIMESTAMP, "'2012-12-21 00:00:00.000'");
+    typeToLiteralValue.put(PrimitiveType.TIMESTAMP,
+        "cast('2012-12-21 00:00:00.000' as timestamp)");
+    typeToLiteralValue.put(PrimitiveType.STRING, "'Hello, World!'");
+    typeToLiteralValue.put(PrimitiveType.NULL_TYPE, "NULL");
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
