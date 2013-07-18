@@ -44,19 +44,19 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
       ReaderContext::PerDiskState& state = disk_states_[i];
       ScanRange* range = NULL;
       while ((range = state.in_flight_ranges()->Dequeue()) != NULL) {
-        range->Cancel();
+        range->Cancel(status);
       }
       while ((range = state.unstarted_ranges()->Dequeue()) != NULL) {
-        range->Cancel();
+        range->Cancel(status);
       }
     }
 
     ScanRange* range = NULL;
     while ((range = ready_to_start_ranges_.Dequeue()) != NULL) {
-      range->Cancel();
+      range->Cancel(status);
     }
     while ((range = blocked_ranges_.Dequeue()) != NULL) {
-      range->Cancel();
+      range->Cancel(status);
     }
     
     // Schedule reader on all disks. The disks will notice it is cancelled and do any

@@ -86,7 +86,8 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   
     if (is_cancelled_) {
       DCHECK(ready_buffers_.empty());
-      return reader_->status_;
+      DCHECK(!status_.ok());
+      return status_;
     }
 
     // Remove the first ready buffer from the queue and return it
@@ -118,10 +119,10 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
   if (reader_->state_ == ReaderContext::Cancelled) {
     reader_->blocked_ranges_.Remove(this);
-    Cancel();
+    Cancel(reader_->status_);
     (*buffer)->Return();
     *buffer = NULL;
-    return reader_->status_;
+    return status_;
   }
 
   bool was_blocked = blocked_on_queue_;
@@ -135,7 +136,8 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   return Status::OK;
 }
 
-void DiskIoMgr::ScanRange::Cancel() {
+void DiskIoMgr::ScanRange::Cancel(const Status& status) {
+  DCHECK(!status.ok());
   {
     unique_lock<mutex> scan_range_lock(lock_);
     DCHECK(Validate()) << DebugString();
@@ -144,6 +146,7 @@ void DiskIoMgr::ScanRange::Cancel() {
       return;
     }
     is_cancelled_ = true;
+    status_ = status;
     CleanupQueuedBuffers();
   }
   buffer_ready_cv_.notify_all();

@@ -211,7 +211,9 @@ class DiskIoMgr {
 
     // Cancel this scan range. This cleans up all queued buffers and
     // wakes up any threads blocked on GetNext().
-    void Cancel();
+    // Status is the reason the range was cancelled. Must not be ok().
+    // Status is returned to the user in GetNext().
+    void Cancel(const Status& status);
 
     std::string DebugString() const;
 
@@ -286,6 +288,11 @@ class DiskIoMgr {
 
     // If true, this scan range has been cancelled.
     bool is_cancelled_;
+
+    // Status for this range. This is non-ok if is_cancelled_ is true.
+    // Note: an individual range can fail without the ReaderContext being
+    // cancelled. This allows us to skip individual ranges.
+    Status status_;
 
     // If true, the last buffer for this scan range has been queued.
     bool eosr_queued_;

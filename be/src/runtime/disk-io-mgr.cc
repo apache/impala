@@ -691,7 +691,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     DCHECK(reader->Validate()) << endl << reader->DebugString();
     ReturnFreeBuffer(reader, buffer->buffer_);
     buffer->buffer_ = NULL;
-    buffer->scan_range_->Cancel();
+    buffer->scan_range_->Cancel(reader->status_);
     // Enqueue the buffer to use the scan range's buffer cleanup path.
     buffer->scan_range_->EnqueueBuffer(buffer);
     return;
@@ -710,7 +710,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     buffer->buffer_ = NULL;
     buffer->eosr_ = true;
     --state.num_remaining_ranges();
-    buffer->scan_range_->Cancel();
+    buffer->scan_range_->Cancel(buffer->status_);
   } else if (buffer->eosr_) {
     buffer->scan_range_->CloseScanRange(reader->hdfs_connection_, reader);
     --state.num_remaining_ranges();

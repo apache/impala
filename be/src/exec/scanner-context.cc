@@ -85,7 +85,7 @@ void ScannerContext::Stream::ReturnAllBuffers() {
   current_buffer_bytes_left_ = 0;
 
   // Cancel the underlying scan range to clean up any queued buffers there
-  if (scan_range_ != NULL) scan_range_->Cancel();
+  if (scan_range_ != NULL) scan_range_->Cancel(Status::CANCELLED);
 }
 
 void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done) {
@@ -95,7 +95,7 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
     if (current_buffer_ != NULL) completed_buffers_.push_back(current_buffer_);
     current_buffer_ = NULL;
     // Cancel the underlying scan range to clean up any queued buffers there
-    scan_range_->Cancel();
+    scan_range_->Cancel(Status::CANCELLED);
   }
 
   for (list<DiskIoMgr::BufferDescriptor*>::iterator it = completed_buffers_.begin();
