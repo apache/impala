@@ -105,7 +105,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   JNIEnv* env = getJNIEnv();
@@ -131,7 +131,7 @@ void HBaseScanNode::WriteTextSlot(
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
   // but there's still some considerable time inside here.
@@ -255,7 +255,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (memory_used_counter() != NULL) {
     COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());

@@ -153,7 +153,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
       
   // Update to using codegen'd process row batch.
@@ -213,7 +213,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(get_results_timer_);
@@ -247,7 +247,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   if (memory_used_counter() != NULL && hash_tbl_.get() != NULL &&
       hash_table_buckets_counter_ != NULL) {
     COUNTER_SET(memory_used_counter(),

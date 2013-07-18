@@ -136,7 +136,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status HashJoinNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   // Must reset probe_batch_ in Close() to release resources
   probe_batch_.reset(NULL);
   if (memory_used_counter_ != NULL && hash_tbl_.get() != NULL) {
@@ -188,7 +188,7 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
 }
 
 Status HashJoinNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_CANCELLED(state);
 
@@ -264,7 +264,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {

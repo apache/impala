@@ -87,7 +87,7 @@ HdfsScanNode::~HdfsScanNode() {
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
@@ -465,7 +465,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 // the initial splits.  Scanners are expected to queue up a non-zero number of
 // those splits to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
 
   if (per_file_splits_.empty()) {
     done_ = true;
@@ -558,7 +558,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsScanNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   {
     unique_lock<mutex> l(row_batches_lock_);
     done_ = true;

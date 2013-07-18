@@ -201,7 +201,7 @@ class ExecNode {
 
   // Executes debug_action_ if phase matches debug_phase_.
   // 'phase' must not be INVALID.
-  Status ExecDebugAction(TExecNodePhase::type phase);
+  Status ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state);
 
   // Appends option to 'runtime_exec_options_'
   void AddRuntimeExecOption(const std::string& option);
