@@ -42,7 +42,7 @@ const i64 DEFAULT_PARTITION_ID = -1;
 // Query options that correspond to ImpalaService.ImpalaQueryOptions,
 // with their respective defaults
 struct TQueryOptions {
-  1: optional bool abort_on_error = 1
+  1: optional bool abort_on_error = 0
   2: optional i32 max_errors = 0
   3: optional bool disable_codegen = 0
   4: optional i32 batch_size = 0
