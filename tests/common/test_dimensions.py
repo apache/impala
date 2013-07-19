@@ -104,6 +104,7 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
   execution time.
   """
   exec_option_dimensions = {
+      'abort_on_error': [1],
       'batch_size': batch_sizes,
       'disable_codegen': disable_codegen_options,
       'num_nodes': cluster_sizes}
