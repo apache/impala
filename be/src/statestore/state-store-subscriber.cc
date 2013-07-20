@@ -56,8 +56,8 @@ class StateStoreSubscriberThriftIf : public StateStoreSubscriberIf {
       : subscriber_(subscriber) { DCHECK(subscriber != NULL); }
   virtual void UpdateState(TUpdateStateResponse& response,
                            const TUpdateStateRequest& params) {
-    subscriber_->UpdateState(params.topic_deltas, &response.topic_updates);
-    Status::OK.ToThrift(&response.status);
+    subscriber_->UpdateState(
+        params.topic_deltas, &response.topic_updates).ToThrift(&response.status);
   }
 
  private:
@@ -199,7 +199,7 @@ void StateStoreSubscriber::RecoveryModeChecker() {
   }
 }
 
-void StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
+Status StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
     vector<TTopicUpdate>* topic_updates) {
   failure_detector_->UpdateHeartbeat(STATE_STORE_ID, true);
 
@@ -223,8 +223,12 @@ void StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
     }
     sw.Stop();
     heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    return Status::OK;
   } else {
     VLOG(1) << "In recovery mode, ignoring update.";
+    stringstream ss;
+    ss << "Subscriber '" << subscriber_id_ << "' is recovering";
+    return Status(ss.str());
   }
 }
 

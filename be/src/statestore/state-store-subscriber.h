@@ -192,7 +192,8 @@ class StateStoreSubscriber {
   // and any updates are aggregated in topic_updates.
   // If the subscriber is in recovery mode, this method returns
   // immediately.
-  void UpdateState(const TopicDeltaMap& topic_deltas,
+  // Returns OK if not in recovery mode, and an error otherwise.
+  Status UpdateState(const TopicDeltaMap& topic_deltas,
       std::vector<TTopicUpdate>* topic_updates);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
