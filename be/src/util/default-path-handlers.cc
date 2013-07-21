@@ -22,7 +22,7 @@
 #include <google/malloc_extension.h>
 
 #include "common/logging.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/logging.h"
 #include "util/pprof-path-handlers.cc"
@@ -97,25 +97,20 @@ void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
 }
 
 // Registered to handle "/memz", and prints out memory allocation statistics.
-void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args, 
+void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args,
     stringstream* output) {
   bool as_text = (args.find("raw") != args.end());
   Tags tags(as_text);
 
-  if (mem_limit != NULL) {
-    (*output) << tags.pre_tag
-              << "Mem Limit: " 
-              << PrettyPrinter::Print(mem_limit->limit(), TCounterType::BYTES) 
-              << endl
-              << "Mem Consumption: " 
-              << PrettyPrinter::Print(mem_limit->consumption(), TCounterType::BYTES) 
-              << endl
-              << tags.end_pre_tag;
-  } else {
-    (*output) << tags.pre_tag
-              << "No process memory limit set."
-              << tags.end_pre_tag;
-  }
+  DCHECK(mem_tracker != NULL);
+  (*output) << tags.pre_tag
+            << "Mem Limit: "
+            << PrettyPrinter::Print(mem_tracker->limit(), TCounterType::BYTES)
+            << endl
+            << "Mem Consumption: "
+            << PrettyPrinter::Print(mem_tracker->consumption(), TCounterType::BYTES)
+            << endl
+            << tags.end_pre_tag;
 
   (*output) << tags.pre_tag;
 #ifdef ADDRESS_SANITIZER
@@ -130,11 +125,13 @@ void MemUsageHandler(MemLimit* mem_limit, const Webserver::ArgumentMap& args,
 #endif
 }
 
-void impala::AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit) {
+void impala::AddDefaultPathHandlers(
+    Webserver* webserver, MemTracker* process_mem_tracker) {
   webserver->RegisterPathHandler("/logs", LogsHandler);
   webserver->RegisterPathHandler("/varz", FlagsHandler);
+  DCHECK(process_mem_tracker != NULL);
   webserver->RegisterPathHandler("/memz",
-      bind<void>(&MemUsageHandler, process_mem_limit, _1, _2));
+      bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
 
 #ifndef ADDRESS_SANITIZER
   // Remote (on-demand) profiling is disabled if the process is already being profiled.

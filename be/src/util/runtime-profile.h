@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include "common/atomic.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "util/thread.h"
@@ -85,18 +86,18 @@ class RuntimeProfile {
     }
     virtual ~Counter(){}
 
-    void Update(int64_t delta) {
-      __sync_fetch_and_add(&value_, delta);
+    virtual void Update(int64_t delta) {
+      value_ += delta;
     }
 
     // Use this to update if the counter is a bitmap
     void BitOr(int64_t delta) {
-      __sync_fetch_and_or(&value_, delta);
+      value_ |= delta;
     }
 
-    void Set(int64_t value) { value_ = value; }
+    virtual void Set(int64_t value) { value_ = value; }
 
-    void Set(double value) {
+    virtual void Set(double value) {
       value_ = *reinterpret_cast<int64_t*>(&value);
     }
 
@@ -108,11 +109,35 @@ class RuntimeProfile {
 
     TCounterType::type type() const { return type_; }
 
-   private:
+   protected:
     friend class RuntimeProfile;
 
-    int64_t value_;
+    AtomicInt<int64_t> value_;
     TCounterType::type type_;
+  };
+
+  // A counter that keeps track of the highest value seen (reporting that
+  // as value()) and the current value.
+  class HighWaterMarkCounter : public Counter {
+   public:
+    HighWaterMarkCounter(TCounterType::type type) : Counter(type) {}
+
+    virtual void Update(int64_t delta) {
+      int64_t new_val = current_value_.UpdateAndFetch(delta);
+      value_.UpdateMax(new_val);
+    }
+
+    virtual void Set(int64_t v) {
+      current_value_ = v;
+      value_.UpdateMax(v);
+    }
+
+    int64_t current_value() const { return current_value_; }
+
+   private:
+    // The current value of the counter. value_ in the super class represents
+    // the high water mark.
+    AtomicInt<int64_t> current_value_;
   };
 
   typedef boost::function<int64_t ()> DerivedCounterFunction;
@@ -283,6 +308,11 @@ class RuntimeProfile {
   // If the counter already exists, the existing counter object is returned.
   Counter* AddCounter(const std::string& name, TCounterType::type type,
       const std::string& parent_counter_name = "");
+
+  // Adds a high water mark counter to the runtime profile. Otherwise, same behavior
+  // as AddCounter()
+  HighWaterMarkCounter* AddHighWaterMarkCounter(const std::string& name,
+      TCounterType::type type, const std::string& parent_counter_name = "");
 
   // Add a derived counter with 'name'/'type'. The counter is owned by the
   // RuntimeProfile object.

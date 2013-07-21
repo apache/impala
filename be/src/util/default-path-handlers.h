@@ -19,12 +19,12 @@
 
 namespace impala {
 
-class MemLimit;
+class MemTracker;
 class Webserver;
 
 // Adds a set of default path handlers to the webserver to display
 // logs and configuration flags
-void AddDefaultPathHandlers(Webserver* webserver, MemLimit* process_mem_limit = NULL);
+void AddDefaultPathHandlers(Webserver* webserver, MemTracker* process_mem_tracker = NULL);
 }
 
 #endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

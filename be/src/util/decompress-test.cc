@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <gtest/gtest.h>
+#include "runtime/mem-tracker.h"
 #include "util/decompress.h"
 #include "util/compress.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -26,9 +27,9 @@ using namespace boost;
 namespace impala {
 
 // Fixture for testing class Decompressor
-class DecompressorTest : public ::testing::Test{
+class DecompressorTest : public ::testing::Test {
  protected:
-  DecompressorTest() : mem_pool_(NULL) {
+  DecompressorTest() : mem_pool_(&mem_tracker_) {
     uint8_t* ip = input_;
     for (int i = 0; i < 1024; i++) {
       for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
@@ -38,6 +39,10 @@ class DecompressorTest : public ::testing::Test{
         *ip++ = ch;
       }
     }
+  }
+
+  ~DecompressorTest() {
+    mem_pool_.FreeAll();
   }
 
   void RunTest(THdfsCompression::type format) {
@@ -56,6 +61,9 @@ class DecompressorTest : public ::testing::Test{
       // bzip does not allow NULL input
       CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
     }
+
+    compressor->Close();
+    decompressor->Close();
   }
 
   void CompressAndDecompress(Codec* compressor, Codec* decompressor,
@@ -99,6 +107,7 @@ class DecompressorTest : public ::testing::Test{
   }
 
   uint8_t input_[2 * 26 * 1024];
+  MemTracker mem_tracker_;
   MemPool mem_pool_;
 };
 

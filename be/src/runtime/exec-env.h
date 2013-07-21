@@ -35,7 +35,7 @@ class StateStoreSubscriber;
 class TestExecEnv;
 class Webserver;
 class Metrics;
-class MemLimit;
+class MemTracker;
 class ThreadResourceMgr;
 
 // Execution environment for queries/plan fragments.
@@ -65,7 +65,7 @@ class ExecEnv {
   DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   Metrics* metrics() { return metrics_.get(); }
-  MemLimit* mem_limit() { return mem_limit_.get(); }
+  MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
@@ -87,7 +87,7 @@ class ExecEnv {
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<Metrics> metrics_;
-  boost::scoped_ptr<MemLimit> mem_limit_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
 
   bool enable_webserver_;

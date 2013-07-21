@@ -32,7 +32,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/row-batch.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/container-util.h"
@@ -50,8 +50,6 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 
 namespace impala {
-
-const string PlanFragmentExecutor::PEAK_MEMORY_USAGE = "PeakMemoryUsage";
 
 PlanFragmentExecutor::PlanFragmentExecutor(
     ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
@@ -88,19 +86,25 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       new RuntimeState(params.fragment_instance_id, request.query_options,
         request.query_globals.now_string, user, exec_env_));
 
-  if (exec_env_->mem_limit() != NULL) {
-    // we have a global limit
-    runtime_state_->mem_limits()->push_back(exec_env_->mem_limit());
-  }
+  // Reserve one main thread from the pool
+  runtime_state_->resource_pool()->AcquireThreadToken();
+  has_thread_token_ = true;
 
-  // Set mem_limit_ to per query limit, or to unlimited if per query limit is not set.
-  // mem_limit_ also tracks peak mem usage of this node.
+  average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
+      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
+          runtime_state_->resource_pool()));
+
+  // Set up three-level hierarchy of mem trackers: process, query, fragment instance.
+  // The instance tracker is tied to our profile.
   bool has_query_mem_limit = request.query_options.__isset.mem_limit &&
       request.query_options.mem_limit > 0;
-  int64_t bytes_limit = has_query_mem_limit ?
-      request.query_options.mem_limit : numeric_limits<int64_t>::max();
-  mem_limit_ = MemLimit::GetMemLimit(query_id_, bytes_limit);
-  runtime_state_->SetQueryMemLimit(mem_limit_.get());
+  int64_t bytes_limit = has_query_mem_limit ? request.query_options.mem_limit : -1;
+  query_mem_tracker_ =
+      MemTracker::GetQueryMemTracker(
+        query_id_, bytes_limit, exec_env_->process_mem_tracker());
+  mem_tracker_.reset(
+      new MemTracker(profile(), -1, profile()->name(), query_mem_tracker_.get()));
+  runtime_state_->SetInstanceMemTracker(mem_tracker_.get());
   if (has_query_mem_limit) {
     if (bytes_limit > MemInfo::physical_mem()) {
       LOG(WARNING) << "Memory limit "
@@ -121,7 +125,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
           runtime_state_->resource_pool()));
   mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
       TCounterType::BYTES,
-      bind<int64_t>(mem_fn(&MemLimit::consumption), mem_limit_.get()));
+      bind<int64_t>(mem_fn(&MemTracker::consumption), mem_tracker_.get()));
   thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
       TCounterType::UNIT,
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
@@ -191,10 +195,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set up profile counters
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
-  peak_mem_usage_ = ADD_COUNTER(profile(), PEAK_MEMORY_USAGE, TCounterType::BYTES);
 
-  row_batch_.reset(new RowBatch(
-      plan_->row_desc(), runtime_state_->batch_size(), *runtime_state_->mem_limits()));
+  row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
+        mem_tracker_.get()));
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;
@@ -245,7 +248,7 @@ Status PlanFragmentExecutor::Open() {
   }
 
   Status status = OpenInternal();
-  if (!status.ok() && !status.IsCancelled() && runtime_state_->LogHasSpace()) {
+  if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
     // Log error message in addition to returning in Status. Queries that do not
     // fetch results (e.g. insert) may not receive the message directly and can
     // only retrieve the log.
@@ -352,10 +355,6 @@ void PlanFragmentExecutor::ReportProfile() {
 }
 
 void PlanFragmentExecutor::SendReport(bool done) {
-  if (mem_limit_.get() != NULL && peak_mem_usage_ != NULL) {
-    peak_mem_usage_->Set(mem_limit_->peak_consumption());
-  }
-
   if (report_status_cb_.empty()) return;
 
   Status status;
@@ -457,7 +456,7 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
 
 void PlanFragmentExecutor::Close() {
   if (closed_) return;
-  row_batch_.reset(NULL);
+  row_batch_.reset();
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
     plan_->Close(runtime_state_.get());

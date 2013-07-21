@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "runtime/mem-pool.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 #include "util/impalad-metrics.h"
 
 #include <algorithm>
@@ -28,7 +28,7 @@ const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 
-MemPool::MemPool(const vector<MemLimit*>* limits, int chunk_size)
+MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     // round up chunk size to nearest 8 bytes
@@ -37,10 +37,10 @@ MemPool::MemPool(const vector<MemLimit*>* limits, int chunk_size)
       : ((chunk_size + 7) / 8) * 8),
     total_allocated_bytes_(0),
     peak_allocated_bytes_(0),
-    exceeded_limit_(false) {
+    total_reserved_bytes_(0),
+    mem_tracker_(mem_tracker) {
   DCHECK_GE(chunk_size_, 0);
-
-  if (limits != NULL) limits_ = *limits;
+  DCHECK(mem_tracker != NULL);
 }
 
 MemPool::ChunkInfo::ChunkInfo(int size)
@@ -61,7 +61,27 @@ MemPool::~MemPool() {
     total_bytes_released += chunks_[i].size;
     delete [] chunks_[i].data;
   }
-  MemLimit::UpdateLimits(-1 * total_bytes_released, &limits_);
+
+  DCHECK(chunks_.empty()) << "Must call FreeAll() or AcquireData() for this pool";
+  if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-total_bytes_released);
+  }
+}
+
+void MemPool::FreeAll() {
+  int64_t total_bytes_released = 0;
+  for (size_t i = 0; i < chunks_.size(); ++i) {
+    if (!chunks_[i].owns_data) continue;
+    total_bytes_released += chunks_[i].size;
+    delete [] chunks_[i].data;
+  }
+  chunks_.clear();
+  current_chunk_idx_ = -1;
+  last_offset_conversion_chunk_idx_ = -1;
+  total_allocated_bytes_ = 0;
+  total_reserved_bytes_ = 0;
+
+  mem_tracker_->Release(total_bytes_released);
   if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
     ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-total_bytes_released);
   }
@@ -108,10 +128,10 @@ void MemPool::FindChunk(int min_size) {
       vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_;
       chunks_.insert(insert_chunk, ChunkInfo(chunk_size));
     }
+    total_reserved_bytes_ += chunk_size;
 
     // update and check limits
-    MemLimit::UpdateLimits(chunk_size, &limits_);
-    exceeded_limit_ = MemLimit::LimitExceeded(limits_);
+    mem_tracker_->Consume(chunk_size);
   }
 
   if (current_chunk_idx_ > 0) {
@@ -136,15 +156,21 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     num_acquired_chunks = src->current_chunk_idx_ + 1;
   }
 
-  if (num_acquired_chunks <= 0) return;
+  if (num_acquired_chunks <= 0) {
+    if (!keep_current) src->FreeAll();
+    return;
+  }
 
   vector<ChunkInfo>::iterator end_chunk = src->chunks_.begin() + num_acquired_chunks;
   int64_t total_transfered_bytes = 0;
   for (vector<ChunkInfo>::iterator i = src->chunks_.begin(); i != end_chunk; ++i) {
     total_transfered_bytes += i->size;
   }
-  MemLimit::UpdateLimits(-1 * total_transfered_bytes, &src->limits_);
-  MemLimit::UpdateLimits(total_transfered_bytes, &limits_);
+  src->total_reserved_bytes_ -= total_transfered_bytes;
+  total_reserved_bytes_ += total_transfered_bytes;
+
+  src->mem_tracker_->Release(total_transfered_bytes);
+  mem_tracker_->Consume(total_transfered_bytes);
 
   // insert new chunks after current_chunk_idx_
   vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_ + 1;
@@ -176,6 +202,7 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     cumulative_bytes += chunks_[i].allocated_bytes;
   }
 
+  if (!keep_current) src->FreeAll();
   DCHECK(CheckIntegrity(false));
 }
 

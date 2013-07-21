@@ -22,20 +22,21 @@
 #include <string>
 
 #include "common/logging.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
-class MemLimit;
+class MemTracker;
 
 // A MemPool maintains a list of memory chunks from which it allocates memory in
 // response to Allocate() calls;
 // Chunks stay around for the lifetime of the mempool or until they are passed on to
 // another mempool.
 //
-// The caller can register a set of MemLimits with the pool, in which case chunk
-// allocations are counted against those limits. If chunks get moved between pools
-// during AcquireData() calls, the respective MemLimits are updated accordingly.
-// Chunks freed up in the d'tor are subtracted from the registered limits.
+// The caller registers a MemTracker with the pool; chunk allocations are counted
+// against that tracker and all of its ancestors. If chunks get moved between pools
+// during AcquireData() calls, the respective MemTrackers are updated accordingly.
+// Chunks freed up in the d'tor are subtracted from the registered trackers.
 //
 // An Allocate() call will attempt to allocate memory from the chunk that was most
 // recently added; if that chunk doesn't have enough memory to
@@ -68,8 +69,8 @@ class MemLimit;
 //      MemPool* p2 = new MemPool();
 // the new mempool receives all chunks containing data from p
 //      p2->AcquireData(p, false);
-// At this point p.total_allocated_bytes_ would be 0 while p.peak_allocated_bytes_ 
-// remains unchanged. 
+// At this point p.total_allocated_bytes_ would be 0 while p.peak_allocated_bytes_
+// remains unchanged.
 // The one remaining (empty) chunk is released:
 //    delete p;
 
@@ -78,10 +79,8 @@ class MemPool {
   // Allocates mempool with fixed-size chunks of size 'chunk_size'.
   // Chunk_size must be >= 0; 0 requests automatic doubling of chunk sizes,
   // up to a limit.
-  // 'limits' are the memlimits for this pool.  NULL can be passed if
-  // the mempool should not update limits or if the limits can only
-  // be set later.
-  MemPool(const std::vector<MemLimit*>* limits, int chunk_size = 0);
+  // 'tracker' tracks the amount of memory allocated by this pool. Must not be NULL.
+  MemPool(MemTracker* mem_tracker, int chunk_size = 0);
 
   // Frees all chunks of memory and subtracts the total allocated bytes
   // from the registered limits.
@@ -135,6 +134,10 @@ class MemPool {
     DCHECK(CheckIntegrity(false));
   }
 
+  // Deletes all allocated chunks. FreeAll() or AcquireData() must be called for
+  // each mem pool
+  void FreeAll();
+
   // Absorb all chunks that hold data from src. If keep_current is true, let src hold on
   // to its last allocated chunk that contains data.
   // All offsets handed out by calls to GetOffset()/GetCurrentOffset() for 'src'
@@ -152,8 +155,8 @@ class MemPool {
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
   int64_t peak_allocated_bytes() const { return peak_allocated_bytes_; }
-  const std::vector<MemLimit*>& limits() { return limits_; }
-  bool exceeded_limit() const { return exceeded_limit_; }
+  int64_t total_reserved_bytes() const { return total_reserved_bytes_; }
+  MemTracker* mem_tracker() { return mem_tracker_; }
 
   // Return sum of chunk_sizes_.
   int64_t GetTotalChunkSizes() const;
@@ -176,7 +179,7 @@ class MemPool {
 
   // Print allocated bytes from all chunks.
   std::string DebugPrint();
-  
+
   // TODO: make a macro for doing this
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
@@ -227,13 +230,14 @@ class MemPool {
   // Maximum number of bytes allocated from this pool at one time.
   int64_t peak_allocated_bytes_;
 
+  // sum of all bytes allocated in chunks_
+  int64_t total_reserved_bytes_;
+
   std::vector<ChunkInfo> chunks_;
 
-  std::vector<MemLimit*> limits_;
-
-  // true if one of the registered limits was exceeded during an Allocate()
-  // call
-  bool exceeded_limit_;
+  // The current and peak memory footprint of this pool. This is different from
+  // total allocated_bytes_ since it includes bytes in chunks that are not used.
+  MemTracker* mem_tracker_;
 
   // Find or allocated a chunk with at least min_size spare capacity and update
   // current_chunk_idx_. Also updates chunks_, chunk_sizes_ and allocated_bytes_

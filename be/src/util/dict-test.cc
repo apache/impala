@@ -19,9 +19,10 @@
 #include <boost/foreach.hpp>
 #include <gtest/gtest.h>
 
-#include "util/dict-encoding.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
+#include "util/dict-encoding.h"
 
 using namespace std;
 
@@ -31,7 +32,9 @@ template<typename T>
 void ValidateDict(const vector<T>& values) {
   set<T> values_set(values.begin(), values.end());
 
-  DictEncoder<T> encoder(/* mem limits */ NULL);
+  MemTracker tracker;
+  MemPool pool(&tracker);
+  DictEncoder<T> encoder(&pool);
   BOOST_FOREACH(T i, values) {
     encoder.Put(i);
   }
@@ -52,6 +55,7 @@ void ValidateDict(const vector<T>& values) {
     decoder.GetValue(&j);
     EXPECT_EQ(i, j);
   }
+  pool.FreeAll();
 }
 
 TEST(DictTest, TestStrings) {

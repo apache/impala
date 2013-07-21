@@ -26,7 +26,7 @@ using namespace boost;
 using namespace boost::assign;
 using namespace impala;
 
-const char* const Codec::DEFAULT_COMPRESSION = 
+const char* const Codec::DEFAULT_COMPRESSION =
     "org.apache.hadoop.io.compress.DefaultCodec";
 
 const char* const Codec::GZIP_COMPRESSION =
@@ -182,9 +182,17 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
 
 Codec::Codec(MemPool* mem_pool, bool reuse_buffer)
   : memory_pool_(mem_pool),
-    temp_memory_pool_(mem_pool != NULL ? &mem_pool->limits() : NULL),
     reuse_buffer_(reuse_buffer),
     out_buffer_(NULL),
     buffer_length_(0) {
+  if (memory_pool_ != NULL) {
+    temp_memory_pool_.reset(new MemPool(memory_pool_->mem_tracker()));
+  }
 }
 
+void Codec::Close() {
+  if (temp_memory_pool_.get() != NULL) {
+    DCHECK(memory_pool_ != NULL);
+    memory_pool_->AcquireData(temp_memory_pool_.get(), false);
+  }
+}

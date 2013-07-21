@@ -63,6 +63,12 @@ Status ExchangeNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
+Status ExchangeNode::Close(RuntimeState* state) {
+  input_batch_.reset();
+  if (stream_recvr_ != NULL) stream_recvr_->Close();
+  return ExecNode::Close(state);
+}
+
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());

@@ -123,6 +123,9 @@ class Codec {
   // don't support this should return -1.
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL) = 0;
 
+  // Must be called on codec before destructor for final cleanup.
+  virtual void Close();
+
   // Largest block we will compress/decompress: 2GB.
   // We are dealing with compressed blocks that are never this big but we
   // want to guard against a corrupt file that has the block length as some
@@ -145,7 +148,7 @@ class Codec {
 
   // Temporary memory pool: in case we get the output size too small we can
   // use this to free unused buffers.
-  MemPool temp_memory_pool_;
+  boost::scoped_ptr<MemPool> temp_memory_pool_;
 
   // Can we reuse the output buffer or do we need to allocate on each call?
   bool reuse_buffer_;

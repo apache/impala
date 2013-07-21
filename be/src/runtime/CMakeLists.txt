@@ -33,7 +33,7 @@ add_library(Runtime STATIC
   hbase-table.cc
   hbase-table-factory.cc
   hdfs-fs-cache.cc
-  mem-limit.cc
+  mem-tracker.cc
   mem-pool.cc
   parallel-executor.cc
   plan-fragment-executor.cc
@@ -63,3 +63,4 @@ ADD_BE_TEST(parallel-executor-test)
 ADD_BE_TEST(raw-value-test)
 ADD_BE_TEST(string-value-test)
 ADD_BE_TEST(thread-resource-mgr-test)
+ADD_BE_TEST(mem-tracker-test)

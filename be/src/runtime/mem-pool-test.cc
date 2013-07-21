@@ -16,80 +16,105 @@
 #include <gtest/gtest.h>
 
 #include "runtime/mem-pool.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 
 using namespace std;
 
 namespace impala {
 
 TEST(MemPoolTest, Basic) {
-  MemPool p(NULL);
-  // allocate a total of 24K in 32-byte pieces (for which we only request 25 bytes)
-  for (int i = 0; i < 768; ++i) {
-    // pads to 32 bytes
-    p.Allocate(25);
+  MemTracker tracker;
+  MemPool p(&tracker);
+  MemPool p2(&tracker);
+  MemPool p3(&tracker);
+
+  for (int iter = 0; iter < 2; ++iter) {
+    // allocate a total of 24K in 32-byte pieces (for which we only request 25 bytes)
+    for (int i = 0; i < 768; ++i) {
+      // pads to 32 bytes
+      p.Allocate(25);
+    }
+    // we handed back 24K
+    EXPECT_EQ(p.total_allocated_bytes(), 24 * 1024);
+    // .. and allocated 28K of chunks (4, 8, 16)
+    EXPECT_EQ(p.GetTotalChunkSizes(), 28 * 1024);
+
+    // we're passing on the first two chunks, containing 12K of data; we're left with
+    // one chunk of 16K containing 12K of data
+    p2.AcquireData(&p, true);
+    EXPECT_EQ(p.total_allocated_bytes(), 12 * 1024);
+    EXPECT_EQ(p.GetTotalChunkSizes(), 16 * 1024);
+
+    // we allocate 8K, for which there isn't enough room in the current chunk,
+    // so another one is allocated (32K)
+    p.Allocate(8 * 1024);
+    EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32) * 1024);
+
+    // we allocate 65K, which doesn't fit into the current chunk or the default
+    // size of the next allocated chunk (64K)
+    p.Allocate(65 * 1024);
+    EXPECT_EQ(p.total_allocated_bytes(), (12 + 8 + 65) * 1024);
+    if (iter == 0) {
+      EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
+    } else {
+      EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
+    }
+    EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
+
+    // Clear() resets allocated data, but doesn't remove any chunks
+    p.Clear();
+    EXPECT_EQ(p.total_allocated_bytes(), 0);
+    if (iter == 0) {
+      EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
+    } else {
+      EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
+    }
+    EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
+
+    // next allocation reuses existing chunks
+    p.Allocate(1024);
+    EXPECT_EQ(p.total_allocated_bytes(), 1024);
+    if (iter == 0) {
+      EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
+    } else {
+      EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
+    }
+    EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
+
+    // ... unless it doesn't fit into any available chunk
+    p.Allocate(120 * 1024);
+    EXPECT_EQ(p.total_allocated_bytes(), (1 + 120) * 1024);
+    if (iter == 0) {
+      EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120) * 1024);
+    } else {
+      EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
+    }
+    EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
+
+    // ... Try another chunk that fits into an existing chunk
+    p.Allocate(33 * 1024);
+    EXPECT_EQ(p.total_allocated_bytes(), (1 + 120 + 33) * 1024);
+    EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
+
+    // we're releasing 3 chunks, which get added to p2
+    p2.AcquireData(&p, false);
+    EXPECT_EQ(p.total_allocated_bytes(), 0);
+    EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
+    EXPECT_EQ(p.GetTotalChunkSizes(), 0);
+
+    p3.AcquireData(&p2, true);  // we're keeping the 65k chunk
+    EXPECT_EQ(p2.total_allocated_bytes(), 33 * 1024);
+    EXPECT_EQ(p2.GetTotalChunkSizes(), 65 * 1024);
+
+    p.FreeAll();
+    p2.FreeAll();
+    p3.FreeAll();
   }
-  // we handed back 24K
-  EXPECT_EQ(p.total_allocated_bytes(), 24 * 1024);
-  // .. and allocated 28K of chunks (4, 8, 16)
-  EXPECT_EQ(p.GetTotalChunkSizes(), 28 * 1024);
-
-  MemPool p2(NULL);
-  // we're passing on the first two chunks, containing 12K of data; we're left with one
-  // chunk of 16K containing 12K of data
-  p2.AcquireData(&p, true);
-  EXPECT_EQ(p.total_allocated_bytes(), 12 * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), 16 * 1024);
-
-  // we allocate 8K, for which there isn't enough room in the current chunk,
-  // so another one is allocated (32K)
-  p.Allocate(8 * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32) * 1024);
-
-  // we allocate 65K, which doesn't fit into the current chunk or the default
-  // size of the next allocated chunk (64K)
-  p.Allocate(65 * 1024);
-  EXPECT_EQ(p.total_allocated_bytes(), (12 + 8 + 65) * 1024);
-  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
-
-  // Clear() resets allocated data, but doesn't remove any chunks
-  p.Clear();
-  EXPECT_EQ(p.total_allocated_bytes(), 0);
-  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
-
-  // next allocation reuses existing chunks
-  p.Allocate(1024);
-  EXPECT_EQ(p.total_allocated_bytes(), 1024);
-  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
-
-  // ... unless it doesn't fit into any available chunk
-  p.Allocate(120 * 1024);
-  EXPECT_EQ(p.total_allocated_bytes(), (1 + 120) * 1024);
-  EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
-
-  // ... Try another chunk that fits into an existing chunk
-  p.Allocate(33 * 1024);
-  EXPECT_EQ(p.total_allocated_bytes(), (1 + 120 + 33) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
-
-  // we're releasing 3 chunks, which get added to p2
-  p2.AcquireData(&p, false);
-  EXPECT_EQ(p.total_allocated_bytes(), 0);
-  EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), 32 * 1024);
-
-  MemPool p3(NULL);
-  p3.AcquireData(&p2, true);  // we're keeping the 65k chunk
-  EXPECT_EQ(p2.total_allocated_bytes(), 33 * 1024);
-  EXPECT_EQ(p2.GetTotalChunkSizes(), 65 * 1024);
 }
 
 TEST(MemPoolTest, Offsets) {
-  MemPool p(NULL);
+  MemTracker tracker;
+  MemPool p(&tracker);
   uint8_t* data[1024];
   int offset = 0;
   // test GetCurrentOffset()
@@ -112,6 +137,7 @@ TEST(MemPoolTest, Offsets) {
     EXPECT_EQ(data[i], p.GetDataPtr(offset));
     offset += 8;
   }
+  p.FreeAll();
 }
 
 // Test that we can keep an allocated chunk and a free chunk.
@@ -119,7 +145,8 @@ TEST(MemPoolTest, Offsets) {
 // remaining chunks are consistent if there were more than one used chunk and some
 // free chunks.
 TEST(MemPoolTest, Keep) {
-  MemPool p(NULL);
+  MemTracker tracker;
+  MemPool p(&tracker);
   p.Allocate(4*1024);
   p.Allocate(8*1024);
   p.Allocate(16*1024);
@@ -132,22 +159,26 @@ TEST(MemPoolTest, Keep) {
   p.Allocate(4*1024);
   EXPECT_EQ(p.total_allocated_bytes(), (1 + 4) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (4 + 8 + 16) * 1024);
-  MemPool p2(NULL);
+  MemPool p2(&tracker);
   p2.AcquireData(&p, true);
   EXPECT_EQ(p.total_allocated_bytes(), 4 * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (8 + 16) * 1024);
   EXPECT_EQ(p2.total_allocated_bytes(), 1 * 1024);
   EXPECT_EQ(p2.GetTotalChunkSizes(), 4 * 1024);
+
+  p.FreeAll();
+  p2.FreeAll();
 }
 
 // Tests that we can return partial allocations.
 TEST(MemPoolTest, ReturnPartial) {
-  MemPool p(NULL);
+  MemTracker tracker;
+  MemPool p(&tracker);
   uint8_t* ptr = p.Allocate(1024);
   EXPECT_EQ(p.total_allocated_bytes(), 1024);
   memset(ptr, 0, 1024);
   p.ReturnPartialAllocation(1024);
- 
+
   uint8_t* ptr2 = p.Allocate(1024);
   EXPECT_EQ(p.total_allocated_bytes(), 1024);
   EXPECT_TRUE(ptr == ptr2);
@@ -173,35 +204,29 @@ TEST(MemPoolTest, ReturnPartial) {
   for (int i = 512; i < 1024; ++i) {
     EXPECT_EQ(ptr[i], 2);
   }
+
+  p.FreeAll();
 }
 
 TEST(MemPoolTest, Limits) {
-  MemLimit limit1(160);
-  MemLimit limit2(240);
-  MemLimit limit3(320);
+  MemTracker limit3(320);
+  MemTracker limit1(160, "", &limit3);
+  MemTracker limit2(240, "", &limit3);
 
-  vector<MemLimit*> limits;
-  limits.push_back(&limit1);
-  limits.push_back(&limit3);
-  MemPool* p1 = new MemPool(&limits, 80);
-  EXPECT_FALSE(p1->exceeded_limit());
+  MemPool* p1 = new MemPool(&limit1, 80);
+  EXPECT_FALSE(limit1.AnyLimitExceeded());
 
-  limits.clear();
-  limits.push_back(&limit2);
-  limits.push_back(&limit3);
-  MemPool* p2 = new MemPool(&limits, 80);
-  EXPECT_FALSE(p2->exceeded_limit());
+  MemPool* p2 = new MemPool(&limit2, 80);
+  EXPECT_FALSE(limit2.AnyLimitExceeded());
 
   // p1 exceeds a non-shared limit
   p1->Allocate(80);
-  EXPECT_FALSE(p1->exceeded_limit());
   EXPECT_FALSE(limit1.LimitExceeded());
   EXPECT_EQ(limit1.consumption(), 80);
   EXPECT_FALSE(limit3.LimitExceeded());
   EXPECT_EQ(limit3.consumption(), 80);
 
   p1->Allocate(88);
-  EXPECT_TRUE(p1->exceeded_limit());
   EXPECT_TRUE(limit1.LimitExceeded());
   EXPECT_EQ(limit1.consumption(), 168);
   EXPECT_FALSE(limit3.LimitExceeded());
@@ -209,24 +234,26 @@ TEST(MemPoolTest, Limits) {
 
   // p2 exceeds a shared limit
   p2->Allocate(80);
-  EXPECT_FALSE(p2->exceeded_limit());
   EXPECT_FALSE(limit2.LimitExceeded());
   EXPECT_EQ(limit2.consumption(), 80);
   EXPECT_FALSE(limit3.LimitExceeded());
   EXPECT_EQ(limit3.consumption(), 248);
 
   p2->Allocate(80);
-  EXPECT_TRUE(p2->exceeded_limit());
   EXPECT_FALSE(limit2.LimitExceeded());
   EXPECT_EQ(limit2.consumption(), 160);
   EXPECT_TRUE(limit3.LimitExceeded());
   EXPECT_EQ(limit3.consumption(), 328);
 
   // deleting pools reduces consumption
+  p1->FreeAll();
   delete p1;
   EXPECT_EQ(limit1.consumption(), 0);
   EXPECT_EQ(limit2.consumption(), 160);
   EXPECT_EQ(limit3.consumption(), 160);
+
+  p2->FreeAll();
+  delete p2;
 }
 
 }

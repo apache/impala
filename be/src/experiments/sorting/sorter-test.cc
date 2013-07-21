@@ -24,8 +24,8 @@
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "exprs/expr.h"
-#include "runtime/mem-limit.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/primitive-type.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
@@ -64,7 +64,7 @@ class SorterTest : public testing::Test {
     writer_.reset(new DiskWriter());
     writer_->Init();
     io_mgr_.reset(new DiskIoMgr());
-    Status status = io_mgr_->Init();
+    Status status = io_mgr_->Init(&mem_tracker_);
     DCHECK(status.ok());
     status = io_mgr_->RegisterReader(NULL, &reader_);
     DCHECK(status.ok());
@@ -72,9 +72,8 @@ class SorterTest : public testing::Test {
 
   // Initializes all data to 0s.
   RowBatch* CreateRowBatch(RowDescriptor* row_desc) {
-    vector<MemLimit*> mem_limits;
-    mem_limits.push_back(new MemLimit(1024*1024*512));
-    RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc, BATCH_CAPACITY, mem_limits));
+    MemTracker* mem_tracker = new MemTracker(1024*1024*512);
+    RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc, BATCH_CAPACITY, mem_tracker));
 
     vector<TupleDescriptor*> tuple_descs = row_desc->tuple_descriptors();
     vector<uint8_t*> tuple_mem;
@@ -104,10 +103,9 @@ class SorterTest : public testing::Test {
   // Simply allocates enough memory to hold a RowBatch for the given tuples.
   RowBatch* CreateEmptyOutputBatch(RowDescriptor* output_row_desc,
       TupleDescriptor* output_tuple_desc) {
-    vector<MemLimit*> mem_limits;
-    mem_limits.push_back(new MemLimit(1024*1024*512));
+    MemTracker* mem_tracker = new MemTracker(1024*1024*512);
     RowBatch* batch = obj_pool_.Add(
-        new RowBatch(*output_row_desc, BATCH_CAPACITY, mem_limits));
+        new RowBatch(*output_row_desc, BATCH_CAPACITY, mem_tracker));
 
     int byte_size = output_tuple_desc->byte_size();
     uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(
@@ -444,6 +442,7 @@ class SorterTest : public testing::Test {
  private:
   ObjectPool obj_pool_;
   MemPool mem_pool_;
+  MemTracker mem_tracker_;
   scoped_ptr<DiskWriter> writer_;
   scoped_ptr<DiskIoMgr> io_mgr_;
   DiskIoMgr::ReaderContext* reader_;

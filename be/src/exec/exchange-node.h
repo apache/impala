@@ -34,6 +34,7 @@ class ExchangeNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
+  virtual Status Close(RuntimeState* state);
 
   // the number of senders needs to be set after the c'tor, because it's not
   // recorded in TPlanNode, and before calling Prepare()
@@ -56,9 +57,9 @@ class ExchangeNode : public ExecNode {
   boost::scoped_ptr<RowBatch> input_batch_;
 
   int next_row_idx_;  // next row to copy
-  
+
   // time spent reconstructing received rows
-  RuntimeProfile::Counter* convert_row_batch_timer_;   
+  RuntimeProfile::Counter* convert_row_batch_timer_;
 };
 
 };

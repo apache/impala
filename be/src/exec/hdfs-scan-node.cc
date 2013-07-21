@@ -343,7 +343,7 @@ Tuple* HdfsScanNode::InitEmptyTemplateTuple() {
   {
     unique_lock<mutex> l(lock_);
     template_tuple = reinterpret_cast<Tuple*>(
-        partition_key_pool_->Allocate(tuple_desc_->byte_size()));
+        scan_node_pool_->Allocate(tuple_desc_->byte_size()));
   }
   memset(template_tuple, 0, tuple_desc_->byte_size());
   return template_tuple;
@@ -359,8 +359,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
-  tuple_pool_.reset(new MemPool(state->mem_limits()));
-  partition_key_pool_.reset(new MemPool(state->mem_limits()));
+  scan_node_pool_.reset(new MemPool(mem_tracker()));
   compact_data_ |= tuple_desc_->string_slots().empty();
 
   // Create mapping from column index in table to slot index in output tuple.
@@ -464,7 +463,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
-      hdfs_connection_, &reader_context_, state->query_mem_limit()));
+      hdfs_connection_, &reader_context_, mem_tracker()));
 
   // Initialize HdfsScanNode specific counters
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
@@ -568,7 +567,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsScanNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   {
     unique_lock<mutex> l(row_batches_lock_);
     done_ = true;
@@ -603,8 +601,9 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
   scanner_pool_.reset(NULL);
+  if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
-  return ExecNode::Close(state);
+  return ScanNode::Close(state);
 }
 
 Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges) {
@@ -737,6 +736,9 @@ inline void HdfsScanNode::ScannerThreadHelper() {
         break;
       }
 
+      if (status.IsMemLimitExceeded()) runtime_state_->LogMemLimitExceeded();
+
+
       status_ = status;
       {
         unique_lock<mutex> l(row_batches_lock_);
@@ -866,10 +868,6 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   ss << "Codegen enabled: " << num_scanners_codegen_enabled_ << " out of "
      << (num_scanners_codegen_enabled_ + num_scanners_codegen_disabled_);
   AddRuntimeExecOption(ss.str());
-
-  if (memory_used_counter_ != NULL) {
-    COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
-  }
 
   if (reader_context_ != NULL) {
     bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));

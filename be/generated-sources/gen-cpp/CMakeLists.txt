@@ -64,7 +64,6 @@ set(SRC_FILES
   StateStoreService_constants.cpp
   StateStoreService_types.cpp
   StateStoreSubscriber.cpp
-
   Status_constants.cpp
   Status_types.cpp
   Types_constants.cpp

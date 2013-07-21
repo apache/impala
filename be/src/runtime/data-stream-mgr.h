@@ -26,6 +26,7 @@
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "runtime/mem-tracker.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 
@@ -34,6 +35,7 @@ namespace impala {
 class DescriptorTbl;
 class DataStreamRecvr;
 class RowBatch;
+class RuntimeState;
 class TRowBatch;
 
 // Singleton class which manages all incoming data streams at a backend node. It
@@ -58,9 +60,9 @@ class DataStreamMgr {
   // is the query's descriptor table and is needed to decode incoming TRowBatches.
   // The caller is responsible for deleting the returned DataStreamRecvr.
   DataStreamRecvr* CreateRecvr(
-      const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size,
-      RuntimeProfile* profile);
+      RuntimeState* state, const RowDescriptor& row_desc,
+      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
+      int num_senders, int buffer_size, RuntimeProfile* profile);
 
   // Adds a row batch to the stream identified by fragment_instance_id/dest_node_id
   // if the stream has not been cancelled.
@@ -87,9 +89,9 @@ class DataStreamMgr {
   class StreamControlBlock {
    public:
     StreamControlBlock(
-        const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
-        PlanNodeId dest_node_id, int num_senders, int buffer_size,
-        RuntimeProfile* profile);
+        RuntimeState* state, const RowDescriptor& row_desc,
+        const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
+        int num_senders, int buffer_size, RuntimeProfile* profile);
 
     // Returns next available batch or NULL if end-of-stream or stream got
     // cancelled (sets 'is_cancelled' accordingly).
@@ -124,6 +126,8 @@ class DataStreamMgr {
     PlanNodeId dest_node_id() const { return dest_node_id_; }
 
    private:
+    RuntimeState* state_;
+
     TUniqueId fragment_instance_id_;
     PlanNodeId dest_node_id_;
     const RowDescriptor& row_desc_;
@@ -159,6 +163,7 @@ class DataStreamMgr {
 
     RuntimeProfile::Counter* bytes_received_counter_;
     RuntimeProfile::Counter* deserialize_row_batch_timer_;
+    MemTracker mem_tracker_;
 
     // Time spent waiting until the first batch arrives
     RuntimeProfile::Counter* first_batch_wait_timer_;

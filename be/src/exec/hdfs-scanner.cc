@@ -94,14 +94,14 @@ Status HdfsScanner::CreateConjunctsCopy() {
 Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
   codegen_fn_ = scan_node_->GetCodegenFn(type);
-  
+
   if (codegen_fn_ == NULL) {
     scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK;
   }
-  if (!scan_node_->tuple_desc()->string_slots().empty() && 
+  if (!scan_node_->tuple_desc()->string_slots().empty() &&
         ((partition->escape_char() != '\0') || stream_->compact_data())) {
-    // Cannot use codegen if there are strings slots and we need to 
+    // Cannot use codegen if there are strings slots and we need to
     // compact (i.e. copy) the data.
     scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK;
@@ -109,15 +109,15 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
 
   write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
       state_->llvm_codegen()->JitFunction(codegen_fn_));
-  VLOG(2) << scanner_name << "(node_id=" << scan_node_->id() 
+  VLOG(2) << scanner_name << "(node_id=" << scan_node_->id()
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();
   return Status::OK;
 }
 
 void HdfsScanner::StartNewRowBatch() {
-  batch_ = new RowBatch(
-      scan_node_->row_desc(), state_->batch_size(), *state_->mem_limits());
+  batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
+      scan_node_->mem_tracker());
   tuple_mem_ =
       batch_->tuple_data_pool()->Allocate(state_->batch_size() * tuple_byte_size_);
 }
@@ -149,7 +149,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   }
 
   if (context_->cancelled()) return Status::CANCELLED;
-  if (MemLimit::LimitExceeded(*state_->mem_limits())) return Status::MEM_LIMIT_EXCEEDED;
+  RETURN_IF_MEM_LIMIT_EXCEEDED(state_);
   return Status::OK;
 }
 
@@ -176,7 +176,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
   } else {
     // Make a row and evaluate the row
     int row_idx = row_batch->AddRow();
-    
+
     TupleRow* current_row = row_batch->GetRow(row_idx);
     current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
     if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
@@ -196,7 +196,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
       current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
       row_batch->CommitLastRow();
     }
-  } 
+  }
   return num_tuples;
 }
 
@@ -205,7 +205,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
 //   1. template_tuple_ is the complete tuple.
 //   2. Eval conjuncts against the tuple.
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
-int HdfsScanner::WriteEmptyTuples(ScannerContext* context, 
+int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
     TupleRow* row, int num_tuples) {
   DCHECK_GE(num_tuples, 0);
   if (num_tuples == 0) return 0;
@@ -221,11 +221,11 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
       row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
       row = next_row(row);
     }
-  } 
+  }
   return num_tuples;
 }
 
-bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields, 
+bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
     Tuple* tuple, TupleRow* tuple_row, Tuple* template_tuple,
     uint8_t* error_fields, uint8_t* error_in_row) {
   *error_in_row = false;
@@ -253,48 +253,48 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 
 // Codegen for WriteTuple(above).  The signature matches WriteTuple (except for the
 // this* first argument).  For writing out and evaluating a single string slot:
-// define i1 @WriteCompleteTuple(%"class.impala::HdfsTextScanner"* %this, 
+// define i1 @WriteCompleteTuple(%"class.impala::HdfsTextScanner"* %this,
 //                               %"class.impala::MemPool"* %pool,
-//                               %"struct.impala::FieldLocation"* %fields, 
-//                               %"class.impala::Tuple"* %tuple, 
-//                               %"class.impala::TupleRow"* %tuple_row, 
-//                               %"class.impala::Tuple"* %template, 
+//                               %"struct.impala::FieldLocation"* %fields,
+//                               %"class.impala::Tuple"* %tuple,
+//                               %"class.impala::TupleRow"* %tuple_row,
+//                               %"class.impala::Tuple"* %template,
 //                               i8* %error_fields, i8* %error_in_row) {
 // entry:
 //   %null_ptr = alloca i1
-//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple 
+//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple
 //                                              to { i8, %"struct.impala::StringValue" }*
 //   %tuple_row_ptr = bitcast %"class.impala::TupleRow"* %tuple_row to i8**
-//   %null_byte = getelementptr inbounds 
+//   %null_byte = getelementptr inbounds
 //                    { i8, %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 0
 //   store i8 0, i8* %null_byte
 //   %0 = bitcast i8** %tuple_row_ptr to { i8, %"struct.impala::StringValue" }**
 //   %1 = getelementptr { i8, %"struct.impala::StringValue" }** %0, i32 0
-//   store { i8, %"struct.impala::StringValue" }* %tuple_ptr, 
+//   store { i8, %"struct.impala::StringValue" }* %tuple_ptr,
 //         { i8, %"struct.impala::StringValue" }** %1
 //   br label %parse
-// 
+//
 // parse:                                            ; preds = %entry
 //   %data_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 0
 //   %len_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 1
 //   %slot_error_ptr = getelementptr i8* %error_fields, i32 0
 //   %data = load i8** %data_ptr
 //   %len = load i32* %len_ptr
-//   %2 = call i1 @WriteSlot({ i8, %"struct.impala::StringValue" }* 
+//   %2 = call i1 @WriteSlot({ i8, %"struct.impala::StringValue" }*
 //                                 %tuple_ptr, i8* %data, i32 %len)
 //   %slot_parse_error = xor i1 %2, true
 //   %error_in_row1 = or i1 false, %slot_parse_error
 //   %3 = zext i1 %slot_parse_error to i8
 //   store i8 %3, i8* %slot_error_ptr
-//   %conjunct_eval = call i1 @BinaryPredicate(i8** %tuple_row_ptr, 
+//   %conjunct_eval = call i1 @BinaryPredicate(i8** %tuple_row_ptr,
 //                                             i8* null, i1* %null_ptr)
 //   br i1 %conjunct_eval, label %parse2, label %eval_fail
-// 
+//
 // parse2:                                           ; preds = %parse
 //   %4 = zext i1 %error_in_row1 to i8
 //   store i8 %4, i8* %error_in_row
 //   ret i1 true
-// 
+//
 // eval_fail:                                        ; preds = %parse
 //   ret i1 false
 // }
@@ -490,7 +490,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
     }
   }
 
-  // Block if eval failed.  
+  // Block if eval failed.
   builder.SetInsertPoint(eval_fail_block);
   builder.CreateRet(codegen->false_value());
 
@@ -498,7 +498,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   return codegen->FinalizeFunction(fn);
 }
 
-Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node, 
+Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node,
     LlvmCodeGen* codegen, Function* write_complete_tuple_fn) {
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);
@@ -533,7 +533,7 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
     LogRowParseError(row_idx, &ss);
     state_->LogError(ss.str());
   }
-  
+
   ++num_errors_in_file_;
   if (state_->abort_on_error()) {
     state_->ReportFileErrors(stream_->filename(), 1);
@@ -547,7 +547,7 @@ void HdfsScanner::LogRowParseError(int row_idx, stringstream* ss) {
   DCHECK(false);
 }
 
-void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc, 
+void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     const char* data, int len) {
   // len < 0 is used to indicate the data contains escape characters.  We don't care
   // about that here and can just output the raw string.
@@ -555,9 +555,9 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
 
   if (state_->LogHasSpace() || state_->abort_on_error()) {
     stringstream ss;
-    ss << "Error converting column: " 
+    ss << "Error converting column: "
        << desc->col_pos() - scan_node_->num_partition_keys()
-       << " TO " << TypeToString(desc->type()) 
+       << " TO " << TypeToString(desc->type())
        << " (Data is: " << string(data,len) << ")";
     if (state_->LogHasSpace()) state_->LogError(ss.str());
     if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());

@@ -26,6 +26,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/client-cache.h"
+#include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/thrift-client.h"
@@ -126,13 +127,15 @@ class DataStreamSender::Channel {
   // Serialize batch_ into thrift_batch_ and send via SendBatch().
   // Returns SendBatch() status.
   Status SendCurrentBatch();
+
+  Status CloseInternal();
 };
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
-  batch_.reset(new RowBatch(row_desc_, capacity, *state->mem_limits()));
+  batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker_.get()));
   return Status::OK;
 }
 
@@ -246,7 +249,7 @@ Status DataStreamSender::Channel::GetSendStatus() {
   return rpc_status_;
 }
 
-Status DataStreamSender::Channel::Close() {
+Status DataStreamSender::Channel::CloseInternal() {
   VLOG_RPC << "Channel::Close() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
@@ -287,6 +290,12 @@ Status DataStreamSender::Channel::Close() {
     return Status(msg.str());
   }
   return Status::OK;
+}
+
+Status DataStreamSender::Channel::Close() {
+  Status status = CloseInternal();
+  batch_.reset();
+  return status;
 }
 
 DataStreamSender::DataStreamSender(ObjectPool* pool,
@@ -343,11 +352,11 @@ Status DataStreamSender::Init(RuntimeState* state) {
   profile_ = pool_->Add(new RuntimeProfile(pool_, title.str()));
   SCOPED_TIMER(profile_->total_time_counter());
 
-  for (int i = 0; i < channels_.size(); ++i) {
-    RETURN_IF_ERROR(channels_[i]->Init(state));
-  }
   RETURN_IF_ERROR(Expr::Prepare(partition_exprs_, state, row_desc_));
 
+  mem_tracker_.reset(
+      new MemTracker(profile(), -1, "DataStreamSender", state->instance_mem_tracker()));
+  state->RegisterMemTracker(mem_tracker_.get());
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
   uncompressed_bytes_counter_ =
@@ -363,6 +372,10 @@ Status DataStreamSender::Init(RuntimeState* state) {
       profile()->AddDerivedCounter("OverallThroughput", TCounterType::BYTES_PER_SECOND,
            bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
                          profile()->total_time_counter()));
+
+  for (int i = 0; i < channels_.size(); ++i) {
+    RETURN_IF_ERROR(channels_[i]->Init(state));
+  }
   return Status::OK;
 }
 

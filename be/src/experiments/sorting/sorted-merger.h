@@ -148,8 +148,7 @@ class SortedMerger {
 
   RowDescriptor row_desc_;
   const bool remove_dups_;
-  boost::scoped_ptr<MemLimit> mem_limit_;
-  std::vector<MemLimit*> mem_limits_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   // The set of incoming SortedRuns that we're merging.
   // This will be a input_runs_.size()-way merge.

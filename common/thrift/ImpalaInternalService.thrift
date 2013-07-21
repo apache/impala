@@ -48,8 +48,8 @@ struct TQueryOptions {
   4: optional i32 batch_size = 0
   5: optional i32 num_nodes = NUM_NODES_ALL
   6: optional i64 max_scan_range_length = 0
-
   7: optional i32 num_scanner_threads = 0
+
   8: optional i32 max_io_buffers = 0              // Deprecated in 1.1
   9: optional bool allow_unsupported_formats = 0
   10: optional i64 default_order_by_limit = -1

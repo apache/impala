@@ -21,6 +21,7 @@
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "util/hash-util.h"
+#include "util/runtime-profile.h"
 
 namespace llvm {
   class Function;
@@ -30,10 +31,10 @@ namespace impala {
 
 class Expr;
 class LlvmCodeGen;
+class MemTracker;
 class RowDescriptor;
 class Tuple;
 class TupleRow;
-class MemLimit;
 
 // Hash table implementation designed for hash aggregation and hash joins.  This is not
 // templatized and is tailored to the usage pattern for aggregation and joins.  The
@@ -41,12 +42,12 @@ class MemLimit;
 // This is the pattern we use for joins and aggregation where the input/build tuple
 // row descriptor is different from the find/probe descriptor.
 // The table is optimized for the query engine's use case as much as possible and is not
-// intended to be a generic hash table implementation.  The API loosely mimics the 
+// intended to be a generic hash table implementation.  The API loosely mimics the
 // std::hashset API.
-// 
+//
 // The hash table stores evaluated expr results for the current row being processed
-// when possible into a contiguous memory buffer. This allows for very efficient 
-// computation for hashing.  The implementation is also designed to allow codegen 
+// when possible into a contiguous memory buffer. This allows for very efficient
+// computation for hashing.  The implementation is also designed to allow codegen
 // for some paths.
 //
 // The hash table does not support removes. The hash table is not thread safe.
@@ -58,7 +59,7 @@ class MemLimit;
 // bucket are linked together (the bucket pointer gets you the head of that linked list).
 // When growing the hash table, the number of buckets is doubled, and nodes from a
 // particular bucket either stay in place or move to an analogous bucket in the second
-// half of buckets. This behavior allows us to avoid moving about half the nodes each 
+// half of buckets. This behavior allows us to avoid moving about half the nodes each
 // time, and maintains good cache properties by only accessing 2 buckets at a time.
 // The node vector is modified in place.
 // Due to the doubling nature of the buckets, we require that the number of buckets is a
@@ -68,30 +69,30 @@ class MemLimit;
 // TODO: this is not a fancy hash table in terms of memory access patterns (cuckoo-hashing
 // or something that spills to disk). We will likely want to invest more time into this.
 // TODO: hash-join and aggregation have very different access patterns.  Joins insert
-// all the rows and then calls scan to find them.  Aggregation interleaves Find() and 
+// all the rows and then calls scan to find them.  Aggregation interleaves Find() and
 // Inserts().  We can want to optimize joins more heavily for Inserts() (in particular
 // growing).
 class HashTable {
  public:
   class Iterator;
 
-  // Create a hash table.  
-  //  - build_exprs are the exprs that should be used to evaluate rows during Insert().  
+  // Create a hash table.
+  //  - build_exprs are the exprs that should be used to evaluate rows during Insert().
   //  - probe_exprs are used during Find()
   //  - num_build_tuples: number of Tuples in the build tuple row
   //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   //  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
   //                 even if stores_nulls is true
   //  - num_buckets: number of buckets that the hash table should be initialized to
-  //  - mem_limits: if non-empty, all memory allocation for nodes and for buckets is
-  //    tracked against those limits; the limits must be valid until the d'tor is called
+  //  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
+  //    tracked; the tracker must be valid until the d'tor is called
   //  - initial_seed: Initial seed value to use when computing hashes for rows
   HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
       int num_build_tuples, bool stores_nulls, bool finds_nulls, int32_t initial_seed,
-      const std::vector<MemLimit*>& mem_limits = std::vector<MemLimit*>(),
-      int64_t num_buckets = 1024);
+      MemTracker* mem_tracker, int64_t num_buckets = 1024);
 
-  ~HashTable();
+  // Call to cleanup any resources. Must be called once.
+  void Close();
 
   // Insert row into the hash table.  Row will be evaluated over build_exprs_
   // This will grow the hash table if necessary
@@ -104,13 +105,13 @@ class HashTable {
   }
 
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
-  // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End() 
+  // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End()
   // to find all the matching rows.
   // Only one scan be in progress at any time (i.e. it is not legal to call
   // Find(), begin iterating through all the matches, call another Find(),
-  // and continuing iterator from the first scan iterator).  
-  // Advancing the returned iterator will go to the next matching row.  The matching 
-  // rows are evaluated lazily (i.e. computed as the Iterator is moved).   
+  // and continuing iterator from the first scan iterator).
+  // Advancing the returned iterator will go to the next matching row.  The matching
+  // rows are evaluated lazily (i.e. computed as the Iterator is moved).
   // Returns HashTable::End() if there is no match.
   Iterator IR_ALWAYS_INLINE Find(TupleRow* probe_row);
 
@@ -120,16 +121,13 @@ class HashTable {
   // Returns the number of buckets
   int64_t num_buckets() { return buckets_.size(); }
 
-  // true if any of the MemLimits was exceeded
-  bool exceeded_limit() const { return exceeded_limit_; }
-
   // Returns the load factor (the number of non-empty buckets)
-  float load_factor() { 
-    return num_filled_buckets_ / static_cast<float>(buckets_.size()); 
+  float load_factor() {
+    return num_filled_buckets_ / static_cast<float>(buckets_.size());
   }
-  
+
   // Returns the number of bytes allocated to the hash table
-  int64_t byte_size() const { 
+  int64_t byte_size() const {
     return node_byte_size_ * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
   }
 
@@ -138,13 +136,13 @@ class HashTable {
   // This value is invalid if the expr evaluated to NULL.
   // TODO: this is an awkward abstraction but aggregation node can take advantage of
   // it and save some expr evaluation calls.
-  void* last_expr_value(int expr_idx) const { 
-    return expr_values_buffer_ + expr_values_buffer_offsets_[expr_idx]; 
+  void* last_expr_value(int expr_idx) const {
+    return expr_values_buffer_ + expr_values_buffer_offsets_[expr_idx];
   }
-  
+
   // Returns if the expr at 'expr_idx' evaluated to NULL for the last row.
-  bool last_expr_value_null(int expr_idx) const { 
-    return expr_value_null_bits_[expr_idx]; 
+  bool last_expr_value_null(int expr_idx) const {
+    return expr_value_null_bits_[expr_idx];
   }
 
   // Return beginning of hash table.  Advancing this iterator will traverse all
@@ -156,8 +154,8 @@ class HashTable {
     return Iterator();
   }
 
-  // Codegen for evaluating a tuple row.  Codegen'd function matches the signature 
-  // for EvalBuildRow and EvalTupleRow.  
+  // Codegen for evaluating a tuple row.  Codegen'd function matches the signature
+  // for EvalBuildRow and EvalTupleRow.
   // if build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs
   llvm::Function* CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build_row);
 
@@ -165,7 +163,7 @@ class HashTable {
   // prototype matches HashCurrentRow identically.
   llvm::Function* CodegenHashCurrentRow(LlvmCodeGen* codegen);
 
-  // Codegen for evaluating a TupleRow and comparing equality against 
+  // Codegen for evaluating a TupleRow and comparing equality against
   // 'expr_values_buffer_'.  Function signature matches HashTable::Equals()
   llvm::Function* CodegenEquals(LlvmCodeGen* codegen);
 
@@ -219,18 +217,18 @@ class HashTable {
 
     HashTable* table_;
     // Current bucket idx
-    int64_t bucket_idx_;        
+    int64_t bucket_idx_;
     // Current node idx (within current bucket)
-    int64_t node_idx_;          
+    int64_t node_idx_;
     // cached hash value for the row passed to Find()()
-    uint32_t scan_hash_;    
+    uint32_t scan_hash_;
   };
 
  private:
   friend class Iterator;
   friend class HashTableTest;
 
-  // Header portion of a Node.  The node data (TupleRow) is right after the 
+  // Header portion of a Node.  The node data (TupleRow) is right after the
   // node memory to maximize cache hits.
   struct Node {
     int64_t next_idx_;  // chain to next node for collisions
@@ -261,7 +259,7 @@ class HashTable {
     DCHECK_NE(idx, -1);
     return reinterpret_cast<Node*>(nodes_ + node_byte_size_ * idx);
   }
-  
+
   // Resize the hash table to 'num_buckets'
   void ResizeBuckets(int64_t num_buckets);
 
@@ -299,7 +297,7 @@ class HashTable {
 
   // Compute the hash of the values in expr_values_buffer_.
   // This will be replaced by codegen.  We don't want this inlined for replacing
-  // with codegen'd functions so the function name does not change.  
+  // with codegen'd functions so the function name does not change.
   uint32_t IR_NO_INLINE HashCurrentRow() {
     if (var_result_begin_ == -1) {
       // This handles NULLs implicitly since a constant seed value was put
@@ -314,7 +312,7 @@ class HashTable {
   // fields (e.g. strings)
   uint32_t HashVariableLenRow();
 
-  // Returns true if the values of build_exprs evaluated over 'build_row' equal 
+  // Returns true if the values of build_exprs evaluated over 'build_row' equal
   // the values cached in expr_values_buffer_
   // This will be replaced by codegen.
   bool Equals(TupleRow* build_row);
@@ -322,7 +320,7 @@ class HashTable {
   // Grow the node array.
   void GrowNodeArray();
 
-  // Load factor that will trigger growing the hash table on insert.  This is 
+  // Load factor that will trigger growing the hash table on insert.  This is
   // defined as the number of non-empty buckets / total_buckets
   static const float MAX_BUCKET_OCCUPANCY_FRACTION;
 
@@ -351,14 +349,13 @@ class HashTable {
   // max number of nodes that can be stored in 'nodes_' before realloc
   int64_t nodes_capacity_;
 
-  std::vector<MemLimit*> mem_limits_;  // saved c'tor param
-  bool exceeded_limit_;   // true if any of mem_limits_[].LimitExceeded()
+  MemTracker* mem_tracker_;
 
   std::vector<Bucket> buckets_;
-  
+
   // equal to buckets_.size() but more efficient than the size function
   int64_t num_buckets_;
-  
+
   // The number of filled buckets to trigger a resize.  This is cached for efficiency
   int64_t num_buckets_till_resize_;
 
@@ -372,7 +369,7 @@ class HashTable {
   // byte size of 'expr_values_buffer_'
   int results_buffer_size_;
 
-  // buffer to store evaluated expr results.  This address must not change once 
+  // buffer to store evaluated expr results.  This address must not change once
   // allocated since the address is baked into the codegen
   uint8_t* expr_values_buffer_;
 

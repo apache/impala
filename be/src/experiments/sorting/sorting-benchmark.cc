@@ -23,8 +23,8 @@
 #include "sort-util.h"
 #include "sorter.h"
 #include "common/object-pool.h"
-#include "runtime/mem-limit.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/thread-resource-mgr.h"
 #include "testutil/desc-tbl-builder.h"
@@ -184,9 +184,8 @@ static uint64_t ROW_BATCH_MEM_LIMIT = 1024L * 1024 * 1024 * 3;
 
 // Initializes all data to 0s.
 RowBatch* CreateRowBatch(RowDescriptor* row_desc, int batch_size) {
-  vector<MemLimit*> mem_limits;
-  mem_limits.push_back(new MemLimit(ROW_BATCH_MEM_LIMIT));
-  RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc, batch_size, mem_limits));
+  MemTracker* mem_tracker = new MemTracker(ROW_BATCH_MEM_LIMIT);
+  RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc, batch_size, mem_tracker));
 
   vector<TupleDescriptor*> tuple_descs = row_desc->tuple_descriptors();
   vector<uint8_t*> tuple_mem;
@@ -216,10 +215,9 @@ RowBatch* CreateRowBatch(RowDescriptor* row_desc, int batch_size) {
 // Simply allocates enough memory to hold a RowBatch for the given tuples.
 RowBatch* CreateEmptyOutputBatch(RowDescriptor* output_row_desc,
     TupleDescriptor* output_tuple_desc, int batch_size) {
-  vector<MemLimit*> mem_limits;
-  mem_limits.push_back(new MemLimit(ROW_BATCH_MEM_LIMIT));
+  MemTracker* mem_tracker = new MemTracker(ROW_BATCH_MEM_LIMIT);
   RowBatch* batch = obj_pool_.Add(
-      new RowBatch(*output_row_desc, batch_size, mem_limits));
+      new RowBatch(*output_row_desc, batch_size, mem_tracker));
 
   int byte_size = output_tuple_desc->byte_size();
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(
@@ -577,11 +575,12 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
   int sort_key_size =
       (data->norm_key_len == -1 ? ideal_sort_key_size : data->norm_key_len);
 
+  MemTracker tracker;
   DiskIoMgr io_mgr;
   DiskIoMgr::ReaderContext* reader;
   DiskWriter writer;
   writer.Init();
-  Status status = io_mgr.Init();
+  Status status = io_mgr.Init(&tracker);
   DCHECK(status.ok());
   status = io_mgr.RegisterReader(NULL, &reader);
   DCHECK(status.ok());

@@ -1,4 +1,17 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,6 +21,7 @@
 #include "common/compiler-util.h"
 #include "experiments/data-provider.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "util/cpu-info.h"
 #include "util/runtime-profile.h"
@@ -52,7 +66,7 @@ struct PointerValue {
   void UpdatePointer(void* p) {
     val = val >> USED_BITS;
     val = val << USED_BITS;
-    val = val | reinterpret_cast<uint64_t>(p); 
+    val = val | reinterpret_cast<uint64_t>(p);
   }
 
   void UpdateValue(uint16_t v) {
@@ -95,7 +109,7 @@ class DataPartitioner {
 
     printf("Tuple Size: %d\n", size_);
     printf("Partitions: %d  Per Partition: %d\n", partitions_per_level_, tuples_per_partition_);
-    
+
     partition_idx_mask_ = partitions_per_level_ - 1;
     build_partitions_.resize(partitions_per_level_);
     child_partitions_.resize(partitions_per_level_);
@@ -143,12 +157,12 @@ class DataPartitioner {
   int NumTuples(const Partition& partition) const {
     return partition.num_last_block + (partition.blocks.size() - 1) * tuples_per_partition_;
   }
-  
+
   int NumTuples(const Partition& partition, int block_idx) const {
     if (block_idx == partition.blocks.size() - 1) return partition.num_last_block;
     return tuples_per_partition_;
   }
-  
+
   bool Finalize(vector<Partition>* results) {
     SCOPED_TIMER(split_time_);
     bool result = true;
@@ -216,12 +230,12 @@ class DataPartitioner {
 
   Partition ToOutputPartition(const BuildPartition& build) const {
     return Partition(build.blocks, build.num_last_block);
-  } 
+  }
 
   int TotalTuples(const BuildPartition& partition) const {
     return partition.num_last_block + (partition.blocks.size() - 1) * tuples_per_partition_;
   }
-  
+
   int NumLastBlock(int p) const {
     return outputs_[p].GetValue();
   }
@@ -355,16 +369,17 @@ int main(int argc, char **argv) {
 
   vector<DataProvider::ColDesc> cols;
   // Hash Slot
-  cols.push_back(DataProvider::ColDesc::Create<int32_t>(0, 0));  
+  cols.push_back(DataProvider::ColDesc::Create<int32_t>(0, 0));
   // Grouping Column
   cols.push_back(DataProvider::ColDesc::Create<int64_t>(0, 500000));
   // Aggregate Column
   cols.push_back(DataProvider::ColDesc::Create<float>(-1, 1));
-  
-  MemPool pool(NULL);
+
+  MemTracker tracker;
+  MemPool pool(&tracker);
   ObjectPool obj_pool;
   RuntimeProfile profile(&obj_pool, "PartitioningTest");
-  
+
   DataProvider provider(&pool, &profile);
   provider.Reset(50*1024*1024, 1024, cols);
   //provider.Reset(100*1024, 1024, cols);

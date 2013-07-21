@@ -22,6 +22,7 @@
 #include "common/daemon.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "runtime/mem-tracker.h"
 #include "statestore/state-store.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
@@ -49,10 +50,11 @@ int main(int argc, char** argv) {
     EXIT_IF_ERROR(InitKerberos("StateStore"));
   }
 
+  MemTracker mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
 
   if (FLAGS_enable_webserver) {
-    AddDefaultPathHandlers(webserver.get());
+    AddDefaultPathHandlers(webserver.get(), &mem_tracker);
     EXIT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";

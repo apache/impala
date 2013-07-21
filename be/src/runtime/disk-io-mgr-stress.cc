@@ -62,15 +62,15 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
      int num_clients, bool includes_cancellation) :
     num_clients_(num_clients),
     includes_cancellation_(includes_cancellation) {
-  
+
   time_t rand_seed = time(NULL);
   LOG(INFO) << "Running with rand seed: " << rand_seed;
   srand(rand_seed);
 
   io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init();
+  Status status = io_mgr_->Init(&dummy_tracker_);
   CHECK(status.ok());
-  
+
   // Initialize some data files.  It doesn't really matter how many there are.
   files_.resize(num_clients * 2);
   for (int i = 0; i < files_.size(); ++i) {
@@ -95,7 +95,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
   while (!shutdown_) {
     bool eos = false;
     int bytes_read = 0;
-    
+
     const string& expected = files_[client->file_idx].data;
 
     while (!eos) {
@@ -109,13 +109,13 @@ void DiskIoMgrStress::ClientThread(int client_id) {
         status = range->GetNext(&buffer);
         CHECK(status.ok() || status.IsCancelled());
         if (buffer == NULL) break;
-      
+
         int64_t scan_range_offset = buffer->scan_range_offset();
         int len = buffer->len();
         CHECK_GE(scan_range_offset, 0);
         CHECK_LT(scan_range_offset, expected.size());
         CHECK_GT(len, 0);
-        
+
         // We get scan ranges back in arbitrary order so the scan range to the file
         // offset.
         int64_t file_offset = scan_range_offset + range->offset();
@@ -124,34 +124,34 @@ void DiskIoMgrStress::ClientThread(int client_id) {
         CHECK_LE(file_offset + len, expected.size());
         CHECK_EQ(strncmp(buffer->buffer(), &expected.c_str()[file_offset], len), 0);
 
-        // Copy the bytes from this read into the result buffer.  
+        // Copy the bytes from this read into the result buffer.
         memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
         buffer->Return();
         buffer = NULL;
         bytes_read += len;
-    
+
         CHECK_GE(bytes_read, 0);
         CHECK_LE(bytes_read, expected.size());
 
-        if (bytes_read > client->abort_at_byte) { 
+        if (bytes_read > client->abort_at_byte) {
           eos = true;
           break;
         }
       } // End of buffer
     } // End of scan range
-      
+
     if (bytes_read == expected.size()) {
       // This entire file was read without being cancelled, validate the entire result
       CHECK(status.ok());
       CHECK_EQ(strncmp(read_buffer, expected.c_str(), bytes_read), 0);
     }
-      
+
     // Unregister the old client and get a new one
     unique_lock<mutex> lock(client->lock);
     io_mgr_->UnregisterReader(client->reader);
     NewClient(client_id);
   }
-  
+
   unique_lock<mutex> lock(client->lock);
   io_mgr_->UnregisterReader(client->reader);
   client->reader = NULL;
@@ -162,7 +162,7 @@ void DiskIoMgrStress::CancelRandomReader() {
   if (!includes_cancellation_) return;
 
   int rand_client = rand() % num_clients_;
-  
+
   unique_lock<mutex> lock(clients_[rand_client].lock);
   io_mgr_->CancelReader(clients_[rand_client].reader);
 }
@@ -173,7 +173,7 @@ void DiskIoMgrStress::Run(int sec) {
     readers_.add_thread(
         new thread(&DiskIoMgrStress::ClientThread, this, i));
   }
-  
+
   // Sleep and let the clients do their thing for 'sec'
   for (int loop_count = 1; sec == 0 || loop_count <= sec; ++loop_count) {
     int iter = (1000) / CANCEL_READER_PERIOD_MS;
@@ -183,7 +183,7 @@ void DiskIoMgrStress::Run(int sec) {
     }
     LOG(ERROR) << "Finished iteration: " << loop_count;
   }
-  
+
   // Signal shutdown for the client threads
   shutdown_ = true;
 
@@ -210,7 +210,7 @@ void DiskIoMgrStress::NewClient(int i) {
     if (rand_value < ABORT_CHANCE) {
       // Abort at a random byte inside the file
       client.abort_at_byte = rand() % file_len;
-    } 
+    }
   }
 
   for (int i = 0; i < client.scan_ranges.size(); ++i) {
@@ -222,7 +222,7 @@ void DiskIoMgrStress::NewClient(int i) {
   while (assigned_len < file_len) {
     int range_len = rand() % (MAX_READ_LEN - MIN_READ_LEN) + MIN_READ_LEN;
     range_len = min(range_len, file_len - assigned_len);
-    
+
     DiskIoMgr::ScanRange* range = new DiskIoMgr::ScanRange();;
     range->Reset(files_[client.file_idx].filename.c_str(), range_len, assigned_len, 0);
     client.scan_ranges.push_back(range);

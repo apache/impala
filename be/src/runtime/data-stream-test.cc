@@ -86,7 +86,8 @@ class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
     : runtime_state_(TUniqueId(), TQueryOptions(), "", "", &exec_env_),
-      next_val_(0) {}
+      next_val_(0) {
+  }
 
   virtual void SetUp() {
     CreateRowDesc();
@@ -142,8 +143,10 @@ class DataStreamTest : public testing::Test {
   static const int NUM_BATCHES = TOTAL_DATA_SIZE / BATCH_CAPACITY / PER_ROW_DATA;
 
   ObjectPool obj_pool_;
+  MemTracker tracker_;
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
+  MemTracker dummy_mem_tracker_;
   ExecEnv exec_env_;
   RuntimeState runtime_state_;
   TUniqueId next_instance_id_;
@@ -242,8 +245,7 @@ class DataStreamTest : public testing::Test {
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
   RowBatch* CreateRowBatch() {
-    RowBatch* batch = new RowBatch(
-        *row_desc_, BATCH_CAPACITY, *runtime_state_.mem_limits());
+    RowBatch* batch = new RowBatch(*row_desc_, BATCH_CAPACITY, &tracker_);
     int64_t* tuple_mem = reinterpret_cast<int64_t*>(
         batch->tuple_data_pool()->Allocate(BATCH_CAPACITY * 8));
     bzero(tuple_mem, BATCH_CAPACITY * 8);
@@ -275,7 +277,7 @@ class DataStreamTest : public testing::Test {
     receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
     ReceiverInfo& info = receiver_info_.back();
     info.stream_recvr =
-        stream_mgr_->CreateRecvr(
+        stream_mgr_->CreateRecvr(&runtime_state_,
             *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size, profile);
     info.thread_handle =
         new thread(&DataStreamTest::ReadStream, this, &info);
@@ -286,6 +288,7 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "join receiver\n";
     for (int i = 0; i < receiver_info_.size(); ++i) {
       receiver_info_[i].thread_handle->join();
+      receiver_info_[i].stream_recvr->Close();
     }
   }
 
@@ -414,6 +417,8 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "closing sender" << sender_num;
     info.status = sender.Close(NULL);
     info.num_bytes_sent = sender.GetNumDataBytesSent();
+
+    batch->Reset();
   }
 
   void TestStream(TPartitionType::type stream_type, int num_senders,
@@ -435,8 +440,6 @@ class DataStreamTest : public testing::Test {
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
-
-
   // starting a sender w/o a corresponding receiver does not result in an error because
   // we cannot distinguish whether a receiver was never created or the receiver
   // willingly tore down the stream

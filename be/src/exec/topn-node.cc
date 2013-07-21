@@ -62,7 +62,7 @@ Status TopNNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 
 Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  tuple_pool_.reset(new MemPool(state->mem_limits()));
+  tuple_pool_.reset(new MemPool(mem_tracker()));
   tuple_descs_ = child(0)->row_desc().tuple_descriptors();
   Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc());
   Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc());
@@ -79,7 +79,7 @@ Status TopNNode::Open(RuntimeState* state) {
 
   // Limit of 0, no need to fetch anything from children.
   if (limit_ != 0) {
-    RowBatch batch(child(0)->row_desc(), state->batch_size(), *state->mem_limits());
+    RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
     bool eos;
     do {
       RETURN_IF_CANCELLED(state);
@@ -91,7 +91,7 @@ Status TopNNode::Open(RuntimeState* state) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         InsertTupleRow(batch.GetRow(i));
       }
-      RETURN_IF_LIMIT_EXCEEDED(state);
+      RETURN_IF_MEM_LIMIT_EXCEEDED(state);
     } while (!eos);
   }
   DCHECK_LE(priority_queue_->size(), limit_);
@@ -118,9 +118,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status TopNNode::Close(RuntimeState* state) {
-  if (memory_used_counter() != NULL && tuple_pool_.get() != NULL) {
-    COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
-  }
+  if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   return ExecNode::Close(state);
 }
 

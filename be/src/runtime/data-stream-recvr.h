@@ -28,10 +28,8 @@ class DataStreamMgr;
 // Receivers are created via DataStreamMgr::CreateRecvr().
 class DataStreamRecvr {
  public:
-  // deregister from mgr_
   ~DataStreamRecvr() {
-    // TODO: log error msg
-    mgr_->DeregisterRecvr(cb_->fragment_instance_id(), cb_->dest_node_id());
+    DCHECK(mgr_ == NULL) << "Must call Close()";
   }
 
   // Returns next row batch in data stream; blocks if there aren't any.
@@ -41,6 +39,13 @@ class DataStreamRecvr {
   // TODO: error handling
   RowBatch* GetBatch(bool* is_cancelled) {
     return cb_->GetBatch(is_cancelled);
+  }
+
+  // deregister from mgr_
+  void Close() {
+    // TODO: log error msg
+    mgr_->DeregisterRecvr(cb_->fragment_instance_id(), cb_->dest_node_id());
+    mgr_ = NULL;
   }
 
  private:

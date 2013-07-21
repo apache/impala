@@ -79,7 +79,7 @@ HashJoinNode::~HashJoinNode() {
 Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  build_pool_.reset(new MemPool(state->mem_limits())),
+  build_pool_.reset(new MemPool(mem_tracker()));
   build_timer_ =
       ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ =
@@ -115,10 +115,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_,
-      stores_nulls, false, id(), *state->mem_limits()));
+      stores_nulls, false, id(), mem_tracker()));
 
-  probe_batch_.reset(
-      new RowBatch(row_descriptor_, state->batch_size(), *state->mem_limits()));
+  probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size(), mem_tracker()));
 
   LlvmCodeGen* codegen = state->llvm_codegen();
   if (codegen != NULL) {
@@ -138,13 +137,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status HashJoinNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
-  // Must reset probe_batch_ in Close() to release resources
-  probe_batch_.reset(NULL);
-  if (memory_used_counter_ != NULL && hash_tbl_.get() != NULL) {
-    COUNTER_UPDATE(memory_used_counter_, build_pool_->peak_allocated_bytes());
-    COUNTER_UPDATE(memory_used_counter_, hash_tbl_->byte_size());
-  }
+  if (build_pool_.get() != NULL) build_pool_->FreeAll();
+  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  probe_batch_.reset();
   return ExecNode::Close(state);
 }
 
@@ -161,7 +156,7 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
   // The hash join node needs to keep in memory all build tuples, including the tuple
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
   // don't need to be stored in the build_pool_.
-  RowBatch build_batch(child(1)->row_desc(), state->batch_size(), *state->mem_limits());
+  RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     RETURN_IF_CANCELLED(state);
@@ -170,7 +165,7 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
     SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
-    RETURN_IF_LIMIT_EXCEEDED(state);
+    RETURN_IF_MEM_LIMIT_EXCEEDED(state);
 
     // Call codegen version if possible
     if (process_build_batch_fn_ == NULL) {

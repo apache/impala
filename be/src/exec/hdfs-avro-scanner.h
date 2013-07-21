@@ -126,9 +126,6 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     // necessary (i.e., all materialized fields are present in the file schema).
     // template_tuple_ is set to this value.
     Tuple* template_tuple;
-
-    // Pool for holding default string values referenced by template_tuple.
-    boost::scoped_ptr<MemPool> default_data_pool;
   };
 
   AvroFileHeader* avro_header_;

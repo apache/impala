@@ -27,7 +27,7 @@
 
 namespace impala {
 
-class MemLimit;
+class MemTracker;
 class TRowBatch;
 class Tuple;
 class TupleRow;
@@ -52,25 +52,16 @@ class RowBatch {
  public:
   // Create RowBatch for a maximum of 'capacity' rows of tuples specified
   // by 'row_desc'.
-  RowBatch(const RowDescriptor& row_desc, int capacity, 
-      const std::vector<MemLimit*>& limits)
-    : has_in_flight_row_(false),
-      num_rows_(0),
-      capacity_(capacity),
-      num_tuples_per_row_(row_desc.tuple_descriptors().size()),
-      row_desc_(row_desc),
-      tuple_data_pool_(new MemPool(&limits)) {
-    tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
-    tuple_ptrs_ = new Tuple*[capacity_ * num_tuples_per_row_];
-    DCHECK_GT(capacity, 0);
-  }
+  // tracker cannot be NULL.
+  RowBatch(const RowDescriptor& row_desc, int capacity, MemTracker* tracker);
 
   // Populate a row batch from input_batch by copying input_batch's
   // tuple_data into the row batch's mempool and converting all offsets
   // in the data back into pointers.
   // TODO: figure out how to transfer the data from input_batch to this RowBatch
   // (so that we don't need to make yet another copy)
-  RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch);
+  RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
+      MemTracker* tracker);
 
   // Releases all resources accumulated at this row batch.  This includes
   //  - tuple_ptrs
@@ -99,7 +90,7 @@ class RowBatch {
     num_rows_ += n;
     has_in_flight_row_ = false;
   }
-  
+
   void CommitLastRow() { CommitRows(1); }
 
   // Set function can be used to reduce the number of rows in the batch.  This is only
@@ -118,7 +109,7 @@ class RowBatch {
   // and io buffers).  This would be a trigger to compact the row batch or reclaim
   // the memory in some way.
   bool AtResourceLimit() {
-    return io_buffers_.size() > MAX_IO_BUFFERS || 
+    return io_buffers_.size() > MAX_IO_BUFFERS ||
            tuple_data_pool()->total_allocated_bytes() > MAX_MEM_POOL_SIZE;
   }
 
@@ -137,39 +128,18 @@ class RowBatch {
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
   }
 
-  void Reset() {
-    num_rows_ = 0;
-    has_in_flight_row_ = false;
-    tuple_data_pool_.reset(new MemPool(NULL));
-    for (int i = 0; i < io_buffers_.size(); ++i) {
-      io_buffers_[i]->Return();
-    }
-    io_buffers_.clear();
-  }
+  MemPool* tuple_data_pool() { return tuple_data_pool_.get(); }
+  int num_io_buffers() { return io_buffers_.size(); }
 
-  MemPool* tuple_data_pool() {
-    return tuple_data_pool_.get();
-  }
+  // Resets the row batch, returning all resources it has accumulated.
+  void Reset();
 
-  void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
-    io_buffers_.push_back(buffer);
-  }
-
-  int num_io_buffers() {
-    return io_buffers_.size();
-  }
+  // Add buffer to this row batch.
+  void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer);
 
   // Transfer ownership of resources to dest.  This includes tuple data in mem
   // pool and io buffers.
-  void TransferResourceOwnership(RowBatch* dest) {
-    dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
-    dest->io_buffers_.insert(dest->io_buffers_.begin(), 
-        io_buffers_.begin(), io_buffers_.end());
-    io_buffers_.clear();
-    // make sure we can't access our tuples after we gave up the pools holding the
-    // tuple data
-    Reset();
-  }
+  void TransferResourceOwnership(RowBatch* dest);
 
   void CopyRow(TupleRow* src, TupleRow* dest) {
     memcpy(dest, src, num_tuples_per_row_ * sizeof(Tuple*));
@@ -209,14 +179,16 @@ class RowBatch {
   int capacity() const { return capacity_; }
 
   const RowDescriptor& row_desc() const { return row_desc_; }
-  
+
   // Allow the row batch to accumulate 32MBs before it is considered at the limit.
   // TODO: are these numbers reasonable?
   static const int MAX_IO_BUFFERS = 4;
   static const int MAX_MEM_POOL_SIZE = 32 * 1024 * 1024;
 
  private:
-  // All members need to be handled in RowBatch::Swap()
+  MemTracker* mem_tracker_;  // not owned
+
+  // All members below need to be handled in RowBatch::Swap()
 
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
   int num_rows_;  // # of committed rows

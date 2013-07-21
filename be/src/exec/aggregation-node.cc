@@ -103,7 +103,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  tuple_pool_.reset(new MemPool(state->mem_limits()));
+  tuple_pool_.reset(new MemPool(mem_tracker()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ =
@@ -128,7 +128,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 
   // TODO: how many buckets?
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, true,
-      id(), *state->mem_limits()));
+      id(), mem_tracker()));
 
   // Determine the number of string slots in the output
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
@@ -168,7 +168,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 
   RETURN_IF_ERROR(children_[0]->Open(state));
 
-  RowBatch batch(children_[0]->row_desc(), state->batch_size(), *state->mem_limits());
+  RowBatch batch(children_[0]->row_desc(), state->batch_size(), mem_tracker());
   int64_t num_input_rows = 0;
   int64_t num_agg_rows = 0;
   while (true) {
@@ -191,15 +191,13 @@ Status AggregationNode::Open(RuntimeState* state) {
     } else {
       ProcessRowBatchWithGrouping(&batch);
     }
-    RETURN_IF_LIMIT_EXCEEDED(state);
     COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
-    COUNTER_SET(memory_used_counter(),
-        tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
     COUNTER_SET(hash_table_load_factor_counter_, hash_tbl_->load_factor());
     num_agg_rows += (hash_tbl_->size() - agg_rows_before);
     num_input_rows += batch.num_rows();
 
     batch.Reset();
+    RETURN_IF_MEM_LIMIT_EXCEEDED(state);
     if (eos) break;
   }
 
@@ -248,13 +246,8 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
-  if (memory_used_counter() != NULL && hash_tbl_.get() != NULL &&
-      hash_table_buckets_counter_ != NULL) {
-    COUNTER_SET(memory_used_counter(),
-        tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
-    COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
-  }
+  if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
+  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
   return ExecNode::Close(state);
 }
 

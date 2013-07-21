@@ -33,6 +33,7 @@ class TupleDescriptor;
 class TupleRow;
 class RuntimeState;
 class HdfsTableWriter;
+class MemTracker;
 
 // Records the temporary and final Hdfs file name,
 // the opened temporary Hdfs file, and the number of appended rows
@@ -84,7 +85,7 @@ struct OutputPartition {
 // The sink consumes all row batches of its child execution tree, and writes the evaluated
 // output_exprs into temporary Hdfs files. The query coordinator moves the temporary files
 // into their final locations after the sinks have finished executing.
-// 
+//
 // This sink supports static and dynamic partition inserts (Hive terminology),
 // as well as inserting into unpartitioned tables,
 // and optional overwriting of partitions/tables.
@@ -136,12 +137,12 @@ class HdfsTableSink : public DataSink {
   virtual RuntimeProfile* profile() { return runtime_profile_; }
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
-  RuntimeProfile::Counter* memory_used_counter() { return memory_used_counter_; }
+  MemTracker* mem_tracker() { return mem_tracker_.get(); }
   RuntimeProfile::Counter* encode_timer() { return encode_timer_; }
   RuntimeProfile::Counter* hdfs_write_timer() { return hdfs_write_timer_; }
 
   std::string DebugString() const;
-  
+
  private:
   // Initialises the filenames of a given output partition, and opens the temporary file.
   Status InitOutputPartition(RuntimeState* state,
@@ -242,11 +243,11 @@ class HdfsTableSink : public DataSink {
   typedef boost::unordered_map<std::string, HdfsPartitionDescriptor*>
       PartitionDescriptorMap;
   PartitionDescriptorMap partition_descriptor_map_;
-  
+
   // Allocated from runtime state's pool.
   RuntimeProfile* runtime_profile_;
   RuntimeProfile::Counter* rows_inserted_counter_;
-  RuntimeProfile::Counter* memory_used_counter_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   // Time spent converting tuple to on disk format.
   RuntimeProfile::Counter* encode_timer_;

@@ -20,7 +20,7 @@
 #include <boost/thread/locks.hpp>
 
 #include "common/logging.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -28,7 +28,7 @@
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 
-// This file contains internal structures to the IoMgr. Users of the IoMgr do 
+// This file contains internal structures to the IoMgr. Users of the IoMgr do
 // not need to include this file.
 namespace impala {
 
@@ -89,7 +89,7 @@ class DiskIoMgr::ReaderContext {
     Active,
 
     // Reader is in the process of being cancelled.  Cancellation is coordinated between
-    // different threads and when they are all complete, the reader context is moved to 
+    // different threads and when they are all complete, the reader context is moved to
     // the inactive state.
     Cancelled,
 
@@ -97,11 +97,11 @@ class DiskIoMgr::ReaderContext {
     // is invalid (i.e. it is equivalent to a dangling pointer).
     Inactive,
   };
-  
+
   ReaderContext(DiskIoMgr* parent, int num_disks);
-  
+
   // Resets this object for a new reader
-  void Reset(hdfsFS hdfs_connection, MemLimit* limit);
+  void Reset(hdfsFS hdfs_connection, MemTracker* tracker);
 
   // Decrements the number of active disks for this reader.  If the disk count
   // goes to 0, the disk complete condition variable is signaled.
@@ -117,7 +117,7 @@ class DiskIoMgr::ReaderContext {
 
   // Reader & Disk Scheduling: Readers that currently can't do work are not on
   // the disk's queue. These readers are ones that don't have any ranges in the
-  // in_flight_queue AND have not prepared a range by setting next_range_to_start. 
+  // in_flight_queue AND have not prepared a range by setting next_range_to_start.
   // The rule to make sure readers are scheduled correctly is to ensure anytime a
   // range is put on the in_flight_queue or anytime next_range_to_start is set to
   // NULL, the reader is scheduled.
@@ -155,9 +155,8 @@ class DiskIoMgr::ReaderContext {
   // of the reader.  NULL if this is a local reader.
   hdfsFS hdfs_connection_;
 
-  // Memory limit for this reader.  This is unowned by this object.  If NULL,
-  // this reader does not have a (per-reader) limit.
-  MemLimit* mem_limit_;
+  // Memory used for this reader.  This is unowned by this object.
+  MemTracker* mem_tracker_;
 
   // Total bytes read for this reader
   RuntimeProfile::Counter* bytes_read_counter_;
@@ -186,7 +185,7 @@ class DiskIoMgr::ReaderContext {
   // The number of scan ranges that have been completed for this reader.  Only
   // used for diagnostics.
   AtomicInt<int> num_finished_ranges_;
-  
+
   // The total number of ranges that have not been started. Only used for
   // diagnostics. This is the sum of all unstarted_ranges across all disks.
   AtomicInt<int> num_unstarted_ranges_;
@@ -223,7 +222,7 @@ class DiskIoMgr::ReaderContext {
   int num_disks_with_ranges_;
 
   // A list of ranges that should be returned in subsequent calls to
-  // GetNextRange. 
+  // GetNextRange.
   // There is a trade-off with when to populate this list.  Populating it on
   // demand means consumers need to wait (happens in DiskIoMgr::GetNextRange()).
   // Populating it preemptively means we make worse scheduling decisions.
@@ -247,7 +246,7 @@ class DiskIoMgr::ReaderContext {
 
     int num_remaining_ranges() const { return num_remaining_ranges_; }
     int& num_remaining_ranges() { return num_remaining_ranges_; }
-    
+
     ScanRange* next_range_to_start() { return next_range_to_start_; }
     void set_next_range_to_start(ScanRange* range) { next_range_to_start_ = range; }
 
@@ -266,11 +265,11 @@ class DiskIoMgr::ReaderContext {
       return v;
     }
 
-    const InternalQueue<ScanRange>* unstarted_ranges() const { 
-      return &unstarted_ranges_; 
+    const InternalQueue<ScanRange>* unstarted_ranges() const {
+      return &unstarted_ranges_;
     }
-    const InternalQueue<ScanRange>* in_flight_ranges() const { 
-      return &in_flight_ranges_; 
+    const InternalQueue<ScanRange>* in_flight_ranges() const {
+      return &in_flight_ranges_;
     }
 
     InternalQueue<ScanRange>* unstarted_ranges() { return &unstarted_ranges_; }
@@ -288,7 +287,7 @@ class DiskIoMgr::ReaderContext {
         reader->parent_->disk_queues_[disk_id]->EnqueueReader(reader);
       }
     }
-    
+
     // Increment the ref count on reader.  We need to track the number of threads per
     // reader per disk that are in the unlocked hdfs read code section. This is updated
     // by multiple threads without a lock so we need to use an atomic int.
@@ -305,7 +304,7 @@ class DiskIoMgr::ReaderContext {
     // read thread. Reader lock must be taken before this.
     void DecrementReadThreadAndCheckDone(ReaderContext* reader) {
       --num_threads_in_read_;
-      // We don't need to worry about reordered loads here because updating 
+      // We don't need to worry about reordered loads here because updating
       // num_threads_in_read_ uses an atomic, which is a barrier.
       if (!is_on_queue_ && num_threads_in_read_ == 0 && !done_) {
         // This thread is the last one for this reader on this disk, do final
@@ -325,13 +324,13 @@ class DiskIoMgr::ReaderContext {
       next_range_to_start_ = NULL;
     }
 
-   private: 
+   private:
     // If true, this disk is all done for this reader, including any cleanup.
     // If done is true, it means that this reader must not be on this disk's queue
     // *AND* there are no reading threads currently working on this reader. To satisfy
     // this, only the last thread (per disk) can set this to true.
     bool done_;
-    
+
     // For each disk, keeps track if the reader is on this disk's queue, indicating
     // the disk must do some work for this reader. The disk needs to do work in 3
     // cases:
@@ -345,7 +344,7 @@ class DiskIoMgr::ReaderContext {
     // and then remove the reader from the queue. Doing this causes thrashing of the
     // threads.
     bool is_on_queue_;
-    
+
     // For each disks, the number of scan ranges that have not been fully read.
     // In the non-cancellation path, this will hit 0, and done will be set to true
     // by the disk thread. This is undefined in the cancellation path (the various
@@ -381,11 +380,11 @@ class DiskIoMgr::ReaderContext {
     AtomicInt<int> num_threads_in_read_;
   };
 
-  // Per disk states to synchronize multiple disk threads accessing the same reader 
+  // Per disk states to synchronize multiple disk threads accessing the same reader
   // context.
   std::vector<PerDiskState> disk_states_;
 };
-  
+
 }
 
 #endif

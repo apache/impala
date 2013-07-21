@@ -25,6 +25,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "util/impalad-metrics.h"
+#include "runtime/mem-tracker.h"
 #include "util/url-coding.h"
 
 #include <vector>
@@ -172,8 +173,9 @@ Status HdfsTableSink::Init(RuntimeState* state) {
 
   rows_inserted_counter_ =
       ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
-  memory_used_counter_ =
-      ADD_COUNTER(profile(), "MemoryUsed", TCounterType::BYTES);
+  mem_tracker_.reset(
+      new MemTracker(profile(), -1, profile()->name(), state->instance_mem_tracker()));
+  state->RegisterMemTracker(mem_tracker_.get());
   encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
 

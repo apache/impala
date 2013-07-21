@@ -131,6 +131,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     total_compressed_byte_size_ = 0;
   }
 
+  // Close this writer. This is only called after Flush() and no more rows will
+  // be added.
+  void Close() {
+    compressor_->Close();
+  }
+
   PrimitiveType type() const { return expr_->type(); }
   uint64_t num_values() const { return num_values_; }
   uint64_t total_compressed_size() const { return total_compressed_byte_size_; }
@@ -227,7 +233,7 @@ class HdfsParquetTableWriter::ColumnWriter :
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = Encoding::PLAIN_DICTIONARY;
-    dict_encoder_.reset(new DictEncoder<T>(parent_->state_->mem_limits()));
+    dict_encoder_.reset(new DictEncoder<T>(parent_->per_file_mem_pool_.get()));
     dict_encoder_base_ = dict_encoder_.get();
   }
 
@@ -543,7 +549,8 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
       current_row_group_(NULL),
       row_count_(0),
       file_size_limit_(0),
-      reusable_col_mem_pool_(new MemPool(state->mem_limits())),
+      reusable_col_mem_pool_(new MemPool(parent_->mem_tracker())),
+      per_file_mem_pool_(new MemPool(parent_->mem_tracker())),
       row_idx_(0) {
 }
 
@@ -657,11 +664,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
 Status HdfsParquetTableWriter::InitNewFile() {
   DCHECK(current_row_group_ == NULL);
 
-  if (per_file_mem_pool_.get() != NULL) {
-    COUNTER_SET(parent_->memory_used_counter(),
-        per_file_mem_pool_->peak_allocated_bytes());
-  }
-  per_file_mem_pool_.reset(new MemPool(state_->mem_limits()));
+  per_file_mem_pool_->Clear();
 
   // Get the file limit
   RETURN_IF_ERROR(HdfsTableSink::GetFileBlockSize(output_, &file_size_limit_));
@@ -743,14 +746,16 @@ Status HdfsParquetTableWriter::Finalize() {
   file_metadata_.num_rows = row_count_;
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
-
-  COUNTER_SET(parent_->memory_used_counter(),
-      reusable_col_mem_pool_->peak_allocated_bytes());
-  if (per_file_mem_pool_.get() != NULL) {
-    COUNTER_SET(parent_->memory_used_counter(),
-        per_file_mem_pool_->peak_allocated_bytes());
-  }
   COUNTER_UPDATE(parent_->rows_inserted_counter(), row_count_);
+
+  // Release all accumulated memory
+  for (int i = 0; i < columns_.size(); ++i) {
+    columns_[i]->Close();
+  }
+  reusable_col_mem_pool_->FreeAll();
+  per_file_mem_pool_->FreeAll();
+  compression_staging_buffer_.clear();
+
   return Status::OK;
 }
 

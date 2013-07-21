@@ -34,7 +34,7 @@ SelectNode::SelectNode(
 Status SelectNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   child_row_batch_.reset(
-      new RowBatch(child(0)->row_desc(), state->batch_size(), *state->mem_limits()));
+      new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK;
 }
 
@@ -102,7 +102,8 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   return output_batch->IsFull() || output_batch->AtResourceLimit();
 }
 
- Status SelectNode::Close(RuntimeState* state) {
+Status SelectNode::Close(RuntimeState* state) {
+  child_row_batch_.reset();
   return ExecNode::Close(state);
 }
 

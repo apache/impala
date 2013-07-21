@@ -25,7 +25,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/state-store-subscriber.h"
@@ -65,7 +65,7 @@ ExecEnv::ExecEnv()
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     metrics_(new Metrics()),
-    mem_limit_(NULL),
+    mem_tracker_(NULL),
     thread_mgr_(new ThreadResourceMgr),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
@@ -92,11 +92,6 @@ ExecEnv::ExecEnv()
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
-
-  Status status = disk_io_mgr_->Init();
-  CHECK(status.ok());
-
-  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
 }
 
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
@@ -108,7 +103,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),
     metrics_(new Metrics()),
-    mem_limit_(NULL),
+    mem_tracker_(NULL),
     thread_mgr_(new ThreadResourceMgr),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()) {
@@ -133,11 +128,6 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
-
-  Status status = disk_io_mgr_->Init();
-  CHECK(status.ok());
-
-  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
 }
 
 ExecEnv::~ExecEnv() {
@@ -155,10 +145,6 @@ Status ExecEnv::StartServices() {
   if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
   }
-  // Limit of 0 means no memory limit.
-  if (bytes_limit > 0) {
-    mem_limit_.reset(new MemLimit(bytes_limit));
-  }
   // Minimal IO Buffer requirements:
   //   IO buffer (8MB default) * number of IO buffers per thread (5) *
   //   number of threads per core * number of cores
@@ -171,6 +157,10 @@ Status ExecEnv::StartServices() {
                  << " does not meet minimal memory requirement of "
                  << PrettyPrinter::Print(min_requirement, TCounterType::BYTES);
   }
+
+  // Limit of 0 means no memory limit.
+  mem_tracker_.reset(new MemTracker(bytes_limit > 0 ? bytes_limit : -1, "Process"));
+
   if (bytes_limit > MemInfo::physical_mem()) {
     LOG(WARNING) << "Memory limit "
                  << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
@@ -180,11 +170,12 @@ Status ExecEnv::StartServices() {
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
 
-  disk_io_mgr_->SetProcessMemLimit(mem_limit_.get());
+  RETURN_IF_ERROR(disk_io_mgr_->Init(mem_tracker_.get()));
+  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
 
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
-    AddDefaultPathHandlers(webserver_.get(), mem_limit_.get());
+    AddDefaultPathHandlers(webserver_.get(), mem_tracker_.get());
     RETURN_IF_ERROR(webserver_->Start());
   } else {
     LOG(INFO) << "Not starting webserver";

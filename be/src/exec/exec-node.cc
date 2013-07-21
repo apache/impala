@@ -30,6 +30,7 @@
 #include "exec/topn-node.h"
 #include "exec/select-node.h"
 #include "runtime/descriptors.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -59,8 +60,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     limit_(tnode.limit),
     num_rows_returned_(0),
     rows_returned_counter_(NULL),
-    rows_returned_rate_(NULL),
-    memory_used_counter_(NULL) {
+    rows_returned_rate_(NULL) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"
@@ -73,8 +73,11 @@ Status ExecNode::Prepare(RuntimeState* state) {
   DCHECK(runtime_profile_.get() != NULL);
   rows_returned_counter_ =
       ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
-  memory_used_counter_ =
-      ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
+  mem_tracker_.reset(new MemTracker(
+      runtime_profile_.get(), -1, runtime_profile_->name(),
+      state->instance_mem_tracker()));
+  state->RegisterMemTracker(mem_tracker_.get());
+
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
@@ -87,16 +90,21 @@ Status ExecNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
+ExecNode::~ExecNode() {
+}
+
 Status ExecNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
+  Status status = ExecDebugAction(TExecNodePhase::CLOSE, state);
   if (rows_returned_counter_ != NULL) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
-  Status result;
   for (int i = 0; i < children_.size(); ++i) {
-    result.AddError(children_[i]->Close(state));
+    status.AddError(children_[i]->Close(state));
   }
-  return result;
+  if (mem_tracker() != NULL) {
+    DCHECK_EQ(mem_tracker()->consumption(), 0) << "Leaked memory.";
+  }
+  return status;
 }
 
 void ExecNode::AddRuntimeExecOption(const string& str) {

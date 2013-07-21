@@ -192,6 +192,8 @@ class Sorter {
   // and prepares merger_ with the final runs.
   void MultilevelMerge();
 
+  MemTracker* mem_tracker() { return mem_tracker_.get(); }
+
   TupleDescriptor output_tuple_desc_;
   boost::scoped_ptr<RowDescriptor> output_row_desc_;
   const std::vector<Expr*> output_slot_exprs_;
@@ -214,7 +216,7 @@ class Sorter {
   // allocate somewhat more memory than this, but it is largely a constant amount.
   // (For instance, we allocate Blocks, ReservationContexts, and other housekeeping
   // objects.)
-  boost::scoped_ptr<MemLimit> mem_limit_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   // The current list of sorted runs (sorted tuple and auxiliary data).
   std::deque<Run*> runs_;

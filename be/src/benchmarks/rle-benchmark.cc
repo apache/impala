@@ -15,8 +15,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "runtime/mem-limit.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "experiments/bit-stream-utils.8byte.inline.h"
 #include "util/benchmark.h"
 #include "util/bit-stream-utils.inline.h"
@@ -191,8 +191,8 @@ void TestBitWriter8ByteDecode(int batch_size, void* d) {
 int main(int argc, char** argv) {
   CpuInfo::Init();
 
-  vector<MemLimit*> mem_limits;
-  MemPool pool(&mem_limits);
+  MemTracker tracker;
+  MemPool pool(&tracker);
 
   int num_values = 4096;
   int max_bits = 16;

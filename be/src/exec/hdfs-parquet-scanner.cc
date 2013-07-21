@@ -85,7 +85,7 @@ namespace impala {
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : HdfsScanner(scan_node, state),
       metadata_range_(NULL),
-      dictionary_pool_(new MemPool(scan_node_->runtime_state()->mem_limits())),
+      dictionary_pool_(new MemPool(scan_node->mem_tracker())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
   assemble_rows_timer_.Stop();
 }
@@ -118,6 +118,11 @@ class HdfsParquetScanner::BaseColumnReader {
           NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
     }
     return Status::OK;
+  }
+
+  // Called once when the scanner is complete for final cleanup.
+  void Close() {
+    if (decompressor_.get() != NULL) decompressor_->Close();
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
@@ -182,8 +187,7 @@ class HdfsParquetScanner::BaseColumnReader {
       field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
       metadata_(NULL),
       stream_(NULL),
-      decompressed_data_pool_(
-          new MemPool(parent->scan_node_->runtime_state()->mem_limits())),
+      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
       num_buffered_values_(0) {
   }
 
@@ -311,13 +315,18 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
 }
 
 Status HdfsParquetScanner::Close() {
+  vector<THdfsCompression::type> compression_types;
+  for (int i = 0; i < column_readers_.size(); ++i) {
+    if (column_readers_[i]->decompressed_data_pool_.get() != NULL) {
+      AttachPool(column_readers_[i]->decompressed_data_pool_.get());
+    }
+    column_readers_[i]->Close();
+    compression_types.push_back(column_readers_[i]->codec());
+  }
   AttachPool(dictionary_pool_.get());
   AddFinalRowBatch();
   context_->Close();
-  vector<THdfsCompression::type> compression_types;
-  for (int i = 0; i < column_readers_.size(); ++i) {
-    compression_types.push_back(column_readers_[i]->codec());
-  }
+
   // If this was a metadata only read (i.e. count(*)), there are no columns.
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);

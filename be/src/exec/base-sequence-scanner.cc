@@ -37,7 +37,7 @@ static const int MIN_SYNC_READ_SIZE = 10 * 1024; // bytes
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
+Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const vector<HdfsFileDesc*>& files) {
   // Issue just the header range for each file.  When the header is complete,
   // we'll issue the splits for that file.  Splits cannot be processed until the
@@ -55,11 +55,11 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges));
   return Status::OK;
 }
-  
+
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state)
   : HdfsScanner(node, state),
     header_(NULL),
-    data_buffer_pool_(new MemPool(state->mem_limits())),
+    data_buffer_pool_(new MemPool(node->mem_tracker())),
     block_start_(0),
     total_block_size_(0),
     num_syncs_(0) {
@@ -81,6 +81,7 @@ Status BaseSequenceScanner::Close() {
   VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
+  if (decompressor_.get() != NULL) decompressor_->Close();
   AttachPool(data_buffer_pool_.get());
   AddFinalRowBatch();
   context_->Close();
@@ -89,9 +90,6 @@ Status BaseSequenceScanner::Close() {
   }
   scan_node_->ReleaseCodegenFn(file_format(), codegen_fn_);
   codegen_fn_ = NULL;
-  // Collect the maximum amount of memory we used to process this file.
-  COUNTER_UPDATE(scan_node_->memory_used_counter(),
-      data_buffer_pool_->peak_allocated_bytes());
   return Status::OK;
 }
 
@@ -116,7 +114,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     scan_node_->AddDiskIoRanges(desc);
     return Status::OK;
   }
-  
+
   // Initialize state for new scan range
   finished_ = false;
   if (header_->is_compressed) stream_->set_compact_data(true);
@@ -134,7 +132,6 @@ Status BaseSequenceScanner::ProcessSplit() {
   RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE));
 
   // Process Range.
-  // We can continue through errors by skipping to the next SYNC hash. 
   while (!finished_) {
     status = ProcessRange();
     if (status.ok()) break;

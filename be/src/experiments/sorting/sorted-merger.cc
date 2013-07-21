@@ -17,8 +17,8 @@
 #include "exprs/expr.h"
 #include "sort-util.h"
 #include "util/tuple-row-compare.h"
-#include "runtime/mem-limit.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
@@ -42,10 +42,9 @@ SortedMerger::SortedMerger(
   DCHECK_EQ(sort_exprs_lhs.size(), sort_exprs_rhs.size());
   DCHECK_EQ(sort_exprs_lhs.size(), is_asc.size());
 
-  mem_limit_.reset(new MemLimit(mem_limit));
-  mem_limits_.push_back(mem_limit_.get());
-  tuple_pool_.reset(new MemPool(&mem_limits_));
-  last_output_row_pool_.reset(new MemPool(&mem_limits_));
+  mem_tracker_.reset(new MemTracker(mem_limit));
+  tuple_pool_.reset(new MemPool(mem_tracker_.get()));
+  last_output_row_pool_.reset(new MemPool(mem_tracker_.get()));
 }
 
 // Represents an incoming sorted run of TupleRows, comprised of a set of RowBatches.
@@ -53,10 +52,10 @@ SortedMerger::SortedMerger(
 class SortedMerger::SortedRun {
  public:
   SortedRun(RowBatchSupplier* batch_supplier, MergeHeap* merge_heap,
-      const RowDescriptor& row_desc, const vector<MemLimit*>& mem_limits)
+      const RowDescriptor& row_desc, MemTracker* mem_tracker)
       : batch_supplier_(batch_supplier), merge_heap_(merge_heap),
         index_(0), end_of_batches_(false) {
-    batch_.reset(new RowBatch(row_desc, ROW_BATCH_SIZE, mem_limits));
+    batch_.reset(new RowBatch(row_desc, ROW_BATCH_SIZE, mem_tracker));
   }
 
   Status Next() {
@@ -107,7 +106,7 @@ SortedMerger::~SortedMerger() {
 
 void SortedMerger::AddRun(RowBatchSupplier* batch_supplier) {
   SortedRun* supplier =
-      new SortedRun(batch_supplier, &merge_heap_, row_desc_, mem_limits_);
+      new SortedRun(batch_supplier, &merge_heap_, row_desc_, mem_tracker_.get());
   supplier->Next();
   input_runs_.push_back(supplier);
 }

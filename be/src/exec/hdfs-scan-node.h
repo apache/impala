@@ -137,6 +137,8 @@ class HdfsScanNode : public ScanNode {
 
   DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
 
+  MemPool* scan_node_pool() { return scan_node_pool_.get(); }
+
   const static int SKIP_COLUMN = -1;
 
   // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
@@ -272,10 +274,6 @@ class HdfsScanNode : public ScanNode {
   // this once per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
 
-  // Mem pool for tuple buffer data. Used by scanners for allocation,
-  // but owned here.
-  boost::scoped_ptr<MemPool> tuple_pool_;
-
   // Files and their splits
   typedef std::map<std::string, HdfsFileDesc*> SplitsMap;
   SplitsMap per_file_splits_;
@@ -385,8 +383,9 @@ class HdfsScanNode : public ScanNode {
   // should be started.
   bool all_ranges_started_;
 
-  // Pool for allocating partition key tuple and string buffers
-  boost::scoped_ptr<MemPool> partition_key_pool_;
+  // Pool for allocating some amounts of memory that is shared between scanners.
+  // e.g. partition key tuple and their string buffers
+  boost::scoped_ptr<MemPool> scan_node_pool_;
 
   // Status of failed operations.  This is set in the ScannerThreads
   // Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup

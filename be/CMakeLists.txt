@@ -185,28 +185,26 @@ set (IMPALA_LINK_LIBS
   Service
   Exec
   Exprs
-  Opcode
-  Exprs
   Util
-  ThriftSaslTransport
   Runtime
   Util
   Statestore
   CodeGen
   Common
-  ImpalaThrift
   Service
   Exec
   Exprs
   Opcode
   Exprs
   Util
-  ImpalaThrift
   Runtime
   Util
   Common
   Webserver
   GlobalFlags
+  Opcode
+  ThriftSaslTransport
+  ImpalaThrift
 # Below are all external dependencies.  They should some after the impala libs.
   ${SNAPPY_STATIC_LIB}
   ${RE2_STATIC_LIB}

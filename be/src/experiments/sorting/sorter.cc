@@ -25,8 +25,8 @@
 #include "sort-util.h"
 #include "common/atomic.h"
 #include "exprs/expr.h"
-#include "runtime/mem-limit.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
@@ -86,7 +86,7 @@ Sorter::Sorter(
   int num_buffers_per_run = (has_aux_data_ ? 4 : 2);
   DCHECK_GE(mem_limit, 3 * num_buffers_per_run * block_size);
 
-  mem_limit_.reset(new MemLimit(mem_limit));
+  mem_tracker_.reset(new MemTracker(mem_limit));
 
   buffer_pool_.reset(new BufferPool(mem_limit/block_size, block_size));
   disk_manager_.reset(new DiskWriter::BufferManager(buffer_pool_.get(), writer));
@@ -113,9 +113,7 @@ Sorter::RunBuilder::RunBuilder(Sorter* sorter, BufferPool* buffer_pool)
       tuple_pool_(new BlockMemPool(sorter_->obj_pool_.get(), buffer_pool)),
       aux_pool_(new BlockMemPool(sorter_->obj_pool_.get(), buffer_pool)),
       first_sort_expr_over_budget_(sorter_->sort_exprs_lhs_.size()) {
-  vector<MemLimit*> mem_limits;
-  mem_limits.push_back(sorter->mem_limit_.get());
-  unsorted_aux_pool_.reset(new MemPool(&mem_limits));
+  unsorted_aux_pool_.reset(new MemPool(sorter->mem_tracker()));
 
   if (sorter_->extract_keys_) {
     tuples_ = BlockedVector<Tuple>(tuple_pool_.get(), sorter_->tuple_size_);
@@ -540,9 +538,7 @@ void Sorter::CopyAuxString(Tuple* tuple, SlotDescriptor* slot, BlockMemPool* aux
 
 void Sorter::MultilevelMerge() {
   COUNTER_SET(stats_.phase2_initial_num_runs, (int64_t) runs_.size());
-  vector<MemLimit*> mem_limits;
-  mem_limits.push_back(mem_limit_.get());
-  intermediate_batch_.reset(new RowBatch(*output_row_desc_.get(), 256, mem_limits));
+  intermediate_batch_.reset(new RowBatch(*output_row_desc_.get(), 256, mem_tracker()));
 
   // Require double buffering per run.
   int num_buffers_per_run = (has_aux_data_ ? 4 : 2);
@@ -561,7 +557,7 @@ void Sorter::MultilevelMerge() {
     // Merge each set of 'runs_merged_inner' runs into one.
     SortedMerger merger(*output_row_desc_.get(), sort_exprs_lhs_,
                         sort_exprs_rhs_, is_asc_, nulls_first_, remove_dups_,
-                        mem_limit_->limit());
+                        mem_tracker()->limit());
 
     for (int i = 0; i < runs_merged_inner; ++i) {
       RunBatchSupplier* supplier =

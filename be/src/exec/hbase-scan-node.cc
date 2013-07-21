@@ -62,7 +62,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
 
-  tuple_pool_.reset(new MemPool(state->mem_limits())),
+  tuple_pool_.reset(new MemPool(mem_tracker()));
   hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
@@ -158,7 +158,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   bool has_next = false;
   while (true) {
     RETURN_IF_CANCELLED(state);
-    if (ReachedLimit() || row_batch->IsFull() || 
+    if (ReachedLimit() || row_batch->IsFull() ||
         tuple_pool_->total_allocated_bytes() > RowBatch::MAX_MEM_POOL_SIZE) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
@@ -256,22 +256,17 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  if (memory_used_counter() != NULL) {
-    COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
-  }
   PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
 
   if (hbase_scanner_.get() != NULL) {
     JNIEnv* env = getJNIEnv();
     hbase_scanner_->Close(env);
   }
+  if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
 
   // Report total number of errors.
-  if (num_errors_ > 0) {
-    state->ReportFileErrors(table_name_, num_errors_);
-  }
+  if (num_errors_ > 0) state->ReportFileErrors(table_name_, num_errors_);
   return ExecNode::Close(state);
 }
 

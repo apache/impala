@@ -65,6 +65,15 @@ class AtomicInt {
     return *this;
   }
 
+  AtomicInt& operator|=(T v) {
+    __sync_or_and_fetch(&value_, v);
+    return *this;
+  }
+  AtomicInt& operator&=(T v) {
+    __sync_and_and_fetch(&value_, v);
+    return *this;
+  }
+
   // These define the preincrement (i.e. --value) operators.
   AtomicInt& operator++() {
     __sync_add_and_fetch(&value_, 1);

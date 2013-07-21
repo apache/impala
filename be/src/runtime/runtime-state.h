@@ -44,7 +44,7 @@ class ExecEnv;
 class Expr;
 class LlvmCodeGen;
 class TimestampValue;
-class MemLimit;
+class MemTracker;
 class DataStreamRecvr;
 
 // Counts how many rows an INSERT query has added to a particular partition
@@ -87,7 +87,6 @@ class RuntimeState {
     return query_options_.abort_on_default_limit_exceeded;
   }
   int max_errors() const { return query_options_.max_errors; }
-  int max_io_buffers() const { return query_options_.max_io_buffers; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::string& user() const { return user_; }
@@ -102,8 +101,7 @@ class RuntimeState {
   HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
   ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
-  std::vector<MemLimit*>* mem_limits() { return &mem_limits_; }
-  MemLimit* query_mem_limit() { return query_mem_limit_; }
+  MemTracker* instance_mem_tracker() { return instance_mem_tracker_; }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -121,12 +119,15 @@ class RuntimeState {
       const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
       int buffer_size, RuntimeProfile* profile);
 
-  // Sets the memory limit and adds it to mem_limits_.  This is the same MemLimit
-  // object that is used by all fragments for this query on this machine.
-  void SetQueryMemLimit(MemLimit* limit) {
-    DCHECK(query_mem_limit_ == NULL);
-    query_mem_limit_ = limit;
-    mem_limits_.push_back(limit);
+  void SetInstanceMemTracker(MemTracker* tracker) {
+    instance_mem_tracker_ = tracker;
+    mem_trackers_.push_back(tracker);
+  }
+
+  // Registers a tracker for this RuntimState (Fragment Instance). The usage for
+  // these trackers is output when the mem limit is exceeded.
+  void RegisterMemTracker(MemTracker* tracker) {
+    mem_trackers_.push_back(tracker);
   }
 
   // Appends error to the error_log_ if there is space
@@ -159,6 +160,9 @@ class RuntimeState {
 
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
+
+  // sets the state to mem limit exceeded and logs all the registered trackers
+  void LogMemLimitExceeded();
 
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
@@ -216,14 +220,18 @@ class RuntimeState {
 
   RuntimeProfile profile_;
 
-  // all mem limits that apply to this query
-  std::vector<MemLimit*> mem_limits_;
+  // all registered mem trackers; not owned
+  std::vector<MemTracker*> mem_trackers_;
 
-  // Query memory limit.  Also contained in mem_limits_
-  MemLimit* query_mem_limit_;
+  // Fragment instance memory tracker.  Also contained in mem_trackers_
+  MemTracker* instance_mem_tracker_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;
+
+  // if true, execution should stop with MEM_LIMIT_EXCEEDED
+  boost::mutex mem_limit_exceeded_lock_;
+  bool is_mem_limit_exceeded_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

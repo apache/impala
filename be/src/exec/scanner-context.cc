@@ -27,7 +27,7 @@ using namespace std;
 
 static const int DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 
-ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node, 
+ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
   : state_(state),
     scan_node_(scan_node),
@@ -40,6 +40,7 @@ void ScannerContext::CloseStreams() {
   // Return all resources for the current streams
   for (int i = 0; i < streams_.size(); ++i) {
     streams_[i]->ReturnAllBuffers();
+    streams_[i]->boundary_pool_->FreeAll();
   }
   streams_.clear();
 }
@@ -51,9 +52,9 @@ void ScannerContext::AttachCompletedResources(RowBatch* batch, bool done) {
   }
 }
 
-ScannerContext::Stream::Stream(ScannerContext* parent) 
+ScannerContext::Stream::Stream(ScannerContext* parent)
   : parent_(parent),
-    boundary_pool_(new MemPool(parent->state_->mem_limits())),
+    boundary_pool_(new MemPool(parent->scan_node_->mem_tracker())),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())) {
 }
 
@@ -110,12 +111,13 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
     }
   }
   completed_io_buffers_.clear();
-  
+
   if (!compact_data_) {
     // If we're not done, keep using the last chunk allocated in boundary_pool_ so we
     // don't have to reallocate. If we are done, transfer it to the row batch.
     batch->tuple_data_pool()->AcquireData(boundary_pool_.get(), /* keep_current */ !done);
   }
+  if (done) boundary_pool_->FreeAll();
 }
 
 Status ScannerContext::Stream::GetNextBuffer() {
@@ -275,8 +277,8 @@ void ScannerContext::Close() {
   }
 }
 
-bool ScannerContext::cancelled() const { 
-  return scan_node_->done_; 
+bool ScannerContext::cancelled() const {
+  return scan_node_->done_;
 }
 
 Status ScannerContext::Stream::ReportIncompleteRead(int length, int bytes_read) {

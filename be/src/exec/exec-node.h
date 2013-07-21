@@ -21,7 +21,7 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
-#include "runtime/mem-limit.h"
+#include "runtime/mem-tracker.h"  // used in RETURN_IF_MEM_LIMIT_EXCEEDED()
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -35,6 +35,7 @@ class RuntimeState;
 class TPlan;
 class TupleRow;
 class DataSink;
+class MemTracker;
 
 // Superclass of all executor nodes.
 // All subclasses need to make sure to check RuntimeState::is_cancelled()
@@ -45,7 +46,7 @@ class ExecNode {
   // Init conjuncts.
   ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual ~ExecNode() {}
+  virtual ~ExecNode();
 
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
@@ -115,7 +116,7 @@ class ExecNode {
   // Codegen'd signature is bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow*);
   // The first two arguments are ignored (the Expr's are baked into the codegen)
   // but it is included so the signature can match EvalConjuncts.
-  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen, 
+  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen,
       const std::vector<Expr*>& conjuncts);
 
   // Returns a string representation in DFS order of the plan rooted at this.
@@ -139,7 +140,7 @@ class ExecNode {
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
 
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
-  RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
+  MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
   // Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
@@ -154,7 +155,7 @@ class ExecNode {
   TPlanNodeType::type type_;
   ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
-  
+
   // True if the codegen'd function for 'conjuncts_' is thread safe.  If not, copies
   // of the conjuncts_ need to be made if the conjuncts will be evaluated by multiple
   // threads.
@@ -175,8 +176,9 @@ class ExecNode {
   boost::scoped_ptr<RuntimeProfile> runtime_profile_;
   RuntimeProfile::Counter* rows_returned_counter_;
   RuntimeProfile::Counter* rows_returned_rate_;
+
   // Account for peak memory used by this node
-  RuntimeProfile::Counter* memory_used_counter_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   // Execution options that are determined at runtime.  This is added to the
   // runtime profile at Close().  Examples for options logged here would be
@@ -207,9 +209,10 @@ class ExecNode {
   void AddRuntimeExecOption(const std::string& option);
 };
 
-#define RETURN_IF_LIMIT_EXCEEDED(state) \
+#define RETURN_IF_MEM_LIMIT_EXCEEDED(state) \
   do { \
-    if (UNLIKELY(MemLimit::LimitExceeded(*(state)->mem_limits()))) { \
+    if (UNLIKELY((state)->instance_mem_tracker()->AnyLimitExceeded())) { \
+      state->LogMemLimitExceeded(); \
       return Status::MEM_LIMIT_EXCEEDED; \
     } \
   } while (false)

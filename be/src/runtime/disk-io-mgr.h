@@ -34,7 +34,7 @@
 
 namespace impala {
 
-class MemLimit;
+class MemTracker;
 
 // Manager object that schedules IO for all queries on all disks. Each query maps
 // to one or more readers, each of which has its own queue of scan ranges. The
@@ -144,8 +144,14 @@ class DiskIoMgr {
     int64_t len() { return len_; }
     bool eosr() { return eosr_; }
 
+    int capacity() const;
+
     // Returns the offset within the scan range that this buffer starts at
     int64_t scan_range_offset() const { return scan_range_offset_; }
+
+    // Updates this buffer buffer to be owned by the new tracker. Consumption is
+    // release from the current tracker and added to the new one.
+    void SetMemTracker(MemTracker* tracker);
 
     // Returns the buffer to the IoMgr. This must be called for every buffer
     // returned by GetNext()/Read() that did not return an error. This is non-blocking.
@@ -162,6 +168,9 @@ class DiskIoMgr {
 
     // Reader that this buffer is for
     ReaderContext* reader_;
+
+    // The current tracker this buffer is associated with.
+    MemTracker* mem_tracker_;
 
     // Scan range that this buffer is for.
     ScanRange* scan_range_;
@@ -333,13 +342,7 @@ class DiskIoMgr {
   ~DiskIoMgr();
 
   // Initialize the IoMgr. Must be called once before any of the other APIs.
-  Status Init(MemLimit* process_mem_limit = NULL);
-
-  // Sets the process wide mem limit. If this is exceeded, io requests will
-  // fail until we are under the limit again.
-  void SetProcessMemLimit(MemLimit* process_mem_limit) {
-    process_mem_limit_ = process_mem_limit;
-  }
+  Status Init(MemTracker* process_mem_tracker);
 
   // Allocates tracking structure for this reader. Register a new reader which is
   // returned in *reader.
@@ -347,12 +350,12 @@ class DiskIoMgr {
   // each reader.
   // hdfs: is the handle to the hdfs connection. If NULL, it is assumed all
   //    scan ranges are on the local file system
-  // reader_mem_limit: If non-null, the memory limit for this reader. IO buffers
-  //    used for this reader will count against this limit. If the limit is exceeded
+  // reader_mem_tracker: If non-null, the memory tracker for this reader. IO buffers
+  //    used for this reader will be tracked by this. If the limit is exceeded
   //    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   //    GetNext().
   Status RegisterReader(hdfsFS hdfs, ReaderContext** reader,
-      MemLimit* reader_mem_limit = NULL);
+      MemTracker* reader_mem_tracker = NULL);
 
   // Unregisters reader from the disk IoMgr. This must be called for every
   // RegisterReader() regardless of cancellation and must be called in the
@@ -442,8 +445,8 @@ class DiskIoMgr {
   // Pool to allocate BufferDescriptors
   ObjectPool pool_;
 
-  // Process memory limit that tracks io buffers.
-  MemLimit* process_mem_limit_;
+  // Process memory tracker; needed to account for io buffers
+  MemTracker* process_mem_tracker_;
 
   // Number of worker(read) threads per disk. Also the max depth of queued
   // work to the disk.
@@ -504,8 +507,7 @@ class DiskIoMgr {
   // Returns a buffer to read into that is the size of max_read_size_. If there is a
   // free buffer in the 'free_buffers_', that is returned, otherwise a new one is
   // allocated.
-  // Updates mem limits for reader
-  char* GetFreeBuffer(ReaderContext* reader);
+  char* GetFreeBuffer();
 
   // Garbage collect all unused io buffers. This is currently only triggered when the
   // process wide limit is hit. This is not good enough. While it is sufficient for
@@ -513,8 +515,8 @@ class DiskIoMgr {
   // TODO: make this run periodically?
   void GcIoBuffers();
 
-  // Returns a buffer to the free list and updates mem usage for 'reader'
-  void ReturnFreeBuffer(ReaderContext* reader, char* buffer);
+  // Returns a buffer to the free list.
+  void ReturnFreeBuffer(char* buffer);
 
   // Disk worker thread loop. This function reads the next range from the
   // disk queue if there are available buffers and places the read buffer

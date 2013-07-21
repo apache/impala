@@ -54,7 +54,7 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
     while ((range = blocked_ranges_.Dequeue()) != NULL) {
       range->Cancel(status);
     }
-    
+
     // Schedule reader on all disks. The disks will notice it is cancelled and do any
     // required cleanup
     for (int i = 0; i < disk_states_.size(); ++i) {
@@ -62,7 +62,7 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
       state.ScheduleReader(this, i);
     }
   }
-  
+
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
   // a cancelled status.
   ready_to_start_ranges_cv_.notify_all();
@@ -79,7 +79,7 @@ DiskIoMgr::ReaderContext::ReaderContext(DiskIoMgr* parent, int num_disks)
 }
 
 // Resets this object for a new reader
-void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemLimit* limit) {
+void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker) {
   DCHECK_EQ(state_, Inactive);
   status_ = Status::OK;
 
@@ -90,7 +90,7 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemLimit* limit) {
 
   state_ = Active;
   hdfs_connection_ = hdfs_connection;
-  mem_limit_ = limit;
+  mem_tracker_ = tracker;
 
   num_unstarted_ranges_ = 0;
   num_disks_with_ranges_ = 0;
@@ -247,7 +247,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
       return false;
     }
   }
-  
+
   return true;
 }
 

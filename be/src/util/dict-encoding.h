@@ -25,6 +25,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 #include "util/rle-encoding.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -76,9 +77,8 @@ class DictEncoderBase {
   int dict_encoded_size() { return dict_encoded_size_; }
 
  protected:
-  DictEncoderBase(const std::vector<MemLimit*>* limits)
-    : dict_encoded_size_(0),
-      pool_(new MemPool(limits)) {
+  DictEncoderBase(MemPool* pool)
+    : dict_encoded_size_(0), pool_(pool) {
   }
 
   // Indices that have not yet be written out by WriteData().
@@ -87,14 +87,14 @@ class DictEncoderBase {
   // The number of bytes needed to encode the dictionary.
   int dict_encoded_size_;
 
-  // Pool to store StringValue data
-  boost::scoped_ptr<MemPool> pool_;
+  // Pool to store StringValue data. Not owned.
+  MemPool* pool_;
 };
 
 template<typename T>
 class DictEncoder : public DictEncoderBase {
  public:
-  DictEncoder(const std::vector<MemLimit*>* limits) : DictEncoderBase(limits) { }
+  DictEncoder(MemPool* pool) : DictEncoderBase(pool) { }
 
   // Encode value. Returns the number of bytes added to the dictionary page length (will
   // be 0 if this value is already in the dictionary). Note that this does not actually

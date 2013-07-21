@@ -129,7 +129,7 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated,
   } else if (!reuse_buffer_ || out_buffer_ == NULL) {
     // guess that we will need no more the input length.
     buffer_length_ = input_length;
-    out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
+    out_buffer_ = temp_memory_pool_->Allocate(buffer_length_);
   }
 
   unsigned int outlen;
@@ -137,9 +137,9 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated,
   while (ret == BZ_OUTBUFF_FULL) {
     if (out_buffer_ == NULL) {
       DCHECK(!output_preallocated);
-      temp_memory_pool_.Clear();
+      temp_memory_pool_->Clear();
       buffer_length_ = buffer_length_ * 2;
-      out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
+      out_buffer_ = temp_memory_pool_->Allocate(buffer_length_);
     }
     outlen = static_cast<unsigned int>(buffer_length_);
     if ((ret = BZ2_bzBuffToBuffCompress(reinterpret_cast<char*>(out_buffer_), &outlen,
@@ -160,7 +160,7 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated,
 
   *output = out_buffer_;
   *output_length = outlen;
-  memory_pool_->AcquireData(&temp_memory_pool_, false);
+  memory_pool_->AcquireData(temp_memory_pool_.get(), false);
   return Status::OK;
 }
 

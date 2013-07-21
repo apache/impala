@@ -16,8 +16,8 @@
 #include <gtest/gtest.h>
 
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-buffer.h"
-
 
 using namespace std;
 
@@ -32,7 +32,8 @@ void ValidateString(const string& std_str, const StringBuffer& str) {
 }
 
 TEST(StringBufferTest, Basic) {
-  MemPool pool(NULL);
+  MemTracker tracker;
+  MemPool pool(&tracker);
   StringBuffer str(&pool);
   string std_str;
 
@@ -58,7 +59,7 @@ TEST(StringBufferTest, Basic) {
   std_str.assign("foo");
   str.Assign("foo", strlen("foo"));
   ValidateString(std_str, str);
-  
+
   // Clear
   std_str.clear();
   str.Clear();
@@ -66,6 +67,8 @@ TEST(StringBufferTest, Basic) {
 
   // Underlying buffer size should be the length of the max string during the test.
   EXPECT_EQ(str.buffer_size(), strlen("HelloWorld"));
+
+  pool.FreeAll();
 }
 
 }

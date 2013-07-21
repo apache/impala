@@ -22,6 +22,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/raw-value.h"
+#include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 
 #include "gen-cpp/ImpalaInternalService.h"
@@ -35,17 +36,19 @@ using namespace apache::thrift::transport;
 
 namespace impala {
 
-DataStreamMgr::StreamControlBlock::StreamControlBlock(
+DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
     const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size,
     RuntimeProfile* profile)
-  : fragment_instance_id_(fragment_instance_id),
+  : state_(state),
+    fragment_instance_id_(fragment_instance_id),
     dest_node_id_(dest_node_id),
     row_desc_(row_desc),
     is_cancelled_(false),
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
-    num_remaining_senders_(num_senders) {
+    num_remaining_senders_(num_senders),
+    mem_tracker_(profile, -1, "DataStreamMgr", state->instance_mem_tracker()) {
   bytes_received_counter_ =
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
   deserialize_row_batch_timer_ =
@@ -54,6 +57,7 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
   buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer(*)");
   data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
   first_batch_wait_timer_ = ADD_TIMER(profile, "FirstBatchArrivalWaitTime");
+  state->RegisterMemTracker(&mem_tracker_);
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
@@ -94,7 +98,7 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
   auto_ptr<RowBatch> batch;
   {
     SCOPED_TIMER(deserialize_row_batch_timer_);
-    batch.reset(new RowBatch(row_desc_, thrift_batch));
+    batch.reset(new RowBatch(row_desc_, thrift_batch, &mem_tracker_));
   }
   COUNTER_UPDATE(bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
@@ -190,15 +194,15 @@ inline uint32_t DataStreamMgr::GetHashValue(
   return value;
 }
 
-DataStreamRecvr* DataStreamMgr::CreateRecvr(
+DataStreamRecvr* DataStreamMgr::CreateRecvr(RuntimeState* state,
     const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile) {
   DCHECK(profile != NULL);
   VLOG_FILE << "creating receiver for fragment="
             << fragment_instance_id << ", node=" << dest_node_id;
   shared_ptr<StreamControlBlock> cb(
-      new StreamControlBlock(row_desc, fragment_instance_id, dest_node_id, num_senders,
-                             buffer_size, profile));
+      new StreamControlBlock(state, row_desc, fragment_instance_id, dest_node_id,
+                             num_senders, buffer_size, profile));
   size_t hash_value = GetHashValue(fragment_instance_id, dest_node_id);
   lock_guard<mutex> l(lock_);
   fragment_stream_set_.insert(make_pair(fragment_instance_id, dest_node_id));

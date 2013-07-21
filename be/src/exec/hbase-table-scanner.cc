@@ -95,8 +95,8 @@ HBaseTableScanner::HBaseTableScanner(
     num_addl_requested_cols_(0),
     num_keyvalues_(0),
     all_keyvalues_present_(false),
-    value_pool_(new MemPool(state->mem_limits())),
-    buffer_pool_(new MemPool(state->mem_limits())),
+    value_pool_(new MemPool(scan_node_->mem_tracker())),
+    buffer_pool_(new MemPool(scan_node_->mem_tracker())),
     scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
       "HBaseTableScanner.ScanSetup")) {
   const TQueryOptions& query_option = state->query_options();
@@ -647,4 +647,7 @@ void HBaseTableScanner::Close(JNIEnv* env) {
 
   // Close the HTable so that the connections are not kept around.
   if (htable_.get() != NULL) htable_->Close();
+
+  value_pool_->FreeAll();
+  buffer_pool_->FreeAll();
 }

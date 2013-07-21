@@ -65,15 +65,11 @@ Status MergeNode::Prepare(RuntimeState* state) {
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(const_result_expr_lists_[i], state, row_desc()));
-    LOG(INFO) << "const result exprs " << i << ": "
-        << Expr::DebugString(const_result_expr_lists_[i]);
     DCHECK_EQ(const_result_expr_lists_[i].size(), tuple_desc_->slots().size());
   }
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(result_expr_lists_[i], state, child(i)->row_desc()));
-    LOG(INFO) << "result exprs " << i << ": "
-        << Expr::DebugString(result_expr_lists_[i]);
     DCHECK_EQ(result_expr_lists_[i].size(), tuple_desc_->slots().size());
   }
   return Status::OK;
@@ -113,7 +109,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     if (child_row_batch_.get() == NULL) {
       RETURN_IF_CANCELLED(state);
       child_row_batch_.reset(new RowBatch(
-          child(child_idx_)->row_desc(), state->batch_size(), *state->mem_limits()));
+          child(child_idx_)->row_desc(), state->batch_size(), mem_tracker()));
       // Open child and fetch the first row batch.
       RETURN_IF_ERROR(child(child_idx_)->Open(state));
       RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
@@ -144,7 +140,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
     // Close current child and move on to next one.
     ++child_idx_;
-    child_row_batch_.reset(NULL);
+    child_row_batch_.reset();
   }
 
   child_idx_ = INVALID_CHILD_IDX;
@@ -153,8 +149,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status MergeNode::Close(RuntimeState* state) {
-  // don't call ExecNode::Close(), it always closes all children
-  child_row_batch_.reset(NULL);
+  child_row_batch_.reset();
   return ExecNode::Close(state);
 }
 

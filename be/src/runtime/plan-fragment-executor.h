@@ -36,6 +36,7 @@ class DataSink;
 class DataStreamMgr;
 class RuntimeProfile;
 class RuntimeState;
+class MemTracker;
 class TRowBatch;
 class TPlanExecRequest;
 class TPlanFragment;
@@ -134,14 +135,10 @@ class PlanFragmentExecutor {
   // Profile information for plan and output sink.
   RuntimeProfile* profile();
 
-  // Name for peak memory usage counter
-  static const std::string PEAK_MEMORY_USAGE;
-
  private:
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
   TUniqueId query_id_;
-  boost::shared_ptr<MemLimit> mem_limit_;
 
   // profile reporting-related
   ReportStatusCallback report_status_cb_;
@@ -199,8 +196,12 @@ class PlanFragmentExecutor {
   // of the execution.
   RuntimeProfile::Counter* average_thread_tokens_;
 
-  // Peak memory consumed
-  RuntimeProfile::Counter* peak_mem_usage_;
+  // Memory usage of this fragment instance
+  boost::scoped_ptr<MemTracker> mem_tracker_;
+
+  // shared_ptr to query MemTracker; we need it to stick around at least until we're
+  // done
+  boost::shared_ptr<MemTracker> query_mem_tracker_;
 
   // Sampled memory usage at even time intervals.
   RuntimeProfile::TimeSeriesCounter* mem_usage_sampled_counter_;

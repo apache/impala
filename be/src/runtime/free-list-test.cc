@@ -17,25 +17,26 @@
 
 #include "runtime/free-list.h"
 #include "runtime/mem-pool.h"
-
+#include "runtime/mem-tracker.h"
 
 using namespace std;
 
 namespace impala {
 
 TEST(FreeListTest, Basic) {
-  MemPool pool(NULL);
+  MemTracker tracker;
+  MemPool pool(&tracker);
   FreeList list;
 
   int allocated_size;
   uint8_t* free_list_mem = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_EQ(NULL, free_list_mem);
   EXPECT_EQ(allocated_size, 0);
-  
+
   uint8_t* mem = pool.Allocate(FreeList::MinSize());
   EXPECT_TRUE(mem != NULL);
 
-  list.Add(mem, FreeList::MinSize()); 
+  list.Add(mem, FreeList::MinSize());
   free_list_mem = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_EQ(mem, free_list_mem);
   EXPECT_EQ(allocated_size, FreeList::MinSize());
@@ -45,7 +46,7 @@ TEST(FreeListTest, Basic) {
   EXPECT_EQ(allocated_size, 0);
 
   // Make 3 allocations and add them to the free list.
-  // Get them all back from the free list, scribbling to the 
+  // Get them all back from the free list, scribbling to the
   // returned memory in between.
   // Attempt a 4th allocation from the free list and make sure
   // we get NULL.
@@ -68,7 +69,7 @@ TEST(FreeListTest, Basic) {
   EXPECT_TRUE(free_list_mem2 != NULL);
   EXPECT_EQ(allocated_size, FreeList::MinSize());
   bzero(free_list_mem2, FreeList::MinSize());
-  
+
   free_list_mem3 = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_TRUE(free_list_mem3 != NULL);
   EXPECT_EQ(allocated_size, FreeList::MinSize());
@@ -91,12 +92,12 @@ TEST(FreeListTest, Basic) {
   EXPECT_TRUE(free_list_mem2 != NULL);
   EXPECT_EQ(allocated_size, FreeList::MinSize());
   bzero(free_list_mem2, FreeList::MinSize());
-  
+
   free_list_mem3 = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_TRUE(free_list_mem3 != NULL);
   EXPECT_EQ(allocated_size, FreeList::MinSize());
   bzero(free_list_mem3, FreeList::MinSize());
-  
+
   free_list_mem = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_EQ(NULL, free_list_mem);
   EXPECT_EQ(allocated_size, 0);
@@ -138,11 +139,13 @@ TEST(FreeListTest, Basic) {
   EXPECT_EQ(mem2, free_list_mem);
   EXPECT_EQ(allocated_size, size2);
   bzero(free_list_mem, size2);
-  
+
   free_list_mem = list.Allocate(size1, &allocated_size);
   EXPECT_EQ(mem1, free_list_mem);
   EXPECT_EQ(allocated_size, size1);
   bzero(free_list_mem, size1);
+
+  pool.FreeAll();
 }
 
 }

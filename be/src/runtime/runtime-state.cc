@@ -51,8 +51,9 @@ RuntimeState::RuntimeState(
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
-    query_mem_limit_(NULL),
-    is_cancelled_(false) {
+    instance_mem_tracker_(NULL),
+    is_cancelled_(false),
+    is_mem_limit_exceeded_(false) {
   Status status = Init(fragment_instance_id, query_options, now, user, exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
@@ -63,7 +64,9 @@ RuntimeState::RuntimeState(const string& now, const string& user)
     unreported_error_idx_(0),
     user_(user),
     profile_(obj_pool_.get(), "<unnamed>"),
-    query_mem_limit_(NULL) {
+    instance_mem_tracker_(NULL),
+    is_cancelled_(false),
+    is_mem_limit_exceeded_(false) {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
   now_.reset(new TimestampValue(now.c_str(), now.size()));
 }
@@ -92,25 +95,19 @@ Status RuntimeState::Init(
   if (query_options_.batch_size <= 0) {
     query_options_.batch_size = DEFAULT_BATCH_SIZE;
   }
-  if (query_options_.max_io_buffers <= 0) {
-    // TODO: how to tune this?
-    query_options_.max_io_buffers = 5 * DiskInfo::num_disks();
-  }
 
   // Register with the thread mgr
   if (exec_env != NULL) {
     resource_pool_ = exec_env->thread_mgr()->RegisterPool();
     DCHECK(resource_pool_ != NULL);
   }
-
-  DCHECK_GT(query_options_.max_io_buffers, 0);
   return Status::OK;
 }
 
 DataStreamRecvr* RuntimeState::CreateRecvr(
     const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
     int buffer_size, RuntimeProfile* profile) {
-  DataStreamRecvr* recvr = exec_env_->stream_mgr()->CreateRecvr(row_desc,
+  DataStreamRecvr* recvr = exec_env_->stream_mgr()->CreateRecvr(this, row_desc,
       fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile);
   lock_guard<mutex> l(data_stream_recvrs_lock_);
   data_stream_recvrs_pool_->Add(recvr);
@@ -165,6 +162,18 @@ void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {
     new_errors->assign(error_log_.begin() + unreported_error_idx_, error_log_.end());
     unreported_error_idx_ = error_log_.size();
   }
+}
+
+void RuntimeState::LogMemLimitExceeded() {
+  {
+    lock_guard<mutex> l(mem_limit_exceeded_lock_);
+    if (is_mem_limit_exceeded_) return;
+    is_mem_limit_exceeded_ = true;
+  }
+  DCHECK(instance_mem_tracker_ != NULL);
+  stringstream ss;
+  ss << "Memory Limit Exceeded\n" << MemTracker::LogUsage(mem_trackers_);
+  LogError(ss.str());
 }
 
 }

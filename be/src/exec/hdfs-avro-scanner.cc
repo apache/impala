@@ -85,7 +85,6 @@ Status HdfsAvroScanner::Prepare(ScannerContext* context) {
 BaseSequenceScanner::FileHeader* HdfsAvroScanner::AllocateFileHeader() {
   AvroFileHeader* header = new AvroFileHeader;
   header->template_tuple = template_tuple_;
-  header->default_data_pool.reset(new MemPool(state_->mem_limits()));
   return header;
 }
 
@@ -347,7 +346,7 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
         if (avro_string_get(default_value, &v)) DCHECK(false);
         StringValue sv(v);
         RawValue::Write(&sv, avro_header_->template_tuple, slot_desc,
-                        avro_header_->default_data_pool.get());
+                        scan_node_->scan_node_pool());
         break;
       }
       case AVRO_NULL:
