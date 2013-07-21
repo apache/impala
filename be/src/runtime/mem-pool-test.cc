@@ -140,6 +140,41 @@ TEST(MemPoolTest, Keep) {
   EXPECT_EQ(p2.GetTotalChunkSizes(), 4 * 1024);
 }
 
+// Tests that we can return partial allocations.
+TEST(MemPoolTest, ReturnPartial) {
+  MemPool p(NULL);
+  uint8_t* ptr = p.Allocate(1024);
+  EXPECT_EQ(p.total_allocated_bytes(), 1024);
+  memset(ptr, 0, 1024);
+  p.ReturnPartialAllocation(1024);
+ 
+  uint8_t* ptr2 = p.Allocate(1024);
+  EXPECT_EQ(p.total_allocated_bytes(), 1024);
+  EXPECT_TRUE(ptr == ptr2);
+  p.ReturnPartialAllocation(1016);
+
+  ptr2 = p.Allocate(1016);
+  EXPECT_EQ(p.total_allocated_bytes(), 1024);
+  EXPECT_TRUE(ptr2 == ptr + 8);
+  p.ReturnPartialAllocation(512);
+  memset(ptr2, 1, 1016 - 512);
+
+  uint8_t* ptr3 = p.Allocate(512);
+  EXPECT_EQ(p.total_allocated_bytes(), 1024);
+  EXPECT_TRUE(ptr3 == ptr + 512);
+  memset(ptr3, 2, 512);
+
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_EQ(ptr[i], 0);
+  }
+  for (int i = 8; i < 512; ++i) {
+    EXPECT_EQ(ptr[i], 1);
+  }
+  for (int i = 512; i < 1024; ++i) {
+    EXPECT_EQ(ptr[i], 2);
+  }
+}
+
 TEST(MemPoolTest, Limits) {
   MemLimit limit1(160);
   MemLimit limit2(240);

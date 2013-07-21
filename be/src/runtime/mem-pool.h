@@ -110,6 +110,19 @@ class MemPool {
     return result;
   }
 
+  // Returns 'byte_size' to the current chunk back to the mem pool. This can
+  // only be used to return either all or part of the previous allocation returned
+  // by Allocate().
+  void ReturnPartialAllocation(int byte_size) {
+    DCHECK_GE(byte_size, 0);
+    DCHECK(current_chunk_idx_ != -1);
+    ChunkInfo& info = chunks_[current_chunk_idx_];
+    DCHECK(info.owns_data);
+    DCHECK_GE(info.allocated_bytes, byte_size);
+    info.allocated_bytes -= byte_size;
+    total_allocated_bytes_ -= byte_size;
+  }
+
   // Makes all allocated chunks available for re-use, but doesn't delete any chunks.
   void Clear() {
     current_chunk_idx_ = -1;
