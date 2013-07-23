@@ -25,6 +25,7 @@ public class SlotDescriptor {
   private final TupleDescriptor parent;
   private PrimitiveType type;
   private Column column;  // underlying column, if there is one
+  private String label;  // for SlotRef.toSql() in absence of column name
 
   // if false, this slot doesn't need to be materialized in parent tuple
   // (and physical layout parameters are invalid)
@@ -50,82 +51,34 @@ public class SlotDescriptor {
     this.isNullable = true;
   }
 
-  public int getNullIndicatorByte() {
-    return nullIndicatorByte;
-  }
-
+  public int getNullIndicatorByte() { return nullIndicatorByte; }
   public void setNullIndicatorByte(int nullIndicatorByte) {
     this.nullIndicatorByte = nullIndicatorByte;
   }
-
-  public int getNullIndicatorBit() {
-    return nullIndicatorBit;
-  }
-
+  public int getNullIndicatorBit() { return nullIndicatorBit; }
   public void setNullIndicatorBit(int nullIndicatorBit) {
     this.nullIndicatorBit = nullIndicatorBit;
   }
-
-  public SlotId getId() {
-    return id;
-  }
-
-  public TupleDescriptor getParent() {
-    return parent;
-  }
-
-  public PrimitiveType getType() {
-    return type;
-  }
-
-  public void setType(PrimitiveType type) {
-    this.type = type;
-  }
-
-  public Column getColumn() {
-    return column;
-  }
-
+  public SlotId getId() { return id; }
+  public TupleDescriptor getParent() { return parent; }
+  public PrimitiveType getType() { return type; }
+  public void setType(PrimitiveType type) { this.type = type; }
+  public Column getColumn() { return column; }
   public void setColumn(Column column) {
     this.column = column;
     this.type = column.getType();
   }
-
-  public boolean getIsMaterialized() {
-    return isMaterialized;
-  }
-
-  public void setIsMaterialized(boolean value) {
-    isMaterialized = value;
-  }
-
-  public boolean getIsNullable() {
-    return isNullable;
-  }
-
-  public void setIsNullable(boolean value) {
-    isNullable = value;
-  }
-
-  public int getByteSize() {
-    return byteSize;
-  }
-
-  public void setByteSize(int byteSize) {
-    this.byteSize = byteSize;
-  }
-
-  public int getByteOffset() {
-    return byteOffset;
-  }
-
-  public void setByteOffset(int byteOffset) {
-    this.byteOffset = byteOffset;
-  }
-
-  public void setSlotIdx(int slotIdx) {
-    this.slotIdx = slotIdx;
-  }
+  public boolean getIsMaterialized() { return isMaterialized; }
+  public void setIsMaterialized(boolean value) { isMaterialized = value; }
+  public boolean getIsNullable() { return isNullable; }
+  public void setIsNullable(boolean value) { isNullable = value; }
+  public int getByteSize() { return byteSize; }
+  public void setByteSize(int byteSize) { this.byteSize = byteSize; }
+  public int getByteOffset() { return byteOffset; }
+  public void setByteOffset(int byteOffset) { this.byteOffset = byteOffset; }
+  public void setSlotIdx(int slotIdx) { this.slotIdx = slotIdx; }
+  public String getLabel() { return label; }
+  public void setLabel(String label) { this.label = label; }
 
   public ColumnStats getStats() {
     if (stats == null) {

@@ -454,15 +454,15 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 3>)
-  |  group by: <slot 2>
+  |  output: SUM(COUNT(*))
+  |  group by: int_col
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -473,7 +473,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: int_col
 
   1:AGGREGATE
   |  output: COUNT(*)

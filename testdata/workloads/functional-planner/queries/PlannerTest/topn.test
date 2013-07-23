@@ -55,7 +55,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 10
   |  tuple ids: 1 
   |  
@@ -73,7 +73,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 10
   |  tuple ids: 1 
   |  
@@ -81,20 +81,20 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: zip
 
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 10
   |  tuple ids: 1 
   |  
   4:AGGREGATE
-  |  output: SUM(<slot 3>)
-  |  group by: <slot 2>
+  |  output: SUM(COUNT(*))
+  |  group by: zip
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -105,7 +105,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: zip
 
   1:AGGREGATE
   |  output: COUNT(*)
@@ -130,7 +130,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: SUM(float_col) ASC
   |  limit: 4
   |  tuple ids: 1 
   |  
@@ -148,7 +148,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: SUM(float_col) ASC
   |  limit: 4
   |  tuple ids: 1 
   |  
@@ -156,20 +156,20 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 3>
+  PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: SUM(float_col) ASC
   |  limit: 4
   |  tuple ids: 1 
   |  
   4:AGGREGATE
-  |  output: SUM(<slot 4>)
-  |  group by: <slot 3>
+  |  output: SUM(SUM(float_col))
+  |  group by: int_col
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -180,7 +180,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 3>
+    HASH_PARTITIONED: int_col
 
   1:AGGREGATE
   |  output: SUM(float_col)
@@ -207,7 +207,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
   |  tuple ids: 1 
   |  
@@ -224,7 +224,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
   |  tuple ids: 1 
   |  
@@ -232,20 +232,20 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
   |  tuple ids: 1 
   |  
   4:AGGREGATE
-  |  output: SUM(<slot 3>), MIN(<slot 4>)
-  |  group by: <slot 2>
+  |  output: SUM(SUM(float_col)), MIN(MIN(float_col))
+  |  group by: int_col
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -256,7 +256,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: int_col
 
   1:AGGREGATE
   |  output: SUM(float_col), MIN(float_col)

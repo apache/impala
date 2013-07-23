@@ -269,6 +269,19 @@ public class Planner {
   }
 
   /**
+   * Returns the product of the distinct value estimates of the individual exprs
+   * or -1 if any of them doesn't have a distinct value estimate.
+   */
+  private long getNumDistinctValues(List<Expr> exprs) {
+    long result = 1;
+    for (Expr expr: exprs) {
+      result *= expr.getNumDistinctValues();
+      if (result < 0) return -1;
+    }
+    return result;
+  }
+
+  /**
    * Returns plan fragment that partitions the output of 'inputFragment' on
    * partitionExprs, unless the expected number of partitions is less than the number
    * of nodes on which inputFragment runs.
@@ -279,22 +292,41 @@ public class Planner {
       ArrayList<PlanFragment> fragments) {
     if (partitionExprs.isEmpty()) return inputFragment;
 
+    // we ignore constants for the sake of partitioning
+    List<Expr> nonConstPartitionExprs = Lists.newArrayList(partitionExprs);
+    Expr.removeConstants(nonConstPartitionExprs);
+
+    LOG.info("partitionExprs=" + Expr.toSql(nonConstPartitionExprs));
+    LOG.info("partitionExprs=" + Expr.debugString(nonConstPartitionExprs));
+    DataPartition inputPartition = inputFragment.getDataPartition();
+    LOG.info("inputPartition.exprs=" + Expr.toSql(inputPartition.getPartitionExprs()));
+    LOG.info("inputPartition.exprs=" + Expr.debugString(inputPartition.getPartitionExprs()));
+
+    // do nothing if the input fragment is already partitioned on partitionExprs
+    if (Expr.equalLists(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
+      return inputFragment;
+    }
+
+    // if the existing partition exprs are a subset of the table partition exprs, check
+    // if it is distributed across all nodes; if so, don't repartition
+    if (Expr.isSubset(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
+      long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
+      LOG.info("#inputpartitions=" + Long.toString(numPartitions));
+      if (numPartitions >= inputFragment.getNumNodes()) return inputFragment;
+    }
+
     // don't repartition if the resulting number of partitions is too low to get good
     // parallelism
-    long numPartitions = 1;
-    for (Expr expr: partitionExprs) {
-      // TODO: take predicates in query into account
-      numPartitions *= expr.getNumDistinctValues();
-    }
+    long numPartitions = getNumDistinctValues(nonConstPartitionExprs);
+    LOG.info("#partitions=" + Long.toString(numPartitions));
+
+    // don't repartition if we know we have fewer partitions than nodes
+    // (ie, default to repartitioning if col stats are missing)
     // TODO: we want to repartition if the resulting files would otherwise
     // be very small (less than some reasonable multiple of the recommended block size);
     // in order to do that, we need to come up with an estimate of the avg row size
     // in the particular file format of the output table/partition
-    if (numPartitions <= inputFragment.getNumNodes()) return inputFragment;
-
-    // nothing to do if the input fragment is already partitioned on partitionExprs
-    DataPartition inputPartition = inputFragment.getDataPartition();
-    if (Expr.equalLists(partitionExprs, inputPartition.getPartitionExprs())) {
+    if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
       return inputFragment;
     }
 
@@ -303,7 +335,7 @@ public class Planner {
     exchNode.computeStats(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition =
-        new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
+        new DataPartition(TPartitionType.HASH_PARTITIONED, nonConstPartitionExprs);
     PlanFragment fragment = new PlanFragment(exchNode, partition);
     inputFragment.setDestination(fragment, exchNode.getId());
     inputFragment.setOutputPartition(partition);

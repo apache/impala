@@ -52,37 +52,14 @@ public class TupleDescriptor {
     slots.add(desc);
   }
 
-  public TupleId getId() {
-    return id;
-  }
-
-  public ArrayList<SlotDescriptor> getSlots() {
-    return slots;
-  }
-
-  public Table getTable() {
-    return table;
-  }
-
-  public void setIsMaterialized(boolean value) {
-    isMaterialized = value;
-  }
-
-  public void setTable(Table tbl) {
-    table = tbl;
-  }
-
-  public int getByteSize() {
-    return byteSize;
-  }
-
-  public boolean getIsMaterialized() {
-    return isMaterialized;
-  }
-
-  public float getAvgSerializedSize() {
-    return avgSerializedSize;
-  }
+  public TupleId getId() { return id; }
+  public ArrayList<SlotDescriptor> getSlots() { return slots; }
+  public Table getTable() { return table; }
+  public void setTable(Table tbl) { table = tbl; }
+  public int getByteSize() { return byteSize; }
+  public float getAvgSerializedSize() { return avgSerializedSize; }
+  public boolean getIsMaterialized() { return isMaterialized; }
+  public void setIsMaterialized(boolean value) { isMaterialized = value; }
 
   public String debugString() {
     String tblStr = (table == null ? "null" : table.getFullName());
@@ -145,9 +122,7 @@ public class TupleDescriptor {
     // is 0, next is 1, etc.
     int slotIdx = 0;
     for (int slotSize = 1; slotSize <= PrimitiveType.getMaxSlotSize(); ++slotSize) {
-      if (slotsBySize.get(slotSize).isEmpty()) {
-        continue;
-      }
+      if (slotsBySize.get(slotSize).isEmpty()) continue;
       if (slotSize > 1) {
         // insert padding
         int alignTo = Math.min(slotSize, 8);
@@ -184,13 +159,9 @@ public class TupleDescriptor {
    * (checks that both have the same number of slots and that slots are of the same type)
    */
   public boolean isCompatible(TupleDescriptor desc) {
-    if (slots.size() != desc.slots.size()) {
-      return false;
-    }
+    if (slots.size() != desc.slots.size()) return false;
     for (int i = 0; i < slots.size(); ++i) {
-      if (slots.get(i).getType() != desc.slots.get(i).getType()) {
-        return false;
-      }
+      if (slots.get(i).getType() != desc.slots.get(i).getType()) return false;
     }
     return true;
   }

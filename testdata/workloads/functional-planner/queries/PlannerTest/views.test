@@ -1,4 +1,3 @@
----- QUERY
 # Basic test with a view.
 select int_col, string_col from functional.alltypes_view
 ---- PLAN
@@ -26,7 +25,6 @@ PLAN FRAGMENT 1
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # Basic test with a complex view.
 select * from functional.complex_view
 ---- PLAN
@@ -34,14 +32,14 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: b.string_col ASC
   |  limit: 100
   |  tuple ids: 2 
   |  
   3:AGGREGATE
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
-  |  having: <slot 5> > 1
+  |  having: COUNT(a.bigint_col) > 1
   |  tuple ids: 2 
   |  
   2:HASH JOIN
@@ -63,7 +61,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: b.string_col ASC
   |  limit: 100
   |  tuple ids: 2 
   |  
@@ -71,21 +69,21 @@ PLAN FRAGMENT 0
      tuple ids: 2 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 4>
+  PARTITION: HASH_PARTITIONED: b.string_col
 
   STREAM DATA SINK
     EXCHANGE ID: 8
     UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 4> ASC
+  |  order by: b.string_col ASC
   |  limit: 100
   |  tuple ids: 2 
   |  
   7:AGGREGATE
-  |  output: SUM(<slot 5>)
-  |  group by: <slot 4>
-  |  having: <slot 5> > 1
+  |  output: SUM(COUNT(a.bigint_col))
+  |  group by: b.string_col
+  |  having: COUNT(a.bigint_col) > 1
   |  tuple ids: 2 
   |  
   6:EXCHANGE
@@ -96,7 +94,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 6
-    HASH_PARTITIONED: <slot 4>
+    HASH_PARTITIONED: b.string_col
 
   3:AGGREGATE
   |  output: COUNT(a.bigint_col)
@@ -128,7 +126,6 @@ PLAN FRAGMENT 3
      table=functional.alltypestiny #partitions=4 size=460B compact
      tuple ids: 1 
 ====
----- QUERY
 # Basic test with a view on a view
 select int_col, string_col from functional.view_view
 ---- PLAN
@@ -156,7 +153,6 @@ PLAN FRAGMENT 1
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # view used in a union.
 select * from functional.alltypes_view union all 
 select * from functional.alltypes_view where id < 10
@@ -211,7 +207,6 @@ PLAN FRAGMENT 2
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # view used in an inline view.
 select * from (select * from functional.alltypes_view) t
 where t.id < 10
@@ -242,7 +237,6 @@ PLAN FRAGMENT 1
      predicates: functional.alltypes.id < 10
      tuple ids: 0 
 ====
----- QUERY
 # Multiple views used in a join.
 select * from functional.alltypes_view t1, functional.alltypes_view_sub t2,
 functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
@@ -253,18 +247,18 @@ PLAN FRAGMENT 0
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    int_col = <slot 40>
+  |    int_col = COUNT(a.bigint_col)
   |  tuple ids: 0 2 7 
   |  
   |----7:TOP-N
-  |    |  order by: <slot 39> ASC
+  |    |  order by: b.string_col ASC
   |    |  limit: 100
   |    |  tuple ids: 7 
   |    |  
   |    6:AGGREGATE
   |    |  output: COUNT(a.bigint_col)
   |    |  group by: b.string_col
-  |    |  having: <slot 40> > 1
+  |    |  having: COUNT(a.bigint_col) > 1
   |    |  tuple ids: 7 
   |    |  
   |    5:HASH JOIN
@@ -312,7 +306,7 @@ PLAN FRAGMENT 1
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    int_col = <slot 40>
+  |    int_col = COUNT(a.bigint_col)
   |  tuple ids: 0 2 7 
   |  
   |----15:EXCHANGE
@@ -340,7 +334,7 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   14:TOP-N
-  |  order by: <slot 39> ASC
+  |  order by: b.string_col ASC
   |  limit: 100
   |  tuple ids: 7 
   |  
@@ -348,21 +342,21 @@ PLAN FRAGMENT 2
      tuple ids: 7 
 
 PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: <slot 39>
+  PARTITION: HASH_PARTITIONED: b.string_col
 
   STREAM DATA SINK
     EXCHANGE ID: 13
     UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 39> ASC
+  |  order by: b.string_col ASC
   |  limit: 100
   |  tuple ids: 7 
   |  
   12:AGGREGATE
-  |  output: SUM(<slot 40>)
-  |  group by: <slot 39>
-  |  having: <slot 40> > 1
+  |  output: SUM(COUNT(a.bigint_col))
+  |  group by: b.string_col
+  |  having: COUNT(a.bigint_col) > 1
   |  tuple ids: 7 
   |  
   11:EXCHANGE
@@ -373,7 +367,7 @@ PLAN FRAGMENT 4
 
   STREAM DATA SINK
     EXCHANGE ID: 11
-    HASH_PARTITIONED: <slot 39>
+    HASH_PARTITIONED: b.string_col
 
   6:AGGREGATE
   |  output: COUNT(a.bigint_col)
@@ -416,7 +410,6 @@ PLAN FRAGMENT 6
      table=functional.alltypes #partitions=24 size=478.45KB compact
      tuple ids: 2 
 ====
----- QUERY
 # Self-join of view to make sure the on clause is properly set
 # in the cloned view instances.
 select * from functional.alltypes_view t1
@@ -517,7 +510,6 @@ PLAN FRAGMENT 4
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # Self-join views to make sure the using clause is properly set
 # in the cloned view instances.
 select * from functional.alltypes_view t1
@@ -618,7 +610,6 @@ PLAN FRAGMENT 4
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # Self-join of view to make sure the join op is properly set
 # in the cloned view instances.
 select * from functional.alltypes_view t1
@@ -729,7 +720,6 @@ PLAN FRAGMENT 5
      table=functional.alltypes #partitions=24 size=478.45KB
      tuple ids: 0 
 ====
----- QUERY
 # Self-join of view to make sure join hints are properly set
 # in the cloned view instances.
 # Note that in the plan above without hints the first join uses shuffle

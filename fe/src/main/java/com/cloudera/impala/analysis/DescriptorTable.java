@@ -60,25 +60,11 @@ public class DescriptorTable {
     return result;
   }
 
-  public TupleDescriptor getTupleDesc(TupleId id) {
-    return tupleDescs.get(id);
-  }
-
-  public SlotDescriptor getSlotDesc(SlotId id) {
-    return slotDescs.get(id);
-  }
-
-  public Collection<TupleDescriptor> getTupleDescs() {
-    return tupleDescs.values();
-  }
-
-  public TupleId getMaxTupleId() {
-    return new TupleId(nextTupleId - 1);
-  }
-
-  public SlotId getMaxSlotId() {
-    return new SlotId(nextSlotId - 1);
-  }
+  public TupleDescriptor getTupleDesc(TupleId id) { return tupleDescs.get(id); }
+  public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs.get(id); }
+  public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs.values(); }
+  public TupleId getMaxTupleId() { return new TupleId(nextTupleId - 1); }
+  public SlotId getMaxSlotId() { return new SlotId(nextSlotId - 1); }
 
   public void addReferencedTable(Table table) {
     referencedTables.add(table);

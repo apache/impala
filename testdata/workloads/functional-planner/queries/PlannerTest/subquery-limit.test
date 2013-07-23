@@ -137,13 +137,13 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    functional.alltypes.id = <slot 1>
-  |  other predicates: <slot 1> < 5
+  |    functional.alltypes.id = id
+  |  other predicates: id < 5
   |  limit: 5
   |  tuple ids: 0 2 
   |  
   |----3:TOP-N
-  |    |  order by: <slot 2> ASC
+  |    |  order by: COUNT(*) ASC
   |    |  limit: 5
   |    |  tuple ids: 2 
   |    |  
@@ -177,8 +177,8 @@ PLAN FRAGMENT 1
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    functional.alltypes.id = <slot 1>
-  |  other predicates: <slot 1> < 5
+  |    functional.alltypes.id = id
+  |  other predicates: id < 5
   |  limit: 5
   |  tuple ids: 0 2 
   |  
@@ -198,7 +198,7 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   8:TOP-N
-  |  order by: <slot 2> ASC
+  |  order by: COUNT(*) ASC
   |  limit: 5
   |  tuple ids: 2 
   |  
@@ -206,20 +206,20 @@ PLAN FRAGMENT 2
      tuple ids: 2 
 
 PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: <slot 1>
+  PARTITION: HASH_PARTITIONED: id
 
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 2> ASC
+  |  order by: COUNT(*) ASC
   |  limit: 5
   |  tuple ids: 2 
   |  
   6:AGGREGATE
-  |  output: SUM(<slot 2>)
-  |  group by: <slot 1>
+  |  output: SUM(COUNT(*))
+  |  group by: id
   |  tuple ids: 2 
   |  
   5:EXCHANGE
@@ -230,7 +230,7 @@ PLAN FRAGMENT 4
 
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: <slot 1>
+    HASH_PARTITIONED: id
 
   2:AGGREGATE
   |  output: COUNT(*)

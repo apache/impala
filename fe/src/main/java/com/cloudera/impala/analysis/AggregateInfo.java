@@ -318,8 +318,7 @@ public class AggregateInfo {
     for (int i = 0; i < getAggregateExprs().size(); ++i) {
       AggregateExpr inputExpr = getAggregateExprs().get(i);
       Expr aggExprParam =
-          new SlotRef(inputDesc.getSlots().get(
-            i + getGroupingExprs().size()));
+          new SlotRef(inputDesc.getSlots().get(i + getGroupingExprs().size()));
       List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
       AggregateExpr aggExpr = null;
       if (inputExpr.getOp() == AggregateExpr.Operator.COUNT) {
@@ -434,9 +433,8 @@ public class AggregateInfo {
         Preconditions.checkState(inputExpr.getOp() == AggregateExpr.Operator.SUM);
         Expr aggExprParam =
             new SlotRef(inputDesc.getSlots().get(origGroupingExprs.size()));
-        List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
         aggExpr = new AggregateExpr(
-            AggregateExpr.Operator.SUM, false, false, aggExprParamList);
+            AggregateExpr.Operator.SUM, false, false, Lists.newArrayList(aggExprParam));
       }
       secondPhaseAggExprs.add(aggExpr);
     }
@@ -531,6 +529,7 @@ public class AggregateInfo {
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
       SlotDescriptor slotD = descTbl.addSlotDescriptor(result);
+      slotD.setLabel(expr.toSql());
       Preconditions.checkArgument(expr.getType() != PrimitiveType.INVALID_TYPE);
       slotD.setType(expr.getType());
       // count(*) is non-nullable.

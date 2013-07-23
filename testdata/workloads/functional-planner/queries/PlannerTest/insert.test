@@ -138,6 +138,48 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ====
+# insert into fully dynamic partitions. The source table has no stats and the insert
+# statement has a partition clause, so hash partition before the sink.
+insert into table functional.alltypessmall
+partition (year, month) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+from functional_seq_snap.alltypes
+where year=2009 and month>10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: year,month
+
+  0:SCAN HDFS
+     table=functional_seq_snap.alltypes #partitions=2 size=11.34KB
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: HASH_PARTITIONED: year, month
+
+  WRITE TO HDFS table=functional.alltypessmall
+    overwrite=false
+    partitions: year,month
+
+  1:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    HASH_PARTITIONED: year, month
+
+  0:SCAN HDFS
+     table=functional_seq_snap.alltypes #partitions=2 size=11.34KB
+     tuple ids: 0 
+---- SCANRANGELOCATIONS
+====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
 insert into table functional.alltypessmall
@@ -154,7 +196,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: <slot 13>,<slot 14>
+    partitions: year,month
 
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
@@ -166,15 +208,15 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 13>, <slot 14>
+  PARTITION: HASH_PARTITIONED: year, month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: <slot 13>,<slot 14>
+    partitions: year,month
 
   3:AGGREGATE
-  |  output: MIN(<slot 15>), MIN(<slot 16>), MIN(<slot 17>), MIN(<slot 18>), MIN(<slot 19>), MIN(<slot 20>), MIN(<slot 21>), MIN(<slot 22>), MIN(<slot 23>), MIN(<slot 24>), MIN(<slot 25>)
-  |  group by: <slot 13>, <slot 14>
+  |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+  |  group by: year, month
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -185,7 +227,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 13>, <slot 14>
+    HASH_PARTITIONED: year, month
 
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
@@ -220,7 +262,7 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: 2009, month
+  PARTITION: HASH_PARTITIONED: month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
@@ -234,7 +276,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 1
-    HASH_PARTITIONED: 2009, month
+    HASH_PARTITIONED: month
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=2 size=40.07KB
@@ -260,7 +302,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,<slot 13>
+    partitions: 2009,month
 
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
@@ -272,15 +314,15 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 13>
+  PARTITION: HASH_PARTITIONED: month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,<slot 13>
+    partitions: 2009,month
 
   3:AGGREGATE
-  |  output: MIN(<slot 14>), MIN(<slot 15>), MIN(<slot 16>), MIN(<slot 17>), MIN(<slot 18>), MIN(<slot 19>), MIN(<slot 20>), MIN(<slot 21>), MIN(<slot 22>), MIN(<slot 23>), MIN(<slot 24>)
-  |  group by: <slot 13>
+  |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+  |  group by: month
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -291,7 +333,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 13>
+    HASH_PARTITIONED: month
 
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
@@ -408,7 +450,7 @@ PLAN FRAGMENT 0
   0:MERGE
      merging 1 SELECT CONSTANT
      tuple ids: 0 
-=======
+====
 # dynamic partition insert from a constant select
 insert into table functional.alltypessmall
 partition (year, month) 

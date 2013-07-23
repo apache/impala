@@ -19,7 +19,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
+  |  output: SUM(COUNT(*)), SUM(COUNT(tinyint_col)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col))
   |  group by: 
   |  tuple ids: 1 
   |  
@@ -79,15 +79,15 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 2>, <slot 3>
+  PARTITION: HASH_PARTITIONED: bigint_col, tinyint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 4>), MIN(<slot 5>), MAX(<slot 6>), SUM(<slot 7>), SUM(<slot 8>)
-  |  group by: <slot 2>, <slot 3>
+  |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
+  |  group by: bigint_col, tinyint_col
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -98,7 +98,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>, <slot 3>
+    HASH_PARTITIONED: bigint_col, tinyint_col
 
   1:AGGREGATE
   |  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
@@ -120,4 +120,61 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+====
+# avg substitution
+select avg(id)
+from functional.testtbl
+having count(id) > 0
+order by avg(zip) limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:TOP-N
+  |  order by: SUM(zip) / COUNT(zip) ASC
+  |  limit: 10
+  |  tuple ids: 1 
+  |  
+  1:AGGREGATE
+  |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
+  |  group by: 
+  |  having: COUNT(id) > 0
+  |  tuple ids: 1 
+  |  
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:TOP-N
+  |  order by: SUM(zip) / COUNT(zip) ASC
+  |  limit: 10
+  |  tuple ids: 1 
+  |  
+  4:AGGREGATE
+  |  output: SUM(SUM(id)), SUM(COUNT(id)), SUM(SUM(zip)), SUM(COUNT(zip))
+  |  group by: 
+  |  having: COUNT(id) > 0
+  |  tuple ids: 1 
+  |  
+  3:EXCHANGE
+     tuple ids: 1 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:AGGREGATE
+  |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
+  |  group by: 
+  |  tuple ids: 1 
+  |  
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0 size=0B
+     tuple ids: 0 
 ====

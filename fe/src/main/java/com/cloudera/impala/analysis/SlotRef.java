@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 public class SlotRef extends Expr {
   private final TableName tblName;
   private final String col;
+  private final String label;  // printed in toSql()
 
   // results of analysis
   private SlotDescriptor desc;
@@ -47,6 +48,7 @@ public class SlotRef extends Expr {
     super();
     this.tblName = tblName;
     this.col = col;
+    this.label = ToSqlUtils.getHiveIdentSql(col);
   }
 
   // C'tor for a "pre-analyzed" ref to slot that doesn't correspond to
@@ -58,6 +60,7 @@ public class SlotRef extends Expr {
     this.desc = desc;
     this.type = desc.getType();
     this.isAnalyzed = true;
+    this.label = desc.getLabel();
   }
 
   @Override
@@ -77,11 +80,12 @@ public class SlotRef extends Expr {
   @Override
   public String toSql() {
     if (tblName != null) {
-      return tblName.toSql() + "." + ToSqlUtils.getHiveIdentSql(col);
-    } else if (col != null) {
-      return ToSqlUtils.getHiveIdentSql(col);
-    } else {
+      Preconditions.checkNotNull(label);
+      return tblName.toSql() + "." + label;
+    } else if (label == null) {
       return "<slot " + Integer.toString(desc.getId().asInt()) + ">";
+    } else {
+      return label;
     }
   }
 

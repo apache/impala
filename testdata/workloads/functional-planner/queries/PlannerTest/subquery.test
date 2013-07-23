@@ -18,7 +18,7 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    <slot 2> = t2.int_col
+  |    int_col = t2.int_col
   |  tuple ids: 1 3 
   |  
   |----3:SCAN HDFS
@@ -26,14 +26,14 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   2:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: int_col
-  |  having: <slot 3> > 1
+  |  having: COUNT(*) > 1
   |  tuple ids: 1 
   |  
   0:SCAN HDFS
@@ -46,14 +46,14 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    <slot 2> = t2.int_col
+  |    int_col = t2.int_col
   |  tuple ids: 1 3 
   |  
   |----9:EXCHANGE
   |       tuple ids: 3 
   |    
   8:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
@@ -72,21 +72,21 @@ PLAN FRAGMENT 1
      tuple ids: 3 
 
 PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> DESC
+  |  order by: COUNT(*) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
   6:AGGREGATE
-  |  output: SUM(<slot 3>)
-  |  group by: <slot 2>
-  |  having: <slot 3> > 1
+  |  output: SUM(COUNT(*))
+  |  group by: int_col
+  |  having: COUNT(*) > 1
   |  tuple ids: 1 
   |  
   5:EXCHANGE
@@ -97,7 +97,7 @@ PLAN FRAGMENT 3
 
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: int_col
 
   1:AGGREGATE
   |  output: COUNT(*)
@@ -691,15 +691,15 @@ PLAN FRAGMENT 0
      tuple ids: 2 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 28>
+  PARTITION: HASH_PARTITIONED: tinyint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 29>), MIN(<slot 30>), MAX(<slot 31>), SUM(<slot 32>), SUM(<slot 33>)
-  |  group by: <slot 28>
+  |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
+  |  group by: tinyint_col
   |  tuple ids: 2 
   |  
   2:EXCHANGE
@@ -710,7 +710,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 28>
+    HASH_PARTITIONED: tinyint_col
 
   1:AGGREGATE
   |  output: COUNT(*), MIN(functional.alltypesagg.tinyint_col), MAX(functional.alltypesagg.tinyint_col), SUM(functional.alltypesagg.tinyint_col), COUNT(functional.alltypesagg.tinyint_col)
@@ -760,15 +760,15 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 1>
+  PARTITION: HASH_PARTITIONED: tinyint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
-  |  group by: <slot 1>
+  |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
+  |  group by: tinyint_col
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -779,7 +779,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 1>
+    HASH_PARTITIONED: tinyint_col
 
   1:AGGREGATE
   |  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
@@ -818,7 +818,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
@@ -835,7 +835,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
@@ -843,20 +843,20 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
     EXCHANGE ID: 5
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> DESC
+  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 5
   |  tuple ids: 1 
   |  
   4:AGGREGATE
-  |  output: SUM(<slot 3>), MIN(<slot 4>)
-  |  group by: <slot 2>
+  |  output: SUM(SUM(float_col)), MIN(MIN(float_col))
+  |  group by: int_col
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -867,7 +867,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: int_col
 
   1:AGGREGATE
   |  output: SUM(float_col), MIN(float_col)
@@ -905,17 +905,17 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 13> ASC, <slot 12> DESC
+  |  order by: MIN(c2) ASC, c1 DESC
   |  limit: 0
   |  tuple ids: 4 
   |  
   3:AGGREGATE
-  |  output: MIN(<slot 4>)
-  |  group by: <slot 3>
+  |  output: MIN(tinyint_col)
+  |  group by: int_col
   |  tuple ids: 4 
   |  
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> ASC
+  |  order by: int_col ASC, tinyint_col ASC
   |  limit: 1
   |  tuple ids: 1 
   |  
@@ -932,17 +932,17 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 13> ASC, <slot 12> DESC
+  |  order by: MIN(c2) ASC, c1 DESC
   |  limit: 0
   |  tuple ids: 4 
   |  
   3:AGGREGATE
-  |  output: MIN(<slot 4>)
-  |  group by: <slot 3>
+  |  output: MIN(tinyint_col)
+  |  group by: int_col
   |  tuple ids: 4 
   |  
   8:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> ASC
+  |  order by: int_col ASC, tinyint_col ASC
   |  limit: 1
   |  tuple ids: 1 
   |  
@@ -950,20 +950,20 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 3>, <slot 4>
+  PARTITION: HASH_PARTITIONED: int_col, tinyint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: <slot 3> ASC, <slot 4> ASC
+  |  order by: int_col ASC, tinyint_col ASC
   |  limit: 1
   |  tuple ids: 1 
   |  
   6:AGGREGATE
-  |  output: MIN(<slot 5>)
-  |  group by: <slot 3>, <slot 4>
+  |  output: MIN(MIN(float_col))
+  |  group by: int_col, tinyint_col
   |  tuple ids: 1 
   |  
   5:EXCHANGE
@@ -974,7 +974,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: <slot 3>, <slot 4>
+    HASH_PARTITIONED: int_col, tinyint_col
 
   1:AGGREGATE
   |  output: MIN(float_col)
@@ -998,7 +998,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE
-  |  group by: <slot 3>, <slot 4>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 3 
   |  
   1:AGGREGATE
@@ -1016,32 +1016,32 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 9>, <slot 10>, <slot 11>
+  PARTITION: HASH_PARTITIONED: x.id, x.name, x.zip
 
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 9>, <slot 10>, <slot 11>
+  |  group by: x.id, x.name, x.zip
   |  tuple ids: 3 
   |  
   5:EXCHANGE
      tuple ids: 3 
 
 PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
+  PARTITION: HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: <slot 9>, <slot 10>, <slot 11>
+    HASH_PARTITIONED: x.id, x.name, x.zip
 
   2:AGGREGATE
-  |  group by: <slot 3>, <slot 4>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 3 
   |  
   4:AGGREGATE
-  |  group by: <slot 3>, <slot 4>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -1052,7 +1052,7 @@ PLAN FRAGMENT 3
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
+    HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 
   1:AGGREGATE
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
@@ -1072,7 +1072,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE
-  |  group by: <slot 3>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.zip
   |  tuple ids: 3 
   |  
   1:AGGREGATE
@@ -1090,32 +1090,32 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 9>, <slot 10>
+  PARTITION: HASH_PARTITIONED: id, zip
 
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 9>, <slot 10>
+  |  group by: id, zip
   |  tuple ids: 3 
   |  
   5:EXCHANGE
      tuple ids: 3 
 
 PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
+  PARTITION: HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 
   STREAM DATA SINK
     EXCHANGE ID: 5
-    HASH_PARTITIONED: <slot 9>, <slot 10>
+    HASH_PARTITIONED: id, zip
 
   2:AGGREGATE
-  |  group by: <slot 3>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.zip
   |  tuple ids: 3 
   |  
   4:AGGREGATE
-  |  group by: <slot 3>, <slot 4>, <slot 5>
+  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1 
   |  
   3:EXCHANGE
@@ -1126,7 +1126,7 @@ PLAN FRAGMENT 3
 
   STREAM DATA SINK
     EXCHANGE ID: 3
-    HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
+    HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 
   1:AGGREGATE
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
@@ -1157,7 +1157,7 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: COUNT(*), SUM(functional.alltypesagg.int_col), COUNT(functional.alltypesagg.int_col)
   |  group by: functional.alltypesagg.int_col % 7
-  |  having: <slot 30> / <slot 31> > 500.0 OR <slot 29> = 10, <slot 28> IS NOT NULL, <slot 29> > 10
+  |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
   |  tuple ids: 2 
   |  
   0:SCAN HDFS
@@ -1171,16 +1171,16 @@ PLAN FRAGMENT 0
      tuple ids: 2 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 28>
+  PARTITION: HASH_PARTITIONED: int_col % 7
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 29>), SUM(<slot 30>), SUM(<slot 31>)
-  |  group by: <slot 28>
-  |  having: <slot 30> / <slot 31> > 500.0 OR <slot 29> = 10, <slot 28> IS NOT NULL, <slot 29> > 10
+  |  output: SUM(COUNT(*)), SUM(SUM(int_col)), SUM(COUNT(int_col))
+  |  group by: int_col % 7
+  |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
   |  tuple ids: 2 
   |  
   2:EXCHANGE
@@ -1191,7 +1191,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 28>
+    HASH_PARTITIONED: int_col % 7
 
   1:AGGREGATE
   |  output: COUNT(*), SUM(functional.alltypesagg.int_col), COUNT(functional.alltypesagg.int_col)
@@ -1357,15 +1357,15 @@ PLAN FRAGMENT 0
      tuple ids: 5 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 38>
+  PARTITION: HASH_PARTITIONED: x.smallint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 11
     UNPARTITIONED
 
   10:AGGREGATE
-  |  output: SUM(<slot 39>)
-  |  group by: <slot 38>
+  |  output: SUM(COUNT(x.id))
+  |  group by: x.smallint_col
   |  tuple ids: 5 
   |  
   9:EXCHANGE
@@ -1376,7 +1376,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 9
-    HASH_PARTITIONED: <slot 38>
+    HASH_PARTITIONED: x.smallint_col
 
   5:AGGREGATE
   |  output: COUNT(b.id)
@@ -1605,14 +1605,14 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  output: SUM(<slot 31>)
-  |  group by: <slot 30>
+  |  output: SUM(COUNT(a.id))
+  |  group by: b.smallint_col
   |  tuple ids: 6 
   |  
   5:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    c.id = <slot 30>
+  |    c.id = b.smallint_col
   |  tuple ids: 0 4 
   |  
   |----4:AGGREGATE
@@ -1645,15 +1645,15 @@ PLAN FRAGMENT 0
      tuple ids: 6 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 35>
+  PARTITION: HASH_PARTITIONED: x.smallint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 13
     UNPARTITIONED
 
   12:AGGREGATE
-  |  output: SUM(<slot 36>)
-  |  group by: <slot 35>
+  |  output: SUM(SUM(x.cnt))
+  |  group by: x.smallint_col
   |  tuple ids: 6 
   |  
   11:EXCHANGE
@@ -1664,17 +1664,17 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 11
-    HASH_PARTITIONED: <slot 35>
+    HASH_PARTITIONED: x.smallint_col
 
   6:AGGREGATE
-  |  output: SUM(<slot 31>)
-  |  group by: <slot 30>
+  |  output: SUM(COUNT(a.id))
+  |  group by: b.smallint_col
   |  tuple ids: 6 
   |  
   5:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    c.id = <slot 30>
+  |    c.id = b.smallint_col
   |  tuple ids: 0 4 
   |  
   |----10:EXCHANGE
@@ -1685,15 +1685,15 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 
 PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: <slot 30>
+  PARTITION: HASH_PARTITIONED: b.smallint_col
 
   STREAM DATA SINK
     EXCHANGE ID: 10
     UNPARTITIONED
 
   9:AGGREGATE
-  |  output: SUM(<slot 31>)
-  |  group by: <slot 30>
+  |  output: SUM(COUNT(a.id))
+  |  group by: b.smallint_col
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -1704,7 +1704,7 @@ PLAN FRAGMENT 4
 
   STREAM DATA SINK
     EXCHANGE ID: 8
-    HASH_PARTITIONED: <slot 30>
+    HASH_PARTITIONED: b.smallint_col
 
   4:AGGREGATE
   |  output: COUNT(a.id)
@@ -1884,7 +1884,7 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 4
+  |  tuple ids: 4 
   |  
   1:MERGE
      merging 1 SELECT CONSTANT

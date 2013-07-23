@@ -38,15 +38,15 @@ PLAN FRAGMENT 0
      tuple ids: 1 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 7>, <slot 8>
+  PARTITION: HASH_PARTITIONED: l_returnflag, l_linestatus
 
   STREAM DATA SINK
     EXCHANGE ID: 4
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 9>), SUM(<slot 10>), SUM(<slot 11>), SUM(<slot 12>), SUM(<slot 13>), SUM(<slot 14>), SUM(<slot 15>), SUM(<slot 16>), SUM(<slot 17>)
-  |  group by: <slot 7>, <slot 8>
+  |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * 1.0 - l_discount)), SUM(SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax)), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
+  |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -57,7 +57,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 7>, <slot 8>
+    HASH_PARTITIONED: l_returnflag, l_linestatus
 
   1:AGGREGATE
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * 1.0 - l_discount), SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
@@ -282,14 +282,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: p_partkey
 
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     overwrite=true
 
   3:AGGREGATE
-  |  output: MIN(<slot 3>)
-  |  group by: <slot 2>
+  |  output: MIN(MIN(ps_supplycost))
+  |  group by: p_partkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -300,7 +300,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: p_partkey
 
   1:AGGREGATE
   |  output: MIN(ps_supplycost)
@@ -430,7 +430,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: round(<slot 13>, 5) DESC, <slot 11> ASC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
@@ -470,7 +470,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(<slot 13>, 5) DESC, <slot 11> ASC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
@@ -478,20 +478,20 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>
+  PARTITION: HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
 
   STREAM DATA SINK
     EXCHANGE ID: 11
     UNPARTITIONED
 
   6:TOP-N
-  |  order by: round(<slot 13>, 5) DESC, <slot 11> ASC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
   10:AGGREGATE
-  |  output: SUM(<slot 13>)
-  |  group by: <slot 10>, <slot 11>, <slot 12>
+  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3 
   |  
   9:EXCHANGE
@@ -502,7 +502,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 9
-    HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>
+    HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
 
   5:AGGREGATE
   |  output: SUM(l_extendedprice * 1.0 - l_discount)
@@ -600,13 +600,13 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: o_orderpriority ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
   4:AGGREGATE
-  |  output: COUNT(<slot 7>)
-  |  group by: <slot 6>
+  |  output: COUNT(l_orderkey)
+  |  group by: o_orderpriority
   |  tuple ids: 3 
   |  
   3:AGGREGATE
@@ -633,7 +633,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   10:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: o_orderpriority ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
@@ -641,24 +641,24 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 6>
+  PARTITION: HASH_PARTITIONED: o_orderpriority
 
   STREAM DATA SINK
     EXCHANGE ID: 9
     UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: o_orderpriority ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
   4:AGGREGATE
-  |  output: COUNT(<slot 7>)
-  |  group by: <slot 6>
+  |  output: COUNT(l_orderkey)
+  |  group by: o_orderpriority
   |  tuple ids: 3 
   |  
   8:AGGREGATE
-  |  group by: <slot 6>, <slot 7>
+  |  group by: o_orderpriority, l_orderkey
   |  tuple ids: 2 
   |  
   7:EXCHANGE
@@ -669,7 +669,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 7
-    HASH_PARTITIONED: <slot 6>
+    HASH_PARTITIONED: o_orderpriority
 
   3:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
@@ -750,7 +750,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(<slot 17>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
@@ -820,7 +820,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   21:TOP-N
-  |  order by: round(<slot 17>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
@@ -828,20 +828,20 @@ PLAN FRAGMENT 0
      tuple ids: 6 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 16>
+  PARTITION: HASH_PARTITIONED: n_name
 
   STREAM DATA SINK
     EXCHANGE ID: 20
     UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(<slot 17>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
   19:AGGREGATE
-  |  output: SUM(<slot 17>)
-  |  group by: <slot 16>
+  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  group by: n_name
   |  tuple ids: 6 
   |  
   18:EXCHANGE
@@ -852,7 +852,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 18
-    HASH_PARTITIONED: <slot 16>
+    HASH_PARTITIONED: n_name
 
   11:AGGREGATE
   |  output: SUM(l_extendedprice * 1.0 - l_discount)
@@ -1019,7 +1019,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(<slot 4>)
+  |  output: SUM(SUM(l_extendedprice * l_discount))
   |  group by: 
   |  tuple ids: 1 
   |  
@@ -1094,7 +1094,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
-  |  order by: <slot 20> ASC
+  |  order by: year(o_orderdate) ASC
   |  limit: 100
   |  tuple ids: 8 
   |  
@@ -1184,7 +1184,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   29:TOP-N
-  |  order by: <slot 20> ASC
+  |  order by: year(o_orderdate) ASC
   |  limit: 100
   |  tuple ids: 8 
   |  
@@ -1192,20 +1192,20 @@ PLAN FRAGMENT 0
      tuple ids: 8 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 20>
+  PARTITION: HASH_PARTITIONED: year(o_orderdate)
 
   STREAM DATA SINK
     EXCHANGE ID: 28
     UNPARTITIONED
 
   16:TOP-N
-  |  order by: <slot 20> ASC
+  |  order by: year(o_orderdate) ASC
   |  limit: 100
   |  tuple ids: 8 
   |  
   27:AGGREGATE
-  |  output: SUM(<slot 21>), SUM(<slot 22>)
-  |  group by: <slot 20>
+  |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END)), SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  group by: year(o_orderdate)
   |  tuple ids: 8 
   |  
   26:EXCHANGE
@@ -1216,7 +1216,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 26
-    HASH_PARTITIONED: <slot 20>
+    HASH_PARTITIONED: year(o_orderdate)
 
   15:AGGREGATE
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
@@ -1453,7 +1453,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: <slot 17> ASC, <slot 18> DESC
+  |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
   |  tuple ids: 6 
   |  
@@ -1522,7 +1522,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   22:TOP-N
-  |  order by: <slot 17> ASC, <slot 18> DESC
+  |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
   |  tuple ids: 6 
   |  
@@ -1530,20 +1530,20 @@ PLAN FRAGMENT 0
      tuple ids: 6 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 17>, <slot 18>
+  PARTITION: HASH_PARTITIONED: n.n_name, year(o.o_orderdate)
 
   STREAM DATA SINK
     EXCHANGE ID: 21
     UNPARTITIONED
 
   12:TOP-N
-  |  order by: <slot 17> ASC, <slot 18> DESC
+  |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
   |  tuple ids: 6 
   |  
   20:AGGREGATE
-  |  output: SUM(<slot 19>)
-  |  group by: <slot 17>, <slot 18>
+  |  output: SUM(SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity))
+  |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6 
   |  
   19:EXCHANGE
@@ -1554,7 +1554,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 19
-    HASH_PARTITIONED: <slot 17>, <slot 18>
+    HASH_PARTITIONED: n.n_name, year(o.o_orderdate)
 
   11:AGGREGATE
   |  output: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
@@ -1744,7 +1744,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:TOP-N
-  |  order by: round(<slot 23>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
@@ -1793,7 +1793,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
-  |  order by: round(<slot 23>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
@@ -1801,20 +1801,20 @@ PLAN FRAGMENT 0
      tuple ids: 4 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
+  PARTITION: HASH_PARTITIONED: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
 
   STREAM DATA SINK
     EXCHANGE ID: 15
     UNPARTITIONED
 
   8:TOP-N
-  |  order by: round(<slot 23>, 5) DESC
+  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
   14:AGGREGATE
-  |  output: SUM(<slot 23>)
-  |  group by: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
+  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4 
   |  
   13:EXCHANGE
@@ -1825,7 +1825,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 13
-    HASH_PARTITIONED: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
+    HASH_PARTITIONED: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
 
   7:AGGREGATE
   |  output: SUM(l_extendedprice * 1.0 - l_discount)
@@ -1978,14 +1978,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 8>
+  PARTITION: HASH_PARTITIONED: ps_partkey
 
   WRITE TO HDFS table=tpch.q11_part_tmp
     overwrite=true
 
   11:AGGREGATE
-  |  output: SUM(<slot 9>)
-  |  group by: <slot 8>
+  |  output: SUM(SUM(ps_supplycost * ps_availqty))
+  |  group by: ps_partkey
   |  tuple ids: 3 
   |  
   10:EXCHANGE
@@ -1996,7 +1996,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 10
-    HASH_PARTITIONED: <slot 8>
+    HASH_PARTITIONED: ps_partkey
 
   5:AGGREGATE
   |  output: SUM(ps_supplycost * ps_availqty)
@@ -2094,7 +2094,7 @@ PLAN FRAGMENT 0
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 1>)
+  |  output: SUM(SUM(part_value))
   |  group by: 
   |  tuple ids: 1 
   |  
@@ -2153,7 +2153,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: l_shipmode ASC
   |  limit: 10
   |  tuple ids: 2 
   |  
@@ -2181,7 +2181,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   10:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: l_shipmode ASC
   |  limit: 10
   |  tuple ids: 2 
   |  
@@ -2189,20 +2189,20 @@ PLAN FRAGMENT 0
      tuple ids: 2 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 7>
+  PARTITION: HASH_PARTITIONED: l_shipmode
 
   STREAM DATA SINK
     EXCHANGE ID: 9
     UNPARTITIONED
 
   4:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: l_shipmode ASC
   |  limit: 10
   |  tuple ids: 2 
   |  
   8:AGGREGATE
-  |  output: SUM(<slot 8>), SUM(<slot 9>)
-  |  group by: <slot 7>
+  |  output: SUM(SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END)), SUM(SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END))
+  |  group by: l_shipmode
   |  tuple ids: 2 
   |  
   7:EXCHANGE
@@ -2213,7 +2213,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 7
-    HASH_PARTITIONED: <slot 7>
+    HASH_PARTITIONED: l_shipmode
 
   3:AGGREGATE
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
@@ -2298,13 +2298,13 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 9> DESC, <slot 8> DESC
+  |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
   |  tuple ids: 4 
   |  
   4:AGGREGATE
   |  output: COUNT(1)
-  |  group by: <slot 5>
+  |  group by: COUNT(o_orderkey)
   |  tuple ids: 4 
   |  
   3:AGGREGATE
@@ -2331,7 +2331,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   13:TOP-N
-  |  order by: <slot 9> DESC, <slot 8> DESC
+  |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
   |  tuple ids: 4 
   |  
@@ -2339,40 +2339,40 @@ PLAN FRAGMENT 0
      tuple ids: 4 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 8>
+  PARTITION: HASH_PARTITIONED: c_count
 
   STREAM DATA SINK
     EXCHANGE ID: 12
     UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 9> DESC, <slot 8> DESC
+  |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
   |  tuple ids: 4 
   |  
   11:AGGREGATE
-  |  output: SUM(<slot 9>)
-  |  group by: <slot 8>
+  |  output: SUM(COUNT(1))
+  |  group by: c_count
   |  tuple ids: 4 
   |  
   10:EXCHANGE
      tuple ids: 4 
 
 PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: <slot 4>
+  PARTITION: HASH_PARTITIONED: c_custkey
 
   STREAM DATA SINK
     EXCHANGE ID: 10
-    HASH_PARTITIONED: <slot 8>
+    HASH_PARTITIONED: c_count
 
   4:AGGREGATE
   |  output: COUNT(1)
-  |  group by: <slot 5>
+  |  group by: COUNT(o_orderkey)
   |  tuple ids: 4 
   |  
   9:AGGREGATE
-  |  output: SUM(<slot 5>)
-  |  group by: <slot 4>
+  |  output: SUM(COUNT(o_orderkey))
+  |  group by: c_custkey
   |  tuple ids: 2 
   |  
   8:EXCHANGE
@@ -2383,7 +2383,7 @@ PLAN FRAGMENT 3
 
   STREAM DATA SINK
     EXCHANGE ID: 8
-    HASH_PARTITIONED: <slot 4>
+    HASH_PARTITIONED: c_custkey
 
   3:AGGREGATE
   |  output: COUNT(o_orderkey)
@@ -2471,7 +2471,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:AGGREGATE
-  |  output: SUM(<slot 6>), SUM(<slot 7>)
+  |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END)), SUM(SUM(l_extendedprice * 1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -2567,14 +2567,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 4>
+  PARTITION: HASH_PARTITIONED: l_suppkey
 
   WRITE TO HDFS table=tpch.revenue
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 5>)
-  |  group by: <slot 4>
+  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  group by: l_suppkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -2585,7 +2585,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 4>
+    HASH_PARTITIONED: l_suppkey
 
   1:AGGREGATE
   |  output: SUM(l_extendedprice * 1.0 - l_discount)
@@ -2623,7 +2623,7 @@ PLAN FRAGMENT 0
     overwrite=true
 
   3:AGGREGATE
-  |  output: MAX(<slot 1>)
+  |  output: MAX(MAX(total_revenue))
   |  group by: 
   |  tuple ids: 1 
   |  
@@ -2897,13 +2897,13 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 15> DESC, <slot 12> ASC, <slot 13> ASC, <slot 14> ASC
+  |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
   |  tuple ids: 3 
   |  
   2:AGGREGATE
-  |  output: COUNT(<slot 11>)
-  |  group by: <slot 8>, <slot 9>, <slot 10>
+  |  output: COUNT(ps_suppkey)
+  |  group by: p_brand, p_type, p_size
   |  tuple ids: 3 
   |  
   1:AGGREGATE
@@ -2919,7 +2919,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 15> DESC, <slot 12> ASC, <slot 13> ASC, <slot 14> ASC
+  |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
   |  tuple ids: 3 
   |  
@@ -2927,24 +2927,24 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 8>, <slot 9>, <slot 10>
+  PARTITION: HASH_PARTITIONED: p_brand, p_type, p_size
 
   STREAM DATA SINK
     EXCHANGE ID: 6
     UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 15> DESC, <slot 12> ASC, <slot 13> ASC, <slot 14> ASC
+  |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
   |  tuple ids: 3 
   |  
   2:AGGREGATE
-  |  output: COUNT(<slot 11>)
-  |  group by: <slot 8>, <slot 9>, <slot 10>
+  |  output: COUNT(ps_suppkey)
+  |  group by: p_brand, p_type, p_size
   |  tuple ids: 3 
   |  
   5:AGGREGATE
-  |  group by: <slot 8>, <slot 9>, <slot 10>, <slot 11>
+  |  group by: p_brand, p_type, p_size, ps_suppkey
   |  tuple ids: 2 
   |  
   4:EXCHANGE
@@ -2955,7 +2955,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 4
-    HASH_PARTITIONED: <slot 8>, <slot 9>, <slot 10>
+    HASH_PARTITIONED: p_brand, p_type, p_size
 
   1:AGGREGATE
   |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
@@ -2988,14 +2988,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: l_partkey
 
   WRITE TO HDFS table=tpch.lineitem_tmp
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 3>), SUM(<slot 4>)
-  |  group by: <slot 2>
+  |  output: SUM(SUM(l_quantity)), SUM(COUNT(l_quantity))
+  |  group by: l_partkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -3006,7 +3006,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: l_partkey
 
   1:AGGREGATE
   |  output: SUM(l_quantity), COUNT(l_quantity)
@@ -3068,7 +3068,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:AGGREGATE
-  |  output: SUM(<slot 8>)
+  |  output: SUM(SUM(l_extendedprice))
   |  group by: 
   |  tuple ids: 3 
   |  
@@ -3155,14 +3155,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: l_orderkey
 
   WRITE TO HDFS table=tpch.q18_tmp
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 3>)
-  |  group by: <slot 2>
+  |  output: SUM(SUM(l_quantity))
+  |  group by: l_orderkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -3173,7 +3173,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: l_orderkey
 
   1:AGGREGATE
   |  output: SUM(l_quantity)
@@ -3215,7 +3215,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:TOP-N
-  |  order by: <slot 14> ASC, <slot 13> ASC
+  |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
   |  tuple ids: 4 
   |  
@@ -3263,7 +3263,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
-  |  order by: <slot 14> ASC, <slot 13> ASC
+  |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
   |  tuple ids: 4 
   |  
@@ -3271,20 +3271,20 @@ PLAN FRAGMENT 0
      tuple ids: 4 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
+  PARTITION: HASH_PARTITIONED: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
 
   STREAM DATA SINK
     EXCHANGE ID: 15
     UNPARTITIONED
 
   8:TOP-N
-  |  order by: <slot 14> ASC, <slot 13> ASC
+  |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
   |  tuple ids: 4 
   |  
   14:AGGREGATE
-  |  output: SUM(<slot 15>)
-  |  group by: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
+  |  output: SUM(SUM(l_quantity))
+  |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
   |  tuple ids: 4 
   |  
   13:EXCHANGE
@@ -3295,7 +3295,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 13
-    HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
+    HASH_PARTITIONED: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
 
   7:AGGREGATE
   |  output: SUM(l_quantity)
@@ -3438,7 +3438,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  output: SUM(<slot 10>)
+  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -3521,13 +3521,13 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 2>
+  PARTITION: HASH_PARTITIONED: p_partkey
 
   WRITE TO HDFS table=tpch.q20_tmp1
     overwrite=true
 
   3:AGGREGATE
-  |  group by: <slot 2>
+  |  group by: p_partkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -3538,7 +3538,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 2>
+    HASH_PARTITIONED: p_partkey
 
   1:AGGREGATE
   |  group by: p_partkey
@@ -3580,14 +3580,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 4>, <slot 5>
+  PARTITION: HASH_PARTITIONED: l_partkey, l_suppkey
 
   WRITE TO HDFS table=tpch.q20_tmp2
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 6>)
-  |  group by: <slot 4>, <slot 5>
+  |  output: SUM(SUM(l_quantity))
+  |  group by: l_partkey, l_suppkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -3598,7 +3598,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 4>, <slot 5>
+    HASH_PARTITIONED: l_partkey, l_suppkey
 
   1:AGGREGATE
   |  output: SUM(l_quantity)
@@ -3728,13 +3728,13 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 3>
+  PARTITION: HASH_PARTITIONED: ps_suppkey
 
   WRITE TO HDFS table=tpch.q20_tmp4
     overwrite=true
 
   3:AGGREGATE
-  |  group by: <slot 3>
+  |  group by: ps_suppkey
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -3745,7 +3745,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 3>
+    HASH_PARTITIONED: ps_suppkey
 
   1:AGGREGATE
   |  group by: ps_suppkey
@@ -3909,7 +3909,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: <slot 16> DESC, <slot 15> ASC
+  |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |  tuple ids: 6 
   |  
@@ -3982,7 +3982,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   22:TOP-N
-  |  order by: <slot 16> DESC, <slot 15> ASC
+  |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |  tuple ids: 6 
   |  
@@ -3990,20 +3990,20 @@ PLAN FRAGMENT 0
      tuple ids: 6 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 15>
+  PARTITION: HASH_PARTITIONED: s_name
 
   STREAM DATA SINK
     EXCHANGE ID: 21
     UNPARTITIONED
 
   12:TOP-N
-  |  order by: <slot 16> DESC, <slot 15> ASC
+  |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |  tuple ids: 6 
   |  
   20:AGGREGATE
-  |  output: SUM(<slot 16>)
-  |  group by: <slot 15>
+  |  output: SUM(COUNT(*))
+  |  group by: s_name
   |  tuple ids: 6 
   |  
   19:EXCHANGE
@@ -4014,7 +4014,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 19
-    HASH_PARTITIONED: <slot 15>
+    HASH_PARTITIONED: s_name
 
   11:AGGREGATE
   |  output: COUNT(*)
@@ -4181,14 +4181,14 @@ PLAN FRAGMENT 0
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: <slot 3>
+  PARTITION: HASH_PARTITIONED: substr(c_name, 1, 1)
 
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(<slot 4>), SUM(<slot 5>)
-  |  group by: <slot 3>
+  |  output: SUM(SUM(c_acctbal)), SUM(COUNT(c_acctbal))
+  |  group by: substr(c_name, 1, 1)
   |  tuple ids: 1 
   |  
   2:EXCHANGE
@@ -4199,7 +4199,7 @@ PLAN FRAGMENT 1
 
   STREAM DATA SINK
     EXCHANGE ID: 2
-    HASH_PARTITIONED: <slot 3>
+    HASH_PARTITIONED: substr(c_name, 1, 1)
 
   1:AGGREGATE
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
@@ -4245,7 +4245,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
   |  tuple ids: 3 
   |  
@@ -4285,7 +4285,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   13:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
   |  tuple ids: 3 
   |  
@@ -4293,20 +4293,20 @@ PLAN FRAGMENT 0
      tuple ids: 3 
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: <slot 7>
+  PARTITION: HASH_PARTITIONED: substring(c_phone, 1, 2)
 
   STREAM DATA SINK
     EXCHANGE ID: 12
     UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 7> ASC
+  |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
   |  tuple ids: 3 
   |  
   11:AGGREGATE
-  |  output: SUM(<slot 8>), SUM(<slot 9>)
-  |  group by: <slot 7>
+  |  output: SUM(COUNT(*)), SUM(SUM(c_acctbal))
+  |  group by: substring(c_phone, 1, 2)
   |  tuple ids: 3 
   |  
   10:EXCHANGE
@@ -4317,7 +4317,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 10
-    HASH_PARTITIONED: <slot 7>
+    HASH_PARTITIONED: substring(c_phone, 1, 2)
 
   5:AGGREGATE
   |  output: COUNT(*), SUM(c_acctbal)

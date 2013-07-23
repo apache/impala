@@ -174,12 +174,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public static String debugString(List<? extends Expr> exprs) {
-    if (exprs == null || exprs.isEmpty()) {
-      return "";
-    }
+    if (exprs == null || exprs.isEmpty()) return "";
     List<String> strings = Lists.newArrayList();
     for (Expr expr: exprs) {
       strings.add(expr.debugString());
+    }
+    return "(" + Joiner.on(" ").join(strings) + ")";
+  }
+
+  public static String toSql(List<? extends Expr> exprs) {
+    if (exprs == null || exprs.isEmpty()) return "";
+    List<String> strings = Lists.newArrayList();
+    for (Expr expr: exprs) {
+      strings.add(expr.toSql());
     }
     return "(" + Joiner.on(" ").join(strings) + ")";
   }
@@ -206,21 +213,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   @Override
   public boolean equals(Object obj) {
-    if (obj == null) {
-      return false;
-    }
-    if (obj.getClass() != this.getClass()) {
-      return false;
-    }
+    if (obj == null) return false;
+    if (obj.getClass() != this.getClass()) return false;
     // don't compare type, this could be called pre-analysis
     Expr expr = (Expr) obj;
-    if (children.size() != expr.children.size()) {
-      return false;
-    }
+    if (children.size() != expr.children.size()) return false;
     for (int i = 0; i < children.size(); ++i) {
-      if (!children.get(i).equals(expr.children.get(i))) {
-        return false;
-      }
+      if (!children.get(i).equals(expr.children.get(i))) return false;
     }
     return true;
   }
@@ -229,15 +228,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Return true if l1[i].equals(l2[i]) for all i.
    */
   public static <C extends Expr> boolean equalLists(List<C> l1, List<C> l2) {
-    if (l1.size() != l2.size()) {
-      return false;
-    }
+    if (l1.size() != l2.size()) return false;
     Iterator<C> l1Iter = l1.iterator();
     Iterator<C> l2Iter = l2.iterator();
     while (l1Iter.hasNext()) {
-      if (!l1Iter.next().equals(l2Iter.next())) {
-        return false;
-      }
+      if (!l1Iter.next().equals(l2Iter.next())) return false;
     }
     return true;
   }
@@ -247,10 +242,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * TODO: come up with something better than O(n^2)?
    */
   public static <C extends Expr> boolean equalSets(List<C> l1, List<C> l2) {
-    if (l1.size() != l2.size()) {
-      return false;
-    }
+    if (l1.size() != l2.size()) return false;
     return l1.containsAll(l2) && l2.containsAll(l1);
+  }
+
+  /**
+   * Return true if l1 is a subset of l2.
+   */
+  public static <C extends Expr> boolean isSubset(List<C> l1, List<C> l2) {
+    if (l1.size() > l2.size()) return false;
+    return l2.containsAll(l1);
   }
 
   @Override
@@ -397,9 +398,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       List<? extends Expr> input, Class<C> cl) {
     Preconditions.checkNotNull(input);
     for (Expr e: input) {
-      if (e.contains(cl)) {
-        return true;
-      }
+      if (e.contains(cl)) return true;
     }
     return false;
   }
@@ -413,9 +412,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (int i = 0; i < sMap.lhs.size(); ++i) {
       if (this.equals(sMap.lhs.get(i))) {
         Expr result = sMap.rhs.get(i).clone(null);
-        if (id != null) {
-          result.id = id;
-        }
+        if (id != null) result.id = id;
         return result;
       }
     }
@@ -430,9 +427,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> void substituteList(
       List<C> l, SubstitutionMap sMap) {
-    if (l == null) {
-      return;
-    }
+    if (l == null) return;
     ListIterator<C> it = l.listIterator();
     while (it.hasNext()) {
       it.set((C) it.next().substitute(sMap));
@@ -443,9 +438,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Removes duplicate exprs (according to equals()).
    */
   public static <C extends Expr> void removeDuplicates(List<C> l) {
-    if (l == null) {
-      return;
-    }
+    if (l == null) return;
     ListIterator<C> it1 = l.listIterator();
     while (it1.hasNext()) {
       C e1 = it1.next();
@@ -453,18 +446,26 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       boolean duplicate = false;
       while (it2.hasNext()) {
         C e2 = it2.next();
-        if (e1 == e2) {
           // only check up to but excluding e1
-          break;
-        }
+        if (e1 == e2) break;
         if (e1.equals(e2)) {
           duplicate = true;
           break;
         }
       }
-      if (duplicate) {
-        it1.remove();
-      }
+      if (duplicate) it1.remove();
+    }
+  }
+
+  /**
+   * Removes constant exprs
+   */
+  public static <C extends Expr> void removeConstants(List<C> l) {
+    if (l == null) return;
+    ListIterator<C> it = l.listIterator();
+    while (it.hasNext()) {
+      C e = it.next();
+      if (e.isConstant()) it.remove();
     }
   }
 
@@ -480,9 +481,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public boolean isBound(List<TupleId> tids) {
     for (Expr child: children) {
-      if (!child.isBound(tids)) {
-        return false;
-      }
+      if (!child.isBound(tids)) return false;
     }
     return true;
   }
@@ -492,18 +491,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public boolean isBound(SlotId slotId) {
     for (Expr child: children) {
-      if (!child.isBound(slotId)) {
-        return false;
-      }
+      if (!child.isBound(slotId)) return false;
     }
     return true;
   }
 
   public static boolean isBound(List<? extends Expr> exprs, List<TupleId> tids) {
     for (Expr expr: exprs) {
-      if (!expr.isBound(tids)) {
-        return false;
-      }
+      if (!expr.isBound(tids)) return false;
     }
     return true;
   }
@@ -516,9 +511,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static <C extends Expr> void getIds(List<? extends Expr> exprs,
       List<TupleId> tupleIds, List<SlotId> slotIds) {
-    if (exprs == null) {
-      return;
-    }
+    if (exprs == null) return;
     for (Expr e: exprs) {
       e.getIds(tupleIds, slotIds);
     }
@@ -575,9 +568,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type, targetType);
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.
-    if (targetType.isNull()) {
-      return this;
-    }
+    if (targetType.isNull()) return this;
     // requested cast must be to assignment-compatible type
     // (which implies no loss of precision)
     Preconditions.checkArgument(type == targetType);
@@ -659,12 +650,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     // add operand casts
     Preconditions.checkState(compatibleType.isValid());
-    if (t1 != compatibleType) {
-      castChild(compatibleType, 0);
-    }
-    if (t2 != compatibleType) {
-      castChild(compatibleType, 1);
-    }
+    if (t1 != compatibleType) castChild(compatibleType, 0);
+    if (t2 != compatibleType) castChild(compatibleType, 1);
     return compatibleType;
   }
 
