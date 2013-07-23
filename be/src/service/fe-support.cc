@@ -87,10 +87,10 @@ Java_com_cloudera_impala_service_FeSupport_NativeLogger(
   if (severity == TLogSeverity::VERBOSE && !VLOG_IS_ON(1)) return;
 
   // Unused required argument to GetStringUTFChars
-  jboolean is_copy;
-  const char* filename = env->GetStringUTFChars(file, &is_copy);
-  const char* str = env->GetStringUTFChars(msg, &is_copy);
-  int log_level;
+  jboolean dummy;
+  const char* filename = env->GetStringUTFChars(file, &dummy);
+  const char* str = env->GetStringUTFChars(msg, &dummy);
+  int log_level = google::INFO;
   switch (severity) {
     case TLogSeverity::VERBOSE:
       log_level = google::INFO;

@@ -110,21 +110,19 @@ public class FeSupport {
 
     // Search for libfesupport.so in all library paths.
     String libPath = System.getProperty("java.library.path");
-    LOG.info("trying to load libfesupport.so from " + libPath);
     String[] paths = libPath.split(":");
     boolean found = false;
     for (String path : paths) {
       String filePath = path + File.separator + "libfesupport.so";
       File libFile = new File(filePath);
       if (libFile.exists()) {
-        LOG.info("loading " + filePath);
         System.load(filePath);
         found = true;
         break;
       }
     }
     if (!found) {
-      LOG.error("Failed to load libfesupport.so from given java.library.paths ("
+      System.out.println("Failed to load libfesupport.so from given java.library.paths ("
           + libPath + ").");
     }
   }

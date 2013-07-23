@@ -2595,6 +2595,7 @@ int main(int argc, char **argv) {
   impala::LlvmCodeGen::InitializeLlvm();
 
   EXIT_IF_ERROR(JniUtil::Init());
+  InitFeSupport();
 
   // Create an in-process Impala server and in-process backends for test environment
   // without any startup validation check
@@ -2618,7 +2619,7 @@ int main(int argc, char **argv) {
   cout << "Running without codegen" << endl;
   int ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
-  
+
   options.push_back("DISABLE_CODEGEN=0");
   disable_codegen_ = false;
   executor_->setExecOptions(options);
