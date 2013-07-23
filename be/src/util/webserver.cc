@@ -134,6 +134,10 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
   }
 }
 
+bool Webserver::IsSecure() const {
+  return !FLAGS_webserver_certificate_file.empty();
+}
+
 Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << http_address_;
 
@@ -145,8 +149,7 @@ Status Webserver::Start() {
     listening_spec << ":" << port_as_string;
   }
 
-  bool enable_ssl = !FLAGS_webserver_certificate_file.empty();
-  if (enable_ssl) {
+  if (IsSecure()) {
     LOG(INFO) << "Webserver: Enabling HTTPS support";
     // Mongoose makes sockets with 's' suffixes accept SSL traffic only
     listening_spec << "s";
@@ -162,7 +165,7 @@ Status Webserver::Start() {
     LOG(INFO)<< "Document root disabled";
   }
 
-  if (enable_ssl) {
+  if (IsSecure()) {
     options.push_back("ssl_certificate");
     options.push_back(FLAGS_webserver_certificate_file.c_str());
   }

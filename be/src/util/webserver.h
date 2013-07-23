@@ -65,6 +65,8 @@ class Webserver {
 
   const TNetworkAddress& http_address() { return http_address_; }
 
+  // True if serving all traffic over SSL, false otherwise
+  bool IsSecure() const;
  private:
   // Container class for a list of path handler callbacks for a single URL.
   class PathHandler {

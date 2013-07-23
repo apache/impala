@@ -36,6 +36,9 @@ struct TBackendDescriptor {
 
   // The address of the debug HTTP server
   3: optional Types.TNetworkAddress debug_http_address;
+
+  // True if the debug webserver is secured (for correctly generating links)
+  4: optional bool secure_webserver;
 }
 
 // Description of a single entry in a topic

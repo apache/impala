@@ -156,6 +156,7 @@ Status SimpleScheduler::Init() {
       } else {
         backend_descriptor_.__set_debug_http_address(webserver_address);
       }
+      backend_descriptor_.__set_secure_webserver(webserver_->IsSecure());
     }
   }
   return Status::OK;
@@ -184,8 +185,12 @@ void SimpleScheduler::BackendsPathHandler(const Webserver::ArgumentMap& args,
       (*output) << "<tr><td>" << backend.address << "</td>"
                 << "<td>";
       if (backend.__isset.debug_http_address) {
-        (*output) << "<a href='http://" << backend.debug_http_address
-                  << "'>Debug pages</a>";
+        if (backend.__isset.secure_webserver && backend.secure_webserver) {
+          (*output) << "<a href='https://";
+        } else {
+          (*output) << "<a href='http://";
+        }
+        (*output) << backend.debug_http_address << "'>Debug pages</a>";
       } else {
         (*output) << "N/A";
       }
