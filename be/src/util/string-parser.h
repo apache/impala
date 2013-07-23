@@ -17,22 +17,25 @@
 #define IMPALA_UTIL_STRING_PARSER_H
 
 #include <limits>
+#include <boost/type_traits.hpp>
 #include "common/compiler-util.h"
 
+#include "common/logging.h"
 namespace impala {
 
-// Utility functions for doing atoi/atof on non-null terminated strings.  On micro benchmarks,
-// this is significantly faster than libc (atoi/strtol and atof/strtod).
+// Utility functions for doing atoi/atof on non-null terminated strings.  On micro 
+// benchmarks, this is significantly faster than libc (atoi/strtol and atof/strtod).
 //
-// For overflows, we are following the mysql behavior, to cap values at the max/min value for that
-// data type.  This is different from hive, which returns NULL for overflow slots for int types
-// and inf/-inf for float types.
+// For overflows, we are following the mysql behavior, to cap values at the max/min value
+// for that data type.  This is different from hive, which returns NULL for overflow 
+// slots for int types and inf/-inf for float types.
 //
 // Things we tried that did not work:
 //  - lookup table for converting character to digit
 // Improvements (TODO):
 //  - Validate input using _sidd_compare_ranges
-//  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] + 10*s[1] + s[2]
+//  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] + 
+//    10*s[1] + s[2]
 class StringParser {
  public:
   enum ParseResult {
@@ -46,41 +49,62 @@ class StringParser {
   // Assumes s represents a decimal number.
   template <typename T>
   static inline T StringToInt(const char* s, int len, ParseResult* result) {
-    T val = 0;
+    typedef typename boost::make_unsigned<T>::type UnsignedT;
+    UnsignedT val = 0;
+    UnsignedT max_val = std::numeric_limits<T>::max();
     bool negative = false;
     int i = 0;
     switch (*s) {
-      case '-': negative = true;
-      case '+': i = 1;
+      case '-': 
+        negative = true;
+        max_val = std::numeric_limits<T>::max() + 1;
+      case '+': ++i;
     }
+
+    // This is the fast path where the string cannot overflow.
+    if (LIKELY(len - i < StringParseTraits<T>::max_ascii_len())) {
+      val = StringToIntNoOverflow<UnsignedT>(s + i, len - i, result);
+      return static_cast<T>(negative ? -val : val);
+    }
+
+    const T max_div_10 = max_val / 10;
+    const T max_mod_10 = max_val % 10;
+
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         T digit = s[i] - '0';
-        val = val * 10 + digit;
-        // Overflow
-        if (UNLIKELY(val < digit)) {
+        // This is a tricky check to see if adding this digit will cause an overflow.
+        if (UNLIKELY(val > (max_div_10 - (digit > max_mod_10)))) {
           *result = PARSE_OVERFLOW;
-          return negative ? std::numeric_limits<T>::min() : std::numeric_limits<T>::max();
+          return negative ? -max_val : max_val;
         }
+        val = val * 10 + digit;
       } else {
         *result = PARSE_FAILURE;
         return 0;
       }
     }
     *result = PARSE_SUCCESS;
-    return (T)(negative ? -val : val);
+    return static_cast<T>(negative ? -val : val);
   }
 
   // Convert a string s representing a number in given base into a decimal number.
   template <typename T>
   static inline T StringToInt(const char* s, int len, int base, ParseResult* result) {
-    T val = 0;
+    typedef typename boost::make_unsigned<T>::type UnsignedT;
+    UnsignedT val = 0;
+    UnsignedT max_val = std::numeric_limits<T>::max();
     bool negative = false;
     int i = 0;
     switch (*s) {
-      case '-': negative = true;
+      case '-': 
+        negative = true;
+        max_val = std::numeric_limits<T>::max() + 1;
       case '+': i = 1;
     }
+    
+    const T max_div_base = max_val / base;
+    const T max_mod_base = max_val % base;
     for (; i < len; ++i) {
       T digit;
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
@@ -94,18 +118,18 @@ class StringParser {
         return 0;
       }
       // Bail, if we encounter a digit that is not available in base.
-      if (digit >= base) {
-        break;
+      if (digit >= base) break;
+      
+      // This is a tricky check to see if adding this digit will cause an 
+      // overflow.
+      if (UNLIKELY(val > (max_div_base - (digit > max_mod_base)))) {
+        *result = PARSE_OVERFLOW;
+        return static_cast<T>(negative ? -max_val : max_val);
       }
       val = val * base + digit;
-      // Overflow
-      if (UNLIKELY(val < digit)) {
-        *result = PARSE_OVERFLOW;
-        return negative ? std::numeric_limits<T>::min() : std::numeric_limits<T>::max();
-      }
     }
     *result = PARSE_SUCCESS;
-    return (T)(negative ? -val : val);
+    return static_cast<T>(negative ? -val : val);
   }
 
   // This is considerably faster than glibc's implementation (>100x why???)
@@ -183,7 +207,46 @@ class StringParser {
     *result = PARSE_FAILURE;
     return false;
   }
+
+ private:
+  template<typename T>
+  class StringParseTraits {
+   public:
+    // Returns the maximum ascii string length for this type.
+    // e.g. the max/min int8_t has 3 characters.
+    static int max_ascii_len();
+  };
+  
+  // Converts an ascii string to an integer of type T assuming it cannot overflow
+  // and the number is positive.
+  template <typename T>
+  static inline T StringToIntNoOverflow(const char* s, int len, ParseResult* result) {
+    T val = 0;
+    for (int i = 0; i < len; ++i) {
+      if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
+        T digit = s[i] - '0';
+        val = val * 10 + digit;
+      } else {
+        *result = PARSE_FAILURE;
+        return 0;
+      }
+    }
+    *result = PARSE_SUCCESS;
+    return val;
+  }
 };
+
+template<> 
+inline int StringParser::StringParseTraits<int8_t>::max_ascii_len() { return 3; }
+
+template<> 
+inline int StringParser::StringParseTraits<int16_t>::max_ascii_len() { return 5; }
+
+template<> 
+inline int StringParser::StringParseTraits<int32_t>::max_ascii_len() { return 10; }
+
+template<> 
+inline int StringParser::StringParseTraits<int64_t>::max_ascii_len() { return 19; }
 
 }
 

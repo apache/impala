@@ -30,14 +30,14 @@ using namespace std;
 // numbers.
 //
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
-// atoi:                 Function                Rate          Comparison
+// atoi:                 Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                         strtol               58.49                  1X
-//                           atoi               58.64              1.003X
-//                         impala               184.2              3.149X
-//                  impala_unsafe               207.7              3.551X
-//                impala_unrolled               196.8              3.365X
-//                   impala_cased               203.1              3.473X
+//                         strtol               59.71                  1X
+//                           atoi               59.87              1.003X
+//                         impala               162.6              2.723X
+//                  impala_unsafe               200.9              3.365X
+//                impala_unrolled               176.5              2.956X
+//                   impala_cased               232.1              3.887X
 
 #define VALIDATE 0
 

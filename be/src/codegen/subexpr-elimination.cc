@@ -18,16 +18,8 @@
 #include <iostream>
 #include <sstream>
 
-#include <boost/thread/mutex.hpp>
 #include <llvm/Analysis/Passes.h>
 #include <llvm/Analysis/InstructionSimplify.h>
-#include <llvm/Support/DynamicLibrary.h>
-#include <llvm/Support/IRReader.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/NoFolder.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/system_error.h>
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/SSAUpdater.h>

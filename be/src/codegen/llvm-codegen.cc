@@ -19,14 +19,14 @@
 #include <sstream>
 #include <boost/thread/mutex.hpp>
 
-#include <llvm/DataLayout.h>
 #include <llvm/Analysis/Passes.h>
 #include <llvm/Analysis/InstructionSimplify.h>
+#include <llvm/Bitcode/ReaderWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/PassManager.h>
 #include <llvm/Support/DynamicLibrary.h>
-#include <llvm/Support/IRReader.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
 #include <llvm/Support/TargetSelect.h>
@@ -498,6 +498,7 @@ Function* LlvmCodeGen::OptimizeFunctionWithExprs(Function* fn) {
 
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   if (!VerifyFunction(function)) return NULL;
+  if (FLAGS_dump_ir) function->dump();
   return function;
 }
 

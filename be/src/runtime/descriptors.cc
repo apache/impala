@@ -19,7 +19,7 @@
 #include <sstream>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/DataLayout.h>
+#include <llvm/IR/DataLayout.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
