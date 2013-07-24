@@ -80,11 +80,11 @@ Status GzipCompressor::Compress(int input_length, uint8_t* input,
   return Status::OK;
 }
 
-Status GzipCompressor::ProcessBlock(int input_length, uint8_t* input,
+Status GzipCompressor::ProcessBlock(bool output_preallocated,
+                                    int input_length, uint8_t* input,
                                     int* output_length, uint8_t** output) {
-  // If length is set then the output has been allocated.
   int max_compressed_len = MaxOutputLen(input_length);
-  if (*output_length == 0) {
+  if (!output_preallocated) {
     if (!reuse_buffer_ || buffer_length_ < max_compressed_len || out_buffer_ == NULL) {
       DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
       buffer_length_ = max_compressed_len;
@@ -109,10 +109,15 @@ int BzipCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
   return -1;
 }
 
-Status BzipCompressor::ProcessBlock(int input_length, uint8_t* input,
+Status BzipCompressor::ProcessBlock(bool output_preallocated,
+                                    int input_length, uint8_t* input,
                                     int *output_length, uint8_t** output) {
+  // The bz2 library does not allow input to be NULL, even when input_length is 0. This
+  // should be OK because we do not write any file formats that support bzip compression.
+  DCHECK(input != NULL);
+
   // If length is set then the output has been allocated.
-  if (*output_length != 0) {
+  if (output_preallocated) {
     buffer_length_ = *output_length;
     out_buffer_ = *output;
   } else if (!reuse_buffer_ || out_buffer_ == NULL) {
@@ -125,7 +130,7 @@ Status BzipCompressor::ProcessBlock(int input_length, uint8_t* input,
   int ret = BZ_OUTBUFF_FULL;
   while (ret == BZ_OUTBUFF_FULL) {
     if (out_buffer_ == NULL) {
-      DCHECK_EQ(*output_length, 0);
+      DCHECK(!output_preallocated);
       temp_memory_pool_.Clear();
       buffer_length_ = buffer_length_ * 2;
       out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
@@ -134,9 +139,7 @@ Status BzipCompressor::ProcessBlock(int input_length, uint8_t* input,
     if ((ret = BZ2_bzBuffToBuffCompress(reinterpret_cast<char*>(out_buffer_), &outlen,
         reinterpret_cast<char*>(input),
         static_cast<unsigned int>(input_length), 5, 2, 0)) == BZ_OUTBUFF_FULL) {
-      // If the output_length was passed we must have enough room.
-      DCHECK_EQ(*output_length, 0);
-      if (*output_length != 0) {
+      if (output_preallocated) {
         return Status("Too small buffer passed to BzipCompressor");
       }
       out_buffer_ = NULL;
@@ -165,9 +168,9 @@ int SnappyBlockCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
   return -1;
 }
 
-Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
+Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
+                                           int input_length, uint8_t* input,
                                            int *output_length, uint8_t** output) {
-
   // Hadoop uses a block compression scheme on top of snappy.  First there is
   // an integer which is the size of the decompressed data followed by a
   // sequence of compressed blocks each preceded with an integer size.
@@ -175,10 +178,9 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
   int block_size = input_length / 2;
   size_t length = snappy::MaxCompressedLength(block_size) * 2;
   length += 3 * sizeof (int32_t);
-  DCHECK(*output_length == 0 || length <= *output_length);
+  DCHECK(!output_preallocated || length <= *output_length);
 
-  // If length is non-zero then the output has been allocated.
-  if (*output_length != 0) {
+  if (output_preallocated) {
     buffer_length_ = *output_length;
     out_buffer_ = *output;
   } else if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < length) {
@@ -190,7 +192,8 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
   uint8_t* sizep;
   ReadWriteUtil::PutInt(outp, static_cast<uint32_t>(input_length));
   outp += sizeof (int32_t);
-  do {
+  while (input_length > 0) {
+    // TODO: should this be a while or a do-while loop? Check what Hadoop does.
     // Point at the spot to store the compressed size.
     sizep = outp;
     outp += sizeof (int32_t);
@@ -202,7 +205,7 @@ Status SnappyBlockCompressor::ProcessBlock(int input_length, uint8_t* input,
     input += block_size;
     input_length -= block_size;
     outp += size;
-  } while (input_length > 0);
+  }
 
   *output = out_buffer_;
   *output_length = outp - out_buffer_;
@@ -217,14 +220,15 @@ int SnappyCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
   return snappy::MaxCompressedLength(input_len);
 }
 
-Status SnappyCompressor::ProcessBlock(int input_length, uint8_t* input,
+Status SnappyCompressor::ProcessBlock(bool output_preallocated,
+                                      int input_length, uint8_t* input,
                                       int* output_length, uint8_t** output) {
   int max_compressed_len = MaxOutputLen(input_length);
-  if (*output_length != 0 && *output_length < max_compressed_len) {
+  if (output_preallocated && *output_length < max_compressed_len) {
     return Status("SnappyCompressor::ProcessBlock: output length too small");
   }
 
-  if (*output_length == 0) {
+  if (!output_preallocated) {
       if ((!reuse_buffer_ || buffer_length_ < max_compressed_len)) {
         DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
         buffer_length_ = max_compressed_len;

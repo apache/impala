@@ -32,7 +32,8 @@ class GzipDecompressor : public Codec {
   virtual ~GzipDecompressor();
 
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
@@ -56,7 +57,8 @@ class BzipDecompressor : public Codec {
   virtual ~BzipDecompressor() { }
 
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
  protected:
   // Bzip does not need initialization
@@ -69,7 +71,8 @@ class SnappyDecompressor : public Codec {
   virtual ~SnappyDecompressor() { }
 
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
@@ -84,7 +87,8 @@ class SnappyBlockDecompressor : public Codec {
   virtual ~SnappyBlockDecompressor() { }
 
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:

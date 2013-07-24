@@ -391,7 +391,7 @@ Status HdfsParquetTableWriter::ColumnWriter::Flush(int64_t* file_pos,
       uint8_t* compressed_data = 
           parent_->per_file_mem_pool_->Allocate(max_compressed_size);
       header.compressed_page_size = max_compressed_size;
-      compressor_->ProcessBlock(header.uncompressed_page_size, dict_buffer,
+      compressor_->ProcessBlock(true, header.uncompressed_page_size, dict_buffer,
           &header.compressed_page_size, &compressed_data);
       dict_buffer = compressed_data;
       // We allocated the output based on the guessed size, return the extra allocated
@@ -493,7 +493,7 @@ int64_t HdfsParquetTableWriter::ColumnWriter::FinalizeCurrentPage() {
     DCHECK_GT(max_compressed_size, 0);
     uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
     header.compressed_page_size = max_compressed_size;
-    compressor_->ProcessBlock(header.uncompressed_page_size, uncompressed_data,
+    compressor_->ProcessBlock(true, header.uncompressed_page_size, uncompressed_data,
         &header.compressed_page_size, &compressed_data);
     current_page_->data = compressed_data;
 

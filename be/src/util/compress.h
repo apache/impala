@@ -47,7 +47,8 @@ class GzipCompressor : public Codec {
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
@@ -81,7 +82,8 @@ class BzipCompressor : public Codec {
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
   // Initialize the compressor.
   virtual Status Init() { return Status::OK; }
@@ -97,7 +99,8 @@ class SnappyBlockCompressor : public Codec {
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
@@ -114,7 +117,8 @@ class SnappyCompressor : public Codec {
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
 
   // Process a block of data.
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
   
  protected:

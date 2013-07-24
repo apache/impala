@@ -531,7 +531,7 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   compressed_buffer.resize(compressor.MaxOutputLen(serialized_buffer.size()));
   int result_len = compressed_buffer.size();
   uint8_t* compressed_buffer_ptr = &compressed_buffer[0];
-  compressor.ProcessBlock(serialized_buffer.size(), &serialized_buffer[0],
+  compressor.ProcessBlock(true, serialized_buffer.size(), &serialized_buffer[0],
       &result_len, &compressed_buffer_ptr);
   compressed_buffer.resize(result_len);
 

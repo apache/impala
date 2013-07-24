@@ -480,10 +480,9 @@ Status HdfsAvroScanner::ProcessRange() {
         // decompressor_ doesn't expect this
         compressed_size -= 4;
       }
-      size = 0; // signal unknown output size
       SCOPED_TIMER(decompress_timer_);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(
-          compressed_size, compressed_data, &size, &data));
+          false, compressed_size, compressed_data, &size, &data));
     } else {
       data = compressed_data;
       size = compressed_size;

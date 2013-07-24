@@ -281,7 +281,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       uint8_t* dict_values = NULL;
       if (decompressor_.get() != NULL) {
         dict_values = parent_->dictionary_pool_->Allocate(uncompressed_size);
-        RETURN_IF_ERROR(decompressor_->ProcessBlock(data_size, data_,
+        RETURN_IF_ERROR(decompressor_->ProcessBlock(true, data_size, data_,
             &uncompressed_size, &dict_values));
         data_size = uncompressed_size;
       } else {
@@ -311,8 +311,8 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       SCOPED_TIMER(parent_->decompress_timer_);
       uint8_t* decompressed_buffer = decompressed_data_pool_->Allocate(uncompressed_size);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(
-          current_page_header_.compressed_page_size, data_, 
-          &uncompressed_size, &decompressed_buffer)); 
+          true, current_page_header_.compressed_page_size, data_,
+          &uncompressed_size, &decompressed_buffer));
       DCHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;

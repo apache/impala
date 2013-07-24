@@ -101,26 +101,22 @@ class Codec {
 
   virtual ~Codec() {}
 
-  // Process a block of data, either compressing or decompressing it.  
-  // If *output_length is 0, the function will allocate from its mempool.  
-  // If *output_length is non-zero, it should be the length of *output and must
-  // be big enough to contain the transformed output.
-  // Inputs:
-  //   input_length: length of the data to process
-  //   input: data to process
+  // Process a block of data, either compressing or decompressing it.
   //
-  // If the output buffer is allocated by the caller, *output must be the 
-  // preallocated buffer and *output_length the buffer length.
-  //
-  // If the output buffer needs to be allocated by the codec, ProcessBlock
-  // must be called with *output_length == 0 and *output will be set to the
-  // buffer allocated by the codec.  In this case, a mempool must have been
-  // passed into the c'tor.
+  // If output_preallocated is true, *output_length must be the length of *output and data
+  // will be written directly to *output (*output must be big enough to contain the
+  // transformed output). If output_preallocated is false, *output will be allocated from
+  // the codec's mempool. In this case, a mempool must have been passed into the c'tor.
   //
   // In either case, *output_length will be set to the actual length of the
   // transformed output.
-  virtual Status ProcessBlock(int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output)  = 0;
+  //
+  // Inputs:
+  //   input_length: length of the data to process
+  //   input: data to process
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
+                              int* output_length, uint8_t** output) = 0;
 
   // Returns the maximum result length from applying the codec to input.
   // Note this is not the exact result length, simply a bound to allow preallocating
@@ -138,8 +134,8 @@ class Codec {
  protected:
   // Create a compression operator
   // Inputs:
-  //   mem_pool: memory pool to allocate the output buffer, this implies that the
-  //             caller is responsible for the memory allocated by the operator.
+  //   mem_pool: memory pool to allocate the output buffer. If mem_pool is NULL then the
+  //             caller must always preallocate *output in ProcessBlock().
   //   reuse_buffer: if false always allocate a new buffer rather than reuse.
   Codec(MemPool* mem_pool, bool reuse_buffer);
 

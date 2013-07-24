@@ -78,7 +78,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     }
     uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
     uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
-    compressor.ProcessBlock(size, input, &compressed_size, &compressed_output);
+    compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output);
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
@@ -115,7 +115,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
     int uncompressed_size = decompressor.MaxOutputLen(compressed_size, compressed_data);
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
     uint8_t* data = tuple_data_pool_->Allocate(uncompressed_size);
-    Status status = decompressor.ProcessBlock(compressed_size, compressed_data,
+    Status status = decompressor.ProcessBlock(true, compressed_size, compressed_data,
         &uncompressed_size, &data);
     DCHECK(status.ok()) << "RowBatch decompression failed.";
   } else {

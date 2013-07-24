@@ -146,10 +146,10 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     RETURN_IF_FALSE(
         stream_->ReadBytes(in_size, &compressed_data, &parse_status_));
 
-    int len = 0;
+    int len;
     {
       SCOPED_TIMER(decompress_timer_);
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(in_size, compressed_data,
+      RETURN_IF_ERROR(decompressor_->ProcessBlock(false, in_size, compressed_data,
           &len, &unparsed_data_buffer_));
     }
     *record_ptr = unparsed_data_buffer_;
@@ -545,9 +545,9 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   RETURN_IF_FALSE(stream_->ReadBytes(block_size, &compressed_data, &parse_status_));
 
   {
-    int len = 0;
+    int len;
     SCOPED_TIMER(decompress_timer_);
-    RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, compressed_data,
+    RETURN_IF_ERROR(decompressor_->ProcessBlock(false, block_size, compressed_data,
                                                 &len, &unparsed_data_buffer_));
     next_record_in_compressed_block_ = unparsed_data_buffer_;
   }

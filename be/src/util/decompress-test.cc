@@ -28,7 +28,7 @@ namespace impala {
 // Fixture for testing class Decompressor
 class DecompressorTest : public ::testing::Test{
  protected:
-  DecompressorTest() {
+  DecompressorTest() : mem_pool_(NULL) {
     uint8_t* ip = input_;
     for (int i = 0; i < 1024; i++) {
       for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
@@ -43,35 +43,63 @@ class DecompressorTest : public ::testing::Test{
   void RunTest(THdfsCompression::type format) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
-    MemPool mem_pool(NULL);
 
     EXPECT_TRUE(
-        Codec::CreateCompressor(NULL, &mem_pool, true, format, &compressor).ok());
+        Codec::CreateCompressor(NULL, &mem_pool_, true, format, &compressor).ok());
     EXPECT_TRUE(
-        Codec::CreateDecompressor(NULL, &mem_pool, true, format, &decompressor).ok());
+        Codec::CreateDecompressor(NULL, &mem_pool_, true, format, &decompressor).ok());
 
+    CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_), input_);
+    if (format != THdfsCompression::BZIP2) {
+      CompressAndDecompress(compressor.get(), decompressor.get(), 0, NULL);
+    } else {
+      // bzip does not allow NULL input
+      CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
+    }
+  }
+
+  void CompressAndDecompress(Codec* compressor, Codec* decompressor,
+                             int input_len, uint8_t* input) {
+    // Non-preallocated output buffers
     uint8_t* compressed;
-    int compressed_length = 0;
-    EXPECT_TRUE(compressor->ProcessBlock(sizeof(input_),
-          input_, &compressed_length, &compressed).ok());
+    int compressed_length;
+    EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
+          input, &compressed_length, &compressed).ok());
     uint8_t* output;
-    int out_len = 0;
+    int output_len;
     EXPECT_TRUE(
-        decompressor->ProcessBlock(compressed_length,
-            compressed, &out_len, &output).ok());
+        decompressor->ProcessBlock(false, compressed_length,
+            compressed, &output_len, &output).ok());
 
-    EXPECT_TRUE(memcmp(&input_, output, sizeof(input_)) == 0);
+    EXPECT_EQ(output_len, input_len);
+    EXPECT_EQ(memcmp(input, output, input_len), 0);
 
-    // Try again specifying the output buffer and length.
-    out_len = sizeof (input_);
-    output = mem_pool.Allocate(out_len);
-    EXPECT_TRUE(decompressor->ProcessBlock(compressed_length,
-          compressed, &out_len, &output).ok());
+    // Preallocated output buffers
+    int max_compressed_length = compressor->MaxOutputLen(input_len, input);
 
-    EXPECT_TRUE(memcmp(&input_, output, sizeof(input_)) == 0);
+    // Don't redo compression if compressor doesn't support MaxOutputLen()
+    if (max_compressed_length != -1) {
+      EXPECT_GE(max_compressed_length, 0);
+      uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
+      compressed_length = max_compressed_length;
+      EXPECT_TRUE(compressor->ProcessBlock(true, input_len,
+            input, &compressed_length, &compressed).ok());
+    }
+
+    output_len = decompressor->MaxOutputLen(compressed_length, compressed);
+    if (output_len == -1) {
+      output_len = input_len;
+    }
+    output = mem_pool_.Allocate(output_len);
+    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length,
+          compressed, &output_len, &output).ok());
+
+    EXPECT_EQ(output_len, input_len);
+    EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
   uint8_t input_[2 * 26 * 1024];
+  MemPool mem_pool_;
 };
 
 TEST_F(DecompressorTest, Default) {
