@@ -12,7 +12,7 @@ import os
 import sys
 import subprocess
 import threading
-from collections import defaultdict
+from collections import defaultdict, deque
 from optparse import OptionParser
 from functools import partial
 from os.path import isfile, isdir
@@ -66,12 +66,12 @@ class WorkloadRunner(object):
     self.skip_impala = kwargs.get('skip_impala', False)
     self.compare_with_hive = kwargs.get('compare_with_hive', False)
     self.hive_cmd = kwargs.get('hive_cmd', 'hive -e ')
-    self.TARGET_IMPALADS = kwargs.get('impalad', 'localhost:21000').split(",")
+    self.target_impalads = deque(kwargs.get('impalad', 'localhost:21000').split(","))
     self.iterations = kwargs.get('iterations', 2)
     self.num_clients = kwargs.get('num_clients', 1)
     self.exec_options = kwargs.get('exec_options', str())
     self.prime_cache = kwargs.get('prime_cache', False)
-    self.remote = not self.TARGET_IMPALADS[0].startswith('localhost')
+    self.remote = not self.target_impalads[0].startswith('localhost')
     self.profiler = kwargs.get('profiler', False)
     self.use_kerberos = kwargs.get('use_kerberos', False)
     self.run_using_hive = kwargs.get('compare_with_hive', False) or self.skip_impala
@@ -81,6 +81,11 @@ class WorkloadRunner(object):
     #self.gprof_cmd = 'google-pprof --text ' + self.runquery_path + ' %s | head -n 60'
     self.__summary = str()
     self.__result_map = defaultdict(list)
+
+  def get_next_impalad(self):
+    """Maintains a rotating list of impalads"""
+    self.target_impalads.rotate(-1)
+    return self.target_impalads[-1]
 
   # Parse for the tables used in this query
   @staticmethod
@@ -135,11 +140,11 @@ class WorkloadRunner(object):
           exec_options=self.exec_options,
           use_kerberos=self.use_kerberos,
           db_name=db_name,
-          impalad=choice(self.TARGET_IMPALADS)),
-          ),
+          impalad=self.get_next_impalad(),
+          )),
         'jdbc': lambda: (execute_using_jdbc,
           JdbcQueryExecOptions(self.iterations,
-          impalad=choice(self.TARGET_IMPALADS),
+          impalad=self.get_next_impalad(),
           db_name=db_name)),
     } [executor_name]()
     return query_options
