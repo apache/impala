@@ -93,7 +93,7 @@ if __name__ == "__main__":
   test_executor.run_tests(args)
 
   # Finally, validate impalad/statestored metrics.
-  args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR, 'log_name': "verify-metrics"}
+  args = build_test_args(log_base_name='verify-metrics', valid_dirs=['verifiers'])
   args += ' verifiers/test_verify_metrics.py'
   test_executor.run_tests(args)
 
