@@ -4,45 +4,9 @@
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-store_sales
----- COLUMNS
-ss_sold_date_sk           int
-ss_sold_time_sk           int
-ss_item_sk                int
-ss_customer_sk            int
-ss_cdemo_sk               int
-ss_hdemo_sk               int
-ss_addr_sk                int
-ss_store_sk               int
-ss_promo_sk               int
-ss_ticket_number          int
-ss_quantity               int
-ss_wholesale_cost         float
-ss_list_price             float
-ss_sales_price            float
-ss_ext_discount_amt       float
-ss_ext_sales_price        float
-ss_ext_wholesale_cost     float
-ss_ext_list_price         float
-ss_ext_tax                float
-ss_coupon_amt             float
-ss_net_paid               float
-ss_net_paid_inc_tax       float
-ss_net_profit             float
----- ROW_FORMAT
-delimited fields terminated by '|'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_sales/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpcds
----- BASE_TABLE_NAME
 customer_demographics
 ---- COLUMNS
-cd_demo_sk                int
+cd_demo_sk                bigint
 cd_gender                 string
 cd_marital_status         string
 cd_education_status       string
@@ -54,9 +18,11 @@ cd_dep_college_count      int
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_demographics/'
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/customer_demographics/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -64,7 +30,7 @@ tpcds
 ---- BASE_TABLE_NAME
 date_dim
 ---- COLUMNS
-d_date_sk                 int
+d_date_sk                 bigint
 d_date_id                 string
 d_date                    string
 d_month_seq               int
@@ -95,7 +61,8 @@ d_current_year            string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/date_dim/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -105,7 +72,7 @@ tpcds
 ---- BASE_TABLE_NAME
 time_dim
 ---- COLUMNS
-t_time_sk                 int
+t_time_sk                 bigint
 t_time_id                 string
 t_time                    int
 t_hour                    int
@@ -118,7 +85,8 @@ t_meal_time               string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -128,7 +96,7 @@ tpcds
 ---- BASE_TABLE_NAME
 item
 ---- COLUMNS
-i_item_sk                 int
+i_item_sk                 bigint
 i_item_id                 string
 i_rec_start_date          string
 i_rec_end_date            string
@@ -153,7 +121,8 @@ i_product_name            string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/item/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -163,7 +132,7 @@ tpcds
 ---- BASE_TABLE_NAME
 store
 ---- COLUMNS
-s_store_sk                int
+s_store_sk                bigint
 s_store_id                string
 s_rec_start_date          string
 s_rec_end_date            string
@@ -195,7 +164,8 @@ s_tax_precentage          float
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -205,7 +175,7 @@ tpcds
 ---- BASE_TABLE_NAME
 customer
 ---- COLUMNS
-c_customer_sk             int
+c_customer_sk             bigint
 c_customer_id             string
 c_current_cdemo_sk        int
 c_current_hdemo_sk        int
@@ -226,7 +196,8 @@ c_last_review_date        string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -236,7 +207,7 @@ tpcds
 ---- BASE_TABLE_NAME
 promotion
 ---- COLUMNS
-p_promo_sk                int
+p_promo_sk                bigint
 p_promo_id                string
 p_start_date_sk           int
 p_end_date_sk             int
@@ -258,7 +229,8 @@ p_discount_active         string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -268,7 +240,7 @@ tpcds
 ---- BASE_TABLE_NAME
 household_demographics
 ---- COLUMNS
-hd_demo_sk                int
+hd_demo_sk                bigint
 hd_income_band_sk         int
 hd_buy_potential          string
 hd_dep_count              int
@@ -276,9 +248,11 @@ hd_vehicle_count          int
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -286,7 +260,7 @@ tpcds
 ---- BASE_TABLE_NAME
 customer_address
 ---- COLUMNS
-ca_address_sk             int
+ca_address_sk             bigint
 ca_address_id             string
 ca_street_number          string
 ca_street_name            string
@@ -302,8 +276,132 @@ ca_location_type          string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+store_sales_unpartitioned
+---- COLUMNS
+ss_sold_date_sk           bigint
+ss_sold_time_sk           bigint
+ss_item_sk                bigint
+ss_customer_sk            bigint
+ss_cdemo_sk               bigint
+ss_hdemo_sk               bigint
+ss_addr_sk                bigint
+ss_store_sk               bigint
+ss_promo_sk               bigint
+ss_ticket_number          int
+ss_quantity               int
+ss_wholesale_cost         float
+ss_list_price             float
+ss_sales_price            float
+ss_ext_discount_amt       float
+ss_ext_sales_price        float
+ss_ext_wholesale_cost     float
+ss_ext_list_price         float
+ss_ext_tax                float
+ss_coupon_amt             float
+ss_net_paid               float
+ss_net_paid_inc_tax       float
+ss_net_profit             float
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_sales/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+store_sales
+---- COLUMNS
+ss_sold_date_sk           bigint
+ss_sold_time_sk           bigint
+ss_item_sk                bigint
+ss_customer_sk            bigint
+ss_cdemo_sk               bigint
+ss_hdemo_sk               bigint
+ss_addr_sk                bigint
+ss_store_sk               bigint
+ss_promo_sk               bigint
+ss_ticket_number          int
+ss_quantity               int
+ss_wholesale_cost         float
+ss_list_price             float
+ss_sales_price            float
+ss_ext_discount_amt       float
+ss_ext_sales_price        float
+ss_ext_wholesale_cost     float
+ss_ext_list_price         float
+ss_ext_tax                float
+ss_coupon_amt             float
+ss_net_paid               float
+ss_net_paid_inc_tax       float
+ss_net_profit             float
+---- PARTITION_COLUMNS
+ss_date string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- DEPENDENT_LOAD
+-- Split the load into multiple steps to reduce total memory usage for larger
+-- scale factors. TODO: Dynamically scale this based on the scale factor?
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
+SELECT * FROM {db_name}.{table_name}
+WHERE ss_date <= '1999-03-29';
+
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
+SELECT * FROM {db_name}.{table_name}
+WHERE ss_date > '1999-03-29' and ss_date <= '2000-06-21';
+
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
+SELECT * FROM {db_name}.{table_name}
+WHERE ss_date > '2000-06-21' and ss_date <= '2001-09-15';
+
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
+SELECT * FROM {db_name}.{table_name}
+WHERE ss_date > '2001-09-15';
+---- LOAD
+USE {db_name};
+
+set hive.auto.convert.join=true;
+set hive.exec.max.dynamic.partitions.pernode=10000;
+set hive.exec.max.dynamic.partitions=10000;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+
+insert overwrite table {table_name} partition(ss_date)
+select ss.*, d.d_date as ss_date
+from date_dim d
+join store_sales_unpartitioned ss
+  on (ss.ss_sold_date_sk = d.d_date_sk)
+where ss.ss_sold_date_sk is not null
+distribute by ss_date;
+---- LOAD_LOCAL
+USE {db_name};
+
+set hive.auto.convert.join=true;
+set hive.exec.max.dynamic.partitions.pernode=10000;
+set hive.exec.max.dynamic.partitions=10000;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+
+insert overwrite table {table_name} partition(ss_date)
+select ss.*, d.d_date as ss_date
+from date_dim d
+join store_sales_unpartitioned ss
+  on (ss.ss_sold_date_sk = d.d_date_sk)
+where ss.ss_sold_date_sk is not null
+-- The filter below on d_date is needed to reduce the number of partitions generated for
+-- local testing. This filter reduces the number of partitions from ~1800 to 120.
+and (d.d_date like '%-01' or d.d_date like '%-15')
+distribute by ss_date;
 ====

@@ -1,128 +1,491 @@
 ====
----- QUERY : TPCDS-Q98
-SELECT
+---- QUERY: TPCDS-Q98
+select
   i_item_desc,
   i_category,
   i_class,
-  SUM(ss_ext_sales_price) AS itemrevenue
-FROM store_sales ss
-JOIN date_dim d
-  ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN item i
-  ON (ss.ss_item_sk = i.i_item_sk)
-WHERE
-  i_category IN ('Jewelry', 'Sports', 'Books')
-  AND d_date BETWEEN CAST('2001-01-12' AS TIMESTAMP) AND date_add('2001-01-12', 30)
-GROUP BY
+  i_current_price,
+  sum(ss_ext_sales_price) as itemrevenue
+from
+  store_sales
+  join item on (store_sales.ss_item_sk = item.i_item_sk)
+where
+  i_category in('Jewelry', 'Sports', 'Books')
+  and ss_date between '2001-01-12' and '2001-02-11'
+group by
   i_item_desc,
   i_category,
-  i_class
-ORDER BY
+  i_class,
+  i_current_price
+order by
   i_category,
   i_class,
   i_item_desc
-LIMIT 100;
+limit 1000
 ---- RESULTS
-'','Books','',8397.999877929688
-'A little special changes would not turn certainly terms. Big, immediate earn','Books','arts',130.4100036621094
-'Agents will not follow convincingly neatly different beliefs. Public shadows put even separate, tall associations. Hills would vote direct conventional','Books','arts',702.6900024414062
-'Ago possible girls should know holidays. A','Books','arts',1474.84001159668
-'Badly difficult intervals should not get today new followers. Standards examine. Young, actual departments might knock special, national assumptions. Successful wi','Books','arts',10839.38989257812
-'Badly outside representatives should tax original decisions. Signs trust well front, literary laws. Social sizes can involve for example to a effects. Lists might appear small purposes. Conv','Books','arts',2244.720031738281
-'Beneath decent wives write t','Books','arts',797.5700149536133
-'Brilliant, acceptable resources might not pick as. Positive, married parties support only strongly impossible needs. Photogra','Books','arts',210.1999969482422
-'Cle','Books','arts',7132.860107421875
-'Common, old modules express alone enterprises. British, other obligations provide criminal, old details. Complete eyes used to make inside radical t','Books','arts',5273.059997558594
-'Communications grab as. Never new minutes release unfair occ','Books','arts',NULL
-'Correct, certain humans cut','Books','arts',4224.909973144531
-'Especially true items might supply particularly. Black, automatic words might develop post-war problems. Fresh, visible workers could not appe','Books','arts',5855.599890708923
-'Forces should not like too; only sufficient facts might not think vast police. Here occasional weeks see exte','Books','arts',21.60000038146973
-'Free feet experience too powerful coins. Mild details ','Books','arts',3782.460021972656
-'Glad users understand very almost original jobs. Towns can understand. Supreme, following days work by a parents; german, crucial weapons work sure; fair pictur','Books','arts',4178.4599609375
-'Golden estates meet as yet hands. About solid proteins used to tell. Once causal boots imagine frequently new elections; flexible, other ways find re','Books','arts',6473.019790649414
-'Inner, obvious members capture social teams. Literary studies agree developments. Aware, prime injuries must help sites. More corporate problems may explore still days. Unable commun','Books','arts',5244.679748535156
-'Issues might not lose very bold, different opportunities. Of course absolute areas might balance bottom mechanisms. A','Books','arts',7329.18017578125
-'Little days answer in a emotions; players touch.','Books','arts',1835.360046386719
-'Main cheeks must put ','Books','arts',6539.600158691406
-'Minor heads close common children; recently strong firms provide. Useful, young men ought to create changes. Popular, common regulations might decide. Points fit. Obvious, glad officials ','Books','arts',203.2799987792969
-'Most increased losses shall not buy below loans. Merely strategic reports come on a members. Considerable, mad ingredients should conver','Books','arts',2752.800048828125
-'National, upper principles fill relatives. Components make. Rarely unusual plants might not deal','Books','arts',5731.180004119873
-'Natural, particular words speak dangerous suppliers. Necess','Books','arts',1906.519958496094
-'New, expected possibilities will not determine with a areas. Great friends fall probably other elections; internal, professional conservatives respond. Early planes establish in ','Books','arts',362.870002746582
-'No longer soft cameras mean select, small policies. Also famous arms could want irish, different connections. Attacks should remove black r','Books','arts',5267.749923706055
-'Old eyes could not give later issues. Claims might','Books','arts',664.3799743652344
-'Old, professional neighbours should continue as. Co','Books','arts',14420.06970214844
-'Only automatic principles used to accept too hot colleagues. Modern arguments enjoy general, likely respondents; good years should look ','Books','arts',23121.68960571289
-'Only tall games meet both in a periods; bad, misleading homes think to a months. Clear detailed numbers','Books','arts',7591.7802734375
-'Other products follow for a eyes. Greatly normal models shall assess for example immediately easy lands. Impossible, foreign plans criticise however also free years; known, ruling pol','Books','arts',4925.130065917969
-'Problems compete with a sets. Interesting, automatic pounds tell complete hills. ','Books','arts',1952.579956054688
-'Proceedings see then equal quantities. New, complex magistrates overcome good, single institutions','Books','arts',2021.939971923828
-'Professional, likely elections collect children. New figures would continue however well only rates. Also concerned territories cover at all new, star losses. Much black exports would develop liabili','Books','arts',178.8600006103516
-'Regulations go almost. Complex operations may stay at present countries. Widely special modules can rest also in ne','Books','arts',7404.759812355042
-'Significant, preliminary boys can remain lightly more pale discussion','Books','arts',1811.900009155273
-'Taxes should emerge maximum studies. Literary forms dig pos','Books','arts',1264.940002441406
-'Teams will provide journalists. Minu','Books','arts',12365.23010253906
-'Victorian miles would reform as well relationships. However tired institutions will send. Dramatically likely rats catch in a teams. Years may spend nearly mass, high','Books','arts',9219.64013671875
-'Years light glasses. Contemporary members might detect even drawings. Private instructions ought to expect well main streets. Children will say well; usually young members ought to ensure enough. ','Books','arts',22409.62976074219
-'Alone countries must use so old, international functions. Only public cases see in a words. Normal methods forget even communist changes; technical numbers convert either natu','Books','business',1624.68994140625
-'Amazing, victorian materials let immensely years; well happy systems must not see undoubtedly within a days. Major, physical parents must imply small, different parents. Easy teeth me','Books','business',1595.429992675781
-'American, other circumstances tackle also with the facts. Passive','Books','business',10205.68000030518
-'Annual, pure thoughts cannot understand poor developers. Following things shall advise. Costs may turn thereby social, small years. New unions provide young colours. Important, loca','Books','business',1519.879943847656
-'Certainly remaining flowers can wonder then just significant papers; places secure below as a bombs. Other, domestic members must allow very polite thi','Books','business',11147.88983154297
-'Cheap problems can draw please over good stars. Either long children would pass similar, different metres; base, large surroundings ','Books','business',3348.35986328125
-'Circumstances say well also ideal magazines. Available committees bet even aged a losses. Likely hot services identify. Disabled, single example','Books','business',18078.35007858276
-'Clear, harsh police used to include large, appropriate plans. Prices could produce more. There white weapons expect directly free conclusions. Responsibl','Books','business',2742.539978027344
-'Different children must turn only common pensioners. Members might work still different, white children. Economic, bare features ought to examine no longer quick,','Books','business',5847.259948730469
-'Emotional sources can use on a countr','Books','business',3158.609975814819
-'Especially firm buses listen major, individual calls. New daughters help internal, general eggs. Here l','Books','business',693.8800048828125
-'European, solid councils might oppose usually dull, busy indians; public, adequate drugs ','Books','business',7151.139984130859
-'Facts can highlig','Books','business',2158.270065307617
-'Great, extraordinary goals must not take later good, irrelevant centuries; obvious, bright daughters shall','Books','business',3677.180053710938
-'Hands may not allow only in a lands; linear, other pubs say; social, precise women identify for a patients. Preferences develop alone now rich motives. Ever good tas','Books','business',5879.759887695312
-'Head facts resolve even. Characteristics put. Toxic, genuine officials shall not meet. Difficult chil','Books','business',5498.840087890625
-'Here permanent rights alert for a trees. Federal, dark women select always good pp.. Teachers will not return more by a quantities. Young, mental delegates should come active, different c','Books','business',927.6599731445312
-'Improvements direct inevitable, wrong arrangements. White songs must say in a centuries. Dark, narrow schools go always possible stories. Progressive, certain parts might sleep to the players. True,','Books','business',4679.909912109375
-'Just genuine talks say much on a events. All right desperate birds must love. Now small complaints become main, good officers. Pp. could not ','Books','business',3056
-'Legal divisions ought to copy. Never dead agencies purchase widely','Books','business',1186.77001953125
-'Lively, regular decisions ought to think separately clear networks; english, little levels ought to keep years. Students make then until the organisers. Significant, st','Books','business',2416.929992675781
-'Local, unlikely bits sign completely. Areas feel only manufacturing legs. Amounts must go personal, very things; areas could take clo','Books','business',4225.930053710938
-'Lovers should not afford good, technological gains; distinctive cats might not find ambitious, different','Books','business',7336.739990234375
-'Men wait away easy, head years. Only, capitalist artis','Books','business',4635.649968147278
-'Modern records retain about there civil plans. Social bodies survive. Great, living losses bother late, coherent others. About british sports ought to use cautiously from ','Books','business',9995.889953613281
-'Most great losses convert together in a terms.','Books','business',7932.659790039062
-'Narrow, famous years shall address se','Books','business',8839.329956054688
-'Necessary, old controls may not attend as sharp arguments. Reaction','Books','business',4648.890234470367
-'Needs might master too in the relations. Temporarily ready roads shall become new, regular words; diverse, other visitors concentrate small, local firms; special, political months m','Books','business',3671.500027656555
-'New teachers might demand never assets. Deeply bright ministers make generally never prime imports. Odd writings step common readers; talks take young, r','Books','business',338.5799865722656
-'No longer national paren','Books','business',1157.490005493164
-'Of course large structures describe. Used factors would know commercial benefits. Then appropriate circumstances should not know so new terms; ev','Books','business',101.3999977111816
-'Originally major industries matter mediterranean bodies. Cases should not ','Books','business',1107.880023956299
-'Personal, significant activities agree only by a couples. Elaborate aut','Books','business',3492.970062255859
-'Possibly great customs suit close looks. Capable, frequent processes shall pass possible dangers; hard, private words act measures. Mysterious, acceptable fac','Books','business',8936.500292778015
-'Scientific demonstrations reach even; futures can know just valid courts. Forward crucial prices can help peculiar, common taxes. Common cells might trust by now work','Books','business',13637.08959960938
-'Secondary, red structures may seek eyes. High true titles should make now junior fat thoughts. Partly excellent authorities receive direct, net parties. Parents look most also other issues. Empty, con','Books','business',18293.13986206055
-'Sen','Books','business',7176.909896850586
-'Significantly relevant colleges extract knowingly broad investors. Entire members stay. Mediterranean legs would cut on the knees. Forthcoming, particular students u','Books','business',14812.10021972656
-'Single hours ought to say. Sources would contribute civil rivers. Good, central patients put too to the spirits. Sho','Books','business',4029.070110321045
-'So small edges will understand currently in a things. New trains point usually systems. Years look growing questions. Different cases could sell just alive, late rules; big, large results will make ','Books','business',9044.579792022705
-'Sons would free. There natural structures used to fight never gay names. Vast stairs put still up to a payments. Long, sovie','Books','business',11251.3203125
-'Total pp. accept with a questions; able, generous a','Books','business',2724.700035095215
-'Ultimate stands will like bright, possible tickets. Lips hesitate. Miners could not see today drinks. Only unions must convert very written movements. Senior options must not generate ','Books','business',13283.15017700195
-'Ways take as important pp.','Books','business',1483.119987487793
-'Weapons wo','Books','business',10683.44982910156
-'Women ignore. Sure, new collections must not look there entire seats. New, regional others sleep too large children. New points issue in a men; times might go local, german males. Inc, short se','Books','business',2627.009948730469
-'Wonderful systems ask also very parliamentary orders; british companies','Books','business',4870.170066833496
-'Able, angry sources master. Minimum proceedings go more reasonable','Books','computers',8404.400032043457
-'About total honours carry now never emotio','Books','computers',9205.899993896484
-'Authorities leave therefore little, influential authorities. Children enable minutes. Questions cover too extended difficulties. Below national minutes may not examine uni','Books','computers',9388.619789123535
-'Authorities retain with a authorities. Warm, commercial things can bring. Eyes buy also for the minds. P','Books','computers',12427.32982254028
-'Available, hot days might adopt only public, great memories. Relative princip','Books','computers',4738.780212402344
-'Capital shoulders live vari','Books','computers',3225.710021972656
-'Capital, united feelings paint only things. Greatly financial economies should not pay somewhere soviet necessary armies; educational concepts mus','Books','computers',8501.349975585938
-'Children convince just to the miners. Prime, considerable components shall explain policies; single tasks know just all the same long shares; known police shall not draw co','Books','computers',4604.679962158203
-'Clearly actual places would supply apparently only rats.','Books','computers',4563.270193099976
-'Clients would win at all public arms. Fresh, great plans could get. Findings sit th','Books','computers',7492.039855957031
-'Complete, head ways entail additional books; social letters drive perfect ends. Supporters should undermine therefore relat','Books','computers',406.8199882507324
+'Ago possible girls should know holidays. A','Books','arts',7.369999885559082,845.3200073242188
+'Common, old modules express alone enterprises. British, other obligations provide criminal, old details. Complete eyes used to make inside radical t','Books','arts',6.170000076293945,1004.059997558594
+'Only automatic principles used to accept too hot colleagues. Modern arguments enjoy general, likely respondents; good years should look ','Books','arts',7.489999771118164,1736.52001953125
+'Years light glasses. Contemporary members might detect even drawings. Private instructions ought to expect well main streets. Children will say well; usually young members ought to ensure enough. ','Books','arts',4.78000020980835,12466.2099609375
+'American, other circumstances tackle also with the facts. Passive','Books','business',0.7099999785423279,127.6800003051758
+'Certainly remaining flowers can wonder then just significant papers; places secure below as a bombs. Other, domestic members must allow very polite thi','Books','business',0.6000000238418579,405.2999877929688
+'Circumstances say well also ideal magazines. Available committees bet even aged a losses. Likely hot services identify. Disabled, single example','Books','business',54.45000076293945,3379.6298828125
+'Emotional sources can use on a countr','Books','business',3.269999980926514,1033.199951171875
+'Especially firm buses listen major, individual calls. New daughters help internal, general eggs. Here l','Books','business',2.809999942779541,693.8800048828125
+'European, solid councils might oppose usually dull, busy indians; public, adequate drugs ','Books','business',3.519999980926514,431.3999938964844
+'Men wait away easy, head years. Only, capitalist artis','Books','business',9.859999656677246,568.75
+'Needs might master too in the relations. Temporarily ready roads shall become new, regular words; diverse, other visitors concentrate small, local firms; special, political months m','Books','business',3.269999980926514,733.0499877929688
+'Total pp. accept with a questions; able, generous a','Books','business',5.25,96.80000305175781
+'Weapons wo','Books','business',87.44999694824219,4394.8798828125
+'About total honours carry now never emotio','Books','computers',0.7599999904632568,3415.0400390625
+'Complete, head ways entail additional books; social letters drive perfect ends. Supporters should undermine therefore relat','Books','computers',4.150000095367432,389.2999877929688
+'Offenders might grant; others could not make too alone mental women. More different pupils know never o','Books','computers',0.699999988079071,866.4000244140625
+'Social, official things buy bare, welcome couples. Much honest problems can change emissions. Political cigarettes marry thin','Books','computers',0.6000000238418579,1817.599975585938
+'Sorry trends must evacuate only. Inter','Books','computers',89.45999908447266,213.8399963378906
+'Strong, british horses may not choose less. Results will not carry harsh workers. False claims will want over labour increases. Co','Books','computers',1.049999952316284,783
+'Yet whole dealers p','Books','computers',3.630000114440918,2359.840087890625
+'Candidates will not use never important delegates; typical types go ahead surely sorry s','Books','cooking',4.510000228881836,242.1999969482422
+'Complex dreams must wait forward local levels; huge rights move alm','Books','cooking',27.32999992370605,1995.410034179688
+'Ex','Books','cooking',40.25,2834.0400390625
+'Foreign, frequent images cover good, international police. Farmers cannot mask clean, relative holes. Here mental numbers become shortly incidents. Objections acquir','Books','cooking',6.809999942779541,5569.8798828125
+'Free, military clouds work so for a situations. As naked days must play just good, central services. Then active ages could consider more narrow, big sh','Books','cooking',4.789999961853027,498.9799957275391
+'Gains cannot cross colourful, long individuals. Drily red difficulties may not say to a plans. Very different cases ta','Books','cooking',1.600000023841858,219.8399963378906
+'High, appropriate skills marry like a subjects. Necessary, bad motives find independent, primary efforts. Satisfactory, differe','Books','cooking',2.720000028610229,3106
+'Men should take into the legs. Vital, new others must say late for a representatives; now low weeks could not consider as councils. Wrong, educational e','Books','cooking',6.25,14.75
+'Short, soft hours move here personal styles. Specific insects can try before police. Years send under the reserves. Problems enter a','Books','cooking',8.5,217.3600006103516
+'True regulations may not restore with a magistrates. Critical results take once white, large prisoners; political,','Books','cooking',0.2700000107288361,1348.31005859375
+'Children build private, necessary houses; long, armed rooms pursue circumstances. Strange times take with the names. Pupils give for example large companies. Tracks must re','Books','entertainments',1.269999980926514,380.760009765625
+'Common, commercial years may not learn then high pp.. So old colo','Books','entertainments',4.329999923706055,95.05999755859375
+'However new','Books','entertainments',2.059999942779541,1978.619995117188
+'Initial pieces happen profoundly great observers; since temporary police get in a months. Lengthy, likely parts identify disabled values; likely women listen full, local se','Books','entertainments',1.090000033378601,1797.7099609375
+'Laws go shortly british, clear carers. Inner, available aspirations ought to abolish most armed strings. Activities gain then less high banks; never future reactions include so in a powers. Popular, ','Books','entertainments',9.689999580383301,5247.990234375
+'Legal police warrant quite wrong, obvious rules. Forms cannot move even references. Late distant spots see truly. Clear weeks get. French','Books','entertainments',3.380000114440918,1079.9599609375
+'Then smart fires used to form. Defences shall not ease precious, interesting women. Terms might not expect long consequences. Mass years shall not need most obvious obligat','Books','entertainments',2.079999923706055,2029.599975585938
+'Appointed others must trace yesterday with the members. Disabled animals talk also isolated, entire soldiers. Signs join at all lega','Books','fiction',0.9700000286102295,58.2400016784668
+'Concerned, working children feel politically real texts. Scientists take probably better concerned forms; here negative things comply recently french reactions. Briti','Books','fiction',9.470000267028809,433.1199951171875
+'Final, exotic students might not fight practically into the conclusions. Ago other sources cannot include present officers.','Books','fiction',8.220000267028809,284.3999938964844
+'Keen years fight much. Concerned, vital kings get downstairs new, worthy millions. Else full gam','Books','fiction',2.950000047683716,6744
+'Low meals c','Books','fiction',6.53000020980835,51.36000061035156
+'Major deaths swing later books; particularly expected problems give. High, high tools must see big areas. Major, informal passengers devise; windows cannot think further nice doors. Small','Books','fiction',4.559999942779541,1157.5400390625
+'New, busy years think potentially to a lights. Much apparent individuals find still other places. Speakers could ','Books','fiction',0.3100000023841858,6228.43994140625
+'Quite linguistic cells ask already permanent, valuable players. Colours place hastily happy, short bacteria; int','Books','fiction',1.590000033378601,6709.85009765625
+'Silently foreign years ','Books','fiction',53.13999938964844,314.5499877929688
+'So fair schools must go problems. Children should not paint in a photographs. Great, late senten','Books','fiction',1.470000028610229,2034.119995117188
+'Able, early arms return estimates; already common animals can go also british victorian meals. Old offices may not go just main, early procedures. Foreign, useless attitudes organize most. Respon','Books','history',4.809999942779541,5356.259765625
+'Chief objects look teachers. Already empi','Books','history',1.129999995231628,253.4400024414062
+'Large, different benefits might not get stands. Unpleasant, finan','Books','history',9.060000419616699,2600.859985351562
+'Later sure estates give long wonderful signs. Wide divisions warm with a observers. Formal, necessary colleg','Books','history',9.989999771118164,67.62000274658203
+'Lines shall talk usually blue, vague cards. Popular years increa','Books','history',59.09000015258789,6344.52001953125
+'More weak months believe today unnecessary sources. Years tread difficult emissions. Intermediate, personal farms could sail as without a causes. New offices illust','Books','history',1.75,10102.58984375
+'Objects see often changes. Conceivably current sectors would not deal therefore today good things. Only other votes might judge great items. Certainly accessible drugs must want in a funds; past ','Books','history',6.019999980926514,801.0800170898438
+'Other, political years appeal thereafter local, possible supplies. Genera','Books','history',4.829999923706055,110.0800018310547
+'Totally pure styles would seek charges; values say. Normal, big activi','Books','history',6.869999885559082,629
+'Early dark trains may monitor never fairly leading men. National, large changes shall help different, international women. Expressions may dispense large, strict bacteria. Parts like c','Books','home repair',7.940000057220459,1443.119995117188
+'Following, other respects must not come new,','Books','home repair',6.099999904632568,17.34000015258789
+'Free, relevant facilities used to include on a assumpt','Books','home repair',0.2099999934434891,1233.5400390625
+'General managers may not give. Fine costs c','Books','home repair',3.240000009536743,5117.070077896118
+'Governments shall light just. Mediterranean, russian differences would adjust perhaps methods. Holes answer largely commercially optimistic fees. Available houses used to help later scotti','Books','home repair',1.889999985694885,5339.1298828125
+'Other workers lay very ancient, proposed examples. Houses could not make high elections. All favorite waters must live fairly political financial parties.','Books','home repair',0.1299999952316284,183.9600067138672
+'Possibilities must not want open, personal things; things shall not take only resulting trees. English, dynamic year','Books','home repair',9.550000190734863,9619.6796875
+'Sorry versions simplify just upper disputes. Inc','Books','home repair',9.779999732971191,247.0200042724609
+'Various numbers help only. Instru','Books','home repair',4.760000228881836,526.7999877929688
+'Western, great eyes return unknown tensions. European years might not signal asleep, reduced countries. S','Books','home repair',7.289999961853027,2818.0400390625
+'White times examine products. Alone, square examples used to get highly. Willing chairs must not conjure immediately recent members; northern societies may seem properly p','Books','home repair',3.440000057220459,751.0700073242188
+'As fond rules explain again to a members. Also central doors balance. Other, significant arms could not ignore best for the women.','Books','mystery',0.1800000071525574,302.6400146484375
+'Fair families ought to leave relationships. Separate, firm services would assist delicious, serious laws; a','Books','mystery',4.960000038146973,4966.5
+'Fe','Books','mystery',8.449999809265137,1833.68994140625
+'Free, young women should view with a insects. Constant lives open of course animals. Controls see well. Particular cattle shall treat also then other stud','Books','mystery',1.830000042915344,252
+'Hopes should not remember more consistent colours. Really new techniques could not consider then forms','Books','mystery',8.609999656677246,1484.43994140625
+'Independent areas may look hardly plants. Ago rich years might not need. Features laugh now spiritual houses. Students might live aside maybe mad lads. Marvellous r','Books','mystery',6.079999923706055,525.97998046875
+'Joint, foreign relationships ring other, physical representations. Illustrations will not understand more flat pupils. Soft, grateful constraints train little, short par','Books','mystery',0.09000000357627869,476.0799865722656
+'Most medium weeks look under the families. Women could mould bare states. Disciplinary, big meetings stand only materials. Practical requirem','Books','mystery',1.700000047683716,1392.640014648438
+'Nerves may provide most to a representatives. Sad, available mechanisms give foreign projects. Loans imagine once recent, biological facilities. Economic directors ','Books','mystery',3.390000104904175,250.8000030517578
+'Now available changes','Books','mystery',2.240000009536743,483.8399963378906
+'Quite welsh costs agree specially results. Goth','Books','mystery',1.830000042915344,32.04000091552734
+'Single plans must gather now specific words. Appropriate, li','Books','mystery',5.110000133514404,579.530029296875
+'Vehicles will go. Ways will retreat courts. Years cannot enable especially days. Wings might lay soviet videos','Books','mystery',75.18000030517578,369.3399963378906
+'Businesses can study half successful lea','Books','parenting',0.5,2482.5400390625
+'Fans sleep here tough leaves. Fully free practitioners exert women. Ideal times might not use hence plan','Books','parenting',6.079999923706055,3572.239990234375
+'International casualties hit so. Chief, sexual prisoners incorporate competitive, major days. Hardly redundant animals diminish here tradi','Books','parenting',0.6000000238418579,2862.909912109375
+'Key, left kinds determine even ','Books','parenting',1.840000033378601,1479.0400390625
+'Little, gold books used to laugh only from the forests. More external dates would say districts. There stupid contacts may rec','Books','parenting',34.72000122070312,2588.39990234375
+'Old, immediate months see especially different leaders. Other, pale charges influence even english, middle-class others; pregnant, wrong eyes help by way of the activ','Books','parenting',99.98999786376953,193.8000030517578
+'Women should stay in a criteria; still asleep activities talk societies. Sorry, other hours should introduce. Solar, psychological members take now else new services; ec','Books','parenting',19.57999992370605,802.1199951171875
+'African minutes consider else critical, christian years. Normal, similar runs may not open even. Appearances shall not g','Books','reference',3.480000019073486,610.9000244140625
+'Late different pains would face broken, sound incomes. Certain reasons would tell years. Children used to boost rem','Books','reference',9.090000152587891,5348.56005859375
+'Never anxious children shall encourage levels. Teams might not stand clearly ','Books','reference',7.650000095367432,589
+'No longer asleep eyes ought to seem in a proceedings. Agencies slip much black clothes. Still big ways should pass recently very, solar authors; thus small countries send thick, splendid ','Books','reference',3.839999914169312,2166
+'Normal ideas practise more. Late, particular cases may not pay rightly open, whole arms. Too cautious ways see useless, main arrangements; poor things hear straight top managers. Ch','Books','reference',2.289999961853027,1097.319976806641
+'Now national objects shall not arise home rece','Books','reference',1.620000004768372,12627.009765625
+'Overseas, back workers make humans. Final, difficult parties kiss over within an metals; possible men ought to work further military meetin','Books','reference',4.320000171661377,12292.01953125
+'Patients should not give still, domestic teachers. Good results would prove; japanese, necessary gr','Books','reference',1.940000057220459,3737.280029296875
+'Patterns let however real facilities. Naturally single variations used to save initially. Operations leave later t','Books','reference',7.039999961853027,NULL
+'Perhaps old sources disappear. Small, bright enterprises used to take by a systems. Local proteins could not try then. Blank, special colleges appear.','Books','reference',7.380000114440918,2004.75
+'Presumably social groups detect marked, tough generations. Narrow weeks should tell almost wide values. Favorite waves will not use; so wide patients would deal later fr','Books','reference',2.440000057220459,9223.9599609375
+'So no','Books','reference',73.22000122070312,856.8400268554688
+'Steep, labour clubs achieve less hands; often great towns mean tall, new maps. Conditions occur following men. Costs should coordinate; objectives know modest details. Child','Books','reference',2.130000114440918,11146.5
+'Windows account northwards hours. Horses used to slip particular, domestic interests; as spare fields determine nationally major, afraid tensions','Books','reference',0.8600000143051147,1151.680053710938
+'Blank, well-know','Books','romance',1.830000042915344,159.4600067138672
+'Otherwise local relations would fly between a women. Whole costs make even from the types','Books','romance',0.6200000047683716,235.9100036621094
+'Poor, lucky years look ever vari','Books','romance',0.449999988079071,NULL
+'Prime, racial rocks enable then reduced, wonderful num','Books','romance',7.900000095367432,26.45999908447266
+'Private, democratic hands could not compete now anxious levels; pure supporters would not question furt','Books','romance',1.360000014305115,6.880000114440918
+'Real cells would take in a women. Then well-known bishops would identify more with a events. Head rates should try player','Books','romance',92.51999664306641,164.8000030517578
+'Short sources may require otherwise consequences. Similarly empty goods shall get actually. Times would operate in order very social things. Economic places make eventually huge interpretations; manuf','Books','romance',43.9900016784668,1998.429977416992
+'Shoulders talk a little essential kinds. Stories make for a months. Most competitive areas think away also global tools. Real differences like also over a device','Books','romance',52.95000076293945,57.04000091552734
+'Subject, external services control external, heavy workers. Materials could see already rights. Courts could not cost firstly taxes; difficult, proud times','Books','romance',88.01999664306641,1059.239990234375
+'Available, fine elections would not like to a parts; just other poets go. More alternative firms imagine also local years. Too principal suggestions recei','Books','science',8.899999618530273,3423.06005859375
+'Boys can excuse at first responsible, powerful product','Books','science',18.04000091552734,707.8499755859375
+'Domestic losses doubt so feet. New,','Books','science',2.279999971389771,2859.340087890625
+'Exact charges cannot result local conditions. Available savings shall put quite correctly local users. Ever positive groups move; els','Books','science',3.269999980926514,15887.080078125
+'Fol','Books','science',1.789999961853027,112.879997253418
+'Machines taste always top, likely interests. Results must bring only apart from a studies; true issues tell now poor procedures; long rules become almost secret diffi','Books','science',1.279999971389771,NULL
+'Objectives could get to a assets. Notions mean completely. Great centres reflect into a cattle. Then provincial eyes shall not','Books','science',3.210000038146973,6708.89990234375
+'Police start there as likely personnel; teams intervene only pieces; qualities cope. Highly industrial students matter to a ','Books','science',5.820000171661377,5015.93994140625
+'Yet small groups feature earnings. Young engines would try t','Books','science',0.75,4629.380004882812
+'British relationships used to keep to a orders; silent, flexible countries would make unknown ','Books','self-help',4.909999847412109,681.02001953125
+'Details give quickly; ','Books','self-help',78.18000030517578,194.1799926757812
+'Eventually small cats find with a goods. Today italian','Books','self-help',1.470000028610229,770.02001953125
+'Har','Books','self-help',0.699999988079071,5840.7998046875
+'International, important addresses earn now associations. Well vast developments encourage all in a cases. Social arms lose things. Strong shoulders will earn s','Books','self-help',3.279999971389771,NULL
+'Members begin together industrial, re','Books','self-help',59.77000045776367,4035.75
+'National, rare waters bring currently external, bad figures. Female standards would match that is in a dogs. Shoes strengthen loyal, late factories. Stairs shall see ','Books','self-help',4.369999885559082,3880
+'Normally maximum cases seem traditionally by now wrong shows. Very human leaders shall not play perfectly from the books. Companies augment rough directors; common, cert','Books','self-help',1.490000009536743,839.219970703125
+'Other emotions might rest much total clothes; nevertheless clear images fight directly odd, ','Books','self-help',2.230000019073486,136
+'Social, mi','Books','self-help',2.25,2446.43994140625
+'Supreme, hard problems might gain. Dull, constant babies will make deep other, poor futures. Good, late proportions root late joint men. Demands may start pretty. Patterns','Books','self-help',6.760000228881836,NULL
+'Types tempt enti','Books','self-help',3.069999933242798,NULL
+'Above american meanings shall get with a troops. Essentially physical professionals outweigh more. Obviou','Books','sports',5.349999904632568,1749.150024414062
+'Costs send more schools. Causes start later. Both human ','Books','sports',5.130000114440918,408
+'Determined g','Books','sports',8.25,9298.2998046875
+'Due contexts should press quickly on the negotia','Books','sports',3.619999885559082,5412.47998046875
+'Elements contribute long funny proportions. Late, upper issues go as well; medium, increased problems stay very public mountains; com','Books','sports',90.43000030517578,2288.300048828125
+'Figures could not stay long certain examples. Numbers can follow. Children could not buy now important individuals. Either outstanding years remove in general typical divis','Books','sports',3.960000038146973,133.2799987792969
+'Groups make past, happy strategies; explicitly english variations may reflect critica','Books','sports',6.070000171661377,3570.840087890625
+'Heavy, exceptional animals notice. Revolutionary un','Books','sports',2.890000104904175,6033.4501953125
+'Internal years may not pr','Books','sports',3.460000038146973,68.84999847412109
+'More married aspects replace eastern, creative institutions. Public, blue ideas will not reduce in a results. Sometimes underlying parameters use widely results. Id','Books','sports',3.160000085830688,469.7999877929688
+'Other things get now. Quite eastern systems should not ask then new days; usual, good friends should work at a proposals. Highly pr','Books','sports',50.02999877929688,0
+'Pleasant, big conclusions look in conjunction with the ages. Bodies would not rest always to the institutions. Main, soviet professionals must call open friendly visitors. Reports decide for a clo','Books','sports',2.359999895095825,93.05999755859375
+'Possible records ','Books','sports',80.65000152587891,386.8999938964844
+'Social, regional years could not conduct hard so','Books','sports',8.989999771118164,1931.930053710938
+'Vital colleagues allow very letters; recent, dramatic resources tell very thousands. Royal, sexual aspirations will earn almost on a legs. We','Books','sports',2.920000076293945,316.7000122070312
+'Wrong countries see countries; lengths will see possible sc','Books','sports',3.380000114440918,NULL
+'Bold pieces could not review days; foreign systems must feel products. Amounts would open about systems. Moments join exciting, political telecommunications. Long-term places c','Books','travel',33.11999893188477,781.2000122070312
+'Combined uses shall not apply strongly upper studies. Soft, poor interests try simply rational areas. Fo','Books','travel',1.450000047683716,67.44000244140625
+'Facilities learn makers. Large, aware objections would appeal later. Ill explanations must tr','Books','travel',9.890000343322754,108
+'Further excessive reactions will provide quickly types. Lucky colleagues seem for a ','Books','travel',8.470000267028809,640.780029296875
+'Here united prospects stop carefully. Only english participants benefit new possibilities. ','Books','travel',0.7799999713897705,666.4500122070312
+'Importan','Books','travel',9.270000457763672,3635.840087890625
+'Obvious problems may find ','Books','travel',4.5,142.1199951171875
+'Occasions can view so customers. Likely hospitals jo','Books','travel',74.97000122070312,177.6799926757812
+'Right, medieval efforts should trust b','Books','travel',83.15000152587891,2141.93994140625
+'Tall relationships may not determine upon a relations. Again popular children would base cold, old boundaries;','Books','travel',3.299999952316284,6900.919921875
+'Annual, eligible pupils should tell yet politi','Jewelry','birdal',8.739999771118164,198.9900054931641
+'Equally current members take enough negative, various words. Workshops could prevent. So solar personnel must want in the industries. ','Jewelry','birdal',3.279999971389771,383.8900146484375
+'Homes will catch as solar records. Residential, sensible lives must acco','Jewelry','birdal',34.81999969482422,1234.640014648438
+'Major parents get only past a products. Obvious structures make now; original, british parties end totally. Most working policies would honour years. Arguments know; ','Jewelry','birdal',9.319999694824219,595.02001953125
+'Men know later other pp.. Matters may campaign however different men. Formal, dependent rates deal in ','Jewelry','birdal',0.3700000047683716,2370.719970703125
+'Now lovely arms may notice nowadays important rights; difficult, only hundreds shall remain new years. Readers would know away different produ','Jewelry','birdal',1.269999980926514,400.9599914550781
+'Others should not contribute very adequate dogs. Substances might involve thus just common assets. Maybe able objects bear sharp from a terms. Probably nasty centres ','Jewelry','birdal',4.340000152587891,3763.260009765625
+'Resources might benefit yesterday relations. Urban boats demonstrate main, following sales. Materials accept therefore thoughts. Short, particular paymen','Jewelry','birdal',2.609999895095825,2161.5400390625
+'Ag','Jewelry','bracelets',2.509999990463257,1221.47998046875
+'Big, worried words will not spend both in a boats. Finan','Jewelry','bracelets',9.039999961853027,26.94000053405762
+'Enough unlikely ','Jewelry','bracelets',8.869999885559082,367.3599853515625
+'General weeks like great, old families. Agricultural lips go with a influences. Regional, organic shoulders afford really m','Jewelry','bracelets',1.759999990463257,2976.800048828125
+'Just short','Jewelry','bracelets',6.170000076293945,454.3200073242188
+'Often past claims hold a little tools; effort','Jewelry','bracelets',1.669999957084656,880.3200073242188
+'Original l','Jewelry','bracelets',3.640000104904175,4983.1201171875
+'There general companies work even. Channels may not say easier things. Thereafter hot agents increase only years; reservations ','Jewelry','bracelets',1.139999985694885,3583.110107421875
+'Top children used to forget nuclear, initial words. For example overall regions shall not fix under inland bad women. Visible matters deny large, single ','Jewelry','bracelets',0.699999988079071,1544
+'Firm towns may come only clear, main companies. Enough old groups appoint. Children know in a co','Jewelry','consignment',2.420000076293945,241.3000030517578
+'Gifts emphasize only dutch societies. Low, dark eyes burn a bit financial women. Probab','Jewelry','consignment',7.360000133514404,1047.920043945312
+'Individuals identify then speakers. Parts shall not pay most causes. Bottom, main clothes might not come somewhere dark, major calculations. Elections like italian purposes. Chinese action','Jewelry','consignment',2.099999904632568,1408.170043945312
+'Necessary','Jewelry','consignment',0.1500000059604645,1151.339965820312
+'Only technical visitors shall talk also bonds.','Jewelry','consignment',72.59999847412109,1056.25
+'Surely environmental winners shall freeze fully parents. Lips may not know however. Following, young levels would come since a cases. Very livin','Jewelry','consignment',4.429999828338623,5255.4599609375
+'Temporary, economic components like big words. Never remote patients should murder. Also appropriate approaches work sometimes at a children. Common, firm sources should change even ','Jewelry','consignment',4.079999923706055,1651.319946289062
+'Very popular beans recognise only names. Present, direct citizens remain then in the hours. Even straight cells sho','Jewelry','consignment',2.900000095367432,809.260009765625
+'Br','Jewelry','costume',3.769999980926514,8300
+'Functional, boring circumstances s','Jewelry','costume',3.339999914169312,629.0399780273438
+'Large boards give carefully just mixed services. Cases shall colle','Jewelry','costume',0.6499999761581421,1106.109985351562
+'More than long times ought to judge. Straight critical symptoms keep interests. Civil chairs pump fully dead politicians; live, vague instructions shal','Jewelry','costume',4.099999904632568,245.4100036621094
+'T','Jewelry','costume',0.7099999785423279,2118.06005859375
+'Urban, substantial problems salvage actually degrees. Firmly different women ought to allow impossible, painful cases. Neatly giant forms know even english kids. Severe christians shall undergo pre','Jewelry','costume',3.890000104904175,5505
+'About military signals could consider swiftly also international records. Good, following owners get fairly obvious sales; players might understand with ','Jewelry','custom',4.809999942779541,58.40000152587891
+'Already recent teachers must receive from the d','Jewelry','custom',2.180000066757202,1661.849975585938
+'Alter','Jewelry','custom',3.509999990463257,600.47998046875
+'Black, recent mothers should not allow very consistent cells. Labour, simple arms could not lay in general only main reports. Sure, chief trends look double parents. Small, local metres sha','Jewelry','custom',4.96999979019165,2385.500061035156
+'Digital names look american bodies. Probably southern years shall improve lastly between a proposals. Minimum problems go always planes. Glad, other women stop also ','Jewelry','custom',3.329999923706055,7317.740234375
+'Elections will use physical ar','Jewelry','custom',4.039999961853027,88.16000366210938
+'Likely, critical keys become similar, nervous experts. Now chief months may wish also deep, true calls. Further alone concerns keep prices; households lie findings. Foreign words try. Once','Jewelry','custom',0.5899999737739563,4367
+'National sea','Jewelry','custom',3.230000019073486,7179.1201171875
+'Necessarily basic organisati','Jewelry','custom',9.109999656677246,1093.9599609375
+'Never clear reports know married relations. Particular teeth should lift generally different women; simple, major dogs must not create always. Good examples back neve','Jewelry','custom',7.840000152587891,201.7599945068359
+'Parents understand certainly villages. Women will call gradually like english churches. Local, real regulations may not like. Deep, unique years will see individual centuries. Parents shall hea','Jewelry','custom',6.789999961853027,150.3999938964844
+'Personal students would lie middle-class, comparable women. Heroes wreck similarly. Almost specialist p','Jewelry','custom',2.180000066757202,11048.60968017578
+'Residential authors would mind perhaps disastrous, effe','Jewelry','custom',2.410000085830688,10682
+'Cells must raise away. Rather prominent ships lead; catholic, full heads must not tell especially double, international police; modest years may fetch readily important, final pubs. Softly','Jewelry','diamonds',3.480000019073486,3840
+'Certain, regular ways will receive then now old areas. Comments give in a acts. Special, whole galleries know further possible, cool provi','Jewelry','diamonds',50.7400016784668,93.12000274658203
+'Different, national statements tell now solar, typical strings','Jewelry','diamonds',0.5899999737739563,3459.330078125
+'Financial, final categories believe terms; warm, other details walk eagerly just common brothers. Much important toys consider very open files. Polite, national lights ma','Jewelry','diamonds',3.690000057220459,383.8800048828125
+'Fresh plans appear ever; at least surprised colleagues contact for a facilities. Techniques gain too powerful channels. Blue stars shall not pursue usually underlying powe','Jewelry','diamonds',3.220000028610229,934.6400146484375
+'Measurements mind false, top funds. Aspects shall reduce already personnel; payable photographs may develop gardens. Processes must feel edges. Certain cases ought to cling from the','Jewelry','diamonds',1.659999966621399,201.8399963378906
+'Well full thousands may not worry future, theoretical collect','Jewelry','diamonds',56.61000061035156,NULL
+'Western, only authorities use. Literary, possible games cannot','Jewelry','diamonds',9.289999961853027,417.1199951171875
+'As misleading associations will care even good relationships; terrible, main days think by far nuclear referen','Jewelry','earings',4.010000228881836,388.3999938964844
+'Christian, good weeks advise as well different terms. Especially real tensions try others. Measures acknowledge pleasant, nor','Jewelry','earings',2.829999923706055,2588
+'Interesting goals will answer residents. Generally various problems could remain once more. Local stones hear indeed. Small children must','Jewelry','earings',0.25,60.84000015258789
+'More difficult forces will not force faithfully recordings. Exports agree simply too teenage patients. Civil, deep police ought to feel currently','Jewelry','earings',9.659999847412109,0
+'Never red languages used to begin more good, warm laws. Nurses make different, white schools; alongside fortunate sessions make for instance expert, fast police. Contemporary,','Jewelry','earings',6.150000095367432,282.0799865722656
+'Pale children used to explain then traditional years. Quietly similar suggestions give. Evil others result j','Jewelry','earings',3.640000104904175,5508.10009765625
+'Presents will refute rural emotions. Special years ask surprisingly to a feet; also just numbers may att','Jewelry','earings',4.21999979019165,27.13999938964844
+'Studies will like; results inform too broken, different holes. Western, expensive share','Jewelry','earings',4.340000152587891,951.0499877929688
+'Victorian, far papers could know measures. Only arguments can see bli','Jewelry','earings',3.339999914169312,574.4199829101562
+'Warm, welsh attitudes start over agricultural, eng','Jewelry','earings',0.7400000095367432,4323.080078125
+'Certain, light forms work years. Political, british movements','Jewelry','estate',4.159999847412109,189.9799957275391
+'Good','Jewelry','estate',9.960000038146973,574
+'Goods should marry again early words. Rapidly generous temperatures should not extend usually on a others; other girls sho','Jewelry','estate',7.150000095367432,417.9599914550781
+'Only rich places ignore tonight forever tall patients; really official pati','Jewelry','estate',2.230000019073486,2585.52001953125
+'Quick days could offer else years. Too independent days may grow only common standards. Characteristically alone flowers proceed operational projects. Most re','Jewelry','estate',7.139999866485596,1945.319946289062
+'Right, other definitions tap thin risks. Present, poor leaders would continue often other, good','Jewelry','estate',2.460000038146973,1512
+'Samples must counter national, wrong letters. Trees might not threaten around in a patients. Directors ought to try. Module','Jewelry','estate',4.909999847412109,186.1199951171875
+'Unable movements pay as yet abstract lives. Extremely successful plans can ensure totally new years. Long volumes may receive nerves. Domi','Jewelry','estate',7.980000019073486,NULL
+'Dramatic, limited','Jewelry','gold',94.56999969482422,1621.199951171875
+'Foreign days walk to a consequences. More major students read then. Never new stones will not see sophisticated funds. Words must not say also. Extra, full t','Jewelry','gold',3.440000057220459,342.6000061035156
+'Full, alone ','Jewelry','gold',67.62999725341797,320.3200073242188
+'Never loyal years get scarcely dark criticisms. Nice criter','Jewelry','gold',68.44000244140625,1496.680053710938
+'Products bring. Authorities bring. Magic parents lea','Jewelry','gold',7.940000057220459,2086.239990234375
+'Adult, agricultural conditions shall pay better relativel','Jewelry','jewelry boxes',6.849999904632568,2674.56005859375
+'Apparent, beneficial years should pay hard arrangements. Impatiently positive cities take undoubtedly so noble centuries; old ideas must afford early drivers. Li','Jewelry','jewelry boxes',2.470000028610229,276.3900146484375
+'Completely small items cry publicly personal investigations. Consequences need at a blues. Natural, ','Jewelry','jewelry boxes',8.729999542236328,6199.1298828125
+'Eyes read clearly only good resources. Illustrations spend finally. Permanent, southern times would take economic da','Jewelry','jewelry boxes',2.970000028610229,532.4000244140625
+'High, jewish legs should not direct existing, current points. Opposite effects make women. Organisers suggest mo','Jewelry','jewelry boxes',2.170000076293945,10481.099609375
+'Human, bad girls shall combine then such as the proposals. Sometimes enormous cus','Jewelry','jewelry boxes',87.01000213623047,270
+'Long useful rates would buy hours. Willing, absolute teachers lay electronic fields. Years shall distinguish better only doubtful heads. As little affairs require perhaps ridiculous, enthusia','Jewelry','jewelry boxes',2.430000066757202,707.0800170898438
+'Modern shares would not conduct now blind parents. Unemployed eyes cost outside from a problems. Regions shall not know only high answers. Solicitors return patterns.','Jewelry','jewelry boxes',1.730000019073486,358.0499877929688
+'Other businesses match on a conservatives. Due thanks might push almost h','Jewelry','jewelry boxes',2.670000076293945,98.16000366210938
+'Possible, welsh rooms sing short procedures. ','Jewelry','jewelry boxes',59.5,768.1799926757812
+'Public needs will realize quite nights. Operations undertake vaguely national, specified lin','Jewelry','jewelry boxes',1.590000033378601,751.4500122070312
+'Quickly great subjects move civil societies. Private relations wil','Jewelry','jewelry boxes',90.13999938964844,4591.979919433594
+'Representatives co-operate open facilities. Late, local terms may not take however square, underlying p','Jewelry','jewelry boxes',42.97999954223633,86.59999847412109
+'Separate tickets can confirm ','Jewelry','jewelry boxes',16.02000045776367,637.8800048828125
+'Small others will provide probably complete countries. Only effective pensions violate on board maybe left animals. Old r','Jewelry','jewelry boxes',7.050000190734863,4727.0400390625
+'Steadily other miles stop terms. Schemes can retire little, physical chairs; likely, statutory improvements stop essentially increased, co','Jewelry','jewelry boxes',2.980000019073486,1135.969970703125
+'Unlikely, assist','Jewelry','jewelry boxes',5.980000019073486,948.219970703125
+'Young, outstanding services will not apply compulsory, dirty decisions. Presidential, spanish cities might like well top, red miles. More soci','Jewelry','jewelry boxes',3.519999980926514,677.1199951171875
+'Ago fundamental shares should enforce almost psychological, german schools. Arbitrary calls compete. Turkish branches should operate rapidly great, current features. Occasi','Jewelry','loose stones',0.8799999952316284,211.8300018310547
+'Chinese features may want later unique, similar readers. Rebels could knock well fixed films','Jewelry','loose stones',8.319999694824219,725.0399780273438
+'English, real women can use. Italian tools get for the things; criminal, permanent women cannot make. New estates can go. Now great men might break even home squar','Jewelry','loose stones',1.720000028610229,4213.60009765625
+'Grateful activities act too available products; ','Jewelry','loose stones',0.7799999713897705,1454.099975585938
+'Local rights may not grow that is. Frequent purposes control invariably social men. Far brow','Jewelry','loose stones',6.159999847412109,6821.43994140625
+'Long active contexts make other, dry modules. Police shall stand successful lengths. Away early practices reassure rates. Or','Jewelry','loose stones',2.119999885559082,6567.5
+'Military methods see relatively k','Jewelry','loose stones',0.4099999964237213,4786.56005859375
+'No longer aware ideas would not finance at a answers. Satisfactory children study away regular dogs; fast, new students could not look never ','Jewelry','loose stones',7.849999904632568,985.8900146484375
+'Old inches may not become just. T','Jewelry','loose stones',1.690000057220459,590.97998046875
+'Principles distract apart at a roles. Middle forces should die there in a imports. Fol','Jewelry','loose stones',1.429999947547913,2265.93994140625
+'Schools check by a machines. Main units will involve hands. All large orders will not date so findings. Strongly brilliant roots reduce. Members bring behind a services. Surprisingly econom','Jewelry','loose stones',98.44000244140625,4113.35986328125
+'Conditions admit essential, considerable drugs. Pregnant, new parents can help thereby reasons. Different fires used to ','Jewelry','mens watch',3.180000066757202,2447.39990234375
+'Only normal components cannot express electronic, huge features. Small, statutory men go. Risks cannot take and so forth messages. Others think tears. Home religious incomes examine','Jewelry','mens watch',1.570000052452087,839.8800048828125
+'Only, subsequent minerals should exist just f','Jewelry','mens watch',2.690000057220459,88.70999908447266
+'Affairs come average, commercial wives. Real minds must resign traditionally. Still combined foods give ','Jewelry','pendants',4.5,170.5
+'Afraid, new contexts contemplate ago for the buildings. Narrow, young games m','Jewelry','pendants',39.02000045776367,2507.050048828125
+'Chief pers','Jewelry','pendants',1.389999985694885,1.879999995231628
+'Gay scientists shall not defer well major times. Natural, public comparisons consider accurately adequate rates. Educational, adviso','Jewelry','pendants',0.949999988079071,3053.909912109375
+'Growing dogs can procure as total, valid teams. Continental, specific skills co','Jewelry','pendants',0.1299999952316284,1382.27001953125
+'Italian, white girls should see special, extra boots. Less very circumstances go important, right windows. More','Jewelry','pendants',5.079999923706055,NULL
+'Jobs provide quite. Major increases should not soften clear, select shoes. Final months take computers. Military years draw other friends. Too alone firms believe conditions. Signs give fixed ','Jewelry','pendants',6.940000057220459,149.4900054931641
+'Kids should take hence local buyers. So new ','Jewelry','pendants',1.090000033378601,3087
+'Long, elderly candidates steal. Methods maintain often necessary, video-taped breasts. Complex rates make conventions. Sure final damages must ','Jewelry','pendants',4.869999885559082,2470.409942626953
+'New, low companies arrange times. Available, foreign troops can complain usuall','Jewelry','pendants',6.429999828338623,3732.469970703125
+'Reasonable, large effects will not play also in the numbers. Purposes u','Jewelry','pendants',2.769999980926514,112.9599990844727
+'Special, private situations shall ask l','Jewelry','pendants',4.309999942779541,1133.640014648438
+'Still similar weeks should struggle fast practical ','Jewelry','pendants',4.449999809265137,2967.60009765625
+'Sufficient windows understand. Yet young men accept so. Totally willing effects make simply simple activities. Presently regional grants may not establish forward, selective birds; superb ru','Jewelry','pendants',5.929999828338623,267.7999877929688
+'Authors can put much free, differen','Jewelry','rings',3.759999990463257,4.269999980926514
+'Badly black animals must not get creative, national changes. Eastern adults claim at la','Jewelry','rings',8.590000152587891,1322.640014648438
+'Complaints assist most necessary, multiple','Jewelry','rings',7.679999828338623,1689.75
+'Inc, little sections will make now native, greek ways; greek, good children live most so new pupils. ','Jewelry','rings',17.39999961853027,243.2700042724609
+'Nuclear police provide even weekends. Little consequences would go perhaps from a ','Jewelry','rings',1.879999995231628,45.5099983215332
+'Only buildings think critica','Jewelry','rings',4.150000095367432,72.75
+'Prisons introduce explicitly hours. Men must get pretty together existing holidays. Really marvellous operations can come','Jewelry','rings',4.489999771118164,1315.75
+'Reluctant, public priests shall prepare in a years; applications prejudice just unlike','Jewelry','rings',4.019999980926514,1704.109985351562
+'Typical,','Jewelry','rings',2.480000019073486,5544.759765625
+'Abstract, dead members look sorry child','Jewelry','semi-precious',0.8100000023841858,993.719970703125
+'As political activities go never after a years; pleased, important schools release specific, legal ','Jewelry','semi-precious',6.869999885559082,1542.239990234375
+'Cells need especially from a things; only urban paths bring indeed with a changes. Also reduced bands dominate accessible structures. Independent persons will know e','Jewelry','semi-precious',7.710000038146973,664.9599761962891
+'Possible months could record aspects. Royal, possible values start however other services. Very private things pr','Jewelry','semi-precious',4.46999979019165,2460.469970703125
+'Stupid errors must make for the books. So industrial rates used to exist simply; literary','Jewelry','semi-precious',3.839999914169312,2516.580078125
+'Twice bad girls will make perfectly normal necessary doors; principles ta','Jewelry','semi-precious',6.78000020980835,7117.47021484375
+'Domestic, american days w','Jewelry','womens watch',0.449999988079071,3563.089904785156
+'Ends protect frequently visitors. Still past markets guess simply english, new','Jewelry','womens watch',1.320000052452087,75.19999694824219
+'Equivalent, perfect remains could not find more mines. Recent schools commemorate situations; ','Jewelry','womens watch',4.260000228881836,245.6799926757812
+'Huge, military children fall electronic, ancient days. Tory, remaining instructions sleep accurately dangerou','Jewelry','womens watch',1.019999980926514,1943.27001953125
+'Leaves continue ','Jewelry','womens watch',7.909999847412109,0
+'Long minutes may lead only mostly private buildings. O','Jewelry','womens watch',2.549999952316284,4476.91015625
+'Previous things may not account; pounds need ultimately products. Owners must use that pleased, different opportunities. Typically diffi','Jewelry','womens watch',0.2000000029802322,421.0700073242188
+'Quiet requests lose correct, friendly men; perhaps subsequent powers would not trap. Major, volunt','Jewelry','womens watch',7.269999980926514,2740.320068359375
+'Rows cannot give then magnetic children. Children join again very labour neighbours. Ways shoot. Horses could prepare little to a heels. Residential, stable issues disappear automaticall','Jewelry','womens watch',35.27999877929688,865.0800170898438
+'Applications can coincide very brown seats. Theoretical costs start then functional, whole prob','Sports','archery',5.380000114440918,77.19999694824219
+'Practical, important lands discriminate much outstanding relations. Fine, overseas months stop fully fashionable attempts; great, important posts ','Sports','archery',1.990000009536743,6824.39990234375
+'Researchers bear from the sisters. Full, human hours search dramatically. Oth','Sports','archery',2.769999980926514,1654.140014648438
+'Soon british records must tolerate often to a children. Forward, running women understand residential, necessary executives. Impossible, new classes should elect so remarkable yea','Sports','archery',2.049999952316284,8865.640037536621
+'At least visual pounds could succeed ago just normal eyes. Convincing hospitals may not enjoy about for the','Sports','athletic shoes',9.840000152587891,2815.1201171875
+'Christian, traditional problems reply conscious, important men. Spanish, large types open also similar men. Loose, ','Sports','athletic shoes',3,1778.150024414062
+'Cold, early wings mind like a columns. Women suffer; under new intervals come financial, level professionals. Countries shape. Of course international leg','Sports','athletic shoes',0.449999988079071,145.0800018310547
+'Effective times sell machines. Comments could not set. British, fresh aspects shall not ensure here young, human organizations. Only, other centres could join in a sections. Clear purposes may','Sports','athletic shoes',4,1566.300048828125
+'Elsewhere favorite groups would swing english, powerful years. Children cannot pref','Sports','athletic shoes',0.3199999928474426,100.3700003623962
+'Important, old communities declare more successful, private members. In','Sports','athletic shoes',1.370000004768372,5938.6201171875
+'New, miserable forces secure social, likely friends. Excellent children begin recently available margins. Jobs know better able film','Sports','athletic shoes',3.349999904632568,422.3800048828125
+'Other, royal parents might not proceed professional, similar transacti','Sports','athletic shoes',5.170000076293945,257.5
+'Records may not say to a fingers. Insta','Sports','athletic shoes',86.27999877929688,2029.7099609375
+'Straig','Sports','athletic shoes',46.34000015258789,2405.340026855469
+'Variable years use','Sports','athletic shoes',2.910000085830688,802.8800048828125
+'Vital, s','Sports','athletic shoes',6.420000076293945,NULL
+'English authorities can take; sometimes mental eyes know quickly; immediate jobs should think below critical villages. Red, international diff','Sports','baseball',1.360000014305115,5553.56005859375
+'Eyes draw years. Elections cannot oppose more by a cases. Local cattle face then different decades. Safely small relationships might develop quite available years; distin','Sports','baseball',6.550000190734863,730.6700000762939
+'Freshly ancient interactions may work. Formerly increasing hands used to burn large se','Sports','baseball',0.1299999952316284,347.2000122070312
+'Global wines would not want names. Familiar firms change. Black, rich papers consider examples. Economic, moving feelings cannot take gently cou','Sports','baseball',1.759999990463257,4943.02978515625
+'Individuals will think really recent minutes. Rightly political problems may not consider','Sports','baseball',0.5799999833106995,4723.41015625
+'Once again recent prem','Sports','baseball',0.8299999833106995,5094.839965820312
+'Recent, alone circumstances amount. Average, private polls get rather products. Financial deputies work no longer','Sports','baseball',9.569999694824219,8284.9501953125
+'Recent, local styles need please. Conditions should not wish. Seconds explain below in a elec','Sports','baseball',3.140000104904175,1172.699951171875
+'Too white boys must appear alike rural months. Ago agricultural documents may not find nowadays r','Sports','baseball',5.739999771118164,577.3499755859375
+'As happy results might supply often able women; faces approach. Principles could think so to a members. Even yellow contributions shall continue quite exc','Sports','basketball',8.920000076293945,2467.199951171875
+'Away present children see perhaps recently political qualities. Black, faint proceedings interpret single men','Sports','basketball',4.119999885559082,NULL
+'Catholic, different aims cannot spend with a demonstrations. Seriously labour cups transform in a products. Back a','Sports','basketball',1.139999985694885,4016.360107421875
+'Considerable institutions say more sound jobs. Emotional moves seem religious allegations; flowers ask about from the terms. Police shall put suddenly big yards. Affairs stop ','Sports','basketball',3.75,2035.0400390625
+'Easy, local pilots would knock easily at all criminal patterns. Insufficient plans make slightly particular members; british','Sports','basketball',57.54000091552734,4448.030227661133
+'Eyes shall wear clearly sorry,','Sports','basketball',3.910000085830688,1115.180053710938
+'More full messages behave chips. Professionals must know high tenants. Light clothes must answer values.','Sports','basketball',0.9700000286102295,1534.070037841797
+'Pools make high others. Immediately impossible cars listen on a dreams. Other schemes can help largely years; grey, informal programmes should not display only, diff','Sports','basketball',4.079999923706055,569.7999877929688
+'Solutions ask over joint, political scots. General copies meet different police; top meetings make subject solicitors. Possible, local members shall use ve','Sports','basketball',0.1299999952316284,508.0499877929688
+'Western tactics will reveal never so generous circumstances. Too british exports help apparently regulatory, whole homes. Years rise splendid, so-called co','Sports','basketball',4.71999979019165,4981.509784698486
+'Active windows shall not find small, relig','Sports','camping',5.510000228881836,15.8100004196167
+'Automatically new terms give enough small thoughts. Yesterday other requirem','Sports','camping',9.810000419616699,319.8999938964844
+'Deeply special ho','Sports','camping',1.539999961853027,202.0299987792969
+'Muscles end obviously other sources. Major links prevent both to a lines. Devices might produce only different conferences. Favorite candidates a','Sports','camping',4.860000133514404,9320.230224609375
+'Other, likely incentives appeal obviously according to the patients. Detailed interests will not work perhaps. Able ','Sports','camping',1.830000042915344,72.26999664306641
+'Principles would not instruct like the consumers. Calls should forget now by a outcomes. Enough burning islands shed highly other, remaining at','Sports','camping',4.710000038146973,11065.1796875
+'Private, existing applications may not remind most from the agreements. Clear, possible weeks shall see enough through a resources. Hours show in a ','Sports','camping',8.479999542236328,NULL
+'Services might not catch accordingly shoes. More formal reasons break eyes; particular conditions display magnetic, full managers. Entirely historical approache','Sports','camping',2.309999942779541,885.9400024414062
+'Still assistant movements ought to become there great premises. Free e','Sports','camping',4.46999979019165,427.6900024414062
+'Then military letters give british, rural lips. Things begin wistfully stages. Magnificent women use medical rates. Visible, absolute relationships emerge basically lengthy ','Sports','camping',8.449999809265137,9.060000419616699
+'Things can r','Sports','camping',7.519999980926514,1238.160034179688
+'Used, total organisers ','Sports','camping',0.4300000071525574,64.19999694824219
+'Absolutely elegant women must gain well complete ','Sports','fishing',1.769999980926514,257.6400146484375
+'Areas check again. Religious seeds should monitor really nuclear objectives; improvements believe total trouse','Sports','fishing',1.649999976158142,212.0599975585938
+'Clothes might like specially quiet, high descriptions. Industrial figures navigate particular officers. Good, empty countries deal so western fingers. Long relatives will n','Sports','fishing',1.840000033378601,385.6699905395508
+'Evident roots think below; specialist beds join marked roads. Well as','Sports','fishing',1.610000014305115,0
+'Limitations must maintain present, new trusts. Modern preferences shall answer financial, sure individuals. Only due projects know also perhaps con','Sports','fishing',8.600000381469727,3485.580078125
+'New photographs will review too once mysterious details. New wings may not go nearly specific child','Sports','fishing',0.6600000262260437,119.0400009155273
+'Only likely practitioners pay simply. Solid horses must push shows. Foreign, furious pairs might not approach in a patients. Days sound shortly therefore local instructions. Under slim yea','Sports','fishing',5.519999980926514,830.2099990844727
+'Other, likely parties would form tightly critical colleges. Problems shall enha','Sports','fishing',0.9399999976158142,1704.780029296875
+'Particularly medieval blocks would not find slightly with a carers. Years respond about at a sec','Sports','fishing',7.300000190734863,791.2999877929688
+'Also black forms accompany bett','Sports','fitness',0.449999988079071,218.9400024414062
+'Basic workers put recent terms. Evidently important neighbours could not p','Sports','fitness',1.139999985694885,243.8600006103516
+'Complete, strange measurements attempt also strange expectations. Abroad substantial levels give new, soviet costs; a little ','Sports','fitness',66.22000122070312,61.75
+'Full, relevant manufacturers should open human, low charges. But far eyes take on a prisoners; politically normal doctors will join mostly incidents; national, pale ','Sports','fitness',7.210000038146973,205.1499938964844
+'Key industries print closely elegant households. Accounts clear only to a prisoners. Certain incentives reach. Keen animals deny directly telecommunications; internationa','Sports','fitness',2.799999952316284,4668.2998046875
+'New, full rises drive however. Legs retain often in a women. Remaining, parliamentary miles may help nevertheless rather full pupils. Glad crimes might','Sports','fitness',7.170000076293945,1083.760009765625
+'Pa','Sports','fitness',32.27999877929688,664.9000244140625
+'Still old sides keep really save for a police. Big, foreign things enable. Other children illustrate distinct, distingui','Sports','fitness',0.4600000083446503,936.0900268554688
+'Armed centres send exactly. More constant women ','Sports','football',2.559999942779541,429.2000122070312
+'Bedrooms enter sideways also old vessels; powerful, free topics use ordinary, new brothers; even afraid lines can see most for example financial dollars. Local resources happen high ','Sports','football',3.779999971389771,2055.0400390625
+'Civil horses share. Authorities could see extremely only sexual hours. Far liberal ways would maintain allegations. Now tired classes could inve','Sports','football',4.869999885559082,721.6199951171875
+'Empty, remarka','Sports','football',9.760000228881836,6012.56982421875
+'Inevitable plants light in a appointments. Important, bold pictures mea','Sports','football',44.33000183105469,4187.10009765625
+'Just bitter topics build at a parents. Falls must not','Sports','football',3.160000085830688,2800.830078125
+'Married children used to obtain eastern, close abiliti','Sports','football',2.789999961853027,3374.909912109375
+'Mean, recent sequences throw separate, other eyes. Sudden, cold roots take just general relations. Advantages could meet. Then annual page','Sports','football',4.829999923706055,306
+'Overall companies will not say senses. So inappropriate circumstances leave yesterday only other mountains. Persons fight else bitter metres. Correctly linguistic patients handle others. Curr','Sports','football',4.630000114440918,2306.919921875
+'Sc','Sports','football',1.080000042915344,925.5999755859375
+'So overall','Sports','football',4.389999866485596,2956.159912109375
+'Specifically honest pp. would ensure wide for a miles. Different families put then western, certain children. Only exciting commitments say f','Sports','football',90.98999786376953,4329.2001953125
+'Still tough unions must refuse especially services. Authorities play only. Main, nati','Sports','football',6.809999942779541,1499.760009765625
+'Even s','Sports','golf',1.450000047683716,153.3600006103516
+'False, concerned hearts may hear short, british','Sports','golf',0.300000011920929,3008.740081787109
+'Hardly historical dollars combine quit','Sports','golf',3.319999933242798,3736.919921875
+'High members may not fulfil by a officials. Bishops may practise well to a bodies; both considerable problems would not make however organic important things. Particular, old companies must take ','Sports','golf',5.840000152587891,3244.719909667969
+'Over sexual activities should not distinguish so. Really large goals provide to a attitudes; already free arms used to accept even for a days. Black, video-taped names may present both to the','Sports','golf',9.140000343322754,NULL
+'Profitable documents would apply now. Literary, nuclear magazines might run general, proposed details. C','Sports','golf',4.179999828338623,5.28000020980835
+'Skills might swallow together. Also emotional styles should not address on','Sports','golf',8.909999847412109,2860.9599609375
+'Then major techniques might forget gently. Prospects encourage ','Sports','golf',7.329999923706055,1116.75
+'Acutely good subsidies take hardly early terms. Merely magnificent areas help res','Sports','guns',2.089999914169312,550.27001953125
+'Attempts feel; extre','Sports','guns',9.199999809265137,370.5
+'Both necessary functions make forthcoming flowers. Respons','Sports','guns',6.75,392.0999984741211
+'Existing changes take even favorite, english industries. As public consequences find upwards months. Regional aspects need recently with a systems. Now essent','Sports','guns',5.889999866485596,5131.6201171875
+'Fine old programmes may not mean. Public pp. may not believe however thus continued lines. Physical agenc','Sports','guns',1.740000009536743,556.780029296875
+'Formal references affect again for a rights. So far minutes reveal still because of a priorities','Sports','guns',8.550000190734863,1024.199951171875
+'Free pp. think rather to the shoulders. Original rates wil','Sports','guns',4.980000019073486,1391.280029296875
+'Front words must not develop societies. Eventual, grey countries make strangely times; ever old indicators send often tomorrow prime computers. Full, high days will come unique companies. Of course s','Sports','guns',4.389999866485596,NULL
+'Furthermore low parents used to reach. Young years can rest completely busy woods. Formal, inadequ','Sports','guns',2.170000076293945,5360.580078125
+'High ministers should not remove for a stations. Certain, linear weeks might not ask so from a improvements. Lakes must not implement f','Sports','guns',8.119999885559082,1681.43994140625
+'National items sha','Sports','guns',3.599999904632568,143.5200042724609
+'Still arguments must undertake su','Sports','guns',3.349999904632568,488.7200012207031
+'Then ordina','Sports','guns',3.809999942779541,332.6400146484375
+'Also appropriate courts let long critical conditions; enough current ','Sports','hockey',3.990000009536743,4600.81982421875
+'Boundaries believe on a needs. Respective, sharp agents would not develop western delegates; successful, biological employees wriggle early in a blocks. Policies adopt togethe','Sports','hockey',1.019999980926514,564.2999877929688
+'Brown changes would go','Sports','hockey',3.440000057220459,3280.06005859375
+'Effects ought','Sports','hockey',2.329999923706055,1535.819946289062
+'Great sounds might shake just extremely important men. Paintings ','Sports','hockey',2.079999923706055,209.1600036621094
+'High, traditional men will base. Primary miles emerge underground in respect of a oper','Sports','hockey',37.40999984741211,408.0299987792969
+'New, separate motives hide never. Regardless local solutions get yet still national years. Colleges dance precisely admittedly great letters; assumptions contain even british details. Local cells may','Sports','hockey',3.990000009536743,590.0399780273438
+'Original, everyday words may not wish even to a paintings. Domestic movements could explore on a improvements. For example specialist contracts use as more subtle weekends. Annual, good performanc','Sports','hockey',5.190000057220459,285.25
+'Recent, french conservatives cannot get somehow; decisions save accordingly happy thousands. Seriously good years argue then golden attacks. Just wide eyes drink underground likely, fin','Sports','hockey',0.09000000357627869,6139.1298828125
+'Special, new attacks leave here between the responsibilities. Approximately new months turn especially. Natural visitors respond str','Sports','hockey',4.360000133514404,6480.240234375
+'Words must long both near a','Sports','hockey',5.949999809265137,52.2599983215332
+'Bloody directors reach highly only heavy women. Ministers shall not avoid afte','Sports','optics',57.90000152587891,5353.020202636719
+'Children ma','Sports','optics',6.800000190734863,1488.359985351562
+'Never extra rights must drift at a appointments. Moral, blank expectations','Sports','optics',0.2300000041723251,590.4000244140625
+'Other, willing materials could take ever external terms. Texts mean steady. Confident banks settle later national, foreign hours. Police will','Sports','optics',21.06999969482422,1205.599975585938
+'Quite empty countries cannot block briefly in a pupils. Crude sheets take tory solutions. Years occur accurately inc attitudes. Elections present e','Sports','optics',3.680000066757202,507.6499938964844
+'Still specific conditions go occasions; traditional claims might help great plant','Sports','optics',1.269999980926514,3845.60009765625
+'Successes embrace modern, able matters. Schools cannot convert wryly odd surveys. Generally useful techniques would not make enormously public, difficult se','Sports','optics',9.170000076293945,2745.679931640625
+'Almost low provisions suggest to','Sports','outdoor',6.659999847412109,37
+'Areas must think always. Longer responsible standards reappear. Other powers cover various players. Areas accept with a resources. As necessary things might not take more than top, ','Sports','outdoor',6.090000152587891,322.0799865722656
+'Decisions want heads. Documents could involve different sales. Particular tables adopt statistic','Sports','outdoor',4.809999942779541,7045.740234375
+'Enough automatic effects look slowly. Races should stay maps; nervous, high hands might make me','Sports','outdoor',4.139999866485596,0
+'Europe','Sports','outdoor',3.119999885559082,1811.199951171875
+'Goods give relatively exact terms. Avail','Sports','outdoor',2.549999952316284,43.06000137329102
+'Southern, physical forms may inherit long forms. Directors find suddenly. Standards should not say under just difficult reasons. Paths join a bit scientific issues. Onl','Sports','outdoor',6.989999771118164,4599
+'Substantially olympic leaders leap stars. Average, urban nations find games. Electronic years might not go ago sa','Sports','outdoor',0.09000000357627869,1671.780029296875
+'Blue days shall not run therefore american hands. Companies might take particularly years. Related hands avoid premises. Love','Sports','pools',5.21999979019165,786.780029296875
+'Conditions want well enormous, proper cells; claims ought to clear now to the times. As well divine surfaces know persistent, ha','Sports','pools',74.69999694824219,1862.670043945312
+'Crucial restaurants make for a children. Too united results begin effectively results. Others feel only in a collections. Aware pp. go simply. Neighbours mig','Sports','pools',7.53000020980835,451.7200012207031
+'Good, single pupils should not combine prisoners; a.d. strong shelves mean now p','Sports','pools',0.8299999833106995,939.6099853515625
+'Likely opportunities used to exercise quiet, present children. Early, limited reasons mean also small types. Possible cases will not stop inevitably major, safe eyebrows. Also economic','Sports','pools',8.649999618530273,688.5
+'Main problems proceed then ','Sports','pools',8.720000267028809,1343
+'Major issue','Sports','pools',29.17000007629395,4423.2001953125
+'More aware responses find','Sports','pools',2.960000038146973,1076.02001953125
+'Old-fashioned doctors must not bring generally. British rats serve skilled brothers. Wrong women will look definite conditions. Then vita','Sports','pools',9.680000305175781,861.0800170898438
+'Passengers will not specify proudly regular, working year','Sports','pools',6.25,168.4799957275391
+'Poor, large reforms must give general months. Executive, old parts must want economic investigations. Still, other girls assist almost publications. Classes mean wi','Sports','pools',63.65999984741211,2057.97998046875
+'Possib','Sports','pools',7.590000152587891,471.0499992370605
+'Senior children would face different, public areas. Almost personal activities get probably experiences. Mechanical, wild sa','Sports','pools',7.900000095367432,3046.22998046875
+'Shallow, vocational efforts used to give very part-time programmes. Only months ought to know; participants will not take then even natural events. Influences take al','Sports','pools',4.920000076293945,1531.02001953125
+'Structures introduce now in a priorities. ','Sports','pools',2.990000009536743,5305.9501953125
+'Too scientific letters could not depend more; instead national attitudes read less magnificent politici','Sports','pools',4.010000228881836,30.95999908447266
+'Areas fall male sisters; due hills strike from a techniques. Enough successful corporations shall go of course cities. Per se japanese schools find most u','Sports','sailing',1.059999942779541,1530.440032958984
+'Average, mean unions include. Cold ways shall work particularly from no rights. Already crucial agencies get very professional days. Perhaps huge methods rule financially awful arms. Strong vehicl','Sports','sailing',7.96999979019165,4282.97998046875
+'Forward students can involve there aware lawyers. Scientifically costly achievements could involve sta','Sports','sailing',1.090000033378601,3383.52001953125
+'International applications','Sports','sailing',0.6499999761581421,2455.320068359375
+'Mainly future offices help services. Curiously wealthy patients prevent certainly. Consequences appear local gentlemen. Degrees bring t','Sports','sailing',96.69000244140625,4758.93017578125
+'Originally federal implications continue always manufacturers. Ins','Sports','sailing',0.6299999952316284,1164.760009765625
+'Perhaps hard lakes consolidate pr','Sports','sailing',0.09000000357627869,3745.320068359375
+'Problems could make seconds; humans guess ever there top pa','Sports','sailing',9.460000038146973,1247.72998046875
+'Sharp brief preferences cannot know overall levels. Joint, good feet visit probably. Players will not get small stars','Sports','sailing',1.909999966621399,106.2600021362305
+'Social, resulting branches mi','Sports','sailing',7.519999980926514,1667.630004882812
+'Active, red things shall remain from the colleagues; largely high members form barely i','Sports','tennis',5.940000057220459,NULL
+'Certain, blue women must tell american words. Elsewhere real kinds might not love etc regular systems. Other, full-time reasons destroy also most dear ','Sports','tennis',5.730000019073486,652.2899780273438
+'Deliberately good years appear for a mechanisms. Only preliminary controls might not discuss only late products; devices will replace still very possi','Sports','tennis',7.53000020980835,1492.680053710938
+'External, medieval ','Sports','tennis',8.960000038146973,10862.8203125
+'Highly local li','Sports','tennis',9.810000419616699,1840.5
+'Knees might chan','Sports','tennis',4.829999923706055,2530.010009765625
+'Longer other prices give here old examples. Much silent police might go including a perceptions. Early, new programmes promote too for a laws. Actors should not speak as relationships. Children cou','Sports','tennis',4.099999904632568,1294.719970703125
+'Silent legs exclude safely. Cli','Sports','tennis',0.7599999904632568,1376.9599609375
+'Variations see ','Sports','tennis',3.569999933242798,129.2899932861328
+'Ways share electronic benefits. Just effective groups repeat social relations. Always coming deaths would treat so ideas. Effective, grand patterns would hold more. Capable feet','Sports','tennis',1.090000033378601,1979.0400390625
 ---- TYPES
-STRING, STRING, STRING, DOUBLE
+STRING, STRING, STRING, FLOAT, DOUBLE
 ====

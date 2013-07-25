@@ -1,5 +1,5 @@
 ====
----- QUERY : TPCDS-Q96
+---- QUERY: TPCDS-Q96
 SELECT
   COUNT(*) AS total
 FROM store_sales ss
@@ -15,7 +15,7 @@ WHERE
   AND hd.hd_dep_count = 5
   AND s.s_store_name = 'ese';
 ---- RESULTS
-949
+81
 ---- TYPES
 BIGINT
 ====

@@ -1,0 +1,143 @@
+====
+---- QUERY: TPCDS-Q89
+select
+  *
+from
+  (select
+    i_category,
+    i_class,
+    i_brand,
+    s_store_name,
+    s_company_name,
+    d_moy,
+    sum(ss_sales_price) sum_sales
+  from
+    store_sales
+    join item on (store_sales.ss_item_sk = item.i_item_sk)
+    join store on (store_sales.ss_store_sk = store.s_store_sk)
+    join date_dim on (store_sales.ss_sold_date_sk = date_dim.d_date_sk)
+  where
+    ss_date between '2000-01-01' and '2000-12-31'
+    and d_year in(2000)
+    and ((i_category in('Home', 'Books', 'Electronics')
+          and i_class in('wallpaper', 'parenting', 'musical'))
+        or (i_category in('Shoes', 'Jewelry', 'Men')
+            and i_class in('womens', 'birdal', 'pants'))
+        )
+  group by
+    i_category,
+    i_class,
+    i_brand,
+    s_store_name,
+    s_company_name,
+    d_moy
+  ) tmp1
+order by
+  sum_sales,
+  s_store_name,
+  i_category
+limit 100
+---- RESULTS
+'Electronics','musical','corpunivamalg #6','ation','Unknown',11,0
+'Books','parenting','corpmaxi #12','bar','Unknown',9,0
+'Home','wallpaper','exportinameless #6','bar','Unknown',7,0
+'Jewelry','birdal','amalgcorp #3','bar','Unknown',9,0
+'Books','parenting','corpmaxi #8','ought','Unknown',4,0.1000000014901161
+'Electronics','musical','corpunivamalg #17','ese','Unknown',9,0.119999997317791
+'Home','wallpaper','exportinameless #1','eing','Unknown',9,0.3400000035762787
+'Jewelry','birdal','amalgcorp #1','eing','Unknown',2,0.3700000047683716
+'Books','parenting','corpmaxi #9','ese','Unknown',4,0.4199999868869781
+'Electronics','musical','corpunivamalg #11','bar','Unknown',12,0.4699999988079071
+'Home','wallpaper','exportinameless #6','eing','Unknown',10,0.5899999737739563
+'Jewelry','birdal','amalgcorp #2','able','Unknown',12,0.7200000286102295
+'Jewelry','birdal','amalgcorp #5','ese','Unknown',4,0.7799999713897705
+'Books','parenting','corpmaxi #9','ese','Unknown',10,0.8299999833106995
+'Jewelry','birdal','amalgcorp #2','able','Unknown',3,0.8899999856948853
+'Electronics','musical','corpunivamalg #6','ought','Unknown',10,0.8899999856948853
+'Electronics','musical','corpunivamalg #8','ation','Unknown',7,0.9700000286102295
+'Jewelry','birdal','amalgcorp #2','ought','Unknown',12,0.9700000286102295
+'Jewelry','birdal','amalgcorp #8','ought','Unknown',6,0.9900000095367432
+'Books','parenting','corpmaxi #6','able','Unknown',4,1.070000052452087
+'Home','wallpaper','exportinameless #7','ation','Unknown',12,1.120000004768372
+'Jewelry','birdal','amalgcorp #4','bar','Unknown',8,1.129999995231628
+'Electronics','musical','corpunivamalg #8','able','Unknown',6,1.149999976158142
+'Home','wallpaper','exportinameless #8','bar','Unknown',10,1.190000057220459
+'Home','wallpaper','exportinameless #3','eing','Unknown',11,1.190000057220459
+'Home','wallpaper','exportinameless #10','bar','Unknown',9,1.240000009536743
+'Home','wallpaper','exportinameless #10','ought','Unknown',6,1.299999952316284
+'Men','pants','exportiimporto #1','able','Unknown',6,1.320000052452087
+'Home','wallpaper','exportinameless #4','ought','Unknown',5,1.519999980926514
+'Home','wallpaper','exportinameless #2','ought','Unknown',6,1.549999952316284
+'Electronics','musical','corpunivamalg #6','ation','Unknown',10,1.570000052452087
+'Jewelry','birdal','amalgcorp #8','eing','Unknown',11,1.620000004768372
+'Home','wallpaper','exportinameless #10','able','Unknown',1,1.639999985694885
+'Books','parenting','corpmaxi #9','bar','Unknown',8,1.690000057220459
+'Shoes','womens','amalgedu pack #2','eing','Unknown',7,1.759999990463257
+'Home','wallpaper','exportinameless #8','ese','Unknown',10,1.850000023841858
+'Books','parenting','corpmaxi #12','ought','Unknown',1,1.870000004768372
+'Electronics','musical','corpunivamalg #6','able','Unknown',9,1.950000047683716
+'Home','wallpaper','exportinameless #6','ation','Unknown',8,2
+'Books','parenting','corpmaxi #8','ought','Unknown',3,2
+'Home','wallpaper','exportinameless #5','ought','Unknown',1,2
+'Electronics','musical','corpunivamalg #2','bar','Unknown',10,2.019999980926514
+'Electronics','musical','corpunivamalg #8','bar','Unknown',7,2.119999885559082
+'Electronics','musical','corpunivamalg #11','able','Unknown',3,2.190000057220459
+'Home','wallpaper','exportinameless #1','ought','Unknown',4,2.339999914169312
+'Men','pants','exportiimporto #1','eing','Unknown',6,2.390000104904175
+'Electronics','musical','corpunivamalg #11','eing','Unknown',11,2.410000085830688
+'Home','wallpaper','exportinameless #8','ought','Unknown',1,2.420000076293945
+'Electronics','musical','corpunivamalg #12','ation','Unknown',9,2.440000057220459
+'Jewelry','birdal','amalgcorp #5','ese','Unknown',5,2.440000057220459
+'Books','parenting','corpmaxi #6','ese','Unknown',12,2.559999942779541
+'Books','parenting','corpmaxi #3','eing','Unknown',1,2.569999933242798
+'Jewelry','birdal','amalgcorp #6','eing','Unknown',11,2.680000066757202
+'Electronics','musical','corpunivamalg #3','able','Unknown',12,2.720000028610229
+'Shoes','womens','amalgedu pack #1','able','Unknown',10,2.940000057220459
+'Jewelry','birdal','amalgcorp #7','ation','Unknown',2,3.069999933242798
+'Electronics','musical','corpunivamalg #7','eing','Unknown',2,3.109999895095825
+'Electronics','musical','corpunivamalg #8','ese','Unknown',11,3.309999942779541
+'Books','parenting','corpmaxi #8','ation','Unknown',10,3.380000114440918
+'Electronics','musical','corpunivamalg #1','able','Unknown',4,3.390000104904175
+'Home','wallpaper','exportinameless #4','ought','Unknown',9,3.460000038146973
+'Books','parenting','corpmaxi #6','bar','Unknown',5,3.519999980926514
+'Home','wallpaper','exportinameless #4','ese','Unknown',12,3.670000076293945
+'Electronics','musical','corpunivamalg #13','ese','Unknown',7,3.720000028610229
+'Electronics','musical','corpunivamalg #5','ought','Unknown',5,3.730000019073486
+'Electronics','musical','corpunivamalg #17','ation','Unknown',10,3.75
+'Home','wallpaper','exportinameless #7','able','Unknown',7,3.799999952316284
+'Books','parenting','corpmaxi #6','able','Unknown',7,3.809999942779541
+'Jewelry','birdal','amalgcorp #8','eing','Unknown',3,3.809999942779541
+'Electronics','musical','corpunivamalg #4','ought','Unknown',10,4.019999980926514
+'Home','wallpaper','exportinameless #2','eing','Unknown',8,4.050000190734863
+'Electronics','musical','corpunivamalg #4','bar','Unknown',1,4.079999923706055
+'Electronics','musical','corpunivamalg #13','able','Unknown',12,4.179999828338623
+'Electronics','musical','corpunivamalg #8','ation','Unknown',10,4.210000038146973
+'Books','parenting','corpmaxi #3','ese','Unknown',9,4.230000019073486
+'Jewelry','birdal','amalgcorp #7','able','Unknown',9,4.409999847412109
+'Jewelry','birdal','amalgcorp #4','able','Unknown',3,4.480000019073486
+'Electronics','musical','corpunivamalg #11','eing','Unknown',9,4.690000057220459
+'Home','wallpaper','exportinameless #9','ought','Unknown',7,4.690000057220459
+'Books','parenting','corpmaxi #5','ation','Unknown',1,4.730000019073486
+'Books','parenting','corpmaxi #2','bar','Unknown',1,4.789999961853027
+'Jewelry','birdal','amalgcorp #5','ation','Unknown',9,4.829999923706055
+'Electronics','musical','corpunivamalg #2','ought','Unknown',1,4.860000133514404
+'Home','wallpaper','exportinameless #8','ought','Unknown',11,4.860000133514404
+'Jewelry','birdal','amalgcorp #7','able','Unknown',8,4.889999866485596
+'Electronics','musical','corpunivamalg #7','bar','Unknown',10,5.199999809265137
+'Electronics','musical','corpunivamalg #7','ought','Unknown',11,5.199999809265137
+'Jewelry','birdal','amalgcorp #7','ation','Unknown',11,5.239999771118164
+'Books','parenting','corpmaxi #12','eing','Unknown',11,5.360000133514404
+'Books','parenting','corpmaxi #6','bar','Unknown',11,5.559999942779541
+'Books','parenting','corpmaxi #9','ese','Unknown',6,5.659999847412109
+'Books','parenting','corpmaxi #6','ese','Unknown',10,5.710000038146973
+'Jewelry','birdal','amalgcorp #5','ation','Unknown',1,5.769999980926514
+'Jewelry','birdal','amalgcorp #1','ation','Unknown',7,6.079999923706055
+'Shoes','womens','amalgedu pack #1','ese','Unknown',6,6.090000152587891
+'Men','pants','exportiimporto #1','ese','Unknown',4,6.139999866485596
+'Electronics','musical','corpunivamalg #6','ese','Unknown',2,6.150000095367432
+'Electronics','musical','corpunivamalg #2','bar','Unknown',11,6.220000088214874
+'Electronics','musical','corpunivamalg #3','ought','Unknown',7,6.25
+'Electronics','musical','corpunivamalg #1','eing','Unknown',11,6.360000133514404
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, INT, DOUBLE
+====

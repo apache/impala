@@ -1,5 +1,5 @@
 ====
----- QUERY : TPCDS-Q73
+---- QUERY: TPCDS-Q73
 SELECT
   c_last_name,
   c_first_name,

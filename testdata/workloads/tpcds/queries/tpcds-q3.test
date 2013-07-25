@@ -1,0 +1,44 @@
+====
+---- QUERY: TPCDS-Q3
+select
+  year(ss_date) as year_sold,
+  item.i_brand_id brand_id,
+  item.i_brand brand,
+  sum(ss_ext_sales_price) sum_agg
+from
+  store_sales
+  join item on (store_sales.ss_item_sk = item.i_item_sk)
+where
+  item.i_manufact_id = 436
+  and (ss_date between '1998-12-01' and '1998-12-31'
+    or ss_date between '1999-12-01' and '1990-12-31'
+    or ss_date between '2000-12-01' and '2000-12-31'
+    or ss_date between '2001-12-01' and '2001-12-31'
+    or ss_date between '2002-12-01' and '2002-12-31')
+group by
+  year(ss_date),
+  item.i_brand,
+  item.i_brand_id
+order by
+  year_sold,
+  sum_agg desc,
+  brand_id
+limit 100
+---- RESULTS
+1998,2001001,'amalgimporto #1',7812.3798828125
+1998,10014017,'edu packamalgamalg #17',888.609992980957
+1998,3003001,'exportiexporti #1',418.3800048828125
+1998,4003001,'exportiedu pack #1',70.55000305175781
+1998,5003001,'exportischolar #1',36.95999908447266
+2000,1004001,'corpunivamalg #12',6812.52001953125
+2000,4003002,'exportiedu pack #2',4726.080078125
+2000,10003008,'exportiunivamalg #8',2263.140014648438
+2000,5003001,'exportischolar #1',641.8499755859375
+2000,5004001,'edu packscholar #1',341.8800048828125
+2001,6015004,'scholarbrand #4',5579.81005859375
+2001,1004001,'corpunivamalg #12',5303.059936523438
+2001,5003001,'maxiunivamalg #9',4469.75
+2002,5004001,'importocorp #8',1660.920043945312
+---- TYPES
+INT, INT, STRING, DOUBLE
+====

@@ -228,6 +228,8 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 
   statement = SET_PARTITION_MODE_NONSTRICT_STATEMENT + "\n"
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
+  statement += "set hive.auto.convert.join=true;\n"
+
   # For some reason (hive bug?) we need to have the CombineHiveInputFormat set
   # for cases where we are compressing in bzip or lzo on certain tables that
   # have multiple files.
@@ -328,7 +330,13 @@ def generate_statements(output_name, test_vectors, sections,
       if create_hive:
         create = create_hive
       insert = section['DEPENDENT_LOAD']
-      load_local = section['LOAD']
+      load = section['LOAD']
+      # For some datasets we may want to use a different load strategy when running local
+      # tests versus tests against large scale factors. The most common reason is to
+      # reduce he number of partitions for the local test environment
+      if not options.scale_factor and section['LOAD_LOCAL']:
+        load = section['LOAD_LOCAL']
+
       base_table_name = section['BASE_TABLE_NAME']
       columns = section['COLUMNS']
       partition_columns = section['PARTITION_COLUMNS']
@@ -354,7 +362,7 @@ def generate_statements(output_name, test_vectors, sections,
       # need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
-      if not load_local and not insert:
+      if not load and not insert:
         create_codec = 'none'
         create_file_format = 'text' if file_format != 'parquet' else 'parquet'
 
@@ -417,8 +425,8 @@ def generate_statements(output_name, test_vectors, sections,
       else:
         print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
         if not db_suffix:
-          if load_local:
-            hive_output.load_base.append(build_load_statement(load_local, db_name,
+          if load:
+            hive_output.load_base.append(build_load_statement(load, db_name,
                                                               db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
@@ -444,7 +452,7 @@ def generate_statements(output_name, test_vectors, sections,
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'DEPENDENT_LOAD', 'LOAD',
-                         'ALTER']
+                         'LOAD_LOCAL', 'ALTER']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":

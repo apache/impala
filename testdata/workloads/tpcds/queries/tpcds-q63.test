@@ -1,0 +1,52 @@
+====
+---- QUERY: TPCDS-Q63
+select
+  *
+from
+  (select
+    i_manager_id,
+    sum(ss_sales_price) sum_sales
+  from
+    store_sales
+    join item on (store_sales.ss_item_sk = item.i_item_sk)
+    join store on (store_sales.ss_store_sk = store.s_store_sk)
+    join date_dim on (store_sales.ss_sold_date_sk = date_dim.d_date_sk)
+  where
+    ss_date between '2001-01-01' and '2001-12-31'
+    and (
+          (i_category in('Books', 'Children', 'Electronics')
+            and i_class in('personal', 'portable', 'refernece', 'self-help')
+            and i_brand in('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')
+          )
+          or 
+          (i_category in('Women', 'Music', 'Men')
+            and i_class in('accessories', 'classical', 'fragrances', 'pants')
+            and i_brand in('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')
+          )
+        )
+  group by
+    i_manager_id,
+    d_moy
+  ) tmp1
+order by
+  i_manager_id,
+  sum_sales
+limit 100
+---- RESULTS
+10,50.08000183105469
+10,92.63999938964844
+13,1.75
+13,4.71999979019165
+13,66.86000061035156
+13,136.1300048828125
+29,2.269999980926514
+29,25.35000038146973
+29,71.66999816894531
+29,81.19000053405762
+34,2.789999961853027
+34,21.90999984741211
+34,83.13999938964844
+34,200.9999931454659
+---- TYPES
+INT, DOUBLE
+====
