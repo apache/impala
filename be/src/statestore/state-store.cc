@@ -120,7 +120,9 @@ void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
 
 StateStore::StateStore(Metrics* metrics)
   : exit_flag_(false),
-    subscriber_heartbeat_threadpool_(FLAGS_statestore_num_heartbeat_threads,
+    subscriber_heartbeat_threadpool_("statestore",
+        "subscriber-heartbeat-worker",
+        FLAGS_statestore_num_heartbeat_threads,
         STATESTORE_MAX_SUBSCRIBERS,
         bind<void>(mem_fn(&StateStore::UpdateSubscriber), this, _1, _2)),
     client_cache_(new ClientCache<StateStoreSubscriberClient>()),

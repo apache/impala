@@ -97,7 +97,8 @@ Status InProcessStateStore::Start() {
 
   state_store_server_.reset(new ThriftServer("StateStoreService", processor,
                                              state_store_port_, metrics_.get(), 5));
-  state_store_main_loop_.reset(new thread(&StateStore::MainLoop, state_store_.get()));
+  state_store_main_loop_.reset(
+      new Thread("state-store", "main-loop", &StateStore::MainLoop, state_store_.get()));
 
   state_store_server_->Start();
   return WaitForServer("localhost", state_store_port_, 10, 100);

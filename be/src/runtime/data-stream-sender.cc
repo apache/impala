@@ -16,7 +16,6 @@
 
 #include <iostream>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/thread.hpp>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
@@ -116,7 +115,7 @@ class DataStreamSender::Channel {
 
   // accessed by rpc_thread_ and by channel only if there is no in-flight rpc
   TRowBatch* in_flight_batch_;
-  thread rpc_thread_;  // sender thread
+  scoped_ptr<Thread> rpc_thread_;  // sender thread
   Status rpc_status_;  // status of most recently finished TransmitData rpc
 
   // Synchronously call TransmitData() on a client from client_cache_ and update
@@ -144,7 +143,8 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
   RETURN_IF_ERROR(GetSendStatus());
   DCHECK(in_flight_batch_ == NULL);
   in_flight_batch_ = batch;
-  rpc_thread_ = thread(&DataStreamSender::Channel::TransmitData, this);
+  rpc_thread_.reset(new Thread("data-stream-sender", "rpc-thread",
+                               &DataStreamSender::Channel::TransmitData, this));
   return Status::OK;
 }
 
@@ -225,7 +225,7 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
 Status DataStreamSender::Channel::SendCurrentBatch() {
   // make sure there's no in-flight TransmitData() call that might still want to
   // access thrift_batch_
-  rpc_thread_.join();
+  if (rpc_thread_.get() != NULL) rpc_thread_->Join();
   {
     SCOPED_TIMER(parent_->serialize_batch_timer_);
     int uncompressed_bytes = batch_->Serialize(&thrift_batch_);
@@ -238,7 +238,8 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
 }
 
 Status DataStreamSender::Channel::GetSendStatus() {
-  rpc_thread_.join();
+  // TODO: This is getting called before rpc_thread_ is initialised
+  if (rpc_thread_.get() != NULL) rpc_thread_->Join();
   if (!rpc_status_.ok()) {
     LOG(ERROR) << "channel send status: " << rpc_status_.GetErrorMsg();
   }

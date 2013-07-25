@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 #include <string>
 #include <gtest/gtest.h>
 #include <boost/bind.hpp>
 
 #include "runtime/parallel-executor.h"
+#include "util/thread.h"
 
 using namespace boost;
 using namespace std;
+using namespace impala;
 
 namespace impala {
 
@@ -76,6 +79,6 @@ TEST(ParallelExecutorTest, Basic) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  InitThreading();
   return RUN_ALL_TESTS();
 }
-

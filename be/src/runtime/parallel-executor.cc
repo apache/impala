@@ -16,20 +16,24 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "util/thread.h"
+
 using namespace boost;
 using namespace impala;
 using namespace std;
 
 Status ParallelExecutor::Exec(Function function, void** args, int num_args) {
   Status status;
-  thread_group worker_threads;
+  ThreadGroup worker_threads;
   mutex lock;
 
   for (int i = 0; i < num_args; ++i) {
-    worker_threads.add_thread(new thread(&ParallelExecutor::Worker, function, 
-            args[i], &lock, &status));
+    stringstream ss;
+    ss << "worker-thread(" << i << ")";
+    worker_threads.AddThread(new Thread("parallel-executor", ss.str(),
+        &ParallelExecutor::Worker, function, args[i], &lock, &status));
   }
-  worker_threads.join_all();
+  worker_threads.JoinAll();
 
   return status;
 }
@@ -41,5 +45,3 @@ void ParallelExecutor::Worker(Function function, void* arg, mutex* lock, Status*
     if (status->ok()) *status = local_status;
   }
 }
-
-

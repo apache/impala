@@ -2657,6 +2657,7 @@ int main(int argc, char **argv) {
   impala::DiskInfo::Init();
   impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
+  impala::InitThreading();
 
   EXIT_IF_ERROR(JniUtil::Init());
   InitFeSupport();

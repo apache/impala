@@ -17,9 +17,10 @@
 
 #include "util/blocking-queue.h"
 
-#include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/bind/mem_fn.hpp>
+
+#include "util/thread.h"
 
 namespace impala {
 
@@ -39,13 +40,16 @@ class ThreadPool {
   //     queue exceeds this size, subsequent calls to Offer will block until there is
   //     capacity available.
   //  -- work_function: the function to run every time an item is consumed from the queue
-  ThreadPool(uint32_t num_threads, uint32_t queue_size, const WorkFunction& work_function)
+  ThreadPool(const std::string& group, const std::string& thread_prefix,
+      uint32_t num_threads, uint32_t queue_size, const WorkFunction& work_function)
     : work_function_(work_function),
       work_queue_(queue_size),
       shutdown_(false) {
     for (int i = 0; i < num_threads; ++i) {
-      threads_.create_thread(
-          boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i));
+      std::stringstream threadname;
+      threadname << thread_prefix << "(" << i + 1 << ":" << num_threads << ")";
+      threads_.AddThread(new Thread(group, threadname.str(),
+          boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i)));
     }
   }
 
@@ -86,7 +90,7 @@ class ThreadPool {
   // Blocks until all threads are finished. Shutdown does not need to have been called,
   // since it may be called on a separate thread.
   void Join() {
-    threads_.join_all();
+    threads_.JoinAll();
   }
 
   uint32_t GetQueueSize() const {
@@ -136,7 +140,7 @@ class ThreadPool {
   BlockingQueue<T> work_queue_;
 
   // Collection of worker threads that process work from the queue.
-  boost::thread_group threads_;
+  ThreadGroup threads_;
 
   // Guards shutdown_ and empty_cv_
   boost::mutex lock_;

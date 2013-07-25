@@ -21,6 +21,7 @@
 #include "common/object-pool.h"
 #include "util/runtime-profile.h"
 #include "util/cpu-info.h"
+#include "util/thread.h"
 
 using namespace std;
 using namespace boost;
@@ -397,6 +398,7 @@ TEST(CountersTest, EventSequences) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitThreading();
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }

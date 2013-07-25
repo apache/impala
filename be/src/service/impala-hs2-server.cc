@@ -352,7 +352,8 @@ void ImpalaServer::ExecuteStatement(
 
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
-  thread wait_thread(&ImpalaServer::Wait, this, exec_state);
+  Thread wait_thread(
+      "impala-server", "wait-thread", &ImpalaServer::Wait, this, exec_state);
 
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);

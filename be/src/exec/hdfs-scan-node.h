@@ -32,6 +32,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
 #include "util/progress-updater.h"
+#include "util/thread.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -325,10 +326,6 @@ class HdfsScanNode : public ScanNode {
   // These descriptors are sorted in order of increasing col_pos
   std::vector<SlotDescriptor*> partition_key_slots_;
 
-  // Thread that constantly reads from the disk io mgr and queues the work on the
-  // context for that scan range.
-  boost::scoped_ptr<boost::thread> disk_read_thread_;
-
   // Keeps track of total splits and the number finished.
   ProgressUpdater progress_;
 
@@ -338,7 +335,7 @@ class HdfsScanNode : public ScanNode {
   std::map<std::string, void*> per_file_metadata_;
 
   // Thread group for all scanner worker threads
-  boost::thread_group scanner_threads_;
+  ThreadGroup scanner_threads_;
 
   // Lock and condition variables protecting materialized_row_batches_.  Row batches are
   // produced asynchronously by the scanner threads and consumed by the main thread in

@@ -30,6 +30,7 @@
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/debug-util.h"
+#include "util/thread.h"
 #include "util/thrift-server.h"
 #include "util/mem-info.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -499,6 +500,7 @@ int main(int argc, char **argv) {
   impala::DiskInfo::Init();
   impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
+  impala::InitThreading();
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("data-stream-test"));
   }

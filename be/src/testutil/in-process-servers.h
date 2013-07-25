@@ -17,9 +17,9 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
 
 #include "common/status.h"
+#include "util/thread.h"
 
 namespace impala {
 
@@ -109,7 +109,7 @@ class InProcessStateStore {
   // State-store Thrift server
   boost::scoped_ptr<ThriftServer> state_store_server_;
 
-  boost::scoped_ptr<boost::thread> state_store_main_loop_;
+  boost::scoped_ptr<Thread> state_store_main_loop_;
 };
 
 }

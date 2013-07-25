@@ -43,7 +43,7 @@ TEST(ThreadPoolTest, BasicTest) {
     thread_counters[i] = 0;
   }
 
-  ThreadPool<int> thread_pool(5, 250, Count);
+  ThreadPool<int> thread_pool("thread-pool", "worker", 5, 250, Count);
   for (int i = 0; i <= OFFERED_RANGE; ++i) {
     ASSERT_TRUE(thread_pool.Offer(i));
   }
@@ -69,6 +69,7 @@ TEST(ThreadPoolTest, BasicTest) {
 
 int main(int argc, char** argv) {
   impala::InitGoogleLoggingSafe(argv[0]);
+  impala::InitThreading();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -206,7 +206,7 @@ DiskIoMgr::~DiskIoMgr() {
     }
     disk_queues_[i]->work_available.notify_all();
   }
-  disk_thread_group_.join_all();
+  disk_thread_group_.JoinAll();
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     int disk_id = disk_queues_[i]->disk_id;
@@ -244,15 +244,17 @@ Status DiskIoMgr::Init(MemLimit* process_mem_limit) {
       }
     }
     for (int j = 0; j < num_threads_per_disk; ++j) {
-      disk_thread_group_.add_thread(
-          new thread(&DiskIoMgr::ReadLoop, this, disk_queues_[i]));
+      stringstream ss;
+      ss << "read-loop(Disk: " << i << ", Thread: " << j << ")";
+      disk_thread_group_.AddThread(new Thread("disk-io-mgr", ss.str(),
+          &DiskIoMgr::ReadLoop, this, disk_queues_[i]));
     }
   }
   reader_cache_.reset(new ReaderCache(this));
   return Status::OK;
 }
 
-Status DiskIoMgr::RegisterReader(hdfsFS hdfs, ReaderContext** reader, 
+Status DiskIoMgr::RegisterReader(hdfsFS hdfs, ReaderContext** reader,
     MemLimit* mem_limit) {
   DCHECK(reader_cache_.get() != NULL) << "Must call Init() first.";
   *reader = reader_cache_->GetNewReader();
@@ -355,7 +357,7 @@ Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
   return Status::OK;
 }
 
-Status DiskIoMgr::AddScanRanges(ReaderContext* reader, 
+Status DiskIoMgr::AddScanRanges(ReaderContext* reader,
     const vector<ScanRange*>& ranges, bool schedule_immediately) {
   if (ranges.empty()) return Status::OK;
 
@@ -412,7 +414,7 @@ Status DiskIoMgr::GetNextRange(ReaderContext* reader, ScanRange** range) {
   DCHECK(reader != NULL);
   DCHECK(range != NULL);
   *range = NULL;
-  
+
   Status status;
 
   unique_lock<mutex> reader_lock(reader->lock_);
@@ -448,7 +450,7 @@ Status DiskIoMgr::GetNextRange(ReaderContext* reader, ScanRange** range) {
   return status;
 }
 
-Status DiskIoMgr::Read(ReaderContext* reader, 
+Status DiskIoMgr::Read(ReaderContext* reader,
     ScanRange* range, BufferDescriptor** buffer) {
   DCHECK(range != NULL);
   DCHECK(buffer != NULL);
@@ -456,7 +458,7 @@ Status DiskIoMgr::Read(ReaderContext* reader,
 
   if (range->len() > max_read_size_) {
     stringstream ss;
-    ss << "Cannot perform sync read larger than " << max_read_size_ 
+    ss << "Cannot perform sync read larger than " << max_read_size_
        << ". Request was " << range->len();
     return Status(ss.str());
   }
@@ -635,7 +637,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
 
     DCHECK_EQ((*reader)->state_, ReaderContext::Active) << (*reader)->DebugString();
 
-    if (reader_disk_state->next_range_to_start() == NULL && 
+    if (reader_disk_state->next_range_to_start() == NULL &&
         !reader_disk_state->unstarted_ranges()->empty()) {
       // We don't have a range queued for this disk for what the caller should
       // read next. Populate that.  We want to have one range waiting to minimize
@@ -644,7 +646,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
       --(*reader)->num_unstarted_ranges_;
       (*reader)->ready_to_start_ranges_.Enqueue(new_range);
       reader_disk_state->set_next_range_to_start(new_range);
-        
+
       if ((*reader)->num_unstarted_ranges_ == 0) {
         // All the ranges have been started, notify everyone blocked on GetNextRange.
         // Only one of them will get work so make sure to return NULL to the other
@@ -654,7 +656,7 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
         (*reader)->ready_to_start_ranges_cv_.notify_one();
       }
     }
-    
+
     // Get the next scan range to work on from the reader. Only in_flight_ranges
     // are eligible since the disk threads do not start new ranges on their own.
 
@@ -716,7 +718,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
   } else if (buffer->eosr_) {
     buffer->scan_range_->CloseScanRange(reader->hdfs_connection_, reader);
     --state.num_remaining_ranges();
-  } 
+  }
 
   bool queue_full = buffer->scan_range_->EnqueueBuffer(buffer);
   if (!buffer->eosr_) {
@@ -725,12 +727,12 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     } else {
       reader->ScheduleScanRange(buffer->scan_range_);
     }
-  } 
+  }
   state.DecrementReadThread();
 }
 
-// The thread waits until there is work or the entire system is being shut down.  
-// If there is work, it reads the next chunk of the next scan range for the first 
+// The thread waits until there is work or the entire system is being shut down.
+// If there is work, it reads the next chunk of the next scan range for the first
 // reader in the queue and round robins across the readers.
 // Locks are not taken when reading from disk.  The main loop has three parts:
 //   1. GetNextScanRange(): Take locks and figure out what the next scan range to read is
@@ -750,7 +752,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
       DCHECK(shut_down_);
       break;
     }
-    
+
     buffer = GetFreeBuffer(reader);
     ++reader->num_used_buffers_;
 
@@ -777,7 +779,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
       SCOPED_TIMER(&read_timer_);
       SCOPED_TIMER(reader->read_timer_);
 
-      buffer_desc->status_ = range->ReadFromScanRange(reader->hdfs_connection_, 
+      buffer_desc->status_ = range->ReadFromScanRange(reader->hdfs_connection_,
           buffer, &buffer_desc->len_, &buffer_desc->eosr_);
       buffer_desc->scan_range_offset_ = range->bytes_read_ - buffer_desc->len_;
 
@@ -796,4 +798,3 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
 
   DCHECK(shut_down_);
 }
-

@@ -41,6 +41,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "util/impalad-metrics.h"
+#include "util/thread.h"
 
 using namespace impala;
 using namespace std;
@@ -76,6 +77,8 @@ int main(int argc, char** argv) {
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
+  StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver());
+
   ThriftServer* beeswax_server = NULL;
   ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
@@ -87,7 +90,7 @@ int main(int argc, char** argv) {
 
   Status status = exec_env.StartServices();
   if (!status.ok()) {
-    LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: " 
+    LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
                << status.GetErrorMsg();
     ShutdownLogging();
     exit(1);

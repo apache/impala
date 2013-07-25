@@ -143,8 +143,8 @@ Status StateStoreSubscriber::Start() {
   heartbeat_server_->Start();
   Status status = Register();
   if (status.ok()) is_registered_ = true;
-  recovery_mode_thread_.reset(
-      new thread(&StateStoreSubscriber::RecoveryModeChecker, this));
+  recovery_mode_thread_.reset(new Thread("statestore-subscriber", "recovery-mode-thread",
+      &StateStoreSubscriber::RecoveryModeChecker, this));
 
   return status;
 }

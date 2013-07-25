@@ -26,6 +26,7 @@
 
 #include "common/status.h"
 #include "util/metrics.h"
+#include "util/thread.h"
 
 namespace boost { class thread; }
 
@@ -139,7 +140,7 @@ class ThriftServer {
   const std::string name_;
 
   // Thread that runs the TNonblockingServer::serve loop
-  boost::scoped_ptr<boost::thread> server_thread_;
+  boost::scoped_ptr<Thread> server_thread_;
 
   // Thrift housekeeping
   boost::scoped_ptr<apache::thrift::server::TServer> server_;

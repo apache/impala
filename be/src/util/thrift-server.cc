@@ -116,7 +116,8 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
   thrift_server_->started_ = false;
 
   thrift_server_->server_thread_.reset(
-      new thread(&ThriftServer::ThriftServerEventProcessor::Supervise, this));
+      new Thread("thrift-server", "supervise",
+                 &ThriftServer::ThriftServerEventProcessor::Supervise, this));
 
   system_time deadline = get_system_time() +
       posix_time::milliseconds(ThriftServer::ThriftServerEventProcessor::TIMEOUT_MS);
@@ -384,7 +385,7 @@ Status ThriftServer::Start() {
 void ThriftServer::Join() {
   DCHECK(server_thread_ != NULL);
   DCHECK(started_);
-  server_thread_->join();
+  server_thread_->Join();
 }
 
 void ThriftServer::StopForTesting() {

@@ -676,7 +676,7 @@ void RuntimeProfile::RegisterBucketingCounters(Counter* src_counter,
   lock_guard<mutex> l(periodic_counter_update_state_.lock);
   if (periodic_counter_update_state_.update_thread.get() == NULL) {
     periodic_counter_update_state_.update_thread.reset(
-        new thread(&RuntimeProfile::PeriodicCounterUpdateLoop));
+        new Thread("runtime-profile", "counter-update-loop", &PeriodicCounterUpdateLoop));
   }
   BucketCountersInfo info;
   info.src_counter = src_counter;
@@ -701,7 +701,7 @@ void RuntimeProfile::RegisterPeriodicCounter(Counter* src_counter, SampleFn samp
   lock_guard<mutex> l(periodic_counter_update_state_.lock);
   if (periodic_counter_update_state_.update_thread.get() == NULL) {
     periodic_counter_update_state_.update_thread.reset(
-        new thread(&RuntimeProfile::PeriodicCounterUpdateLoop));
+        new Thread("runtime-profile", "counter-update-loop", &PeriodicCounterUpdateLoop));
   }
   switch (type) {
     case RATE_COUNTER: {
@@ -767,7 +767,7 @@ RuntimeProfile::PeriodicCounterUpdateState::~PeriodicCounterUpdateState() {
       lock_guard<mutex> l(periodic_counter_update_state_.lock);
       done_ = true;
     }
-    periodic_counter_update_state_.update_thread->join();
+    periodic_counter_update_state_.update_thread->Join();
   }
 }
 

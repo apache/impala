@@ -165,7 +165,8 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
-  thread wait_thread(&ImpalaServer::Wait, this, exec_state);
+  Thread wait_thread(
+      "impala-server", "wait-thread", &ImpalaServer::Wait, this, exec_state);
 }
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,

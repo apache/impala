@@ -173,7 +173,7 @@ class ImpalaServer::FragmentExecState {
   const TUniqueId& query_id() const { return query_id_; }
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
 
-  void set_exec_thread(thread* exec_thread) { exec_thread_.reset(exec_thread); }
+  void set_exec_thread(Thread* exec_thread) { exec_thread_.reset(exec_thread); }
 
  private:
   TUniqueId query_id_;
@@ -188,7 +188,7 @@ class ImpalaServer::FragmentExecState {
   const TNetworkAddress coord_hostport_;
 
   // the thread executing this plan fragment
-  scoped_ptr<thread> exec_thread_;
+  scoped_ptr<Thread> exec_thread_;
 
   // protects exec_status_
   mutex status_lock_;
@@ -408,6 +408,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // size is deliberately set so high that it should never fill; if it does the
   // cancellations will get ignored and retried on the next statestore heartbeat.
   cancellation_thread_pool_.reset(new ThreadPool<TUniqueId>(
+          "impala-server", "cancellation-worker",
       FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
 }
@@ -501,12 +502,12 @@ Status ImpalaServer::InitProfileLogging() {
     ss << FLAGS_log_dir << "/profiles/";
     FLAGS_profile_log_dir = ss.str();
   }
-
   profile_logger_.reset(new SimpleLogger(FLAGS_profile_log_dir,
       PROFILE_LOG_FILE_PREFIX, FLAGS_max_profile_log_file_size));
   RETURN_IF_ERROR(profile_logger_->Init());
-  profile_log_file_flush_thread_.reset(
-      new thread(&ImpalaServer::LogFileFlushThread, this));
+  profile_log_file_flush_thread_.reset(new Thread("impala-server", "log-flush-thread",
+      &ImpalaServer::LogFileFlushThread, this));
+
   return Status::OK;
 }
 
@@ -1346,8 +1347,9 @@ Status ImpalaServer::StartPlanFragmentExecution(
 
   // execute plan fragment in new thread
   // TODO: manage threads via global thread pool
-  exec_state->set_exec_thread(
-      new thread(&ImpalaServer::RunExecPlanFragment, this, exec_state.get()));
+  exec_state->set_exec_thread(new Thread("impala-server", "exec-plan-fragment",
+      &ImpalaServer::RunExecPlanFragment, this, exec_state.get()));
+
   return Status::OK;
 }
 

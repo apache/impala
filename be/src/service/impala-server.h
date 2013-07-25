@@ -570,7 +570,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::scoped_ptr<SimpleLogger> audit_event_logger_;
 
   // If profile logging is enabled, wakes once every 5s to flush query profiles to disk
-  boost::scoped_ptr<boost::thread> profile_log_file_flush_thread_;
+  boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
 
   // If audit event logging is enabled, wakes once every 5s to flush audit events to disk
   boost::scoped_ptr<boost::thread> audit_event_logger_flush_thread_;

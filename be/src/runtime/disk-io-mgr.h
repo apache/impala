@@ -30,6 +30,7 @@
 #include "runtime/thread-resource-mgr.h"
 #include "util/internal-queue.h"
 #include "util/runtime-profile.h"
+#include "util/thread.h"
 
 namespace impala {
 
@@ -66,7 +67,7 @@ class MemLimit;
 //  3. ScanRange::GetNext: returns the next buffer for this range.  This is blocking.
 //
 // The disk threads do not synchronize with each other. The readers don't synchronize
-// with each other. There is a lock and condition variable for each reader queue and 
+// with each other. There is a lock and condition variable for each reader queue and
 // each disk queue.
 // IMPORTANT: whenever both locks are needed, the lock order is to grab the reader lock
 // before the disk lock.
@@ -94,7 +95,7 @@ class MemLimit;
 //     range = GetNextRange()
 //     while (!range.eosr)
 //       buffer = range.GetNext()
-// To have multiple reading threads, the caller would simply spin up the threads 
+// To have multiple reading threads, the caller would simply spin up the threads
 // and each would process the loops above.
 //
 // To control the number of IO buffers, each scan range has a soft max capacity for
@@ -103,14 +104,14 @@ class MemLimit;
 // This capacity does not need to be fixed, and the caller can dynamically adjust
 // it if necessary.
 //
-// As an example: If we allowed 5 buffers per range on a 24 core, 72 thread 
-// (we default to allowing 3x threads) machine, we should see at most 
-// 72 * 5 * 8MB = 2.8GB in io buffers memory usage. This should remain roughly constant 
+// As an example: If we allowed 5 buffers per range on a 24 core, 72 thread
+// (we default to allowing 3x threads) machine, we should see at most
+// 72 * 5 * 8MB = 2.8GB in io buffers memory usage. This should remain roughly constant
 // regardless of how many concurrent readers are running.
-// 
+//
 // Buffer Management:
 // Buffers are allocated by the IoMgr as necessary to service reads. These buffers
-// are directly returned to the caller. The caller must call Return() on the buffer 
+// are directly returned to the caller. The caller must call Return() on the buffer
 // when it is done, at which point the buffer will be recycled for another read. In error
 // cases, the IoMgr will recycle the buffers more promptly but regardless, the caller
 // must always call Return()
@@ -134,7 +135,7 @@ class DiskIoMgr {
   class ScanRange;
 
   // Buffer struct that is used by the caller and IoMgr to pass read buffers.
-  // It is is expected that only one thread has ownership of this object at a 
+  // It is is expected that only one thread has ownership of this object at a
   // time.
   class BufferDescriptor {
    public:
@@ -146,7 +147,7 @@ class DiskIoMgr {
     // Returns the offset within the scan range that this buffer starts at
     int64_t scan_range_offset() const { return scan_range_offset_; }
 
-    // Returns the buffer to the IoMgr. This must be called for every buffer 
+    // Returns the buffer to the IoMgr. This must be called for every buffer
     // returned by GetNext()/Read() that did not return an error. This is non-blocking.
     void Return();
 
@@ -164,13 +165,13 @@ class DiskIoMgr {
 
     // Scan range that this buffer is for.
     ScanRange* scan_range_;
-    
+
     // buffer with the read contents
     char* buffer_;
-    
+
     // len of read contents
     int64_t len_;
-    
+
     // true if the current scan range is complete
     bool eosr_;
 
@@ -179,8 +180,8 @@ class DiskIoMgr {
 
     int64_t scan_range_offset_;
   };
-  
-  // ScanRange description. The caller must call Reset() to initialize the fields 
+
+  // ScanRange description. The caller must call Reset() to initialize the fields
   // before calling AddScanRanges(). The private fields are used internally by
   // the IoMgr.
   class ScanRange : public InternalQueue<ScanRange>::Node {
@@ -189,9 +190,9 @@ class DiskIoMgr {
     ScanRange(int initial_capacity = -1);
 
     // Resets this scan range object with the scan range description.
-    void Reset(const char* file, int64_t len, 
+    void Reset(const char* file, int64_t len,
         int64_t offset, int disk_id, void* metadata = NULL);
-   
+
     const char* file() const { return file_; }
     int64_t len() const { return len_; }
     int64_t offset() const { return offset_; }
@@ -203,10 +204,10 @@ class DiskIoMgr {
     void set_offset(int64_t offset) { offset_ = offset; }
 
     // Returns the next buffer for this scan range. buffer is an output parameter.
-    // This function blocks until a buffer is ready or an error occurred. If this is 
+    // This function blocks until a buffer is ready or an error occurred. If this is
     // called when all buffers have been returned, *buffer is set to NULL and Status::OK
     // is returned.
-    // Only one thread can be in GetNext() at any time. 
+    // Only one thread can be in GetNext() at any time.
     Status GetNext(BufferDescriptor** buffer);
 
     // Cancel this scan range. This cleans up all queued buffers and
@@ -219,7 +220,7 @@ class DiskIoMgr {
 
    private:
     friend class DiskIoMgr;
-    
+
     // Initialize internal fields
     void InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader);
 
@@ -234,22 +235,22 @@ class DiskIoMgr {
     // Validates the internal state of this range. lock_ must be taken
     // before calling this.
     bool Validate();
-  
+
     // Opens the file for this range. This function only modifies state in this range.
     // if hdfs_connection is NULL, 'range' must be for a local file
     Status OpenScanRange(hdfsFS hdfs_connection);
 
     // Closes the file for this range. This function only modifies state in this
-    // range. 
+    // range.
     // if hdfs_connection is NULL, 'range' must be for a local file
     void CloseScanRange(hdfsFS hdfs_connection, ReaderContext* reader);
 
     // Reads from this range into 'buffer'. Buffer is preallocated. Returns the number
-    // of bytes read. Updates range to keep track of where in the file we are. 
+    // of bytes read. Updates range to keep track of where in the file we are.
     // if hdfs_connection is NULL, 'range' must be for a local file
-    Status ReadFromScanRange(hdfsFS hdfs_connection, char* buffer, 
+    Status ReadFromScanRange(hdfsFS hdfs_connection, char* buffer,
         int64_t* bytes_read, bool* eosr);
-    
+
     // Path to file
     const char* file_;
 
@@ -264,7 +265,7 @@ class DiskIoMgr {
     int64_t len_;
 
     // id of the disk the data is on. This is 0-indexed
-    int disk_id_;    
+    int disk_id_;
 
     DiskIoMgr* io_mgr_;
 
@@ -309,7 +310,7 @@ class DiskIoMgr {
     boost::condition_variable buffer_ready_cv_;
     std::list<BufferDescriptor*> ready_buffers_;
 
-    // The soft capacity limit for ready_buffers_. ready_buffers_ can exceed 
+    // The soft capacity limit for ready_buffers_. ready_buffers_ can exceed
     // the limit temporarily as the capacity is adjusted dynamically.
     // In that case, the capcity is only realized when the caller removes buffers
     // from ready_buffers_.
@@ -334,7 +335,7 @@ class DiskIoMgr {
   // Initialize the IoMgr. Must be called once before any of the other APIs.
   Status Init(MemLimit* process_mem_limit = NULL);
 
-  // Sets the process wide mem limit. If this is exceeded, io requests will 
+  // Sets the process wide mem limit. If this is exceeded, io requests will
   // fail until we are under the limit again.
   void SetProcessMemLimit(MemLimit* process_mem_limit) {
     process_mem_limit_ = process_mem_limit;
@@ -350,10 +351,10 @@ class DiskIoMgr {
   //    used for this reader will count against this limit. If the limit is exceeded
   //    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   //    GetNext().
-  Status RegisterReader(hdfsFS hdfs, ReaderContext** reader, 
+  Status RegisterReader(hdfsFS hdfs, ReaderContext** reader,
       MemLimit* reader_mem_limit = NULL);
 
-  // Unregisters reader from the disk IoMgr. This must be called for every 
+  // Unregisters reader from the disk IoMgr. This must be called for every
   // RegisterReader() regardless of cancellation and must be called in the
   // same thread as GetNext()
   // The 'reader' cannot be used after this call.
@@ -383,9 +384,9 @@ class DiskIoMgr {
   // This call is blocking.
   Status GetNextRange(ReaderContext* reader, ScanRange** range);
 
-  // Reads the range and returns the result in buffer. 
-  // This behaves like the typical synchronous read() api, blocking until the data 
-  // is read. This can be called while there are outstanding ScanRanges and is 
+  // Reads the range and returns the result in buffer.
+  // This behaves like the typical synchronous read() api, blocking until the data
+  // is read. This can be called while there are outstanding ScanRanges and is
   // thread safe. Multiple threads can be calling Read() per reader at a time.
   // range *cannot* have already been added via AddScanRanges.
   Status Read(ReaderContext* reader, ScanRange* range, BufferDescriptor** buffer);
@@ -405,7 +406,7 @@ class DiskIoMgr {
   int64_t bytes_read_local(ReaderContext* reader) const;
   int64_t bytes_read_short_circuit(ReaderContext* reader) const;
 
-  // Returns the read throughput across all readers. 
+  // Returns the read throughput across all readers.
   // TODO: should this be a sliding window?  This should report metrics for the
   // last minute, hour and since the beginning.
   int64_t GetReadThroughput();
@@ -448,7 +449,7 @@ class DiskIoMgr {
   const int max_read_size_;
 
   // Thread group containing all the worker threads.
-  boost::thread_group disk_thread_group_;
+  ThreadGroup disk_thread_group_;
 
   // True if the IoMgr should be torn down. Worker threads watch for this to
   // know to terminate. This variable is read/written to by different threads.
@@ -468,7 +469,7 @@ class DiskIoMgr {
 
   // Protects free_buffers_ and free_buffer_descs_
   boost::mutex free_buffers_lock_;
-  
+
   // List of free buffer descs that can be handed out to clients.
   std::list<char*> free_buffers_;
 
@@ -491,13 +492,13 @@ class DiskIoMgr {
 
   // Returns a buffer desc object which can now be used for another reader.
   void ReturnBufferDesc(BufferDescriptor* desc);
-  
+
   // Returns the buffer desc and underlying buffer to the disk IoMgr. This also updates
   // the reader and disk queue state.
   void ReturnBuffer(BufferDescriptor* buffer);
 
   // Returns a buffer to read into that is the size of max_read_size_. If there is a
-  // free buffer in the 'free_buffers_', that is returned, otherwise a new one is 
+  // free buffer in the 'free_buffers_', that is returned, otherwise a new one is
   // allocated.
   // Updates mem limits for reader
   char* GetFreeBuffer(ReaderContext* reader);
@@ -508,10 +509,10 @@ class DiskIoMgr {
   // TODO: make this run periodically?
   void GcIoBuffers();
 
-  // Returns a buffer to the free list and updates mem usage for 'reader' 
+  // Returns a buffer to the free list and updates mem usage for 'reader'
   void ReturnFreeBuffer(ReaderContext* reader, char* buffer);
 
-  // Disk worker thread loop. This function reads the next range from the 
+  // Disk worker thread loop. This function reads the next range from the
   // disk queue if there are available buffers and places the read buffer
   // into the scan ranges outgoing queue.
   // There can be multiple threads per disk running this loop.
@@ -523,7 +524,7 @@ class DiskIoMgr {
   // This function cycles through readers and scan ranges in the reader.
   // Only returns false if the disk thread should be shut down.
   // No locks should be taken before this function call and none are left taken after.
-  bool GetNextScanRange(DiskQueue*, ScanRange** range, 
+  bool GetNextScanRange(DiskQueue*, ScanRange** range,
       ReaderContext** reader);
 
   // Updates disk queue and reader state after a read is complete. The read result
@@ -537,4 +538,3 @@ class DiskIoMgr {
 }
 
 #endif
-

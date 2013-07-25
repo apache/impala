@@ -1,0 +1,84 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "util/proc-util.h"
+
+#include <unistd.h>
+#include <fstream>
+#include <sstream>
+#include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
+
+#include "util/string-parser.h"
+
+using namespace impala;
+using namespace std;
+using namespace boost::filesystem;
+using namespace boost;
+
+// Ensure that Impala compiles on earlier kernels. If the target kernel does not support
+// _SC_CLK_TCK, sysconf(_SC_CLK_TCK) will return -1.
+#ifndef _SC_CLK_TCK
+#define _SC_CLK_TCK 2
+#endif
+
+static const int64_t TICKS_PER_SEC = sysconf(_SC_CLK_TCK);
+
+// Offsets into the ../stat file array of per-thread statistics
+static const int64_t USER_TICKS = 13;
+static const int64_t KERNEL_TICKS = 14;
+static const int64_t IO_WAIT = 41;
+
+// Largest offset we are interested in, to check we get a well formed stat file.
+static const int64_t MAX_OFFSET = IO_WAIT;
+
+Status impala::GetThreadStats(int64_t tid, ThreadStats* stats) {
+  DCHECK(stats != NULL);
+  if (TICKS_PER_SEC <= 0) return Status("ThreadStats not supported");
+
+  stringstream proc_path;
+  proc_path << "/proc/self/task/" << tid << "/stat";
+  if (!exists(proc_path.str())) return Status("Thread path does not exist");
+
+  ifstream proc_file(proc_path.str().c_str());
+  if (!proc_file.is_open()) return Status("Could not open ifstream");
+
+  string buffer((istreambuf_iterator<char>(proc_file)),
+      istreambuf_iterator<char>());
+
+  vector<string> splits;
+  split(splits, buffer, is_any_of(" "), token_compress_on);
+  if (splits.size() < MAX_OFFSET) return Status("Unrecognised /proc format");
+
+  StringParser::ParseResult parse_result;
+  int64_t tmp = StringParser::StringToInt<int64_t>(splits[USER_TICKS].c_str(),
+      splits[USER_TICKS].size(), &parse_result);
+  if (parse_result == StringParser::PARSE_SUCCESS) {
+    stats->user_ns = tmp * (1e9 / TICKS_PER_SEC);
+  }
+
+  tmp = StringParser::StringToInt<int64_t>(splits[KERNEL_TICKS].c_str(),
+      splits[KERNEL_TICKS].size(), &parse_result);
+  if (parse_result == StringParser::PARSE_SUCCESS) {
+    stats->kernel_ns = tmp * (1e9 / TICKS_PER_SEC);
+  }
+
+  tmp = StringParser::StringToInt<int64_t>(splits[IO_WAIT].c_str(),
+      splits[IO_WAIT].size(), &parse_result);
+  if (parse_result == StringParser::PARSE_SUCCESS) {
+    stats->iowait_ns = tmp * (1e9 / TICKS_PER_SEC);
+  }
+
+  return Status::OK;
+}

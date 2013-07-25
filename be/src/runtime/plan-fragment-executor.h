@@ -24,6 +24,7 @@
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "runtime/runtime-state.h"
+#include "util/thread.h"
 
 namespace impala {
 
@@ -144,7 +145,7 @@ class PlanFragmentExecutor {
 
   // profile reporting-related
   ReportStatusCallback report_status_cb_;
-  boost::thread report_thread_;
+  boost::scoped_ptr<Thread> report_thread_;
   boost::mutex report_thread_lock_;
 
   // Indicates that profile reporting thread should stop.

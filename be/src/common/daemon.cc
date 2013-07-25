@@ -20,6 +20,7 @@
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/thrift-util.h"
+#include "util/thread.h"
 
 DECLARE_string(hostname);
 
@@ -30,6 +31,7 @@ void impala::InitDaemon(int argc, char** argv) {
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
+  impala::InitThreading();
 
   LOG(INFO) << impala::GetVersionString();
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;

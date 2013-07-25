@@ -172,7 +172,6 @@ Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) 
 Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_params) {
   // Convert the input ranges into per file DiskIO::ScanRange objects
   int num_ranges_missing_volume_id = 0;
-
   for (int i = 0; i < scan_range_params.size(); ++i) {
     DCHECK(scan_range_params[i].scan_range.__isset.hdfs_file_split);
     const THdfsFileSplit& split = scan_range_params[i].scan_range.hdfs_file_split;
@@ -574,7 +573,7 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   }
   state->resource_pool()->SetThreadAvailableCb(NULL);
 
-  scanner_threads_.join_all();
+  scanner_threads_.JoinAll();
 
   // There are materialized batches that have not been returned to the parent node.
   // Clean those up now.
@@ -654,7 +653,10 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
       pool->TryAcquireThreadToken()) {
     COUNTER_UPDATE(&active_scanner_thread_counter_, 1);
     COUNTER_UPDATE(num_scanner_threads_started_counter_, 1);
-    scanner_threads_.add_thread(new thread(&HdfsScanNode::ScannerThread, this));
+    stringstream ss;
+    ss << "scanner-thread(" << num_scanner_threads_started_counter_->value() << ")";
+    scanner_threads_.AddThread(
+        new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
     started_scanner = true;
   }
   if (!started_scanner) ++num_skipped_tokens_;
@@ -877,4 +879,3 @@ void HdfsScanNode::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
          << PrettyPrinter::Print(i->second.second, TCounterType::BYTES) << " ";
   }
 }
-

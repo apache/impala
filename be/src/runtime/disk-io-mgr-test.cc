@@ -24,6 +24,7 @@
 #include "runtime/mem-limit.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/cpu-info.h"
+#include "util/thread.h"
 
 using namespace std;
 using namespace boost;
@@ -66,7 +67,7 @@ class DiskIoMgrTest : public testing::Test {
       const Status& expected_status) {
     char result[strlen(expected) + 1];
     memset(result, 0, strlen(expected) + 1);
-    
+
     while (true) {
       DiskIoMgr::BufferDescriptor* buffer = NULL;
       Status status = range->GetNext(&buffer);
@@ -75,7 +76,7 @@ class DiskIoMgrTest : public testing::Test {
         if (buffer != NULL) buffer->Return();
         break;
       }
-      memcpy(result + range->offset() + buffer->scan_range_offset(), 
+      memcpy(result + range->offset() + buffer->scan_range_offset(),
           buffer->buffer(), buffer->len());
       buffer->Return();
     }
@@ -99,7 +100,7 @@ class DiskIoMgrTest : public testing::Test {
     }
   }
 
-  DiskIoMgr::ScanRange* InitRange(int num_buffers, const char* file_path, int offset, 
+  DiskIoMgr::ScanRange* InitRange(int num_buffers, const char* file_path, int offset,
       int len, int disk_id, void* meta_data = NULL) {
     DiskIoMgr::ScanRange* range = pool_->Add(new DiskIoMgr::ScanRange(num_buffers));
     range->Reset(file_path, len, offset, disk_id, meta_data);
@@ -127,10 +128,10 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                     << " num_disk=" << num_disks << " num_buffers=" << num_buffers
                     << " num_read_threads=" << num_read_threads;
-          
+
           if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-          
+
           Status status = io_mgr.Init(&mem_limit);
           ASSERT_TRUE(status.ok());
           DiskIoMgr::ReaderContext* reader;
@@ -148,7 +149,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           AtomicInt<int> num_ranges_processed;
           thread_group threads;
           for (int i = 0; i < num_read_threads; ++i) {
-            threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data, 
+            threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
                 Status::OK, 0, &num_ranges_processed));
           }
           threads.join_all();
@@ -177,10 +178,10 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         pool_.reset(new ObjectPool);
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
-        
+
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-        
+
         Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
@@ -199,7 +200,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
           }
         }
         AtomicInt<int> num_ranges_processed;
-        
+
         // Issue first half the scan ranges.
         status = io_mgr.AddScanRanges(reader, ranges_first_half);
         ASSERT_TRUE(status.ok());
@@ -214,7 +215,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         // Start up some threads and then cancel
         thread_group threads;
         for (int i = 0; i < 3; ++i) {
-          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data, 
+          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
               Status::CANCELLED, 0, &num_ranges_processed));
         }
 
@@ -244,16 +245,16 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         pool_.reset(new ObjectPool);
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
-        
+
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-        
+
         Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
         status = io_mgr.RegisterReader(NULL, &reader, NULL);
         ASSERT_TRUE(status.ok());
-        
+
         DiskIoMgr::ScanRange* complete_range = InitRange(1, tmp_file, 0, strlen(data), 0);
 
         // Issue some reads before the async ones are issued
@@ -271,7 +272,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         AtomicInt<int> num_ranges_processed;
         thread_group threads;
         for (int i = 0; i < 5; ++i) {
-          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data, 
+          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
               Status::OK, 0, &num_ranges_processed));
         }
 
@@ -295,7 +296,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
 }
 
 
-// Tests a single reader cancelling half way through scan ranges.  
+// Tests a single reader cancelling half way through scan ranges.
 TEST_F(DiskIoMgrTest, SingleReaderCancel) {
   MemLimit mem_limit(LARGE_MEM_LIMIT);
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
@@ -310,10 +311,10 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         pool_.reset(new ObjectPool);
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
-        
+
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
-        
+
         Status status = io_mgr.Init(&mem_limit);
         ASSERT_TRUE(status.ok());
         DiskIoMgr::ReaderContext* reader;
@@ -335,11 +336,11 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
           ScanRangeThread(&io_mgr, reader, data, Status::OK, 1, &num_ranges_processed);
         }
         EXPECT_EQ(num_ranges_processed, num_succesful_ranges);
-          
+
         // Start up some threads and then cancel
         thread_group threads;
         for (int i = 0; i < 3; ++i) {
-          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data, 
+          threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
               Status::CANCELLED, 0, &num_ranges_processed));
         }
 
@@ -372,7 +373,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
     DiskIoMgr io_mgr(1, 1, BUFFER_SIZE);
-        
+
     MemLimit mem_limit(mem_limit_num_buffers * BUFFER_SIZE);
     Status status = io_mgr.Init(&mem_limit);
     ASSERT_TRUE(status.ok());
@@ -391,7 +392,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     vector<DiskIoMgr::BufferDescriptor*> buffers;
 
     AtomicInt<int> num_ranges_processed;
-    ScanRangeThread(&io_mgr, reader, data, Status::MEM_LIMIT_EXCEEDED, 
+    ScanRangeThread(&io_mgr, reader, data, Status::MEM_LIMIT_EXCEEDED,
         1, &num_ranges_processed);
 
     char result[strlen(data) + 1];
@@ -403,13 +404,13 @@ TEST_F(DiskIoMgrTest, MemLimits) {
       status = io_mgr.GetNextRange(reader, &range);
       ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
       if (range == NULL) break;
-      
+
       while (true) {
         DiskIoMgr::BufferDescriptor* buffer = NULL;
         Status status = range->GetNext(&buffer);
         ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
         if (buffer == NULL) break;
-        memcpy(result + range->offset() + buffer->scan_range_offset(), 
+        memcpy(result + range->offset() + buffer->scan_range_offset(),
             buffer->buffer(), buffer->len());
         buffers.push_back(buffer);
       }
@@ -443,7 +444,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
   data.resize(NUM_READERS);
   results.resize(NUM_READERS);
 
-  // Initialize data for each reader.  The data will be 
+  // Initialize data for each reader.  The data will be
   // 'abcd...' for reader one, 'bcde...' for reader two (wrapping around at 'z')
   for (int i = 0; i < NUM_READERS; ++i) {
     char buf[DATA_LEN];
@@ -452,7 +453,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
       buf[j] = 'a' + c;
     }
     data[i] = string(buf, DATA_LEN);
-            
+
     stringstream ss;
     ss << "/tmp/disk_io_mgr_test" << i << ".txt";
     file_names[i] = ss.str();
@@ -461,7 +462,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
     results[i] = new char[DATA_LEN + 1];
     memset(results[i], 0, DATA_LEN + 1);
   }
-  
+
   // This exercises concurrency, run the test multiple times
   int64_t iters = 0;
   for (int iteration = 0; iteration < ITERATIONS; ++iteration) {
@@ -472,15 +473,15 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           LOG(INFO) << "Starting test with num_threads_per_disk=" << threads_per_disk
                     << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        
+
           DiskIoMgr io_mgr(num_disks, threads_per_disk, BUFFER_SIZE);
           Status status = io_mgr.Init(&mem_limit);
           ASSERT_TRUE(status.ok());
-            
+
           for (int i = 0; i < NUM_READERS; ++i) {
             status = io_mgr.RegisterReader(NULL, &readers[i], NULL);
             ASSERT_TRUE(status.ok());
-          
+
             vector<DiskIoMgr::ScanRange*> ranges;
             for (int j = 0; j < DATA_LEN; ++j) {
               int disk_id = j % num_disks;
@@ -495,7 +496,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           thread_group threads;
           for (int i = 0; i < NUM_READERS; ++i) {
             for (int j = 0; j < NUM_THREADS_PER_READER; ++j) {
-              threads.add_thread(new thread(ScanRangeThread, &io_mgr, readers[i], 
+              threads.add_thread(new thread(ScanRangeThread, &io_mgr, readers[i],
                   data[i].c_str(), Status::OK, 0, &num_ranges_processed));
             }
           }
@@ -526,6 +527,6 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
+  impala::InitThreading();
   return RUN_ALL_TESTS();
 }
-

@@ -60,6 +60,7 @@ int main(int argc, char** argv) {
 
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
+  StartThreadInstrumentation(metrics.get(), webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad
   metrics->CreateAndRegisterPrimitiveMetric<string>(

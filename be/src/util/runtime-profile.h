@@ -19,13 +19,13 @@
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
 
 #include "common/logging.h"
 #include "common/object-pool.h"
+#include "util/thread.h"
 #include "util/stopwatch.h"
 #include "gen-cpp/RuntimeProfile_types.h"
 
@@ -480,7 +480,7 @@ class RuntimeProfile {
     volatile bool done_;
 
     // Thread performing asynchronous updates.
-    boost::scoped_ptr<boost::thread> update_thread;
+    boost::scoped_ptr<Thread> update_thread;
 
     // A map of the dst (rate) counter to the src counter and elapsed time.
     typedef std::map<Counter*, RateCounterInfo> RateCounterMap;

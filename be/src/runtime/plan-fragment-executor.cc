@@ -225,7 +225,8 @@ Status PlanFragmentExecutor::Open() {
   // at end, otherwise the coordinator hangs in case we finish w/ an error
   if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
     unique_lock<mutex> l(report_thread_lock_);
-    report_thread_ = thread(&PlanFragmentExecutor::ReportProfile, this);
+    report_thread_.reset(new Thread("plan-fragment-executor", "report-profile",
+                                    &PlanFragmentExecutor::ReportProfile, this));
     // make sure the thread started up, otherwise ReportProfile() might get into a race
     // with StopReportThread()
     report_thread_started_cv_.wait(l);
@@ -365,7 +366,7 @@ void PlanFragmentExecutor::StopReportThread() {
     report_thread_active_ = false;
   }
   stop_report_thread_cv_.notify_one();
-  report_thread_.join();
+  report_thread_->Join();
 }
 
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {

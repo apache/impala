@@ -222,7 +222,8 @@ Status HashJoinNode::Open(RuntimeState* state) {
   Promise<Status> build_side_status;
   if (state->resource_pool()->TryAcquireThreadToken()) {
     AddRuntimeExecOption("Hash Table Built Asynchronously");
-    thread(bind(&HashJoinNode::BuildSideThread, this, state, &build_side_status));
+    Thread build_thread("hash-join-node", "build thread",
+        bind(&HashJoinNode::BuildSideThread, this, state, &build_side_status));
   } else {
     build_side_status.Set(ConstructHashTable(state));
   }

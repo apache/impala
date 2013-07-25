@@ -46,6 +46,8 @@ add_library(Util
   pprof-path-handlers.cc
 # TODO: not supported on RHEL 5
 #  perf-counters.cc
+  proc-util.cc
+  thread.cc
   progress-updater.cc
   runtime-profile.cc
   simple-logger.cc
