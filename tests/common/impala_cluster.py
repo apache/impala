@@ -113,9 +113,13 @@ class Process(object):
     """Gets the pid of the process. Returns None if the PID cannot be determined"""
     LOG.info("Attempting to find PID for %s" % ' '.join(self.cmd))
     for pid in psutil.get_pid_list():
-      process = psutil.Process(pid)
-      if set(self.cmd) == set(process.cmdline):
-        return pid
+      try:
+        process = psutil.Process(pid)
+        if set(self.cmd) == set(process.cmdline):
+          return pid
+      except psutil.NoSuchProcess, e:
+        # A process from get_pid_list() no longer exists, continue.
+        LOG.info(e)
     LOG.info("No PID found for process cmdline: %s. Process is dead?" % self.cmd)
     return None
 
