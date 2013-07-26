@@ -541,7 +541,7 @@ void DiskIoMgr::GcIoBuffers() {
   for (list<char*>::iterator iter = free_buffers_.begin();
       iter != free_buffers_.end(); ++iter) {
     if (process_mem_limit_ != NULL) process_mem_limit_->Release(max_read_size_);
-    delete *iter;
+    delete[] *iter;
   }
   free_buffers_.clear();
 }
