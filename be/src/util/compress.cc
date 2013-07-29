@@ -54,6 +54,13 @@ Status GzipCompressor::Init() {
 }
 
 int GzipCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
+#if !defined ZLIB_VERNUM || ZLIB_VERNUM <= 0x1230
+  if (UNLIKELY(input_len == 0 && format_ == GZIP)) {
+    // zlib version 1.2.3 has a bug in deflateBound() that causes it to return too low a
+    // bound for this case. Hardcode the value returned in zlib version 1.2.3.1+.
+    return 23;
+  }
+#endif
   return deflateBound(&stream_, input_len);
 }
 
