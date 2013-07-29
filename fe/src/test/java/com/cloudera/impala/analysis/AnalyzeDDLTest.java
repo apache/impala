@@ -344,6 +344,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("alter view functional.alltypes_view as " +
         "select * from functional.alltypes_view");
 
+    // View-definition resulting in Hive-style auto-generated column names.
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select trim('abc'), 17 * 7");
+
     // Cannot ALTER VIEW a table.
     AnalysisError("alter view functional.alltypes as " +
         "select * from functional.alltypesagg",
@@ -542,6 +546,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Creating a view on a view is ok (alltypes_view is a view on alltypes).
     AnalyzesOk("create view foo as select * from functional.alltypes_view");
     AnalyzesOk("create view foo (aaa, bbb) as select * from functional.complex_view");
+
+    // Create a view resulting in Hive-style auto-generated column names.
+    AnalyzesOk("create view foo as select trim('abc'), 17 * 7");
 
     // Creating a view on an HBase table is ok.
     AnalyzesOk("create view foo as select * from functional.hbasealltypesagg");

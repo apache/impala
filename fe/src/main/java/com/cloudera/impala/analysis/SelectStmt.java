@@ -139,7 +139,8 @@ public class SelectStmt extends QueryStmt {
         }
       } else {
         resultExprs.add(item.getExpr());
-        SlotRef aliasRef = new SlotRef(null, item.toHiveColumnLabel(i));
+        String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
+        SlotRef aliasRef = new SlotRef(null, label);
         if (aliasSMap.lhs.contains(aliasRef)) {
           // If we have already seen this alias, it refers to more than one column and
           // therefore is ambiguous.
@@ -147,7 +148,7 @@ public class SelectStmt extends QueryStmt {
         }
         aliasSMap.lhs.add(aliasRef);
         aliasSMap.rhs.add(item.getExpr().clone(null));
-        colLabels.add(item.toHiveColumnLabel(i));
+        colLabels.add(label);
       }
     }
 

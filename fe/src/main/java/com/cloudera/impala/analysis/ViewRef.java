@@ -127,7 +127,7 @@ public class ViewRef extends InlineViewRef {
     // privileged information (e.g., the existence of a table).
     if (analyzer.isExplain()) {
       try {
-        analyzeAsUser(analyzer, analyzer.getUser());
+        analyzeAsUser(analyzer, analyzer.getUser(), true);
       } catch (AuthorizationException e) {
         throw new AuthorizationException(
             String.format("User '%s' does not have privileges to " +
@@ -136,7 +136,7 @@ public class ViewRef extends InlineViewRef {
     } else {
       // Use the super user to circumvent authorization checking during the
       // analysis of this view's defining queryStmt.
-      analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance());
+      analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance(), true);
     }
   }
 

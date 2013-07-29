@@ -45,21 +45,10 @@ class SelectListItem {
     this.isStar = true;
   }
 
-  public boolean isStar() {
-    return isStar;
-  }
-
-  public TableName getTblName() {
-    return tblName;
-  }
-
-  public Expr getExpr() {
-    return expr;
-  }
-
-  public String getAlias() {
-    return alias;
-  }
+  public boolean isStar() { return isStar; }
+  public TableName getTblName() { return tblName; }
+  public Expr getExpr() { return expr; }
+  public String getAlias() { return alias; }
 
   public String toSql() {
     if (!isStar) {
@@ -77,31 +66,31 @@ class SelectListItem {
   }
 
   /**
-   * Returns a column label for the select list item.
-   *
+   * Returns a column label for this select list item.
    * If an alias was given, then the column label is the lower case alias.
    * If expr is a SlotRef then directly use its lower case column name.
-   * Otherwise, this method returns an auto-generated column label using Hive's
-   * convention of a "_c" prefix and a column-position suffix (starting from 0), e.g.,
-   * "_c0", "_c1", "_c2", etc. Uses the given selectListPos as the label's suffix.
+   * Otherwise, the label is the lower case toSql() of expr or a Hive auto-generated
+   * column name (depending on useHiveColLabels).
+   * Hive's auto-generated column labels have a "_c" prefix and a select-list pos suffix,
+   * e.g., "_c0", "_c1", "_c2", etc.
+   *
    * Using auto-generated columns that are consistent with Hive is important
    * for view compatibility between Impala and Hive.
    */
-  public String toHiveColumnLabel(int selectListPos) {
+  public String toColumnLabel(int selectListPos, boolean useHiveColLabels) {
     if (alias != null) return alias.toLowerCase();
     if (expr instanceof SlotRef) {
       SlotRef slotRef = (SlotRef) expr;
       return slotRef.getColumnName().toLowerCase();
     }
-    // Return auto-generated column label.
-    return "_c" + selectListPos;
+    // Optionally return auto-generated column label.
+    if (useHiveColLabels) return "_c" + selectListPos;
+    return expr.toSql().toLowerCase();
   }
 
   @Override
   public SelectListItem clone() {
-    if (isStar) {
-      return createStarItem(tblName);
-    }
+    if (isStar) return createStarItem(tblName);
     return new SelectListItem(expr.clone(null), alias);
   }
 

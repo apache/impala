@@ -52,6 +52,13 @@ public class AnalyzerTest {
     return new Analyzer(catalog, defaultDb, new User(System.getProperty("user.name")));
   }
 
+  protected Analyzer createAnalyzerUsingHiveColLabels() {
+    Analyzer analyzer = new Analyzer(catalog, Catalog.DEFAULT_DB,
+        new User(System.getProperty("user.name")));
+    analyzer.setUseHiveColLabels(true);
+    return analyzer;
+  }
+
   @BeforeClass
   public static void setUp() throws Exception {
     catalog = new Catalog();

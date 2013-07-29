@@ -87,13 +87,14 @@ public class InlineViewRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    analyzeAsUser(analyzer, analyzer.getUser());
+    analyzeAsUser(analyzer, analyzer.getUser(), analyzer.useHiveColLabels());
   }
 
-  protected void analyzeAsUser(Analyzer analyzer, User user)
+  protected void analyzeAsUser(Analyzer analyzer, User user, boolean useHiveColLabels)
       throws AuthorizationException, AnalysisException {
     // Analyze the inline view query statement with its own analyzer
     inlineViewAnalyzer = new Analyzer(analyzer, user);
+    inlineViewAnalyzer.setUseHiveColLabels(useHiveColLabels);
     queryStmt.analyze(inlineViewAnalyzer);
     queryStmt.getMaterializedTupleIds(materializedTupleIds);
     desc = analyzer.registerInlineViewRef(this);

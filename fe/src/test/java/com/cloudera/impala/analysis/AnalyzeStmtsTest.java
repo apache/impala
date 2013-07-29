@@ -222,31 +222,38 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // test NULLs
     AnalyzesOk("select * from (select NULL) a");
 
-    // test auto-generated column labels assigned to non-SlotRef expressions
-    // using Hive's convention
-    AnalyzesOk("select _c0, a, int_col, _c3 from " +
+    // test that auto-generated columns are not used by default
+    AnalyzesOk("select `int_col * 1`, a, int_col, `NOT bool_col` from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
         "from functional.alltypes) t");
+    // test auto-generated column labels by enforcing their use in inline views
+    AnalyzesOk("select _c0, a, int_col, _c3 from " +
+        "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
+        "from functional.alltypes) t", createAnalyzerUsingHiveColLabels());
     // test auto-generated column labels in group by and order by
     AnalyzesOk("select _c0, count(a), count(int_col), _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
-        "from functional.alltypes) t group by _c0, _c3 order by _c0 limit 10");
+        "from functional.alltypes) t group by _c0, _c3 order by _c0 limit 10",
+        createAnalyzerUsingHiveColLabels());
     // test auto-generated column labels in multiple scopes
     AnalyzesOk("select x.front, x._c1, x._c2 from " +
         "(select y.back as front, y._c0 * 10, y._c2 + 2 from " +
         "(select int_col * 10, int_col as back, int_col + 2 from " +
-        "functional.alltypestiny) y) x");
+        "functional.alltypestiny) y) x",
+        createAnalyzerUsingHiveColLabels());
 
     // ambiguous reference to an auto-generated column
     AnalysisError("select _c0 from " +
         "(select int_col * 2, id from functional.alltypes) a inner join " +
         "(select int_col + 6, id from functional.alltypes) b " +
         "on a.id = b.id",
+        createAnalyzerUsingHiveColLabels(),
         "Unqualified column reference '_c0' is ambiguous");
     // auto-generated column doesn't exist
     AnalysisError("select _c0, a, _c2, _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
         "from functional.alltypes) t",
+        createAnalyzerUsingHiveColLabels(),
         "couldn't resolve column reference: '_c2'");
   }
 
@@ -997,9 +1004,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select t1.x, t2.x, t.x from t as t1, t as t2, t " +
         "where t1.x = t2.x and t2.x = t.x");
 
-    // Test auto-generated column labels in WITH-clause view.
+    // Test column labels in WITH-clause view for non-SlotRef exprs.
     AnalyzesOk("with t as (select int_col + 2, !bool_col from functional.alltypes) " +
-        "select _c0, _c1 from t");
+        "select `int_col + 2`, `NOT bool_col` from t");
 
     // Conflicting table aliases in WITH clause.
     AnalysisError("with t1 as (select 1), t1 as (select 2) select * from t1",

@@ -36,6 +36,8 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     tableName.analyze();
+    // Enforce Hive column labels for view compatibility.
+    analyzer.setUseHiveColLabels(true);
     viewDefStmt.analyze(analyzer);
 
     Preconditions.checkState(tableName != null && !tableName.isEmpty());

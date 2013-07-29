@@ -77,6 +77,9 @@ public class Analyzer {
   // True if we are analyzing an explain request. Should be set before starting analysis.
   private boolean isExplain;
 
+  // Whether to use Hive's auto-generated column labels.
+  private boolean useHiveColLabels = false;
+
   // An analyzer is a repository for a single select block. A select block can be a top
   // level select statement, or a inline view select block. An inline
   // view has its own Analyzer. parentAnalyzer is the analyzer of the enclosing
@@ -169,6 +172,7 @@ public class Analyzer {
     Preconditions.checkNotNull(user);
     this.user = user;
     this.isExplain = parentAnalyzer.isExplain;
+    this.useHiveColLabels = parentAnalyzer.useHiveColLabels;
     // make sure we don't create duplicate ids across entire stmt
     this.conjunctIdGenerator = parentAnalyzer.conjunctIdGenerator;
     this.equivClassIdGenerator = null;  // only needed at top
@@ -946,4 +950,8 @@ public class Analyzer {
 
   public void setIsExplain(boolean isExplain) { this.isExplain = isExplain; }
   public boolean isExplain() { return isExplain; }
+  public void setUseHiveColLabels(boolean useHiveColLabels) {
+    this.useHiveColLabels = useHiveColLabels;
+  }
+  public boolean useHiveColLabels() { return useHiveColLabels; }
 }

@@ -40,7 +40,22 @@ HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test that auto-generated column names are fully compatible
-# (non-SlotRef exprs use auto-generated column names).
+# (non-SlotRef exprs use auto-generated column names)
+create view test as
+select int_col % 3, trim(string_col), float_col * 10
+from functional.alltypes
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_HIVE_VIEW_RESULTS
+IMPALA=SUCCESS
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
+---- CREATE_VIEW
+# Test that auto-generated column names are fully compatible
+# (non-SlotRef exprs use auto-generated column names)
 create view test (a, b, c) as
 select int_col % 3, trim(string_col), float_col * 10
 from functional.alltypes
@@ -54,13 +69,13 @@ IMPALA=SUCCESS
 HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
-# Test that auto-generated column names are quoted in
+# Test that exotic column names are quoted in
 # Impala's view to make them parseable by Hive.
 # Hive cannot parse the unquoted identifiers starting with "_",
 # so the view creation should fail.
 create view test as
 select _c0, _c1, _c2 from 
-(select int_col % 3, trim(string_col), float_col * 10
+(select int_col % 3 AS _c0, trim(string_col) AS _c1, float_col * 10 AS _c2
 from functional.alltypes) t
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS

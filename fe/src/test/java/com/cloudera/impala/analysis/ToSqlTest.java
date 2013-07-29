@@ -98,9 +98,9 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("with _t as (select 1 as a) select * from _t",
         "WITH `_t` AS (SELECT 1 a) SELECT * FROM `_t`");
 
-    // Test quoting of auto-generated column names.
-    testToSql("select _c0, _c1 from (select 1 + 10, trim('abc')) as t",
-        "SELECT `_c0`, `_c1` FROM (SELECT 1 + 10, trim('abc')) t");
+    // Test quoting of non-SlotRef exprs in inline views.
+    testToSql("select `1 + 10`, `trim('abc')` from (select 1 + 10, trim('abc')) as t",
+        "SELECT `1 + 10`, `trim('abc')` FROM (SELECT 1 + 10, trim('abc')) t");
   }
 
   // Test the toSql() output of the where clause.
