@@ -2240,6 +2240,19 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("datediff('2012-12-22', NULL)", TYPE_INT);
   TestIsNull("datediff(NULL, NULL)", TYPE_INT);
 
+  TestStringValue("dayname(cast('2011-12-18 09:10:11.000000' as timestamp))", "Sunday");
+  TestStringValue("dayname(cast('2011-12-19 09:10:11.000000' as timestamp))", "Monday");
+  TestStringValue("dayname(cast('2011-12-20 09:10:11.000000' as timestamp))", "Tuesday");
+  TestStringValue("dayname(cast('2011-12-21 09:10:11.000000' as timestamp))",
+      "Wednesday");
+  TestStringValue("dayname(cast('2011-12-22 09:10:11.000000' as timestamp))",
+      "Thursday");
+  TestStringValue("dayname(cast('2011-12-23 09:10:11.000000' as timestamp))", "Friday");
+  TestStringValue("dayname(cast('2011-12-24 09:10:11.000000' as timestamp))",
+      "Saturday");
+  TestStringValue("dayname(cast('2011-12-25 09:10:11.000000' as timestamp))", "Sunday");
+  TestIsNull("dayname(NULL)", TYPE_STRING);
+
   // Tests from Hive
   // The hive documentation states that timestamps are timezoneless, but the tests
   // show that they treat them as being in the current timezone so these tests

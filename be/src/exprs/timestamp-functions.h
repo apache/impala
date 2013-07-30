@@ -45,6 +45,9 @@ class TimestampFunctions {
   static void* FromUtc(Expr* e, TupleRow* row);
   static void* ToUtc(Expr* e, TupleRow* row);
 
+  // Returns the day's name as a string (e.g. 'Saturday').
+  static void* DayName(Expr* e, TupleRow* row);
+
   // Functions to extract parts of the timestamp, return integers.
   static void* Year(Expr* e, TupleRow* row);
   static void* Month(Expr* e, TupleRow* row);
@@ -76,6 +79,15 @@ class TimestampFunctions {
   // Issue a warning for a bad format string.
   static void ReportBadFormat(StringValue* format);
 
+ private:
+  // Static result values for DayName() function.
+  static const StringValue MONDAY;
+  static const StringValue TUESDAY;
+  static const StringValue WEDNESDAY;
+  static const StringValue THURSDAY;
+  static const StringValue FRIDAY;
+  static const StringValue SATURDAY;
+  static const StringValue SUNDAY;
 };
 
 // Functions to load and access the timestamp database.

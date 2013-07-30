@@ -37,6 +37,14 @@ namespace impala {
 local_time::tz_database TimezoneDatabase::tz_database_;
 vector<string> TimezoneDatabase::tz_region_list_;
 
+const StringValue TimestampFunctions::MONDAY = StringValue("Monday");
+const StringValue TimestampFunctions::TUESDAY = StringValue("Tuesday");
+const StringValue TimestampFunctions::WEDNESDAY = StringValue("Wednesday");
+const StringValue TimestampFunctions::THURSDAY = StringValue("Thursday");
+const StringValue TimestampFunctions::FRIDAY = StringValue("Friday");
+const StringValue TimestampFunctions::SATURDAY = StringValue("Saturday");
+const StringValue TimestampFunctions::SUNDAY = StringValue("Sunday");
+
 void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
   DCHECK_LE(e->GetNumChildren(), 2);
   DCHECK_NE(e->GetNumChildren(), 0);
@@ -135,6 +143,22 @@ void TimestampFunctions::ReportBadFormat(StringValue* format) {
   string format_str(format->ptr, format->len);
   LOG(WARNING) << "Bad date/time conversion format: " << format_str 
                << " Format must be: 'yyyy-MM-dd[ HH:mm:ss]'";
+}
+
+void* TimestampFunctions::DayName(Expr* e, TupleRow* row) {
+  void* dow = DayOfWeek(e, row);
+  if (dow == NULL) return NULL;
+  switch (e->result_.int_val) {
+    case 1: e->result_.string_val = SUNDAY; break;
+    case 2: e->result_.string_val = MONDAY; break;
+    case 3: e->result_.string_val = TUESDAY; break;
+    case 4: e->result_.string_val = WEDNESDAY; break;
+    case 5: e->result_.string_val = THURSDAY; break;
+    case 6: e->result_.string_val = FRIDAY; break;
+    case 7: e->result_.string_val = SATURDAY; break;
+    default: DCHECK(false);
+  }
+  return &e->result_.string_val;
 }
 
 void* TimestampFunctions::Year(Expr* e, TupleRow* row) {

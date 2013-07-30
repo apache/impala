@@ -163,6 +163,8 @@ functions = [
         'TimestampFunctions::FromUnix', ['from_unixtime']],
   ['From_UnixTime', 'STRING', ['INT', 'STRING'], \
         'TimestampFunctions::FromUnix', ['from_unixtime']],
+  ['Timestamp_dayname', 'STRING', ['TIMESTAMP'], \
+        'TimestampFunctions::DayName', ['dayname']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
   ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], \
