@@ -668,7 +668,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
       stringstream ss;
       ss << "File " << stream_->filename() << ": metadata is incompatible "
          << "with the schema.  Schema expects " << (col_idx + 1) << " cols, while the "
-         << "file only has " << (row_group.columns.size() + 1) << " cols.";
+         << "file only has " << (row_group.columns.size()) << " cols.";
       return Status(ss.str());
     }
 
