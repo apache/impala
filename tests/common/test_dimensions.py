@@ -89,6 +89,11 @@ SINGLE_NODE_ONLY = [1]
 ALL_NODES_ONLY = [0]
 ALL_DISABLE_CODEGEN_OPTIONS = [True, False]
 
+def create_single_exec_option_dimension():
+  """Creates an exec_option dimension that will produce a single test vector"""
+  return create_exec_option_dimension(cluster_sizes=ALL_NODES_ONLY,
+      disable_codegen_options=[False], batch_sizes=[0])
+
 def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
                                  batch_sizes=ALL_BATCH_SIZES):

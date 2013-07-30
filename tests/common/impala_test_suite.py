@@ -221,7 +221,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def execute_query_using_client(self, client, query, vector):
     self.change_database(client, vector.get_value('table_format'))
-    client.execute(query)
+    return client.execute(query)
 
   @execute_wrapper
   def execute_query_async(self, query, query_exec_options=None):
