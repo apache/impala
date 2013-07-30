@@ -133,7 +133,7 @@ class ImpalaShell(cmd.Cmd):
     if not options:
       print '\tNo options available.'
     else:
-      print '\n'.join(["\t%s: %s" % (k,v) for (k,v) in options.iteritems()])
+      print '\n'.join(["\t%s: %s" % (k, options[k]) for k in sorted(options.keys())])
 
   def __options_to_string_list(self):
     return ["%s=%s" % (k,v) for (k,v) in self.set_query_options.iteritems()]
