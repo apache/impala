@@ -123,6 +123,8 @@ class DictDecoder {
     data_decoder_.reset(new RleDecoder(buffer, buffer_len, bit_width));
   }
 
+  int num_entries() const { return dict_.size(); }
+
   // Returns the next value.  Returns false if the data is invalid.
   // For StringValues, this does not make a copy of the data.  Instead,
   // the string data is from the dictionary buffer passed into the c'tor.

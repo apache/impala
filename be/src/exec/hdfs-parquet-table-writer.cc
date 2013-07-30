@@ -378,7 +378,7 @@ Status HdfsParquetTableWriter::ColumnWriter::Flush(int64_t* file_pos,
     PageHeader header;
     header.type = PageType::DICTIONARY_PAGE;
     header.uncompressed_page_size = dict_encoder_->dict_encoded_size();
-    header.dictionary_page_header = dict_header;
+    header.__set_dictionary_page_header(dict_header);
 
     // Write the dictionary page data, compressing it if necessary.
     uint8_t* dict_buffer = parent_->per_file_mem_pool_->Allocate(

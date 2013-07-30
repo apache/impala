@@ -14,6 +14,8 @@
 
 #include "exec/hdfs-parquet-scanner.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scanner-context.inline.h"
@@ -37,6 +39,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace boost::algorithm;
 using namespace impala;
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
@@ -275,6 +278,20 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
         return Status("Unexpected dictionary page. Dictionary page is only "
             " supported for string types.");
       }
+      const parquet::DictionaryPageHeader* dict_header = NULL;
+      if (current_page_header_.__isset.dictionary_page_header) {
+        dict_header = &current_page_header_.dictionary_page_header;
+      } else {
+        // In 1.1, we had a bug where the dictionary page metadata was not set. For
+        // compatibility, omit checking the metadata
+        if (parent_->file_version_.application != "impala" ||
+            parent_->file_version_.version != "1.1") {
+          return Status("Dictionary page does not have dictionary header set.");
+        }
+      }
+      if (dict_header != NULL && dict_header->encoding != parquet::Encoding::PLAIN) {
+        return Status("Only PLAIN encoding is supported for dictionary pages.");
+      }
 
       if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
 
@@ -293,6 +310,14 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       }
 
       dict_decoder_.reset(new DictDecoder<StringValue>(dict_values, data_size));
+      if (dict_header != NULL && 
+          dict_header->num_values != dict_decoder_->num_entries()) {
+        stringstream ss;
+        ss << "Invalid dictionary. Expected " << dict_header->num_values 
+           << " entries but data contained " << dict_decoder_->num_entries() 
+           << " entries.";
+        return Status(ss.str());
+      }
       // Done with dictionary page, read next page
       continue;
     }
@@ -739,6 +764,18 @@ Status HdfsParquetScanner::ValidateFileMetadata() {
        << "file version: " << file_metadata_.version;
     return Status(ss.str());
   } 
+
+  // Parse out the created by application version string
+  if (file_metadata_.__isset.created_by) {
+    vector<string> tokens;
+    split(tokens, file_metadata_.created_by, is_any_of(" "), token_compress_on);
+    if (tokens.size() >= 3 && tokens[1] == "version") {
+      file_version_.application = tokens[0];
+      std::transform(file_version_.application.begin(), file_version_.application.begin(),
+          file_version_.application.end(), ::tolower);
+      file_version_.version = tokens[2];
+    }
+  }
   return Status::OK;
 }
 

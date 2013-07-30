@@ -65,11 +65,21 @@ class HdfsParquetScanner : public HdfsScanner {
   class ColumnReader;
   friend class ColumnReader;
 
+  struct FileVersion {
+    // Application that wrote the file. e.g. "IMPALA"
+    std::string application;
+
+    // Version of the application that wrote the file. e.g. "1.1"
+    std::string version;
+  };
+
   // Column reader for each materialized columns for this file.
   std::vector<ColumnReader*> column_readers_;
 
   // File metadata thrift object
   parquet::FileMetaData file_metadata_;
+
+  FileVersion file_version_;
 
   // Scan range for the metadata.
   const DiskIoMgr::ScanRange* metadata_range_;
