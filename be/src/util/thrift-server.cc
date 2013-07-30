@@ -29,9 +29,12 @@
 #include <thrift/transport/TServerSocket.h>
 #include <gflags/gflags.h>
 
+#include "gen-cpp/Types_types.h"
 #include "util/thrift-server.h"
 #include "util/authorization.h"
+#include "util/debug-util.h"
 #include "util/network-util.h"
+#include "util/uid-util.h"
 
 #include <sstream>
 
@@ -186,7 +189,7 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
 __thread ThriftServer::SessionContext* __session_context__;
 
 
-const ThriftServer::SessionId& ThriftServer::GetThreadSessionId() {
+const TUniqueId& ThriftServer::GetThreadSessionId() {
   return __session_context__->session_id;
 }
 
@@ -225,7 +228,8 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
         MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 
     lock_guard<mutex> l(thrift_server_->session_contexts_lock_);
-    session_ptr->session_id = to_string(thrift_server_->uuid_generator_());
+    uuid session_uuid = thrift_server_->uuid_generator_();
+    UUIDToTUniqueId(session_uuid, &session_ptr->session_id);
 
     // Add the session to the session map.
     __session_context__ = session_ptr.get();

@@ -157,8 +157,8 @@ public class PlannerTest {
     boolean isImplemented = expectedErrorMsg == null;
 
     options.setNum_nodes(1);
-    TSessionState sessionState =
-        new TSessionState("default", System.getProperty("user.name"), null, null);
+    TSessionState sessionState = new TSessionState(null, null, "default",
+        System.getProperty("user.name"), null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
     StringBuilder explainBuilder = new StringBuilder();
 

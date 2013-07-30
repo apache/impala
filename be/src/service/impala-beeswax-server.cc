@@ -417,13 +417,13 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 }
 
 void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {
-  const ThriftServer::SessionId& session_id = session_context.session_id;
+  const TUniqueId& session_id = session_context.session_id;
   shared_ptr<SessionState> state;
   state.reset(new SessionState);
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->database = "default";
-  state->session_type = BEESWAX;
+  state->session_type = TSessionType::BEESWAX;
   state->network_address = session_context.network_address;
   // If the username was set by a lower-level transport, use it.
   if (!session_context.username.empty()) {
@@ -447,7 +447,7 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
-    const ThriftServer::SessionId& session_id = ThriftServer::GetThreadSessionId();
+    const TUniqueId& session_id = ThriftServer::GetThreadSessionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
     session->ToThrift(session_id, &request->sessionState);
   }

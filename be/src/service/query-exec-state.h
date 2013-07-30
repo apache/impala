@@ -99,6 +99,8 @@ class ImpalaServer::QueryExecState {
 
   ImpalaServer::SessionState* parent_session() { return parent_session_.get(); }
   const std::string& user() const { return parent_session_->user; }
+  TSessionType::type session_type() const { return query_session_state_.session_type; }
+  const TUniqueId& session_id() const { return query_session_state_.session_id; }
   const std::string& default_db() const { return query_session_state_.database; }
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
@@ -108,6 +110,7 @@ class ImpalaServer::QueryExecState {
   const TUniqueId& query_id() const { return query_id_; }
   const TExecRequest& exec_request() const { return exec_request_; }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
+  TDdlType::type ddl_type() const { return exec_request_.ddl_exec_request.ddl_type; }
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
   const beeswax::QueryState::type query_state() const { return query_state_; }

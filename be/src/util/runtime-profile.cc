@@ -538,12 +538,12 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   Base64Encode(compressed_buffer, out);
 }
 
-void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) {
+void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
   tree->nodes.clear();
   ToThrift(&tree->nodes);
 }
 
-void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
+void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   nodes->reserve(nodes->size() + children_.size());
 
   int index = nodes->size();

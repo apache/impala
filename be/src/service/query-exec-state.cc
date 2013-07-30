@@ -59,10 +59,11 @@ ImpalaServer::QueryExecState::QueryExecState(
   // thread-safe).
   random_generator uuid_generator;
   uuid query_uuid = uuid_generator();
-  query_id_.hi = *reinterpret_cast<uint64_t*>(&query_uuid.data[0]);
-  query_id_.lo = *reinterpret_cast<uint64_t*>(&query_uuid.data[8]);
+  UUIDToTUniqueId(query_uuid, &query_id_);
 
   profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
+  summary_profile_.AddInfoString("Session ID", PrintId(session_id()));
+  summary_profile_.AddInfoString("Session Type", PrintTSessionType(session_type()));
   summary_profile_.AddInfoString("Start Time", start_time().DebugString());
   summary_profile_.AddInfoString("End Time", "");
   summary_profile_.AddInfoString("Query Type", "N/A");
@@ -70,6 +71,8 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Query Status", "OK");
   summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
   summary_profile_.AddInfoString("User", user());
+  summary_profile_.AddInfoString("Network Address",
+      lexical_cast<string>(parent_session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
   summary_profile_.AddInfoString("Sql Statement", sql_stmt);
 }
@@ -91,6 +94,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       return Status::OK;
     }
     case TStmtType::DDL: {
+      summary_profile_.AddInfoString("DDL Type", PrintTDdlType(ddl_type()));
       if (exec_request_.ddl_exec_request.ddl_type == TDdlType::USE) {
         lock_guard<mutex> l(parent_session_->lock);
         parent_session_->database = exec_request_.ddl_exec_request.use_db_params.db;

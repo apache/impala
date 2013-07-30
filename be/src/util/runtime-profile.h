@@ -296,8 +296,8 @@ class RuntimeProfile {
 
   // Serializes profile to thrift.
   // Does not hold locks when it makes any function calls.
-  void ToThrift(TRuntimeProfileTree* tree);
-  void ToThrift(std::vector<TRuntimeProfileNode>* nodes);
+  void ToThrift(TRuntimeProfileTree* tree) const;
+  void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
 
   // Serializes the runtime profile to a string.  This first serializes the
   // object using thrift compact binary format, then gzip compresses it and

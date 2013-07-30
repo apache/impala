@@ -22,6 +22,7 @@
 
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Opcodes_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/RuntimeProfile_types.h"
@@ -52,6 +53,8 @@ std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
+std::string PrintTDdlType(const TDdlType::type& type);
+std::string PrintTSessionType(const TSessionType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);
 std::string PrintEncoding(const parquet::Encoding::type& type);

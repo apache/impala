@@ -676,25 +676,10 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
             << "<th>Start Time</th></tr>"
             << endl;
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
-    string session_type;
-    string session_id;
-    if (session.second->session_type == BEESWAX) {
-      session_type = "Beeswax";
-      session_id = session.first;
-    } else {
-      session_type = "HiveServer2";
-      // Print HiveServer2 session key as TUniqueId
-      stringstream result;
-      TUniqueId tmp_key;
-      memcpy(&(tmp_key.hi), session.first.c_str(), 8);
-      memcpy(&(tmp_key.lo), session.first.c_str() + 8, 8);
-      result << tmp_key.hi << ":" << tmp_key.lo;
-      session_id = result.str();
-    }
     (*output) << "<tr>"
-              << "<td>" << session_type << "</td>"
+              << "<td>" << PrintTSessionType(session.second->session_type) << "</td>"
               << "<td>" << session.second->user << "</td>"
-              << "<td>" << session_id << "</td>"
+              << "<td>" << session.first << "</td>"
               << "<td>" << session.second->network_address << "</td>"
               << "<td>" << session.second->database << "</td>"
               << "<td>" << session.second->start_time.DebugString() << "</td>"
@@ -1040,7 +1025,7 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   return Status::OK;
 }
 
-Status ImpalaServer::CloseSessionInternal(const ThriftServer::SessionId& session_id) {
+Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id) {
   // Find the session_state and remove it from the map.
   shared_ptr<SessionState> session_state;
   {
@@ -1435,12 +1420,13 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
   }
 }
 
-void ImpalaServer::SessionState::ToThrift(const ThriftServer::SessionId& session_id,
+void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
     TSessionState* state) {
   lock_guard<mutex> l(lock);
+  state->session_id = session_id;
+  state->session_type = session_type;
   state->database = database;
   state->user = user;
-  state->session_id = session_id;
   state->network_address = network_address;
 }
 

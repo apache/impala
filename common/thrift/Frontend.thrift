@@ -26,16 +26,25 @@ include "cli_service.thrift"
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
 
+// Impala currently has two types of sessions: Beeswax and HiveServer2
+enum TSessionType {
+  BEESWAX,
+  HIVESERVER2
+}
+
 // Per-client session state
 struct TSessionState {
+  // A unique identifier for this session
+  3: required Types.TUniqueId session_id
+
+  // Session Type (Beeswax or HiveServer2)
+  5: required TSessionType session_type
+
   // The default database for the session
   1: required string database
 
   // The user to whom this session belongs
   2: required string user
-
-  // A unique identifier for this session
-  3: required string session_id
 
   // Client network address
   4: required Types.TNetworkAddress network_address

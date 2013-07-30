@@ -16,6 +16,8 @@
 #ifndef IMPALA_UTIL_UID_UTIL_H
 #define IMPALA_UTIL_UID_UTIL_H
 
+#include <boost/uuid/uuid.hpp>
+
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 
 namespace impala {
@@ -25,6 +27,11 @@ namespace impala {
     boost::hash_combine(seed, id.lo);
     boost::hash_combine(seed, id.hi);
     return seed;
+  }
+
+  inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id) {
+    memcpy(&(unique_id->hi), &uuid.data[0], 8);
+    memcpy(&(unique_id->lo), &uuid.data[8], 8);
   }
 }
 

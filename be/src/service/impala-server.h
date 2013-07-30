@@ -340,7 +340,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Close the session and release all resource used by this session.
   // Caller should not hold any locks when calling this function.
-  Status CloseSessionInternal(const ThriftServer::SessionId& session_id);
+  Status CloseSessionInternal(const TUniqueId& session_id);
 
   // Gets the runtime profile string for a given query_id and writes it to the output
   // stream. First searches for the query id in the map of in-flight queries. If no
@@ -493,7 +493,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // and an error status will be returned. As part of this call, the TMetadataOpRequest
   // struct will be populated with the requesting user's session state.
   // Returns a TOperationHandle and TStatus.
-  void ExecuteMetadataOp(const ThriftServer::SessionId& session_id,
+  void ExecuteMetadataOp(
+      const apache::hive::service::cli::thrift::THandleIdentifier& session_handle,
       TMetadataOpRequest* request,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
@@ -593,17 +594,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   TQueryOptions default_query_options_;
   std::vector<beeswax::ConfigVariable> default_configs_;
 
-  // Impala has two types of sessions: Beeswax and HiveServer2
-  enum SessionType {
-    BEESWAX,
-    HIVESERVER2
-  };
-
   // Per-session state.  This object is reference counted using shared_ptrs.  There
   // is one ref count in the SessionStateMap for as long as the session is active.
   // All queries running from this session also have a reference.
   struct SessionState {
-    SessionType session_type;
+    TSessionType::type session_type;
 
     // Time the session was created
     TimestampValue start_time;
@@ -630,23 +625,22 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Inflight queries belonging to this session
     boost::unordered_set<TUniqueId> inflight_queries;
 
-    // Builds a Thrift representation of the default database for serialisation to
+    // Builds a Thrift representation of this SessionState for serialisation to
     // the frontend.
-    void ToThrift(const ThriftServer::SessionId& session_id,
-        TSessionState* session_state);
+    void ToThrift(const TUniqueId& session_id, TSessionState* session_state);
   };
 
   // Protects session_state_map_
   boost::mutex session_state_map_lock_;
 
   // A map from session identifier to a structure containing per-session information
-  typedef boost::unordered_map<ThriftServer::SessionId, boost::shared_ptr<SessionState> >
+  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<SessionState> >
     SessionStateMap;
   SessionStateMap session_state_map_;
 
   // Return session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.
-  inline Status GetSessionState(const ThriftServer::SessionId& session_id,
+  inline Status GetSessionState(const TUniqueId& session_id,
       boost::shared_ptr<SessionState>* session_state) {
     boost::lock_guard<boost::mutex> l(session_state_map_lock_);
     SessionStateMap::iterator i = session_state_map_.find(session_id);

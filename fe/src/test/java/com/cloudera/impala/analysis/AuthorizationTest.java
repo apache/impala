@@ -1064,6 +1064,7 @@ public class AuthorizationTest {
   }
 
   private static TSessionState createSessionState(String defaultDb, User user) {
-    return new TSessionState(defaultDb, user.getName(), "", new TNetworkAddress("", 0));
+    return new TSessionState(null, null,
+        defaultDb, user.getName(), new TNetworkAddress("", 0));
   }
 }

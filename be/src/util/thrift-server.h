@@ -38,15 +38,12 @@ namespace impala {
 // If TThreadPoolServer is used, client must use TSocket as transport.
 class ThriftServer {
  public:
-  // An opaque identifier for the current session, which identifies a client connection.
-  typedef std::string SessionId;
-
   // Username.
   typedef std::string Username;
 
   // Per-connection session information.
   struct SessionContext {
-    SessionId session_id;
+    TUniqueId session_id;
     Username username;
     TNetworkAddress network_address;
   };
@@ -110,7 +107,7 @@ class ThriftServer {
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static const SessionId& GetThreadSessionId();
+  static const TUniqueId& GetThreadSessionId();
 
   // Returns a pointer to a struct that contains information about the current
   // session. This includes:
