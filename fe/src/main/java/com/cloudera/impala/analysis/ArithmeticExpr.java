@@ -131,6 +131,7 @@ public class ArithmeticExpr extends Expr {
     PrimitiveType t1 = getChild(0).getType();
     PrimitiveType t2 = getChild(1).getType();  // only bitnot is unary
 
+    FunctionOperator funcOp = op.toFunctionOp();
     switch (op) {
       case MULTIPLY:
       case ADD:
@@ -142,6 +143,8 @@ public class ArithmeticExpr extends Expr {
         break;
       case MOD:
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        // Use MATH_MOD function operator for floating-point modulo.
+        if (type.isFloatingPointType()) funcOp = FunctionOperator.MATH_FMOD;
         break;
       case DIVIDE:
         type = PrimitiveType.DOUBLE;
@@ -168,7 +171,11 @@ public class ArithmeticExpr extends Expr {
 
     type = castBinaryOp(type);
     OpcodeRegistry.Signature match =
-      OpcodeRegistry.instance().getFunctionInfo(op.toFunctionOp(), true, type, type);
+      OpcodeRegistry.instance().getFunctionInfo(funcOp, true, type, type);
+    if (match == null) {
+      Preconditions.checkState(false, String.format("No match in function registry " +
+          "for '%s' with operand types %s and %s", toSql(), type, type));
+    }
     this.opcode = match.opcode;
   }
 }

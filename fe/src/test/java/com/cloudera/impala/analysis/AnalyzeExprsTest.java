@@ -414,8 +414,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   /**
-   * Test of all arithmetic type casts following mysql's casting policy.
-   * @throws AnalysisException
+   * Test of all arithmetic type casts.
    */
   @Test
   public void TestArithmeticTypeCasts() throws AnalysisException {
@@ -430,7 +429,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             PrimitiveType.getAssignmentCompatibleType(type1, type2);
         PrimitiveType promotedType = compatibleType.getMaxResolutionType();
 
-        // +, -, *
+        // +, -, *, %
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.ADD, null,
             promotedType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.ADD, null,
@@ -443,6 +442,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             promotedType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MULTIPLY, null,
             promotedType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
+            compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
+            compatibleType);
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
@@ -450,15 +453,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
             PrimitiveType.DOUBLE);
 
-        // % div, &, |, ^ only for fixed-point types
+        // div, &, |, ^ only for fixed-point types
         if ((!type1.isFixedPointType() && !type1.isNull())
             || (!type2.isFixedPointType() && !type2.isNull())) {
           continue;
         }
-        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
-            compatibleType);
-        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
-            compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.INT_DIVIDE, null,
             compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.INT_DIVIDE, null,

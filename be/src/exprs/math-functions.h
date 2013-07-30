@@ -61,6 +61,8 @@ class MathFunctions {
   static void* ConvString(Expr* e, TupleRow* row);
   static void* PmodBigInt(Expr* e, TupleRow* row);
   static void* PmodDouble(Expr* e, TupleRow* row);
+  static void* FmodFloat(Expr* e, TupleRow* row);
+  static void* FmodDouble(Expr* e, TupleRow* row);
   static void* PositiveBigInt(Expr* e, TupleRow* row);
   static void* PositiveDouble(Expr* e, TupleRow* row);
   static void* NegativeBigInt(Expr* e, TupleRow* row);

@@ -501,6 +501,22 @@ void* MathFunctions::PmodDouble(Expr* e, TupleRow* row) {
   return &e->result_.double_val;
 }
 
+void* MathFunctions::FmodFloat(Expr* e, TupleRow* row) {
+  float* val1 = reinterpret_cast<float*>(e->children()[0]->GetValue(row));
+  float* val2 = reinterpret_cast<float*>(e->children()[1]->GetValue(row));
+  if (val1 == NULL || val2 == NULL || *val2 == 0) return NULL;
+  e->result_.float_val = fmodf(*val1, *val2);
+  return &e->result_.float_val;
+}
+
+void* MathFunctions::FmodDouble(Expr* e, TupleRow* row) {
+  double* val1 = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
+  double* val2 = reinterpret_cast<double*>(e->children()[1]->GetValue(row));
+  if (val1 == NULL || val2 == NULL || *val2 == 0) return NULL;
+  e->result_.double_val = fmod(*val1, *val2);
+  return &e->result_.double_val;
+}
+
 void* MathFunctions::PositiveBigInt(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   int64_t* i = reinterpret_cast<int64_t*>(e->children()[0]->GetValue(row));

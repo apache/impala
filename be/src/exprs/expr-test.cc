@@ -1879,6 +1879,32 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("pmod(-123456.789, -13.456)", TYPE_DOUBLE,
       fmod(fmod(-123456.789, -13.456) - 13.456, -13.456));
 
+  // Test floating-point modulo function.
+  TestValue("fmod(cast(12345.345 as float), cast(7 as float))",
+      TYPE_FLOAT, fmodf(12345.345f, 7.0f));
+  TestValue("fmod(cast(-12345.345 as float), cast(7 as float))",
+      TYPE_FLOAT, fmodf(-12345.345f, 7.0f));
+  TestValue("fmod(cast(-12345.345 as float), cast(-7 as float))",
+      TYPE_FLOAT, fmodf(-12345.345f, -7.0f));
+  TestValue("fmod(cast(12345.345 as double), 7)", TYPE_DOUBLE, fmod(12345.345, 7.0));
+  TestValue("fmod(-12345.345, cast(7 as double))", TYPE_DOUBLE, fmod(-12345.345, 7.0));
+  TestValue("fmod(cast(-12345.345 as double), -7)", TYPE_DOUBLE, fmod(-12345.345, -7.0));
+  // Test floating-point modulo operator.
+  TestValue("cast(12345.345 as float) % cast(7 as float)",
+      TYPE_FLOAT, fmodf(12345.345f, 7.0f));
+  TestValue("cast(-12345.345 as float) % cast(7 as float)",
+      TYPE_FLOAT, fmodf(-12345.345f, 7.0f));
+  TestValue("cast(-12345.345 as float) % cast(-7 as float)",
+      TYPE_FLOAT, fmodf(-12345.345f, -7.0f));
+  TestValue("cast(12345.345 as double) % 7", TYPE_DOUBLE, fmod(12345.345, 7.0));
+  TestValue("-12345.345 % cast(7 as double)", TYPE_DOUBLE, fmod(-12345.345, 7.0));
+  TestValue("cast(-12345.345 as double) % -7", TYPE_DOUBLE, fmod(-12345.345, -7.0));
+  // Test floating-point modulo by zero.
+  TestIsNull("fmod(cast(-12345.345 as float), cast(0 as float))", TYPE_FLOAT);
+  TestIsNull("fmod(cast(-12345.345 as double), 0)", TYPE_DOUBLE);
+  TestIsNull("cast(-12345.345 as float) % cast(0 as float)", TYPE_FLOAT);
+  TestIsNull("cast(-12345.345 as double) % 0", TYPE_DOUBLE);
+
   // Test bigint param.
   TestValue("positive(1234567890)", TYPE_BIGINT, 1234567890);
   TestValue("positive(-1234567890)", TYPE_BIGINT, -1234567890);
@@ -1920,6 +1946,16 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("pmod(NULL, 3)", TYPE_BIGINT);
   TestIsNull("pmod(10, NULL)", TYPE_BIGINT);
   TestIsNull("pmod(NULL, NULL)", TYPE_BIGINT);
+  TestIsNull("fmod(NULL, cast(3.2 as float))", TYPE_FLOAT);
+  TestIsNull("fmod(cast(10.3 as float), NULL)", TYPE_FLOAT);
+  TestIsNull("fmod(NULL, cast(3.2 as double))", TYPE_DOUBLE);
+  TestIsNull("fmod(cast(10.3 as double), NULL)", TYPE_DOUBLE);
+  TestIsNull("NULL % cast(3.2 as float)", TYPE_FLOAT);
+  TestIsNull("cast(10.3 as float) % NULL", TYPE_FLOAT);
+  TestIsNull("NULL % cast(3.2 as double)", TYPE_DOUBLE);
+  TestIsNull("cast(10.3 as double) % NULL", TYPE_DOUBLE);
+  TestIsNull("fmod(NULL, NULL)", TYPE_FLOAT);
+  TestIsNull("NULL % NULL", TYPE_NULL);
   TestIsNull("positive(NULL)", TYPE_BIGINT);
   TestIsNull("negative(NULL)", TYPE_BIGINT);
   TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);

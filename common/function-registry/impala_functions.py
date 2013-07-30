@@ -77,6 +77,8 @@ functions = [
         'MathFunctions::ConvString', ['conv']],
   ['Math_Pmod', 'BIGINT', ['BIGINT', 'BIGINT'], 'MathFunctions::PmodBigInt', ['pmod']],
   ['Math_Pmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'], 'MathFunctions::PmodDouble', ['pmod']],
+  ['Math_Fmod', 'FLOAT', ['FLOAT', 'FLOAT'], 'MathFunctions::FmodFloat', ['fmod']],
+  ['Math_Fmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'], 'MathFunctions::FmodDouble', ['fmod']],
   ['Math_Positive', 'BIGINT', ['BIGINT'], 'MathFunctions::PositiveBigInt', ['positive']],
   ['Math_Positive', 'DOUBLE', ['DOUBLE'], 'MathFunctions::PositiveDouble', ['positive']],
   ['Math_Negative', 'BIGINT', ['BIGINT'], 'MathFunctions::NegativeBigInt', ['negative']],
@@ -163,7 +165,7 @@ functions = [
         'TimestampFunctions::FromUnix', ['from_unixtime']],
   ['From_UnixTime', 'STRING', ['INT', 'STRING'], \
         'TimestampFunctions::FromUnix', ['from_unixtime']],
-  ['Timestamp_dayname', 'STRING', ['TIMESTAMP'], \
+  ['From_Dayname', 'STRING', ['TIMESTAMP'], \
         'TimestampFunctions::DayName', ['dayname']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
