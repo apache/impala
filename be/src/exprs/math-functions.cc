@@ -51,7 +51,7 @@ void* MathFunctions::Sign(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   double* d = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
   if (d == NULL) return NULL;
-  e->result_.float_val = (*d < 0) ? -1.0 : 1.0;
+  e->result_.float_val = (*d > 0) ? 1.0f : ((*d < 0) ? -1.0f : 0.0f);
   return &e->result_.float_val;
 }
 

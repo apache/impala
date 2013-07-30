@@ -1819,9 +1819,12 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("e()", TYPE_DOUBLE, M_E);
   TestValue("abs(-1.0)", TYPE_DOUBLE, 1.0);
   TestValue("abs(1.0)", TYPE_DOUBLE, 1.0);
-  TestValue("sign(0.0)", TYPE_FLOAT, 1.0f);
+  TestValue("sign(0.0)", TYPE_FLOAT, 0.0f);
+  TestValue("sign(-0.0)", TYPE_FLOAT, 0.0f);
+  TestValue("sign(+0.0)", TYPE_FLOAT, 0.0f);
   TestValue("sign(10.0)", TYPE_FLOAT, 1.0f);
   TestValue("sign(-10.0)", TYPE_FLOAT, -1.0f);
+  TestIsNull("sign(NULL)", TYPE_FLOAT);
 
   // It is important to calculate the expected values
   // using math functions, and not simply use constants.
