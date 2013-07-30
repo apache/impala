@@ -4,6 +4,8 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.fail;
 
+import java.lang.reflect.Field;
+
 import org.junit.Test;
 
 import com.cloudera.impala.common.AnalysisException;
@@ -1686,10 +1688,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    // this fails with
-    // private static int[] com.cloudera.impala.analysis.TableRef.$SWITCH_TABLE$com$cloudera$impala$analysis$JoinOperator
-    // being reported as the 11th member
-    //testNumberOfMembers(TableRef.class, 10);
+    testNumberOfMembers(TableRef.class, 10);
     testNumberOfMembers(BaseTableRef.class, 2);
     testNumberOfMembers(InlineViewRef.class, 5);
     testNumberOfMembers(ViewRef.class, 2);
@@ -1697,7 +1696,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @SuppressWarnings("rawtypes")
   private void testNumberOfMembers(Class cl, int expectedNumMembers) {
-    int actualNumMembers = cl.getDeclaredFields().length;
+    int actualNumMembers = 0;
+    for (Field f: cl.getDeclaredFields()) {
+      // Exclude synthetic fields such as enum jump tables that may be added at runtime.
+      if (!f.isSynthetic()) ++actualNumMembers;
+    }
     if (actualNumMembers != expectedNumMembers) {
       fail(String.format("The number of members in %s have changed.\n" +
           "Expected %s but found %s. Please modify clone() accordingly and " +
