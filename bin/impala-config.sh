@@ -89,8 +89,6 @@ export PATH=$HADOOP_HOME/bin:$PATH
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
-export HIVE_JDBC_DRIVER_CLASSPATH=${HIVE_JDBC_DRIVER_CLASSPATH-\
-$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/lib/*}
 
 ### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 ### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
