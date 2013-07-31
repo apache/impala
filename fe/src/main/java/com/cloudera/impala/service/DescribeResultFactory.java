@@ -75,8 +75,13 @@ public class DescribeResultFactory {
     descResult.results = Lists.newArrayList();
 
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
+
+    // To avoid initializing any of the SerDe classes in the metastore table Thrift
+    // struct, create the ql.metadata.Table object by calling the empty c'tor and
+    // then calling setTTable().
     org.apache.hadoop.hive.ql.metadata.Table hiveTable =
-        new org.apache.hadoop.hive.ql.metadata.Table(msTable);
+        new org.apache.hadoop.hive.ql.metadata.Table();
+    hiveTable.setTTable(msTable);
     StringBuilder sb = new StringBuilder();
     // First add all the columns (includes partition columns).
     sb.append(MetaDataFormatUtils.getAllColumnsInformation(msTable.getSd().getCols(),
