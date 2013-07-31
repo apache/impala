@@ -39,6 +39,8 @@ class TimestampFunctions {
 
   // Return a timestamp string from a unix time_t
   // Optional second argument is the format of the string.
+  // TIME is the integer type of the unix time argument.
+  template <class TIME>
   static void* FromUnix(Expr* e, TupleRow* row);
 
   // Convert a timestamp to or from a particular timezone based time.

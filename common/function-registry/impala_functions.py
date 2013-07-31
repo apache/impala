@@ -162,10 +162,14 @@ functions = [
   ['Unix_Timestamp', 'INT', ['STRING', 'STRING'], \
         'TimestampFunctions::Unix', ['unix_timestamp']],
   ['From_UnixTime', 'STRING', ['INT'], \
-        'TimestampFunctions::FromUnix', ['from_unixtime']],
+        'TimestampFunctions::FromUnix<int32_t>', ['from_unixtime']],
   ['From_UnixTime', 'STRING', ['INT', 'STRING'], \
-        'TimestampFunctions::FromUnix', ['from_unixtime']],
-  ['From_Dayname', 'STRING', ['TIMESTAMP'], \
+        'TimestampFunctions::FromUnix<int32_t>', ['from_unixtime']],
+  ['From_UnixTime', 'STRING', ['BIGINT'], \
+        'TimestampFunctions::FromUnix<int64_t>', ['from_unixtime']],
+  ['From_UnixTime', 'STRING', ['BIGINT', 'STRING'], \
+        'TimestampFunctions::FromUnix<int64_t>', ['from_unixtime']],
+  ['Timestamp_Dayname', 'STRING', ['TIMESTAMP'], \
         'TimestampFunctions::DayName', ['dayname']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],

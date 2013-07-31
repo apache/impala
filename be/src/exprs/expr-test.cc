@@ -2209,16 +2209,25 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("unix_timestamp(NULL, NULL)", TYPE_INT);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0)", "1970-01-01 00:00:00");
+  TestStringValue("from_unixtime(cast(0 as bigint))", "1970-01-01 00:00:00");
   TestIsNull("from_unixtime(NULL)", TYPE_STRING);
   TestStringValue("from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')", "1970-01-01 00:00:00");
+  TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd HH:mm:ss')",
+      "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0, 'yyyy-MM-dd')", "1970-01-01");
-  TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
+  TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd')", "1970-01-01");
   TestIsNull("from_unixtime(0, NULL)", TYPE_STRING);
+  TestIsNull("from_unixtime(cast(0 as bigint), NULL)", TYPE_STRING);
+  TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
   TestIsNull("from_unixtime(NULL, NULL)", TYPE_STRING);
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd')", "1999-01-01");
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:10");
+  TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10') + (60*60*24), \
+        'yyyy-MM-dd')", "1999-01-02");
+  TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10') + 10, \
+        'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:20");
   TestValue("cast('2011-12-22 09:10:11.123456789' as timestamp) > \
       cast('2011-12-22 09:10:11.12345678' as timestamp)", TYPE_BOOLEAN, true);
   TestValue("cast('2011-12-22 08:10:11.123456789' as timestamp) > \
@@ -2351,6 +2360,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("from_unixtime(0, 'yy-MM-dd HH:mm:dd')", TYPE_STRING);
   TestIsNull("from_unixtime(0, 'yyyy-MM-dd HH::dd')", TYPE_STRING);
   TestIsNull("from_unixtime(0, 'HH:mm:dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(cast(0 as bigint), 'yy-MM-dd HH:mm:dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd HH::dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(cast(0 as bigint), 'HH:mm:dd')", TYPE_STRING);
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

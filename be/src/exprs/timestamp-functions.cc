@@ -45,12 +45,13 @@ const StringValue TimestampFunctions::FRIDAY = StringValue("Friday");
 const StringValue TimestampFunctions::SATURDAY = StringValue("Saturday");
 const StringValue TimestampFunctions::SUNDAY = StringValue("Sunday");
 
+template <class TIME>
 void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
   DCHECK_LE(e->GetNumChildren(), 2);
   DCHECK_NE(e->GetNumChildren(), 0);
   
   Expr* op = e->children()[0];
-  uint32_t* intp = reinterpret_cast<uint32_t*>(op->GetValue(row));
+  TIME* intp = reinterpret_cast<TIME*>(op->GetValue(row));
   if (intp == NULL) return NULL;
   TimestampValue t(boost::posix_time::from_time_t(*intp));
 
@@ -444,6 +445,11 @@ time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz) {
 // are only indirectly called via a function pointer provided by the opcode registry
 // which does not trigger implicit template instantiation.
 // Must be kept in sync with common/function-registry/impala_functions.py.
+
+template void*
+TimestampFunctions::FromUnix<int32_t>(Expr* e, TupleRow* row);
+template void*
+TimestampFunctions::FromUnix<int64_t>(Expr* e, TupleRow* row);
 
 template void*
 TimestampFunctions::DateAddSub<true, int32_t, years>(Expr* e, TupleRow* row);
