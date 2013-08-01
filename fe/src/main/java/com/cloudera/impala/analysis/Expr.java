@@ -47,6 +47,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   protected boolean isAnalyzed;  // true after analyze() has been called
   protected TExprOpcode opcode;  // opcode for this expr
 
+  // Flag to indicate whether to wrap this expr's toSql() in parenthesis. Set by parser.
+  // Needed for properly capturing expr precedences in the SQL string.
+  protected boolean printSqlInParens = false;
+
   // estimated probability of a predicate evaluating to true;
   // set during analysis;
   // between 0 and 1 if valid: invalid: -1
@@ -67,25 +71,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     numDistinctValues = -1;
   }
 
-  public ExprId getId() {
-    return id;
-  }
-
-  protected void setId(ExprId id) {
-    this.id = id;
-  }
-
-  public PrimitiveType getType() {
-    return type;
-  }
-
-  public TExprOpcode getOpcode() {
-    return opcode;
-  }
-
+  public ExprId getId() { return id; }
+  protected void setId(ExprId id) { this.id = id; }
+  public PrimitiveType getType() { return type; }
+  public TExprOpcode getOpcode() { return opcode; }
   public double getSelectivity() { return selectivity; }
-
   public long getNumDistinctValues() { return numDistinctValues; }
+  public void setPrintSqlInParens(boolean b) { printSqlInParens = b; }
 
   /* Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
@@ -126,9 +118,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
+  @Override
   public String toSql() {
-    return "";
+    return (printSqlInParens) ? "(" + toSqlImpl() + ")" : toSqlImpl();
   }
+
+  /**
+   * Returns a SQL string representing this expr. Subclasses should override this method
+   * instead of toSql() to ensure that parenthesis are properly added around the toSql().
+   */
+  protected abstract String toSqlImpl();
 
   // Convert this expr, including all children, to its Thrift representation.
   public TExpr treeToThrift() {
@@ -615,6 +614,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Returns child expr if this expr is an implicit cast, otherwise returns 'this'.
    */
   public Expr ignoreImplicitCast() {
+    if (this instanceof CastExpr) {
+      CastExpr cast = (CastExpr) this;
+      if (cast.isImplicit()) return cast.getChild(0).ignoreImplicitCast();
+    }
     return this;
   }
 

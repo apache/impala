@@ -38,42 +38,26 @@ public class ToSqlTest extends AnalyzerTest {
     AnalyzesOk(actual);
   }
 
-  // Test the toSql() output of select list expressions.
-  @Test
-  public void selectListTest() {
-    testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
-        "from functional.alltypes",
-        "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
-        "FROM functional.alltypes");
-    // Test aliases.
-    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
-        "from functional.alltypes",
-        "SELECT 1234 i, 1234.0 j, 1234.0 + 1.0 k, 1234.0 + 1.0 l " +
-        "FROM functional.alltypes");
-    // Test select without from.
-    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
-        "SELECT 1234 i, 1234.0 j, 1234.0 + 1.0 k, 1234.0 + 1.0 l");
-    // Test select without from.
-    testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
-        "from functional.alltypes",
-        "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
-        "FROM functional.alltypes");
-    testToSql("select int_col + int_col, " +
-        "tinyint_col + int_col, " +
-        "float_col + double_col, " +
-        "float_col + bigint_col, " +
-        "cast(float_col as int), " +
-        "bool_col " +
-        "from functional.alltypes",
-        "SELECT int_col + int_col, " +
-        "tinyint_col + int_col, " +
-        "float_col + double_col, " +
-        "float_col + bigint_col, " +
-        "CAST(float_col AS INT), " +
-        "bool_col " +
-        "FROM functional.alltypes");
-    // TODO: test boolean expressions and date literals
-  }
+ @Test
+ public void selectListTest() {
+   testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
+       "from functional.alltypes",
+       "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
+       "FROM functional.alltypes");
+   // Test aliases.
+   testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
+       "from functional.alltypes",
+       "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l " +
+       "FROM functional.alltypes");
+   // Test select without from.
+   testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
+       "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l");
+   // Test select without from.
+   testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
+       "from functional.alltypes",
+       "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
+       "FROM functional.alltypes");
+ }
 
   /**
    * Tests quoting of identifiers for view compatibility with Hive.
@@ -81,14 +65,14 @@ public class ToSqlTest extends AnalyzerTest {
   @Test
   public void TestIdentifierQuoting() {
     // The quotes of quoted identifiers will be removed if they are unnecessary.
-    testToSql("select 1 as `abc`, 2.0 as `xyz`", "SELECT 1 abc, 2.0 xyz");
+    testToSql("select 1 as `abc`, 2.0 as 'xyz'", "SELECT 1 abc, 2.0 xyz");
 
     // These identifiers are lexable by Impala but not Hive. For view compatibility
     // we enclose the idents in quotes.
     testToSql("select 1 as _c0, 2.0 as $abc", "SELECT 1 `_c0`, 2.0 `$abc`");
 
     // Quoted identifiers that require quoting in both Impala and Hive.
-    testToSql("select 1 as `???`, 2.0 as `^^^`", "SELECT 1 `???`, 2.0 `^^^`");
+    testToSql("select 1 as `???`, 2.0 as '^^^'", "SELECT 1 `???`, 2.0 `^^^`");
 
     // Test quoting of inline view aliases.
     testToSql("select a from (select 1 as a) as _t",
@@ -255,14 +239,14 @@ public class ToSqlTest extends AnalyzerTest {
     // Test undoing expr substitution in select-list exprs and on clause.
     testToSql("select t1.int_col, t2.int_col from " +
         "(select int_col from functional.alltypes) t1 inner join " +
-        "(select int_col from functional.alltypes) t2 on t1.int_col = t2.int_col",
+        "(select int_col from functional.alltypes) t2 on (t1.int_col = t2.int_col)",
         "SELECT t1.int_col, t2.int_col FROM " +
         "(SELECT int_col FROM functional.alltypes) t1 INNER JOIN " +
         "(SELECT int_col FROM functional.alltypes) t2 ON (t1.int_col = t2.int_col)");
     // Test undoing expr substitution in aggregates and group by and having clause.
     testToSql("select count(t1.string_col), sum(t2.float_col) from " +
         "(select id, string_col from functional.alltypes) t1 inner join " +
-        "(select id, float_col from functional.alltypes) t2 on t1.id = t2.id " +
+        "(select id, float_col from functional.alltypes) t2 on (t1.id = t2.id) " +
         "group by t1.id, t2.id having count(t2.float_col) > 2",
         "SELECT COUNT(t1.string_col), SUM(t2.float_col) FROM " +
         "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
@@ -271,7 +255,7 @@ public class ToSqlTest extends AnalyzerTest {
     // Test undoing expr substitution in order by clause.
     testToSql("select t1.id, t2.id from " +
         "(select id, string_col from functional.alltypes) t1 inner join " +
-        "(select id, float_col from functional.alltypes) t2 on t1.id = t2.id " +
+        "(select id, float_col from functional.alltypes) t2 on (t1.id = t2.id) " +
         "order by t1.id, t2.id",
         "SELECT t1.id, t2.id FROM " +
         "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
@@ -305,9 +289,9 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT * FROM t a INNER JOIN t b USING (int_col)");
     // WITH clause in a union stmt.
     testToSql("with t1 as (select * from functional.alltypes)" +
-    		"select * from t1 union all select * from t1",
+        "select * from t1 union all select * from t1",
         "WITH t1 AS (SELECT * FROM functional.alltypes) " +
-    		"SELECT * FROM t1 UNION ALL SELECT * FROM t1");
+        "SELECT * FROM t1 UNION ALL SELECT * FROM t1");
     // WITH clause in values stmt.
     testToSql("with t1 as (select * from functional.alltypes) values(1, 2), (3, 4)",
         "WITH t1 AS (SELECT * FROM functional.alltypes) VALUES((1, 2), (3, 4))");
@@ -324,8 +308,8 @@ public class ToSqlTest extends AnalyzerTest {
         "full outer join t t3 on t2.y = t3.x order by t1.x limit 10",
         "WITH t AS (SELECT int_col x, bigint_col y FROM functional.alltypestiny " +
         "ORDER BY id ASC LIMIT 2) " +
-        "SELECT * FROM t t1 LEFT OUTER JOIN t t2 ON (t1.y = t2.x) " +
-        "FULL OUTER JOIN t t3 ON (t2.y = t3.x) ORDER BY t1.x ASC LIMIT 10");
+        "SELECT * FROM t t1 LEFT OUTER JOIN t t2 ON t1.y = t2.x " +
+        "FULL OUTER JOIN t t3 ON t2.y = t3.x ORDER BY t1.x ASC LIMIT 10");
   }
 
   // Test the toSql() output of insert queries.
@@ -404,5 +388,122 @@ public class ToSqlTest extends AnalyzerTest {
         " partition (year=2009, month) values(1, 12)",
         "INSERT INTO TABLE functional.alltypes(id) " +
         "PARTITION (year=2009, month) VALUES(1, 12)");
+  }
+
+  /**
+   * Tests all expressions including whether their toSql() is properly
+   * enclosed in parentheses.
+   */
+  @Test
+  public void testExprs() {
+    // AggregateExpr.
+    testToSql("select count(*), (count(*)), avg(int_col), (avg(int_col)), " +
+        "sum(int_col), (sum(int_col)), min(int_col), (min(int_col)), " +
+        "max(int_col), (max(int_col)) from functional.alltypes",
+        "SELECT COUNT(*), (COUNT(*)), AVG(int_col), (AVG(int_col)), " +
+        "SUM(int_col), (SUM(int_col)), MIN(int_col), (MIN(int_col)), " +
+        "MAX(int_col), (MAX(int_col)) FROM functional.alltypes");
+    // ArithmeticExpr.
+    testToSql("select 1 * 1, (1 * 1), 2 / 2, (2 / 2), 3 % 3, (3 % 3), " +
+        "4 DIV 4, (4 DIV 4), 5 + 5, (5 + 5), 6 - 6, (6 - 6), 7 & 7, (7 & 7), " +
+        "8 | 8, (8 | 8), 9 ^ 9, (9 ^ 9), ~10, (~10)",
+        "SELECT 1 * 1, (1 * 1), 2.0 / 2.0, (2.0 / 2.0), 3 % 3, (3 % 3), " +
+         "4 DIV 4, (4 DIV 4), 5 + 5, (5 + 5), 6 - 6, (6 - 6), 7 & 7, (7 & 7), " +
+        "8 | 8, (8 | 8), 9 ^ 9, (9 ^ 9), ~10, (~10)");
+    testToSql("select (((1 + 2) * (3 - 4) + 6) / 7)",
+        "SELECT (((1 + 2) * (3 - 4) + 6) / 7.0)");
+
+    // CaseExpr.
+    // Single case without else clause. No case expr.
+    testToSql("select case when true then 1 end, " +
+        "(case when true then 1 end)",
+        "SELECT CASE WHEN TRUE THEN 1 END, " +
+        "(CASE WHEN TRUE THEN 1 END)");
+    // Multiple cases with else clause. No case expr.
+    testToSql("select case when true then 1 when false then 2 else 3 end, " +
+        "(case when true then 1 when false then 2 else 3 end)",
+        "SELECT CASE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END, " +
+        "(CASE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END)");
+    // Multiple cases with else clause with case expr.
+    testToSql("select case true when true then 1 when false then 2 else 3 end, " +
+        "(case true when true then 1 when false then 2 else 3 end)",
+        "SELECT CASE TRUE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END, " +
+        "(CASE TRUE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END)");
+
+    // CastExpr.
+    testToSql("select cast(NULL as INT), (cast(NULL as INT))",
+        "SELECT CAST(NULL AS INT), (CAST(NULL AS INT))");
+    // FunctionCallExpr.
+    testToSql("select pi(), (pi()), trim('a'), (trim('a'))",
+        "SELECT pi(), (pi()), trim('a'), (trim('a'))");
+    // LiteralExpr.
+    testToSql("select 10, (10), 20.0, (20.0), NULL, (NULL), 'abc', ('abc')",
+        "SELECT 10, (10), 20.0, (20.0), NULL, (NULL), 'abc', ('abc')");
+    // BetweenPredicate.
+    testToSql("select 5 between 10 and 20, (5 between 10 and 20)",
+        "SELECT 5 BETWEEN 10 AND 20, (5 BETWEEN 10 AND 20)");
+    testToSql("select 5 not between 10 and 20, (5 not between 10 and 20)",
+        "SELECT 5 NOT BETWEEN 10 AND 20, (5 NOT BETWEEN 10 AND 20)");
+    // BinaryPredicate.
+    testToSql("select 'a' = 'b', ('a' = 'b'), 'a' != 'b', ('a' != 'b'), " +
+        "1 < 2, (1 < 2), 1 <= 2, (1 <= 2), 1 > 2, (1 > 2), 1 >= 2, (1 >= 2)",
+        "SELECT 'a' = 'b', ('a' = 'b'), 'a' != 'b', ('a' != 'b'), " +
+        "1 < 2, (1 < 2), 1 <= 2, (1 <= 2), 1 > 2, (1 > 2), 1 >= 2, (1 >= 2)");
+    // CompoundPredicate.
+    testToSql("select true and false, (true and false), " +
+        "false or true, (false or true), " +
+        "!true, (!true), not false, (not false)",
+        "SELECT TRUE AND FALSE, (TRUE AND FALSE), " +
+         "FALSE OR TRUE, (FALSE OR TRUE), " +
+        "NOT TRUE, (NOT TRUE), NOT FALSE, (NOT FALSE)");
+    testToSql("select ((true and (false or false) or true) and (false or true))",
+        "SELECT ((TRUE AND (FALSE OR FALSE) OR TRUE) AND (FALSE OR TRUE))");
+    // InPredicate.
+    testToSql("select 5 in (4, 6, 7, 5), (5 in (4, 6, 7, 5))," +
+        "5 not in (4, 6, 7, 5), (5 not In (4, 6, 7, 5))",
+        "SELECT 5 IN (4, 6, 7, 5), (5 IN (4, 6, 7, 5)), " +
+        "5 NOT IN (4, 6, 7, 5), (5 NOT IN (4, 6, 7, 5))");
+    // IsNullPredicate.
+    testToSql("select 5 is null, (5 is null), 10 is not null, (10 is not null)",
+        "SELECT 5 IS NULL, (5 IS NULL), 10 IS NOT NULL, (10 IS NOT NULL)");
+    // LikePredicate.
+    testToSql("select 'a' LIKE '%b.', ('a' LIKE '%b.'), " +
+        "'b' RLIKE '.c%', ('b' RLIKE '.c%')," +
+        "'d' REGEXP '.e%', ('d' REGEXP '.e%')",
+        "SELECT 'a' LIKE '%b.', ('a' LIKE '%b.'), " +
+         "'b' RLIKE '.c%', ('b' RLIKE '.c%'), " +
+        "'d' REGEXP '.e%', ('d' REGEXP '.e%')");
+    // SlotRef.
+    testToSql("select bool_col, (bool_col), int_col, (int_col) " +
+        "string_col, (string_col), timestamp_col, (timestamp_col) " +
+        "from functional.alltypes",
+        "SELECT bool_col, (bool_col), int_col, (int_col) " +
+         "string_col, (string_col), timestamp_col, (timestamp_col) " +
+        "FROM functional.alltypes");
+
+    // TimestampArithmeticExpr.
+    // Non-function-call like version.
+    testToSql("select timestamp_col + interval 10 years, " +
+        "(timestamp_col + interval 10 years) from functional.alltypes",
+        "SELECT timestamp_col + INTERVAL 10 years, " +
+        "(timestamp_col + INTERVAL 10 years) FROM functional.alltypes");
+    testToSql("select timestamp_col - interval 20 months, " +
+        "(timestamp_col - interval 20 months) from functional.alltypes",
+        "SELECT timestamp_col - INTERVAL 20 months, " +
+        "(timestamp_col - INTERVAL 20 months) FROM functional.alltypes");
+    // Reversed interval and timestamp using addition.
+    testToSql("select interval 30 weeks + timestamp_col, " +
+        "(interval 30 weeks + timestamp_col) from functional.alltypes",
+        "SELECT INTERVAL 30 weeks + timestamp_col, " +
+        "(INTERVAL 30 weeks + timestamp_col) FROM functional.alltypes");
+    // Function-call like version.
+    testToSql("select date_add(timestamp_col, interval 40 days), " +
+        "(date_add(timestamp_col, interval 40 days)) from functional.alltypes",
+        "SELECT DATE_ADD(timestamp_col, INTERVAL 40 days), " +
+        "(DATE_ADD(timestamp_col, INTERVAL 40 days)) FROM functional.alltypes");
+    testToSql("select date_sub(timestamp_col, interval 40 hours), " +
+        "(date_sub(timestamp_col, interval 40 hours)) from functional.alltypes",
+        "SELECT DATE_SUB(timestamp_col, INTERVAL 40 hours), " +
+        "(DATE_SUB(timestamp_col, INTERVAL 40 hours)) FROM functional.alltypes");
   }
 }

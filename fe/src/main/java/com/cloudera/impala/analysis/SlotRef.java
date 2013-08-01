@@ -78,7 +78,7 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     if (tblName != null) {
       Preconditions.checkNotNull(label);
       return tblName.toSql() + "." + label;

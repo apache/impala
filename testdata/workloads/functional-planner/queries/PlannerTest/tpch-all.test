@@ -22,7 +22,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE
-  |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * 1.0 - l_discount), SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
+  |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1 
   |  
@@ -45,7 +45,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * 1.0 - l_discount)), SUM(SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax)), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
+  |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * (1.0 - l_discount))), SUM(SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax))), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
   |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1 
   |  
@@ -60,7 +60,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: l_returnflag, l_linestatus
 
   1:AGGREGATE
-  |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * 1.0 - l_discount), SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
+  |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1 
   |  
@@ -430,12 +430,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
   5:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3 
   |  
@@ -470,7 +470,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
@@ -485,12 +485,12 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   6:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC, o_orderdate ASC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
   |  tuple ids: 3 
   |  
   10:AGGREGATE
-  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3 
   |  
@@ -505,7 +505,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
 
   5:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3 
   |  
@@ -750,12 +750,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
   11:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
   |  tuple ids: 6 
   |  
@@ -820,7 +820,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   21:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
@@ -835,12 +835,12 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   12:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
   |  tuple ids: 6 
   |  
   19:AGGREGATE
-  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: n_name
   |  tuple ids: 6 
   |  
@@ -855,7 +855,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: n_name
 
   11:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
   |  tuple ids: 6 
   |  
@@ -1099,7 +1099,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 8 
   |  
   15:AGGREGATE
-  |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
   |  tuple ids: 8 
   |  
@@ -1204,7 +1204,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 8 
   |  
   27:AGGREGATE
-  |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END)), SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: year(o_orderdate)
   |  tuple ids: 8 
   |  
@@ -1219,7 +1219,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: year(o_orderdate)
 
   15:AGGREGATE
-  |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
   |  tuple ids: 8 
   |  
@@ -1458,7 +1458,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 6 
   |  
   11:AGGREGATE
-  |  output: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
+  |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6 
   |  
@@ -1542,7 +1542,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 6 
   |  
   20:AGGREGATE
-  |  output: SUM(SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity))
+  |  output: SUM(SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity))
   |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6 
   |  
@@ -1557,7 +1557,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: n.n_name, year(o.o_orderdate)
 
   11:AGGREGATE
-  |  output: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
+  |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6 
   |  
@@ -1744,12 +1744,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
   7:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4 
   |  
@@ -1793,7 +1793,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
@@ -1808,12 +1808,12 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:TOP-N
-  |  order by: round(SUM(l_extendedprice * 1.0 - l_discount), 5) DESC
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
   |  tuple ids: 4 
   |  
   14:AGGREGATE
-  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4 
   |  
@@ -1828,7 +1828,7 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
 
   7:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4 
   |  
@@ -2174,7 +2174,7 @@ PLAN FRAGMENT 0
   |    
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP', l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
+     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -2252,7 +2252,7 @@ PLAN FRAGMENT 4
 
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP', l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
+     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -2448,7 +2448,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -2471,7 +2471,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:AGGREGATE
-  |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END)), SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -2486,7 +2486,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -2557,7 +2557,7 @@ PLAN FRAGMENT 0
     overwrite=true
 
   1:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
   |  tuple ids: 1 
   |  
@@ -2573,7 +2573,7 @@ PLAN FRAGMENT 0
     overwrite=true
 
   3:AGGREGATE
-  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_suppkey
   |  tuple ids: 1 
   |  
@@ -2588,7 +2588,7 @@ PLAN FRAGMENT 1
     HASH_PARTITIONED: l_suppkey
 
   1:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
   |  tuple ids: 1 
   |  
@@ -3415,7 +3415,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -3423,7 +3423,7 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  other predicates: p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON' OR p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON' OR p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON'
+  |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
   |  tuple ids: 0 1 
   |  
   |----1:SCAN HDFS
@@ -3438,7 +3438,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  output: SUM(SUM(l_extendedprice * 1.0 - l_discount))
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -3453,7 +3453,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   3:AGGREGATE
-  |  output: SUM(l_extendedprice * 1.0 - l_discount)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: 
   |  tuple ids: 2 
   |  
@@ -3461,7 +3461,7 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  other predicates: p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON' OR p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON' OR p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON'
+  |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
   |  tuple ids: 0 1 
   |  
   |----4:EXCHANGE
@@ -4177,7 +4177,7 @@ PLAN FRAGMENT 0
   |  
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
-     predicates: c.c_acctbal > 0.0, substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
+     predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -4208,7 +4208,7 @@ PLAN FRAGMENT 1
   |  
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
-     predicates: c.c_acctbal > 0.0, substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
+     predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
      tuple ids: 0 
 ====
 # QUERY_NAME : TPCH-Q22_QUERY_2
@@ -4278,7 +4278,7 @@ PLAN FRAGMENT 0
   |    
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
-     predicates: substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
+     predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
      tuple ids: 0 
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -4367,7 +4367,7 @@ PLAN FRAGMENT 4
   |    
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
-     predicates: substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17'
+     predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
      tuple ids: 0 
 
 PLAN FRAGMENT 5

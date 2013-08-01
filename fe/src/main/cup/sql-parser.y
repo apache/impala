@@ -1303,7 +1303,10 @@ non_pred_expr ::=
   | arithmetic_expr:e
   {: RESULT = e; :}
   | LPAREN non_pred_expr:e RPAREN
-  {: RESULT = e; :}
+  {:
+    e.setPrintSqlInParens(true);
+    RESULT = e;
+  :}
   ;
 
 func_arg_list ::=
@@ -1462,7 +1465,10 @@ predicate ::=
   | like_predicate:p
   {: RESULT = p; :}
   | LPAREN predicate:p RPAREN
-  {: RESULT = p; :}
+  {:
+    p.setPrintSqlInParens(true);
+    RESULT = p;
+  :}
   ;
 
 comparison_predicate ::=

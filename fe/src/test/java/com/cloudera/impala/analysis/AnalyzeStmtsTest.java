@@ -246,7 +246,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select _c0 from " +
         "(select int_col * 2, id from functional.alltypes) a inner join " +
         "(select int_col + 6, id from functional.alltypes) b " +
-        "on a.id = b.id",
+        "on (a.id = b.id)",
         createAnalyzerUsingHiveColLabels(),
         "Unqualified column reference '_c0' is ambiguous");
     // auto-generated column doesn't exist
@@ -277,12 +277,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // arbitrary expr not returning bool
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
-        "join functional.alltypes b on (trim(a.string_col))",
+        "join functional.alltypes b on trim(a.string_col)",
         "ON clause 'trim(a.string_col)' requires return type 'BOOLEAN'. " +
         "Actual type is 'STRING'.");
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
-        "join functional.alltypes b on (a.int_col * b.float_col)",
+        "join functional.alltypes b on a.int_col * b.float_col",
         "ON clause 'a.int_col * b.float_col' requires return type 'BOOLEAN'. " +
         "Actual type is 'DOUBLE'.");
     // unknown column
@@ -303,7 +303,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // incompatible comparison
     AnalysisError(
         "select a.int_col from functional.alltypes a join " +
-        "functional.alltypes b on (a.bool_col = b.string_col)",
+        "functional.alltypes b on a.bool_col = b.string_col",
         "operands are not comparable: a.bool_col = b.string_col");
     AnalyzesOk(
     "select a.int_col, b.int_col, c.int_col " +
@@ -1098,7 +1098,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Complex query on a complex view with a join and an aggregate.
     AnalyzesOk("select sum(t1.abc), t2.xyz from functional.complex_view t1 " +
-        "inner join functional.complex_view t2 on t1.abc = t2.abc " +
+        "inner join functional.complex_view t2 on (t1.abc = t2.abc) " +
         "group by t2.xyz");
 
     // Cannot insert into a view.

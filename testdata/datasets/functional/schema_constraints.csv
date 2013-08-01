@@ -45,6 +45,7 @@ table_name:alltypes_view, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:alltypes_view_sub, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view_sub, constraint:restrict_to, table_format:seq/snap/block
+table_name:alltypes_parens, constraint:restrict_to, table_format:text/none/none
 table_name:complex_view, constraint:restrict_to, table_format:text/none/none
 table_name:complex_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:view_view, constraint:restrict_to, table_format:text/none/none

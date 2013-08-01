@@ -822,3 +822,33 @@ PLAN FRAGMENT 4
      table=functional.alltypes #partitions=24 size=478.45KB compact
      tuple ids: 2 
 ====
+# Tests that parentheses are preserved when creating a view
+# enabling proper partition pruning for this particular view.
+select * from functional.alltypes_parens
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=1 size=19.95KB
+     predicates: (int_col < 100 OR bool_col = FALSE)
+     tuple ids: 0 
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+     tuple ids: 0 
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=1 size=19.95KB
+     predicates: (int_col < 100 OR bool_col = FALSE)
+     tuple ids: 0 
+====

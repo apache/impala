@@ -44,7 +44,7 @@ public class TupleIsNullPredicate extends Predicate {
     }
   }
 
-  public List<TupleId> getTupleIds() {
-    return tupleIds;
-  }
+  @Override
+  protected String toSqlImpl() { return ""; }
+  public List<TupleId> getTupleIds() { return tupleIds; }
 }

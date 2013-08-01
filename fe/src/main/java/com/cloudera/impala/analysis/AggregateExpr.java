@@ -111,7 +111,7 @@ public class AggregateExpr extends Expr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     StringBuilder sb = new StringBuilder(op.toString());
     sb.append("(");
     if (isStar) {

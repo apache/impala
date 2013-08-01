@@ -83,7 +83,7 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
   }
 

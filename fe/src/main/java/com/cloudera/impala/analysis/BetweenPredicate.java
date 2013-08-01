@@ -96,7 +96,7 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     String notStr = (isNotBetween) ? "NOT " : "";
     return originalChildren.get(0).toSql() + " " + notStr + "BETWEEN " +
         originalChildren.get(1).toSql() + " AND " + originalChildren.get(2).toSql();

@@ -277,7 +277,6 @@ public abstract class TableRef implements ParseNode {
    */
   abstract protected String tableRefToSql();
 
-
   @Override
   public String toSql() {
     if (joinOp == null) {
@@ -291,7 +290,7 @@ public abstract class TableRef implements ParseNode {
     if (usingColNames != null) {
       output.append("USING (").append(Joiner.on(", ").join(usingColNames)).append(")");
     } else if (onClause != null) {
-      output.append("ON (").append(onClause.toSql()).append(")");
+      output.append("ON ").append(onClause.toSql());
     }
     return output.toString();
   }

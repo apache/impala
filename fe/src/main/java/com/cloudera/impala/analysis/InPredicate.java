@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,7 @@ public class InPredicate extends Predicate {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
     String notStr = (isNotIn) ? "NOT " : "";
     strBuilder.append(getChild(0).toSql() + " " + notStr + "IN (");

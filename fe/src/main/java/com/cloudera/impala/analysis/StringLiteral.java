@@ -46,14 +46,13 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return "'" + value + "'";
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.STRING_LITERAL;
-
     msg.string_literal = new TStringLiteral(getUnescapedValue());
   }
 

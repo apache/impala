@@ -767,6 +767,16 @@ AS SELECT * FROM {db_name}{db_suffix}.alltypes_view;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypes_parens
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.alltypes
+WHERE year = 2009 and (int_col < 100 OR bool_col = false) and month = 1;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 escapenoquotes
 ---- COLUMNS
 col1 string

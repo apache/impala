@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
@@ -44,7 +45,7 @@ public class IsNullPredicate extends Predicate {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return getChild(0).toSql() + (isNotNull ? " IS NOT NULL" : " IS NULL");
   }
 

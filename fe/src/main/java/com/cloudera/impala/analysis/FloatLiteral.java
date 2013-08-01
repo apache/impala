@@ -67,7 +67,7 @@ public class FloatLiteral extends LiteralExpr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return getStringValue();
   }
 

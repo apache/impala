@@ -556,7 +556,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Complex view definition with joins and aggregates.
     AnalyzesOk("create view foo (cnt) as " +
         "select count(distinct x.int_col) from functional.alltypessmall x " +
-        "inner join functional.alltypessmall y on x.id = y.id group by x.bigint_col");
+        "inner join functional.alltypessmall y on (x.id = y.id) group by x.bigint_col");
 
     // Test different query-statement types as view definition.
     AnalyzesOk("create view foo (a, b) as values(1, 'a'), (2, 'b')");

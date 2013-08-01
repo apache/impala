@@ -41,7 +41,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return functionName + "(" + Joiner.on(", ").join(childrenToSql()) + ")";
   }
 

@@ -214,7 +214,7 @@ where bigint_col is null limit 10
 ---- RESULTS
 ====
 ---- QUERY
-# Test querying the alterer view
+# Test querying the altered view
 select count(bigint_col), count(string_col) from ddl_test_db.new_parquet_view
 ---- RESULTS
 0,10
@@ -233,4 +233,20 @@ select * from ddl_test_db.const_view
 1,'a',10.0
 ---- TYPES
 tinyint,string,float
+====
+---- QUERY
+# Test that parentheses are preserved in view creation.
+# If the parentheses were ignored the query would return a count > 0.
+create view ddl_test_db.paren_view as
+select count(*) from functional.alltypessmall
+where true and (true or false) and false
+---- RESULTS
+====
+---- QUERY
+# Test that parentheses are preserved in view creation.
+select * from ddl_test_db.paren_view
+---- RESULTS
+0
+---- TYPES
+bigint
 ====

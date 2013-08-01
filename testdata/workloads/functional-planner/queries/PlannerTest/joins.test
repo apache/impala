@@ -368,7 +368,7 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    a.id = c.id
   |    b.string_col = c.string_col
-  |  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+  |  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, (b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000)
   |  tuple ids: 0N 1N 2 
   |  
   |----3:SCAN HDFS
@@ -408,7 +408,7 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    a.id = c.id
   |    b.string_col = c.string_col
-  |  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+  |  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, (b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000)
   |  tuple ids: 0N 1N 2 
   |  
   |----8:EXCHANGE

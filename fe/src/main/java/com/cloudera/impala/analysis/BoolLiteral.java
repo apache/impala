@@ -52,7 +52,7 @@ public class BoolLiteral extends LiteralExpr {
   }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     return getStringValue();
   }
 

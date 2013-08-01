@@ -163,20 +163,12 @@ public class TimestampArithmeticExpr extends Expr {
     msg.setOpcode(opcode);
   }
 
-  public String getTimeUnitIdent() {
-    return timeUnitIdent;
-  }
-
-  public TimeUnit getTimeUnit() {
-    return timeUnit;
-  }
-
-  public ArithmeticExpr.Operator getOp() {
-    return op;
-  }
+  public String getTimeUnitIdent() { return timeUnitIdent; }
+  public TimeUnit getTimeUnit() { return timeUnit; }
+  public ArithmeticExpr.Operator getOp() { return op; }
 
   @Override
-  public String toSql() {
+  public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
     if (funcName != null) {
       // Function-call like version.
