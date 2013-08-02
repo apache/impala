@@ -30,12 +30,13 @@ const char* HashTable::LLVM_CLASS_NAME = "class.impala::HashTable";
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& probe_exprs,
-    int num_build_tuples, bool stores_nulls, int32_t initial_seed,
+    int num_build_tuples, bool stores_nulls, bool finds_nulls, int32_t initial_seed,
     const vector<MemLimit*>& mem_limits, int64_t num_buckets)
   : build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
+    finds_nulls_(finds_nulls),
     initial_seed_(initial_seed),
     node_byte_size_(sizeof(Node) + sizeof(Tuple*) * num_build_tuples_),
     num_filled_buckets_(0),

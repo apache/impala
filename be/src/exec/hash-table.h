@@ -80,12 +80,14 @@ class HashTable {
   //  - probe_exprs are used during Find()
   //  - num_build_tuples: number of Tuples in the build tuple row
   //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
+  //  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
+  //                 even if stores_nulls is true
   //  - num_buckets: number of buckets that the hash table should be initialized to
   //  - mem_limits: if non-empty, all memory allocation for nodes and for buckets is
   //    tracked against those limits; the limits must be valid until the d'tor is called
   //  - initial_seed: Initial seed value to use when computing hashes for rows
   HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
-      int num_build_tuples, bool stores_nulls, int32_t initial_seed,
+      int num_build_tuples, bool stores_nulls, bool finds_nulls, int32_t initial_seed,
       const std::vector<MemLimit*>& mem_limits = std::vector<MemLimit*>(),
       int64_t num_buckets = 1024);
 
@@ -110,7 +112,7 @@ class HashTable {
   // Advancing the returned iterator will go to the next matching row.  The matching 
   // rows are evaluated lazily (i.e. computed as the Iterator is moved).   
   // Returns HashTable::End() if there is no match.
-  Iterator Find(TupleRow* probe_row);
+  Iterator IR_ALWAYS_INLINE Find(TupleRow* probe_row);
 
   // Returns number of elements in the hash table
   int64_t size() { return num_nodes_; }
@@ -330,6 +332,7 @@ class HashTable {
   // Number of Tuple* in the build tuple row
   const int num_build_tuples_;
   const bool stores_nulls_;
+  const bool finds_nulls_;
 
   const int32_t initial_seed_;
 

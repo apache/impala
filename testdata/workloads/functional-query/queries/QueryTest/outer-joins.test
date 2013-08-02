@@ -561,3 +561,25 @@ int, int, int
 NULL,1,NULL
 NULL,NULL,1
 ====
+---- QUERY
+# test that right outer join includes tuples from rhs
+# even if one of its join columns is NULL
+select count(*) from functional.alltypesagg a
+right outer join functional.alltypesagg b on a.int_col = b.int_col
+where b.int_col is null
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+# test that full outer join includes tuples from rhs
+# even if one of its join columns is NULL
+select count(*) from functional.alltypesagg a
+full outer join functional.alltypesagg b on a.int_col = b.int_col
+where a.int_col is null or b.int_col is null
+---- TYPES
+bigint
+---- RESULTS
+20
+====

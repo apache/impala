@@ -126,7 +126,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc(), false));
 
   // TODO: how many buckets?
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, 
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, true,
       id(), *state->mem_limits()));
   
   // Determine the number of string slots in the output

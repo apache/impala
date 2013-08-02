@@ -22,7 +22,7 @@ namespace impala {
 
 inline HashTable::Iterator HashTable::Find(TupleRow* probe_row) {
   bool has_nulls = EvalProbeRow(probe_row);
-  if (!stores_nulls_ && has_nulls) return End();
+  if ((!stores_nulls_ || !finds_nulls_) && has_nulls) return End();
   uint32_t hash = HashCurrentRow();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
 

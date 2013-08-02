@@ -175,7 +175,7 @@ TEST_F(HashTableTest, BasicTest) {
   }
   
   // Create the hash table and insert the build rows
-  HashTable hash_table(build_expr_, probe_expr_, 1, false, 0);
+  HashTable hash_table(build_expr_, probe_expr_, 1, false, false, 0);
   for (int i = 0; i < 5; ++i) {
     hash_table.Insert(build_rows[i]);
   }
@@ -212,7 +212,7 @@ TEST_F(HashTableTest, BasicTest) {
 
 // This tests makes sure we can scan ranges of buckets
 TEST_F(HashTableTest, ScanTest) {
-  HashTable hash_table(build_expr_, probe_expr_, 1, false, 0);
+  HashTable hash_table(build_expr_, probe_expr_, 1, false, false, 0);
   // Add 1 row with val 1, 2 with val 2, etc 
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -258,7 +258,7 @@ TEST_F(HashTableTest, GrowTableTest) {
   vector<MemLimit*> mem_limits;
   mem_limits.push_back(&mem_limit);
   HashTable hash_table(
-      build_expr_, probe_expr_, 1, false, 0, mem_limits, num_to_add);
+      build_expr_, probe_expr_, 1, false, false, 0, mem_limits, num_to_add);
   EXPECT_TRUE(!mem_limit.LimitExceeded());
 
   // This inserts about 5M entries
