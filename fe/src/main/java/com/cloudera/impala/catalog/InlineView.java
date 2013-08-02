@@ -20,6 +20,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.base.Preconditions;
 
@@ -61,6 +62,8 @@ public class InlineView extends Table {
 
   @Override
   public boolean isVirtualTable() { return true; }
+  @Override
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.VIEW; }
 
   /**
    * This should never be called.

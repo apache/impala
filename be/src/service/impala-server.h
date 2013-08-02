@@ -34,6 +34,7 @@
 #include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
+#include "util/simple-logger.h"
 #include "util/thread-pool.h"
 #include "util/uid-util.h"
 #include "runtime/coordinator.h"
@@ -392,20 +393,32 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void InitializeConfigVariables();
 
   // Checks settings for profile logging, including whether the output
-  // directory exists and is writeable. Calls OpenProfileLogFile to
-  // initialise the first log file. Returns OK unless there is some
-  // problem preventing profile log files from being written.
-  // If an error is returned, the constructor will disable profile logging.
+  // directory exists and is writeable, and initialises the first log file.
+  // Returns OK unless there is some problem preventing profile log files
+  // from being written. If an error is returned, the constructor will disable
+  // profile logging.
   Status InitProfileLogging();
 
-  // Opens a profile log file for profile archival. If reopen is true,
-  // reopens the current file (causing a flush to disk), otherwise
-  // closes the current file and creates a new one.
-  // Must be called with profile_log_file_lock_ held.
-  Status OpenProfileLogFile(bool reopen);
+  // Checks settings for audit event logging, including whether the output
+  // directory exists and is writeable, and initialises the first log file.
+  // Returns OK unless there is some problem preventing audit event log files
+  // from being written. If an error is returned, impalad startup will be aborted.
+  Status InitAuditEventLogging();
+
+  // Initializes a logging directory, creating the directory if it does not already
+  // exist. If there is any error creating the directory an error will be returned.
+  static Status InitLoggingDir(const std::string& log_dir);
+
+  // Returns true if audit event logging is enabled, false otherwise.
+  bool IsAuditEventLoggingEnabled();
 
   // Runs once every 5s to flush the profile log file to disk.
   void LogFileFlushThread();
+
+  // Runs once every 5s to flush the audit log file to disk.
+  void AuditEventLoggerFlushThread();
+
+  Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
 
   // Copies a query's state into the query log. Called immediately prior to a
   // QueryExecState's deletion. Also writes the query profile to the profile log on disk.
@@ -548,23 +561,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
   QueryLogIndex query_log_index_;
 
-  // Protects profile_log_file_, log_file_size and profile_log_file_name_
-  boost::mutex profile_log_file_lock_;
-
-  // Encoded query profiles are written to this stream, one per line
-  // with the following format:
+  // Logger for writing encoded query profiles, one per line with the following format:
   // <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
-  std::ofstream profile_log_file_;
+  boost::scoped_ptr<SimpleLogger> profile_logger_;
 
-  // Counts the number of queries written to profile_log_file_; used to
-  // decide when to close the file and start a new one.
-  uint64_t profile_log_file_size_;
-
-  // Current query log file name.
-  std::string profile_log_file_name_;
+  // Logger for writing audit events, one per line with the format:
+  // "<current timestamp>" : { JSON object }
+  boost::scoped_ptr<SimpleLogger> audit_event_logger_;
 
   // If profile logging is enabled, wakes once every 5s to flush query profiles to disk
   boost::scoped_ptr<boost::thread> profile_log_file_flush_thread_;
+
+  // If audit event logging is enabled, wakes once every 5s to flush audit events to disk
+  boost::scoped_ptr<boost::thread> audit_event_logger_flush_thread_;
 
   // A Frontend proxy, used both for planning and for catalog requests.
   boost::scoped_ptr<Frontend> frontend_;

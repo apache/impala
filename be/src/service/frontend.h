@@ -141,6 +141,9 @@ class Frontend {
   // response in the TLoadDataResp output parameter. Returns OK if the operation
   // completed successfully.
   Status LoadData(const TLoadDataReq& load_data_request, TLoadDataResp* response);
+
+  // Returns true if the error returned by the FE was due to an AuthorizationException.
+  static bool IsAuthorizationError(const Status& status);
  private:
   // Descriptor of Java Frontend class itself, used to create a new instance.
   jclass fe_class_;

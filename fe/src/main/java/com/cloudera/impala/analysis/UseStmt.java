@@ -46,10 +46,7 @@ public class UseStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (analyzer.getCatalog().getDb(
-        database, analyzer.getUser(), Privilege.ANY) == null) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + getDatabase());
-    }
+    analyzer.getDb(database, Privilege.ANY);
   }
 
   public TUseDbParams toThrift() {

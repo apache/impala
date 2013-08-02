@@ -43,6 +43,8 @@ import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -143,6 +145,9 @@ public class Analyzer {
   // map from slot id to its equivalence class id
   private final Map<SlotId, EquivalenceClassId> equivClassBySlotId = Maps.newHashMap();
 
+  // Tracks access to catalog objects for this Analyzer instance
+  private List<TAccessEvent> accessEvents = Lists.newArrayList();
+
   public Analyzer(Catalog catalog, String defaultDb, User user) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
@@ -178,6 +183,7 @@ public class Analyzer {
     this.equivClassIdGenerator = null;  // only needed at top
     this.equivClassMembers = null;
     this.queryGlobals = parentAnalyzer.queryGlobals;
+    this.accessEvents = parentAnalyzer.accessEvents;
   }
 
   /**
@@ -219,7 +225,9 @@ public class Analyzer {
     // Consult the catalog for a matching view.
     Table tbl = null;
     try {
-      tbl = getTable(ref.getName(), ref.getPrivilegeRequirement());
+      // Skip audit tracking for this request since it is only to determine if the
+      // catalog contains the specified table/view.
+      tbl = getTable(ref.getName(), ref.getPrivilegeRequirement(), false);
     } catch (AnalysisException e) {
       // Swallow this analysis exception to allow detection and proper error
       // reporting of recursive references in WITH-clause views.
@@ -259,7 +267,8 @@ public class Analyzer {
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
-    Table tbl = getTable(ref.getName(), ref.getPrivilegeRequirement());
+
+    Table tbl = getTable(ref.getName(), ref.getPrivilegeRequirement(), true);
     // Views should have been substituted already.
     Preconditions.checkState(!(tbl instanceof View),
         String.format("View %s has not been properly substituted.", tbl.getFullName()));
@@ -626,9 +635,6 @@ public class Analyzer {
         Preconditions.checkState(p != null);
         Pair<SlotId, SlotId> slotIds = p.getEqSlots();
         if (slotIds == null) continue;
-        // TODO: remove
-        LOG.info("slotIds.first=" + Integer.toString(slotIds.first.asInt()) + " slotIds.second=" + Integer.toString(slotIds.second.asInt()));
-
         TableRef tblRef = ojClauseByConjunct.get(id);
         Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
         if (tblRef == null) {
@@ -877,14 +883,24 @@ public class Analyzer {
     return queryGlobals;
   }
 
-  /*
+  /**
+   * Returns a list of the successful catalog object access events. Does not include
+   * accesses that failed due to AuthorizationExceptions. In general, if analysis
+   * fails for any reason this list may be incomplete.
+   */
+  public List<TAccessEvent> getAccessEvents() { return accessEvents; }
+  public void addAccessEvent(TAccessEvent event) { accessEvents.add(event); }
+
+  /**
    * Returns the Catalog Table object for the TableName at the given Privilege level.
    *
    * If the user does not have sufficient privileges to access the table an
-   * AuthorizationException is thrown.
-   * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
+   * AuthorizationException is thrown. If the table or the db does not exist in the
+   * Catalog, an AnalysisError is thrown.
+   * If addAccessEvent is true, this call will add a new entry to accessEvents if the
+   * catalog access was successful. If false, no accessEvent will be added.
    */
-  public Table getTable(TableName tableName, Privilege privilege)
+  public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
       throws AuthorizationException, AnalysisException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
@@ -896,6 +912,13 @@ public class Analyzer {
     try {
       table =
           catalog.getTable(tableName.getDb(), tableName.getTbl(), getUser(), privilege);
+      if (addAccessEvent) {
+        // Add an audit event for this access
+        TCatalogObjectType objectType = TCatalogObjectType.TABLE;
+        if (table instanceof View) objectType = TCatalogObjectType.VIEW;
+        accessEvents.add(new TAccessEvent(
+            tableName.toString(), objectType, privilege.toString()));
+      }
     } catch (DatabaseNotFoundException e) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tableName.getDb());
     } catch (TableNotFoundException e) {
@@ -908,7 +931,20 @@ public class Analyzer {
     return table;
   }
 
-  /*
+  /**
+   * Returns the Catalog Table object for the TableName at the given Privilege level and
+   * adds an audit event if the access was successful.
+   *
+   * If the user does not have sufficient privileges to access the table an
+   * AuthorizationException is thrown.
+   * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
+   */
+  public Table getTable(TableName tableName, Privilege privilege)
+      throws AuthorizationException, AnalysisException {
+    return getTable(tableName, privilege, true);
+  }
+
+  /**
    * Returns the Catalog Db object for the given database name at the given
    * Privilege level.
    *
@@ -920,10 +956,12 @@ public class Analyzer {
       throws AnalysisException, AuthorizationException {
     Db db = catalog.getDb(dbName, getUser(), privilege);
     if (db == null) throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    accessEvents.add(new TAccessEvent(
+        dbName, TCatalogObjectType.DATABASE, privilege.toString()));
     return db;
   }
 
-  /*
+  /**
    * Checks if the given database contains the given table for the given Privilege
    * level. If the table exists in the database, true is returned. Otherwise false.
    *

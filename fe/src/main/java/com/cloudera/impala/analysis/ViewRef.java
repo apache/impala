@@ -15,9 +15,11 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
 import com.google.common.base.Preconditions;
 
 /**
@@ -138,6 +140,8 @@ public class ViewRef extends InlineViewRef {
       // analysis of this view's defining queryStmt.
       analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance(), true);
     }
+    analyzer.addAccessEvent(new TAccessEvent(table.getFullName(),
+        table.getCatalogObjectType(), Privilege.SELECT.toString()));
   }
 
   @Override

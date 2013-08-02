@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <exception>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
@@ -27,6 +28,9 @@
 #include <boost/lexical_cast.hpp>
 #include <google/heap-profiler.h>
 #include <google/malloc_extension.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
@@ -106,6 +110,13 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala if there are improper configs.");
 
+DEFINE_int32(max_audit_event_log_file_size, 5000, "The maximum size (in queries) of the "
+    "audit event log file before a new one is created (if event logging is enabled)");
+DEFINE_string(audit_event_log_dir, "", "The directory in which audit event log files are "
+    "written. Setting this flag will enable audit event logging.");
+DEFINE_bool(abort_on_failed_audit_event, true, "Shutdown Impala if there is a problem "
+    "recording an audit event.");
+
 DEFINE_string(profile_log_dir, "", "The directory in which profile log files are"
     " written. If blank, defaults to <log_file_dir>/profiles");
 DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
@@ -119,10 +130,11 @@ namespace impala {
 ThreadManager* fe_tm;
 ThreadManager* be_tm;
 
-// Prefix of profile log filenames. The version number is
+// Prefix of profile and event log filenames. The version number is
 // internal, and does not correspond to an Impala release - it should
 // be changed only when the file format changes.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
+const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
 const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
@@ -307,9 +319,9 @@ const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
+
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : profile_log_file_size_(0),
-      exec_env_(exec_env) {
+    : exec_env_(exec_env) {
   // Initialize default config
   InitializeConfigVariables();
 
@@ -326,7 +338,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!status.ok()) {
     LOG(ERROR) << status.GetErrorMsg();
     if (FLAGS_abort_on_config_error) {
-      LOG(ERROR) << "Impala is aborted due to improper configurations.";
+      LOG(ERROR) << "Aborting Impala Server startup due to improper configuration";
       exit(1);
     }
   }
@@ -334,6 +346,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!InitProfileLogging().ok()) {
     LOG(ERROR) << "Query profile archival is disabled";
     FLAGS_log_query_to_file = false;
+  }
+
+  if (!InitAuditEventLogging().ok()) {
+    LOG(ERROR) << "Aborting Impala Server startup due to failure initializing "
+               << "audit event logging";
+    exit(1);
   }
 
   Webserver::PathHandlerCallback varz_callback =
@@ -394,6 +412,87 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
 }
 
+Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_state,
+    const TExecRequest& request) {
+  stringstream ss;
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+  writer.StartObject();
+  // Each log entry is a timestamp mapped to a JSON object
+  int64_t ms_since_epoch = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+  ss << ms_since_epoch;
+  writer.String(ss.str().c_str());
+  writer.StartObject();
+  writer.String("query_id");
+  writer.String(PrintId(exec_state.query_id()).c_str());
+  writer.String("session_id");
+  writer.String(PrintId(exec_state.session_id()).c_str());
+  writer.String("start_time");
+  writer.String(exec_state.start_time().DebugString().c_str());
+  writer.String("authorization_failure");
+  writer.Bool(Frontend::IsAuthorizationError(exec_state.query_status()));
+  writer.String("status");
+  writer.String(exec_state.query_status().GetErrorMsg().c_str());
+  writer.String("user");
+  writer.String(exec_state.user().c_str());
+  // Impala does not support impersonation so always mark this field as null.
+  writer.String("impersonator");
+  writer.Null();
+  writer.String("statement_type");
+  if (request.stmt_type == TStmtType::DDL) {
+    writer.String(PrintTDdlType(request.ddl_exec_request.ddl_type).c_str());
+  } else {
+    writer.String(PrintTStmtType(request.stmt_type).c_str());
+  }
+  writer.String("network_address");
+  writer.String(
+      lexical_cast<string>(exec_state.parent_session()->network_address).c_str());
+  writer.String("sql_statement");
+  writer.String(replace_all_copy(exec_state.sql_stmt(), "\n", " ").c_str());
+  writer.String("catalog_objects");
+  writer.StartArray();
+  BOOST_FOREACH(const TAccessEvent& event, request.access_events) {
+    writer.StartObject();
+    writer.String("name");
+    writer.String(event.name.c_str());
+    writer.String("object_type");
+    writer.String(PrintTCatalogObjectType(event.object_type).c_str());
+    writer.String("privilege");
+    writer.String(event.privilege.c_str());
+    writer.EndObject();
+  }
+  writer.EndArray();
+  writer.EndObject();
+  writer.EndObject();
+  Status status = audit_event_logger_->AppendEntry(buffer.GetString());
+  if (!status.ok()) {
+    LOG(ERROR) << "Unable to record audit event record: " << status.GetErrorMsg();
+    if (FLAGS_abort_on_failed_audit_event) {
+      LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_audit_event=true";
+      exit(1);
+    }
+  }
+  return status;
+}
+
+bool ImpalaServer::IsAuditEventLoggingEnabled() {
+  return !FLAGS_audit_event_log_dir.empty();
+}
+
+Status ImpalaServer::InitAuditEventLogging() {
+  if (!IsAuditEventLoggingEnabled()) {
+    LOG(INFO) << "Event logging is disabled";
+    return Status::OK;
+  }
+  audit_event_logger_.reset(new SimpleLogger(FLAGS_audit_event_log_dir,
+     AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size));
+  RETURN_IF_ERROR(audit_event_logger_->Init());
+  audit_event_logger_flush_thread_.reset(
+      new thread(&ImpalaServer::AuditEventLoggerFlushThread, this));
+  return Status::OK;
+}
+
 Status ImpalaServer::InitProfileLogging() {
   if (!FLAGS_log_query_to_file) return Status::OK;
 
@@ -403,38 +502,11 @@ Status ImpalaServer::InitProfileLogging() {
     FLAGS_profile_log_dir = ss.str();
   }
 
-  LOG(INFO) << "Profile log path: " << FLAGS_profile_log_dir;
-
-  if (!exists(FLAGS_profile_log_dir)) {
-    LOG(INFO) << "Profile log directory does not exist, creating: "
-              << FLAGS_profile_log_dir;
-    try {
-      create_directory(FLAGS_profile_log_dir);
-    } catch (const std::exception& e) { // Explicit std:: to distinguish from boost::
-      LOG(ERROR) << "Could not create profile log directory: "
-                 << FLAGS_profile_log_dir << ", " << e.what();
-      return Status("Failed to create profile log directory");
-    }
-  }
-
-  if (!is_directory(FLAGS_profile_log_dir)) {
-    LOG(ERROR) << "Profile log path is not a directory ("
-               << FLAGS_profile_log_dir << ")";
-    return Status("Profile log path is not a directory");
-  }
-
-  LOG(INFO) << "Profile log path is a directory ("
-            << FLAGS_profile_log_dir << ")";
-
-  Status log_file_status = OpenProfileLogFile(false);
-  if (!log_file_status.ok()) {
-    LOG(ERROR) << "Could not open query log file for writing: "
-               << log_file_status.GetErrorMsg();
-    return log_file_status;
-  }
+  profile_logger_.reset(new SimpleLogger(FLAGS_profile_log_dir,
+      PROFILE_LOG_FILE_PREFIX, FLAGS_max_profile_log_file_size));
+  RETURN_IF_ERROR(profile_logger_->Init());
   profile_log_file_flush_thread_.reset(
       new thread(&ImpalaServer::LogFileFlushThread, this));
-
   return Status::OK;
 }
 
@@ -751,32 +823,24 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
   }
 }
 
-Status ImpalaServer::OpenProfileLogFile(bool reopen) {
-  if (profile_log_file_.is_open()) {
-    // flush() alone does not apparently fsync, but we actually want
-    // the results to become visible, hence the close / reopen
-    profile_log_file_.flush();
-    profile_log_file_.close();
-  }
-  if (!reopen) {
-    stringstream ss;
-    int64_t ms_since_epoch = (microsec_clock::local_time() - EPOCH).total_milliseconds();
-    ss << FLAGS_profile_log_dir << "/" << PROFILE_LOG_FILE_PREFIX
-       << ms_since_epoch;
-    profile_log_file_name_ = ss.str();
-    profile_log_file_size_ = 0;
-  }
-  profile_log_file_.open(profile_log_file_name_.c_str(), ios_base::app | ios_base::out);
-  if (!profile_log_file_.is_open()) return Status("Could not open log file");
-  return Status::OK;
-}
-
 void ImpalaServer::LogFileFlushThread() {
   while (true) {
     sleep(5);
-    {
-      lock_guard<mutex> l(profile_log_file_lock_);
-      OpenProfileLogFile(true);
+    profile_logger_->Flush();
+  }
+}
+
+void ImpalaServer::AuditEventLoggerFlushThread() {
+  while (true) {
+    sleep(5);
+    Status status = audit_event_logger_->Flush();
+    if (!status.ok()) {
+      LOG(ERROR) << "Error flushing audit event log: " << status.GetErrorMsg();
+      if (FLAGS_abort_on_failed_audit_event) {
+        LOG(ERROR) << "Shutting down Impala Server due to "
+                   << "abort_on_failed_audit_event=true";
+        exit(1);
+      }
     }
   }
 }
@@ -788,26 +852,16 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   // not writeable), FLAGS_log_query_to_file will have been set to
   // false
   if (FLAGS_log_query_to_file) {
-    lock_guard<mutex> l(profile_log_file_lock_);
-    if (!profile_log_file_.is_open() ||
-        profile_log_file_size_ > FLAGS_max_profile_log_file_size) {
-      // Roll the file
-      Status status = OpenProfileLogFile(false);
-      if (!status.ok()) {
-        LOG_EVERY_N(WARNING, 1000) << "Could not open new query log file ("
-                                   << google::COUNTER << " attempts failed): "
-                                   << status.GetErrorMsg();
-        LOG_EVERY_N(WARNING, 1000)
-            << "Disable query logging with --log_query_to_file=false";
-      }
-    }
-
-    if (profile_log_file_.is_open()) {
-      int64_t timestamp = (microsec_clock::local_time() - EPOCH).total_milliseconds();
-      profile_log_file_ << timestamp << " " << query.query_id() << " "
-                      << encoded_profile_str
-                      << "\n"; // Not std::endl, since that causes an implicit flush
-      ++profile_log_file_size_;
+    int64_t timestamp = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+    stringstream ss;
+    ss << timestamp << " " << query.query_id() << " " << encoded_profile_str;
+    Status status = profile_logger_->AppendEntry(ss.str());
+    if (!status.ok()) {
+      LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
+                                 << google::COUNTER << " attempts failed): "
+                                 << status.GetErrorMsg();
+      LOG_EVERY_N(WARNING, 1000)
+          << "Disable query logging with --log_query_to_file=false";
     }
   }
 
@@ -886,6 +940,10 @@ Status ImpalaServer::ExecuteInternal(
     }
   }
 
+  if (IsAuditEventLoggingEnabled()) {
+    LogAuditRecord(*(exec_state->get()), result);
+  }
+
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
   if (result.stmt_type == TStmtType::DDL) {
@@ -951,6 +1009,11 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
     query_exec_state_map_.erase(entry);
   }
 
+  // Ignore all audit events except for those due to an AuthorizationException.
+  if (IsAuditEventLoggingEnabled() &&
+      Frontend::IsAuthorizationError(exec_state->query_status())) {
+    LogAuditRecord(*exec_state.get(), exec_state->exec_request());
+  }
   exec_state->Done();
 
   {
@@ -1604,5 +1667,6 @@ shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
     return i->second;
   }
 }
+
 
 }

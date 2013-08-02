@@ -23,6 +23,8 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
@@ -214,6 +216,8 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", dbName, getTbl()));
     }
+    analyzer.addAccessEvent(new TAccessEvent(dbName + "." + tableName.getTbl(),
+        TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
 
     if (columnDefs.size() == 0) {
       throw new AnalysisException("A table requires at least 1 column");

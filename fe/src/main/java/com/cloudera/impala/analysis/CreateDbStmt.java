@@ -20,6 +20,8 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateDbParams;
 
 /**
@@ -116,6 +118,8 @@ public class CreateDbStmt extends StatementBase {
     if (db != null && !ifNotExists) {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }
+    analyzer.addAccessEvent(new TAccessEvent(
+        getDb(), TCatalogObjectType.DATABASE, Privilege.CREATE.toString()));
 
     if (location != null) location.analyze(analyzer, Privilege.ALL);
   }

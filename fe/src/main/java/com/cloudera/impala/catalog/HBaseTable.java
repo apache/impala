@@ -48,6 +48,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HBaseTableSink;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
@@ -402,9 +403,7 @@ public class HBaseTable extends Table {
    * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() {
-    return colsByPos;
-  }
+  public ArrayList<Column> getColumnsInHiveOrder() { return colsByPos; }
 
   @Override
   public TTableDescriptor toThrift() {
@@ -427,15 +426,16 @@ public class HBaseTable extends Table {
     return tableDescriptor;
   }
 
-  public String getHBaseTableName() {
-    return hbaseTableName;
-  }
+  public String getHBaseTableName() { return hbaseTableName; }
 
   @Override
   public int getNumNodes() {
     // TODO: implement
     return 100;
   }
+
+  @Override
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
 
   @Override
   public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
@@ -483,7 +483,5 @@ public class HBaseTable extends Table {
   /**
    * Returns the input-format class string for HBase tables read by Hive.
    */
-  public static String getInputFormat() {
-    return hbaseInputFormat;
-  }
+  public static String getInputFormat() { return hbaseInputFormat; }
 }

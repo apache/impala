@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -80,16 +81,26 @@ public abstract class Table {
     this.lastDdlTime = (msTable != null) ? Catalog.getLastDdlTime(msTable) : -1;
   }
 
-  public TableId getId() {
-    return id;
-  }
-
-  public long getNumRows() {
-    return numRows;
-  }
-
-  // number of nodes that contain data for this table; -1: unknown
+  //number of nodes that contain data for this table; -1: unknown
   public abstract int getNumNodes();
+  public abstract TTableDescriptor toThrift();
+  /**
+   * @return
+   *         An output sink appropriate for writing to this table.
+   */
+  public abstract DataSink createDataSink(
+      List<Expr> partitionKeyExprs, boolean overwrite);
+  public abstract TCatalogObjectType getCatalogObjectType();
+
+  /**
+   * Populate members of 'this' from metastore info. Reuse metadata from oldValue if the
+   * metadata is still valid.
+   */
+  public abstract void load(Table oldValue, HiveMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
+
+  public TableId getId() { return id; }
+  public long getNumRows() { return numRows; }
 
   /**
    * Returns the metastore.api.Table object this Table was created from. Returns null
@@ -98,13 +109,6 @@ public abstract class Table {
   public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
     return msTable;
   }
-
-  /**
-   * Populate members of 'this' from metastore info. Reuse metadata from oldValue if the
-   * metadata is still valid.
-   */
-  public abstract void load(Table oldValue, HiveMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
 
   /**
    * Creates the Impala representation of Hive/HBase metadata for one table.
@@ -195,28 +199,11 @@ public abstract class Table {
    * toThrift() should not work on virtual tables.
    */
   public boolean isVirtualTable() { return false; }
-
-  public abstract TTableDescriptor toThrift();
-
-  public Db getDb() {
-    return db;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public String getFullName() {
-    return (db != null ? db.getName() + "." : "") + name;
-  }
-
-  public String getOwner() {
-    return owner;
-  }
-
-  public ArrayList<Column> getColumns() {
-    return colsByPos;
-  }
+  public Db getDb() { return db; }
+  public String getName() { return name; }
+  public String getFullName() { return (db != null ? db.getName() + "." : "") + name; }
+  public String getOwner() { return owner; }
+  public ArrayList<Column> getColumns() { return colsByPos; }
 
   /**
    * Returns the list of all columns, but with partition columns at the end of
@@ -239,18 +226,6 @@ public abstract class Table {
   /**
    * Case-insensitive lookup.
    */
-  public Column getColumn(String name) {
-    return colsByName.get(name.toLowerCase());
-  }
-
-  public int getNumClusteringCols() {
-    return numClusteringCols;
-  }
-
-  /**
-   * @return
-   *         An output sink appropriate for writing to this table.
-   */
-  public abstract DataSink createDataSink(
-      List<Expr> partitionKeyExprs, boolean overwrite);
+  public Column getColumn(String name) { return colsByName.get(name.toLowerCase()); }
+  public int getNumClusteringCols() { return numClusteringCols; }
 }

@@ -139,6 +139,11 @@ set_target_properties(re2 PROPERTIES IMPORTED_LOCATION "${RE2_LIBRARY}")
 message(STATUS ${RE2_INCLUDE_DIR})
 message(STATUS ${RE2_LIBRARY})
 
+# find rapidjson headers
+find_package(RapidJson REQUIRED)
+include_directories(${RAPIDJSON_INCLUDE_DIR})
+message(STATUS ${RAPIDJSON_INCLUDE_DIR})
+
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 include_directories(${AVRO_INCLUDE_DIR})

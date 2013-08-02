@@ -651,6 +651,29 @@ struct TMetadataOpResponse {
   2: required list<Data.TResultRow> results
 }
 
+// Enum used by TAccessEvent to mark what type of Catalog object was accessed
+// in a query statement
+enum TCatalogObjectType {
+  DATABASE,
+  TABLE,
+  VIEW,
+}
+
+// Tracks accesses to Catalog objects for use during auditing. This information, paired
+// with the current session information, provides a view into what objects a user's
+// query accessed
+struct TAccessEvent {
+  // Fully qualified object name
+  1: required string name
+
+  // The object type (DATABASE, VIEW, TABLE)
+  2: required TCatalogObjectType object_type
+
+  // The requested privilege on the object
+  // TODO: Create an enum for this?
+  3: required string privilege
+}
+
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type;
@@ -673,6 +696,10 @@ struct TExecRequest {
 
   // Request for LOAD DATA statements.
   7: optional TLoadDataReq load_data_request
+
+  // List of catalog objects accessed by this request. May be empty in this
+  // case that the query did not access any Catalog objects.
+  8: optional list<TAccessEvent> access_events
 }
 
 // Convenience type to map between log4j levels and glog severity

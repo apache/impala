@@ -15,11 +15,13 @@
 package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
+import java.util.List;
 
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
 import com.google.common.base.Preconditions;
 
 /**
@@ -207,6 +209,10 @@ public class AnalysisContext {
 
     public Analyzer getAnalyzer() {
       return analyzer;
+    }
+
+    public List<TAccessEvent> getAccessEvents() {
+      return analyzer.getAccessEvents();
     }
   }
 

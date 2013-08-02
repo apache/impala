@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -48,6 +50,8 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", dbName, tableName.getTbl()));
     }
+    analyzer.addAccessEvent(new TAccessEvent(dbName + "." + tableName.getTbl(),
+        TCatalogObjectType.VIEW, Privilege.CREATE.toString()));
     createColumnAndViewDefs(analyzer);
   }
 

@@ -79,7 +79,9 @@ public class PartitionSpec implements ParseNode {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilegeRequirement);
 
-    Table table = analyzer.getTable(tableName, privilegeRequirement);
+    // Skip adding an audit event when analyzing partitions. The parent table should
+    // be audited outside of the PartitionSpec.
+    Table table = analyzer.getTable(tableName, privilegeRequirement, false);
     String tableName = table.getDb().getName() + "." + getTbl();
 
     // Make sure the target table is partitioned.

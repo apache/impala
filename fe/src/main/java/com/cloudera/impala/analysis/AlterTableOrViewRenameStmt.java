@@ -18,6 +18,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
@@ -82,5 +83,7 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", newDbName, getNewTbl()));
     }
+    analyzer.addAccessEvent(new TAccessEvent(newDbName + "." + newTableName.getTbl(),
+        table.getCatalogObjectType(), Privilege.CREATE.toString()));
   }
 }

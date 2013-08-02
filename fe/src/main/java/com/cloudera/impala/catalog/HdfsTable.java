@@ -59,6 +59,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.HdfsTableSink;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -257,28 +258,21 @@ public class HdfsTable extends Table {
     this.partitions = Lists.newArrayList();
   }
 
-  public List<HdfsPartition> getPartitions() {
-    return partitions;
-  }
+  @Override
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
+  public List<HdfsPartition> getPartitions() { return partitions; }
 
   /**
    * Returns the value Hive is configured to use for NULL partition key values.
    * Set during load.
    */
-  public String getNullPartitionKeyValue() {
-    return nullPartitionKeyValue;
-  }
-
-  public String getNullColumnValue() {
-    return nullColumnValue;
-  }
+  public String getNullPartitionKeyValue() { return nullPartitionKeyValue; }
+  public String getNullColumnValue() { return nullColumnValue; }
 
   /*
    * Returns the storage location (HDFS path) of this table.
    */
-  public String getLocation() {
-    return super.getMetaStoreTable().getSd().getLocation();
-  }
+  public String getLocation() { return super.getMetaStoreTable().getSd().getLocation(); }
 
   /**
    * Gets the HdfsPartition matching the given partition spec. Returns null if no match
@@ -775,14 +769,9 @@ public class HdfsTable extends Table {
     return new HdfsTableSink(this, partitionKeyExprs, overwrite);
   }
 
-  public String getHdfsBaseDir() {
-    return hdfsBaseDir;
-  }
-
+  public String getHdfsBaseDir() { return hdfsBaseDir; }
   @Override
-  public int getNumNodes() {
-    return uniqueHostPortsCount;
-  }
+  public int getNumNodes() { return uniqueHostPortsCount; }
 
   /**
    * Return a partition name formed from concatenating partition keys and their values,
@@ -799,5 +788,4 @@ public class HdfsTable extends Table {
     String partitionName = hdfsPath.substring(firstPartColPos, lastPartColPos);
     return partitionName;
   }
-
 }

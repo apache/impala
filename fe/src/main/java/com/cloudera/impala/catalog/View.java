@@ -28,6 +28,7 @@ import com.cloudera.impala.analysis.SqlParser;
 import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.ViewRef;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 
 /**
@@ -110,6 +111,8 @@ public class View extends Table {
     }
   }
 
+  @Override
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.VIEW; }
   public ViewRef getViewDef() { return viewDef; }
   public String getOriginalViewDef() { return originalViewDef; }
   public String getInlineViewDef() { return inlineViewDef; }

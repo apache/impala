@@ -18,6 +18,8 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
@@ -182,6 +184,8 @@ public class CreateTableLikeStmt extends StatementBase {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", dbName, getTbl()));
     }
+    analyzer.addAccessEvent(new TAccessEvent(dbName + "." + tableName.getTbl(),
+        TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
     owner = analyzer.getUser().getName();
   }
 }

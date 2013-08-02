@@ -199,7 +199,6 @@ public class SelectStmt extends QueryStmt {
       BaseTableRef tblRef = (BaseTableRef) tblRefs.get(i);
       ViewRef viewDefinition = analyzer.findViewDefinition(tblRef, true);
       if (viewDefinition == null) continue;
-
       // Instantiate the view to replace the original BaseTableRef.
       ViewRef viewRef = viewDefinition.instantiate(tblRef);
       viewRef.getViewStmt().setIsExplain(isExplain);

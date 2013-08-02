@@ -341,6 +341,7 @@ public class Frontend {
 
     TExecRequest result = new TExecRequest();
     result.setQuery_options(request.getQueryOptions());
+    result.setAccess_events(analysisResult.getAccessEvents());
 
     if (analysisResult.isDdlStmt()) {
       result.stmt_type = TStmtType.DDL;

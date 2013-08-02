@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -137,8 +138,9 @@ public class Db {
     }
   }
 
-  public String getName() {
-    return name;
+  public String getName() { return name; }
+  public TCatalogObjectType getCatalogObjectType() {
+    return TCatalogObjectType.DATABASE;
   }
 
   public List<String> getAllTableNames() {

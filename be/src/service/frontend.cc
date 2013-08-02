@@ -284,3 +284,7 @@ Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
   return CallJniMethodWithThriftArgs(load_table_data_id_, request, response);
 }
+
+bool Frontend::IsAuthorizationError(const Status& status) {
+  return !status.ok() && status.GetErrorMsg().find("AuthorizationException") == 0;
+}

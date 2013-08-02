@@ -53,6 +53,7 @@ std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
+std::string PrintTCatalogObjectType(const TCatalogObjectType::type& type);
 std::string PrintTDdlType(const TDdlType::type& type);
 std::string PrintTSessionType(const TSessionType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
