@@ -75,6 +75,7 @@ void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
   while (column_idx_ < scan_node_->num_cols()) {
     AddColumn<process_escapes>(len, last_column, num_fields, field_locations);
     // The rest of the columns will be null.
+    last_column = &dummy;
     len = 0;
   }
 }

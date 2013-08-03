@@ -48,7 +48,9 @@ class TScanRange;
 // their lengths.  In the second pass, the FieldLocation is used to write out the
 // slots. We want to keep this struct as small as possible.
 struct FieldLocation {
-  //start of field
+  // start of field. This is set to NULL for FieldLocations that are past the
+  // end of the row in the file. E.g. the file only had 3 cols but the table
+  // has 10. These then get written out as NULL slots.
   char* start;
   // Encodes the length and whether or not this fields needs to be unescaped.
   // If len < 0, then the field needs to be unescaped.

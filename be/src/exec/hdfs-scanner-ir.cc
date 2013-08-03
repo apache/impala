@@ -113,12 +113,12 @@ double IrStringToDouble(const char* s, int len, StringParser::ParseResult* resul
 
 extern "C"
 bool IrIsNullString(const char* data, int len) {
-  return len == 2 && data[0] == '\\' && data[1] == 'N';
+  return data == NULL || (len == 2 && data[0] == '\\' && data[1] == 'N');
 }
 
 extern "C"
 bool IrGenericIsNullString(const char* s, int slen, const char* n, int nlen) {
-  return slen == nlen && StringCompare(s, slen, n, nlen, slen) == 0;
+  return s == NULL || (slen == nlen && StringCompare(s, slen, n, nlen, slen) == 0);
 }
 #endif
 

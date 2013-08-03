@@ -114,11 +114,6 @@ hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 # Remove an index file so we test an un-indexed LZO file
 hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.index
 
-# Replace functional_rc.tinytable's file to test an RC file with an extra column (see
-# IMPALA-293). rc_tinytable_extra_col has an extra int column.
-hadoop fs -rm /test-warehouse/tinytable_rc/*
-hadoop fs -put ${IMPALA_HOME}/testdata/tinytable_rc/rc_tinytable_extra_col /test-warehouse/tinytable_rc/
-
 # Add a sequence file that only contains a header (see IMPALA-362)
 hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
                   /test-warehouse/tinytable_seq_snap
