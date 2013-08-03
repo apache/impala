@@ -264,9 +264,9 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
     return THdfsFileFormat::RC_FILE; 
   }
 
-  // read the RCFile Header Metadata section in the current file verifying the
-  // number of columns is correct.  Other pieces of the metadata are ignored.
-  Status VerifyNumColumnsMetadata();
+  // Reads the RCFile Header Metadata section in the current file to determine the number
+  // of columns.  Other pieces of the metadata are ignored.
+  Status ReadNumColumnsMetadata();
 
   // Read the rowgroup header
   // Verifies:
@@ -372,16 +372,14 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
     int32_t current_field_len_rep;
   };
   
-  // Vector of of all (non-partition key) column descriptions.  Indexed by column
-  // index, including non-materialized columns.
+  // Vector of column descriptions for each column in the file (i.e., may contain a
+  // different number of non-partition columns than are in the table metadata).  Indexed
+  // by column index, including non-materialized columns.
   std::vector<ColumnInfo> columns_;
 
   // Buffer for copying key buffers.  This buffer is reused between row groups.
   std::vector<uint8_t> key_buffer_;
   
-  // number of columns in this rowgroup object
-  int num_cols_;
-
   // number of rows in this rowgroup object
   int num_rows_;
 

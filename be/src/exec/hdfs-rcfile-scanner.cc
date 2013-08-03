@@ -29,6 +29,7 @@
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
 #include "util/codec.h"
+#include "util/string-parser.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -81,17 +82,16 @@ Status HdfsRCFileScanner::InitNewRange() {
   // Allocate the buffers for the key information that is used to read and decode
   // the column data.
   columns_.resize(reinterpret_cast<RcFileHeader*>(header_)->num_cols);
-  num_cols_ = columns_.size();
   int num_table_cols = scan_node_->num_cols() - scan_node_->num_partition_keys();
-  DCHECK_GE(num_cols_, num_table_cols);
-  for (int i = 0; i < num_table_cols; ++i) {
-    int col_idx = i + scan_node_->num_partition_keys();
-    columns_[i].materialize_column =
-        scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
-  }
-  // Treat columns not found in table metadata as extra unmaterialized columns
-  for (int i = num_table_cols; i < num_cols_; ++i) {
-    columns_[i].materialize_column = false;
+  for (int i = 0; i < columns_.size(); ++i) {
+    if (i < num_table_cols) {
+      int col_idx = i + scan_node_->num_partition_keys();
+      columns_[i].materialize_column =
+          scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
+    } else {
+      // Treat columns not found in table metadata as extra unmaterialized columns
+      columns_[i].materialize_column = false;
+    }
   }
 
   // TODO: Initialize codegen fn here
@@ -177,8 +177,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
             << (header_->is_compressed ?  "compressed" : "not compressed");
   if (header_->is_compressed) VLOG_FILE << header_->codec;
 
-  // Read file metadata and verify the number of cols is correct
-  RETURN_IF_ERROR(VerifyNumColumnsMetadata());
+  RETURN_IF_ERROR(ReadNumColumnsMetadata());
 
   // Read file sync marker
   uint8_t* sync;
@@ -189,7 +188,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   return Status::OK;
 }
 
-Status HdfsRCFileScanner::VerifyNumColumnsMetadata() {
+Status HdfsRCFileScanner::ReadNumColumnsMetadata() {
   int map_size = 0;
   RETURN_IF_FALSE(stream_->ReadInt(&map_size, &parse_status_));
 
@@ -201,18 +200,19 @@ Status HdfsRCFileScanner::VerifyNumColumnsMetadata() {
 
     if (key_len == strlen(RCFILE_METADATA_KEY_NUM_COLS) &&
         !memcmp(key, HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS, key_len)) {
-      string tmp(reinterpret_cast<char*>(value), value_len);
-      int file_num_cols = atoi(tmp.c_str());
-      int table_num_cols = scan_node_->num_cols() - scan_node_->num_partition_keys();
-      if (file_num_cols >= table_num_cols) {
-        RcFileHeader* rc_header = reinterpret_cast<RcFileHeader*>(header_);
-        rc_header->num_cols = file_num_cols;
-      } else {
+      string value_str(reinterpret_cast<char*>(value), value_len);
+      StringParser::ParseResult result;
+      int num_cols =
+          StringParser::StringToInt<int>(value_str.c_str(), value_str.size(), &result);
+      if (result != StringParser::PARSE_SUCCESS) {
         stringstream ss;
-        ss << "Unexpected hive.io.rcfile.column.number value!"
-           << " Expected value >= " << table_num_cols << ", got " << file_num_cols;
+        ss << "Could not parse number of columns in file " << stream_->filename()
+           << ": " << value_str;
+        if (result == StringParser::PARSE_OVERFLOW) ss << " (result overflowed)";
         return Status(ss.str());
       }
+      RcFileHeader* rc_header = reinterpret_cast<RcFileHeader*>(header_);
+      rc_header->num_cols = num_cols;
     }
   }
   return Status::OK;
@@ -338,7 +338,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
   int bytes_read = ReadWriteUtil::GetVInt(key_buf_ptr, &num_rows_);
   key_buf_ptr += bytes_read;
 
-  for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
+  for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
     GetCurrentKeyBuffer(col_idx, !columns_[col_idx].materialize_column, &key_buf_ptr);
     DCHECK_LE(key_buf_ptr, key_buffer + key_length_);
   }
@@ -407,7 +407,7 @@ inline Status HdfsRCFileScanner::NextRow() {
   // TODO: Wrap this in an iterator and prevent people from alternating
   // calls to NextField()/NextRow()
   DCHECK_LT(row_pos_, num_rows_);
-  for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
+  for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
     if (columns_[col_idx].materialize_column) {
       RETURN_IF_ERROR(NextField(col_idx));
     }
@@ -417,7 +417,7 @@ inline Status HdfsRCFileScanner::NextRow() {
 }
 
 Status HdfsRCFileScanner::ReadColumnBuffers() {
-  for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
+  for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
     ColumnInfo& column = columns_[col_idx];
     if (!columns_[col_idx].materialize_column) {
       // Not materializing this column, just skip it.
@@ -501,8 +501,15 @@ Status HdfsRCFileScanner::ProcessRange() {
 
       for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
         const SlotDescriptor* slot_desc = *it;
-        int rc_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
-        ColumnInfo& column = columns_[rc_column_idx];
+        int file_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
+
+        // Set columns missing in this file to NULL
+        if (file_column_idx >= columns_.size()) {
+          tuple->SetNull(slot_desc->null_indicator_offset());
+          continue;
+        }
+
+        ColumnInfo& column = columns_[file_column_idx];
         DCHECK(column.materialize_column);
 
         const char* col_start = reinterpret_cast<const char*>(

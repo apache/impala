@@ -86,8 +86,8 @@ class TestUnmatchedSchema(ImpalaTestSuite):
 
   def test_unmatched_schema(self, vector):
     table_format = vector.get_value('table_format')
-    if table_format.file_format in ['parquet', 'rc']:
-      pytest.xfail('IMPALA-499 + IMPALA-497')
+    if table_format.file_format  == 'parquet':
+      pytest.xfail('IMPALA-499')
 
     self.__create_test_table(vector)
     self.run_test_case('QueryTest/test-unmatched-schema', vector)
