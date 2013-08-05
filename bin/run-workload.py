@@ -84,8 +84,9 @@ parser.add_option("-V", "--verify_results", dest="verify_results", action="store
 parser.add_option("-c", "--client_type", dest="client_type", default='beeswax',
                   help="Client type. Valid options are 'beeswax' or 'jdbc'")
 parser.add_option("--plugin_names", dest="plugin_names", default=None,
-                  help=("Set of comma-separated plugin names; "
-                        "plugin names are case sensitive"))
+                  help=("Set of comma-separated plugin names with scope; Plugins are"
+                    " specified as <plugin_name>[:<scope>]. If no scope if specified,"
+                    " it defaults to Query. Plugin names are case sensitive"))
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -182,11 +183,13 @@ def run_workloads(workload_runner, failure_injector=None):
 
   for workload_and_scale_factor in options.workloads.split(','):
     workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
+    if plugin_runner: plugin_runner.run_plugins_pre(scope="Workload")
     workload_runner.run_workload(workload, scale_factor,
         table_formats=options.table_formats,
         query_names=options.query_names,
         exploration_strategy=options.exploration_strategy,
         stop_on_query_error=stop_on_error)
+    if plugin_runner: plugin_runner.run_plugins_post(scope="Workload")
 
   if failure_injector is not None:
     failure_injector.cancel()

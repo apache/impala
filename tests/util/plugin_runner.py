@@ -35,9 +35,9 @@ class PluginRunner(object):
   message is logged and the plugin in not loaded.
   '''
 
-  def __init__(self, plugin_names):
+  def __init__(self, plugin_infos):
     self.__available_modules = self.__get_plugin_modules()
-    self.__get_plugins_from_modules(plugin_names)
+    self.__get_plugins_from_modules(plugin_infos)
     self.plugins = self.__plugins
 
   def __get_plugin_modules(self):
@@ -46,13 +46,16 @@ class PluginRunner(object):
     for loader, mod_name, ispkg in modules:
       yield __import__("tests.benchmark.plugins.%s" % mod_name, fromlist=[mod_name])
 
-  def __get_plugins_from_modules(self, plugin_names):
+  def __get_plugins_from_modules(self, plugin_infos):
     '''Look for user speicifed plugins in the availabe modules.'''
     self.__plugins = []
+    plugin_names = []
     for module in self.__available_modules:
-      for plugin in plugin_names:
-        if hasattr(module, plugin):
-          self.__plugins.append(getattr(module, plugin)())
+      for plugin_info in plugin_infos:
+        plugin_name, scope = self.__get_plugin_info(plugin_info)
+        plugin_names.append(plugin_name)
+        if hasattr(module, plugin_name):
+          self.__plugins.append(getattr(module, plugin_name)(scope=scope.lower()))
     # The plugin(s) that could not be loaded are captured in the set difference
     # between plugin_names and self.__plugins
     plugins_found = [p.__name__ for p in self.__plugins]
@@ -63,18 +66,29 @@ class PluginRunner(object):
       msg = "Plugin(s) not found: %s" % (','.join(list(plugins_not_found)))
       raise RuntimeError, msg
 
+  def __get_plugin_info(self, plugin_info):
+    info = plugin_info.split(':')
+    if len(info) == 1:
+      return info[0], 'query'
+    elif len(info) == 2:
+      return info[0], info[1]
+    else:
+      raise ValueError("Plugin names specified in the form <plugin_name>[:<scope>]")
+
   def print_plugin_names(self):
     for p in self.__plugins:
-      LOG.info("Plugin: %s" % p.__name__)
+      LOG.info("Plugin: %s, Scope: %s" % (p.__name__, p.scope))
 
-  def run_plugins_pre(self, context=None):
+  def run_plugins_pre(self, context=None, scope=None):
     if len(self.__plugins) == 0: return
     for p in self.__plugins:
-      LOG.info('Running pre-hook for %s' % p.__name__)
-      p.run_pre_hook(context=context)
+      if not scope or p.scope == scope.lower():
+        LOG.info('Running pre-hook for %s at scope %s' % (p.__name__, scope))
+        p.run_pre_hook(context=context)
 
-  def run_plugins_post(self, context=None):
+  def run_plugins_post(self, context=None, scope=None):
     if len(self.__plugins) == 0: return
     for p in self.__plugins:
-      LOG.info('Running post-hook for %s' % p.__name__)
-      p.run_post_hook(context=context)
+      if not scope or p.scope == scope.lower():
+        LOG.info('Running post-hook for %s at scope %s' % (p.__name__, scope))
+        p.run_post_hook(context=context)
