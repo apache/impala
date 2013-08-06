@@ -56,10 +56,11 @@ namespace impala {
 #else
   #define ADD_COUNTER(profile, name, type) NULL
   #define ADD_TIMER(profile, name) NULL
+  #define ADD_CHILD_TIMER(profile, name, parent) NULL
   #define SCOPED_TIMER(c)
   #define COUNTER_UPDATE(c, v)
   #define COUNTER_SET(c, v)
-  #define ADD_THREADCOUNTERS(profile, prefix) NULL
+  #define ADD_THREAD_COUNTERS(profile, prefix) NULL
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
 #endif
 
