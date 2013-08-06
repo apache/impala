@@ -120,6 +120,9 @@ public class View extends Table {
   }
 
   @Override
+  public boolean isVirtualTable() { return true; }
+
+  @Override
   public TTableDescriptor toThrift() {
     throw new IllegalStateException("Cannot call toThrift() on a view.");
   }

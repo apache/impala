@@ -79,7 +79,8 @@ public class TupleDescriptor {
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc =
         new TTupleDescriptor(id.asInt(), byteSize, numNullBytes);
-    if (table != null && table.getId() != null) {
+    // do not set the table id for virtual tables such as views and inline views
+    if (table != null && !table.isVirtualTable()) {
       ttupleDesc.setTableId(table.getId().asInt());
     }
     return ttupleDesc;

@@ -226,6 +226,10 @@ bigint,bigint
 create view ddl_test_db.const_view
 as select 1, 'a', 10.0
 ---- RESULTS
+====
+---- QUERY
+select * from ddl_test_db.const_view
+---- RESULTS
 1,'a',10.0
 ---- TYPES
 tinyint,string,float

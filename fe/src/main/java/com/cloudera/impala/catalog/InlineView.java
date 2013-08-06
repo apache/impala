@@ -59,6 +59,9 @@ public class InlineView extends Table {
     throw new UnsupportedOperationException("Inline View should never be loaded");
   }
 
+  @Override
+  public boolean isVirtualTable() { return true; }
+
   /**
    * This should never be called.
    */
@@ -83,5 +86,4 @@ public class InlineView extends Table {
   public int getNumNodes() {
     throw new UnsupportedOperationException("InlineView.getNumNodes() not supported");
   }
-
 }

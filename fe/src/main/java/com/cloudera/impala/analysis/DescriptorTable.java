@@ -20,9 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.thrift.TDescriptorTable;
 import com.google.common.collect.Sets;
 
@@ -91,8 +89,7 @@ public class DescriptorTable {
         // views and inline views have a materialized tuple if they are defined by a
         // constant select. they do not require or produce a thrift table descriptor.
         Table table = tupleD.getTable();
-        if (table != null &&
-            !(table instanceof View) && !(table instanceof InlineView)) {
+        if (table != null && !table.isVirtualTable()) {
           referencedTbls.add(table);
         }
         for (SlotDescriptor slotD: tupleD.getSlots()) {

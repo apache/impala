@@ -189,6 +189,13 @@ public abstract class Table {
     }
   }
 
+  /**
+   * Returns true if this table is not a base table that stores data (e.g., a view).
+   * Virtual tables should not be added to the descriptor table sent to the BE, i.e.,
+   * toThrift() should not work on virtual tables.
+   */
+  public boolean isVirtualTable() { return false; }
+
   public abstract TTableDescriptor toThrift();
 
   public Db getDb() {
