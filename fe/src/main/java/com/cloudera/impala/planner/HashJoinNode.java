@@ -164,14 +164,12 @@ public class HashJoinNode extends PlanNode {
       // on the relevant columns, we very optimistically assume we're doing an
       // FK/PK join (which doesn't alter the cardinality of the left-hand side)
       cardinality = getChild(0).cardinality;
-    } else {
+    } else if (getChild(0).cardinality != -1 && getChild(1).cardinality != -1) {
       cardinality = Math.round(
           (double) getChild(0).cardinality
             * (double) getChild(1).cardinality / (double) maxNumDistinct);
-      // TODO: remove log output before 1.0
-      LOG.info("lhs card=" + Long.toString(getChild(0).cardinality) + " rhs card="
-          + Long.toString(getChild(1).cardinality));
     }
+    Preconditions.checkState(hasValidStats());
     LOG.info("stats HashJoin: cardinality=" + Long.toString(cardinality));
   }
 

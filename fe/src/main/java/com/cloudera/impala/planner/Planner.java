@@ -34,8 +34,8 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
@@ -394,7 +394,7 @@ public class Planner {
     // total amount of data sent
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
     long rhsDataSize = 0;
-    long broadcastCost = 0;
+    long broadcastCost = Long.MAX_VALUE;
     if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
       rhsDataSize = Math.round(
           (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
@@ -410,7 +410,7 @@ public class Planner {
     // TODO: take existing partition of input fragments into account to avoid
     // unnecessary repartitioning
     PlanNode lhsTree = leftChildFragment.getPlanRoot();
-    long partitionCost = 0;
+    long partitionCost = Long.MAX_VALUE;
     if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
       partitionCost = Math.round(
           (double) lhsTree.getCardinality() * lhsTree.getAvgRowSize()

@@ -54,6 +54,9 @@ public class IsNullPredicate extends Predicate {
     super.analyze(analyzer);
 
     // determine selectivity
+    // TODO: increase this to make sure we don't end up favoring broadcast joins
+    // due to underestimated cardinalities?
+    selectivity = 0.1;
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (isSingleColumnPredicate(slotRefRef, null)) {
       SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
@@ -68,10 +71,6 @@ public class IsNullPredicate extends Predicate {
         }
         selectivity = Math.max(0.0, Math.min(1.0, selectivity));
       }
-    } else {
-      // TODO: increase this to make sure we don't end up favoring broadcast joins
-      // due to underestimated cardinalities?
-      selectivity = 0.1;
     }
     LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
