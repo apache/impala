@@ -20,7 +20,6 @@ import os
 import sys
 from time import sleep, time
 from optparse import OptionParser
-from tests.common.impala_cluster import ImpalaCluster
 
 # log4j settings for impala
 LOG4J_IMPALA_PROPERTIES = '''log.threshold=INFO
@@ -240,11 +239,20 @@ if __name__ == "__main__":
 
   # Kill existing processes.
   kill_all(force=options.force_kill)
-  # Make sure the processes have been killed. We loop till we can't detect a single
-  # impald or a statestore process.
-  impala_cluster = ImpalaCluster()
-  while len(impala_cluster.impalads) != 0 or impala_cluster.statestored:
-    impala_cluster.refresh()
+
+  # If ImpalaCluster cannot be imported, fall back to the command-line to check
+  # whether impalads/statestre are up.
+  try:
+    from tests.common.impala_cluster import ImpalaCluster
+    # Make sure the processes have been killed. We loop till we can't detect a single
+    # impalad or a statestore process.
+    impala_cluster = ImpalaCluster()
+    while len(impala_cluster.impalads) != 0 or impala_cluster.statestored:
+      impala_cluster.refresh()
+  except ImportError:
+    print 'ImpalaCluster module not found.'
+    wait_for_cluster = wait_for_cluster_cmdline
+
   if options.inprocess:
     # The statestore and the impalads start in the same process. Additionally,
     # the statestore does not have a debug webpage.
