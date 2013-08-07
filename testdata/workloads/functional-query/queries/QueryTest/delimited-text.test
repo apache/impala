@@ -1,0 +1,73 @@
+====
+---- QUERY
+# test querying text table with:
+# fields terminated by ','
+# escaped by '\\'
+# lines terminated by '\n'
+select * from text_comma_backslash_newline
+---- RESULTS
+'one','two',3,4
+'one,one','two',3,4
+'one\','two',3,4
+'one\,one','two',3,4
+'one\\','two',3,4
+---- TYPES
+STRING,STRING,INT,INT
+====
+---- QUERY
+# test querying text table with:
+# fields terminated by '$'
+# escaped by '#'
+# lines terminated by '|'
+select * from text_dollar_hash_pipe
+---- RESULTS
+'one','two',3,4
+'one$one','two',3,4
+'one#','two',3,4
+'one#$one','two',3,4
+'one##','two',3,4
+---- TYPES
+STRING,STRING,INT,INT
+====
+---- QUERY
+# create new tables like the ones above to test inserting
+create table delim_text_test_db.cbn like text_comma_backslash_newline;
+create table delim_text_test_db.dhp like text_dollar_hash_pipe;
+---- RESULTS
+====
+---- QUERY
+# insert data into cbn table and check results
+insert into delim_text_test_db.cbn values
+('abc , abc', 'xyz \\ xyz', 1, 2),
+('abc ,,, abc', 'xyz \\\\\\ xyz', 3, 4),
+('abc \\,\\, abc', 'xyz ,\\,\\ xyz', 5, 6)
+---- RESULTS
+: 3
+====
+---- QUERY
+select * from delim_text_test_db.cbn
+---- RESULTS
+'abc , abc','xyz \ xyz',1,2
+'abc ,,, abc','xyz \\\ xyz',3,4
+'abc \,\, abc','xyz ,\,\ xyz',5,6
+---- TYPES
+STRING,STRING,INT,INT
+====
+---- QUERY
+# insert data into dhp table and check results
+insert into delim_text_test_db.dhp values
+('abc $ abc', 'xyz # xyz', 1, 2),
+('abc $$$ abc', 'xyz ### xyz', 3, 4),
+('abc #$#$ abc', 'xyz $#$# xyz', 5, 6)
+---- RESULTS
+: 3
+====
+---- QUERY
+select * from delim_text_test_db.dhp
+---- RESULTS
+'abc $ abc','xyz # xyz',1,2
+'abc $$$ abc','xyz ### xyz',3,4
+'abc #$#$ abc','xyz $#$# xyz',5,6
+---- TYPES
+STRING,STRING,INT,INT
+====

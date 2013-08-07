@@ -15,7 +15,7 @@ RELOAD nullinsert
 ---- TYPES
 string, string, string, string, int
 ---- RESULTS
-'NULL','','NULL','NULL',NULL
+'NULL','','NULL','\N',NULL
 ====
 ---- QUERY
 select * from nullinsert_alt
@@ -24,7 +24,7 @@ RELOAD nullinsert_alt
 ---- TYPES
 string
 ---- RESULTS
-'\N,,NULL,\N,\N'
+'\N,,NULL,\\N,\N'
 ====
 ---- QUERY
 # Test inserting NULLs for all types

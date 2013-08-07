@@ -777,18 +777,30 @@ WHERE year = 2009 and (int_col < 100 OR bool_col = false) and month = 1;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-escapenoquotes
+text_comma_backslash_newline
 ---- COLUMNS
 col1 string
 col2 string
 col3 int
 col4 int
 ---- ROW_FORMAT
-delimited fields terminated by ','  escaped by '\\'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+delimited fields terminated by ',' escaped by '\\' lines terminated by '\n'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/escape-no-quotes.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-comma-backslash-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+text_dollar_hash_pipe
+---- COLUMNS
+col1 string
+col2 string
+col3 int
+col4 int
+---- ROW_FORMAT
+delimited fields terminated by '$' escaped by '#' lines terminated by '|'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-dollar-hash-pipe.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional

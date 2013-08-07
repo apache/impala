@@ -30,6 +30,7 @@ class Expr;
 class TupleDescriptor;
 class TupleRow;
 class RuntimeState;
+class StringValue;
 struct OutputPartition;
 
 // The writer consumes all rows passed to it and writes the evaluated output_exprs_
@@ -55,13 +56,18 @@ class HdfsTextTableWriter : public HdfsTableWriter {
                         const std::vector<int32_t>& row_group_indices, bool* new_file);
 
  private:
+  // Escapes occurrences of field_delim_ and escape_char_ with escape_char_ and
+  // writes the escaped result into rowbatch_stringstream_. Neither Hive nor Impala
+  // support escaping tuple_delim_.
+  inline void PrintEscaped(const StringValue* str_val);
+
   // Character delimiting tuples.
   char tuple_delim_;
 
   // Character delimiting fields (to become slots).
   char field_delim_;
 
-  // Escape character. TODO: Escape output.
+  // Escape character.
   char escape_char_;
   
   // Stringstream to buffer output.  The stream is cleared between HDFS

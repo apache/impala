@@ -674,18 +674,6 @@ tinyint
 ---- RESULTS
 ====
 ---- QUERY
-# Tests escape characters
-select * from functional.EscapeNoQuotes
----- TYPES
-string, string, int, int
----- RESULTS
-'one','two',3,4
-'one,one','two',3,4
-'one\','two',3,4
-'one\,one','two',3,4
-'one\\','two',3,4
-====
----- QUERY
 # Test multi files non-partitioned table (hdfs)
 select count(*) from AllTypesAggMultiFilesNoPart
 ---- TYPES

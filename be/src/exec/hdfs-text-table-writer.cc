@@ -77,7 +77,11 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
       for (int j = 0; j < num_non_partition_cols; ++j) {
         void* value = output_exprs_[j]->GetValue(current_row);
         if (value != NULL) {
-          output_exprs_[j]->PrintValue(value, &rowbatch_stringstream_);
+          if (output_exprs_[j]->type() == TYPE_STRING) {
+            PrintEscaped(reinterpret_cast<const StringValue*>(value));
+          } else {
+            output_exprs_[j]->PrintValue(value, &rowbatch_stringstream_);
+          }
         } else {
           // NULLs in hive are encoded based on the 'serialization.null.format' property.
           rowbatch_stringstream_ << table_desc_->null_column_value();
@@ -103,6 +107,15 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
 
   *new_file = false;
   return Status::OK;
+}
+
+inline void HdfsTextTableWriter::PrintEscaped(const StringValue* str_val) {
+  for (int i = 0; i < str_val->len; ++i) {
+    if (UNLIKELY(str_val->ptr[i] == field_delim_ || str_val->ptr[i] == escape_char_)) {
+      rowbatch_stringstream_ << escape_char_;
+    }
+    rowbatch_stringstream_ << str_val->ptr[i];
+  }
 }
 
 }
