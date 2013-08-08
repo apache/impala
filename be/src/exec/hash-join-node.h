@@ -23,6 +23,7 @@
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
+#include "util/promise.h"
 
 #include "gen-cpp/PlanNodes_types.h"  // for TJoinOp
 
@@ -129,9 +130,9 @@ class HashJoinNode : public ExecNode {
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
-  // Supervises ConstructHashTable in a separate thread, and
-  // returns its status in the promise parameter.
-  void BuildSideThread(RuntimeState* state, boost::promise<Status>* status);
+  // Supervises ConstructHashTable in a separate thread, and returns its status in the
+  // promise parameter.
+  void BuildSideThread(RuntimeState* state, Promise<Status>* status);
 
   // We parallelise building the build-side with Open'ing the
   // probe-side. If, for example, the probe-side child is another

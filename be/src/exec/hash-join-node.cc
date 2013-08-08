@@ -114,7 +114,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // TODO: default buckets
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_, 
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_,
       stores_nulls, false, id(), *state->mem_limits()));
 
   probe_batch_.reset(
@@ -148,8 +148,8 @@ Status HashJoinNode::Close(RuntimeState* state) {
   return ExecNode::Close(state);
 }
 
-void HashJoinNode::BuildSideThread(RuntimeState* state, promise<Status>* status) {
-  status->set_value(ConstructHashTable(state));
+void HashJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* status) {
+  status->Set(ConstructHashTable(state));
   // Release the thread token as soon as possible (before the main thread joins
   // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
   // we'd keep the additional thread busy the whole time.
@@ -219,12 +219,12 @@ Status HashJoinNode::Open(RuntimeState* state) {
   // thread, so that the left child can do any initialisation in parallel.
   // Only do this if we can get a thread token.  Otherwise, do this in the
   // main thread
-  promise<Status> thread_status;
+  Promise<Status> build_side_status;
   if (state->resource_pool()->TryAcquireThreadToken()) {
     AddRuntimeExecOption("Hash Table Built Asynchronously");
-    thread(bind(&HashJoinNode::BuildSideThread, this, state, &thread_status));
+    thread(bind(&HashJoinNode::BuildSideThread, this, state, &build_side_status));
   } else {
-    thread_status.set_value(ConstructHashTable(state));
+    build_side_status.Set(ConstructHashTable(state));
   }
 
   // Open the probe-side child so that it may perform any initialisation in parallel.
@@ -232,10 +232,9 @@ Status HashJoinNode::Open(RuntimeState* state) {
   // to finish.
   Status open_status = child(0)->Open(state);
 
-  // Blocks until ConstructHashTable has returned, after which
-  // the hash table is fully constructed and we can start the probe
-  // phase.
-  RETURN_IF_ERROR(thread_status.get_future().get());
+  // Blocks until ConstructHashTable has returned, after which the hash table is fully
+  // constructed and we can start the probe phase.
+  RETURN_IF_ERROR(build_side_status.Get());
 
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
   RETURN_IF_ERROR(open_status);
