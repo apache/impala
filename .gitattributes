@@ -1,0 +1,28 @@
+# Based on recipe here: https://help.github.com/articles/dealing-with-line-endings
+
+# Default behavior, in case users don't have core.autocrlf set
+* text=auto
+
+*.cpp    text diff=cpp
+*.cc     text diff=cpp
+*.c      text diff=cpp
+*.h      text diff=cpp
+*.cs     text diff=csharp
+*.java   text diff=java
+*.html   text diff=html
+*.py     text diff=python
+*.pl     text diff=perl
+*.pm     text diff=perl
+*.css    text
+*.js     text
+*.sql    text
+
+*.sh     text eol=lf
+
+*.bat    text eol=crlf
+*.csproj text merge=union eol=crlf
+*.sln    text merge=union eol=crlf
+
+*.avro binary
+*.png binary
+*.jpg binary
