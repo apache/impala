@@ -14,6 +14,9 @@
 # limitations under the License.
 
 # Generates the impala version and build information.
+# Note: for internal (aka pre-release) versions, the version should have
+# "-INTERNAL" appended. Parts of the code will look for this to distinguish
+# between released and internal versions.
 VERSION=1.2-INTERNAL
 GIT_HASH=$(git rev-parse HEAD)
 BUILD_TIME=`date`
