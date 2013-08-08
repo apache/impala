@@ -46,11 +46,11 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
       --reader_->num_used_buffers_;
       buffer->Return();
       return false;
-    } 
+    }
     ++reader_->num_ready_buffers_;
     ready_buffers_.push_back(buffer);
     eosr_queued_ = buffer->eosr();
-  
+
     blocked_on_queue_ = ready_buffers_.size() >= ready_buffers_capacity_;
     if (blocked_on_queue_ && ready_buffers_capacity_ > MIN_QUEUE_CAPACITY) {
       // We have filled the queue, indicating we need back pressure on
@@ -64,7 +64,7 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
 
   return blocked_on_queue_;
 }
-    
+
 Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   *buffer = NULL;
 
@@ -83,7 +83,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
     while (ready_buffers_.empty() && !is_cancelled_) {
       buffer_ready_cv_.wait(scan_range_lock);
     }
-  
+
     if (is_cancelled_) {
       DCHECK(ready_buffers_.empty());
       DCHECK(!status_.ok());
@@ -96,7 +96,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
     ready_buffers_.pop_front();
     eosr_returned_ = (*buffer)->eosr();
   }
-  
+
   // Update tracking counters.  The buffer has now moved from the IoMgr to the
   // caller.
   if (eosr_returned_) {
@@ -114,7 +114,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
     *buffer = NULL;
     return status;
   }
-  
+
   unique_lock<mutex> reader_lock(reader_->lock_);
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
   if (reader_->state_ == ReaderContext::Cancelled) {
@@ -137,6 +137,9 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 }
 
 void DiskIoMgr::ScanRange::Cancel(const Status& status) {
+  // Cancelling a range that was never started, ignore.
+  if (io_mgr_ == NULL) return;
+
   DCHECK(!status.ok());
   {
     unique_lock<mutex> scan_range_lock(lock_);
@@ -169,7 +172,7 @@ void DiskIoMgr::ScanRange::CleanupQueuedBuffers() {
 string DiskIoMgr::ScanRange::DebugString() const {
   stringstream ss;
   ss << "file=" << file_ << " disk_id=" << disk_id_ << " offset=" << offset_
-     << " len=" << len_ << " bytes_read=" << bytes_read_ 
+     << " len=" << len_ << " bytes_read=" << bytes_read_
      << " buffer_queue=" << ready_buffers_.size()
      << " capacity=" << ready_buffers_capacity_;
   return ss.str();
@@ -183,20 +186,20 @@ bool DiskIoMgr::ScanRange::Validate() {
   }
   if (eosr_returned_ && !eosr_queued_) {
     LOG(WARNING) << "Returned eosr to reader before finishing reading the scan range"
-                 << " eosr_returned_=" << eosr_returned_ 
+                 << " eosr_returned_=" << eosr_returned_
                  << " eosr_queued_=" << eosr_queued_;
     return false;
   }
   if (is_cancelled_ && !ready_buffers_.empty()) {
     LOG(WARNING) << "Cancelling the reader must clean up queued buffers."
-                 << " is_cancelled_=" << is_cancelled_ 
+                 << " is_cancelled_=" << is_cancelled_
                  << " ready_buffers_.size()=" << ready_buffers_.size();
     return false;
   }
   return true;
 }
 
-DiskIoMgr::ScanRange::ScanRange(int capacity) 
+DiskIoMgr::ScanRange::ScanRange(int capacity)
   : ready_buffers_capacity_(capacity) {
   Reset(NULL, -1, -1, -1);
 }
@@ -209,6 +212,8 @@ void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
   offset_ = offset;
   disk_id_ = disk_id;
   meta_data_ = meta_data;
+  io_mgr_ = NULL;
+  reader_ = NULL;
 }
 
 void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader) {
@@ -224,7 +229,7 @@ void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader
   if (ready_buffers_capacity_ <= 0) {
     ready_buffers_capacity_ = reader->initial_scan_range_queue_capacity();
     DCHECK_GE(ready_buffers_capacity_, MIN_QUEUE_CAPACITY);
-  } 
+  }
   DCHECK(Validate()) << DebugString();
 }
 
@@ -281,7 +286,7 @@ void DiskIoMgr::ScanRange::CloseScanRange(hdfsFS hdfs_connection, ReaderContext*
       reader->bytes_read_short_circuit_ += read_statistics->totalShortCircuitBytesRead;
       hdfsFileFreeReadStatistics(read_statistics);
     }
-    
+
     hdfsCloseFile(hdfs_connection, hdfs_file_);
     hdfs_file_ = NULL;
   } else {
@@ -304,7 +309,7 @@ Status DiskIoMgr::ScanRange::ReadFromScanRange(hdfsFS hdfs_connection,
 
   *eosr = false;
   *bytes_read = 0;
-  int bytes_to_read = 
+  int bytes_to_read =
       min(static_cast<int64_t>(io_mgr_->max_read_size_), len_ - bytes_read_);
 
   if (hdfs_connection != NULL) {

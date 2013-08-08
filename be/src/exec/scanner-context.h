@@ -36,7 +36,7 @@ class StringBuffer;
 class Tuple;
 class TupleRow;
 
-// This class abstracts over getting buffers from the IoMgr. Each ScannerContext is 1:1 
+// This class abstracts over getting buffers from the IoMgr. Each ScannerContext is 1:1
 // a HdfsScanner. ScannerContexts contain Streams, which are 1:1 with a ScanRange.
 // Columnar formats have multiple streams per context object.
 // This class handles stitching data split across IO buffers and providing
@@ -66,22 +66,22 @@ class ScannerContext {
   class Stream {
    public:
     // Returns the next *len bytes or an error.  This can block if bytes are not
-    // available.  
+    // available.
     //  - *buffer on return is a pointer to the buffer.  The memory is owned by
     //    the ScannerContext and should not be modified.  If the buffer is entirely
     //    from one disk io buffer, a pointer inside that buffer is returned directly.
     //    if the requested buffer straddles io buffers, a copy is done here.
     //  - requested_len is the number of bytes requested.  This function will return
-    //    those number of bytes unless end of file or an error occurred.  
+    //    those number of bytes unless end of file or an error occurred.
     //    if requested_len is 0, the next complete buffer will be returned
     //  - *out_len is the number of bytes returned.
     //  - *eos is set to true if all the bytes in this scan range are returned.
-    //  - *status is set if there is an error.  
+    //  - *status is set if there is an error.
     // Returns true if the call was success (i.e. status->ok())
     // This should only be called from the scanner thread.
     // Note that this will return bytes past the end of the scan range if
     // requested (e.g., this can be called again after *eos is set to true).
-    bool GetBytes(int requested_len, uint8_t** buffer, int* out_len, 
+    bool GetBytes(int requested_len, uint8_t** buffer, int* out_len,
         bool* eos, Status* status);
 
     // Gets the bytes from the first available buffer without advancing the scan
@@ -89,7 +89,7 @@ class ScannerContext {
     // If the buffer is the last one in the scan range, *eos will be set to true.
     // If we are past the end of the scan range, *out_len will be 0 and *eos will be true.
     Status GetRawBytes(uint8_t** buffer, int* out_len, bool* eos);
-  
+
     // Sets whether of not the resulting tuples have a compact format.  If not, the
     // io buffers must be attached to the row batch, otherwise they can be returned
     // immediately.  This by default, is inferred from the scan_node tuple descriptor
@@ -105,10 +105,10 @@ class ScannerContext {
     // Reading past the end of the scan range is likely a remote read.  We want
     // to minimize the number of io requests as well as the data volume.
     void set_read_past_buffer_size(int size) { read_past_buffer_size_ = size; }
-  
+
     // Return the number of bytes left in the range for this stream.
     int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
-  
+
     // If true, all bytes in this scan range have been returned
     bool eosr() const { return read_eosr_ || total_bytes_returned_ >= total_len_; }
 
@@ -117,44 +117,44 @@ class ScannerContext {
 
     const char* filename() { return scan_range_->file(); }
     const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
-  
+
     // Returns the buffer's current offset in the file.
     int64_t file_offset() { return scan_range_start_ + total_bytes_returned_; }
-  
+
     // Returns the total number of bytes returned
     int64_t total_bytes_returned() { return total_bytes_returned_; }
-  
+
     // Read a Boolean primitive value written using Java serialization.
     // Equivalent to java.io.DataInput.readBoolean()
     bool ReadBoolean(bool* boolean, Status*);
-    
+
     // Read an Integer primitive value written using Java serialization.
     // Equivalent to java.io.DataInput.readInt()
     bool ReadInt(int32_t* val, Status*);
-    
+
     // Read a variable-length Long value written using Writable serialization.
     // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
     bool ReadVLong(int64_t* val, Status*);
-    
+
     // Read a variable length Integer value written using Writable serialization.
     // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
     bool ReadVInt(int32_t* val, Status*);
-    
+
     // Read a zigzag encoded long
     bool ReadZLong(int64_t* val, Status*);
-    
+
     // Skip over the next length bytes in the specified HDFS file.
     bool SkipBytes(int length, Status*);
-    
+
     // Read length bytes into the supplied buffer.  The returned buffer is owned
     // by this object.
     bool ReadBytes(int length, uint8_t** buf, Status*);
-    
+
     // Read a Writable Text value from the supplied file.
     // Ref: org.apache.hadoop.io.WritableUtils.readString()
     // The returned buffer is owned by this object.
     bool ReadText(uint8_t** buf, int* length, Status*);
-    
+
     // Skip this text object.
     bool SkipText(Status*);
 
@@ -163,12 +163,12 @@ class ScannerContext {
     ScannerContext* parent_;
     DiskIoMgr::ScanRange* scan_range_;
     const HdfsFileDesc* file_desc_;
-  
+
     // Byte offset for this scan range
     int64_t scan_range_start_;
-    
+
     // If true, tuple data in the row batches is compact and the io buffers can be
-    // recycled immediately.  
+    // recycled immediately.
     bool compact_data_;
 
     // Total number of bytes returned from GetBytes()
@@ -179,36 +179,36 @@ class ScannerContext {
 
     // Bytes left in the first buffer
     int current_buffer_bytes_left_;
-  
+
     // The buffer size to use for when reading past the end of the scan range.  A
     // default value is pickd and scanners can overwrite it (i.e. the scanner knows
     // more about the file format)
     int read_past_buffer_size_;
-    
+
     // Total number of bytes that's expected to to be read from this stream.  The
     // actual number could be higher if we need to read bytes past the end.
     int64_t total_len_;
-  
+
     // Set to true when a buffer returns the end of the scan range.
     bool read_eosr_;
-  
-    // Pool for allocating boundary buffers.  
+
+    // Pool for allocating boundary buffers.
     boost::scoped_ptr<MemPool> boundary_pool_;
     boost::scoped_ptr<StringBuffer> boundary_buffer_;
-  
+
     // List of buffers that are completed but still have bytes referenced by the caller.
     // On the next GetBytes() call, these buffers are released (the caller by calling
     // GetBytes() signals it is done with its previous bytes).  At this point the
     // buffers are either returned to the io mgr or attached to the current row batch.
     std::list<DiskIoMgr::BufferDescriptor*> completed_buffers_;
-    
+
     // The current io buffer. This starts as NULL before we've read any bytes
     // and then becomes NULL when we've finished the scan range.
     DiskIoMgr::BufferDescriptor* current_buffer_;
-  
+
     Stream(ScannerContext* parent);
 
-    // GetBytes helper to handle the slow path 
+    // GetBytes helper to handle the slow path
     // If peek is set then return the data but do not move the current offset.
     // Updates current_buffer_.
     Status GetBytesInternal(int requested_len, uint8_t** buffer,
@@ -228,10 +228,10 @@ class ScannerContext {
     Status ReportIncompleteRead(int length, int bytes_read);
   };
 
-  Stream* GetStream(int idx = 0) { 
+  Stream* GetStream(int idx = 0) {
     DCHECK_GE(idx, 0);
     DCHECK_LT(idx, streams_.size());
-    return streams_[idx]; 
+    return streams_[idx];
   }
 
   // Attach completed io buffers and boundary mem pools from all streams to 'batch'.

@@ -98,6 +98,8 @@ class HdfsParquetScanner::ColumnReader {
     : parent_(parent),
       desc_(desc),
       field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
+      metadata_(NULL),
+      stream_(NULL),
       decompressed_data_pool_(
           new MemPool(parent->scan_node_->runtime_state()->mem_limits())),
       num_buffered_values_(0) {
@@ -125,6 +127,10 @@ class HdfsParquetScanner::ColumnReader {
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
   const SlotDescriptor* slot_desc() const { return desc_; }
+  THdfsCompression::type codec() const {
+    if (metadata_ == NULL) return THdfsCompression::NONE;
+    return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
+  }
 
   // Read the next value into tuple for this column.  Returns
   // false if there are no more values in the file.
@@ -205,9 +211,13 @@ Status HdfsParquetScanner::Close() {
   AttachPool(dictionary_pool_.get());
   AddFinalRowBatch();
   context_->Close();
-  // TODO: this doesn't really work for parquet since the file is
-  // not uniformly compressed.
-  scan_node_->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
+  vector<THdfsCompression::type> compression_types;
+  for (int i = 0; i < column_readers_.size(); ++i) {
+    compression_types.push_back(column_readers_[i]->codec());
+  }
+  // If this was a metadata only read (i.e. count(*)), there are no columns.
+  if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
+  scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
   assemble_rows_timer_.UpdateCounter();
   return Status::OK;
 }
@@ -294,8 +304,11 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
           return Status("Dictionary page does not have dictionary header set.");
         }
       }
-      if (dict_header != NULL && dict_header->encoding != parquet::Encoding::PLAIN) {
-        return Status("Only PLAIN encoding is supported for dictionary pages.");
+      if (dict_header != NULL &&
+          dict_header->encoding != parquet::Encoding::PLAIN &&
+          dict_header->encoding != parquet::Encoding::PLAIN_DICTIONARY) {
+        return Status("Only PLAIN and PLAIN_DICTIONARY encodings are supported "
+            "for dictionary pages.");
       }
 
       if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
