@@ -161,8 +161,18 @@ struct TExecPlanFragmentResult {
   1: optional Status.TStatus status
 }
 
-
 // ReportExecStatus
+struct TParquetInsertStats {
+  // For each column, the on disk byte size
+  1: required map<string, i64> per_column_size
+}
+
+// Per partition insert stats
+// TODO: this should include the table stats that we update the metastore with.
+struct TInsertStats {
+  1: required i64 bytes_written
+  2: optional TParquetInsertStats parquet_stats
+}
 
 // The results of an INSERT query, sent to the coordinator as part of 
 // TReportExecStatusParams
@@ -176,6 +186,10 @@ struct TInsertExecStatus {
   // A map from temporary absolute file path to final absolute destination. The 
   // coordinator performs these updates after the query completes. 
   2: required map<string, string> files_to_move;
+
+  // Stats from running the insert, per-partition. The keys are coded the
+  // same way as with num_appended_rows.
+  3: optional map<string, TInsertStats> insert_stats
 }
 
 struct TReportExecStatusParams {

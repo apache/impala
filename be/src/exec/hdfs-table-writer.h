@@ -82,6 +82,9 @@ class HdfsTableWriter {
   // Called once when this writer should cleanup any resources.
   virtual void Close() = 0;
 
+  // Returns the stats for this writer.
+  TInsertStats& stats() { return stats_; };
+
   // Default block size to use for this file format.  If the file format doesn't
   // care, it should return 0 and the hdfs config default will be used.
   virtual uint64_t default_block_size() = 0;
@@ -116,6 +119,9 @@ class HdfsTableWriter {
 
   // Expressions that materialize output values.
   std::vector<Expr*> output_exprs_;
+
+  // Subclass should populate any file format specific stats.
+  TInsertStats stats_;
 };
 }
 #endif

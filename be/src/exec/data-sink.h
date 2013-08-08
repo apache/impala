@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "runtime/runtime-state.h"
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/Exprs_types.h"
 
@@ -59,6 +60,15 @@ class DataSink {
 
   // Returns the runtime profile for the sink.
   virtual RuntimeProfile* profile() = 0;
+
+  // Merges two sets of partition stats. dst will be updated to contain all partitions
+  // in src. Partitions that are in both will have the stats added together.
+  static void MergeInsertStats(const PartitionInsertStats& src,
+      PartitionInsertStats* dst);
+
+  // Outputs the insert stats to a string
+  static std::string OutputInsertStats(const PartitionInsertStats& stats,
+      const std::string& prefix = "");
 };
 
 }  // namespace impala

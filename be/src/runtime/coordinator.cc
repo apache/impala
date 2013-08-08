@@ -656,6 +656,7 @@ Status Coordinator::Wait() {
     // Because there are no other updates, safe to copy the maps rather than merge them.
     files_to_move_ = *state->hdfs_files_to_move();
     partition_row_counts_ = *state->num_appended_rows();
+    partition_insert_stats_ = *state->insert_stats();
   } else {
     // Query finalization can only happen when all backends have reported
     // relevant state. They only have relevant state to report in the parallel
@@ -670,6 +671,8 @@ Status Coordinator::Wait() {
   }
 
   if (stmt_type_ == TStmtType::DML) {
+    query_profile_->AddInfoString("Insert Stats",
+        DataSink::OutputInsertStats(partition_insert_stats_, "\n"));
     // For DML queries, when Wait is done, the query is complete.  Report aggregate
     // query profiles at this point.
     // TODO: make sure ReportQuerySummary gets called on error
@@ -1045,6 +1048,11 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     files_to_move_.insert(
         params.insert_exec_status.files_to_move.begin(),
         params.insert_exec_status.files_to_move.end());
+
+    if (params.insert_exec_status.__isset.insert_stats) {
+      const PartitionInsertStats& stats = params.insert_exec_status.insert_stats;
+      DataSink::MergeInsertStats(stats, &partition_insert_stats_);
+    }
   }
 
   if (VLOG_FILE_IS_ON) {

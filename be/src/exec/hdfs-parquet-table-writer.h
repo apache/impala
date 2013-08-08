@@ -19,6 +19,7 @@
 #include "exec/data-sink.h"
 
 #include <hdfs.h>
+#include <map>
 #include <boost/scoped_ptr.hpp>
 
 #include "util/compress.h"
@@ -44,6 +45,7 @@ class TupleRow;
 // from the FE.  This includes:
 // - compression & codec
 // - type of encoding to use for each type
+
 class HdfsParquetTableWriter : public HdfsTableWriter {
  public:
   HdfsParquetTableWriter(HdfsTableSink* parent,
@@ -164,6 +166,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // Staging buffer to use to compress data.  This is used only if compression is
   // enabled and is reused between all data pages.
   std::vector<uint8_t> compression_staging_buffer_;
+
+  // For each column, the on disk size written.
+  TParquetInsertStats parquet_stats_;
 };
 
 }

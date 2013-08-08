@@ -53,6 +53,9 @@ class DataStreamRecvr;
 // identified by the empty string.
 typedef std::map<std::string, int64_t> PartitionRowCount;
 
+// Stats per partition for insert queries. They key is the same as for PartitionRowCount
+typedef std::map<std::string, TInsertStats> PartitionInsertStats;
+
 // Tracks files to move from a temporary (key) to a final destination (value) as
 // part of query finalization. If the destination is empty, the file is to be
 // deleted.
@@ -106,6 +109,7 @@ class RuntimeState {
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
+  PartitionInsertStats* insert_stats() { return &insert_stats_; }
 
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
@@ -221,6 +225,9 @@ class RuntimeState {
 
   // Records the total number of appended rows per created Hdfs partition
   PartitionRowCount num_appended_rows_;
+
+  // Insert stats per partition.
+  PartitionInsertStats insert_stats_;
 
   RuntimeProfile profile_;
 

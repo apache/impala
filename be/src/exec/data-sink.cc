@@ -23,6 +23,7 @@
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/data-stream-sender.h"
+#include "util/container-util.h"
 #include "util/logging.h"
 
 using namespace std;
@@ -84,6 +85,59 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
       return Status(error_msg.str());
   }
   return Status::OK;
+}
+
+void DataSink::MergeInsertStats(const PartitionInsertStats& src,
+    PartitionInsertStats* dst) {
+  for (PartitionInsertStats::const_iterator src_it = src.begin();
+      src_it != src.end(); ++src_it) {
+    PartitionInsertStats::iterator dst_it = dst->find(src_it->first);
+    if (dst_it == dst->end()) {
+      (*dst)[src_it->first] = src_it->second;
+    } else {
+      const TInsertStats& src_stats = src_it->second;
+      TInsertStats& dst_stats = dst_it->second;
+      dst_stats.bytes_written += src_stats.bytes_written;
+      if (src_stats.__isset.parquet_stats) {
+        if (dst_stats.__isset.parquet_stats) {
+          MergeMapValues<string, int64_t>(src_stats.parquet_stats.per_column_size,
+              &dst_stats.parquet_stats.per_column_size);
+        } else {
+          dst_stats.__set_parquet_stats(src_stats.parquet_stats);
+        }
+      }
+    }
+  }
+}
+
+string DataSink::OutputInsertStats(const PartitionInsertStats& stats,
+    const string& prefix) {
+  const char* indent = "  ";
+  stringstream ss;
+  ss << prefix;
+  for (PartitionInsertStats::const_iterator it = stats.begin();
+      it != stats.end(); ++it) {
+    if (it != stats.begin()) ss << endl;
+    ss << "Partition: ";
+    if (it->first.empty()) {
+      ss << "Default" << endl;
+    } else {
+      ss << it->first << endl;
+    }
+    const TInsertStats& stats = it->second;
+    ss << indent << "BytesWritten: "
+       << PrettyPrinter::Print(stats.bytes_written, TCounterType::BYTES);
+    if (stats.__isset.parquet_stats) {
+      const TParquetInsertStats& parquet_stats = stats.parquet_stats;
+      ss << endl << indent << "Per Column Sizes:";
+      for (map<string, int64_t>::const_iterator i = parquet_stats.per_column_size.begin();
+           i != parquet_stats.per_column_size.end(); ++i) {
+        ss << endl << indent << indent << i->first << ": "
+           << PrettyPrinter::Print(i->second, TCounterType::BYTES);
+      }
+    }
+  }
+  return ss.str();
 }
 
 }  // namespace impala

@@ -134,7 +134,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Close this writer. This is only called after Flush() and no more rows will
   // be added.
   void Close() {
-    compressor_->Close();
+    if (compressor_.get() != NULL) compressor_->Close();
     if (dict_encoder_base_ != NULL) dict_encoder_base_->ClearIndices();
   }
 
@@ -765,8 +765,8 @@ Status HdfsParquetTableWriter::Finalize() {
   file_metadata_.num_rows = row_count_;
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
+  stats_.__set_parquet_stats(parquet_stats_);
   COUNTER_UPDATE(parent_->rows_inserted_counter(), row_count_);
-
   return Status::OK;
 }
 
@@ -791,6 +791,7 @@ Status HdfsParquetTableWriter::WriteFileHeader() {
 Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   if (current_row_group_ == NULL) return Status::OK;
 
+  int num_clustering_cols = table_desc_->num_clustering_cols();
   for (int i = 0; i < columns_.size(); ++i) {
     int64_t data_page_offset, dict_page_offset;
     // Flush this column.  This updates the final metadata sizes for this column.
@@ -811,6 +812,8 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     current_row_group_->total_byte_size += columns_[i]->total_compressed_size();
     current_row_group_->num_rows = columns_[i]->num_values();
     current_row_group_->columns[i].file_offset = file_pos_;
+    const string& col_name = table_desc_->col_names()[i + num_clustering_cols];
+    parquet_stats_.per_column_size[col_name] += columns_[i]->total_compressed_size();
 
     // Since we don't supported complex schemas, all columns should have the same
     // number of values.

@@ -442,6 +442,11 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   // Track total number of appended rows per partition in runtime
   // state. partition->num_rows counts number of rows appended is per-file.
   (*state->num_appended_rows())[partition->partition_name] += partition->num_rows;
+
+  PartitionInsertStats stats;
+  stats[partition->partition_name] = partition->writer->stats();
+  DataSink::MergeInsertStats(stats, state->insert_stats());
+
   ClosePartitionFile(state, partition);
   return Status::OK;
 }

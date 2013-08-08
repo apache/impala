@@ -41,6 +41,7 @@ Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {
         << " " << error_msg;
     return Status(msg.str());
   }
+  stats_.bytes_written += len;
   return Status::OK;
 }
 }

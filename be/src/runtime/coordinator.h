@@ -300,6 +300,9 @@ class Coordinator {
   // entire table.
   PartitionRowCount partition_row_counts_;
 
+  // Per partition insert stats.
+  PartitionInsertStats partition_insert_stats_;
+
   // The set of files to move after an INSERT query has run, in (src, dest) form. An empty
   // string for the destination means that a file is to be deleted.
   FileMoveMap files_to_move_;

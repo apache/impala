@@ -275,9 +275,11 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     if (runtime_state->hdfs_files_to_move()->size() > 0) {
       insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
     }
-    if (executor_.runtime_state()->num_appended_rows()->size() > 0) {
-      insert_status.__set_num_appended_rows(
-          *executor_.runtime_state()->num_appended_rows());
+    if (runtime_state->num_appended_rows()->size() > 0) {
+      insert_status.__set_num_appended_rows(*runtime_state->num_appended_rows());
+    }
+    if (runtime_state->insert_stats()->size() > 0) {
+      insert_status.__set_insert_stats(*runtime_state->insert_stats());
     }
 
     params.__set_insert_exec_status(insert_status);
