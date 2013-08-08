@@ -48,8 +48,13 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.mapred.SequenceFileInputFormat";
 
   // Input format class for Parquet tables read by Hive.
-  private static final String PARQUET_INPUT_FORMAT =
-      "com.cloudera.impala.hive.serde.ParquetInputFormat";
+  // The location (i.e. java class path) for the SerDe has
+  // changed during its development. Impala will treat any
+  // of these format classes as Parquet
+  private static final String[] PARQUET_INPUT_FORMATS = {
+      "com.cloudera.impala.hive.serde.ParquetInputFormat",
+      "parquet.hive.DeprecatedParquetInputFormat"
+  };
 
   // Input format class for Avro tables read by hive.
   private static final String AVRO_INPUT_FORMAT =
@@ -62,7 +67,8 @@ public enum HdfsFileFormat {
           .put(LZO_TEXT_INPUT_FORMAT, LZO_TEXT)
           .put(SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE)
           .put(AVRO_INPUT_FORMAT, AVRO)
-          .put(PARQUET_INPUT_FORMAT, PARQUET)
+          .put(PARQUET_INPUT_FORMATS[0], PARQUET)
+          .put(PARQUET_INPUT_FORMATS[1], PARQUET)
           .build();
 
   /**

@@ -23,6 +23,8 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import parquet.hive.serde.ParquetHiveSerDe;
+
 import com.cloudera.impala.thrift.DescriptorsConstants;
 import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableList;
@@ -60,10 +62,13 @@ public class HdfsStorageDescriptor {
         serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
         serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
 
+  // The Parquet serde shows up multiple times as the location of the implementation
+  // has changed between Impala versions.
   final static List<String> COMPATIBLE_SERDES = ImmutableList.of(
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", // (seq / text / parquet)
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe", // (avro)
-      "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe"); // (rc)
+      "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe", // (rc)
+      ParquetHiveSerDe.class.getName()); // (parquet)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 

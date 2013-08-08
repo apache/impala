@@ -105,6 +105,14 @@
     </dependency>
 
     <dependency>
+      <groupId>parquet</groupId>
+      <artifactId>parquet-hive</artifactId>
+      <version>1.0</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.0.0.jar</systemPath>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.shiro</groupId>
       <artifactId>shiro-core</artifactId>
       <version>1.2.1</version>

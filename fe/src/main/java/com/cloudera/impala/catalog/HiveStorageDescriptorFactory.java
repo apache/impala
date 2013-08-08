@@ -18,8 +18,10 @@ import java.util.HashMap;
 
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
-import com.cloudera.impala.hive.serde.ParquetInputFormat;
-import com.cloudera.impala.hive.serde.ParquetOutputFormat;
+import parquet.hive.DeprecatedParquetInputFormat;
+import parquet.hive.DeprecatedParquetOutputFormat;
+import parquet.hive.serde.ParquetHiveSerDe;
+
 import com.google.common.base.Preconditions;
 
 public class HiveStorageDescriptorFactory {
@@ -59,10 +61,9 @@ public class HiveStorageDescriptorFactory {
 
   private static StorageDescriptor createParquetFileSd() {
     StorageDescriptor sd = createGenericSd();
-    sd.setInputFormat(ParquetInputFormat.class.getName());
-    sd.setOutputFormat(ParquetOutputFormat.class.getName());
-    sd.getSerdeInfo().setSerializationLib(
-        org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
+    sd.setInputFormat(DeprecatedParquetInputFormat.class.getName());
+    sd.setOutputFormat(DeprecatedParquetOutputFormat.class.getName());
+    sd.getSerdeInfo().setSerializationLib(ParquetHiveSerDe.class.getName());
     sd.setCompressed(false);
     return sd;
   }
