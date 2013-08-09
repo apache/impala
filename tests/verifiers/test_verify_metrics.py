@@ -39,22 +39,17 @@ class TestValidateMetrics(ImpalaTestSuite):
   TODO: Add a test for local assignments.
   """
 
-  def __get_metric_value(self, metric):
-    """Returns an integer metric value"""
-    return self.impalad_test_service.get_metric_value(metric)
-
   def test_metrics_are_zero(self):
     """Test that all the metric in METRIC_LIST are 0"""
     for metric in METRIC_LIST:
-      self.__assert_metric_value(metric, 0)
+      self.__wait_for_metric_value(metric, 0)
 
   def test_num_unused_buffers(self):
     """Test that all buffers are unused"""
-    buffers = self.__get_metric_value("impala-server.io-mgr.num-buffers")
-    unused_buffers = self.__get_metric_value("impala-server.io-mgr.num-unused-buffers")
-    self.__assert_metric_value("impala-server.io-mgr.num-unused-buffers", buffers)
+    buffers =\
+        self.impalad_test_service.get_metric_value("impala-server.io-mgr.num-buffers")
+    self.__wait_for_metric_value("impala-server.io-mgr.num-unused-buffers", buffers)
 
-  def __assert_metric_value(self, metric_name, expected_value):
-    actual_value = self.__get_metric_value(metric_name)
-    assert expected_value == actual_value, "Metric '%s' value is: %s Expected: %s" %\
-        (metric_name, actual_value, expected_value)
+  def __wait_for_metric_value(self, metric_name, expected_value):
+    self.impalad_test_service.wait_for_metric_value(\
+        metric_name, expected_value, timeout=60)
