@@ -126,7 +126,7 @@ class WorkloadRunner(object):
     command = PRIME_CACHE_CMD % query
     os.system(command)
 
-  def create_executor(self, db_name, executor_name):
+  def create_executor(self, db_name, executor_name, table_format_str, query_name):
     # Add additional query exec options here
     query_options = {
         'hive': lambda: (execute_using_hive,
@@ -141,7 +141,9 @@ class WorkloadRunner(object):
           use_kerberos=self.use_kerberos,
           db_name=db_name,
           impalad=self.get_next_impalad(),
-          )),
+          table_format_str=table_format_str,
+          query_name=query_name),
+          ),
         'jdbc': lambda: (execute_using_jdbc,
           JdbcQueryExecOptions(self.iterations,
           impalad=self.get_next_impalad(),
@@ -149,7 +151,8 @@ class WorkloadRunner(object):
     } [executor_name]()
     return query_options
 
-  def run_query(self, executor_name, db_name, query, prime_cache, exit_on_error):
+  def run_query(self, executor_name, db_name, query, prime_cache, exit_on_error,
+      table_format_str, query_name):
     """
     Run a query command and return the result.
 
@@ -165,8 +168,10 @@ class WorkloadRunner(object):
     execution_result = None
     for client in xrange(self.num_clients):
       name = "Client Thread " + str(client)
-      exec_tuple = self.create_executor(db_name, executor_name)
-      threads.append(QueryExecutor(name, exec_tuple[0], exec_tuple[1], query))
+      exec_tuple = self.create_executor(db_name, executor_name, table_format_str,
+          query_name)
+      threads.append(QueryExecutor(name, exec_tuple[0], exec_tuple[1], query,
+          table_format_str, query_name))
     for thread in threads:
       LOG.debug(thread.name + " starting")
       thread.start()
@@ -231,7 +236,7 @@ class WorkloadRunner(object):
     query_map = defaultdict(list)
     for query_file_name in WorkloadRunner.__enumerate_query_files(query_dir):
       LOG.debug('Parsing Query Test File: ' + query_file_name)
-      sections = parse_query_test_file(query_file_name, None)
+      sections = parse_query_test_file(query_file_name)
       test_name = re.sub('/', '.', query_file_name.split('.')[0])[1:]
       for section in sections:
         query_map[test_name].append((section['QUERY_NAME'],
@@ -279,7 +284,8 @@ class WorkloadRunner(object):
             LOG.info('Query Name: \n%s\n' % query_name)
 
           execution_result = self.run_query(executor_name, db_name, query_string,
-                                            self.prime_cache, stop_on_query_error)
+                                            self.prime_cache, stop_on_query_error,
+                                            table_format_str, query_name)
 
           # Don't verify insert results and allow user to continue on error if there is
           # a verification failure
@@ -301,7 +307,8 @@ class WorkloadRunner(object):
           hive_execution_result = self.run_query('hive', db_name,
                                                          query_string,
                                                          self.prime_cache,
-                                                         False)
+                                                         False, table_format_str,
+                                                         query_name)
           self.__summary += "%s\n" % hive_execution_result
         LOG.debug("---------------------------------------------------------------------")
 

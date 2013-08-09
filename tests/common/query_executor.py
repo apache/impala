@@ -88,11 +88,13 @@ class ImpalaBeeswaxExecOptions(ImpalaQueryExecOptions):
   def __init__(self, iterations, **kwargs):
     ImpalaQueryExecOptions.__init__(self, iterations, **kwargs)
     self.use_kerberos = kwargs.get('use_kerberos', False)
-    self._build_exec_options(kwargs.get('exec_options', None))
+    self.__build_options(kwargs)
 
-  def _build_exec_options(self, exec_options):
+  def __build_options(self, kwargs):
     """Read the exec_options into a dictionary"""
+    exec_options = kwargs.get('exec_options', None)
     self.exec_options = dict()
+    self.query_options = dict()
     if exec_options:
       # exec_options are seperated by ; on the command line
       options = exec_options.split(';')
@@ -100,6 +102,8 @@ class ImpalaBeeswaxExecOptions(ImpalaQueryExecOptions):
         key, value = option.split(':')
         # The keys in ImpalaService QueryOptions are upper case.
         self.exec_options[key.upper()] = value
+    self.query_options['table_format_str'] = kwargs.get('table_format_str')
+    self.query_options['new_query_name'] = kwargs.get('query_name')
 
 
 # Hive query exec options
@@ -116,7 +120,8 @@ class HiveQueryExecOptions(QueryExecOptions):
 # The QueryExecutor is used to run the given query using the target executor (Hive,
 # Impala, Impala Beeswax)
 class QueryExecutor(threading.Thread):
-  def __init__(self, name, query_exec_func, exec_options, query):
+  def __init__(self, name, query_exec_func, exec_options, query,
+      table_format_str, query_name):
     """
     Initialize the QueryExecutor
 
@@ -128,6 +133,8 @@ class QueryExecutor(threading.Thread):
     self.query_exec_func = query_exec_func
     self.query_exec_options = exec_options
     self.query = query
+    self.table_format_str = table_format_str
+    self.new_query_name = query_name
     self.output_result = None
     self.execution_result = QueryExecutionResult()
     threading.Thread.__init__(self)
@@ -157,9 +164,14 @@ def establish_beeswax_connection(query, query_options):
   client.connect()
   LOG.debug('Connected to %s' % query_options.impalad)
   # Set the exec options.
-  client.clear_query_options()
-  for key, value in query_options.exec_options.iteritems():
-    client.set_query_option(key, value)
+  exec_options = query_options.exec_options
+  for exec_option in exec_options.keys():
+    # TODO: Move the validation to the ImpalaBeeswaxExecOptions.
+    if not client.get_query_option(exec_option):
+      LOG.error('Illegal exec_option: %s' % exec_option)
+      return (False, None)
+    # change the default value to the user specified value.
+    client.set_query_option(exec_option, exec_options[exec_option])
   return (True, client)
 
 def execute_using_impala_beeswax(query, query_options):
@@ -180,10 +192,10 @@ def execute_using_impala_beeswax(query, query_options):
   # execute the query
   results = []
   # create a map for query options and the query names to send to the plugin
-  context = vars(query_options)
-  context['query_name'] = query
+  context = build_context(query, query_options)
   for i in xrange(query_options.iterations):
     LOG.debug("Running iteration %d" % (i+1))
+    context['iteration'] = i
     result = QueryResult()
     if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
     try:
@@ -201,6 +213,13 @@ def execute_using_impala_beeswax(query, query_options):
   del client
   # construct the execution result.
   return construct_execution_result(query_options.iterations, results)
+
+def build_context(query, query_options):
+  context = vars(query_options)
+  context['query_name'] = query
+  context['table_format'] = query_options.query_options.get('table_format_str')
+  context['short_query_name'] = query_options.query_options.get('new_query_name')
+  return context
 
 def construct_execution_result(iterations, results):
   """

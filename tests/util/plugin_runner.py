@@ -81,6 +81,7 @@ class PluginRunner(object):
 
   def run_plugins_pre(self, context=None, scope=None):
     if len(self.__plugins) == 0: return
+    if context: context['scope'] = scope
     for p in self.__plugins:
       if not scope or p.scope == scope.lower():
         LOG.info('Running pre-hook for %s at scope %s' % (p.__name__, scope))
