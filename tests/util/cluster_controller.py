@@ -43,7 +43,7 @@ class ClusterController(object):
     self.cmd = str()
     self.__get_cluster_hosts()
     if not self.local:
-      self.__set_fabric_env()
+      self.__set_fabric_env(kwargs)
       self.__validate()
 
   def __validate(self):
@@ -55,13 +55,31 @@ class ClusterController(object):
     # We do not need to validate the connection for a local run
     pass
 
-  def __set_fabric_env(self):
+  def __set_fabric_env(self, kwargs):
     """Set fabric global environment variables"""
     fabric_env.hosts = ClusterController.hosts
+    fabric_env.warn_only = kwargs.get('continue_on_error', True)
+    # This sets the fabric timeout
+    # TODO: Find optimal timeout value
+    fabric_env.timeout = kwargs.get('timeout', 60)
     if self.user:
       fabric_env.user = self.user
     if self.ssh_key:
       fabric_env.key_filename = self.ssh_key
+
+  def change_fabric_hosts(self, hosts):
+    """Change fabric hosts
+
+    This method can be called if an operation needs to only be run on specific machines.
+    """
+    fabric_env.hosts = hosts
+
+  def reset_fabric_hosts(self):
+    """Reset the fabric hosts to the ClusterController default
+
+    This method can be called after an operation on specifc hosts. It's generally called
+    after an operation requiring change_fabric_hosts"""
+    fabric_env.hosts = ClusterController.hosts
 
   def __get_cluster_hosts(self):
     """Get the host list from the environment variable
@@ -79,27 +97,29 @@ class ClusterController(object):
       LOG.error("No host file specified, running command on localhost")
       LOG.error("Error: %s" % e)
 
-  def run_cmd(self, cmd, serial=False):
+  def run_cmd(self, cmd, serial):
     """Run commands locally or remotely.
 
     If in local mode, the command is run locally. When not local,
     the command is run with superuser privileges on remote hosts
     in parallel. The user can override running the command in parallel
     by explicity invoking run_cmd to run serially.
+    The method returns a dictionary. key = hostname, value = the results of the
+    command.
     TODO: Make this cleaner. Remove superuser restriction and make it an option.
     """
     self.cmd = cmd
     if self.local:
       local(self.cmd)
       return
-    if not serial:
-      execute(self.__run_cmd_parallel)
+    if serial:
+      return execute(self.__run_cmd_serial)
     else:
-      execute(self.__run_cmd_serial)
+      return execute(self.__run_cmd_parallel)
 
   @parallel
   def __run_cmd_parallel(self):
-    sudo(self.cmd, combine_stderr=True)
+    return sudo(self.cmd, combine_stderr=True)
 
   def __run_cmd_serial(self):
-    sudo(self.cmd, combine_stderr=True)
+    return sudo(self.cmd, combine_stderr=True)
