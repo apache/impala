@@ -248,7 +248,7 @@ public class Planner {
           analyzer);
     } else if (root instanceof AggregationNode) {
       result = createAggregationFragment(
-          (AggregationNode) root, childFragments.get(0), fragments);
+          (AggregationNode) root, childFragments.get(0), fragments, analyzer);
     } else if (root instanceof SortNode) {
       result =
           createTopnFragment((SortNode) root, childFragments.get(0), fragments, analyzer);
@@ -295,12 +295,7 @@ public class Planner {
     // we ignore constants for the sake of partitioning
     List<Expr> nonConstPartitionExprs = Lists.newArrayList(partitionExprs);
     Expr.removeConstants(nonConstPartitionExprs);
-
-    LOG.info("partitionExprs=" + Expr.toSql(nonConstPartitionExprs));
-    LOG.info("partitionExprs=" + Expr.debugString(nonConstPartitionExprs));
     DataPartition inputPartition = inputFragment.getDataPartition();
-    LOG.info("inputPartition.exprs=" + Expr.toSql(inputPartition.getPartitionExprs()));
-    LOG.info("inputPartition.exprs=" + Expr.debugString(inputPartition.getPartitionExprs()));
 
     // do nothing if the input fragment is already partitioned on partitionExprs
     if (Expr.equalLists(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
@@ -311,21 +306,21 @@ public class Planner {
     // if it is distributed across all nodes; if so, don't repartition
     if (Expr.isSubset(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
       long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
-      LOG.info("#inputpartitions=" + Long.toString(numPartitions));
       if (numPartitions >= inputFragment.getNumNodes()) return inputFragment;
     }
 
     // don't repartition if the resulting number of partitions is too low to get good
     // parallelism
     long numPartitions = getNumDistinctValues(nonConstPartitionExprs);
-    LOG.info("#partitions=" + Long.toString(numPartitions));
 
     // don't repartition if we know we have fewer partitions than nodes
     // (ie, default to repartitioning if col stats are missing)
     // TODO: we want to repartition if the resulting files would otherwise
     // be very small (less than some reasonable multiple of the recommended block size);
     // in order to do that, we need to come up with an estimate of the avg row size
-    // in the particular file format of the output table/partition
+    // in the particular file format of the output table/partition.
+    // We should always know on how many nodes our input is running.
+    Preconditions.checkState(inputFragment.getNumNodes() != -1);
     if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
       return inputFragment;
     }
@@ -615,7 +610,7 @@ public class Planner {
    * for the phase 2 AggregationNode.
    */
   private PlanFragment createAggregationFragment(AggregationNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments) {
+      PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer) {
     if (!childFragment.isPartitioned()) {
       // nothing to distribute; do full aggregation directly within childFragment
       childFragment.addPlanRoot(node);
@@ -670,6 +665,7 @@ public class Planner {
             new PlanNodeId(nodeIdGenerator), mergeFragment.getPlanRoot(),
             node.getAggInfo().getMergeAggInfo());
       mergeAggNode.setLimit(limit);
+      mergeAggNode.computeStats(analyzer);
       mergeFragment.addPlanRoot(mergeAggNode);
 
       // HAVING predicates can only be evaluated after the merge agg step
@@ -720,6 +716,7 @@ public class Planner {
         new AggregationNode(
           new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
     mergeFragment.addPlanRoot(mergeAggNode);
+    mergeAggNode.computeStats(analyzer);
     // the 2nd-phase aggregation consumes the output of the merge agg;
     // if there is a limit, it had already been placed with the 2nd aggregation
     // step (which is where it should be)
@@ -736,6 +733,7 @@ public class Planner {
       mergeAggNode =
           new AggregationNode(
             new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
+      mergeAggNode.computeStats(analyzer);
       mergeFragment.addPlanRoot(mergeAggNode);
     }
 

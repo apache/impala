@@ -54,6 +54,8 @@ public class ExchangeNode extends PlanNode {
     } else {
       cardinality = inputNode.cardinality;
     }
+    numNodes = inputNode.numNodes;
+    avgRowSize = inputNode.avgRowSize;
   }
 
   @Override

@@ -96,6 +96,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
     this.cardinality = -1;
+    this.numNodes = -1;
     this.displayName = displayName;
   }
 
@@ -104,6 +105,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
     this.cardinality = -1;
+    this.numNodes = -1;
     this.displayName = displayName;
   }
 
@@ -118,6 +120,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
     this.conjuncts = Expr.cloneList(node.conjuncts, null);
     this.cardinality = -1;
+    this.numNodes = -1;
     this.compactData = node.compactData;
     this.displayName = displayName;
   }
