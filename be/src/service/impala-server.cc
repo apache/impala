@@ -60,6 +60,7 @@
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
+#include "util/thrift-thread.h"
 #include "util/url-coding.h"
 #include "util/webserver.h"
 #include "gen-cpp/Types_types.h"
@@ -1687,11 +1688,6 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
   DCHECK((be_port == 0) == (be_server == NULL));
 
   shared_ptr<ImpalaServer> handler(new ImpalaServer(exec_env));
-
-  // TODO: do we want a BoostThreadFactory?
-  // TODO: we want separate thread factories here, so that fe requests can't starve
-  // be requests
-  shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
 
   if (beeswax_port != 0 && beeswax_server != NULL) {
     // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support

@@ -57,6 +57,7 @@ add_library(Util
   thrift-util.cc
   thrift-client.cc
   thrift-server.cc
+  thrift-thread.cc
   url-parser.cc
   url-coding.cc
 )

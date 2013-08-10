@@ -17,7 +17,6 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
-#include <thrift/concurrency/PosixThreadFactory.h>
 #include <thrift/concurrency/Thread.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -35,6 +34,7 @@
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/uid-util.h"
+#include "util/thrift-thread.h"
 
 #include <sstream>
 
@@ -115,8 +115,10 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
   unique_lock<mutex> lock(signal_lock_);
   thrift_server_->started_ = false;
 
+  stringstream name;
+  name << "supervise-" << thrift_server_->name_;
   thrift_server_->server_thread_.reset(
-      new Thread("thrift-server", "supervise",
+      new Thread("thrift-server", name.str(),
                  &ThriftServer::ThriftServerEventProcessor::Supervise, this));
 
   system_time deadline = get_system_time() +
@@ -309,7 +311,8 @@ Status ThriftServer::Start() {
   DCHECK(!started_);
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
   shared_ptr<ThreadManager> thread_mgr;
-  shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
+  shared_ptr<ThreadFactory> thread_factory(
+      new ThriftThreadFactory("thrift-server", name_));
   shared_ptr<TServerTransport> fe_server_transport;
   shared_ptr<TTransportFactory> transport_factory;
 
