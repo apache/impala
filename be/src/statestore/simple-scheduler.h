@@ -94,6 +94,14 @@ class SimpleScheduler : public Scheduler {
   typedef boost::unordered_map<std::string, std::string> BackendIpAddressMap;
   BackendIpAddressMap backend_ip_map_;
 
+  // Map from unique backend id to TBackendDescriptor. Used to track the known backends
+  // from the statestore. It's important to track both the backend ID as well as the
+  // TBackendDescriptor so we know what is being removed in a given update.
+  // Locking of this map is not needed since it should only be read/modified from
+  // within the UpdateMembership() function.
+  typedef boost::unordered_map<std::string, TBackendDescriptor> BackendIdMap;
+  BackendIdMap current_membership_;
+
   // Metrics subsystem access
   Metrics* metrics_;
 
@@ -128,8 +136,8 @@ class SimpleScheduler : public Scheduler {
   uint32_t update_count_;
 
   // Called asynchronously when an update is received from the subscription manager
-  void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& service_state,
-      std::vector<TTopicUpdate>* topic_updates);
+  void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+      std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Webserver callback that prints a list of known backends
   void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);

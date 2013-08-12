@@ -70,8 +70,14 @@ class Status;
 // different subscribers may treat the same topic differently wrt to
 // the transience of their updates.
 //
-// TODO: Compute deltas based on subscriber last-seen version numbers
-// and only send the changes.
+// The statestore tracks the history of updates to each topic, with each
+// topic update getting a sequentially increasing version number that is
+// unique across the topic.
+// Subscribers also track the max version of each topic which they have have
+// successfully processed. The statestore can use this information to send
+// a delta of updates to a subscriber, rather than all items in the topic.
+// For non-delta updates, the statestore will send an update that includes
+// all values in the topic.
 class StateStore {
  public:
   // A SubscriberId uniquely identifies a single subscriber, and is
@@ -126,6 +132,9 @@ class StateStore {
     // sequentially later updates have larger version numbers.
     typedef uint64_t Version;
 
+    // The Version value used to initialize a new TopicEntry.
+    static const Version TOPIC_ENTRY_INITIAL_VERSION = 1L;
+
     // Representation of an empty Value
     static const Value NULL_VALUE;
 
@@ -136,7 +145,7 @@ class StateStore {
     // TODO: Consider enforcing version monotonicity here.
     void SetValue(const Value& bytes, Version version);
 
-    TopicEntry() : value_(NULL_VALUE), version_(0L) { }
+    TopicEntry() : value_(NULL_VALUE), version_(TOPIC_ENTRY_INITIAL_VERSION) { }
 
     const Value& value() const { return value_; }
     uint64_t version() const { return version_; }
@@ -157,6 +166,10 @@ class StateStore {
 
   // Map from TopicEntryKey to TopicEntry, maintained by a Topic object.
   typedef boost::unordered_map<TopicEntryKey, TopicEntry> TopicEntryMap;
+
+  // Map from Version to TopicEntryKey, maintained by a Topic object. Effectively a
+  // log of the updates made to a Topic, ordered by version.
+  typedef std::map<TopicEntry::Version, TopicEntryKey> TopicUpdateLog;
 
   // A Topic is logically a map between a string key and a sequence of
   // bytes. A <string, bytes> pair is a TopicEntry.
@@ -190,6 +203,7 @@ class StateStore {
 
     const TopicId& id() const { return topic_id_; }
     const TopicEntryMap& entries() const { return entries_; }
+    const TopicUpdateLog& topic_update_log() const { return topic_update_log_; }
 
    private:
     // Map from topic entry key to topic entry.
@@ -198,9 +212,18 @@ class StateStore {
     // Unique identifier for this topic. Should be human-readable.
     const TopicId topic_id_;
 
-    // Incremented on every Put(..), and each TopicEntry is tagged
-    // with the current version.
+    // Tracks the last version that was assigned to an entry in this Topic. Incremented
+    // on every Put() so each TopicEntry is tagged with a unique version value.
     TopicEntry::Version last_version_;
+
+    // Contains a history of updates to this Topic, with each key being a
+    // Version and the value being a TopicEntryKey. Used to look up the TopicEntry
+    // in the entries_ map corresponding to each version update.
+    // TODO: Looking up a TopicEntry from the topic_update_log_ requires two reads - one
+    // to get the TopicEntryKey and another to use that key to look up the corresponding
+    // TopicEntry in the entries_ map. Based on performance needs, we may need to
+    // revisit this to find a way to do the look up using a single read.
+    TopicUpdateLog topic_update_log_;
   };
 
   // Note on locking: Subscribers and Topics should be accessed under their own coarse
@@ -230,9 +253,20 @@ class StateStore {
     Subscriber(const SubscriberId& subscriber_id, const TNetworkAddress& network_address,
                const std::vector<TTopicRegistration>& subscribed_topics);
 
-    // The set of topics subscribed to, and whether entries to each
-    // topic written by this subcriber should be considered transient.
-    typedef boost::unordered_map<TopicId, bool> Topics;
+    // The TopicState contains information on whether entries written by this
+    // subscriber should be considered transient, as well as the last topic entry version
+    // successfully processed by this subscriber.
+    struct TopicState {
+      bool is_transient;
+      TopicEntry::Version last_version;
+    };
+
+    // The set of topics subscribed to, and current state (as seen by this subscriber) of
+    // the topic.
+    typedef boost::unordered_map<TopicId, TopicState> Topics;
+
+    // The Version value used to initialize new Topic subscriptions for this Subscriber.
+    static const TopicEntry::Version TOPIC_INITIAL_VERSION;
 
     const Topics& subscribed_topics() const { return subscribed_topics_; }
     const TNetworkAddress& network_address() const { return network_address_; }
@@ -254,21 +288,31 @@ class StateStore {
 
     const TransientEntryMap& transient_entries() const { return transient_entries_; }
 
+    // Returns the maximum version of the given TopicId which this subscriber
+    // has successfully processed.
+    const TopicEntry::Version GetMaxVersionForTopic(const TopicId& topic_id) const;
+
+    // Updates the subscriber max version of the given TopicId to the given value.
+    // This should only be set when once a subscriber has succesfully processed the
+    // given update corresponding to this version.
+    void SetMaxVersionForTopic(const TopicId& topic_id, TopicEntry::Version version);
+
    private:
     // Unique human-readable identifier for this subscriber, set by
-    // the subscriber itself on a Register call
+    // the subscriber itself on a Register call.
     const SubscriberId subscriber_id_;
 
-    // The location of the heartbeat service that this subscriber runs
+    // The location of the heartbeat service that this subscriber runs.
     const TNetworkAddress network_address_;
 
-    // List of subscriber topics, with a boolean for each describing
-    // whether updates on that topic are 'transient' (i.e., to be
-    // deleted upon subscriber failure) or not.
-    boost::unordered_map<TopicId, bool> subscribed_topics_;
+    // Map of topic subscriptions to current TopicState. The the state describes
+    // whether updates on the topic are 'transient' (i.e., to be deleted upon subscriber
+    // failure) or not and contains the version number of the last update processed by
+    // this Subscriber on the topic.
+    Topics subscribed_topics_;
 
     // List of updates made by this subscriber so that transient
-    // entries may be deleted on failure
+    // entries may be deleted on failure.
     TransientEntryMap transient_entries_;
   };
 
@@ -336,6 +380,12 @@ class StateStore {
   // failed subscribers. Otherwise, it sends the deltas to the
   // subscriber, and receives and processes a list of updates.
   Status ProcessOneSubscriber(Subscriber* subscriber);
+
+  // Populates a TUpdateStateRequest with the update state for this subscriber. Iterates
+  // over all updates in all subscribed topics, populating the given
+  // TUpdateStateRequest object. Must be called while holding the topic_lock_.
+  void GatherTopicUpdates(const Subscriber& subscriber,
+      TUpdateStateRequest* update_state_request);
 
   // True if the shutdown flag has been set true, false otherwise.
   bool ShouldExit();

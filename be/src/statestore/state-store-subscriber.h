@@ -96,7 +96,7 @@ class StateStoreSubscriber {
   // topic_updates parameter, although updates for unknown topics
   // (i.e. those with no subscribers) will be ignored.
   typedef boost::function<void (const TopicDeltaMap& state,
-                                std::vector<TTopicUpdate>* topic_updates)> UpdateCallback;
+                                std::vector<TTopicDelta>* topic_updates)> UpdateCallback;
 
   // Adds a topic to the set of topics that updates will be received
   // for. When a topic update is received, the supplied UpdateCallback
@@ -165,6 +165,11 @@ class StateStoreSubscriber {
   // disconnection.
   std::map<StateStore::TopicId, bool> topic_registrations_;
 
+  // Mapping of TopicId to the last version of the topic this subscriber successfully
+  // processed.
+  typedef boost::unordered_map<StateStore::TopicId, int64_t> TopicVersionMap;
+  TopicVersionMap current_topic_versions_;
+
   // State-store client cache - only one client is ever used.
   boost::scoped_ptr<StateStoreClientCache> client_cache_;
 
@@ -188,14 +193,22 @@ class StateStoreSubscriber {
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StateStoreSubscriberThriftIf;
 
-  // Called when the state-store sends a heartbeat. Each registered
-  // callback is called in turn with the given list of topic deltas,
-  // and any updates are aggregated in topic_updates.
-  // If the subscriber is in recovery mode, this method returns
-  // immediately.
+  // Called when the state-store sends a heartbeat. Each registered callback is called
+  // in turn with the given map of incoming_topic_deltas from the state-store. Each
+  // TTopicDelta sent from the state-store to the subscriber will contain the topic name,
+  // a list of additions to the topic, a list of deletions from the topic, and the
+  // version range the update covers. A from_version of 0 indicates a non-delta update.
+  // In response, any updates to the topic by the subscriber are aggregated in
+  // subscriber_topic_updates and returned to the state-store. Each update is a
+  // TTopicDelta that contains a list of additions to the topic and a list of deletions
+  // from the topic. Additionally, if a subscriber has received an unexpected delta
+  // update version range, they can request a new delta update by setting the
+  // "from_version" field of the TTopicDelta response. The next state-store update will
+  // be based off the version the subscriber responds with.
+  // If the subscriber is in recovery mode, this method returns immediately.
   // Returns OK if not in recovery mode, and an error otherwise.
-  Status UpdateState(const TopicDeltaMap& topic_deltas,
-      std::vector<TTopicUpdate>* topic_updates);
+  Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
+      std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
   // state-store is still sending heartbeats. If not, enter 'recovery mode'

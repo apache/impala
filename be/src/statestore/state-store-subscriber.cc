@@ -199,8 +199,8 @@ void StateStoreSubscriber::RecoveryModeChecker() {
   }
 }
 
-Status StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
-    vector<TTopicUpdate>* topic_updates) {
+Status StateStoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
+    vector<TTopicDelta>* subscriber_topic_updates) {
   failure_detector_->UpdateHeartbeat(STATE_STORE_ID, true);
 
   // We don't want to block here because this is an RPC, and delaying
@@ -215,10 +215,40 @@ Status StateStoreSubscriber::UpdateState(const TopicDeltaMap& topic_deltas,
         heartbeat_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
     MonotonicStopWatch sw;
     sw.Start();
-    BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
-      BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
-        // TODO: Consider filtering the topics to only send registered topics to callbacks
-        callback(topic_deltas, topic_updates);
+
+    // Check the version ranges of all delta updates to ensure they can be applied
+    // to this subscriber. If any invalid ranges are found, request new update(s) with
+    // version ranges applicable to this subscriber.
+    bool found_unexpected_delta = false;
+    BOOST_FOREACH(const TopicDeltaMap::value_type& delta, incoming_topic_deltas) {
+      TopicVersionMap::const_iterator itr = current_topic_versions_.find(delta.first);
+      if (itr != current_topic_versions_.end()) {
+        if (delta.second.is_delta && delta.second.from_version != itr->second) {
+          LOG(ERROR) << "Unexpected delta update to topic '" << delta.first << "' of "
+                     << "version range (" << delta.second.from_version << ":"
+                     << delta.second.to_version << "]. Expected delta start version: "
+                     << itr->second;
+
+          subscriber_topic_updates->push_back(TTopicDelta());
+          TTopicDelta& update = subscriber_topic_updates->back();
+          update.topic_name = delta.second.topic_name;
+          update.__set_from_version(itr->second);
+          found_unexpected_delta = true;
+        } else {
+          // Update the current topic version
+          current_topic_versions_[delta.first] = delta.second.to_version;
+        }
+      }
+    }
+
+    // Skip calling the callbacks when an unexpected delta update is found.
+    if (!found_unexpected_delta) {
+      BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
+        BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
+          // TODO: Consider filtering the topics to only send registered topics to
+          // callbacks
+          callback(incoming_topic_deltas, subscriber_topic_updates);
+        }
       }
     }
     sw.Stop();

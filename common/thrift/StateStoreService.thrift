@@ -51,20 +51,8 @@ struct TTopicItem {
   2: required string value;
 }
 
-// Sent from a client to the statestore to update a single topic
-// TODO: Can we junk this and use TTopicDelta everywhere?
-struct TTopicUpdate {
-  // Name of the topic this update applies to
-  1: required string topic_name;
-
-  // List of changes to topic entries
-  2: required list<TTopicItem> topic_updates;
-
-  // List of topic entries to be deleted.
-  3: required list<string> topic_deletions;
-}
-
-// Set of changes to a single topic, sent to a subscriber.
+// Set of changes to a single topic, sent from the statestore to a subscriber as well as
+// from a subscriber to the statestore.
 struct TTopicDelta {
   // Name of the topic this delta applies to
   1: required string topic_name;
@@ -78,6 +66,16 @@ struct TTopicDelta {
   // True if entries / deletions are to be applied to in-memory state,
   // otherwise topic_entries contains entire topic state.
   4: required bool is_delta;
+
+  // The Topic version range this delta covers. If there have been changes to the topic,
+  // the update will include all changes in the range: [from_version, to_version).
+  // If there have been no changes in the topic the from_version will match the
+  // to_version. The from_version will always be 0 for non-delta updates.
+  // If this is an update being sent from a subscriber to the statestore, the from_version
+  // is set only when recovering from an inconsistent state, to the last version of the
+  // topic the subscriber successfully processed.
+  5: optional i64 from_version
+  6: optional i64 to_version
 }
 
 // Description of a topic to subscribe to as part of a RegisterSubscriber call
@@ -128,11 +126,19 @@ struct TUpdateStateResponse {
   1: required Status.TStatus status;
 
   // List of updates published by the subscriber to be made centrally by the state-store
-  2: required list<TTopicUpdate> topic_updates;
+  2: required list<TTopicDelta> topic_updates;
 }
 
 service StateStoreSubscriber {
-  // Heartbeat message sent by the state-store, containing a list of topic updates.
-  // Response is list of updates published by the subscriber.
+  // Called when the state-store sends a heartbeat. The request contains a map of
+  // topic names to TTopicDelta updates, sent from the state-store to the subscriber. Each
+  // of these delta updates will contain a list of additions to the topic and a list of
+  // deletions from the topic.
+  // In response, the subscriber returns an aggregated list of updates to topic(s) to
+  // the state-store. Each update is a TTopicDelta that contains a list of additions to
+  // the topic and a list of deletions from the topic. Additionally, if a subscriber has
+  // received an unexpected delta update version range, they can request a new delta
+  // update based off a specific version from the state-store. The next state-store
+  // delta update will be based off of the version the subscriber requested.
   TUpdateStateResponse UpdateState(1: TUpdateStateRequest params);
 }

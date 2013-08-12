@@ -176,7 +176,6 @@ void SimpleScheduler::BackendsPathHandler(const Webserver::ArgumentMap& args,
   BackendList backends;
   GetAllKnownBackends(&backends);
   sort(backends.begin(), backends.end(), TBackendDescriptorComparator);
-
   if (args.find("raw") == args.end()) {
     (*output) << "<h2>Known Backends "
               << "(" << backends.size() << ")"
@@ -210,87 +209,91 @@ void SimpleScheduler::BackendsPathHandler(const Webserver::ArgumentMap& args,
 }
 
 void SimpleScheduler::UpdateMembership(
-    const StateStoreSubscriber::TopicDeltaMap& service_state,
-    vector<TTopicUpdate>* topic_updates) {
+    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    vector<TTopicDelta>* subscriber_topic_updates) {
   ++update_count_;
   // TODO: Work on a copy if possible, or at least do resolution as a separate step
   // First look to see if the topic(s) we're interested in have an update
   StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
-      service_state.find(IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(IMPALA_MEMBERSHIP_TOPIC);
 
-  // Copy to work on without holding the map lock
-  BackendMap backend_map_copy;
-  BackendIpAddressMap backend_ip_map_copy;
-  bool found_self = false;
-  int num_backends = 0;
-
-  if (topic != service_state.end()) {
+  if (topic != incoming_topic_deltas.end()) {
     const TTopicDelta& delta = topic->second;
-    if (delta.is_delta) {
-      // TODO: Handle deltas when the state-store starts sending them
-      LOG(WARNING) << "Unexpected delta update from state-store, ignoring as scheduler"
-                      " cannot handle deltas";
-      return;
-    }
 
-    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
-      TBackendDescriptor backend_descriptor;
-      // Benchmarks have suggested that this method can deserialize
-      // ~10m messages per second, so no immediate need to consider optimisation.
-      uint32_t len = item.value.size();
-      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &backend_descriptor);
-      if (!status.ok()) {
-        VLOG(2) << "Error deserializing topic item with key: " << item.key;
-        continue;
+    // This function needs to handle both delta and non-delta updates. For delta
+    // updates, it is desireable to minimize the number of copies to only
+    // the added/removed items. To accomplish this, all updates are processed
+    // under a lock and applied to the shared backend maps (backend_map_ and
+    // backend_ip_map_) in place.
+    {
+      lock_guard<mutex> lock(backend_map_lock_);
+      if (!delta.is_delta) {
+        current_membership_.clear();
+        backend_map_.clear();
+        backend_ip_map_.clear();
       }
 
-      if (item.key == backend_id_) {
-        if (backend_descriptor.address == backend_descriptor_.address) {
-          found_self = true;
-        } else {
+      // Process new entries to the topic
+      BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+        TBackendDescriptor be_desc;
+        // Benchmarks have suggested that this method can deserialize
+        // ~10m messages per second, so no immediate need to consider optimisation.
+        uint32_t len = item.value.size();
+        Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
+            item.value.data()), &len, false, &be_desc);
+        if (!status.ok()) {
+          VLOG(2) << "Error deserializing topic item with key: " << item.key;
+          continue;
+        }
+        if (item.key == backend_id_ && be_desc.address != backend_descriptor_.address) {
           // Someone else has registered this subscriber ID with a
           // different address. We will try to re-register
           // (i.e. overwrite their subscription), but there is likely
           // a configuration problem.
           LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-                                   << backend_descriptor.address;
+                                   << be_desc.address;
+        }
+
+        list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
+        if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
+          backend_map_[be_desc.ip_address].push_back(be_desc);
+        }
+        backend_ip_map_[be_desc.address.hostname] = be_desc.ip_address;
+        current_membership_.insert(make_pair(item.key, be_desc));
+      }
+      // Process deletions from the topic
+      BOOST_FOREACH(const string& backend_id, delta.topic_deletions) {
+        if (current_membership_.find(backend_id) != current_membership_.end()) {
+          const TBackendDescriptor& be_desc = current_membership_[backend_id];
+          backend_ip_map_.erase(be_desc.address.hostname);
+          list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
+          be_descs->erase(
+              remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
+          current_membership_.erase(backend_id);
         }
       }
-
-      backend_map_copy[backend_descriptor.ip_address].push_back(
-          backend_descriptor);
-      backend_ip_map_copy[backend_descriptor.address.hostname] =
-          backend_descriptor.ip_address;
-      ++num_backends;
+      next_nonlocal_backend_entry_ = backend_map_.begin();
     }
-  }
 
-  // If this impalad is not in our view of the membership list, we
-  // should add it and tell the state-store.
-  if (!found_self) {
-    VLOG(2) << "Registering local backend with state-store";
-    topic_updates->push_back(TTopicUpdate());
-    TTopicUpdate& update = topic_updates->back();
-    update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
-    update.topic_updates.push_back(TTopicItem());
+    // If this impalad is not in our view of the membership list, we should add it and
+    // tell the state-store.
+    if (current_membership_.find(backend_id_) == current_membership_.end()) {
+      VLOG(1) << "Registering local backend with state-store";
+      subscriber_topic_updates->push_back(TTopicDelta());
+      TTopicDelta& update = subscriber_topic_updates->back();
+      update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
+      update.topic_entries.push_back(TTopicItem());
 
-    TTopicItem& item = update.topic_updates.back();
-    item.key = backend_id_;
-    Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
-    if (!status.ok()) {
-      LOG(INFO) << "Failed to serialize Impala backend address for state-store topic: "
-                << status.GetErrorMsg();
-      topic_updates->pop_back();
+      TTopicItem& item = update.topic_entries.back();
+      item.key = backend_id_;
+      Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
+      if (!status.ok()) {
+        LOG(INFO) << "Failed to serialize Impala backend address for state-store topic: "
+                  << status.GetErrorMsg();
+        subscriber_topic_updates->pop_back();
+      }
     }
-  }
-  if (metrics_ != NULL) num_backends_metric_->Update(num_backends);
-
-  {
-    lock_guard<mutex> lock(backend_map_lock_);
-    backend_map_.swap(backend_map_copy);
-    backend_ip_map_.swap(backend_ip_map_copy);
-    next_nonlocal_backend_entry_ = backend_map_.begin();
+    if (metrics_ != NULL) num_backends_metric_->Update(current_membership_.size());
   }
 }
 

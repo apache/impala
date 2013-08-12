@@ -1522,25 +1522,20 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id, const TUniqueId& que
 }
 
 void ImpalaServer::MembershipCallback(
-    const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
-    vector<TTopicUpdate>* topic_updates) {
+    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    vector<TTopicDelta>* subscriber_topic_updates) {
   // TODO: Consider rate-limiting this. In the short term, best to have
   // state-store heartbeat less frequently.
   StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
-      topic_deltas.find(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC);
 
-  if (topic != topic_deltas.end()) {
+  if (topic != incoming_topic_deltas.end()) {
     const TTopicDelta& delta = topic->second;
-    // Although the protocol allows for it, we don't accept true
-    // deltas from the state-store, but expect each topic to contains
-    // its entire contents.
-    if (delta.is_delta) {
-      LOG_EVERY_N(WARNING, 60) << "Unexpected topic delta from state-store, ignoring"
-                               << "(seen " << google::COUNTER << " deltas)";
-      return;
-    }
-    set<TNetworkAddress> current_membership;
+    // If this is not a delta, the update should include all entries in the topic so
+    // clear the saved mapping of known backends.
+    if (!delta.is_delta) known_backends_.clear();
 
+    // Process membership additions.
     BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
       uint32_t len = item.value.size();
       TBackendDescriptor backend_descriptor;
@@ -1550,7 +1545,19 @@ void ImpalaServer::MembershipCallback(
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      current_membership.insert(backend_descriptor.address);
+      // This is a new item - add it to the map of known backends.
+      known_backends_.insert(make_pair(item.key, backend_descriptor.address));
+    }
+    // Process membership deletions.
+    BOOST_FOREACH(const string& backend_id, delta.topic_deletions) {
+      known_backends_.erase(backend_id);
+    }
+
+    // Create a set of known backend network addresses. Used to test for cluster
+    // membership by network address.
+    set<TNetworkAddress> current_membership;
+    BOOST_FOREACH(const BackendAddressMap::value_type& backend, known_backends_) {
+      current_membership.insert(backend.second);
     }
 
     set<TUniqueId> queries_to_cancel;

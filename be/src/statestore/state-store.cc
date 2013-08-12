@@ -46,6 +46,13 @@ const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
 
 const StateStore::TopicEntry::Value StateStore::TopicEntry::NULL_VALUE = "";
 
+// Initial version for each Topic registered by a Subscriber. Generally, the Topic will
+// have a Version that is the MAX() of all entries in the Topic, but this initial
+// value needs to be less than TopicEntry::TOPIC_ENTRY_INITIAL_VERSION to distinguish
+// between the case where a Topic is empty and the case where the Topic only contains
+// an item with the initial version.
+const StateStore::TopicEntry::Version StateStore::Subscriber::TOPIC_INITIAL_VERSION = 0L;
+
 // Used to control the maximum size of the heartbeat input queue, in which there is at
 // most one entry per subscriber.
 const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
@@ -86,8 +93,14 @@ StateStore::TopicEntry::Version StateStore::Topic::Put(const string& key,
   TopicEntryMap::iterator entry_it = entries_.find(key);
   if (entry_it == entries_.end()) {
     entry_it = entries_.insert(make_pair(key, TopicEntry())).first;
+  } else {
+    // Delete the old item from the version history. There is no need to search the
+    // version_history because there should only be at most a single item in the history
+    // at any given time
+    topic_update_log_.erase(entry_it->second.version());
   }
-  entry_it->second.SetValue(bytes, last_version_++);
+  entry_it->second.SetValue(bytes, ++last_version_);
+  topic_update_log_.insert(make_pair(entry_it->second.version(), key));
   return entry_it->second.version();
 }
 
@@ -95,7 +108,11 @@ void StateStore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
     const StateStore::TopicEntryKey& key) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
   if (entry_it != entries_.end() && entry_it->second.version() == version) {
-    entry_it->second.SetValue(StateStore::TopicEntry::NULL_VALUE, last_version_++);
+    // Add a new entry with the the version history for this deletion and remove
+    // the old entry
+    topic_update_log_.erase(version);
+    topic_update_log_.insert(make_pair(++last_version_, key));
+    entry_it->second.SetValue(StateStore::TopicEntry::NULL_VALUE, last_version_);
   }
 }
 
@@ -104,7 +121,10 @@ StateStore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
     const vector<TTopicRegistration>& subscribed_topics)
       : subscriber_id_(subscriber_id), network_address_(network_address) {
   BOOST_FOREACH(const TTopicRegistration& topic, subscribed_topics) {
-    subscribed_topics_[topic.topic_name] = topic.is_transient;
+    TopicState topic_state;
+    topic_state.is_transient = topic.is_transient;
+    topic_state.last_version = TOPIC_INITIAL_VERSION;
+    subscribed_topics_[topic.topic_name] = topic_state;
   }
 }
 
@@ -113,9 +133,21 @@ void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
   // Only record the update if the topic is transient
   const Topics::const_iterator topic_it = subscribed_topics_.find(topic_id);
   DCHECK(topic_it != subscribed_topics_.end());
-  if (topic_it->second == true) {
+  if (topic_it->second.is_transient == true) {
     transient_entries_[make_pair(topic_id, topic_key)] = version;
   }
+}
+
+const StateStore::TopicEntry::Version StateStore::Subscriber::GetMaxVersionForTopic(
+    const TopicId& topic_id) const {
+  Topics::const_iterator itr = subscribed_topics_.find(topic_id);
+  return itr == subscribed_topics_.end() ?
+      TOPIC_INITIAL_VERSION : itr->second.last_version;
+}
+
+void StateStore::Subscriber::SetMaxVersionForTopic(const TopicId& topic_id,
+    TopicEntry::Version version) {
+  subscribed_topics_[topic_id].last_version = version;
 }
 
 StateStore::StateStore(Metrics* metrics)
@@ -247,29 +279,7 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   TUpdateStateRequest update_state_request;
   {
     lock_guard<mutex> l(topic_lock_);
-
-    BOOST_FOREACH(const Subscriber::Topics::value_type& topic,
-        subscriber->subscribed_topics()) {
-      TopicMap::const_iterator topic_it = topics_.find(topic.first);
-      DCHECK(topic_it != topics_.end());
-
-      TTopicDelta& topic_delta = update_state_request.topic_deltas[topic.first];
-      topic_delta.topic_name = topic.first;
-      BOOST_FOREACH(const TopicEntryMap::value_type& entry, topic_it->second.entries()) {
-        if (entry.second.value() == StateStore::TopicEntry::NULL_VALUE) {
-          // NULL -> deletion
-          topic_delta.topic_deletions.push_back(entry.first);
-        } else {
-          topic_delta.topic_entries.push_back(TTopicItem());
-          TTopicItem& topic_item = topic_delta.topic_entries.back();
-          topic_item.key = entry.first;
-          // TODO: Does this do a needless copy?
-          topic_item.value = entry.second.value();
-        }
-      }
-      // TODO: Compute deltas
-      topic_delta.is_delta = false;
-    }
+    GatherTopicUpdates(*subscriber, &update_state_request);
   }
 
   // Second: try and send it
@@ -294,18 +304,36 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   }
   RETURN_IF_ERROR(Status(response.status));
 
+  // At this point the updates are assumed to have been successfully processed
+  // by the subscriber. Update the subscriber's max version of each topic.
+  map<TopicEntryKey, TTopicDelta>::const_iterator topic_delta =
+      update_state_request.topic_deltas.begin();
+  for (; topic_delta != update_state_request.topic_deltas.end(); ++topic_delta) {
+    subscriber->SetMaxVersionForTopic(topic_delta->first, topic_delta->second.to_version);
+  }
+
   // Thirdly: perform any / all updates returned by the subscriber
   {
     lock_guard<mutex> l(topic_lock_);
-    BOOST_FOREACH(const TTopicUpdate& update, response.topic_updates) {
+    BOOST_FOREACH(const TTopicDelta& update, response.topic_updates) {
       TopicMap::iterator topic_it = topics_.find(update.topic_name);
       if (topic_it == topics_.end()) {
         VLOG(1) << "Received update for unexpected topic:" << update.topic_name;
         continue;
       }
 
+      // The subscriber sent back their from_version which indicates that they
+      // want to reset their max version for this topic to this value. The next update
+      // sent will be from this version.
+      if (update.__isset.from_version) {
+        LOG(INFO) << "Received request for different delta base of topic: "
+                  << update.topic_name << " from: " << subscriber->id()
+                  << " subscriber from_version: " << update.from_version;
+        subscriber->SetMaxVersionForTopic(topic_it->first, update.from_version);
+      }
+
       Topic* topic = &topic_it->second;
-      BOOST_FOREACH(const TTopicItem& item, update.topic_updates) {
+      BOOST_FOREACH(const TTopicItem& item, update.topic_entries) {
         TopicEntry::Version version = topic->Put(item.key, item.value);
         subscriber->AddTransientUpdate(update.topic_name, item.key, version);
       }
@@ -318,6 +346,53 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
     }
   }
   return Status::OK;
+}
+
+void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
+    TUpdateStateRequest* update_state_request) {
+  BOOST_FOREACH(const Subscriber::Topics::value_type& subscribed_topic,
+      subscriber.subscribed_topics()) {
+    TopicMap::const_iterator topic_it = topics_.find(subscribed_topic.first);
+    DCHECK(topic_it != topics_.end());
+
+    TTopicDelta& topic_delta = update_state_request->topic_deltas[subscribed_topic.first];
+    topic_delta.topic_name = subscribed_topic.first;
+
+    // If the subscriber version is > 0, send this update as a delta. Otherwise, this
+    // is a new subscriber so send them a non-delta update that includes all items
+    // in the topic.
+    TopicEntry::Version max_version = subscriber.GetMaxVersionForTopic(topic_it->first);
+    topic_delta.is_delta = max_version > Subscriber::TOPIC_INITIAL_VERSION;
+    topic_delta.__set_from_version(max_version);
+
+    const Topic& topic = topic_it->second;
+    TopicUpdateLog::const_iterator next_update =
+        topic.topic_update_log().upper_bound(max_version);
+
+    for (; next_update != topic.topic_update_log().end(); ++next_update) {
+      TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
+      DCHECK(itr != topic.entries().end());
+      const TopicEntry& topic_entry = itr->second;
+      if (topic_entry.value() == StateStore::TopicEntry::NULL_VALUE) {
+        topic_delta.topic_deletions.push_back(itr->first);
+      } else {
+        topic_delta.topic_entries.push_back(TTopicItem());
+        TTopicItem& topic_item = topic_delta.topic_entries.back();
+        topic_item.key = itr->first;
+        // TODO: Does this do a needless copy?
+        topic_item.value = topic_entry.value();
+      }
+    }
+
+    if (topic.topic_update_log().size() > 0) {
+      // The largest version for this topic will be the last item in the version
+      // history map.
+      topic_delta.__set_to_version(topic.topic_update_log().rbegin()->first);
+    } else {
+      // There are no updates in the version history
+      topic_delta.__set_to_version(Subscriber::TOPIC_INITIAL_VERSION);
+    }
+  }
 }
 
 bool StateStore::ShouldExit() {

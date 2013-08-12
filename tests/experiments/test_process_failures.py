@@ -78,7 +78,7 @@ class TestProcessFailures(ImpalaTestSuite):
   @classmethod
   def __start_impala_cluster(cls):
     call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
-        '--wait', '--impalad_args="-logtostderr=1"', '-s %d' % CLUSTER_SIZE])
+        '--wait', '-s %d' % CLUSTER_SIZE])
 
   @pytest.mark.execute_serially
   def test_restart_coordinator(self, vector):
@@ -157,13 +157,21 @@ class TestProcessFailures(ImpalaTestSuite):
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     self.execute_query_using_client(client, QUERY, vector)
+
+    # Kill each impalad and wait for the statestore to register the failures.
     for impalad_proc in self.cluster.impalads:
-      impalad_proc.restart()
-
+      impalad_proc.kill()
     statestored = self.cluster.statestored
-    statestored.service.wait_for_live_backends(CLUSTER_SIZE, timeout=30)
+    statestored.service.wait_for_live_backends(0, timeout=30)
 
-    # Should be able to the query against any node.
+    # Start each impalad back up and wait for the statestore to see them.
+    for impalad_proc in self.cluster.impalads:
+      impalad_proc.start()
+
+    # The impalads should re-register with the statestore on restart at which point they
+    # can execute queries.
+    statestored.service.wait_for_live_backends(CLUSTER_SIZE, timeout=30)
     for impalad in self.cluster.impalads:
+      impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=30)
       client = impalad.service.create_beeswax_client()
       self.execute_query_using_client(client, QUERY, vector)

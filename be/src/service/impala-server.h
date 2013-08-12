@@ -229,10 +229,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Called when a membership update is received from the state-store. Looks for
   // active nodes that have failed, and cancels any queries running on them.
-  //  - topic_deltas: all changes to registered state-store topics
-  //  - topic_updates: output parameter to publish any topic updates to. Unused.
-  void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
-      std::vector<TTopicUpdate>* topic_updates);
+  //  - incoming_topic_deltas: all changes to registered state-store topics
+  //  - subscriber_topic_updates: output parameter to publish any topic updates to.
+  //                              Currently unused.
+  void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap&
+      incoming_topic_deltas, std::vector<TTopicDelta>* subscriber_topic_updates);
 
  private:
   class FragmentExecState;
@@ -687,6 +688,18 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId> >
       QueryLocations;
   QueryLocations query_locations_;
+
+  // A map from unique backend ID to the corresponding TNetworkAddress of that backend.
+  // Used to track membership updates from the statestore so queries can be cancelled
+  // when a backend is removed. It's not enough to just cancel fragments that are running
+  // based on the deletions mentioned in the most recent statestore heartbeat; sometimes
+  // cancellations are skipped and the statestore, at its discretion, may send only
+  // a delta of the current membership so we need to compute any deletions.
+  // TODO: Currently there are multiple locations where cluster membership is tracked,
+  // here and in the scheduler. This should be consolidated so there is a single component
+  // (the scheduler?) that tracks this information and calls other interested components.
+  typedef boost::unordered_map<std::string, TNetworkAddress> BackendAddressMap;
+  BackendAddressMap known_backends_;
 
   // Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;
