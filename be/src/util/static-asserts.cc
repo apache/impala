@@ -28,6 +28,8 @@ class UnusedClass {
   BOOST_STATIC_ASSERT(offsetof(StringValue, len) == 8);
   BOOST_STATIC_ASSERT(sizeof(TimestampValue) == 16);
   BOOST_STATIC_ASSERT(offsetof(TimestampValue, date_) == 8);
+  BOOST_STATIC_ASSERT(sizeof(boost::posix_time::time_duration) == 8);
+  BOOST_STATIC_ASSERT(sizeof(boost::gregorian::date) == 4);
   BOOST_STATIC_ASSERT(sizeof(hdfsFS) == sizeof(void*));
   BOOST_STATIC_ASSERT(sizeof(hdfsFile) == sizeof(void*));
 };

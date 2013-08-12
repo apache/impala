@@ -183,7 +183,7 @@ class  TimestampValue {
   static TimestampValue local_time_micros() {
     return TimestampValue(boost::posix_time::microsec_clock::local_time());
   }
-  
+
   inline uint32_t Hash() const {
     uint32_t hash = HashUtil::Hash(
         &time_of_day_, sizeof(boost::posix_time::time_duration), 0);
@@ -217,8 +217,8 @@ class  TimestampValue {
 
   // Boost ptime leaves a gap in the structure, so we swap the order to make it
   // 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
-  boost::posix_time::time_duration time_of_day_;
-  boost::gregorian::date date_;
+  boost::posix_time::time_duration time_of_day_;  // 8 bytes
+  boost::gregorian::date date_;                   // 4 bytes
 };
 
 // This function must be called 'hash_value' to be picked up by boost.

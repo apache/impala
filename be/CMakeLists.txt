@@ -200,6 +200,7 @@ set (IMPALA_LINK_LIBS
   Runtime
   Util
   Common
+  Udf
   Webserver
   GlobalFlags
   Opcode
@@ -274,6 +275,8 @@ add_subdirectory(src/runtime)
 add_subdirectory(src/statestore)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
+add_subdirectory(src/udf)
+add_subdirectory(src/udf_samples)
 add_subdirectory(src/util)
 add_subdirectory(src/transport)
 
