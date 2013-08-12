@@ -15,6 +15,7 @@
 #ifndef IMPALA_UTIL_PROMISE_H
 #define IMPALA_UTIL_PROMISE_H
 
+#include "common/logging.h"
 #include <boost/thread.hpp>
 
 namespace impala {
