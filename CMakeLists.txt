@@ -28,31 +28,31 @@ find_package(PICLibs REQUIRED)
 set(Boost_DEBUG TRUE)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt)
-include_directories(${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS ${Boost_INCLUDE_DIRS})
 message(STATUS ${Boost_LIBRARIES})
 
 # find jni headers and libs
 find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
+include_directories(SYSTEM ${JNI_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JNI_LIBRARIES})
 message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
 message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
 
 # find HDFS headers and libs
 find_package(HDFS REQUIRED)
-include_directories(${HDFS_INCLUDE_DIR})
+include_directories(SYSTEM ${HDFS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${HDFS_LIBS})
 
 find_package(Mongoose REQUIRED)
-include_directories(${MONGOOSE_INCLUDE_DIR})
+include_directories(SYSTEM ${MONGOOSE_INCLUDE_DIR})
 
 # find GLog headers and libs.  Must include glog headers before the other
 # google libraries.  They all have a config.h and we want glog's to be picked
 # up first.
 find_package(GLog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
+include_directories(SYSTEM ${GLOG_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GLOG_LIBS})
 # for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
 add_library(glogstatic STATIC IMPORTED)
@@ -62,7 +62,7 @@ message(STATUS ${GLOG_INCLUDE_DIR})
 
 # find GFlags headers and libs (needed for GLog)
 find_package(GFlags REQUIRED)
-include_directories(${GFLAGS_INCLUDE_DIR})
+include_directories(SYSTEM ${GFLAGS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GFLAGS_LIBS})
 # for static linking with GFLAGS, GFLAGS_STATIC_LIB is set in GFLAGS' find module
 add_library(gflagsstatic STATIC IMPORTED)
@@ -72,7 +72,7 @@ message(STATUS ${GFLAGS_INCLUDE_DIR})
 
 # find PProf libs
 find_package(PProf REQUIRED)
-include_directories(${PPROF_INCLUDE_DIR})
+include_directories(SYSTEM ${PPROF_INCLUDE_DIR})
 set (LIBS ${LIBS} ${PPROF_LIBRARIES})
 add_library(pprofstatic STATIC IMPORTED)
 set_target_properties(pprofstatic PROPERTIES IMPORTED_LOCATION "${PPROF_STATIC_LIB}")
@@ -83,7 +83,7 @@ message(STATUS ${PPROF_INCLUDE_DIR})
 
 # find GTest headers and libs
 find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIR})
+include_directories(SYSTEM ${GTEST_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GTEST_LIBRARIES})
 add_library(gtest STATIC IMPORTED)
 set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
@@ -93,19 +93,19 @@ message(STATUS ${GTEST_LIBRARY})
 
 # find LLVM
 find_package(Llvm REQUIRED)
-include_directories(${LLVM_INCLUDE_DIR})
+include_directories(SYSTEM ${LLVM_INCLUDE_DIR})
 set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 
 # find Sasl
 find_package(Sasl REQUIRED)
-include_directories(${SASL_INCLUDE_DIR})
+include_directories(SYSTEM ${SASL_INCLUDE_DIR})
 add_library(saslstatic STATIC IMPORTED)
 set_target_properties(saslstatic PROPERTIES IMPORTED_LOCATION ${SASL_STATIC_LIBRARY})
 set(SASL_LIBRARY saslstatic)
 
 # find thrift headers and libs
 find_package(Thrift REQUIRED)
-include_directories(${THRIFT_INCLUDE_DIR})
+include_directories(SYSTEM ${THRIFT_INCLUDE_DIR})
 set(LIBS ${LIBS} ${THRIFT_LIBS})
 message(STATUS "Thrift include dir: ${THRIFT_INCLUDE_DIR}")
 message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
@@ -121,7 +121,7 @@ set_target_properties(thriftnbstatic PROPERTIES IMPORTED_LOCATION ${THRIFT_NB_ST
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)
-include_directories(${SNAPPY_INCLUDE_DIR})
+include_directories(SYSTEM ${SNAPPY_INCLUDE_DIR})
 set(LIBS ${LIBS} ${SNAPPY_LIBRARIES})
 add_library(snappy STATIC IMPORTED)
 set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_LIBRARY}")
@@ -131,7 +131,7 @@ message(STATUS ${SNAPPY_LIBRARY})
 
 # find re2 headers and libs
 find_package(Re2 REQUIRED)
-include_directories(${RE2_INCLUDE_DIR})
+include_directories(SYSTEM ${RE2_INCLUDE_DIR})
 set(LIBS ${LIBS} ${RE2_LIBRARIES})
 add_library(re2 STATIC IMPORTED)
 set_target_properties(re2 PROPERTIES IMPORTED_LOCATION "${RE2_LIBRARY}")
@@ -141,12 +141,12 @@ message(STATUS ${RE2_LIBRARY})
 
 # find rapidjson headers
 find_package(RapidJson REQUIRED)
-include_directories(${RAPIDJSON_INCLUDE_DIR})
+include_directories(SYSTEM ${RAPIDJSON_INCLUDE_DIR})
 message(STATUS ${RAPIDJSON_INCLUDE_DIR})
 
 # find Avro headers and libs
 find_package(Avro REQUIRED)
-include_directories(${AVRO_INCLUDE_DIR})
+include_directories(SYSTEM ${AVRO_INCLUDE_DIR})
 set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
 add_library(avro STATIC IMPORTED)
 set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
