@@ -25,3 +25,4 @@ target_link_libraries(compression-test ${IMPALA_LINK_LIBS})
 ADD_BE_TEST(string-search-test)
 
 add_subdirectory(hashing)
+add_subdirectory(sorting)

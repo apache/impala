@@ -24,8 +24,8 @@ BIGINT, STRING
 select t.* from (select * from functional.complex_view) t
 order by t.abc limit 10;
 ---- RESULTS
-2,'0'
 2,'1'
+2,'0'
 ---- TYPES
 BIGINT, STRING
 ====

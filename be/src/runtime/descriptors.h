@@ -349,6 +349,9 @@ class RowDescriptor {
       tuple_idx_map_(desc.tuple_idx_map_) {
   }
 
+  RowDescriptor(const std::vector<TupleDescriptor*>& tuple_descs,
+      const std::vector<bool>& nullable_tuples);
+
   // dummy descriptor, needed for the JNI EvalPredicate() function
   RowDescriptor() {}
 
@@ -383,6 +386,9 @@ class RowDescriptor {
   std::string DebugString() const;
 
  private:
+  // Initializes tupleIdxMap during c'tor using the tuple_desc_map_.
+  void InitTupleIdxMap();
+
   // map from position of tuple w/in row to its descriptor
   std::vector<TupleDescriptor*> tuple_desc_map_;
 

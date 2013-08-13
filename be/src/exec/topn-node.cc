@@ -33,10 +33,8 @@
 using namespace impala;
 using namespace std;
 
-TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs) 
-  : ExecNode(pool, tnode, descs),
-    tuple_row_less_than_(this),
-    priority_queue_(tuple_row_less_than_) {
+TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
+  : ExecNode(pool, tnode, descs) {
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
   DCHECK(status.ok()) << "TopNNode c'tor:Init failed: \n" << status.GetErrorMsg();
@@ -52,38 +50,14 @@ Status TopNNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
       tnode.sort_node.is_asc_order.end());
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
   abort_on_default_limit_exceeded_ = tnode.sort_node.is_default_limit;
+
+  // TODO: Get nulls_first from the plan node
+  tuple_row_less_than_.reset(new TupleRowComparator(
+      lhs_ordering_exprs_, rhs_ordering_exprs_, is_asc_order_, false));
+  priority_queue_.reset(
+      new priority_queue<TupleRow*, vector<TupleRow*>, TupleRowComparator>(
+          *tuple_row_less_than_));
   return Status::OK;
-}
-
-// The stl::priority_queue is a MAX heap.
-bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* const& rhs)
-    const {
-  DCHECK(node_ != NULL);
-
-  vector<Expr*>::const_iterator lhs_expr_iter = node_->lhs_ordering_exprs_.begin();
-  vector<Expr*>::const_iterator rhs_expr_iter = node_->rhs_ordering_exprs_.begin();
-  vector<bool>::const_iterator is_asc_iter = node_->is_asc_order_.begin();
-
-  for (;lhs_expr_iter != node_->lhs_ordering_exprs_.end(); 
-      ++lhs_expr_iter,++rhs_expr_iter,++is_asc_iter) {
-    Expr* lhs_expr = *lhs_expr_iter;
-    Expr* rhs_expr = *rhs_expr_iter;
-    void *lhs_value = lhs_expr->GetValue(lhs);
-    void *rhs_value = rhs_expr->GetValue(rhs);
-    bool less_than = *is_asc_iter;
-
-    // NULL's always go at the end regardless of asc/desc
-    if (lhs_value == NULL && rhs_value == NULL) continue;
-    if (lhs_value == NULL && rhs_value != NULL) return false;
-    if (lhs_value != NULL && rhs_value == NULL) return true;
-
-    int result = RawValue::Compare(lhs_value, rhs_value, lhs_expr->type());
-    if (!less_than) result = -result;
-    if (result > 0) return false;
-    if (result < 0) return true;
-    // Otherwise, try the next Expr
-  }
-  return true;
 }
 
 Status TopNNode::Prepare(RuntimeState* state) {
@@ -120,7 +94,7 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_LIMIT_EXCEEDED(state);
     } while (!eos);
   }
-  DCHECK_LE(priority_queue_.size(), limit_);
+  DCHECK_LE(priority_queue_->size(), limit_);
   PrepareForOutput();
   return Status::OK;
 }
@@ -140,7 +114,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
   *eos = get_next_iter_ == sorted_top_n_.end();
-  return Status::OK; 
+  return Status::OK;
 }
 
 Status TopNNode::Close(RuntimeState* state) {
@@ -153,34 +127,34 @@ Status TopNNode::Close(RuntimeState* state) {
 // Insert if either not at the limit or it's a new TopN tuple_row
 void TopNNode::InsertTupleRow(TupleRow* input_row) {
   TupleRow* insert_tuple_row = NULL;
-  
-  if (priority_queue_.size() < limit_) {
+
+  if (priority_queue_->size() < limit_) {
     insert_tuple_row = input_row->DeepCopy(tuple_descs_, tuple_pool_.get());
   } else {
-    DCHECK(!priority_queue_.empty());
-    TupleRow* top_tuple_row = priority_queue_.top();
-    if (tuple_row_less_than_(input_row, top_tuple_row)) {
+    DCHECK(!priority_queue_->empty());
+    TupleRow* top_tuple_row = priority_queue_->top();
+    if ((*tuple_row_less_than_)(input_row, top_tuple_row)) {
       // TODO: DeepCopy will allocate new buffers for the string data.  This needs
       // to be fixed to use a freelist
       input_row->DeepCopy(top_tuple_row, tuple_descs_, tuple_pool_.get(), true);
       insert_tuple_row = top_tuple_row;
-      priority_queue_.pop();
+      priority_queue_->pop();
     }
   }
 
   if (insert_tuple_row != NULL) {
-    priority_queue_.push(insert_tuple_row);
+    priority_queue_->push(insert_tuple_row);
   }
 }
 
 // Reverse the order of the tuples in the priority queue
 void TopNNode::PrepareForOutput() {
-  sorted_top_n_.resize(priority_queue_.size());
+  sorted_top_n_.resize(priority_queue_->size());
   int index = sorted_top_n_.size() - 1;
 
-  while (priority_queue_.size() > 0) {
-    TupleRow* tuple_row = priority_queue_.top();
-    priority_queue_.pop();
+  while (priority_queue_->size() > 0) {
+    TupleRow* tuple_row = priority_queue_->top();
+    priority_queue_->pop();
     sorted_top_n_[index] = tuple_row;
     --index;
   }

@@ -16,6 +16,8 @@
 #ifndef IMPALA_BIT_UTIL_H
 #define IMPALA_BIT_UTIL_H
 
+#include <endian.h>
+
 #include "common/compiler-util.h"
 #include "util/cpu-info.h"
 
@@ -52,7 +54,7 @@ class BitUtil {
       return PopcountNoHw(x);
     }
   }
-  
+
   // Returns the 'num_bits' least-significant bits of 'v'.
   static inline uint64_t TrailingBits(uint64_t v, int num_bits) {
     if (UNLIKELY(num_bits == 0)) return 0;
@@ -60,7 +62,7 @@ class BitUtil {
     int n = 64 - num_bits;
     return (v << n) >> n;
   }
-  
+
   // TODO: this could be faster if we use __builtin_clz
   // Fix this if this ever shows up in a hot path.
   static inline int Log2(uint64_t x) {
@@ -80,7 +82,7 @@ class BitUtil {
   static inline int32_t ByteSwap(int32_t value) {
     return __builtin_bswap32(value);
   }
-  static inline int32_t ByteSwap(uint32_t value) {
+  static inline uint32_t ByteSwap(uint32_t value) {
     return static_cast<uint32_t>(__builtin_bswap32(value));
   }
   static inline int16_t ByteSwap(int16_t value) {
@@ -108,6 +110,23 @@ class BitUtil {
       default: DCHECK(false);
     }
   }
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+  // Converts to big endian format (if not already in big endian).
+  static inline int64_t  BigEndian(int64_t value)  { return ByteSwap(value); }
+  static inline uint64_t BigEndian(uint64_t value) { return ByteSwap(value); }
+  static inline int32_t  BigEndian(int32_t value)  { return ByteSwap(value); }
+  static inline uint32_t BigEndian(uint32_t value) { return ByteSwap(value); }
+  static inline int16_t  BigEndian(int16_t value)  { return ByteSwap(value); }
+  static inline uint16_t BigEndian(uint16_t value) { return ByteSwap(value); }
+#else
+  static inline int64_t  BigEndian(int64_t val)  { return val; }
+  static inline uint64_t BigEndian(uint64_t val) { return val; }
+  static inline int32_t  BigEndian(int32_t val)  { return val; }
+  static inline uint32_t BigEndian(uint32_t val) { return val; }
+  static inline int16_t  BigEndian(int16_t val)  { return val; }
+  static inline uint16_t BigEndian(uint16_t val) { return val; }
+#endif
 
 };
 

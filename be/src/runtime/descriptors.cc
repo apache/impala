@@ -225,14 +225,25 @@ string TupleDescriptor::DebugString() const {
 
 RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
                              const std::vector<TTupleId>& row_tuples,
-                             const std::vector<bool>& nullable_tuples) {
-  DCHECK(nullable_tuples.size() == row_tuples.size());
+                             const std::vector<bool>& nullable_tuples)
+  : tuple_idx_nullable_map_(nullable_tuples) {
+  DCHECK_EQ(nullable_tuples.size(), row_tuples.size());
   for (int i = 0; i < row_tuples.size(); ++i) {
     tuple_desc_map_.push_back(desc_tbl.GetTupleDescriptor(row_tuples[i]));
     DCHECK(tuple_desc_map_.back() != NULL);
-    tuple_idx_nullable_map_.push_back(nullable_tuples[i]);
   }
+  InitTupleIdxMap();
+}
 
+RowDescriptor::RowDescriptor(const vector<TupleDescriptor*>& tuple_descs,
+                             const std::vector<bool>& nullable_tuples)
+  : tuple_desc_map_(tuple_descs),
+    tuple_idx_nullable_map_(nullable_tuples) {
+  DCHECK_EQ(nullable_tuples.size(), tuple_descs.size());
+  InitTupleIdxMap();
+}
+
+void RowDescriptor::InitTupleIdxMap() {
   // find max id
   TupleId max_id = 0;
   for (int i = 0; i < tuple_desc_map_.size(); ++i) {
