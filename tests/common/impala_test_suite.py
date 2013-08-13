@@ -182,6 +182,9 @@ class ImpalaTestSuite(BaseTestSuite):
   def change_database(cls, impala_client, table_format):
     db_name =  QueryTestSectionReader.get_db_name(table_format)
     query = 'use %s' % db_name
+    # Clear the exec_options before executing a USE statement.
+    # The USE statement should not fail for negative exec_option tests.
+    impala_client.clear_query_options()
     impala_client.execute(query)
 
   def execute_wrapper(function):
@@ -252,7 +255,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def load_query_test_file(self, workload, file_name, valid_section_names=None):
     """
     Loads/Reads the specified query test file. Accepts the given section names as valid.
-    Uses a default list of valid section names if valid_section_names is None.  
+    Uses a default list of valid section names if valid_section_names is None.
     """
     test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
     if not os.path.isfile(test_file_path):
