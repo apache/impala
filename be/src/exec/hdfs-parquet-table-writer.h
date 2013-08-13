@@ -86,8 +86,13 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   // Per-column information state.  This contains some metadata as well as the
   // data buffers.
-  class ColumnWriter;
-  friend class ColumnWriter;
+  class BaseColumnWriter;
+  friend class BaseColumnWriter;
+
+  template<typename T> class ColumnWriter;
+  template<typename T> friend class ColumnWriter;
+  class BoolColumnWriter;
+  friend class BoolColumnWriter;
 
   // Fills in the schema portion of the file metadata, converting the schema in 
   // table_desc_ into the format in the file metadata
@@ -118,7 +123,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   parquet::RowGroup* current_row_group_;
 
   // array of pointers to column information.
-  std::vector<ColumnWriter*> columns_;
+  std::vector<BaseColumnWriter*> columns_;
 
   // Number of rows in current file
   int64_t row_count_;

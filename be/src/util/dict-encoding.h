@@ -36,26 +36,36 @@ namespace impala {
 // the encoder, including new dictionary entries.
 // TODO: if the dictionary was made to be ordered, the dictionary would compress better.
 // Add this to the spec as future improvement.
-template<typename T> 
-class DictEncoder {
- public:
-  DictEncoder(const std::vector<MemLimit*>* limits)
-    : dict_encoded_size_(0),
-      pool_(new MemPool(limits)) {
-  }
 
-  ~DictEncoder() {
+// Base class for encoders. This is convenient so users can have a type that
+// abstracts over the actual dictionary type.
+// Note: it does not provide a virtual Put(). Users are expected to know the subclass
+// type when using Put().
+class DictEncoderBase {
+ public:
+  virtual ~DictEncoderBase() {
     DCHECK(buffered_indices_.empty());
   }
 
-  // Encode value. Returns the number of bytes added to the dictionary page length (will
-  // be 0 if this value is already in the dictionary). Note that this does not actually
-  // write any data, just buffers the value's index to be written later.
-  int Put(const T& value);
-
   // Writes out the encoded dictionary to buffer. buffer must be preallocated to
   // dict_encoded_size() bytes.
-  void WriteDict(uint8_t* buffer);
+  virtual void WriteDict(uint8_t* buffer) = 0;
+
+  // The number of entries in the dictionary.
+  virtual int num_entries() const = 0;
+
+  // Returns a conservative estimate of the number of bytes needed to encode the buffered
+  // indices. Used to size the buffer passed to WriteData.
+  // TODO: better estimate
+  int EstimatedDataEncodedSize() { return 1 + bit_width() * buffered_indices_.size(); }
+
+  // The minimum bit width required to encode the currently buffered indices.
+  int bit_width() const {
+    if (UNLIKELY(num_entries() == 0)) return 0;
+    if (UNLIKELY(num_entries() == 1)) return 1;
+    int max_id = num_entries() - 1;
+    return BitUtil::Log2(max_id);
+  }
 
   // Writes out any buffered indices to buffer preceded by the bit width of this data and
   // clears the buffered indices, meaning it cannot be called multiple times for the
@@ -63,18 +73,37 @@ class DictEncoder {
   // EstimatedDataEncodedSize() to size buffer.
   int WriteData(uint8_t* buffer, int buffer_len);
 
-  // Returns a conservative estimate of the number of bytes needed to encode the buffered
-  // indices. Used to size the buffer passed to WriteData.
-  // TODO: better estimate
-  int EstimatedDataEncodedSize() { return 1 + bit_width() * buffered_indices_.size(); }
-
-  // The number of entries in the dictionary.
-  int num_entries() { return dict_index_.size(); }
-
-  // The minimum bit width required to encode the currently buffered indices.
-  int bit_width();
-
   int dict_encoded_size() { return dict_encoded_size_; }
+
+ protected:
+  DictEncoderBase(const std::vector<MemLimit*>* limits)
+    : dict_encoded_size_(0),
+      pool_(new MemPool(limits)) {
+  }
+
+  // Indices that have not yet be written out by WriteData().
+  std::vector<int> buffered_indices_;
+
+  // The number of bytes needed to encode the dictionary.
+  int dict_encoded_size_;
+
+  // Pool to store StringValue data
+  boost::scoped_ptr<MemPool> pool_;
+};
+
+template<typename T>
+class DictEncoder : public DictEncoderBase {
+ public:
+  DictEncoder(const std::vector<MemLimit*>* limits) : DictEncoderBase(limits) { }
+
+  // Encode value. Returns the number of bytes added to the dictionary page length (will
+  // be 0 if this value is already in the dictionary). Note that this does not actually
+  // write any data, just buffers the value's index to be written later.
+  int Put(const T& value);
+
+  virtual void WriteDict(uint8_t* buffer);
+
+  virtual int num_entries() const { return dict_index_.size(); }
 
  private:
   // Dictionary mapping value to index (i.e. the number used to encode this value in the
@@ -86,15 +115,6 @@ class DictEncoder {
   // write dictionary page.
   std::vector<T> dict_;
 
-  // Indices that have not yet be written out by WriteData().
-  std::vector<int> buffered_indices_;
-
-  // The number of bytes needed to encode the dictionary.
-  int dict_encoded_size_;
-
-  // Pool to store StringValue data
-  boost::scoped_ptr<MemPool> pool_;
-
   // Adds value to dict_ and updates dict_encoded_size_. Returns the
   // number of bytes added to dict_encoded_size_.
   // *index is the output parameter and is the index into the dict_ for 'value'
@@ -104,15 +124,8 @@ class DictEncoder {
 // Decoder class for dictionary encoded data. This class does not allocate any
 // buffers. The input buffers (dictionary buffer and RLE buffer) must be maintained
 // by the caller and valid as long as this object is.
-template<typename T>
-class DictDecoder {
+class DictDecoderBase {
  public:
-  // The input buffer containing the dictionary.  'dict_len' is the byte length
-  // of dict_buffer.
-  // For string data, the decoder returns StringValues with data directly from
-  // dict_buffer (i.e. no copies).
-  DictDecoder(uint8_t* dict_buffer, int dict_len);
-
   // The rle encoded indices into the dictionary.
   void SetData(uint8_t* buffer, int buffer_len) {
     DCHECK_GT(buffer_len, 0);
@@ -123,7 +136,22 @@ class DictDecoder {
     data_decoder_.reset(new RleDecoder(buffer, buffer_len, bit_width));
   }
 
-  int num_entries() const { return dict_.size(); }
+  virtual int num_entries() const = 0;
+
+ protected:
+  boost::scoped_ptr<RleDecoder> data_decoder_;
+};
+
+template<typename T>
+class DictDecoder : public DictDecoderBase {
+ public:
+  // The input buffer containing the dictionary.  'dict_len' is the byte length
+  // of dict_buffer.
+  // For string data, the decoder returns StringValues with data directly from
+  // dict_buffer (i.e. no copies).
+  DictDecoder(uint8_t* dict_buffer, int dict_len);
+
+  virtual int num_entries() const { return dict_.size(); }
 
   // Returns the next value.  Returns false if the data is invalid.
   // For StringValues, this does not make a copy of the data.  Instead,
@@ -132,7 +160,6 @@ class DictDecoder {
 
  private:
   std::vector<T> dict_;
-  boost::scoped_ptr<RleDecoder> data_decoder_;
 };
 
 template<typename T>
@@ -190,8 +217,7 @@ inline void DictEncoder<T>::WriteDict(uint8_t* buffer) {
   }
 }
 
-template<typename T>
-inline int DictEncoder<T>::WriteData(uint8_t* buffer, int buffer_len) {
+inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
   // Write bit width in first byte
   *buffer = bit_width();
   ++buffer;
@@ -206,14 +232,6 @@ inline int DictEncoder<T>::WriteData(uint8_t* buffer, int buffer_len) {
   encoder.Flush();
   buffered_indices_.clear();
   return 1 + encoder.len();
-}
-
-template<typename T>
-inline int DictEncoder<T>::bit_width() {
-  if (UNLIKELY(num_entries() == 0)) return 0;
-  if (UNLIKELY(num_entries() == 1)) return 1;
-  int max_id = num_entries() - 1;
-  return BitUtil::Log2(max_id);
 }
 
 template<typename T>

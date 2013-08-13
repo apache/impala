@@ -27,32 +27,6 @@ string
 '\N,,NULL,\\N,\N'
 ====
 ---- QUERY
-# Test inserting NULLs for all types
-insert overwrite table alltypesnopart_insert
-select NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-from alltypessmall limit 10
----- RESULTS
-: 10
-====
----- QUERY
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypesnopart_insert
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
----- RESULTS
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
-====
----- QUERY
 # Test NULL partition keys using static partition insert. Both partitions keys are NULL.
 insert overwrite table alltypesinsert
 partition(year=NULL, month=NULL)

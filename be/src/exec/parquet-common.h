@@ -30,7 +30,7 @@ const uint32_t PARQUET_CURRENT_VERSION = 1;
 
 // Mapping of impala types to parquet storage types.  This is indexed by
 // PrimitiveType enum
-const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = { 
+const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BOOLEAN,     // Invalid
   parquet::Type::BOOLEAN,     // NULL type
   parquet::Type::BOOLEAN,
@@ -77,15 +77,35 @@ class ParquetPlainEncoder {
     memcpy(buffer, &t, ByteSize(t));
     return ByteSize(t);
   }
-  
+
   // Decodes t from buffer. Returns the number of bytes read.  Buffer need
   // not be aligned.
   template<typename T>
   static int Decode(uint8_t* buffer, T* v) {
-    memcpy(v, buffer, ByteSize(*v));
+    memcpy(v, buffer, sizeof(T));
     return ByteSize(*v);
   }
 };
+
+// Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
+template<>
+inline int ParquetPlainEncoder::ByteSize(const int8_t& v) { return sizeof(int32_t); }
+template<>
+inline int ParquetPlainEncoder::ByteSize(const int16_t& v) { return sizeof(int32_t); }
+
+template<>
+inline int ParquetPlainEncoder::Encode(uint8_t* buffer, const int8_t& v) {
+  int32_t val = v;
+  memcpy(buffer, &val, sizeof(int32_t));
+  return ByteSize(v);
+}
+
+template<>
+inline int ParquetPlainEncoder::Encode(uint8_t* buffer, const int16_t& v) {
+  int32_t val = v;
+  memcpy(buffer, &val, sizeof(int32_t));
+  return ByteSize(v);
+}
 
 template<>
 inline int ParquetPlainEncoder::ByteSize(const StringValue& v) {

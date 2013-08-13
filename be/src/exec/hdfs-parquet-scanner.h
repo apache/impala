@@ -78,11 +78,16 @@ class HdfsParquetScanner : public HdfsScanner {
   static const int MAX_PAGE_HEADER_SIZE = 100;
 
   // Per column reader.
-  class ColumnReader;
-  friend class ColumnReader;
+  class BaseColumnReader;
+  friend class BaseColumnReader;
+
+  template<typename T> class ColumnReader;
+  template<typename T> friend class ColumnReader;
+  class BoolColumnReader;
+  friend class BoolColumnReader;
 
   // Column reader for each materialized columns for this file.
-  std::vector<ColumnReader*> column_readers_;
+  std::vector<BaseColumnReader*> column_readers_;
 
   // File metadata thrift object
   parquet::FileMetaData file_metadata_;
@@ -125,6 +130,11 @@ class HdfsParquetScanner : public HdfsScanner {
   // If there are extra columns in the file schema, it is simply ignored. If there
   // are extra in the table schema, we return NULLs for those columns.
   Status CreateColumnReaders();
+
+  // Creates a reader for slot_desc. The reader is added to the runtime state's object
+  // pool.
+  // file_idx is the ordinal of the column in the parquet file.
+  BaseColumnReader* CreateReader(SlotDescriptor* slot_desc, int file_idx);
 
   // Walks file_metadata_ and initiates reading the materialized columns.  This
   // initializes column_readers_ and issues the reads for the columns.

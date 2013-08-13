@@ -80,6 +80,8 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   return Status::OK;
 }
 
+namespace impala {
+
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : HdfsScanner(scan_node, state),
       metadata_range_(NULL),
@@ -93,19 +95,11 @@ HdfsParquetScanner::~HdfsParquetScanner() {
 
 // Reader for a single column from the parquet file.  It's associated with a
 // ScannerContext::Stream and is responsible for decoding the data.
-class HdfsParquetScanner::ColumnReader {
+// Super class for per-type column readers. This contains most of the logic,
+// the type specific functions must be implemented in the subclass.
+class HdfsParquetScanner::BaseColumnReader {
  public:
-  ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
-    : parent_(parent),
-      desc_(desc),
-      file_idx_(file_idx),
-      field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
-      metadata_(NULL),
-      stream_(NULL),
-      decompressed_data_pool_(
-          new MemPool(parent->scan_node_->runtime_state()->mem_limits())),
-      num_buffered_values_(0) {
-  }
+  virtual ~BaseColumnReader() {}
 
   // This is called once for each row group in the file.
   Status Reset(const parquet::SchemaElement* schema_element,
@@ -118,7 +112,7 @@ class HdfsParquetScanner::ColumnReader {
     data_ = NULL;
     stream_ = stream;
     metadata_ = metadata;
-    dict_decoder_.reset();
+    dict_decoder_base_ = NULL;
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
           parent_->scan_node_->runtime_state(), NULL, false,
@@ -145,7 +139,7 @@ class HdfsParquetScanner::ColumnReader {
   // are currently dense so we'll need to figure out something there.
   bool ReadValue(MemPool* pool, Tuple* tuple);
 
- private:
+ protected:
   friend class HdfsParquetScanner;
 
   HdfsParquetScanner* parent_;
@@ -174,16 +168,25 @@ class HdfsParquetScanner::ColumnReader {
   // Pointer to start of next value in data page
   uint8_t* data_;
 
-  // Decoder for bool values.  Only valid if type is TYPE_BOOLEAN
-  BitReader bool_values_;
-
   // Decoder for definition.  Only one of these is valid at a time, depending on
   // the data page metadata.
   RleDecoder rle_def_levels_;
   BitReader bit_packed_def_levels_;
 
-  // Decoder for dictionary-encoded string columns.
-  scoped_ptr<DictDecoder<StringValue> > dict_decoder_;
+  // Decoder for dictionary-encoded columns. Set by the subclass.
+  DictDecoderBase* dict_decoder_base_;
+
+  BaseColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
+    : parent_(parent),
+      desc_(desc),
+      file_idx_(file_idx),
+      field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
+      metadata_(NULL),
+      stream_(NULL),
+      decompressed_data_pool_(
+          new MemPool(parent->scan_node_->runtime_state()->mem_limits())),
+      num_buffered_values_(0) {
+  }
 
   // Read the next data page.  If a dictionary page is encountered, that will
   // be read and this function will continue reading for the next data page.
@@ -193,13 +196,113 @@ class HdfsParquetScanner::ColumnReader {
   // Returns -1 if there was a error parsing it.
   int ReadDefinitionLevel();
 
-  // Decode a plain-encoded value from data_ into slot.
-  bool DecodePlainValue(void* slot, MemPool* pool);
+  // Creates a dictionary decoder from values/size. Subclass must implement this
+  // and set dict_decoder_base_.
+  virtual void CreateDictionaryDecoder(uint8_t* values, int size) = 0;
+
+  // Initializes the reader with the data contents. This is the content for
+  // the entire decompressed data page. Decoders can initialize state from
+  // here.
+  virtual Status InitDataPage(uint8_t* data, int size) = 0;
+
+  // Writes the next value into *slot using pool if necessary.
+  // Returns false if there was an error.
+  // Subclass must implement this.
+  // TODO: we need to remove this with codegen.
+  virtual bool ReadSlot(void* slot, MemPool* pool) = 0;
 };
+
+// Per column type reader.
+template<typename T>
+class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnReader {
+ public:
+  ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
+    : BaseColumnReader(parent, desc, file_idx) {
+    DCHECK_NE(desc->type(), TYPE_BOOLEAN);
+  }
+
+ protected:
+  virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
+    dict_decoder_.reset(new DictDecoder<T>(values, size));
+    dict_decoder_base_ = dict_decoder_.get();
+  }
+
+  virtual Status InitDataPage(uint8_t* data, int size) {
+    if (current_page_header_.data_page_header.encoding ==
+          parquet::Encoding::PLAIN_DICTIONARY) {
+      if (dict_decoder_.get() == NULL) {
+        return Status("File corrupt. Missing dictionary page.");
+      }
+      dict_decoder_->SetData(data, size);
+    }
+    return Status::OK;
+  }
+
+  virtual bool ReadSlot(void* slot, MemPool* pool)  {
+    parquet::Encoding::type page_encoding =
+        current_page_header_.data_page_header.encoding;
+    bool result;
+    if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
+      result = dict_decoder_->GetValue(reinterpret_cast<T*>(slot));
+    } else {
+      DCHECK(page_encoding == parquet::Encoding::PLAIN);
+      data_ += ParquetPlainEncoder::Decode<T>(data_, reinterpret_cast<T*>(slot));
+      if (stream_->compact_data()) CopySlot(reinterpret_cast<T*>(slot), pool);
+      return true;
+    }
+    return result;
+  }
+
+ private:
+  void CopySlot(T* slot, MemPool* pool) {
+    // no-op for non-string columns.
+  }
+
+  scoped_ptr<DictDecoder<T> > dict_decoder_;
+};
+
+template<>
+void HdfsParquetScanner::ColumnReader<StringValue>::CopySlot(
+    StringValue* slot, MemPool* pool) {
+  if (slot->len == 0) return;
+  uint8_t* buffer = pool->Allocate(slot->len);
+  memcpy(buffer, slot->ptr, slot->len);
+  slot->ptr = reinterpret_cast<char*>(buffer);
+}
+
+class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColumnReader {
+ public:
+  BoolColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
+    : BaseColumnReader(parent, desc, file_idx) {
+    DCHECK_EQ(desc->type(), TYPE_BOOLEAN);
+  }
+
+ protected:
+  virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
+    DCHECK(false) << "Dictionary encoding is not supported for bools. Should never "
+                  << "have gotten this far.";
+  }
+
+  virtual Status InitDataPage(uint8_t* data, int size) {
+    // Initialize bool decoder
+    bool_values_ = BitReader(data, size);
+    return Status::OK;
+  }
+
+  virtual bool ReadSlot(void* slot, MemPool* pool)  {
+    bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
+    if (!valid) parent_->parse_status_ = Status("Invalid bool column.");
+    return valid;
+  }
+
+ private:
+  BitReader bool_values_;
+};
+
+}
 
 Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
-
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TCounterType::UNIT);
@@ -223,6 +326,43 @@ Status HdfsParquetScanner::Close() {
   return Status::OK;
 }
 
+HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
+    SlotDescriptor* desc, int file_idx) {
+  BaseColumnReader* reader = NULL;
+  switch (desc->type()) {
+    case TYPE_BOOLEAN:
+      reader = new BoolColumnReader(this, desc, file_idx);
+      break;
+    case TYPE_TINYINT:
+      reader = new ColumnReader<int8_t>(this, desc, file_idx);
+      break;
+    case TYPE_SMALLINT:
+      reader = new ColumnReader<int16_t>(this, desc, file_idx);
+      break;
+    case TYPE_INT:
+      reader = new ColumnReader<int32_t>(this, desc, file_idx);
+      break;
+    case TYPE_BIGINT:
+      reader = new ColumnReader<int64_t>(this, desc, file_idx);
+      break;
+    case TYPE_FLOAT:
+      reader = new ColumnReader<float>(this, desc, file_idx);
+      break;
+    case TYPE_DOUBLE:
+      reader = new ColumnReader<double>(this, desc, file_idx);
+      break;
+    case TYPE_TIMESTAMP:
+      reader = new ColumnReader<TimestampValue>(this, desc, file_idx);
+      break;
+    case TYPE_STRING:
+      reader = new ColumnReader<StringValue>(this, desc, file_idx);
+      break;
+    default:
+      DCHECK(false);
+  }
+  return scan_node_->runtime_state()->obj_pool()->Add(reader);
+}
+
 // In 1.1, we had a bug where the dictionary page metadata was not set. Returns true
 // if this matches those versions and compatibility workarounds need to be used.
 static bool RequiresSkippedDictionaryHeaderCheck(
@@ -231,7 +371,7 @@ static bool RequiresSkippedDictionaryHeaderCheck(
   return v.version == "1.1" || (v.version == "1.2" && v.is_impala_internal);
 }
 
-Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
+Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   Status status;
 
   uint8_t* buffer;
@@ -289,12 +429,12 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
     int uncompressed_size = current_page_header_.uncompressed_page_size;
 
     if (current_page_header_.type == parquet::PageType::DICTIONARY_PAGE) {
-      if (dict_decoder_.get() != NULL) {
+      if (dict_decoder_base_ != NULL) {
         return Status("Column chunk should not contain two dictionary pages.");
       }
-      if (desc_->type() != TYPE_STRING) {
-        return Status("Unexpected dictionary page. Dictionary page is only "
-            "supported for string types.");
+      if (desc_->type() == TYPE_BOOLEAN) {
+        return Status("Unexpected dictionary page. Dictionary page is not"
+            " supported for booleans.");
       }
       const parquet::DictionaryPageHeader* dict_header = NULL;
       if (current_page_header_.__isset.dictionary_page_header) {
@@ -327,12 +467,12 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
         memcpy(dict_values, data_, data_size);
       }
 
-      dict_decoder_.reset(new DictDecoder<StringValue>(dict_values, data_size));
+      CreateDictionaryDecoder(dict_values, data_size);
       if (dict_header != NULL &&
-          dict_header->num_values != dict_decoder_->num_entries()) {
+          dict_header->num_values != dict_decoder_base_->num_entries()) {
         stringstream ss;
         ss << "Invalid dictionary. Expected " << dict_header->num_values
-           << " entries but data contained " << dict_decoder_->num_entries()
+           << " entries but data contained " << dict_decoder_base_->num_entries()
            << " entries.";
         return Status(ss.str());
       }
@@ -390,19 +530,8 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       data_size -= num_definition_bytes;
     }
 
-    if (desc_->type() == TYPE_BOOLEAN) {
-      // Initialize bool decoder
-      bool_values_ = BitReader(data_, data_size);
-    }
-
-    if (current_page_header_.data_page_header.encoding ==
-          parquet::Encoding::PLAIN_DICTIONARY) {
-      if (dict_decoder_.get() == NULL) {
-        return Status("File corrupt. Missing dictionary page.");
-      }
-      dict_decoder_->SetData(data_, data_size);
-    }
-
+    // Data can be empty if the column contains all NULLs
+    if (data_size != 0) RETURN_IF_ERROR(InitDataPage(data_, data_size));
     break;
   }
 
@@ -410,7 +539,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
 }
 
 // TODO More codegen here as well.
-inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
+inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
   if (field_repetition_type_ == parquet::FieldRepetitionType::REQUIRED) {
     // This column is required so there is nothing encoded for the definition
     // levels.
@@ -418,7 +547,7 @@ inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
   }
 
   uint8_t definition_level;
-  bool valid;
+  bool valid = false;
   switch (current_page_header_.data_page_header.definition_level_encoding) {
     case parquet::Encoding::RLE:
       valid = rle_def_levels_.Get(&definition_level);
@@ -434,7 +563,7 @@ inline int HdfsParquetScanner::ColumnReader::ReadDefinitionLevel() {
   return definition_level;
 }
 
-inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
+inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
   if (num_buffered_values_ == 0) {
     parent_->assemble_rows_timer_.Stop();
     parent_->parse_status_ = ReadDataPage();
@@ -456,77 +585,7 @@ inline bool HdfsParquetScanner::ColumnReader::ReadValue(MemPool* pool, Tuple* tu
   }
 
   DCHECK_EQ(definition_level, 1);
-
-  void* slot = tuple->GetSlot(desc_->tuple_offset());
-  parquet::Encoding::type page_encoding = current_page_header_.data_page_header.encoding;
-  bool result;
-  if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
-    DCHECK_EQ(desc_->type(), TYPE_STRING);
-    result = dict_decoder_->GetValue(reinterpret_cast<StringValue*>(slot));
-  } else {
-    DCHECK(page_encoding == parquet::Encoding::PLAIN);
-    result = DecodePlainValue(slot, pool);
-  }
-  return result;
-}
-
-inline bool HdfsParquetScanner::ColumnReader::DecodePlainValue(void* slot,
-    MemPool* pool) {
-  switch (desc_->type()) {
-    case TYPE_BOOLEAN: {
-      bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
-      if (!valid) {
-        parent_->parse_status_ = Status("Invalid bool column");
-        return false;
-      }
-      break;
-    }
-    case TYPE_TINYINT:
-      *reinterpret_cast<int8_t*>(slot) = *reinterpret_cast<int32_t*>(data_);
-      data_ += 4;
-      break;
-    case TYPE_SMALLINT:
-      *reinterpret_cast<int16_t*>(slot) = *reinterpret_cast<int32_t*>(data_);
-      data_ += 4;
-      break;
-    case TYPE_INT:
-      *reinterpret_cast<int32_t*>(slot) = *reinterpret_cast<int32_t*>(data_);
-      data_ += 4;
-      break;
-    case TYPE_BIGINT:
-      *reinterpret_cast<int64_t*>(slot) = *reinterpret_cast<int64_t*>(data_);
-      data_ += 8;
-      break;
-    case TYPE_FLOAT:
-      *reinterpret_cast<float*>(slot) = *reinterpret_cast<float*>(data_);
-      data_ += 4;
-      break;
-    case TYPE_DOUBLE:
-      *reinterpret_cast<double*>(slot) = *reinterpret_cast<double*>(data_);
-      data_ += 8;
-      break;
-    case TYPE_STRING: {
-      StringValue* sv = reinterpret_cast<StringValue*>(slot);
-      sv->len = *reinterpret_cast<int32_t*>(data_);
-      data_ += sizeof(int32_t);
-      if (stream_->compact_data() && sv->len > 0) {
-        sv->ptr = reinterpret_cast<char*>(pool->Allocate(sv->len));
-        memcpy(sv->ptr, data_, sv->len);
-      } else {
-        sv->ptr = reinterpret_cast<char*>(data_);
-      }
-      data_ += sv->len;
-      break;
-    }
-    case TYPE_TIMESTAMP:
-      // timestamp type is a 12 byte value.
-      memcpy(slot, data_, 12);
-      data_ += 12;
-      break;
-    default:
-      DCHECK(false);
-  }
-  return true;
+  return ReadSlot(tuple->GetSlot(desc_->tuple_offset()), pool);
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
@@ -710,8 +769,7 @@ Status HdfsParquetScanner::CreateColumnReaders() {
       continue;
     }
 
-    column_readers_.push_back(scan_node_->runtime_state()->obj_pool()->Add(
-        new ColumnReader(this, slot_desc, col_idx)));
+    column_readers_.push_back(CreateReader(slot_desc, col_idx));
   }
   return Status::OK;
 }
