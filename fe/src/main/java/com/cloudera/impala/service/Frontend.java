@@ -20,6 +20,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -84,6 +88,7 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Frontend API for the impalad process.
@@ -97,6 +102,13 @@ public class Frontend {
   private Catalog catalog;
   private DdlExecutor ddlExecutor;
   private final AuthorizationConfig authzConfig;
+
+  // Only applies to partition updates after an INSERT for now.
+  private static final int NUM_CONCURRENT_METASTORE_OPERATIONS = 16;
+
+  // Used to execute metastore updates in parallel
+  ExecutorService executor =
+      Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
 
   public Frontend(boolean lazy, AuthorizationConfig authorizationConfig) {
     this.lazyCatalog = lazy;
@@ -522,6 +534,59 @@ public class Frontend {
   }
 
   /**
+   * Creates a single partition in the metastore.
+   * TODO: Depending how often we do lots of metastore operations at once, might be worth
+   * making this reusable.
+   */
+  private class CreatePartitionRunnable implements Runnable {
+    /**
+     * Constructs a new operation to create a partition in dbName.tblName called
+     * partName. The supplied future is signalled if an error occurs, or if numPartitions
+     * is decremented to 0 after the partition creation has completed. If a partition is
+     * actually created, partitionCreated is set.
+     */
+    public CreatePartitionRunnable(TableName tblName,
+        String partName, AtomicBoolean partitionCreated,
+        SettableFuture<Void> allFinished, AtomicInteger numPartitions) {
+      tblName_ = tblName;
+      partName_ = partName;
+      partitionCreated_ = partitionCreated;
+      allFinished_ = allFinished;
+      numPartitions_ = numPartitions;
+    }
+
+    public void run() {
+      // If there was an exception in another operation, abort
+      if (allFinished_.isDone()) return;
+      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      try {
+        LOG.info("Creating partition: " + partName_ + " in table: " + tblName_);
+        msClient.getHiveClient().appendPartitionByName(tblName_.getDb(),
+            tblName_.getTbl(), partName_);
+        partitionCreated_.set(true);
+      } catch (AlreadyExistsException e) {
+        LOG.info("Ignoring partition " + partName_ + ", since it already exists");
+        // Ignore since partition already exists.
+      } catch (Exception e) {
+        allFinished_.setException(e);
+      } finally {
+        msClient.release();
+      }
+
+      // If this is the last operation to complete, signal the future
+      if (numPartitions_.decrementAndGet() == 0) {
+        allFinished_.set(null);
+      }
+    }
+
+    private final TableName tblName_;
+    private final String partName_;
+    private final AtomicBoolean partitionCreated_;
+    private final AtomicInteger numPartitions_;
+    private final SettableFuture<Void> allFinished_;
+  }
+
+  /**
    * Create any new partitions required as a result of an INSERT statement.
    * Updates the lastDdlTime of the table if new partitions were created.
    */
@@ -535,43 +600,46 @@ public class Frontend {
       return;
     }
 
-    String dbName = table.getDb().getName();
-    String tblName = table.getName();
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
-    try {
-      boolean addedNewPartition = false;
-      if (table.getNumClusteringCols() > 0) {
-        // Add all partitions to metastore.
-        for (String partName: update.getCreated_partitions()) {
-          try {
-            LOG.info("Creating partition: " + partName + " in table: " + tblName);
-            msClient.getHiveClient().appendPartitionByName(dbName, tblName, partName);
-            addedNewPartition = true;
-          } catch (AlreadyExistsException e) {
-            LOG.info("Ignoring partition " + partName + ", since it already exists");
-            // Ignore since partition already exists.
-          } catch (Exception e) {
-            throw new InternalException("Error updating metastore", e);
-          }
-        }
+    TableName tblName = new TableName(table.getDb().getName(), table.getName());
+    AtomicBoolean addedNewPartition = new AtomicBoolean(false);
+
+    if (table.getNumClusteringCols() > 0) {
+      SettableFuture<Void> allFinished = SettableFuture.create();
+      AtomicInteger numPartitions =
+          new AtomicInteger(update.getCreated_partitions().size());
+      // Add all partitions to metastore.
+      for (String partName: update.getCreated_partitions()) {
+        Preconditions.checkState(partName != null && !partName.isEmpty());
+        CreatePartitionRunnable rbl =
+            new CreatePartitionRunnable(tblName, partName, addedNewPartition, allFinished,
+                numPartitions);
+        executor.execute(rbl);
       }
-      if (addedNewPartition) {
-        try {
-          // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
-          // if the alteration fails in the metastore.
-          org.apache.hadoop.hive.metastore.api.Table msTbl =
-              table.getMetaStoreTable().deepCopy();
-          DdlExecutor.updateLastDdlTime(msTbl, msClient);
-        } catch (Exception e) {
-          throw new InternalException("Error updating lastDdlTime", e);
-        }
+
+      try {
+        // Will throw if any operation calls setException
+        allFinished.get();
+      } catch (Exception e) {
+        throw new InternalException("Error updating metastore", e);
       }
-    } finally {
-      msClient.release();
+    }
+    if (addedNewPartition.get()) {
+      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      try {
+        // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
+        // if the alteration fails in the metastore.
+        org.apache.hadoop.hive.metastore.api.Table msTbl =
+            table.getMetaStoreTable().deepCopy();
+        DdlExecutor.updateLastDdlTime(msTbl, msClient);
+      } catch (Exception e) {
+        throw new InternalException("Error updating lastDdlTime", e);
+      } finally {
+        msClient.release();
+      }
     }
 
     // Refresh the table metadata.
-    resetTable(dbName, tblName, true);
+    resetTable(tblName.getDb(), tblName.getTbl(), true);
   }
 
   /**
