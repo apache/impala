@@ -95,9 +95,10 @@ HdfsParquetScanner::~HdfsParquetScanner() {
 // ScannerContext::Stream and is responsible for decoding the data.
 class HdfsParquetScanner::ColumnReader {
  public:
-  ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc)
+  ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : parent_(parent),
       desc_(desc),
+      file_idx_(file_idx),
       field_repetition_type_(parquet::FieldRepetitionType::OPTIONAL),
       metadata_(NULL),
       stream_(NULL),
@@ -128,6 +129,7 @@ class HdfsParquetScanner::ColumnReader {
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
   const SlotDescriptor* slot_desc() const { return desc_; }
+  int file_idx() const { return file_idx_; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
@@ -148,6 +150,9 @@ class HdfsParquetScanner::ColumnReader {
 
   HdfsParquetScanner* parent_;
   const SlotDescriptor* desc_;
+
+  // Index of this column in the this parquet file.
+  int file_idx_;
 
   // This is either required, optional or repeated.
   // If it is required, the column cannot have NULLs.
@@ -194,11 +199,6 @@ class HdfsParquetScanner::ColumnReader {
 
 Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
-  column_readers_.resize(scan_node_->materialized_slots().size());
-  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-    column_readers_[i] = scan_node_->runtime_state()->obj_pool()->Add(
-        new ColumnReader(this, scan_node_->materialized_slots()[i]));
-  }
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   num_cols_counter_ =
@@ -294,7 +294,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       }
       if (desc_->type() != TYPE_STRING) {
         return Status("Unexpected dictionary page. Dictionary page is only "
-            " supported for string types.");
+            "supported for string types.");
       }
       const parquet::DictionaryPageHeader* dict_header = NULL;
       if (current_page_header_.__isset.dictionary_page_header) {
@@ -542,6 +542,7 @@ Status HdfsParquetScanner::ProcessSplit() {
   // We've processed the metadata and there are columns that need to be
   // materialized.
   COUNTER_SET(num_cols_counter_, static_cast<int64_t>(column_readers_.size()));
+  RETURN_IF_ERROR(CreateColumnReaders());
 
   // Iterate through each row group in the file and read all the materialized columns
   // per row group.  Row groups are independent, so this this could be parallelized.
@@ -552,7 +553,6 @@ Status HdfsParquetScanner::ProcessSplit() {
     // just the footer stream or streams for the previous row group.
     context_->CloseStreams();
 
-    // TODO: better error handling
     RETURN_IF_ERROR(InitColumns(i));
     RETURN_IF_ERROR(AssembleRows());
   }
@@ -694,29 +694,45 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   return Status::OK;
 }
 
-Status HdfsParquetScanner::InitColumns(int row_group_idx) {
+Status HdfsParquetScanner::CreateColumnReaders() {
+  DCHECK(column_readers_.empty());
   int num_partition_keys = scan_node_->num_partition_keys();
+
+  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
+    SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
+    int col_idx = slot_desc->col_pos() - num_partition_keys;
+    if (col_idx >= file_metadata_.schema[0].num_children) {
+      // In this case, we are selecting a column that is not in the file.
+      // Update the template tuple to put a NULL in this slot.
+      if (template_tuple_ == NULL) {
+        template_tuple_ = scan_node_->InitEmptyTemplateTuple();
+      }
+      template_tuple_->SetNull(slot_desc->null_indicator_offset());
+      continue;
+    }
+
+    column_readers_.push_back(scan_node_->runtime_state()->obj_pool()->Add(
+        new ColumnReader(this, slot_desc, col_idx)));
+  }
+  return Status::OK;
+}
+
+Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
   // All the scan ranges (one for each col).
   vector<DiskIoMgr::ScanRange*> col_ranges;
 
-  // Walk over the materialized columns
-  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-    int col_idx = scan_node_->materialized_slots()[i]->col_pos() - num_partition_keys;
-    if (col_idx >= row_group.columns.size()) {
-      stringstream ss;
-      ss << "File " << stream_->filename() << ": metadata is incompatible "
-         << "with the schema.  Schema expects " << (col_idx + 1) << " cols, while the "
-         << "file only has " << (row_group.columns.size()) << " cols.";
-      return Status(ss.str());
-    }
+  for (int i = 0; i < column_readers_.size(); ++i) {
+    const SlotDescriptor* slot_desc = column_readers_[i]->desc_;
+    int file_col_idx = column_readers_[i]->file_idx();
 
-    RETURN_IF_ERROR(ValidateColumn(i, col_idx));
-
-    const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
-    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    const parquet::SchemaElement& schema_element =
+        file_metadata_.schema[file_col_idx + 1];
+    const parquet::ColumnChunk& col_chunk = row_group.columns[file_col_idx];
     int64_t col_start = col_chunk.meta_data.data_page_offset;
+
+    RETURN_IF_ERROR(ValidateColumn(slot_desc, file_col_idx));
 
     // If there is a dictionary page, the file format requires it to come before
     // any data pages.  We need to start reading the column from the data page.
@@ -739,12 +755,14 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     }
 
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
-        metadata_range_->file(), col_len, col_start, i, metadata_range_->disk_id());
+        metadata_range_->file(), col_len, col_start, file_col_idx,
+        metadata_range_->disk_id());
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column
     ScannerContext::Stream* stream = context_->AddStream(col_range);
     DCHECK(stream != NULL);
+
     RETURN_IF_ERROR(column_readers_[i]->Reset(&schema_element,
         &col_chunk.meta_data, stream));
 
@@ -757,7 +775,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     }
   }
   DCHECK_EQ(col_ranges.size(), column_readers_.size());
-  DCHECK_EQ(scan_node_->materialized_slots().size(), column_readers_.size());
+  DCHECK_GE(scan_node_->materialized_slots().size(), column_readers_.size());
 
   // The super class stream is not longer valid/used.  It was used
   // just to parse the file header.
@@ -820,7 +838,7 @@ bool IsEncodingSupported(parquet::Encoding::type e) {
   }
 }
 
-Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
+Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int col_idx) {
   parquet::ColumnChunk& file_data = file_metadata_.row_groups[0].columns[col_idx];
   const parquet::SchemaElement& schema_element = file_metadata_.schema[col_idx + 1];
 
@@ -846,8 +864,7 @@ Status HdfsParquetScanner::ValidateColumn(int slot_idx, int col_idx) {
   }
 
   // Check the type in the file is compatible with the catalog metadata.
-  ColumnReader* impala_data = column_readers_[slot_idx];
-  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[impala_data->desc_->type()];
+  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type()];
   if (type != file_data.meta_data.type) {
     stringstream ss;
     ss << "File " << stream_->filename() << " has an incompatible type with the"

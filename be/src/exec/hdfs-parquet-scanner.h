@@ -119,6 +119,13 @@ class HdfsParquetScanner : public HdfsScanner {
   // *eosr is a return value.  If true, the scan range is complete (e.g. select count(*))
   Status ProcessFooter(bool* eosr);
 
+  // Populates column_readers_ from the file schema. Schema resolution is handled in
+  // this function as well.
+  // We allow additional columns at the end in either the table or file schema.
+  // If there are extra columns in the file schema, it is simply ignored. If there
+  // are extra in the table schema, we return NULLs for those columns.
+  Status CreateColumnReaders();
+
   // Walks file_metadata_ and initiates reading the materialized columns.  This
   // initializes column_readers_ and issues the reads for the columns.
   Status InitColumns(int row_group_idx);
@@ -127,8 +134,8 @@ class HdfsParquetScanner : public HdfsScanner {
   Status ValidateFileMetadata();
 
   // Validates the column metadata at 'col_idx' to make sure this column is supported
-  // (e.g. encoding, type, etc) and matches the type for the slot at 'slot_idx'
-  Status ValidateColumn(int slot_idx, int col_idx);
+  // (e.g. encoding, type, etc) and matches the type for slot_desc.
+  Status ValidateColumn(const SlotDescriptor* slot_desc, int col_idx);
 };
 
 } // namespace impala
