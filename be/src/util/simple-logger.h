@@ -69,7 +69,7 @@ class SimpleLogger {
   std::string log_file_name_;
 
   // Generates and sets a new log file name that is based off the log file name prefix
-  // and the current system time. The format will be: PREFIX-<timestamp>
+  // and the current system time. The format will be: PREFIX-<UTC timestamp>
   void GenerateLogFileName();
 
   // Flushes the log file to disk (closes and reopens the file). Must be called with the

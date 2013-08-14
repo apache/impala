@@ -48,7 +48,8 @@ Status InitLoggingDir(const string& log_dir) {
 
 void SimpleLogger::GenerateLogFileName() {
   stringstream ss;
-  int64_t ms_since_epoch = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+  int64_t ms_since_epoch =
+      (microsec_clock::universal_time() - EPOCH).total_milliseconds();
   ss << log_dir_ << "/" << log_file_name_prefix_ << ms_since_epoch;
   log_file_name_ = ss.str();
 }
