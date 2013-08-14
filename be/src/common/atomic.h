@@ -43,12 +43,12 @@ class AtomicInt {
 
   operator T() const { return value_; }
 
-  AtomicInt& operator=(T val) { 
-    value_ = val; 
+  AtomicInt& operator=(T val) {
+    value_ = val;
     return *this;
   }
-  AtomicInt& operator=(const AtomicInt<T>& val) { 
-    value_ = val.value_; 
+  AtomicInt& operator=(const AtomicInt<T>& val) {
+    value_ = val.value_;
     return *this;
   }
 
@@ -60,7 +60,7 @@ class AtomicInt {
     __sync_add_and_fetch(&value_, -delta);
     return *this;
   }
-  
+
   // These define the preincrement (i.e. --value) operators.
   AtomicInt& operator++() {
     __sync_add_and_fetch(&value_, 1);
@@ -70,7 +70,7 @@ class AtomicInt {
     __sync_add_and_fetch(&value_, -1);
     return *this;
   }
-  
+
   // This is post increment, which needs to return a new object.
   AtomicInt<T> operator++(int) {
     T prev = __sync_fetch_and_add(&value_, 1);
@@ -81,6 +81,15 @@ class AtomicInt {
     return AtomicInt<T>(prev);
   }
 
+  // Increments by delta (i.e. += delta) and returns the new val
+  T UpdateAndFetch(T delta) {
+    return __sync_add_and_fetch(&value_, delta);
+  }
+
+  // Increment by delta and returns the old val
+  T FetchAndUpdate(T delta) {
+    return __sync_fetch_and_add(&value_, delta);
+  }
 
   // Updates the int to 'value' if value is larger
   void UpdateMax(T value) {

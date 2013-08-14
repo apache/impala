@@ -19,7 +19,7 @@
 
 namespace impala {
 
-// Simple test to make sure there is no obvious error in the usage of the 
+// Simple test to make sure there is no obvious error in the usage of the
 // __sync* operations.  This is not intended to test the thread safety.
 TEST(AtomicTest, Basic) {
   AtomicInt<int> i1;
@@ -48,10 +48,22 @@ TEST(AtomicTest, Basic) {
   EXPECT_EQ(i1, -200);
 }
 
+TEST(AtomicTest, TestAndSet) {
+  AtomicInt<int> i1;
+  for (int i = 0; i < 100; ++i) {
+    EXPECT_EQ(i + 1, i1.UpdateAndFetch(1));
+  }
+
+  i1 = 0;
+
+  for (int i = 0; i < 100; ++i) {
+    EXPECT_EQ(i, i1.FetchAndUpdate(1));
+  }
+}
+
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-
