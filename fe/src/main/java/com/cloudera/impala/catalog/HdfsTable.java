@@ -664,7 +664,7 @@ public class HdfsTable extends Table {
       // populate Avro schema if necessary
       String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-        avroSchema = getAvroSchema(msTbl.getParameters());
+        avroSchema = getAvroSchema();
       }
     } catch (TableLoadingException e) {
       throw e;
@@ -695,20 +695,44 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Gets an Avro table's JSON schema. tableParams may store the schema directly
-   * or provide an HDFS/http URL. This function does not perform any validation
-   * on the returned string (e.g., it may not be a valid schema).
+   * Gets an Avro table's JSON schema. The schema may be specified as a string
+   * literal or provided as an HDFS/http URL that points to the schema. The schema
+   * can be specified in the TBLPROPERTIES or in the SERDEPROPERTIES, with the
+   * latter taking precedence. This function does not perform any validation on
+   * the returned string (e.g., it may not be a valid schema).
    */
-  private String getAvroSchema(Map<String, String> tableParams)
-      throws TableLoadingException {
-    String literal = tableParams.get(AvroSerdeUtils.SCHEMA_LITERAL);
-    if (literal != null && !literal.equals(AvroSerdeUtils.SCHEMA_NONE)) return literal;
+  private String getAvroSchema() throws TableLoadingException {
+    org.apache.hadoop.hive.metastore.api.Table msTbl = this.getMetaStoreTable();
 
-    String url = tableParams.get(AvroSerdeUtils.SCHEMA_URL).trim();
+    // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+    // taking precedence.
+    List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+    schemaSearchLocations.add(msTbl.getSd().getSerdeInfo().getParameters());
+    schemaSearchLocations.add(msTbl.getParameters());
+
+    String url = null;
+    // Search all locations and break out on the first valid schema found.
+    for (Map<String, String> schemaLocation: schemaSearchLocations) {
+      if (schemaLocation == null) continue;
+
+      String literal = schemaLocation.get(AvroSerdeUtils.SCHEMA_LITERAL);
+      if (literal != null && !literal.equals(AvroSerdeUtils.SCHEMA_NONE)) return literal;
+
+      url = schemaLocation.get(AvroSerdeUtils.SCHEMA_URL);
+      if (url != null) {
+        url = url.trim();
+        break;
+      }
+    }
+
     if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
       throw new TableLoadingException("No Avro schema provided for table " + name);
     }
+    return loadAvroSchemaFromUrl(url);
+  }
 
+  private static String loadAvroSchemaFromUrl(String url)
+      throws TableLoadingException {
     if (!url.toLowerCase().startsWith("hdfs://") &&
         !url.toLowerCase().startsWith("http://")) {
       throw new TableLoadingException("avro.schema.url must be of form " +
