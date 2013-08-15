@@ -582,8 +582,8 @@ Status HdfsParquetScanner::AssembleRows() {
           // are reading.
           DCHECK(c == 0 || !parse_status_.ok()) << "c=" << c << " "
               << parse_status_.GetErrorMsg();;
-          CommitRows(num_to_commit);
           COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
+          RETURN_IF_ERROR(CommitRows(num_to_commit));
           return parse_status_;
         }
       }
@@ -595,12 +595,11 @@ Status HdfsParquetScanner::AssembleRows() {
         ++num_to_commit;
       }
     }
-    CommitRows(num_to_commit);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
+    RETURN_IF_ERROR(CommitRows(num_to_commit));
   }
 
   assemble_rows_timer_.Stop();
-  if (context_->cancelled()) return Status::CANCELLED;
   return parse_status_;
 }
 
@@ -677,7 +676,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
         num_tuples -= max_tuples;
 
         int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-        CommitRows(num_to_commit);
+        RETURN_IF_ERROR(CommitRows(num_to_commit));
       }
 
       *eosr = true;

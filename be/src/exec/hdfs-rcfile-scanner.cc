@@ -467,8 +467,8 @@ Status HdfsRCFileScanner::ProcessRange() {
         // we can shortcircuit the parse loop
         row_pos_ += max_tuples;
         int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-        CommitRows(num_to_commit);
         COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
+        RETURN_IF_ERROR(CommitRows(num_to_commit));
         continue;
       }
 
@@ -527,10 +527,9 @@ Status HdfsRCFileScanner::ProcessRange() {
           tuple = next_tuple(tuple);
         }
       }
-      CommitRows(num_to_commit);
       COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
+      RETURN_IF_ERROR(CommitRows(num_to_commit));
       if (scan_node_->ReachedLimit()) return Status::OK;
-      if (context_->cancelled()) return Status::CANCELLED;
     }
 
     // RCFiles don't end with syncs

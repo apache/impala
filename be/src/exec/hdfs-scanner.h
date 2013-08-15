@@ -237,7 +237,8 @@ class HdfsScanner {
 
   // Commit num_rows to the current row batch.  If this completes the row batch, the
   // row batch is enqueued with the scan node and StartNewRowBatch is called.
-  void CommitRows(int num_rows);
+  // Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
+  Status CommitRows(int num_rows);
 
   // Attach all remaining resources from context_ to batch_ and send batch_ to the scan
   // node. This must be called after all rows have been committed and before closing

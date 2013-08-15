@@ -500,15 +500,14 @@ Status HdfsAvroScanner::ProcessRange() {
         // No slots to materialize (e.g. count(*)), no need to decode data
         int n = min(num_records, static_cast<int64_t>(max_tuples));
         int num_to_commit = WriteEmptyTuples(context_, tuple_row, n);
-        CommitRows(num_to_commit);
         num_records -= n;
         COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
+        RETURN_IF_ERROR(CommitRows(num_to_commit));
       } else {
         RETURN_IF_ERROR(DecodeAvroData(max_tuples, &num_records, pool, &data, &size,
                                        tuple, tuple_row));
       }
       if (scan_node_->ReachedLimit()) return Status::OK;
-      if (context_->cancelled()) return Status::CANCELLED;
     }
 
     if (!stream_->compact_data()) {
@@ -555,9 +554,9 @@ Status HdfsAvroScanner::DecodeAvroData(int max_tuples, int64_t* num_records,
       tuple = next_tuple(tuple);
     }
   }
-  CommitRows(num_to_commit);
   (*num_records) -= n;
   COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
+  RETURN_IF_ERROR(CommitRows(num_to_commit));
 
   return Status::OK;
 }

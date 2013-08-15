@@ -175,8 +175,8 @@ Status HdfsTextScanner::FinishScanRange() {
         int num_tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
         DCHECK_LE(num_tuples, 1);
         DCHECK_GE(num_tuples, 0);
-        CommitRows(num_tuples);
         COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
+        RETURN_IF_ERROR(CommitRows(num_tuples));
       }
       break;
     }
@@ -262,19 +262,17 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
       }
       boundary_row_.Append(last_row, byte_buffer_ptr_ - last_row);
     }
-    
-    // Commit the rows to the row batch and scan node
-    CommitRows(num_tuples_materialized);
 
     COUNTER_UPDATE(scan_node_->rows_read_counter(), *num_tuples);
+
+    // Commit the rows to the row batch and scan node
+    RETURN_IF_ERROR(CommitRows(num_tuples_materialized));
 
     // Done with this buffer and the scan range
     if ((byte_buffer_ptr_ == byte_buffer_end_ && eosr) || past_scan_range) {
       break;
-    } 
+    }
 
-    // Scanning was aborted by main thread
-    if (context_->cancelled()) return Status::CANCELLED;
     if (scan_node_->ReachedLimit()) return Status::OK;
   }
 

@@ -131,7 +131,7 @@ int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_r
   return batch_->capacity() - batch_->num_rows();
 }
 
-void HdfsScanner::CommitRows(int num_rows) {
+Status HdfsScanner::CommitRows(int num_rows) {
   DCHECK(batch_ != NULL);
   DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
   batch_->CommitRows(num_rows);
@@ -147,6 +147,10 @@ void HdfsScanner::CommitRows(int num_rows) {
     scan_node_->AddMaterializedRowBatch(batch_);
     StartNewRowBatch();
   }
+
+  if (context_->cancelled()) return Status::CANCELLED;
+  if (MemLimit::LimitExceeded(*state_->mem_limits())) return Status::MEM_LIMIT_EXCEEDED;
+  return Status::OK;
 }
 
 void HdfsScanner::AddFinalRowBatch() {
