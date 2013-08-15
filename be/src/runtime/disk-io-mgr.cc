@@ -493,6 +493,8 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
 void DiskIoMgr::ReturnBufferDesc(BufferDescriptor* desc) {
   DCHECK(desc != NULL);
   unique_lock<mutex> lock(free_buffers_lock_);
+  DCHECK(find(free_buffer_descs_.begin(), free_buffer_descs_.end(), desc)
+         == free_buffer_descs_.end());
   free_buffer_descs_.push_back(desc);
 }
 

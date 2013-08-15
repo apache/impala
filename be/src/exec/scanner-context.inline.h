@@ -18,6 +18,7 @@
 
 #include "exec/scanner-context.h"
 #include "exec/read-write-util.h"
+#include "runtime/string-buffer.h"
 
 using namespace impala;
 
@@ -28,49 +29,36 @@ using namespace impala;
 // is the path used by sequence/rc/parquet file formats to read a very small number
 // (i.e. single int) of bytes.
 inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
-    int* out_len, bool* eos, Status* status) {
-
+    int* out_len, Status* status, bool peek) {
   if (UNLIKELY(requested_len == 0)) {
-    *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
-    return status->ok();
+    *out_len = 0;
+    return true;
   }
-
-  // Note: the fast path does not grab any locks even though another thread might be 
-  // updating current_buffer_bytes_left_, current_buffer_ and current_buffer_pos_.
-  // See the implementation of AddBuffer() on why this is okay.
-  if (LIKELY(requested_len < current_buffer_bytes_left_)) {
-    *eos = false;
-    // Memory barrier to guarantee current_buffer_pos_ is not read before the 
-    // above if statement.
-    __sync_synchronize();
-    DCHECK(current_buffer_ != NULL);
-    *buffer = current_buffer_pos_;
+  if (LIKELY(requested_len <= *output_buffer_bytes_left_)) {
     *out_len = requested_len;
-    current_buffer_bytes_left_ -= requested_len;
-    current_buffer_pos_ += requested_len;
-    total_bytes_returned_ += *out_len;
-    if (UNLIKELY(current_buffer_bytes_left_ == 0)) {
-      *eos = current_buffer_->eosr();
+    *buffer = *output_buffer_pos_;
+    if (LIKELY(!peek)) {
+      total_bytes_returned_ += *out_len;
+      *output_buffer_pos_ += *out_len;
+      *output_buffer_bytes_left_ -= *out_len;
     }
     return true;
   }
-  *status = GetBytesInternal(requested_len, buffer, false, out_len, eos);
+  DCHECK_GT(requested_len, 0);
+  *status = GetBytesInternal(requested_len, buffer, peek, out_len);
   return status->ok();
 }
 
-inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status* status) {
+inline bool ScannerContext::Stream::ReadBytes(
+    int length, uint8_t** buf, Status* status, bool peek) {
   if (UNLIKELY(length < 0)) {
     *status = Status("Negative length");
     return false;
   }
-  if (UNLIKELY(length == 0)) {
-    *status = Status::OK;
-    return true;
-  }
   int bytes_read;
-  bool dummy_eos;
-  RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, &dummy_eos, status));
+  RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, status, peek));
   if (UNLIKELY(length != bytes_read)) {
+    DCHECK_LT(bytes_read, length);
     *status = ReportIncompleteRead(length, bytes_read);
     return false;
   }
@@ -80,15 +68,11 @@ inline bool ScannerContext::Stream::ReadBytes(int length, uint8_t** buf, Status*
 // TODO: consider implementing a Skip in the context/stream object that's more 
 // efficient than GetBytes.
 inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
-  if (UNLIKELY(length == 0)) {
-    *status = Status::OK;
-    return true;
-  }
   uint8_t* dummy_buf;
   int bytes_read;
-  bool dummy_eos;
-  RETURN_IF_FALSE(GetBytes(length, &dummy_buf, &bytes_read, &dummy_eos, status));
+  RETURN_IF_FALSE(GetBytes(length, &dummy_buf, &bytes_read, status));
   if (UNLIKELY(length != bytes_read)) {
+    DCHECK_LT(bytes_read, length);
     *status = ReportIncompleteRead(length, bytes_read);
     return false;
   }
@@ -114,9 +98,9 @@ inline bool ScannerContext::Stream::ReadBoolean(bool* b, Status* status) {
   return true;
 }
 
-inline bool ScannerContext::Stream::ReadInt(int32_t* val, Status* status) {
+inline bool ScannerContext::Stream::ReadInt(int32_t* val, Status* status, bool peek) {
   uint8_t* bytes;
-  RETURN_IF_FALSE(ReadBytes(sizeof(uint32_t), &bytes, status));
+  RETURN_IF_FALSE(ReadBytes(sizeof(uint32_t), &bytes, status, peek));
   *val = ReadWriteUtil::GetInt<uint32_t>(bytes);
   return true;
 }
@@ -172,6 +156,10 @@ inline bool ScannerContext::Stream::ReadZLong(int64_t* value, Status* status) {
   } while (*byte & 0x80);
   *value = (zlong >> 1) ^ -(zlong & 1);
   return true;
+}
+
+inline bool ScannerContext::Stream::eof() const {
+  return file_offset() == file_desc_->file_length;
 }
 
 #undef RETURN_IF_FALSE

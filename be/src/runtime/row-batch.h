@@ -94,6 +94,7 @@ class RowBatch {
   int AddRow() { return AddRows(1); }
 
   void CommitRows(int n) {
+    DCHECK_GE(n, 0);
     DCHECK_LE(num_rows_ + n, capacity_);
     num_rows_ += n;
     has_in_flight_row_ = false;

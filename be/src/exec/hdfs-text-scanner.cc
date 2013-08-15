@@ -264,9 +264,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     }
     
     // Commit the rows to the row batch and scan node
-    if (num_tuples_materialized > 0) {
-      CommitRows(num_tuples_materialized);
-    }
+    CommitRows(num_tuples_materialized);
 
     COUNTER_UPDATE(scan_node_->rows_read_counter(), *num_tuples);
 
@@ -286,9 +284,16 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
 Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
   *eosr = false;
   Status status;
-  stream_->GetBytes(num_bytes, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
-      &byte_buffer_read_size_, eosr, &status);
+  if (num_bytes > 0) {
+    stream_->GetBytes(num_bytes, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+                      &byte_buffer_read_size_, &status);
+  } else {
+    DCHECK_EQ(num_bytes, 0);
+    status = stream_->GetBuffer(false, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+                                &byte_buffer_read_size_);
+  }
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
+  *eosr = stream_->eosr();
   return status;
 }
 

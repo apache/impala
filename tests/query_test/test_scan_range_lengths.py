@@ -25,9 +25,6 @@ class TestScanRangeLengths(ImpalaTestSuite):
         TestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
 
   def test_scan_ranges(self, vector):
-    if vector.get_value('table_format').file_format != 'text':
-      pytest.xfail(reason='IMP-636')
-
     vector.get_value('exec_option')['max_scan_range_length'] =\
         vector.get_value('max_scan_range_length')
     self.run_test_case('QueryTest/hdfs-tiny-scan', vector)

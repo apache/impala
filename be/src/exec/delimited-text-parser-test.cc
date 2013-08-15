@@ -61,7 +61,7 @@ TEST(DelimitedTextParser, Escapes) {
 
   // The parser doesn't support this case.  
   // TODO: update test when it is fixed
-  ValidateTupleStart(&escape_parser, "@|no_delims", 2, TUPLE_DELIM);
+  ValidateTupleStart(&escape_parser, "@|no_delims", -1, TUPLE_DELIM);
 }
 
 // TODO: expand test for other delimited text parser functions/cases.

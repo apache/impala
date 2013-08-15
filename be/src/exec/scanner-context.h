@@ -65,30 +65,29 @@ class ScannerContext {
   // one stream; for columnar, there is one stream per column.
   class Stream {
    public:
-    // Returns the next *len bytes or an error.  This can block if bytes are not
+    // Returns up to requested_len bytes or an error.  This can block if bytes are not
     // available.
+    //  - requested_len is the number of bytes requested.  This function will return
+    //    those number of bytes unless end of file or an error occurred.
+    //  - If peek is true, the scan range position is not incremented (i.e. repeated calls
+    //    with peek = true will return the same data).
     //  - *buffer on return is a pointer to the buffer.  The memory is owned by
     //    the ScannerContext and should not be modified.  If the buffer is entirely
     //    from one disk io buffer, a pointer inside that buffer is returned directly.
-    //    if the requested buffer straddles io buffers, a copy is done here.
-    //  - requested_len is the number of bytes requested.  This function will return
-    //    those number of bytes unless end of file or an error occurred.
-    //    if requested_len is 0, the next complete buffer will be returned
+    //    If the requested buffer straddles io buffers, a copy is done here.
     //  - *out_len is the number of bytes returned.
-    //  - *eos is set to true if all the bytes in this scan range are returned.
     //  - *status is set if there is an error.
     // Returns true if the call was success (i.e. status->ok())
     // This should only be called from the scanner thread.
-    // Note that this will return bytes past the end of the scan range if
-    // requested (e.g., this can be called again after *eos is set to true).
+    // Note that this will return bytes past the end of the scan range until the end of
+    // the file.
     bool GetBytes(int requested_len, uint8_t** buffer, int* out_len,
-        bool* eos, Status* status);
+        Status* status, bool peek = false);
 
-    // Gets the bytes from the first available buffer without advancing the scan
-    // range location (e.g. repeated calls to this function will return the same thing).
-    // If the buffer is the last one in the scan range, *eos will be set to true.
-    // If we are past the end of the scan range, *out_len will be 0 and *eos will be true.
-    Status GetRawBytes(uint8_t** buffer, int* out_len, bool* eos);
+    // Gets the bytes from the first available buffer within the scan range. This may be
+    // the boundary buffer used to stitch IO buffers together.
+    // If we are past the end of the scan range, no bytes are returned.
+    Status GetBuffer(bool peek, uint8_t** buffer, int* out_len);
 
     // Sets whether of not the resulting tuples have a compact format.  If not, the
     // io buffers must be attached to the row batch, otherwise they can be returned
@@ -110,16 +109,16 @@ class ScannerContext {
     int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
 
     // If true, all bytes in this scan range have been returned
-    bool eosr() const { return read_eosr_ || total_bytes_returned_ >= total_len_; }
+    bool eosr() const { return total_bytes_returned_ >= scan_range_->len(); }
 
     // If true, the stream has reached the end of the file.
-    bool eof();
+    bool eof() const;
 
     const char* filename() { return scan_range_->file(); }
     const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
 
     // Returns the buffer's current offset in the file.
-    int64_t file_offset() { return scan_range_start_ + total_bytes_returned_; }
+    int64_t file_offset() const { return scan_range_start_ + total_bytes_returned_; }
 
     // Returns the total number of bytes returned
     int64_t total_bytes_returned() { return total_bytes_returned_; }
@@ -130,7 +129,7 @@ class ScannerContext {
 
     // Read an Integer primitive value written using Java serialization.
     // Equivalent to java.io.DataInput.readInt()
-    bool ReadInt(int32_t* val, Status*);
+    bool ReadInt(int32_t* val, Status*, bool peek = false);
 
     // Read a variable-length Long value written using Writable serialization.
     // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
@@ -148,7 +147,7 @@ class ScannerContext {
 
     // Read length bytes into the supplied buffer.  The returned buffer is owned
     // by this object.
-    bool ReadBytes(int length, uint8_t** buf, Status*);
+    bool ReadBytes(int length, uint8_t** buf, Status*, bool peek = false);
 
     // Read a Writable Text value from the supplied file.
     // Ref: org.apache.hadoop.io.WritableUtils.readString()
@@ -174,48 +173,55 @@ class ScannerContext {
     // Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_;
 
-    // Byte offset into the current (first) io buffer.
-    uint8_t* current_buffer_pos_;
-
-    // Bytes left in the first buffer
-    int current_buffer_bytes_left_;
-
     // The buffer size to use for when reading past the end of the scan range.  A
     // default value is pickd and scanners can overwrite it (i.e. the scanner knows
     // more about the file format)
     int read_past_buffer_size_;
 
-    // Total number of bytes that's expected to to be read from this stream.  The
-    // actual number could be higher if we need to read bytes past the end.
-    int64_t total_len_;
+    // The current io buffer. This starts as NULL before we've read any bytes.
+    DiskIoMgr::BufferDescriptor* io_buffer_;
 
-    // Set to true when a buffer returns the end of the scan range.
-    bool read_eosr_;
+    // Next byte to read in io_buffer_
+    uint8_t* io_buffer_pos_;
 
-    // Pool for allocating boundary buffers.
+    // Bytes left in io_buffer_
+    int io_buffer_bytes_left_;
+
+    // The boundary buffer is used to copy multiple IO buffers from the scan range into a
+    // single buffer to return to the scanner.  After copying all or part of an IO buffer
+    // into the boundary buffer, the current buffer's state is updated to no longer
+    // include the copied bytes (e.g., io_buffer_bytes_left_ is decremented).
+    // Conceptually, the data in the boundary buffer always comes before that in the
+    // current buffer, and all the bytes in the stream are either already returned to the
+    // scanner, in the current IO buffer, or in the boundary buffer.
     boost::scoped_ptr<MemPool> boundary_pool_;
     boost::scoped_ptr<StringBuffer> boundary_buffer_;
+    uint8_t* boundary_buffer_pos_;
+    int boundary_buffer_bytes_left_;
+
+    // Points to either io_buffer_pos_ or boundary_buffer_pos_
+    uint8_t** output_buffer_pos_;
+    // Points to either io_buffer_bytes_left_ or boundary_buffer_bytes_left_
+    int* output_buffer_bytes_left_;
 
     // List of buffers that are completed but still have bytes referenced by the caller.
     // On the next GetBytes() call, these buffers are released (the caller by calling
     // GetBytes() signals it is done with its previous bytes).  At this point the
     // buffers are either returned to the io mgr or attached to the current row batch.
-    std::list<DiskIoMgr::BufferDescriptor*> completed_buffers_;
-
-    // The current io buffer. This starts as NULL before we've read any bytes
-    // and then becomes NULL when we've finished the scan range.
-    DiskIoMgr::BufferDescriptor* current_buffer_;
+    std::list<DiskIoMgr::BufferDescriptor*> completed_io_buffers_;
 
     Stream(ScannerContext* parent);
 
-    // GetBytes helper to handle the slow path
+    // GetBytes helper to handle the slow path.
     // If peek is set then return the data but do not move the current offset.
-    // Updates current_buffer_.
-    Status GetBytesInternal(int requested_len, uint8_t** buffer,
-                            bool peek, int* out_len, bool* eos);
+    Status GetBytesInternal(int requested_len, uint8_t** buffer, bool peek, int* out_len);
 
-    // Gets (and blocks) for the next io buffer.
-    // Updates current_buffer_.
+    // Gets (and blocks) for the next io buffer. After fetching all buffers in the scan
+    // range, performs synchronous reads past the scan range until EOF.  Updates
+    // io_buffer_, io_buffer_bytes_left_, and io_buffer_pos_.  If GetNextBuffer() is
+    // called after all bytes in the file have been returned, io_buffer_bytes_left_ will
+    // be set to 0. In the non-error case, io_buffer_ is never set to NULL, even if it
+    // contains 0 bytes.
     Status GetNextBuffer();
 
     // Attach all completed io buffers and the boundary mem pool to batch.
@@ -275,4 +281,3 @@ class ScannerContext {
 }
 
 #endif
-

@@ -48,13 +48,11 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   return Status::OK;
 }
   
-BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,
-                                         bool marker_precedes_sync)
+BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state)
   : HdfsScanner(node, state),
     header_(NULL),
     block_start_(0),
-    data_buffer_pool_(new MemPool(state->mem_limits())),
-    marker_precedes_sync_(marker_precedes_sync) {
+    data_buffer_pool_(new MemPool(state->mem_limits())) {
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {
@@ -109,29 +107,23 @@ Status BaseSequenceScanner::ProcessSplit() {
   finished_ = false;
   RETURN_IF_ERROR(InitNewRange());
 
-  Status status;
+  Status status = Status::OK;
 
-  // Find the first record
-  if (stream_->scan_range()->offset() == 0) {
-    // scan range that starts at the beginning of the file, just skip ahead by
-    // the header size.
-    if (!stream_->SkipBytes(header_->header_size, &status)) return status;
-  } else {
-    status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
-    if (stream_->eosr()) {
-      // We don't care about status here -- OK if we can't find the sync but
-      // we're at the end of the scan range
-      return Status::OK;
-    }
-    RETURN_IF_ERROR(status);
+  // Skip to the first record
+  if (stream_->file_offset() < header_->header_size) {
+    // If the scan range starts within the header, skip to the end of the header so we
+    // don't accidentally skip to an extra sync within the header
+    RETURN_IF_FALSE(stream_->SkipBytes(
+        header_->header_size - stream_->file_offset(), &parse_status_));
   }
+  RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE));
 
   // Process Range.
   int64_t first_error_offset = 0;
   int num_errors = 0;
 
   // We can continue through errors by skipping to the next SYNC hash. 
-  do {
+  while (!finished_) {
     status = ProcessRange();
     if (status.IsCancelled()) return status;
     // Save the offset of any error.
@@ -155,20 +147,15 @@ Status BaseSequenceScanner::ProcessSplit() {
     // If no errors or we abort on error then exit loop, otherwise try to recover.
     if (state_->abort_on_error() || status.ok()) break;
 
-    if (!stream_->eosr()) {
-      parse_status_ = Status::OK;
-      ++num_errors;
-      // Recover by skipping to the next sync.
-      int64_t error_offset = stream_->file_offset();
-      status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
-      COUNTER_UPDATE(bytes_skipped_counter_, stream_->file_offset() - error_offset);
-      if (status.IsCancelled()) return status;
-      if (stream_->eosr()) break;
-
-      // An error status is explicitly ignored here so we can skip over bad blocks.
-      // We will continue through this loop again looking for the next sync.
-    }
-  } while (!stream_->eosr());
+    // Recover by skipping to the next sync.
+    parse_status_ = Status::OK;
+    ++num_errors;
+    int64_t error_offset = stream_->file_offset();
+    status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
+    COUNTER_UPDATE(bytes_skipped_counter_, stream_->file_offset() - error_offset);
+    RETURN_IF_ERROR(status);
+    DCHECK(parse_status_.ok());
+  }
 
   if (num_errors != 0 || !status.ok()) {
     if (state_->LogHasSpace()) {
@@ -192,9 +179,8 @@ Status BaseSequenceScanner::ReadSync() {
 
   uint8_t* hash;
   int out_len;
-  bool eos;
   RETURN_IF_FALSE(
-      stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &eos, &parse_status_));
+      stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
   if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
     if (state_->LogHasSpace()) {
       stringstream ss;
@@ -210,24 +196,14 @@ Status BaseSequenceScanner::ReadSync() {
     }
     return Status("bad sync hash block");
   }
-  // TODO: finished_ |= end of file (this will prevent us from reading off
-  // the end of the file)
+  finished_ |= stream_->eof();
   return Status::OK;
 }
 
 int BaseSequenceScanner::FindSyncBlock(const uint8_t* buffer, int buffer_len,
                                        const uint8_t* sync, int sync_len) {
-  StringValue needle;
-  char marker_and_sync[4 + sync_len];
-  if (marker_precedes_sync_) {
-    marker_and_sync[0] = marker_and_sync[1] =
-        marker_and_sync[2] = marker_and_sync[3] = 0xff;
-    memcpy(marker_and_sync + 4, sync, sync_len);
-    needle = StringValue(marker_and_sync, 4 + sync_len);
-  } else {
-    char* sync_str = reinterpret_cast<char*>(const_cast<uint8_t*>(sync));
-    needle = StringValue(sync_str, sync_len);
-  }
+  char* sync_str = reinterpret_cast<char*>(const_cast<uint8_t*>(sync));
+  StringValue needle = StringValue(sync_str, sync_len);
 
   StringValue haystack(
       const_cast<char*>(reinterpret_cast<const char*>(buffer)), buffer_len);
@@ -238,9 +214,6 @@ int BaseSequenceScanner::FindSyncBlock(const uint8_t* buffer, int buffer_len,
   if (offset != -1) {
     // Advance offset past sync
     offset += sync_len;
-    if (marker_precedes_sync_) {
-      offset += 4;
-    }
   }
   return offset;
 }
@@ -250,57 +223,58 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   int offset = -1;
   uint8_t* buffer;
   int buffer_len;
-  bool eosr;
   Status status;
-  
-  // A sync marker can span multiple buffers.  In that case, we use this staging
-  // buffer to combine bytes from the buffers.  
-  // The -1 marker (if present) and the sync can start anywhere in the last 19 bytes 
-  // of the buffer, so we save the 19-byte tail of the buffer.
-  int tail_size = sync_size + sizeof(int32_t) - 1;
-  uint8_t split_buffer[2 * tail_size];
 
-  // Read buffers until we find a sync or reach end of scan range
-  RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &buffer_len, &eosr));
-  while (true) {
-    // Check if sync fully contained in current buffer
+  // Read buffers until we find a sync or reach the end of the scan range. If we read all
+  // the buffers remaining in the scan range and none of them contain a sync (including a
+  // sync that starts at the end of this scan range and continues into the next one), then
+  // there are no more syncs in this scan range and we're finished.
+  while (!stream_->eosr()) {
+    // Check if there's a sync fully contained in the current buffer
+    RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_len));
     offset = FindSyncBlock(buffer, buffer_len, sync, sync_size);
     DCHECK_LE(offset, buffer_len);
     if (offset != -1) break;
 
-    // It wasn't in the full buffer, copy the bytes at the end
-    int bytes_first_buffer = ::min(tail_size, buffer_len);
-    uint8_t* bp = buffer + buffer_len - bytes_first_buffer;
-    memcpy(split_buffer, bp, bytes_first_buffer);
+    // No sync found in the current buffer, so check if there's a sync spanning the
+    // current buffer and the next. First we skip so there are sync_size - 1 bytes left,
+    // then we read these bytes plus the first sync_size - 1 bytes of the next buffer.
+    // This guarantees that we find any syncs that start in the current buffer and end in
+    // the next buffer.
+    int to_skip = max(0, buffer_len - (sync_size - 1));
+    RETURN_IF_FALSE(stream_->SkipBytes(to_skip, &parse_status_));
+    // Peek so we don't advance stream_ into the next buffer. If we don't find a sync here
+    // then we'll need to check all of the next buffer, including the first sync_size -1
+    // bytes.
+    RETURN_IF_FALSE(stream_->GetBytes(
+        (sync_size - 1) * 2, &buffer, &buffer_len, &parse_status_, true));
+    offset = FindSyncBlock(buffer, buffer_len, sync, sync_size);
+    DCHECK_LE(offset, buffer_len);
+    if (offset != -1) break;
 
-    // Read the next buffer
-    if (!stream_->SkipBytes(buffer_len, &status)) return status;
-    RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &buffer_len, &eosr));
-
-    // Copy the first few bytes of the next buffer and check again.
-    int bytes_second_buffer = ::min(tail_size, buffer_len);
-    memcpy(split_buffer + bytes_first_buffer, buffer, bytes_second_buffer);
-    offset = FindSyncBlock(split_buffer, 
-        bytes_first_buffer + bytes_second_buffer, sync, sync_size);
-    if (offset != -1) {
-      DCHECK_GE(offset, bytes_first_buffer);
-      // Adjust the offset to be relative to the start of the new buffer
-      offset -= bytes_first_buffer;
-      break;
-    }
-
-    if (eosr) {
-      // No sync marker found in this scan range
-      return Status::OK;
-    }
+    // No sync starting in this buffer, so advance stream_ to the beginning of the next
+    // buffer.
+    RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &buffer_len));
   }
 
-  // We found a sync at offset. offset cannot be 0 since it points to the end of
-  // the sync in the current buffer.
-  DCHECK_GT(offset, 0);
-  if (!stream_->SkipBytes(offset, &status)) return status;
+  if (offset == -1) {
+    // No more syncs in this scan range
+    DCHECK(stream_->eosr());
+    finished_ = true;
+    return Status::OK;
+  }
+  DCHECK_GE(offset, sync_size);
+
+  // Make sure sync starts in our scan range
+  if (offset - sync_size >= stream_->bytes_left()) {
+    finished_ = true;
+    return Status::OK;
+  }
+
+  RETURN_IF_FALSE(stream_->SkipBytes(offset, &parse_status_));
   VLOG_FILE << "Found sync for: " << stream_->filename()
             << " at " << stream_->file_offset() - sync_size;
+  if (stream_->eof()) finished_ = true;
   return Status::OK;
 }
 

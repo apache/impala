@@ -69,7 +69,7 @@ struct ScopedAvroSchemaT {
 };
 
 HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
-  : BaseSequenceScanner(scan_node, state, /* marker_precedes_sync */ false),
+  : BaseSequenceScanner(scan_node, state),
     avro_header_(NULL) {
 }
 
@@ -111,7 +111,7 @@ Status HdfsAvroScanner::ReadFileHeader() {
   RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
-  header_->header_size = stream_->total_bytes_returned();
+  header_->header_size = stream_->total_bytes_returned() - SYNC_HASH_SIZE;
   return Status::OK;
 }
 
@@ -456,7 +456,7 @@ Status HdfsAvroScanner::InitNewRange() {
 }
 
 Status HdfsAvroScanner::ProcessRange() {
-  while (!finished() && !stream_->eof()) {
+  while (!finished()) {
     // Read new data block
     block_start_ = stream_->file_offset();
 
@@ -500,7 +500,7 @@ Status HdfsAvroScanner::ProcessRange() {
         // No slots to materialize (e.g. count(*)), no need to decode data
         int n = min(num_records, static_cast<int64_t>(max_tuples));
         int num_to_commit = WriteEmptyTuples(context_, tuple_row, n);
-        if (num_to_commit > 0) CommitRows(num_to_commit);
+        CommitRows(num_to_commit);
         num_records -= n;
         COUNTER_UPDATE(scan_node_->rows_read_counter(), n);
       } else {

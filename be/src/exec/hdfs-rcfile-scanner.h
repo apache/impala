@@ -268,9 +268,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   // of columns.  Other pieces of the metadata are ignored.
   Status ReadNumColumnsMetadata();
 
-  // Read the rowgroup header
-  // Verifies:
-  //   sync hash if pressent.
+  // Reads the rowgroup header starting after the sync.
   // Sets:
   //   key_length_
   //   compressed_key_length_
@@ -312,9 +310,9 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   //   cur_field_length_[col_idx]
   Status NextField(int col_idx);
 
-  // Read a row group into buffers.
+  // Read a row group (except for the sync marker and sync) into buffers.
   // Calls:
-  //   ReadHeader
+  //   ReadRowGroupHeader
   //   ReadKeyBuffers
   //   ReadColumnBuffers
   Status ReadRowGroup();

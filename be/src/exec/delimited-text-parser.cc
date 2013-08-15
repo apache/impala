@@ -84,13 +84,13 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
 
   // scan_node_ can be NULL in test setups
   if (scan_node_ == NULL) return;
-  
+
   ParserReset();
 
   num_cols_ = scan_node_->num_cols();
   is_materialized_col_ = new bool[num_cols_];
   for (int i = 0; i < num_cols_; ++i) {
-    is_materialized_col_[i] = 
+    is_materialized_col_[i] =
         scan_node_->GetMaterializedSlotIdx(i) != HdfsScanNode::SKIP_COLUMN;
   }
 }
@@ -108,13 +108,13 @@ void DelimitedTextParser::ParserReset() {
 
 // Parsing raw csv data into FieldLocation descriptors.
 Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remaining_len,
-    char** byte_buffer_ptr, char** row_end_locations, 
+    char** byte_buffer_ptr, char** row_end_locations,
     FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
   // If there was a '\r' at the end of the last batch, set the offset to
-  // just before the begining. Otherwise make it invalid.
+  // just before the beginning. Otherwise make it invalid.
   if (last_row_delim_offset_ == 0) {
     last_row_delim_offset_ = remaining_len;
   } else {
@@ -132,7 +132,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   }
 
   if (*num_tuples == max_tuples) return Status::OK;
-  
+
   // Handle the remaining characters
   while (remaining_len > 0) {
     bool new_tuple = false;
@@ -205,7 +205,7 @@ int DelimitedTextParser::FindFirstInstance(const char* buffer, int len) {
   const char* buffer_start = buffer;
   bool found = false;
 
-  // If the last char in the previous buffer was \r then either return the start of 
+  // If the last char in the previous buffer was \r then either return the start of
   // this buffer or skip a \n at the beginning of the buffer.
   if (last_row_delim_offset_ != -1) {
     if (*buffer_start == '\n') return 1;
@@ -223,7 +223,7 @@ restart:
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
       // This differs from ParseSse by using the slower cmpestrm instruction which
       // takes a chr_count and can search less than 16 bytes at a time.
-      xmm_tuple_mask = _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, 
+      xmm_tuple_mask = _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer,
           SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
@@ -240,7 +240,7 @@ restart:
       tuple_start += SSEUtil::CHARS_PER_128_BIT_REGISTER;
       buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
-  } 
+  }
   if (!found) {
     for (; tuple_start < len; ++tuple_start) {
       char c = *buffer++;
@@ -251,6 +251,8 @@ restart:
       }
     }
   }
+
+  if (!found) return -1;
 
   if (escape_char_ != '\0') {
     // Scan backwards for escape characters.  We do this after
@@ -268,7 +270,7 @@ restart:
         break;
       }
     }
-    
+
     // TODO: This sucks.  All the preceding characters before the tuple delim were
     // escape characters.  We need to read from the previous block to see what to do.
     if (before_tuple_end < 0) {
@@ -277,24 +279,21 @@ restart:
         LOG(WARNING) << "Unhandled code path.  This might cause a tuple to be "
                      << "skipped or repeated.";
         warning_logged = true;
-        return tuple_start;
       }
     }
 
     // An even number of escape characters means they cancel out and this tuple break
     // is *not* escaped.
-    if (num_escape_chars % 2 != 0) {
-      goto restart;
-    }
+    if (num_escape_chars % 2 != 0) goto restart;
   }
 
-  if (!found) return -1;
   if (tuple_start == len - 1 && buffer_start[tuple_start] == '\r') {
     // If \r is the last char we need to wait to see if the next one is \n or not.
     last_row_delim_offset_ = 0;
     return -1;
   }
-  if (buffer_start[tuple_start] == '\n' && buffer_start[tuple_start - 1] == '\r') {
+  if (tuple_start < len && buffer_start[tuple_start] == '\n' &&
+      buffer_start[tuple_start - 1] == '\r') {
     // We have \r\n, move to the next character.
     ++tuple_start;
   }

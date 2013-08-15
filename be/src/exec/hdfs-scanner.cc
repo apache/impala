@@ -162,11 +162,6 @@ void HdfsScanner::AddFinalRowBatch() {
 //   2. Eval conjuncts against the tuple.
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
-  // Cap the number of result tuples up at the limit
-  if (scan_node_->limit() != -1) {
-    num_tuples = min(num_tuples,
-        static_cast<int>(scan_node_->limit() - scan_node_->rows_returned()));
-  }
   DCHECK_GT(num_tuples, 0);
 
   if (template_tuple_ == NULL) {
@@ -208,11 +203,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 int HdfsScanner::WriteEmptyTuples(ScannerContext* context, 
     TupleRow* row, int num_tuples) {
-  // Cap the number of result tuples up at the limit
-  if (scan_node_->limit() != -1) {
-    num_tuples = min(num_tuples,
-        static_cast<int>(scan_node_->limit() - scan_node_->rows_returned()));
-  }
+  DCHECK_GE(num_tuples, 0);
   if (num_tuples == 0) return 0;
 
   if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;

@@ -38,7 +38,7 @@ const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
 HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state) 
-    : BaseSequenceScanner(scan_node, state, /* marker_precedes_sync */ true),
+    : BaseSequenceScanner(scan_node, state),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0) {
 }
@@ -106,39 +106,22 @@ BaseSequenceScanner::FileHeader* HdfsSequenceScanner::AllocateFileHeader() {
 }
   
 inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
-                                             int64_t* record_len, bool *eosr) {
+                                             int64_t* record_len) {
   // There are 2 cases:
   //  Record-compressed -- like a regular record, but the data is compressed.
   //  Uncompressed.
     
   block_start_ = stream_->file_offset();
-  bool sync;
-  *eosr = stream_->eosr();
-  Status stat = ReadBlockHeader(&sync);
-  if (!stat.ok()) {
-    *record_ptr = NULL;
-    if (*eosr) return Status::OK;
-    return stat;
-  }
-
-  // If we read a sync mark and are past the end of the scan range we are done.
-  if (sync && *eosr) {
-    *record_ptr = NULL;
-    return Status::OK;
-  }
-
-  // If we have not read the end the next sync mark keep going.
-  *eosr = false;
+  RETURN_IF_ERROR(ReadBlockHeader());
 
   // We don't look at the keys, only the values.
   RETURN_IF_FALSE(stream_->SkipBytes(current_key_length_, &parse_status_));
 
   if (header_->is_compressed) {
     int in_size = current_block_length_ - current_key_length_;
-    // Check for a reasonable size
-    if (in_size > stream_->scan_range()->len() || in_size < 0) {
+    if (in_size < 0) {
       stringstream ss;
-      ss << "Compressed record size is: " << in_size;
+      ss << "Invalid record size: " << in_size;
       if (state_->LogHasSpace()) state_->LogError(ss.str());
       return Status(ss.str());
     }
@@ -165,9 +148,9 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
   } else {
     // Uncompressed records
     RETURN_IF_FALSE(stream_->ReadVLong(record_len, &parse_status_));
-    if (*record_len > stream_->scan_range()->len() || *record_len < 0) {
+    if (*record_len < 0) {
       stringstream ss;
-      ss << "Record length is: " << record_len;
+      ss << "Invalid record length: " << *record_len;
       if (state_->LogHasSpace()) state_->LogError(ss.str());
       return Status(ss.str());
     }
@@ -185,58 +168,42 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
 //   a. Collect the start of records and their lengths
 //   b. Parse cols locations to field_locations_
 //   c. Materialize those field locations to row batches
+// 3. Read the sync indicator and check the sync block
 // This mimics the technique for text.
 // This function only returns on error or when the entire scan range is complete.
 Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
   DCHECK(header_->is_compressed);
 
-  while (!stream_->eosr() || num_buffered_records_in_compressed_block_ > 0) {
+  while (!finished()) {
     if (scan_node_->ReachedLimit()) return Status::OK;
     if (context_->cancelled()) return Status::CANCELLED;
 
-    if (num_buffered_records_in_compressed_block_ == 0) {
-      if (stream_->eosr()) return Status::OK;
-      // No more decompressed data, decompress the next block
-      RETURN_IF_ERROR(ReadCompressedBlock());
-      if (num_buffered_records_in_compressed_block_ < 0) return parse_status_;
-    }
+    // Step 1
+    RETURN_IF_ERROR(ReadCompressedBlock());
+    if (num_buffered_records_in_compressed_block_ < 0) return parse_status_;
 
     // Step 2
-    RETURN_IF_ERROR(ProcessDecompressedBlock());
-
-    // If we're finished processing the current block, read the marker + sync of
-    // the next block. We don't do this at the beginning of the loop since
-    // BaseSequenceScanner starts us after a sync, meaning we start by reading
-    // data.
-    if (num_buffered_records_in_compressed_block_ == 0) {
-      // If we are exactly at the end of the scan range, we don't attempt to
-      // read a sync marker because we may be at the end of file, and we don't
-      // want to trigger an "incomplete read" parse status and abort the
-      // query. This is safe to do even if we're not at the end of the file
-      // since we'll be finished after reading this sync.
-      // TODO: check EOF instead
-      if (stream_->bytes_left() == 0) return Status::OK;
-
-      // Read the sync indicator and check the sync block.
-      int sync_indicator;
-      if (!stream_->ReadInt(&sync_indicator, &parse_status_)) {
-        // We've reached the end of the file
-        // TODO: check that we actually reached the end of the file
-        DCHECK(stream_->eosr());
-        return Status::OK;
-      }
-      if (sync_indicator != -1) {
-        if (state_->LogHasSpace()) {
-          stringstream ss;
-          ss << "Expecting sync indicator (-1) at file offset "
-             << (stream_->file_offset() - sizeof(int)) << ".  "
-             << "Sync indicator found " << sync_indicator << ".";
-          state_->LogError(ss.str());
-        }
-        return Status("Bad sync hash");
-      }
-      RETURN_IF_ERROR(ReadSync());
+    while (num_buffered_records_in_compressed_block_ > 0) {
+      RETURN_IF_ERROR(ProcessDecompressedBlock());
     }
+
+    // SequenceFiles don't end with syncs
+    if (stream_->eof()) return Status::OK;
+
+    // Step 3
+    int sync_indicator;
+    RETURN_IF_FALSE(stream_->ReadInt(&sync_indicator, &parse_status_));
+    if (sync_indicator != -1) {
+      if (state_->LogHasSpace()) {
+        stringstream ss;
+        ss << "Expecting sync indicator (-1) at file offset "
+           << (stream_->file_offset() - sizeof(int)) << ".  "
+           << "Sync indicator found " << sync_indicator << ".";
+        state_->LogError(ss.str());
+      }
+      return Status("Bad sync hash");
+    }
+    RETURN_IF_ERROR(ReadSync());
   }
 
   return Status::OK;
@@ -252,7 +219,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (scan_node_->materialized_slots().empty()) {
     // Handle case where there are no slots to materialize (e.g. count(*))
     num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
-    if (num_to_process > 0) CommitRows(num_to_process);
+    CommitRows(num_to_process);
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
     return Status::OK;
   }
@@ -331,17 +298,11 @@ Status HdfsSequenceScanner::ProcessRange() {
   // this on each record.
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   
-  bool eosr = false;
-  while (!eosr && !stream_->eof()) {
+  while (!finished()) {
     DCHECK_GT(record_locations_.size(), 0);
     // Get the next compressed or uncompressed record.
     RETURN_IF_ERROR(
-        GetRecord(&record_locations_[0].record, &record_locations_[0].len, &eosr));
-
-    if (eosr) {
-      DCHECK(record_locations_[0].record == NULL);
-      break;
-    }
+        GetRecord(&record_locations_[0].record, &record_locations_[0].len));
 
     MemPool* pool;
     TupleRow* tuple_row_mem;
@@ -383,6 +344,17 @@ Status HdfsSequenceScanner::ProcessRange() {
     COUNTER_UPDATE(scan_node_->rows_read_counter(), 1);
     if (scan_node_->ReachedLimit()) break;
     if (context_->cancelled()) return Status::CANCELLED;
+
+    // Sequence files don't end with syncs
+    if (stream_->eof()) return Status::OK;
+
+    // Check for sync by looking for the marker that precedes syncs.
+    int marker;
+    RETURN_IF_FALSE(stream_->ReadInt(&marker, &parse_status_, /* peek */ true));
+    if (marker == SYNC_MARKER) {
+      RETURN_IF_FALSE(stream_->ReadInt(&marker, &parse_status_, /* peek */ false));
+      RETURN_IF_ERROR(ReadSync());
+    }
   }
 
   return Status::OK;
@@ -452,35 +424,18 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
-  if (header_->is_compressed && !seq_header->is_row_compressed && !stream_->eof()) {
-    // With block compression, record blocks have a leading -1 marker and sync
-    // (i.e., we just read the sync in the file header, but there is another
-    // sync immediately following it which is the beginning of the first
-    // block). We include this extra marker and sync in the header so that
-    // BaseSequenceScanner skips directly to the actual data in the first record
-    // block.
-    // TODO: this will cause the entire query to fail if this sync is corrupt
-    int marker;
-    RETURN_IF_FALSE(stream_->ReadInt(&marker, &parse_status_));
-    if (marker != HdfsSequenceScanner::SYNC_MARKER) {
-      return Status("Didn't find sync marker after file header");
-    }
-    RETURN_IF_ERROR(ReadSync());
-  }
-
   header_->header_size = stream_->total_bytes_returned();
+
+  if (!header_->is_compressed || seq_header->is_row_compressed) {
+    // Block-compressed scan ranges have an extra sync following the sync in the header,
+    // all other formats do not
+    header_->header_size -= SYNC_HASH_SIZE;
+  }
   return Status::OK;
 }
 
-Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
+Status HdfsSequenceScanner::ReadBlockHeader() {
   RETURN_IF_FALSE(stream_->ReadInt(&current_block_length_, &parse_status_));
-  *sync = false;
-  if (current_block_length_ == HdfsSequenceScanner::SYNC_MARKER) {
-    RETURN_IF_ERROR(ReadSync());
-    RETURN_IF_FALSE(
-        stream_->ReadInt(&current_block_length_, &parse_status_));
-    *sync = true;
-  }
   if (current_block_length_ < 0) {
     stringstream ss;
     int64_t position = stream_->file_offset();

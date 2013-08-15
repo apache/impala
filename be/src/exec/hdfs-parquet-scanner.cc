@@ -65,12 +65,13 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 
       // Compute the offset of the file footer
       DCHECK_GT(files[i]->file_length, 0);
-      int64_t footer_start = max(0L, files[i]->file_length - FOOTER_SIZE);
+      int64_t footer_size = min(static_cast<int64_t>(FOOTER_SIZE), files[i]->file_length);
+      int64_t footer_start = files[i]->file_length - FOOTER_SIZE;
 
       ScanRangeMetadata* metadata =
           reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
       DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
-          files[i]->filename.c_str(), FOOTER_SIZE,
+          files[i]->filename.c_str(), footer_size,
           footer_start, metadata->partition_id, files[i]->splits[0]->disk_id());
       footer_ranges.push_back(footer_range);
     }
@@ -235,7 +236,6 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
 
   uint8_t* buffer;
   int num_bytes;
-  bool eos;
 
   // We're about to move to the next data page.  The previous data page is
   // now complete, pass along the memory allocated for it.
@@ -246,9 +246,9 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
   // a data page was found).
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
-    RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &num_bytes, &eos));
+    RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &num_bytes));
     if (num_bytes == 0) {
-      DCHECK(eos);
+      DCHECK(stream_->eosr());
       break;
     }
 
@@ -266,7 +266,7 @@ Status HdfsParquetScanner::ColumnReader::ReadDataPage() {
       memcpy(header_buffer, buffer, header_first_part);
 
       if (!stream_->SkipBytes(header_first_part, &status)) return status;
-      RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &num_bytes, &eos));
+      RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &num_bytes));
       if (num_bytes == 0) return status;
 
       uint32_t header_second_part =
@@ -611,12 +611,9 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   while (true) {
     uint8_t* buffer;
     int len;
-    bool eos;
 
-    if (!stream_->GetBytes(0, &buffer, &len, &eos, &parse_status_)) {
-      return parse_status_;
-    }
-    DCHECK(eos);
+    RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &len));
+    DCHECK(stream_->eosr());
 
     // Number of bytes in buffer after the fixed size footer is accounted for.
     int remaining_bytes_buffered = len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER);
@@ -680,7 +677,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
         num_tuples -= max_tuples;
 
         int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-        if (num_to_commit > 0) CommitRows(num_to_commit);
+        CommitRows(num_to_commit);
       }
 
       *eosr = true;

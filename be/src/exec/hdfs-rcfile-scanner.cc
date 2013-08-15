@@ -52,7 +52,7 @@ const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
 HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : BaseSequenceScanner(scan_node, state, /* marker_precedes_sync */ true) {
+    : BaseSequenceScanner(scan_node, state) {
 }
 
 HdfsRCFileScanner::~HdfsRCFileScanner() {
@@ -105,7 +105,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   // Validate file version
   RETURN_IF_FALSE(stream_->ReadBytes(
       sizeof(RCFILE_VERSION_HEADER), &header, &parse_status_));
-  if (!memcmp(header, HdfsSequenceScanner::SEQFILE_VERSION_HEADER, 
+  if (!memcmp(header, HdfsSequenceScanner::SEQFILE_VERSION_HEADER,
       sizeof(HdfsSequenceScanner::SEQFILE_VERSION_HEADER))) {
     rc_header->version = SEQ6;
   } else if (!memcmp(header, RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER))) {
@@ -116,7 +116,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
        << ReadWriteUtil::HexDump(header, sizeof(RCFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
-  
+
   if (rc_header->version == SEQ6) {
     // Validate class name key/value
     uint8_t* class_name_key;
@@ -183,8 +183,8 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   uint8_t* sync;
   RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
-  
-  header_->header_size = stream_->total_bytes_returned();
+
+  header_->header_size = stream_->total_bytes_returned() - SYNC_HASH_SIZE;
   return Status::OK;
 }
 
@@ -259,20 +259,6 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       row_group_buffer_size_ = row_group_length_;
     }
     RETURN_IF_ERROR(ReadColumnBuffers());
-    if (stream_->eosr()) {
-      if (stream_->eof()) break;
-
-      // We must read up to the next sync marker.
-      int32_t record_length;
-      RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
-
-      if (record_length == HdfsRCFileScanner::SYNC_MARKER) {
-        // If the marker is there, it's an error not to have a Sync block following the
-        // Marker.
-        RETURN_IF_ERROR(ReadSync());
-        break;
-      } 
-    }
   }
   return Status::OK;
 }
@@ -280,11 +266,6 @@ Status HdfsRCFileScanner::ReadRowGroup() {
 Status HdfsRCFileScanner::ReadRowGroupHeader() {
   int32_t record_length;
   RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
-  // The sync block is marked with a record_length of -1.
-  if (record_length == HdfsRCFileScanner::SYNC_MARKER) {
-    RETURN_IF_ERROR(ReadSync());
-    RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
-  }
   if (record_length < 0) {
     stringstream ss;
     int64_t position = stream_->file_offset();
@@ -305,7 +286,7 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad compressed key length: " << compressed_key_length_ 
+    ss << "Bad compressed key length: " << compressed_key_length_
        << " at offset: " << position;
     return Status(ss.str());
   }
@@ -424,8 +405,8 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
       RETURN_IF_FALSE(
           stream_->SkipBytes(column.buffer_len, &parse_status_));
       continue;
-    } 
-      
+    }
+
     // TODO: Stream through these column buffers instead of reading everything
     // in at once.
     DCHECK_LE(column.uncompressed_buffer_len + column.start_offset, row_group_length_);
@@ -445,7 +426,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
       RETURN_IF_FALSE(stream_->ReadBytes(
           column.buffer_len, &uncompressed_data, &parse_status_));
       // TODO: this is bad.  Remove this copy.
-      memcpy(row_group_buffer_ + column.start_offset, 
+      memcpy(row_group_buffer_ + column.start_offset,
           uncompressed_data, column.buffer_len);
     }
   }
@@ -459,97 +440,109 @@ Status HdfsRCFileScanner::ProcessRange() {
   // materialized columns into a row group buffer.
   // It will then materialize tuples from the row group buffer.  When the row
   // group is complete, it will move onto the next row group.
-  while (!stream_->eosr() || num_rows_ != row_pos_) {
-    if (num_rows_ == row_pos_) {
-      // Finished materializing this row group, read the next one.
-      RETURN_IF_ERROR(ReadRowGroup());
-      if (num_rows_ == 0) break;
-    }
-    
-    SCOPED_TIMER(scan_node_->materialize_tuple_timer());
-    
-    // Indicates whether the current row has errors.
-    bool error_in_row = false;
-    const vector<SlotDescriptor*>& materialized_slots = 
-        scan_node_->materialized_slots();
-    vector<SlotDescriptor*>::const_iterator it;
-    
-    // Materialize rows from this row group in row batch sizes
-    MemPool* pool;
-    Tuple* tuple;
-    TupleRow* current_row;
-    int max_tuples = GetMemory(&pool, &tuple, &current_row);
-    max_tuples = min(max_tuples, num_rows_ - row_pos_);
+  while (!finished()) {
+    DCHECK_EQ(num_rows_, row_pos_);
+    // Finished materializing this row group, read the next one.
+    RETURN_IF_ERROR(ReadRowGroup());
+    if (num_rows_ == 0) break;
 
-    if (materialized_slots.empty()) {
-      // If there are no materialized slots (e.g. count(*) or just partition cols)
-      // we can shortcircuit the parse loop
-      row_pos_ += max_tuples;
-      int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-      if (num_to_commit > 0) CommitRows(num_to_commit);
+    while (num_rows_ != row_pos_) {
+      SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+
+      // Indicates whether the current row has errors.
+      bool error_in_row = false;
+      const vector<SlotDescriptor*>& materialized_slots =
+          scan_node_->materialized_slots();
+      vector<SlotDescriptor*>::const_iterator it;
+
+      // Materialize rows from this row group in row batch sizes
+      MemPool* pool;
+      Tuple* tuple;
+      TupleRow* current_row;
+      int max_tuples = GetMemory(&pool, &tuple, &current_row);
+      max_tuples = min(max_tuples, num_rows_ - row_pos_);
+
+      if (materialized_slots.empty()) {
+        // If there are no materialized slots (e.g. count(*) or just partition cols)
+        // we can shortcircuit the parse loop
+        row_pos_ += max_tuples;
+        int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
+        CommitRows(num_to_commit);
+        COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
+        continue;
+      }
+
+      int num_to_commit = 0;
+      for (int i = 0; i < max_tuples; ++i) {
+        RETURN_IF_ERROR(NextRow());
+
+        // Initialize tuple from the partition key template tuple before writing the
+        // slots
+        InitTuple(template_tuple_, tuple);
+
+        for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
+          const SlotDescriptor* slot_desc = *it;
+          int file_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
+
+          // Set columns missing in this file to NULL
+          if (file_column_idx >= columns_.size()) {
+            tuple->SetNull(slot_desc->null_indicator_offset());
+            continue;
+          }
+
+          ColumnInfo& column = columns_[file_column_idx];
+          DCHECK(column.materialize_column);
+
+          const char* col_start = reinterpret_cast<const char*>(
+              row_group_buffer_ + column.start_offset + column.buffer_pos);
+          int field_len = column.current_field_len;
+          DCHECK_LE(col_start + field_len,
+                    reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
+
+          if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
+                                          stream_->compact_data(), false, pool)) {
+            ReportColumnParseError(slot_desc, col_start, field_len);
+            error_in_row = true;
+          }
+        }
+
+        if (error_in_row) {
+          error_in_row = false;
+          if (state_->LogHasSpace()) {
+            stringstream ss;
+            ss << "file: " << stream_->filename();
+            state_->LogError(ss.str());
+          }
+          if (state_->abort_on_error()) {
+            state_->ReportFileErrors(stream_->filename(), 1);
+            return Status(state_->ErrorLog());
+          }
+        }
+
+        current_row->SetTuple(scan_node_->tuple_idx(), tuple);
+        // Evaluate the conjuncts and add the row to the batch
+        if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
+          ++num_to_commit;
+          current_row = next_row(current_row);
+          tuple = next_tuple(tuple);
+        }
+      }
+      CommitRows(num_to_commit);
       COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
-      continue;
+      if (scan_node_->ReachedLimit()) return Status::OK;
+      if (context_->cancelled()) return Status::CANCELLED;
     }
 
-    int num_to_commit = 0;
-    for (int i = 0; i < max_tuples; ++i) {
-      RETURN_IF_ERROR(NextRow());
+    // RCFiles don't end with syncs
+    if (stream_->eof()) return Status::OK;
 
-      // Initialize tuple from the partition key template tuple before writing the
-      // slots
-      InitTuple(template_tuple_, tuple);
-
-      for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
-        const SlotDescriptor* slot_desc = *it;
-        int file_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
-
-        // Set columns missing in this file to NULL
-        if (file_column_idx >= columns_.size()) {
-          tuple->SetNull(slot_desc->null_indicator_offset());
-          continue;
-        }
-
-        ColumnInfo& column = columns_[file_column_idx];
-        DCHECK(column.materialize_column);
-
-        const char* col_start = reinterpret_cast<const char*>(
-            row_group_buffer_ + column.start_offset + column.buffer_pos);
-        int field_len = column.current_field_len;
-        DCHECK_LE(col_start + field_len,
-            reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
-
-        if (!text_converter_->WriteSlot(slot_desc, tuple, 
-              col_start, field_len, stream_->compact_data(), false, pool)) {
-          ReportColumnParseError(slot_desc, col_start, field_len);
-          error_in_row = true;
-        }
-      }
-
-      if (error_in_row) {
-        error_in_row = false;
-        if (state_->LogHasSpace()) {
-          stringstream ss;
-          ss << "file: " << stream_->filename();
-          state_->LogError(ss.str());
-        }
-        if (state_->abort_on_error()) {
-          state_->ReportFileErrors(stream_->filename(), 1);
-          return Status(state_->ErrorLog());
-        }
-      }
-
-      current_row->SetTuple(scan_node_->tuple_idx(), tuple);
-      // Evaluate the conjuncts and add the row to the batch
-      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
-        ++num_to_commit;
-        current_row = next_row(current_row);
-        tuple = next_tuple(tuple);
-      }
+    // Check for sync by looking for the marker that precedes syncs.
+    int marker;
+    RETURN_IF_FALSE(stream_->ReadInt(&marker, &parse_status_, /* peek */ true));
+    if (marker == HdfsRCFileScanner::SYNC_MARKER) {
+      RETURN_IF_FALSE(stream_->ReadInt(&marker, &parse_status_, /* peek */ false));
+      RETURN_IF_ERROR(ReadSync());
     }
-    CommitRows(num_to_commit);
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
-    if (scan_node_->ReachedLimit()) break;
-    if (context_->cancelled()) return Status::CANCELLED;
   }
   return Status::OK;
 }
@@ -557,7 +550,7 @@ Status HdfsRCFileScanner::ProcessRange() {
 void HdfsRCFileScanner::DebugString(int indentation_level, stringstream* out) const {
   // TODO: Add more details of internal state.
   *out << string(indentation_level * 2, ' ')
-       << "HdfsRCFileScanner(tupleid=" << scan_node_->tuple_idx() 
+       << "HdfsRCFileScanner(tupleid=" << scan_node_->tuple_idx()
        << " file=" << stream_->filename();
   // TODO: Scanner::DebugString
   //  ExecNode::DebugString(indentation_level, out);

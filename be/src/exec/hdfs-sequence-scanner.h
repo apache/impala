@@ -190,10 +190,10 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   // This is always "org.apache.hadoop.io.Text"
   static const char* const SEQFILE_VALUE_CLASS_NAME;
 
-  // Read the record header, return if there was a sync block.
+  // Read the record header.
   // Sets:
   //   current_block_length_
-  Status ReadBlockHeader(bool* sync);
+  Status ReadBlockHeader();
 
   // Process an entire block compressed scan range.  Block compressed ranges are 
   // more common and can be parsed more efficiently in larger pieces.
@@ -212,8 +212,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   // Output:
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
-  //   eors: set to true if we are at the end of the scan range.
-  Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool* eosr);
+  Status GetRecord(uint8_t** record_ptr, int64_t *record_len);
   
   // Appends the current file and line to the RuntimeState's error log.
   // row_idx is 0-based (in current batch) where the parse error occurred.

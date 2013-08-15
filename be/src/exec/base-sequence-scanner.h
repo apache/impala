@@ -65,7 +65,8 @@ class BaseSequenceScanner : public HdfsScanner {
     // Enum for compression type.
     THdfsCompression::type compression_type;
 
-    // Byte size of header
+    // Byte size of header. This must not include the sync directly preceding the data
+    // (even if the sync is considered part of the header in the file format spec).
     int64_t header_size;
   };
   
@@ -100,19 +101,19 @@ class BaseSequenceScanner : public HdfsScanner {
 
   // Returns type of scanner: e.g. rcfile, seqfile
   virtual THdfsFileFormat::type file_format() const = 0;
-  
-  // - marker_precedes_sync: if true, sync markers are preceded by 4 bytes of
-  //   0xFFFFFFFF.
-  BaseSequenceScanner(HdfsScanNode*, RuntimeState*, bool marker_precedes_sync);
-  
-  // Read and validate sync marker against header_->sync.  Returns non-ok if the
-  // sync marker did not match. Scanners should always use this function to read
-  // sync markers, otherwise finished() might not be updated correctly.
+
+  BaseSequenceScanner(HdfsScanNode*, RuntimeState*);
+
+  // Read and validate sync marker against header_->sync.  Returns non-ok if the sync
+  // marker did not match. Scanners should always use this function to read sync markers,
+  // otherwise finished() might not be updated correctly. If finished() returns true after
+  // calling this function, scanners must not process any more records.
   Status ReadSync();
   
-  // Utility function to advance past the next sync marker, reading bytes from
-  // context_.
-  // - sync: sync marker (does not include 0xFFFFFFFF prefix)
+  // Utility function to advance past the next sync marker, reading bytes from stream_.
+  // If no sync is found in the scan range, return Status::OK and sets finished_ to
+  // true. It is safe to call this function past eosr.
+  // - sync: sync marker to search for (does not include 0xFFFFFFFF prefix)
   // - sync_size: number of bytes for sync
   Status SkipToSync(const uint8_t* sync, int sync_size);
 
@@ -156,11 +157,9 @@ class BaseSequenceScanner : public HdfsScanner {
   // scan range must process the following block since the second scan range
   // cannot find the incomplete sync. context_->eosr() will not alert us to this
   // situation, causing the block to be skipped.
-  // TODO(skye): update other scanners to use finished() instead of eosr
+  //
+  // finished_ is set by ReadSync() and SkipToSync().
   bool finished_;
-
-  // See constructor.
-  bool marker_precedes_sync_;
 
   // Utility function to look for 'sync' in buffer.  Returns the offset into
   // buffer of the _end_ of sync if it is found, otherwise, returns -1.
