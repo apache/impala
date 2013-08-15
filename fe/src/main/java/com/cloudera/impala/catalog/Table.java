@@ -16,7 +16,6 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -25,8 +24,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
@@ -86,12 +83,7 @@ public abstract class Table {
   //number of nodes that contain data for this table; -1: unknown
   public abstract int getNumNodes();
   public abstract TTableDescriptor toThrift();
-  /**
-   * @return
-   *         An output sink appropriate for writing to this table.
-   */
-  public abstract DataSink createDataSink(
-      List<Expr> partitionKeyExprs, boolean overwrite);
+
   public abstract TCatalogObjectType getCatalogObjectType();
 
   /**

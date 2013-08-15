@@ -29,6 +29,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Aggregation computation.
@@ -36,6 +37,14 @@ import com.google.common.base.Objects;
  */
 public class AggregationNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(AggregationNode.class);
+
+  // Default per-host memory requirement used if no valid stats are available.
+  // TODO: Come up with a more useful heuristic.
+  private final static long DEFAULT_PER_HOST_MEM = 128L * 1024L * 1024L;
+
+  // Conservative minimum size of hash table for low-cardinality aggregations.
+  private final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
+
   private final AggregateInfo aggInfo;
 
   // Set to true if this aggregation node contains aggregate functions that require
@@ -70,14 +79,13 @@ public class AggregationNode extends PlanNode {
     this(id, input, aggInfo, false);
   }
 
-  public AggregateInfo getAggInfo() {
-    return aggInfo;
-  }
+  public AggregateInfo getAggInfo() { return aggInfo; }
 
   @Override
-  public void setCompactData(boolean on) {
-    this.compactData = on;
-  }
+  public void setCompactData(boolean on) { this.compactData = on; }
+
+  @Override
+  public boolean isBlockingNode() { return true; }
 
   @Override
   public void computeStats(Analyzer analyzer) {
@@ -87,8 +95,7 @@ public class AggregationNode extends PlanNode {
     // cardinality: product of # of distinct values produced by grouping exprs
     for (Expr groupingExpr: groupingExprs) {
       long numDistinct = groupingExpr.getNumDistinctValues();
-      // TODO: remove these before 1.0
-      LOG.info("grouping expr: " + groupingExpr.toSql() + " #distinct="
+      LOG.debug("grouping expr: " + groupingExpr.toSql() + " #distinct="
           + Long.toString(numDistinct));
       if (numDistinct == -1) {
         cardinality = -1;
@@ -106,14 +113,14 @@ public class AggregationNode extends PlanNode {
       cardinality *= numDistinct;
     }
     // take HAVING predicate into account
-    LOG.info("Agg: cardinality=" + Long.toString(cardinality));
+    LOG.debug("Agg: cardinality=" + Long.toString(cardinality));
     if (cardinality > 0) {
       cardinality = Math.round((double) cardinality * computeSelectivity());
-      LOG.info("sel=" + Double.toString(computeSelectivity()));
+      LOG.debug("sel=" + Double.toString(computeSelectivity()));
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality < 0) cardinality = -1;
-    LOG.info("stats Agg: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Agg: cardinality=" + Long.toString(cardinality));
   }
 
   @Override
@@ -161,5 +168,22 @@ public class AggregationNode extends PlanNode {
     // we indirectly reference all grouping slots (because we write them)
     // so they're all materialized.
     aggInfo.getRefdSlots(ids);
+  }
+
+  @Override
+  public void computeCosts() {
+    Preconditions.checkNotNull(fragment,
+        "PlanNode must be placed into a fragment before calling this method.");
+    perHostMemCost = 0;
+    long perHostCardinality = fragment.getNumDistinctValues(aggInfo.getGroupingExprs());
+    if (perHostCardinality != -1) {
+      // take HAVING predicate into account
+      perHostCardinality =
+          Math.round((double) perHostCardinality * computeSelectivity());
+      perHostMemCost += Math.max(perHostCardinality * avgRowSize *
+          Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
+    } else {
+      perHostMemCost += DEFAULT_PER_HOST_MEM;
+    }
   }
 }

@@ -15,6 +15,7 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +89,7 @@ public class PlanFragment {
     this.outputExprs = Expr.cloneList(outputExprs, null);
     this.dataPartition = DataPartition.UNPARTITIONED;
     this.outputPartition = this.dataPartition;
+    setFragmentInPlanTree(planRoot);
   }
 
   /**
@@ -97,6 +99,21 @@ public class PlanFragment {
     this.planRoot = root;
     this.dataPartition = partition;
     this.outputPartition = DataPartition.UNPARTITIONED;
+    setFragmentInPlanTree(planRoot);
+  }
+
+  /**
+   * Assigns 'this' as fragment of all PlanNodes in the plan tree rooted at node.
+   * Does not traverse the children of ExchangeNodes because those must belong to a
+   * different fragment.
+   */
+  private void setFragmentInPlanTree(PlanNode node) {
+    node.setFragment(this);
+    if (!(node instanceof ExchangeNode)) {
+      for (PlanNode child : node.getChildren()) {
+        setFragmentInPlanTree(child);
+      }
+    }
   }
 
   public void setOutputExprs(ArrayList<Expr> outputExprs) {
@@ -116,6 +133,7 @@ public class PlanFragment {
       // we're streaming to an exchange node
       DataStreamSink streamSink = new DataStreamSink(destNodeId);
       streamSink.setPartition(outputPartition);
+      streamSink.setFragment(this);
       sink = streamSink;
     }
 
@@ -176,6 +194,31 @@ public class PlanFragment {
     }
   }
 
+  /**
+   * Estimates the per-node number of distinct values of exprs based on the data
+   * partition of this fragment and its number of nodes. Returns -1 for an invalid
+   * estimate, e.g., because getNumDistinctValues() failed on one of the exprs.
+   */
+  public long getNumDistinctValues(List<Expr> exprs) {
+    Preconditions.checkNotNull(dataPartition);
+    long result = 1;
+    int numNodes = getNumNodes();
+    Preconditions.checkState(numNodes >= 1);
+    for (Expr expr: exprs) {
+      long numDistinct = expr.getNumDistinctValues();
+      if (numDistinct == -1) {
+        result = -1;
+        break;
+      }
+      if (dataPartition.getPartitionExprs().contains(expr)) {
+        result *= Math.max((double) numDistinct / (double) numNodes, 1L);
+      } else {
+        result *= numDistinct;
+      }
+    }
+    return result;
+  }
+
   public TPlanFragment toThrift() {
     TPlanFragment result = new TPlanFragment();
     if (planRoot != null) {
@@ -209,8 +252,17 @@ public class PlanFragment {
     return (dataPartition.getType() != TPartitionType.UNPARTITIONED);
   }
 
-  public PlanFragment getDestFragment() {
-    return destFragment;
+  public PlanFragment getDestFragment() { return destFragment; }
+  public PlanNodeId getDestNodeId() { return destNodeId; }
+  public DataPartition getDataPartition() { return dataPartition; }
+  public DataPartition getOutputPartition() { return outputPartition; }
+  public void setOutputPartition(DataPartition outputPartition) {
+    this.outputPartition = outputPartition;
+  }
+  public PlanNode getPlanRoot() { return planRoot; }
+  public void setPlanRoot(PlanNode root) {
+    planRoot = root;
+    setFragmentInPlanTree(planRoot);
   }
 
   public void setDestination(PlanFragment fragment, PlanNodeId exchangeId) {
@@ -219,34 +271,13 @@ public class PlanFragment {
     // TODO: check that fragment contains node w/ exchangeId
   }
 
+  public boolean hasSink() { return sink != null; }
+  public DataSink getSink() { return sink; }
   public void setSink(DataSink sink) {
     Preconditions.checkState(this.sink == null);
     Preconditions.checkNotNull(sink);
+    sink.setFragment(this);
     this.sink = sink;
-  }
-
-  public PlanNodeId getDestNodeId() {
-    return destNodeId;
-  }
-
-  public DataPartition getDataPartition() {
-    return dataPartition;
-  }
-
-  public DataPartition getOutputPartition() {
-    return outputPartition;
-  }
-
-  public void setOutputPartition(DataPartition outputPartition) {
-    this.outputPartition = outputPartition;
-  }
-
-  public PlanNode getPlanRoot() {
-    return planRoot;
-  }
-
-  public void setPlanRoot(PlanNode root) {
-    planRoot = root;
   }
 
   /**
@@ -257,6 +288,6 @@ public class PlanFragment {
     Preconditions.checkState(newRoot.getChildren().size() == 1);
     newRoot.setChild(0, planRoot);
     planRoot = newRoot;
+    planRoot.setFragment(this);
   }
-
 }

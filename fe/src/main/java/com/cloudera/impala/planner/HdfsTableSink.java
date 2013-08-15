@@ -17,31 +17,79 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.THdfsTableSink;
 import com.cloudera.impala.thrift.TTableSink;
 import com.cloudera.impala.thrift.TTableSinkType;
+import com.google.common.base.Preconditions;
 
 /**
  * Base class for Hdfs data sinks such as HdfsTextTableSink.
  *
  */
 public class HdfsTableSink extends TableSink {
+  // Default number of partitions used for computeCosts() in the absence of column stats.
+  protected final long DEFAULT_NUM_PARTITIONS = 10;
+
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs;
   // Whether to overwrite the existing partition(s).
   protected final boolean overwrite;
-  protected THdfsFileFormat format;
 
-  public HdfsTableSink(Table targetTable,
-      List<Expr> partitionKeyExprs, boolean overwrite) {
+  public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
+      boolean overwrite) {
     super(targetTable);
+    Preconditions.checkState(targetTable instanceof HdfsTable);
     this.partitionKeyExprs = partitionKeyExprs;
     this.overwrite = overwrite;
+  }
+
+  @Override
+  public void computeCosts() {
+    HdfsTable table = (HdfsTable) targetTable;
+    // TODO: Estimate the memory requirements more accurately by partition type.
+    HdfsFileFormat format = table.getMajorityFormat();
+    PlanNode inputNode = fragment.getPlanRoot();
+    int numNodes = fragment.getNumNodes();
+    long numPartitions = fragment.getNumDistinctValues(partitionKeyExprs);
+    if (numPartitions == -1) numPartitions = DEFAULT_NUM_PARTITIONS;
+    long perPartitionMemReq = getPerPartitionMemReq(format);
+
+    // The estimate is based purely on the per-partition mem req if the input cardinality
+    // or the avg row size is unknown.
+    if (inputNode.getCardinality() == -1 || inputNode.getAvgRowSize() == -1) {
+      perHostMemCost = numPartitions * perPartitionMemReq;
+      return;
+    }
+
+    // The per-partition estimate may be higher than the memory required to buffer
+    // the entire input data.
+    long perHostInputCardinality = Math.max(1L, inputNode.getCardinality() / numNodes);
+    long perHostInputBytes =
+        (long) Math.ceil(perHostInputCardinality * inputNode.getAvgRowSize());
+    perHostMemCost = Math.min(perHostInputBytes, numPartitions * perPartitionMemReq);
+  }
+
+  /**
+   * Returns the per-partition memory requirement for inserting into the given
+   * file format.
+   */
+  private long getPerPartitionMemReq(HdfsFileFormat format) {
+    switch (format) {
+      // Writing to a Parquet table requires up to 1GB of buffer per partition.
+      // TODO: The per-partition memory requirement is configurable in the QueryOptions.
+      case PARQUET: return 1024L * 1024L * 1024L;
+      case TEXT: return 100L * 1024L;
+      default:
+        Preconditions.checkState(false, "Unsupported TableSink format " +
+            format.toString());
+    }
+    return 0;
   }
 
   @Override
@@ -70,7 +118,6 @@ public class HdfsTableSink extends TableSink {
         TTableSinkType.HDFS);
     tTableSink.hdfs_table_sink = hdfsTableSink;
     result.table_sink = tTableSink;
-
     return result;
   }
 }

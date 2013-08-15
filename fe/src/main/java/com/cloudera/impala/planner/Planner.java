@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -57,9 +58,11 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
+import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 
@@ -73,7 +76,7 @@ public class Planner {
 
   // Estimate of the overhead imposed by storing data in a hash tbl;
   // used for determining whether a broadcast join is feasible.
-  private final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
+  public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
   private final IdGenerator<PlanNodeId> nodeIdGenerator = new IdGenerator<PlanNodeId>();
 
@@ -1487,4 +1490,222 @@ public class Planner {
     }
   }
 
+  /**
+   * Represents a set of PlanNodes and DataSinks that execute and consume resources
+   * concurrently. PlanNodes and DataSinks in such a pipelined plan node set may belong
+   * to different plan fragments because data is streamed across fragments.
+   *
+   * For example, a series of left-deep joins consists of two plan node sets. The first
+   * set contains all build-side nodes. The second set contains the leftmost
+   * scan. Both sets contain all join nodes because they execute and consume
+   * resources during the build and probe phases. Similarly, all nodes below a 'blocking'
+   * node (e.g, an AggregationNode) are placed into a differnet plan node set than the
+   * nodes above it, but the blocking node itself belongs to both sets.
+   */
+  private class PipelinedPlanNodeSet {
+    // Minimum per-host resource requirements to ensure that no plan node set can have
+    // estimates of zero, even if the contained PlanNodes have estimates of zero.
+    public static final long MIN_PER_HOST_MEM = 10 * 1024 * 1024;
+    public static final int MIN_PER_HOST_VCORES = 1;
+
+    // List of plan nodes that execute and consume resources concurrently.
+    private final ArrayList<PlanNode> planNodes = Lists.newArrayList();
+
+    // DataSinks that execute and consume resources concurrently.
+    // Primarily used for estimating the cost of insert queries.
+    private final List<DataSink> dataSinks = Lists.newArrayList();
+
+    // Estimated per-host memory and CPU requirements.
+    // Valid after computeResourceEstimates().
+    private long perHostMem = MIN_PER_HOST_MEM;
+    private int perHostVcores = MIN_PER_HOST_VCORES;
+
+    public void add(PlanNode node) {
+      Preconditions.checkNotNull(node.getFragment());
+      planNodes.add(node);
+    }
+
+    public void addSink(DataSink sink) {
+      Preconditions.checkNotNull(sink);
+      dataSinks.add(sink);
+    }
+
+    /**
+     * Computes the estimated per-host memory and CPU requirements of this plan node set.
+     * Optionally excludes unpartitioned fragments from the estimation.
+     * Returns true if at least one plan node was included in the estimation.
+     * Otherwise returns false indicating the estimates are invalid.
+     */
+    public boolean computeResourceEstimates(boolean excludeUnpartitionedFragments) {
+      Set<PlanFragment> uniqueFragments = Sets.newHashSet();
+      long perHostMem = 0L;
+
+      for (int i = 0; i < planNodes.size(); ++i) {
+       PlanNode node = planNodes.get(i);
+       PlanFragment fragment = node.getFragment();
+       if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
+       node.computeCosts();
+       uniqueFragments.add(fragment);
+       Preconditions.checkState(node.getPerHostMemCost() >= 0);
+       perHostMem += node.getPerHostMemCost();
+      }
+
+      for (int i = 0; i < dataSinks.size(); ++i) {
+        DataSink sink = dataSinks.get(i);
+        PlanFragment fragment = sink.getFragment();
+        if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
+        // Sanity check that this plan-node set has at least one PlanNode of fragment.
+        Preconditions.checkState(uniqueFragments.contains(fragment));
+        sink.computeCosts();
+        Preconditions.checkState(sink.getPerHostMemCost() >= 0);
+        perHostMem += sink.getPerHostMemCost();
+      }
+
+      // The backend needs at least one thread per fragment.
+      int perHostVcores = uniqueFragments.size();
+
+      // This plan node set might only have unpartitioned fragments.
+      // Only set estimates if they are valid.
+      if (perHostMem > 0 && perHostVcores > 0) {
+        this.perHostMem = perHostMem;
+        this.perHostVcores = perHostVcores;
+        return true;
+      }
+      return false;
+    }
+
+    public long getPerHostMem() { return perHostMem; }
+    public int getPerHostVcores() { return perHostVcores; }
+  }
+
+  /**
+   * Estimates the per-host memory and CPU requirements for the given plan fragments,
+   * and sets the results in request.
+   * Optionally excludes the requirements for unpartitioned fragments.
+   */
+  public void computeResourceReqs(List<PlanFragment> fragments,
+      boolean excludeUnpartitionedFragments, TQueryExecRequest request) {
+    Preconditions.checkState(!fragments.isEmpty());
+    Preconditions.checkNotNull(request);
+
+    // Maps from an ExchangeNode's PlanNodeId to the fragments feeding it.
+    Map<PlanNodeId, List<PlanFragment>> exchangeSources = Maps.newHashMap();
+    for (PlanFragment fragment: fragments) {
+      List<PlanFragment> srcFragments = exchangeSources.get(fragment.getDestNodeId());
+      if (srcFragments == null) {
+        srcFragments = Lists.newArrayList();
+        exchangeSources.put(fragment.getDestNodeId(), srcFragments);
+      }
+      srcFragments.add(fragment);
+    }
+
+    // Compute pipelined plan node sets.
+    ArrayList<PipelinedPlanNodeSet> planNodeSets =
+        Lists.newArrayList(new PipelinedPlanNodeSet());
+    computePlanNodeSets(fragments.get(0).getPlanRoot(),
+        exchangeSources, planNodeSets.get(0), null, planNodeSets);
+
+    // Compute the max of the per-host mem and vcores requirement.
+    // Note that the max mem and vcores may come from different plan node sets.
+    long maxPerHostMem = Long.MIN_VALUE;
+    int maxPerHostVcores = Integer.MIN_VALUE;
+    for (PipelinedPlanNodeSet planNodeSet: planNodeSets) {
+      if (!planNodeSet.computeResourceEstimates(excludeUnpartitionedFragments)) continue;
+      long perHostMem = planNodeSet.getPerHostMem();
+      int perHostVcores = planNodeSet.getPerHostVcores();
+      if (perHostMem > maxPerHostMem) maxPerHostMem = perHostMem;
+      if (perHostVcores > maxPerHostVcores) maxPerHostVcores = perHostVcores;
+    }
+
+    // Legitimately set costs to zero if there are only unpartitioned fragments
+    // and excludeUnpartitionedFragments is true.
+    if (maxPerHostMem == Long.MIN_VALUE || maxPerHostVcores == Integer.MIN_VALUE) {
+      boolean allUnpartitioned = true;
+      for (PlanFragment fragment: fragments) {
+        if (fragment.isPartitioned()) {
+          allUnpartitioned = false;
+          break;
+        }
+      }
+      if (allUnpartitioned && excludeUnpartitionedFragments) {
+        maxPerHostMem = 0;
+        maxPerHostVcores = 0;
+      }
+    }
+
+    Preconditions.checkState(maxPerHostMem >= 0 && maxPerHostMem != Long.MIN_VALUE);
+    Preconditions.checkState(maxPerHostVcores >= 0 &&
+        maxPerHostVcores != Integer.MIN_VALUE);
+    request.setPer_host_mem_req(maxPerHostMem);
+    request.setPer_host_vcores((short) maxPerHostVcores);
+
+    LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
+    LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+  }
+
+  /**
+   * Populates 'planNodeSets' by recursively traversing the plan tree rooted at 'node'
+   * belonging to 'fragment'. The traversal spans fragments by resolving exchange nodes
+   * to their feeding fragment via exchangeSources.
+   *
+   * The plan node sets are computed top-down. As a result, the plan node sets are added
+   * in reverse order of their runtime execution.
+   *
+   * Nodes are generally added to lhsSet. Joins are treated specially in that their
+   * left child is added to lhsSet and their right child to rhsSet to make sure
+   * that concurrent join builds end up in the same plan node set.
+   */
+  private void computePlanNodeSets(PlanNode node,
+      Map<PlanNodeId, List<PlanFragment>> exchangeSources, PipelinedPlanNodeSet lhsSet,
+      PipelinedPlanNodeSet rhsSet, ArrayList<PipelinedPlanNodeSet> planNodeSets) {
+    lhsSet.add(node);
+    if (node == node.getFragment().getPlanRoot() && node.getFragment().hasSink()) {
+      lhsSet.addSink(node.getFragment().getSink());
+    }
+
+    if (node instanceof HashJoinNode) {
+      // Create a new set for the right-hand sides of joins if necessary.
+      if (rhsSet == null) {
+        rhsSet = new PipelinedPlanNodeSet();
+        planNodeSets.add(rhsSet);
+      }
+      // The join node itself is added to the lhsSet (above) and the rhsSet.
+      rhsSet.add(node);
+      computePlanNodeSets(node.getChild(1), exchangeSources, rhsSet, null,
+          planNodeSets);
+      computePlanNodeSets(node.getChild(0), exchangeSources, lhsSet, rhsSet,
+          planNodeSets);
+      return;
+    }
+
+    if (node instanceof ExchangeNode) {
+      // Recurse into the plan roots of the fragments feeding this exchange.
+      // Assume that all feeding fragments execute concurrently.
+      List<PlanFragment> srcFragments = exchangeSources.get(node.getId());
+      Preconditions.checkNotNull(srcFragments);
+      for (PlanFragment srcFragment: srcFragments) {
+        computePlanNodeSets(srcFragment.getPlanRoot(), exchangeSources, lhsSet, null,
+            planNodeSets);
+      }
+      return;
+    }
+
+    if (node.isBlockingNode()) {
+      // We add blocking nodes to two plan node sets because they require resources while
+      // consuming their input (execution of the preceding set) and while they
+      // emit their output (execution of the following set).
+      lhsSet = new PipelinedPlanNodeSet();
+      lhsSet.add(node);
+      planNodeSets.add(lhsSet);
+      // Join builds under this blocking node belong in a new rhsSet.
+      rhsSet = null;
+    }
+
+    // Assume that non-join, non-blocking nodes with multiple children (e.g., MergeNode)
+    // consume their inputs in an arbitrary order (i.e., all child subtrees execute
+    // concurrently).
+    for (PlanNode child: node.getChildren()) {
+      computePlanNodeSets(child, exchangeSources, lhsSet, rhsSet, planNodeSets);
+    }
+  }
 }

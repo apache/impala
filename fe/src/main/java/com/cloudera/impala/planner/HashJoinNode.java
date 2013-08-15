@@ -46,6 +46,10 @@ import com.google.common.base.Preconditions;
 public class HashJoinNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
 
+  // Default per-host memory requirement used if no valid stats are available.
+  // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
+  private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
+
   private final TableRef innerRef;
   private final JoinOperator joinOp;
 
@@ -219,7 +223,6 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-
   protected String getNodeExplainString(String detailPrefix,
       TExplainLevel detailLevel) {
     String distrModeStr = (distrMode != DistributionMode.NONE) ?
@@ -240,5 +243,17 @@ public class HashJoinNode extends PlanNode {
           .append(getExplainString(conjuncts) + "\n");
     }
     return output.toString();
+  }
+
+  @Override
+  public void computeCosts() {
+    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
+        || numNodes == 0) {
+      perHostMemCost = DEFAULT_PER_HOST_MEM;
+      return;
+    }
+    perHostMemCost = (long) Math.ceil(getChild(1).cardinality * getChild(1).avgRowSize *
+        Planner.HASH_TBL_SPACE_OVERHEAD);
+    if (distrMode == DistributionMode.PARTITIONED) perHostMemCost /= numNodes;
   }
 }

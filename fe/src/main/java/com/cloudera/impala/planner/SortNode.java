@@ -74,9 +74,10 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  public void setCompactData(boolean on) {
-    this.compactData = on;
-  }
+  public void setCompactData(boolean on) { this.compactData = on; }
+
+  @Override
+  public boolean isBlockingNode() { return true; }
 
   @Override
   protected void computeStats(Analyzer analyzer) {
@@ -132,5 +133,12 @@ public class SortNode extends PlanNode {
     }
     output.append("\n");
     return output.toString();
+  }
+
+  @Override
+  public void computeCosts() {
+    Preconditions.checkState(hasValidStats());
+    Preconditions.checkState(useTopN);
+    perHostMemCost = (long) Math.ceil(cardinality * avgRowSize);
   }
 }

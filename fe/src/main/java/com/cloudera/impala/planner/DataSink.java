@@ -14,8 +14,15 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.List;
+
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.google.common.base.Preconditions;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -25,6 +32,14 @@ import com.cloudera.impala.thrift.TExplainLevel;
  *
  */
 public abstract class DataSink {
+
+  // estimated per-host memory requirement for sink;
+  // set in computeCosts(); invalid: -1
+  protected long perHostMemCost = -1;
+
+  // Fragment that this DataSink belongs to. Set by the PlanFragment enclosing this sink.
+  protected PlanFragment fragment;
+
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed
    * by "prefix"
@@ -34,4 +49,35 @@ public abstract class DataSink {
   public abstract String getExplainString(String prefix, TExplainLevel explainLevel);
 
   protected abstract TDataSink toThrift();
+
+  public void setFragment(PlanFragment fragment) { this.fragment = fragment; }
+  public PlanFragment getFragment() { return fragment; }
+  public long getPerHostMemCost() { return perHostMemCost; }
+
+  /**
+   * Returns an output sink appropriate for writing to the given table.
+   */
+  public static DataSink createDataSink(Table table,
+      List<Expr> partitionKeyExprs, boolean overwrite) {
+    if (table instanceof HdfsTable) {
+      return new HdfsTableSink(table, partitionKeyExprs, overwrite);
+    } else if (table instanceof HBaseTable) {
+      // Partition clause doesn't make sense for an HBase table.
+      Preconditions.checkState(partitionKeyExprs.isEmpty());
+      // HBase doesn't have a way to perform INSERT OVERWRITE
+      Preconditions.checkState(overwrite == false);
+      // Create the HBaseTableSink and return it.
+      return new HBaseTableSink(table);
+    } else {
+      throw new UnsupportedOperationException(
+          "Cannot create data sink into table of type: " + table.getClass().getName());
+    }
+  }
+
+  /**
+   * Estimates the cost of executing this DataSink. Currently only sets perHostMemCost.
+   */
+  public void computeCosts() {
+    perHostMemCost = 0;
+  }
 }

@@ -44,10 +44,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.HBaseTableSink;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -436,17 +433,6 @@ public class HBaseTable extends Table {
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
-
-  @Override
-  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
-    // Partition clause doesn't make sense for an HBase table.
-    Preconditions.checkState(partitionKeyExprs.isEmpty());
-
-    // HBase doesn't have a way to perform INSERT OVERWRITE
-    Preconditions.checkState(overwrite == false);
-    // Create the HBaseTableSink and return it.
-    return new HBaseTableSink(this);
-  }
 
   /**
    * This is copied from org.apache.hadoop.hbase.client.HTable. The only difference is

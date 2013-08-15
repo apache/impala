@@ -43,6 +43,10 @@ public class ExchangeNode extends PlanNode {
    * Create ExchangeNode that consumes output of inputNode.
    * An ExchangeNode doesn't have an input node as a child, which is why we
    * need to compute the cardinality here.
+   *
+   * TODO: The cardinality estimation is not correct for ExchangeNodes being fed by
+   * multiple PlanNodes/Fragments, e.g., for distributed union queries. This means
+   * that ExchangeNodes can have multiple 'child' PlanNodes.
    */
   public ExchangeNode(PlanNodeId id, PlanNode inputNode, boolean copyConjuncts) {
     super(id, inputNode, "EXCHANGE");
@@ -74,5 +78,4 @@ public class ExchangeNode extends PlanNode {
         .addValue(super.debugString())
         .toString();
   }
-
 }

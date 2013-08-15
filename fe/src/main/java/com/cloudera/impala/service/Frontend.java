@@ -415,6 +415,7 @@ public class Frontend {
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
+    planner.computeResourceReqs(fragments, true, queryExecRequest);
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx

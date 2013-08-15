@@ -53,6 +53,9 @@ import com.google.common.collect.Sets;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
+  // TODO: Retrieve from the query options instead of using a default.
+  protected final static int DEFAULT_BATCH_SIZE = 1024;
+
   // String used for this node in getExplainString().
   protected final String displayName;
 
@@ -76,6 +79,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected List<Expr> conjuncts = Lists.newArrayList();
 
+  // Fragment that this PlanNode is executed in. Valid only after this PlanNode has been
+  // assigned to a fragment. Set and maintained by enclosing PlanFragment.
+  protected PlanFragment fragment;
+
   // estimate of the output cardinality of this node; set in computeStats();
   // invalid: -1
   protected long cardinality;
@@ -89,6 +96,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   //  Node should compact data.
   protected boolean compactData;
+
+  // estimated per-host memory requirement for this node;
+  // set in computeCosts(); invalid: -1
+  protected long perHostMemCost = -1;
 
   protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String displayName) {
     this.id = id;
@@ -125,21 +136,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.displayName = displayName;
   }
 
-  public PlanNodeId getId() {
-    return id;
-  }
-
-  public long getLimit() {
-    return limit;
-  }
-
-  public boolean hasLimit() {
-    return limit > -1;
-  }
-
+  public PlanNodeId getId() { return id; }
+  public long getLimit() { return limit; }
+  public boolean hasLimit() { return limit > -1; }
+  public long getPerHostMemCost() { return perHostMemCost; }
   public long getCardinality() { return cardinality; }
   public int getNumNodes() { return numNodes; }
   public float getAvgRowSize() { return avgRowSize; }
+  public void setFragment(PlanFragment fragment) { this.fragment = fragment; }
+  public PlanFragment getFragment() { return fragment; }
 
   /** Set the value of compactData in all children. */
   public void setCompactData(boolean on) {
@@ -160,9 +165,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
   }
 
-  public void unsetLimit() {
-    limit = -1;
-  }
+  public void unsetLimit() { limit = -1; }
 
   public ArrayList<TupleId> getTupleIds() {
     Preconditions.checkState(tupleIds != null);
@@ -179,9 +182,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return nullableTupleIds;
   }
 
-  public List<Expr> getConjuncts() {
-    return conjuncts;
-  }
+  public List<Expr> getConjuncts() { return conjuncts; }
 
   public void addConjuncts(List<Expr> conjuncts) {
     if (conjuncts == null) {
@@ -219,7 +220,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       TExplainLevel detailLevel) {
     StringBuilder expBuilder = new StringBuilder();
     String detailPrefix = prefix;
-    if (children != null && children.size() > 0) {
+    // Do not traverse into the children of an Exchange node to avoid crossing
+    // fragment boundaries.
+    if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
       detailPrefix += "|  ";
     } else {
       detailPrefix += "   ";
@@ -241,8 +244,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append("\n");
     }
 
-    // Print the children
-    if (children != null && children.size() > 0) {
+    // Print the children. Do not traverse into the children of an Exchange node to
+    // avoid crossing fragment boundaries.
+    if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
       expBuilder.append(detailPrefix + "\n");
       String childHeadlinePrefix = prefix + "|----";
       String childDetailPrefix = prefix + "|    ";
@@ -382,5 +386,21 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected boolean hasValidStats() {
     return (numNodes == -1 || numNodes >= 0) && (cardinality == -1 || cardinality >= 0);
+  }
+
+  /**
+   * Returns true if this plan node can output its first row only after consuming
+   * all rows of all its children. This method is used to group plan nodes
+   * into pipelined units for resource estimation.
+   */
+  public boolean isBlockingNode() { return false; }
+
+  /**
+   * Estimates the cost of executing this PlanNode. Currently only sets perHostMemCost.
+   * May only be called after this PlanNode has been placed in a PlanFragment because
+   * the cost computation is dependent on the enclosing fragment's data partition.
+   */
+  public void computeCosts() {
+    perHostMemCost = 0;
   }
 }

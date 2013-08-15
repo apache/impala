@@ -259,4 +259,18 @@ public class HdfsScanNode extends ScanNode {
    */
   public void validateFileFormat() throws NotImplementedException {
   }
+
+  @Override
+  public void computeCosts() {
+    // TODO: The total memory consumption for a particular query depends on the number
+    // of *available* cores, i.e., it depends the resource consumption of other
+    // concurrent queries. Figure out how to account for that.
+    // TODO: A better way to estimate the costs might be to ask the BE IoMgr
+    // to return an estimate.
+    // TODO: The calculation below is a worst-case estimate that is temporarily
+    // acceptable for testing resource management with hard memory limit enforcement.
+    int numCores = Runtime.getRuntime().availableProcessors();
+    // Impala starts up 3 scan ranges per core each using a default of 5 * 8MB buffers.
+    perHostMemCost = numCores * 3 * 5 * 8 * 1024 * 1024;
+  }
 }

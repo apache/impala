@@ -412,4 +412,10 @@ public class HBaseScanNode extends ScanNode {
           "HBase: Unsupported Impala compare operator: " + impalaOp);
     }
   }
+
+  @Override
+  public void computeCosts() {
+    // TODO: What's a good estimate of memory consumption?
+    perHostMemCost = 1024L * 1024L * 1024L;
+  }
 }

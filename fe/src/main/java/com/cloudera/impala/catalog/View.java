@@ -21,13 +21,11 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
-import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ParseNode;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SqlParser;
 import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.ViewRef;
-import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 
@@ -128,10 +126,5 @@ public class View extends Table {
   @Override
   public TTableDescriptor toThrift() {
     throw new IllegalStateException("Cannot call toThrift() on a view.");
-  }
-
-  @Override
-  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
-    throw new IllegalStateException("Cannot create a DataSink on a view.");
   }
 }

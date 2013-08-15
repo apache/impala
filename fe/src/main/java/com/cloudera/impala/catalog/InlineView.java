@@ -14,12 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.List;
-
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.base.Preconditions;
@@ -73,16 +69,6 @@ public class InlineView extends Table {
     // An inline view never generate Thrift representation.
     throw new UnsupportedOperationException(
         "Inline View should not generate Thrift representation");
-  }
-
-  /**
-   * This should never be called.
-   */
-  @Override
-  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
-    // An inlinview should never be a target of a n insert.
-    throw new UnsupportedOperationException(
-        "Inline View should never be the target of an insert");
   }
 
   @Override

@@ -653,6 +653,13 @@ struct TQueryExecRequest {
   // the stmt_type of the parent TExecRequest, but in some cases (such as CREATE TABLE
   // AS SELECT), these may differ.
   9: required Types.TStmtType stmt_type
+
+  // Estimated per-host peak memory consumption in bytes. Used for resource management.
+  10: optional i64 per_host_mem_req
+
+  // Estimated per-host CPU requirements in YARN virtual cores.
+  // Used for resource management.
+  11: optional i16 per_host_vcores
 }
 
 enum TDdlType {

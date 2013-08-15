@@ -481,7 +481,7 @@ public class InsertStmt extends StatementBase {
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table != null);
-    return table.createDataSink(partitionKeyExprs, overwrite);
+    return DataSink.createDataSink(table, partitionKeyExprs, overwrite);
   }
 
   @Override

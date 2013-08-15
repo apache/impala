@@ -44,7 +44,6 @@ public class HBaseTableSink extends TableSink {
     TTableSink tTableSink =
         new TTableSink(targetTable.getId().asInt(), TTableSinkType.HBASE);
     result.table_sink = tTableSink;
-
     return result;
   }
 }

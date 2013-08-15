@@ -56,8 +56,6 @@ import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.HdfsTableSink;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.THdfsPartition;
@@ -789,11 +787,6 @@ public class HdfsTable extends Table {
     return TTableDescriptor;
   }
 
-  @Override
-  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
-    return new HdfsTableSink(this, partitionKeyExprs, overwrite);
-  }
-
   public String getHdfsBaseDir() { return hdfsBaseDir; }
   @Override
   public int getNumNodes() { return uniqueHostPortsCount; }
@@ -812,5 +805,33 @@ public class HdfsTable extends Table {
     lastPartColPos = hdfsPath.indexOf('/', lastPartColPos);
     String partitionName = hdfsPath.substring(firstPartColPos, lastPartColPos);
     return partitionName;
+  }
+
+  /**
+   * Returns the file format that the majority of partitions are stored in.
+   */
+  public HdfsFileFormat getMajorityFormat() {
+    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newHashMap();
+    for (HdfsPartition partition: partitions) {
+      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
+      Integer numPartitions = numPartitionsByFormat.get(format);
+      if (numPartitions == null) {
+        numPartitions = Integer.valueOf(1);
+      } else {
+        numPartitions = Integer.valueOf(numPartitions.intValue() + 1);
+      }
+      numPartitionsByFormat.put(format, numPartitions);
+    }
+
+    int maxNumPartitions = Integer.MIN_VALUE;
+    HdfsFileFormat majorityFormat = null;
+    for (Map.Entry<HdfsFileFormat, Integer> entry: numPartitionsByFormat.entrySet()) {
+      if (entry.getValue().intValue() > maxNumPartitions) {
+        majorityFormat = entry.getKey();
+        maxNumPartitions = entry.getValue().intValue();
+      }
+    }
+    Preconditions.checkNotNull(majorityFormat);
+    return majorityFormat;
   }
 }
