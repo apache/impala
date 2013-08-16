@@ -2,19 +2,22 @@
 ---- QUERY
 use default
 ---- RESULTS
+
 ====
 ---- QUERY
 # Make sure the database doesn't exist
 show databases like 'ddl_test_db'
----- RESULTS
----- TYPES
-string
 ---- SETUP
 RELOAD
+---- RESULTS
+
+---- TYPES
+STRING
 ====
 ---- QUERY
 create database ddl_test_db
 ---- RESULTS
+
 ====
 ---- QUERY
 # It should show up now
@@ -22,21 +25,24 @@ show databases like 'ddl_test_db'
 ---- RESULTS
 'ddl_test_db'
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 # Make sure creating a database with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
 create database if not exists ddl_test_db
 ---- RESULTS
+
 ====
 ---- QUERY
 show tables in ddl_test_db
 ---- RESULTS
+
 ====
 ---- QUERY
 create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
 ---- RESULTS
+
 ====
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
@@ -48,13 +54,14 @@ ESCAPED BY '\\'
 LINES TERMINATED BY '\n'
 STORED AS TEXTFILE
 ---- RESULTS
+
 ====
 ---- QUERY
 show tables in ddl_test_db
 ---- RESULTS
 'testtbl'
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 describe ddl_test_db.testtbl
@@ -62,7 +69,7 @@ describe ddl_test_db.testtbl
 'i','int',''
 's','string','String col'
 ---- TYPES
-string,string,string
+STRING, STRING, STRING
 ====
 ---- QUERY
 insert overwrite table ddl_test_db.testtbl SELECT 1, 'Hi'
@@ -84,11 +91,12 @@ select * from ddl_test_db.testtbl
 1,'Hi'
 1,'Hi'
 ---- TYPES
-int,string
+INT, STRING
 ====
 ---- QUERY
 create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
 ---- RESULTS
+
 ====
 ---- QUERY
 # Partition columns are displayed as part of DESCRIBE <table>
@@ -98,7 +106,7 @@ describe ddl_test_db.testtbl_part
 's','string',''
 'id','int','C'
 ---- TYPES
-string,string,string
+STRING, STRING, STRING
 ====
 ---- QUERY
 insert overwrite table ddl_test_db.testtbl_part partition(id=1)
@@ -119,17 +127,19 @@ select * from ddl_test_db.testtbl_part
 20,'Twenty',2
 20,'Twenty',2
 ---- TYPES
-int, string, int
+INT, STRING, INT
 ====
 ---- QUERY
 select * from ddl_test_db.testtbl_part where id = 1
 ---- RESULTS
 10,'Ten',1
 ---- TYPES
-int, string, int
+INT, STRING, INT
 ====
 ---- QUERY
 use ddl_test_db
+---- RESULTS
+
 ====
 ---- QUERY
 show tables
@@ -137,12 +147,13 @@ show tables
 'testtbl'
 'testtbl_part'
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 # Make sure we create the table in the proper database after a "use"
 create table testtbl2(f float, d double) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 ---- RESULTS
+
 ====
 ---- QUERY
 show tables
@@ -151,11 +162,12 @@ show tables
 'testtbl2'
 'testtbl_part'
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 drop table testtbl2
 ---- RESULTS
+
 ====
 ---- QUERY
 show tables
@@ -163,13 +175,14 @@ show tables
 'testtbl'
 'testtbl_part'
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 # CREATE TABLE LIKE on partitioned table
 create table alltypes_test like functional_seq_snap.alltypes
 stored as parquetfile
 ---- RESULTS
+
 ====
 ---- QUERY
 # Make sure no data exists for this table
@@ -203,11 +216,12 @@ BIGINT
 alter table alltypes_test partition (year=2009, month=4)
 set fileformat textfile
 ---- RESULTS
+
 ====
 ---- QUERY
 select count(*) from alltypes_test
 ---- RESULTS
-138
+136
 ---- TYPES
 BIGINT
 ====
@@ -216,6 +230,7 @@ BIGINT
 create external table jointbl_like like functional_rc_gzip.jointbl
 location '/test-warehouse/jointbl_rc_gzip'
 ---- RESULTS
+
 ====
 ---- QUERY
 # should get some results back
@@ -225,12 +240,13 @@ select * from jointbl_like order by test_id limit 3
 1002,'Name2',94611,5000
 1003,'Name3',94611,5000
 ---- TYPES
-bigint,string,int,int
+BIGINT, STRING, INT, INT
 ====
 ---- QUERY
 # CREATE TABLE LIKE on unpartitioned table.
 create table testtbl_like like testtbl
 ---- RESULTS
+
 ====
 ---- QUERY
 # Make sure the new table can be queried and no data exists for this table.
@@ -244,13 +260,15 @@ BIGINT
 # No error is thrown when IF NOT EXISTS is specified and the table already exists.
 create table if not exists testtbl_like like testtbl
 ---- RESULTS
+
 ====
 ---- QUERY
 # IF NOT EXISTS also applies when the src table is the same as the new table.
 create table if not exists testtbl_like like testtbl_like
 ---- RESULTS
+
 ====
----- QUERY 
+---- QUERY
 insert overwrite table testtbl_like
 select * from testtbl limit 5
 ---- RESULTS
@@ -271,46 +289,56 @@ INT, STRING
 ---- QUERY
 drop table testtbl
 ---- RESULTS
+
 ====
 ---- QUERY
 drop table testtbl_part
 ---- RESULTS
+
 ====
 ---- QUERY
 drop table alltypes_test
 ---- RESULTS
+
 ====
 ---- QUERY
 drop table jointbl_like
 ---- RESULTS
+
 ====
 ---- QUERY
 drop table testtbl_like
 ---- RESULTS
+
 ====
 ---- QUERY
 show tables
 ---- RESULTS
+
 ---- TYPES
-string
+STRING
 ====
 ---- QUERY
 drop table if exists non_existent_db.tbl
 ---- RESULTS
+
 ====
 ---- QUERY
 # Need to switch databases before dropping
 use default
 ---- RESULTS
+
 ====
 ---- QUERY
 drop database ddl_test_db
 ---- RESULTS
+
 ====
 ---- QUERY
 # Should be gone now
 show databases like 'ddl_test_db'
 ---- RESULTS
+
 ---- TYPES
-string
+STRING
 ====
