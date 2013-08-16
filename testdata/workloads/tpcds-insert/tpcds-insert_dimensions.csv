@@ -1,0 +1,4 @@
+file_format: text,parquet
+dataset: tpcds
+compression_codec: none
+compression_type: none

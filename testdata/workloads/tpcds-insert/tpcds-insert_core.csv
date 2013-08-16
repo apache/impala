@@ -1,0 +1,1 @@
+file_format: parquet, dataset: tpcds, compression_codec: none, compression_type: none

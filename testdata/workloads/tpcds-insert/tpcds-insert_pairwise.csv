@@ -1,0 +1,3 @@
+# Generated File.
+file_format: text, dataset: tpcds, compression_codec: none, compression_type: none
+file_format: parquet, dataset: tpcds, compression_codec: none, compression_type: none

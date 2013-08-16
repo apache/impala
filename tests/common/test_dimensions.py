@@ -69,6 +69,7 @@ class TableFormatInfo(object):
       compression_str = 'none'
     return '%s/%s' % (self.file_format, compression_str)
 
+
 # Available Exec Options:
 #01: abort_on_error (bool)
 #02 max_errors (i32)
@@ -157,3 +158,9 @@ def load_table_info_dimension(workload, exploration_strategy, file_formats=None,
       vector_values.append(TableFormatInfo(**vals))
 
   return TestDimension('table_format', *vector_values)
+
+def is_supported_insert_format(table_format):
+  # Returns true if the given table_format is a supported Impala INSERT format
+  return table_format.compression_codec == 'none' and\
+      table_format.file_format in ['text', 'parquet']
+

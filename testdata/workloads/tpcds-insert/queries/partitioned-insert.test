@@ -1,0 +1,74 @@
+====
+---- QUERY: TPCDS-SS-INSERT-SETUP1
+DROP TABLE IF EXISTS store_sales_insert
+---- RESULTS
+====
+---- QUERY: TPCDS-SS-INSERT-SETUP2
+CREATE TABLE store_sales_insert LIKE store_sales
+---- RESULTS
+====
+---- QUERY: TPCDS-SS-INSERT-DAY
+# Insert a day's worth of data
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+SELECT * FROM store_sales
+WHERE ss_date = '1999-03-01'
+---- RESULTS
+ss_date=1999-03-01/: 847
+====
+---- QUERY: TPCDS-SS-INSERT-MONTH
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+SELECT * FROM store_sales
+WHERE ss_date >= '1999-04-01' and ss_date <= '1999-04-30'
+---- RESULTS
+ss_date=1999-04-15/: 794
+ss_date=1999-04-01/: 822
+====
+---- QUERY: TPCDS-SS-INSERT-QUARTER
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+SELECT * FROM store_sales
+WHERE ss_date >= '1999-09-01' and ss_date <= '1999-12-31'
+---- RESULTS
+ss_date=1999-10-01/: 1941
+ss_date=1999-11-01/: 2075
+ss_date=1999-09-01/: 1881
+ss_date=1999-11-15/: 3007
+ss_date=1999-12-15/: 3144
+ss_date=1999-10-15/: 1908
+ss_date=1999-09-15/: 1989
+ss_date=1999-12-01/: 2980
+====
+---- QUERY: TPCDS-SS-INSERT-YEAR
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+SELECT * FROM store_sales
+WHERE ss_date >= '2000-01-01' and ss_date < '2001-01-01'
+---- RESULTS
+ss_date=2000-08-15/: 1985
+ss_date=2000-02-01/: 819
+ss_date=2000-12-15/: 2999
+ss_date=2000-07-15/: 855
+ss_date=2000-01-15/: 867
+ss_date=2000-11-15/: 2975
+ss_date=2000-01-01/: 2743
+ss_date=2000-02-15/: 1004
+ss_date=2000-06-15/: 714
+ss_date=2000-11-01/: 2184
+ss_date=2000-05-15/: 953
+ss_date=2000-06-01/: 809
+ss_date=2000-08-01/: 1071
+ss_date=2000-09-15/: 2306
+ss_date=2000-10-01/: 1753
+ss_date=2000-09-01/: 1984
+ss_date=2000-04-01/: 1001
+ss_date=2000-10-15/: 1629
+ss_date=2000-04-15/: 751
+ss_date=2000-03-15/: 923
+ss_date=2000-03-01/: 707
+ss_date=2000-12-01/: 2966
+ss_date=2000-07-01/: 990
+ss_date=2000-05-01/: 868
+====
+---- QUERY: TPCDS-SS-INSERT-VERIFY
+SELECT COUNT(*) FROM store_sales_insert
+---- RESULTS
+57244
+====
