@@ -102,8 +102,8 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     afterDdlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
 
     if expect_changed:
-      # check that the time difference is within 5s
-      assert long(afterDdlTime) - long(beforeDdlTime) <= 5
+      # check that the time difference is within 20s
+      assert long(afterDdlTime) - long(beforeDdlTime) <= 20
     else:
       assert long(afterDdlTime) == long(beforeDdlTime)
 
