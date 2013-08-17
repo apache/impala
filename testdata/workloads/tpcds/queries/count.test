@@ -1,0 +1,63 @@
+====
+---- QUERY
+select count(*) from customer
+---- RESULTS
+100000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from customer_address;
+---- RESULTS
+50000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from customer_demographics;
+---- RESULTS
+1920800
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from date_dim;
+---- RESULTS
+73049
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from household_demographics;
+---- RESULTS
+7200
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from item;
+---- RESULTS
+18000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from promotion;
+---- RESULTS
+300
+---- TYPES
+BIGINT
+---- QUERY
+select count(*) from store;
+---- RESULTS
+12
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from time_dim;
+---- RESULTS
+86400
+---- TYPES
+BIGINT
+====

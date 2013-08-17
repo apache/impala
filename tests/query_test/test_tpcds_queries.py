@@ -23,6 +23,11 @@ class TestTpcdsQuery(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0)
 
+  @pytest.mark.execute_serially
+  # Marked serially to make sure it runs first.
+  def test_tpcds_count(self, vector):
+    self.run_test_case('count', vector)
+
   def test_tpcds_q3(self, vector):
     self.run_test_case('tpcds-q3', vector)
 
