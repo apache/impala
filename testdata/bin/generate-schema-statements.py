@@ -341,6 +341,15 @@ def generate_statements(output_name, test_vectors, sections,
       columns = section['COLUMNS']
       partition_columns = section['PARTITION_COLUMNS']
       row_format = section['ROW_FORMAT']
+
+      # Force reloading of the table if the user specified the --force option or
+      # if the table is partitioned and there was no ALTER section specified. This is to
+      # ensure the partition metadata is always properly created. The ALTER section is
+      # used to create partitions, so if that section exists there is no need to force
+      # reload.
+      # TODO: Rename the ALTER section to ALTER_TABLE_ADD_PARTITION
+      force_reload = options.force_reload or (partition_columns and not alter)
+
       table_name = base_table_name
       db_suffix = build_db_suffix(file_format, codec, compression_type)
       db_name = '{0}{1}'.format(data_set, options.scale_factor)
@@ -420,7 +429,7 @@ def generate_statements(output_name, test_vectors, sections,
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
       # INSERT INTO statement or a LOAD statement.
-      if not options.force_reload and hdfs_location in existing_tables:
+      if not force_reload and hdfs_location in existing_tables:
         print 'HDFS path:', data_path, 'contains data. Data loading can be skipped.'
       else:
         print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
