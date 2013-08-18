@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.Map;
 
@@ -34,8 +35,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 /**
- * Query-relevant information for one table partition. Not thread safe due to a static
- * counter that's incremented for every time the constructor is called.
+ * Query-relevant information for one table partition.
  */
 public class HdfsPartition {
   /**
@@ -163,7 +163,7 @@ public class HdfsPartition {
   // TODO: fill this
   private final Map<Column, ColumnStats> columnStats = Maps.newHashMap();
 
-  private static long partitionIdCounter = 0;
+  private static AtomicLong partitionIdCounter = new AtomicLong();
 
   // A unique ID for each partition, used to identify a partition in the thrift
   // representation of a table.
@@ -254,7 +254,7 @@ public class HdfsPartition {
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
-        partitionIdCounter++);
+        partitionIdCounter.getAndIncrement());
   }
 
   public static HdfsPartition defaultPartition(

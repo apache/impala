@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,7 +66,7 @@ public class Catalog {
   //TODO: Make the reload interval configurable.
   private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
   private final boolean lazy;
-  private int nextTableId;
+  private AtomicInteger nextTableId;
   private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
   // Cache of database metadata.
   private final CatalogObjectCache<Db> dbCache = new CatalogObjectCache<Db>(
@@ -96,7 +97,7 @@ public class Catalog {
    */
   public Catalog(boolean lazy, boolean raiseExceptions,
       AuthorizationConfig authzConfig) {
-    this.nextTableId = 0;
+    this.nextTableId = new AtomicInteger();
     this.lazy = lazy;
     this.authzConfig = authzConfig;
     this.authzChecker = new AuthorizationChecker(authzConfig);
@@ -187,7 +188,7 @@ public class Catalog {
   }
 
   public TableId getNextTableId() {
-    return new TableId(nextTableId++);
+    return new TableId(nextTableId.getAndIncrement());
   }
 
   /**

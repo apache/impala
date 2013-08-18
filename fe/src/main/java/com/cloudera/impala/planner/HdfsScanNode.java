@@ -161,6 +161,7 @@ public class HdfsScanNode extends ScanNode {
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
     List<TScanRangeLocations> result = Lists.newArrayList();
     for (HdfsPartition partition: partitions) {
+      Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (HdfsPartition.FileBlock block: fileDesc.getFileBlocks()) {
           String[] blockHostPorts = block.getHostPorts();
