@@ -54,7 +54,7 @@ RuntimeState::RuntimeState(
     query_mem_limit_(NULL),
     is_cancelled_(false) {
   Status status = Init(fragment_instance_id, query_options, now, user, exec_env);
-  DCHECK(status.ok());
+  DCHECK(status.ok()) << status.GetErrorMsg();
 }
 
 RuntimeState::RuntimeState(const string& now, const string& user)
@@ -97,12 +97,12 @@ Status RuntimeState::Init(
     query_options_.max_io_buffers = 5 * DiskInfo::num_disks();
   }
 
-  // Register with the thread mgr 
+  // Register with the thread mgr
   if (exec_env != NULL) {
     resource_pool_ = exec_env->thread_mgr()->RegisterPool();
     DCHECK(resource_pool_ != NULL);
   }
-  
+
   DCHECK_GT(query_options_.max_io_buffers, 0);
   return Status::OK;
 }

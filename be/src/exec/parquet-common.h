@@ -82,16 +82,32 @@ class ParquetPlainEncoder {
   // not be aligned.
   template<typename T>
   static int Decode(uint8_t* buffer, T* v) {
-    memcpy(v, buffer, sizeof(T));
+    memcpy(v, buffer, ByteSize(*v));
     return ByteSize(*v);
   }
 };
+
+// Disable for bools. Plain encoding is not used for booleans.
+template<> int ParquetPlainEncoder::ByteSize(const bool& b);
+template<> int ParquetPlainEncoder::Encode(uint8_t*, const bool&);
+template<> int ParquetPlainEncoder::Decode(uint8_t*, bool* v);
 
 // Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
 template<>
 inline int ParquetPlainEncoder::ByteSize(const int8_t& v) { return sizeof(int32_t); }
 template<>
 inline int ParquetPlainEncoder::ByteSize(const int16_t& v) { return sizeof(int32_t); }
+
+template<>
+inline int ParquetPlainEncoder::Decode(uint8_t* buffer, int8_t* v) {
+  *v = *buffer;
+  return ByteSize(*v);
+}
+template<>
+inline int ParquetPlainEncoder::Decode(uint8_t* buffer, int16_t* v) {
+  memcpy(v, buffer, sizeof(int16_t));
+  return ByteSize(*v);
+}
 
 template<>
 inline int ParquetPlainEncoder::Encode(uint8_t* buffer, const int8_t& v) {

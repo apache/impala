@@ -30,7 +30,7 @@ class Expr;
 class TupleDescriptor;
 class TupleRow;
 class RuntimeState;
-class StringValue;
+struct StringValue;
 struct OutputPartition;
 
 // The writer consumes all rows passed to it and writes the evaluated output_exprs_
@@ -69,7 +69,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   // Escape character.
   char escape_char_;
-  
+
   // Stringstream to buffer output.  The stream is cleared between HDFS
   // Write calls to allow for the internal buffers to be reused.
   std::stringstream rowbatch_stringstream_;
