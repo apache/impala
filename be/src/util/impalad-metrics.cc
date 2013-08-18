@@ -52,6 +52,8 @@ const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
     "catalog.num-tables";
+const char* ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT =
+    "impala-server.num-files-open-for-insert";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -69,6 +71,7 @@ Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
+Metrics::IntMetric* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
@@ -96,6 +99,10 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L);
   HASH_TABLE_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L);
+
+  // Initialize insert metrics
+  NUM_FILES_OPEN_FOR_INSERT = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0L);
 
   // Initialize IO mgr metrics
   IO_MGR_NUM_OPEN_FILES = m->CreateAndRegisterPrimitiveMetric(

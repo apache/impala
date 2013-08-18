@@ -70,6 +70,9 @@ class ImpaladMetricKeys {
 
   // Number of tables in the catalog
   static const char* CATALOG_NUM_TABLES;
+
+  // Number of files open for insert
+  static const char* NUM_FILES_OPEN_FOR_INSERT;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -93,6 +96,7 @@ class ImpaladMetrics {
   static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
   static Metrics::IntMetric* CATALOG_NUM_DBS;
   static Metrics::IntMetric* CATALOG_NUM_TABLES;
+  static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(Metrics* m);
