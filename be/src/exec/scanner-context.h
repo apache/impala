@@ -98,12 +98,14 @@ class ScannerContext {
     // Returns if the scanner should return compact row batches.
     bool compact_data() const { return compact_data_; }
 
-    // Sets the number of bytes to read past the scan range when necessary.  This
-    // can be set by the scanner if it knows something about the file, otherwise
-    // the default is used.
-    // Reading past the end of the scan range is likely a remote read.  We want
-    // to minimize the number of io requests as well as the data volume.
-    void set_read_past_buffer_size(int size) { read_past_buffer_size_ = size; }
+    // Callback that returns the buffer size to use when reading past the end of the scan
+    // range.  By default a constant value is used, which scanners can override with this
+    // callback.  The callback takes the file offset of the asyncronous read (this may be
+    // more than file_offset() due to data being assembled in the boundary buffer).
+    // Reading past the end of the scan range is likely a remote read, so we want to
+    // minimize the number of io requests as well as the data volume.
+    typedef boost::function<int (int64_t)> ReadPastSizeCallback;
+    void set_read_past_size_cb(ReadPastSizeCallback cb) { read_past_size_cb_ = cb; }
 
     // Return the number of bytes left in the range for this stream.
     int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
@@ -118,7 +120,7 @@ class ScannerContext {
     const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
 
     // Returns the buffer's current offset in the file.
-    int64_t file_offset() const { return scan_range_start_ + total_bytes_returned_; }
+    int64_t file_offset() const { return scan_range_->offset() + total_bytes_returned_; }
 
     // Returns the total number of bytes returned
     int64_t total_bytes_returned() { return total_bytes_returned_; }
@@ -163,9 +165,6 @@ class ScannerContext {
     DiskIoMgr::ScanRange* scan_range_;
     const HdfsFileDesc* file_desc_;
 
-    // Byte offset for this scan range
-    int64_t scan_range_start_;
-
     // If true, tuple data in the row batches is compact and the io buffers can be
     // recycled immediately.
     bool compact_data_;
@@ -173,10 +172,7 @@ class ScannerContext {
     // Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_;
 
-    // The buffer size to use for when reading past the end of the scan range.  A
-    // default value is pickd and scanners can overwrite it (i.e. the scanner knows
-    // more about the file format)
-    int read_past_buffer_size_;
+    ReadPastSizeCallback read_past_size_cb_;
 
     // The current io buffer. This starts as NULL before we've read any bytes.
     DiskIoMgr::BufferDescriptor* io_buffer_;

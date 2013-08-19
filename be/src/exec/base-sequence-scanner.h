@@ -132,9 +132,6 @@ class BaseSequenceScanner : public HdfsScanner {
   // If true, this scanner object is only for processing the header.
   bool only_parsing_header_;
   
-  // Byte offset from start of file for current block.  Used for error reporting.
-  int block_start_;
-
   // Decompressor class to use, if any.
   boost::scoped_ptr<Codec> decompressor_;
 
@@ -160,6 +157,22 @@ class BaseSequenceScanner : public HdfsScanner {
   //
   // finished_ is set by ReadSync() and SkipToSync().
   bool finished_;
+
+  // Byte offset from the start of the file for the current block. Note that block refers
+  // to all the data between two syncs.
+  int64_t block_start_;
+
+  // The total number of bytes in all blocks this scan range has processed (updated in
+  // SkipToSync(), so only includes blocks that were completely processed).
+  int total_block_size_;
+
+  // The number of syncs seen by this scanner so far.
+  int num_syncs_;
+
+  // Callback for stream_ to compute how much to read past the scan range. Returns the
+  // average number of bytes per block minus how far 'file_offset' is into the current
+  // block.
+  int ReadPastSize(int64_t file_offset);
 
   // Utility function to look for 'sync' in buffer.  Returns the offset into
   // buffer of the _end_ of sync if it is found, otherwise, returns -1.

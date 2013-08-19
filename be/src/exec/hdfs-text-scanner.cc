@@ -97,7 +97,6 @@ Status HdfsTextScanner::Close() {
 }
 
 void HdfsTextScanner::InitNewRange() {
-  stream_->set_read_past_buffer_size(NEXT_BLOCK_READ_SIZE);
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   
   char field_delim = hdfs_partition->field_delim();

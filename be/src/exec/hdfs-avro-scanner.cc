@@ -457,15 +457,13 @@ Status HdfsAvroScanner::InitNewRange() {
 
 Status HdfsAvroScanner::ProcessRange() {
   while (!finished()) {
-    // Read new data block
-    block_start_ = stream_->file_offset();
-
     int64_t num_records;
     uint8_t* compressed_data;
     int64_t compressed_size;
     uint8_t* data;
     int size;
 
+    // Read new data block
     RETURN_IF_FALSE(
         stream_->ReadZLong(&num_records, &parse_status_));
     DCHECK_GE(num_records, 0);

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <boost/bind.hpp>
+
 #include "exec/base-sequence-scanner.h"
 
 #include "exec/hdfs-scan-node.h"
@@ -20,11 +22,17 @@
 #include "runtime/string-search.h"
 #include "util/codec.h"
 
+using namespace boost;
 using namespace impala;
 using namespace std;
 
 const int BaseSequenceScanner::HEADER_SIZE = 1024;
 const int BaseSequenceScanner::SYNC_MARKER = -1;
+
+// Constants used in ReadPastSize()
+static const double BLOCK_SIZE_PADDING_PERCENT = 0.1;
+static const int REMAINING_BLOCK_SIZE_GUESS = 100 * 1024; // bytes
+static const int MIN_SYNC_READ_SIZE = 10 * 1024; // bytes
 
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
@@ -51,8 +59,10 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state)
   : HdfsScanner(node, state),
     header_(NULL),
+    data_buffer_pool_(new MemPool(state->mem_limits())),
     block_start_(0),
-    data_buffer_pool_(new MemPool(state->mem_limits())) {
+    total_block_size_(0),
+    num_syncs_(0) {
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {
@@ -60,6 +70,7 @@ BaseSequenceScanner::~BaseSequenceScanner() {
 
 Status BaseSequenceScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
+  stream_->set_read_past_size_cb(bind(&BaseSequenceScanner::ReadPastSize, this, _1));
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
@@ -67,6 +78,9 @@ Status BaseSequenceScanner::Prepare(ScannerContext* context) {
 }
 
 Status BaseSequenceScanner::Close() {
+  VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
+  VLOG_FILE << "Average block size: "
+            << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
   AttachPool(data_buffer_pool_.get());
   AddFinalRowBatch();
   context_->Close();
@@ -171,6 +185,9 @@ Status BaseSequenceScanner::ReadSync() {
     return Status(ss.str());
   }
   finished_ |= stream_->eof();
+  total_block_size_ += stream_->file_offset() - block_start_;
+  block_start_ = stream_->file_offset();
+  ++num_syncs_;
   return Status::OK;
 }
 
@@ -249,6 +266,8 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   VLOG_FILE << "Found sync for: " << stream_->filename()
             << " at " << stream_->file_offset() - sync_size;
   if (stream_->eof()) finished_ = true;
+  block_start_ = stream_->file_offset();
+  ++num_syncs_;
   return Status::OK;
 }
 
@@ -260,4 +279,25 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
     COUNTER_UPDATE(bytes_skipped_counter_, splits[i]->len());
     scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);
   }
+}
+
+int BaseSequenceScanner::ReadPastSize(int64_t file_offset) {
+  DCHECK_GE(total_block_size_, 0);
+  if (total_block_size_ == 0) {
+    // This scan range didn't include a complete block, so we have no idea how many bytes
+    // remain in the block. Guess.
+    return REMAINING_BLOCK_SIZE_GUESS;
+  }
+  DCHECK_GE(num_syncs_, 2);
+  int average_block_size = total_block_size_ / (num_syncs_ - 1);
+
+  // Number of bytes read in the current block
+  int block_bytes_read = file_offset - block_start_;
+  DCHECK_GE(block_bytes_read, 0);
+  int bytes_left = max(average_block_size - block_bytes_read, 0);
+  // Include some padding
+  bytes_left += average_block_size * BLOCK_SIZE_PADDING_PERCENT;
+
+  int max_read_size = state_->io_mgr()->read_buffer_size();
+  return min(max(bytes_left, MIN_SYNC_READ_SIZE), max_read_size);
 }

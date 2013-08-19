@@ -25,7 +25,7 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-static const int DEFAULT_READ_PAST_SIZE = 10 * 1024;  // In Bytes
+static const int DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node, 
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
@@ -61,10 +61,8 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   Stream* stream = state_->obj_pool()->Add(new Stream(this));
   stream->scan_range_ = range;
   stream->file_desc_ = scan_node_->GetFileDesc(stream->filename());
-  stream->scan_range_start_ = range->offset();
   stream->total_bytes_returned_ = 0;
   stream->io_buffer_pos_ = NULL;
-  stream->read_past_buffer_size_ = DEFAULT_READ_PAST_SIZE;
   stream->io_buffer_ = NULL;
   stream->io_buffer_bytes_left_ = 0;
   stream->boundary_buffer_bytes_left_ = 0;
@@ -139,11 +137,14 @@ Status ScannerContext::Stream::GetNextBuffer() {
   if (!eosr) {
     RETURN_IF_ERROR(scan_range_->GetNext(&io_buffer_));
   } else {
+    int64_t offset = file_offset() + boundary_buffer_bytes_left_;
+    int read_past_buffer_size = read_past_size_cb_.empty() ?
+                                DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
+    VLOG_FILE << "read_past_buffer_size = " << read_past_buffer_size;
     // TODO: we're reading past this scan range so this is likely a remote read.
     // Update when the IoMgr has better support for remote reads.
-    int64_t offset = file_offset() + boundary_buffer_bytes_left_;
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
-        filename(), read_past_buffer_size_, offset, -1, scan_range_->disk_id());
+        filename(), read_past_buffer_size, offset, -1, scan_range_->disk_id());
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
         parent_->scan_node_->reader_context(), range, &io_buffer_));
   }

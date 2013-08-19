@@ -108,10 +108,8 @@ BaseSequenceScanner::FileHeader* HdfsSequenceScanner::AllocateFileHeader() {
 inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
                                              int64_t* record_len) {
   // There are 2 cases:
-  //  Record-compressed -- like a regular record, but the data is compressed.
-  //  Uncompressed.
-    
-  block_start_ = stream_->file_offset();
+  //  - Record-compressed -- like a regular record, but the data is compressed.
+  //  - Uncompressed.
   RETURN_IF_ERROR(ReadBlockHeader());
 
   // We don't look at the keys, only the values.
@@ -460,9 +458,6 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   if (!stream_->compact_data()) {
     AttachPool(data_buffer_pool_.get());
   }
-
-  block_start_ = stream_->file_offset();
-
   RETURN_IF_FALSE(stream_->ReadVLong(
       &num_buffered_records_in_compressed_block_, &parse_status_));
   if (num_buffered_records_in_compressed_block_ < 0) {
