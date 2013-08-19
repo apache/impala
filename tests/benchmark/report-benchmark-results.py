@@ -55,6 +55,16 @@ parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
 parser.add_option("--tval_threshold", dest="tval_threshold", default=None,
                   type="float", help="The ttest t-value at which a performance change "\
                   "will be flagged as sigificant.")
+parser.add_option("--min_percent_change_threshold",
+                  dest="min_percent_change_threshold", default=5.0,
+                  type="float", help="Any performance changes below this threshold" \
+                  " will not be classified as significant. If the user specifies an" \
+                  " empty value, the threshold will be set to 0")
+parser.add_option("--max_percent_change_threshold",
+                  dest="max_percent_change_threshold", default=20.0,
+                  type="float", help="Any performance changes above this threshold"\
+                  " will be classified as significant. If the user specifies an" \
+                  " empty value, the threshold will be set to the system's maxint")
 
 # These parameters are specific to recording results in a database. This is optional
 parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
@@ -70,6 +80,16 @@ parser.add_option("--db_username", dest="db_username", default='hiveuser',
 parser.add_option("--db_password", dest="db_password", default='password',
                   help="Password used to connect to the the database.")
 options, args = parser.parse_args()
+
+# Disable thresholds
+if options.min_percent_change_threshold == None:
+  options.min_percent_change_threshold = 0.0
+if options.max_percent_change_threshold == None:
+  options.max_percent_change_threshold = sys.maxint
+
+if options.min_percent_change_threshold >= options.max_percent_change_threshold:
+  print "Minimun threshold must always be greater than the maximum threshold"
+  exit(1)
 
 VERBOSE = options.verbose
 COL_WIDTH = 18
@@ -206,13 +226,24 @@ def build_perf_change_str(row, ref_row, regression):
        format_if_float(ref_row[AVG_IDX]), format_if_float(row[AVG_IDX]))
 
 def check_perf_change_significance(row, ref_row):
-  if options.tval_threshold:
-    # Cast values to the proper types
-    avg, ref_avg = map(float, [row[AVG_IDX], ref_row[AVG_IDX]])
-    iters, ref_iters = map(int, [row[NUM_ITERS_IDX], ref_row[NUM_ITERS_IDX]])
-    ref_stddev = 0.0 if ref_row[STDDEV_IDX] == 'N/A' else float(ref_row[STDDEV_IDX])
-    stddev = 0.0 if row[STDDEV_IDX] == 'N/A' else float(row[STDDEV_IDX])
-
+  # Cast values to the proper types
+  ref_stddev = 0.0 if ref_row[STDDEV_IDX] == 'N/A' else float(ref_row[STDDEV_IDX])
+  stddev = 0.0 if row[STDDEV_IDX] == 'N/A' else float(row[STDDEV_IDX])
+  avg, ref_avg = map(float, [row[AVG_IDX], ref_row[AVG_IDX]])
+  iters, ref_iters = map(int, [row[NUM_ITERS_IDX], ref_row[NUM_ITERS_IDX]])
+  stddevs_are_zero = (ref_stddev == 0.0) and (stddev == 0.0)
+  percent_difference = abs(ref_avg - avg) * 100 / ref_avg
+  # If result is within min_percent_change_threshold of the baseline,
+  # mark it as insignificant and ignore the t-test.
+  if percent_difference < options.min_percent_change_threshold:
+    return False, False
+  # If the average is more than max_percent_change_threshold of the baseline,
+  # ignore the t-test and mark it as significant.
+  elif percent_difference > options.max_percent_change_threshold:
+    return True, ref_avg - avg < 0
+  # If both stddev and ref_stddev are 0, the t-test is meaningless, and causes a divide
+  # by zero exception.
+  elif options.tval_threshold and not stddevs_are_zero:
     tval = calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters)
     # TODO: Currently, this doesn't take into account the degrees of freedom
     # (number of iterations). In the future the regression threshold could be updated to
