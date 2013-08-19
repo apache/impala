@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <gtest/gtest.h>
 #include "exec/parquet-common.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 
 using namespace std;
