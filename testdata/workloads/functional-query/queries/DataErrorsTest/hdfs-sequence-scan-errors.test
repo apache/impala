@@ -2,15 +2,13 @@
 ---- QUERY
 select count(*) from functional_seq_snap.bad_seq_snap
 ---- ERRORS
-Bad sync hash at file offset 899498.
-Expected: '6e 91 6 ec be 78 a0 ac 72 10 7e 41 b4 da 93 3c '
-Actual:   '6e 91 6 78 78 78 a0 ac 72 10 7e 41 b4 da 93 3c '
-Format error in record or block header at offset: 149
-Format error in record or block header at offset: 1784325
-Format error in record or block header at offset: 1790563
-Format error in record or block header at offset: 1791244
-Format error in record or block header at end of file.
-First error while processing: hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset: 899514
+Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 899514: Bad synchronization marker
+  Expected: '6e 91 6 ec be 78 a0 ac 72 10 7e 41 b4 da 93 3c '
+  Actual:   '6e 91 6 78 78 78 a0 ac 72 10 7e 41 b4 da 93 3c '
+Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1784692: Decompressor: invalid compressed length.  Data is likely corrupt.
+Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1790812: Decompressor: invalid compressed length.  Data is likely corrupt.
+Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1791562: Decompressor: invalid compressed length.  Data is likely corrupt.
+Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at end of file: Tried to read 896782 bytes but could only read 896777 bytes. This may indicate data file corruption. (file: hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file, byte offset: 2691508)
 ---- TYPES
 bigint
 ---- RESULTS

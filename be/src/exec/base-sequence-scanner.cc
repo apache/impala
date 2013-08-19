@@ -119,53 +119,33 @@ Status BaseSequenceScanner::ProcessSplit() {
   RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE));
 
   // Process Range.
-  int64_t first_error_offset = 0;
-  int num_errors = 0;
-
   // We can continue through errors by skipping to the next SYNC hash. 
   while (!finished_) {
     status = ProcessRange();
-    if (status.IsCancelled()) return status;
-    // Save the offset of any error.
-    if (first_error_offset == 0) first_error_offset = stream_->file_offset();
+    if (status.ok()) break;
+    if (status.IsCancelled() || status.IsMemLimitExceeded()) return status;
 
-    // Catch errors from file format parsing.  We call some utilities
-    // that do not log errors so generate a reasonable message.
-    if (!status.ok()) {
-      if (state_->LogHasSpace()) {
-        stringstream ss;
-        ss << "Format error in record or block header ";
-        if (stream_->eosr()) {
-          ss << "at end of file.";
-        } else {
-          ss << "at offset: "  << block_start_;
-        }
-        state_->LogError(ss.str());
-      }
+    // Log error from file format parsing.
+    stringstream ss;
+    ss << "Problem parsing file " << stream_->filename() << " at ";
+    if (stream_->eof()) {
+      ss << "end of file";
+    } else {
+      ss << "offset " << stream_->file_offset();
     }
+    ss << ": " << status.GetErrorMsg();
+    state_->LogError(ss.str());
 
-    // If no errors or we abort on error then exit loop, otherwise try to recover.
-    if (state_->abort_on_error() || status.ok()) break;
+    // If abort on error then return, otherwise try to recover.
+    if (state_->abort_on_error()) return status;
 
     // Recover by skipping to the next sync.
     parse_status_ = Status::OK;
-    ++num_errors;
     int64_t error_offset = stream_->file_offset();
     status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
     COUNTER_UPDATE(bytes_skipped_counter_, stream_->file_offset() - error_offset);
     RETURN_IF_ERROR(status);
     DCHECK(parse_status_.ok());
-  }
-
-  if (num_errors != 0 || !status.ok()) {
-    if (state_->LogHasSpace()) {
-      stringstream ss;
-      ss  << "First error while processing: " << stream_->filename()
-          << " at offset: "  << first_error_offset;
-      state_->LogError(ss.str());
-      state_->ReportFileErrors(stream_->filename(), num_errors == 0 ? 1 : num_errors);
-    }
-    if (state_->abort_on_error()) return status;
   }
 
   // All done with this scan range.
@@ -182,19 +162,13 @@ Status BaseSequenceScanner::ReadSync() {
   RETURN_IF_FALSE(
       stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
   if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
-    if (state_->LogHasSpace()) {
-      stringstream ss;
-      ss  << "Bad sync hash at file offset "
-          << (stream_->file_offset() - SYNC_HASH_SIZE) << "." << endl
-          << "Expected: '"
-          << ReadWriteUtil::HexDump(header_->sync, SYNC_HASH_SIZE)
-          << "'" << endl
-          << "Actual:   '"
-          << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE)
-          << "'" << endl;
-      state_->LogError(ss.str());
-    }
-    return Status("bad sync hash block");
+    stringstream ss;
+    ss  << "Bad synchronization marker" << endl
+        << "  Expected: '"
+        << ReadWriteUtil::HexDump(header_->sync, SYNC_HASH_SIZE) << "'" << endl
+        << "  Actual:   '"
+        << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE) << "'";
+    return Status(ss.str());
   }
   finished_ |= stream_->eof();
   return Status::OK;
