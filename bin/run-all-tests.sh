@@ -52,18 +52,17 @@ echo "Split and assign HBase regions"
 ${IMPALA_HOME}/testdata/bin/split-hbase.sh
 
 # Preemptively force kill impalads and the statestore to clean up any running instances.
+# The BE unit tests cannot run when impalads are started.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
 
-# Start an in-process Impala cluster and run queries against it using run-workload.
-# This helps verify mini-impala-cluster and run-workload have not been broken.
-# TODO: Disable running in-process cluster until IMPALA-155 is resolved.
-#${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
-#    --in-process --wait_for_cluster --cluster_size=3
+# Run backend tests.
+${IMPALA_HOME}/bin/run-backend-tests.sh
 
 # Run the remaining tests against an external Impala test cluster.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
     --wait_for_cluster --cluster_size=3
 
+# Run some queries using run-workload to verify run-workload has not been broken.
 ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
     --table_format=text/none
 
@@ -86,9 +85,3 @@ ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${FE_LOG_DIR}\
 
 cd $IMPALA_FE_DIR
 mvn test
-
-# End-to-end test and frontend tests have completed. Stop the impala test cluster.
-${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
-
-# Run backend tests
-${IMPALA_HOME}/bin/run-backend-tests.sh
