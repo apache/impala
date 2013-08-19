@@ -21,26 +21,6 @@ import sys
 from time import sleep, time
 from optparse import OptionParser
 
-# log4j settings for impala
-LOG4J_IMPALA_PROPERTIES = '''log.threshold=INFO
-main.logger=FA
-impala.root.logger=${log.threshold},${main.logger}
-log4j.rootLogger=${impala.root.logger}
-log.dir=%s
-log.file=%s.INFO
-'''
-
-# log4j appender settings
-LOG4J_APPENDER_PROPERTIES = '''log4j.appender.FA=org.apache.log4j.FileAppender
-log4j.appender.FA.File=${log.dir}/${log.file}
-log4j.appender.FA.layout=org.apache.log4j.PatternLayout
-log4j.appender.FA.layout.ConversionPattern=%p%d{MMdd HH:mm:ss.SSS'000'} %t %c] %m%n
-log4j.appender.console=org.apache.log4j.ConsoleAppender
-log4j.appender.console.target=System.err
-log4j.appender.console.layout=org.apache.log4j.PatternLayout
-log4j.appender.console.layout.ConversionPattern=%d{yy/MM/dd HH:mm:ss} %p %c{2}: %m%n
-'''
-
 # Options
 parser = OptionParser()
 parser.add_option("-s", "--cluster_size", type="int", dest="cluster_size", default=3,
@@ -75,8 +55,7 @@ IMPALAD_PATH = os.path.join(IMPALA_HOME,
     'bin/start-impalad.sh -build_type=%s' % options.build_type)
 STATE_STORE_PATH = os.path.join(IMPALA_HOME, 'be/build',
     options.build_type, 'statestore/statestored')
-MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME,
-    'bin/start-mini-impala-cluster.sh -build_type=%s' % options.build_type)
+MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
@@ -85,23 +64,6 @@ IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
 # -v=1 generates more output in the be logs (runtime profiles etc.)
 BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=1 --logbuflevel=-1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
-LOG4J_PROPERTIES_DIR = os.path.join(options.log_dir, 'log4j_properties_%d')
-
-def setup_log4j(log4j_text, log4j_dir):
-  """Create a custom log4j.properties file for each impalad
-
-  The log4j.properties file points the front end logs to the log file used
-  by the backend. This coaleses the logs into one file.
-  """
-  # cleanup the old dir
-  os.system('rm -rf %s' % log4j_dir)
-  os.system('mkdir -p %s' % log4j_dir)
-  try:
-    f = open('%s/log4j.properties' % log4j_dir, 'w')
-    log4j_text = log4j_text + LOG4J_APPENDER_PROPERTIES
-    f.write(log4j_text)
-  finally:
-    f.close()
 
 def exec_impala_process(cmd, args, stderr_log_file_path):
   redirect_output = str()
@@ -149,13 +111,7 @@ def build_impalad_port_args(instance_num):
 
 def build_impalad_logging_args(instance_num, service_name):
   log_file_path = os.path.join(options.log_dir, "%s.INFO" % service_name)
-  args = BE_LOGGING_ARGS % (service_name, options.log_dir)
-  if service_name == 'statestored' or options.verbose:
-    return args
-  log4j_impala_prop = LOG4J_IMPALA_PROPERTIES % (options.log_dir, service_name)
-  log4j_prop_dir = LOG4J_PROPERTIES_DIR % instance_num
-  setup_log4j(log4j_impala_prop, log4j_prop_dir)
-  return  '-classpath_prefix=%s ' % log4j_prop_dir + args
+  return BE_LOGGING_ARGS % (service_name, options.log_dir)
 
 def start_impalad_instances(cluster_size):
   # Start each impalad instance and optionally redirect the output to a log file.
@@ -230,15 +186,15 @@ if __name__ == "__main__":
     print 'Please specify a cluster size > 0'
     sys.exit(1)
 
+  # Kill existing processes.
+  kill_all(force=options.force_kill)
+
   try:
     import json
     wait_for_cluster = wait_for_cluster_web
   except ImportError:
     print "json module not found, checking for cluster startup through the command-line"
     wait_for_cluster = wait_for_cluster_cmdline
-
-  # Kill existing processes.
-  kill_all(force=options.force_kill)
 
   # If ImpalaCluster cannot be imported, fall back to the command-line to check
   # whether impalads/statestre are up.

@@ -13,14 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Starts up a single Impalad with the specified command line arguments. An optional
-# -build_type parameter can be passed to determine the build type to use for the
-# impalad instance.
+# Starts up an impalad or a mini-impala-cluster with the specified command line
+# arguments. An optional -build_type parameter can be passed to determine the build
+# type to use for the impalad instance.
 
+set -e
+set -u
 
 BUILD_TYPE=debug
 IMPALAD_ARGS=""
-CLASSPATH_PREFIX=""
+BINARY_BASE_DIR=${IMPALA_HOME}/be/build
+IN_PROCESS=false
+
 # Everything except for -build_type should be passed as an Impalad argument
 for ARG in $*
 do
@@ -31,12 +35,12 @@ do
     -build_type=release)
       BUILD_TYPE=release
       ;;
-    -classpath_prefix=*)
-      CLASSPATH_PREFIX=`echo $ARG | sed 's/-classpath_prefix=//'`
-      ;;
     -build_type=*)
       echo "Invalid build type. Valid values are: debug, release"
       exit 1
+      ;;
+    -in-process)
+      IN_PROCESS=true
       ;;
     *)
       IMPALAD_ARGS="${IMPALAD_ARGS} ${ARG}"
@@ -44,6 +48,8 @@ do
 done
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-
-CLASSPATH=$CLASSPATH_PREFIX:$CLASSPATH \
-  $IMPALA_HOME/be/build/${BUILD_TYPE}/service/impalad ${IMPALAD_ARGS}
+if $IN_PROCESS; then
+  exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/testutil/mini-impala-cluster ${IMPALAD_ARGS}
+else
+  exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/service/impalad ${IMPALAD_ARGS}
+fi
