@@ -489,8 +489,8 @@ Status ImpalaServer::InitAuditEventLogging() {
   audit_event_logger_.reset(new SimpleLogger(FLAGS_audit_event_log_dir,
      AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size));
   RETURN_IF_ERROR(audit_event_logger_->Init());
-  audit_event_logger_flush_thread_.reset(
-      new thread(&ImpalaServer::AuditEventLoggerFlushThread, this));
+  audit_event_logger_flush_thread_.reset(new Thread("impala-server",
+        "audit-event-log-flush", &ImpalaServer::AuditEventLoggerFlushThread, this));
   return Status::OK;
 }
 
