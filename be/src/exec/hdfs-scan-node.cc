@@ -453,6 +453,11 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // We need at least one scanner thread to make progress. We need to make this
   // reservation before any ranges are issued.
   runtime_state_->resource_pool()->ReserveOptionalTokens(1);
+  if (runtime_state_->query_options().num_scanner_threads > 0) {
+    runtime_state_->resource_pool()->set_max_quota(
+        runtime_state_->query_options().num_scanner_threads);
+  }
+
   runtime_state_->resource_pool()->SetThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
 

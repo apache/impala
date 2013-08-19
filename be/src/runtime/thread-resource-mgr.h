@@ -36,9 +36,9 @@ namespace impala {
 // hardware.  If there are multiple fragments, the CPU pool must be shared
 // between them.  Currently, the total system pool is split evenly between
 // all consumers.  Each consumer gets ceil(total_system_threads / num_consumers).
-// 
-// Each fragment must register with the ThreadResourceMgr to request threads 
-// (in the form of tokens).  The fragment has required threads (it can't run 
+//
+// Each fragment must register with the ThreadResourceMgr to request threads
+// (in the form of tokens).  The fragment has required threads (it can't run
 // with fewer threads) and optional threads.  If the fragment is running on its
 // own, it will be able to spin up more optional threads.  When the system
 // is under load, the ThreadResourceMgr will stop giving out tokens for optional
@@ -51,7 +51,7 @@ namespace impala {
 // system, the first pool's quota is then cut by half (16 total) and will
 // over time drop the optional threads.
 // This class is thread safe.
-// TODO: this is an initial simple version to improve the behavior with 
+// TODO: this is an initial simple version to improve the behavior with
 // concurrency.  This will need to be expanded post GA.  These include:
 //  - More places where threads are optional (e.g. hash table build side,
 //    data stream threads, etc).
@@ -95,7 +95,7 @@ class ThreadResourceMgr {
     // Pools should use this API for resources they can use but don't
     // need (e.g. scanner threads).
     bool TryAcquireThreadToken();
-    
+
     // Set a reserved optional number of threads for this pool.  This can be
     // used to implement that a component needs n+ number of threads.  The
     // first 'num' threads are guaranteed to be acquirable (via TryAcquireThreadToken)
@@ -103,7 +103,7 @@ class ThreadResourceMgr {
     // This can also be done with:
     //  if (pool->num_optional_threads() < num) AcquireThreadToken();
     //  else TryAcquireThreadToken();
-    // and similar tracking on the Release side but this is common enough to 
+    // and similar tracking on the Release side but this is common enough to
     // abstract it away.
     void ReserveOptionalTokens(int num);
 
@@ -113,7 +113,7 @@ class ThreadResourceMgr {
     // if from TryAcquireThreadToken.
     // Must not be called from from ThreadAvailableCb.
     void ReleaseThreadToken(bool required);
-  
+
     // Add a callback to be notified when a thread is available.
     // 'arg' is opaque and passed directly to the callback.
     // The previous callback is no longer notified.
@@ -149,7 +149,7 @@ class ThreadResourceMgr {
 
     // Returns the number of optional threads that can still be used.
     int num_available_threads() const {
-      int value = std::max(quota() - static_cast<int>(num_threads()), 
+      int value = std::max(quota() - static_cast<int>(num_threads()),
           num_reserved_optional_threads_ - num_optional_threads());
       return std::max(0, value);
     }
@@ -158,9 +158,8 @@ class ThreadResourceMgr {
     // based on system load.
     int quota() const { return std::min(max_quota_, parent_->per_pool_quota_); }
 
-    // Sets the max thread quota for this pool.  This is only used for testing since
-    // the dynamic values should be used normally.  The actual quota is the min of this
-    // value and the dynamic quota.
+    // Sets the max thread quota for this pool.
+    // The actual quota is the min of this value and the dynamic value.
     void set_max_quota(int quota) { max_quota_ = quota; }
 
    private:
@@ -172,7 +171,7 @@ class ThreadResourceMgr {
     void Reset();
 
     ThreadResourceMgr* parent_;
-  
+
     int max_quota_;
     int num_reserved_optional_threads_;
 
@@ -181,7 +180,7 @@ class ThreadResourceMgr {
     // swap operations.  The number of required threads is the lower
     // 32 bits and the number of optional threads is the upper 32 bits.
     int64_t num_threads_;
-    
+
     // Lock for the fields below.  This lock is taken when the callback
     // function is called.
     // TODO: reconsider this.
