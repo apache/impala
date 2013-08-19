@@ -41,6 +41,8 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
+const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 5;
+
 // This class provides a cache of ReaderContext objects.  ReaderContexts are recycled.
 // This is good for locality as well as lock contention.  The cache has the property that
 // regardless of how many clients get added/removed, the memory locations for

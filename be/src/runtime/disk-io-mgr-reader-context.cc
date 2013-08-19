@@ -18,10 +18,6 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-// Default ready buffer queue capacity. This constant doesn't matter too much
-// since the system dynamically adjusts.
-static const int DEFAULT_QUEUE_CAPACITY = 5;
-
 void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
   DCHECK(!status.ok());
 
@@ -118,7 +114,7 @@ int DiskIoMgr::ReaderContext::initial_scan_range_queue_capacity() {
   if (num_finished_ranges_ > 0) {
     return total_range_queue_capacity_ / num_finished_ranges_;
   }
-  return DEFAULT_QUEUE_CAPACITY;
+  return DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 }
 
 // Dumps out reader information.  Lock should be taken by caller

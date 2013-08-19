@@ -52,6 +52,8 @@ DEFINE_string(state_store_host, "localhost",
 DEFINE_int32(state_store_subscriber_port, 23000,
              "port where StateStoreSubscriberService should be exported");
 DECLARE_int32(state_store_port);
+DECLARE_int32(num_threads_per_core);
+DECLARE_int32(num_cores);
 
 namespace impala {
 
@@ -157,12 +159,23 @@ Status ExecEnv::StartServices() {
   if (bytes_limit > 0) {
     mem_limit_.reset(new MemLimit(bytes_limit));
   }
+  // Minimal IO Buffer requirements:
+  //   IO buffer (8MB default) * number of IO buffers per thread (5) *
+  //   number of threads per core * number of cores
+  int64_t min_requirement = disk_io_mgr_->read_buffer_size() *
+      DiskIoMgr::DEFAULT_QUEUE_CAPACITY *
+      FLAGS_num_threads_per_core * FLAGS_num_cores;
+  if (bytes_limit < min_requirement) {
+    LOG(WARNING) << "Memory limit "
+                 << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                 << " does not meet minimal memory requirement of "
+                 << PrettyPrinter::Print(min_requirement, TCounterType::BYTES);
+  }
   if (bytes_limit > MemInfo::physical_mem()) {
     LOG(WARNING) << "Memory limit "
                  << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
                  << " exceeds physical memory of "
-                 << PrettyPrinter::Print(MemInfo::physical_mem(),
-                    TCounterType::BYTES);
+                 << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
   }
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);

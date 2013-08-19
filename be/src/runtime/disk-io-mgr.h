@@ -430,6 +430,10 @@ class DiskIoMgr {
   // for debugging.
   bool Validate() const;
 
+  // Default ready buffer queue capacity. This constant doesn't matter too much
+  // since the system dynamically adjusts.
+  static const int DEFAULT_QUEUE_CAPACITY;
+
  private:
   friend class BufferDescriptor;
   struct DiskQueue;

@@ -27,6 +27,10 @@
 using namespace boost;
 using namespace std;
 
+DEFINE_int32(num_cores, 0, "(Advanced) If > 0, it sets the number of cores available to"
+    " Impala. Setting it to 0 means Impala will use all available cores on the machine"
+    " according to /proc/cpuinfo.");
+
 namespace impala {
 
 bool CpuInfo::initialized_ = false;
@@ -120,6 +124,8 @@ void CpuInfo::Init() {
     num_cores_ = 1;
   }
   
+  if (FLAGS_num_cores > 0) num_cores_ = FLAGS_num_cores;
+
   initialized_ = true;
 }
 
