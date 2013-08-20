@@ -57,7 +57,7 @@ then
   make
   cd $IMPALA_BE_DIR
   python src/codegen/gen_ir_descriptions.py
-  make -j4
+  make -j${IMPALA_BUILD_THREADS:-4}
   cd $IMPALA_HOME
 
   # Run sample queries - outputs .gcda files
@@ -98,7 +98,7 @@ then
   make
   cd $IMPALA_BE_DIR
   python src/codegen/gen_ir_descriptions.py
-  make -j4
+  make -j${IMPALA_BUILD_THREADS:-4}
   cd $IMPALA_HOME
 
   # Remove all the PGO intermediates and set build to release.  This seems to be the most
@@ -116,5 +116,5 @@ else
   make
   cd $IMPALA_BE_DIR
   python src/codegen/gen_ir_descriptions.py
-  make -j4
+  make -j${IMPALA_BUILD_THREADS:-4}
 fi

@@ -105,6 +105,8 @@ export HBASE_CONF_DIR=$HIVE_CONF_DIR
 export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
 export THRIFT_HOME=${THRIFT_SRC_DIR}build/
 
+export IMPALA_BUILD_THREADS=`nproc`
+
 # Configure python path
 . $IMPALA_HOME/bin/set-pythonpath.sh
 

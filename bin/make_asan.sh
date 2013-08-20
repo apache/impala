@@ -31,4 +31,4 @@ cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
 python src/codegen/gen_ir_descriptions.py
-make -j4
+make -j${IMPALA_BUILD_THREADS:-4}
