@@ -17,6 +17,7 @@
 # reporting will be enabled when perf results are stored in a database as well as CSV
 # files.
 import csv
+import difflib
 import math
 import os
 import re
@@ -205,8 +206,14 @@ def build_table(results, verbose, reference_results = None):
         if ref_row is not None:
           was_change_significant, is_regression =\
               check_perf_change_significance(full_row, ref_row)
+          diff_args = [full_row, ref_row]
           if was_change_significant:
             perf_changes += build_perf_change_str(full_row, ref_row, is_regression)
+          try:
+            generate_runtime_profile_diff(full_row, ref_row, was_change_significant,
+                                          is_regression)
+          except Exception as e:
+            print 'Could not generate an html diff: %s' % e
 
           speedup =\
               format_if_float(calculate_speedup(ref_row[AVG_IDX], full_row[AVG_IDX]))
@@ -218,6 +225,38 @@ def build_table(results, verbose, reference_results = None):
 
     output += table.draw() + '\n'
   return output, perf_changes
+
+def generate_runtime_profile_diff(current_row, ref_row, was_change_significant,
+                                  is_regression):
+  """Generate an html diff of the runtime profiles.
+
+  Generates a diff of the baseline vs current runtime profile to $IMPALA_HOME/results
+  in html format. The diff file is tagged with the relavent query information
+  and whether its an improvement or a regression ( if applicable )
+  """
+  diff = difflib.HtmlDiff(wrapcolumn=90, linejunk=difflib.IS_LINE_JUNK)
+  file_name_prefix = "%s-%s-%s-%s" % (current_row[QUERY_NAME_IDX],
+                                      current_row[SCALE_FACTOR_IDX],
+                                      current_row[FILE_FORMAT_IDX],
+                                      current_row[COMPRESSION_IDX])
+  if was_change_significant:
+    file_name_prefix += '-regression' if is_regression else '-improvement'
+  file_name = '%s.html' % file_name_prefix
+  # Some compressions codecs have a `/`, which is not a valid file name character.
+  file_name = file_name.replace('/', '-')
+  dir_path = os.path.join(os.environ["IMPALA_HOME"], 'results')
+  # If dir_path does not exist, create a directory. If it does exist
+  # and is not a directory, remove the file and create a directory.
+  if not os.path.exists(dir_path):
+    os.mkdirs(dir_path)
+  elif not os.path.isdir(dir_path):
+    raise RuntimeError("Unable to create $IMPALA_HOME/results, results file exists")
+  file_path = os.path.join(dir_path, file_name)
+  html_diff = diff.make_file(ref_row[RUNTIME_PROFILE_IDX].splitlines(1),
+      current_row[RUNTIME_PROFILE_IDX].splitlines(1),
+      fromdesc="Baseline Runtime Profile", todesc="Current Runtime Profile")
+  with open(file_path, 'w+') as f:
+    f.write(html_diff)
 
 def build_perf_change_str(row, ref_row, regression):
   perf_change_type = "regression" if regression else "improvement"
