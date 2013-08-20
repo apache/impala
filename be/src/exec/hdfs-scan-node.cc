@@ -720,7 +720,10 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       }
 
       status_ = status;
-      done_ = true;
+      {
+        unique_lock<mutex> l(row_batches_lock_);
+        done_ = true;
+      }
       // Notify the disk which will trigger tear down of all threads.
       runtime_state_->io_mgr()->CancelReader(reader_context_);
       // Notify the main thread which reports the error
