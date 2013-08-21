@@ -144,7 +144,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status TopNNode::Close(RuntimeState* state) {
-  if (memory_used_counter() != NULL) {
+  if (memory_used_counter() != NULL && tuple_pool_.get() != NULL) {
     COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
   }
   return ExecNode::Close(state);
