@@ -122,6 +122,7 @@ class SimpleScheduler : public Scheduler {
 
   // Initialisation metric
   Metrics::BooleanMetric* initialised_;
+  Metrics::IntMetric* num_backends_metric_;
 
   // Counts the number of UpdateMembership invocations, to help throttle the logging.
   uint32_t update_count_;

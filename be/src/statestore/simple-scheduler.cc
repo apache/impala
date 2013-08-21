@@ -38,6 +38,7 @@ namespace impala {
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
+static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
@@ -125,6 +126,8 @@ Status SimpleScheduler::Init() {
         metrics_->CreateAndRegisterPrimitiveMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
     initialised_ =
         metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
+    num_backends_metric_ = metrics_->CreateAndRegisterPrimitiveMetric<int64_t>(
+        NUM_BACKENDS_KEY, backend_map_.size());
   }
 
   if (statestore_subscriber_ != NULL) {
@@ -219,6 +222,7 @@ void SimpleScheduler::UpdateMembership(
   BackendMap backend_map_copy;
   BackendIpAddressMap backend_ip_map_copy;
   bool found_self = false;
+  int num_backends = 0;
 
   if (topic != service_state.end()) {
     const TTopicDelta& delta = topic->second;
@@ -258,6 +262,7 @@ void SimpleScheduler::UpdateMembership(
           backend_descriptor);
       backend_ip_map_copy[backend_descriptor.address.hostname] =
           backend_descriptor.ip_address;
+      ++num_backends;
     }
   }
 
@@ -279,6 +284,7 @@ void SimpleScheduler::UpdateMembership(
       topic_updates->pop_back();
     }
   }
+  if (metrics_ != NULL) num_backends_metric_->Update(num_backends);
 
   {
     lock_guard<mutex> lock(backend_map_lock_);
