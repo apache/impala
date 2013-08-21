@@ -9,6 +9,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.test_file_parser import QueryTestSectionReader
+from tests.verifiers.metric_verifier import MetricVerifier
 
 # Queries to execute. Use the TPC-H dataset because tables are large so queries take some
 # time to execute.
@@ -17,8 +18,10 @@ QUERIES = ['select l_returnflag from lineitem',
            'select * from lineitem limit 50',
            ]
 
+QUERY_TYPE = ["SELECT", "CTAS"]
+
 # Time to sleep between issuing query and canceling
-CANCEL_DELAY_IN_SECONDS = [0, 1, 2]
+CANCEL_DELAY_IN_SECONDS = [0, 1, 2, 3, 4]
 
 # Number of times to execute/cancel each query under test
 NUM_CANCELATION_ITERATIONS = 1
@@ -35,15 +38,28 @@ class TestCancellation(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestCancellation, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(TestDimension('query', *QUERIES))
+    cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
     cls.TestMatrix.add_dimension(TestDimension('action', *DEBUG_ACTIONS))
 
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS' or (\
+        v.get_value('table_format').file_format in ['text', 'parquet'] and\
+        v.get_value('table_format').compression_codec == 'none'))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
     if cls.exploration_strategy() != 'core':
       NUM_CANCELATION_ITERATIONS = 3
 
-  def test_basic_cancel(self, vector):
+  def cleanup_test_table(self, table_format):
+    self.execute_query("invalidate metadata")
+    self.execute_query("drop table if exists ctas_cancel", table_format=table_format)
+
+  def execute_cancel_test(self, vector):
     query = vector.get_value('query')
+    query_type = vector.get_value('query_type')
+    if query_type == "CTAS":
+      self.cleanup_test_table(vector.get_value('table_format'))
+      query = "create table ctas_cancel stored as %sfile as %s" %\
+          (vector.get_value('table_format').file_format, query)
 
     action = vector.get_value('action')
     # node ID 0 is the scan node
@@ -80,6 +96,9 @@ class TestCancellation(ImpalaTestSuite):
       if thread.fetch_results_error is not None:
         raise thread.fetch_results_error
 
+      if query_type == "CTAS":
+        self.cleanup_test_table(vector.get_value('table_format'))
+
       # TODO: Add some additional verification to check to make sure the query was
       # actually canceled
 
@@ -94,3 +113,27 @@ class TestCancellation(ImpalaTestSuite):
     # fail. Introducing a small delay allows everything to quiesce.
     # TODO: Figure out a better way to address this
     sleep(1)
+
+
+class TestCancellationParallel(TestCancellation):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCancellationParallel, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS')
+
+  def test_cancel_select(self, vector):
+    self.execute_cancel_test(vector)
+
+class TestCancellationSerial(TestCancellation):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCancellationSerial, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS')
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') != 0)
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('action') is None)
+
+  @pytest.mark.execute_serially
+  def test_cancel_insert(self, vector):
+    self.execute_cancel_test(vector)
+    metric_verifier = MetricVerifier(self.impalad_test_service)
+    metric_verifier.verify_no_open_files(timeout=10)

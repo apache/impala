@@ -19,18 +19,7 @@ import logging
 import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import TestDimension
-
-# List of metrics that should be equal to zero when there are no outstanding queries.
-METRIC_LIST = ["impala-server.backends.client-cache.clients-in-use",
-               "impala-server.io-mgr.num-open-files",
-               "impala-server.hash-table.total-bytes",
-               "impala-server.io-mgr.num-open-files",
-               "impala-server.mem-pool.total-bytes",
-               "impala-server.num-files-open-for-insert",
-               # Disable checking of num-missing-volume-id due to IMPALA-467
-               # "impala-server.scan-ranges.num-missing-volume-id",
-               ]
-
+from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestValidateMetrics(ImpalaTestSuite):
   """Verify metric values from the debug webpage.
@@ -42,15 +31,10 @@ class TestValidateMetrics(ImpalaTestSuite):
 
   def test_metrics_are_zero(self):
     """Test that all the metric in METRIC_LIST are 0"""
-    for metric in METRIC_LIST:
-      self.__wait_for_metric_value(metric, 0)
+    verifier = MetricVerifier(self.impalad_test_service)
+    verifier.verify_metrics_are_zero()
 
   def test_num_unused_buffers(self):
     """Test that all buffers are unused"""
-    buffers =\
-        self.impalad_test_service.get_metric_value("impala-server.io-mgr.num-buffers")
-    self.__wait_for_metric_value("impala-server.io-mgr.num-unused-buffers", buffers)
-
-  def __wait_for_metric_value(self, metric_name, expected_value):
-    self.impalad_test_service.wait_for_metric_value(\
-        metric_name, expected_value, timeout=60)
+    verifier = MetricVerifier(self.impalad_test_service)
+    verifier.verify_num_unused_buffers()

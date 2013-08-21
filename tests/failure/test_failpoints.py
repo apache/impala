@@ -4,7 +4,9 @@
 # two types of failures - cancellation of the query and a failure test hook.
 #
 import pytest
+import re
 from copy import copy
+from collections import defaultdict
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY
 from tests.common.test_vector import TestDimension
@@ -31,12 +33,9 @@ order by int_sum
 limit 200
 """
 
-# This provides a map of where the node type to node id(s) for the test query. The node
-# ids were found by examining the output query plan.
-# TODO: Once EXPLAIN output is easier to parse, this map should be built dynamically.
-NODE_ID_MAP = {'SORT_NODE': [3, 7], 'EXCHANGE_NODE': [8, 9, 12, 13],
-    'HASH_JOIN_NODE': [5], 'HDFS_SCAN_NODE': [2, 4], 'MERGE_NODE': [10, 11],
-    'AGGREGATION_NODE': [6, 14], 'HBASE_SCAN_NODE': [0]}
+# TODO: Update to include INSERT when we support failpoints in the HDFS/Hbase sinks using
+# a similar pattern as test_cancellation.py
+QUERY_TYPE = ["SELECT"]
 
 class TestFailpoints(ImpalaTestSuite):
   @classmethod
@@ -44,14 +43,28 @@ class TestFailpoints(ImpalaTestSuite):
     return 'functional-query'
 
   @classmethod
+  def parse_plan_nodes_from_explain_output(cls, query, use_db="default"):
+    """Parses the EXPLAIN <query> output and returns a map of node_name->list(node_id)"""
+    client = cls.create_impala_client()
+    client.execute("use %s" % use_db)
+    explain_result = client.execute("explain " + QUERY)
+    # Maps plan node names to their respective node ids. Expects format of <ID>:<NAME>
+    node_id_map = defaultdict(list)
+    for row in explain_result.data:
+      match = re.search(r'\s*(?P<node_id>\d+)\:(?P<node_type>\S+\s*\S+)', row)
+      if match is not None:
+        node_id_map[match.group('node_type')].append(int(match.group('node_id')))
+    return node_id_map
+
+  @classmethod
   def add_test_dimensions(cls):
     super(TestFailpoints, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('location', *FAILPOINT_LOCATION))
-    cls.TestMatrix.add_dimension(
-        TestDimension('target_node', *(NODE_ID_MAP.items())))
-    cls.TestMatrix.add_dimension(
-        TestDimension('action', *FAILPOINT_ACTION))
+    node_id_map = TestFailpoints.parse_plan_nodes_from_explain_output(QUERY, "functional")
+    assert node_id_map
+    cls.TestMatrix.add_dimension(TestDimension('location', *FAILPOINT_LOCATION))
+    cls.TestMatrix.add_dimension(TestDimension('target_node', *(node_id_map.items())))
+    cls.TestMatrix.add_dimension(TestDimension('action', *FAILPOINT_ACTION))
+    cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
     cls.TestMatrix.add_dimension(create_exec_option_dimension([0], [False], [0]))
 
     # These are invalid test cases.
@@ -59,7 +72,7 @@ class TestFailpoints(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v: not (\
         v.get_value('action') == 'FAIL' and\
         v.get_value('location') in ['CLOSE'] and\
-        v.get_value('target_node')[0] == 'HASH_JOIN_NODE') and\
+        v.get_value('target_node')[0] in ['AGGREGATE', 'HASH JOIN']) and\
         not (v.get_value('location') in ['PREPARE'] and \
              v.get_value('action') == 'CANCEL'))
 
@@ -75,11 +88,10 @@ class TestFailpoints(ImpalaTestSuite):
     action = vector.get_value('action')
     location = vector.get_value('location')
 
-
     for node_id in node_ids:
       debug_action = '%d:%s:%s' % (node_id, location,
                                    'WAIT' if action == 'CANCEL' else 'FAIL')
-      print 'Current dubug action string: %s' % debug_action
+      print 'Current dubug action: SET DEBUG_ACTION=%s' % debug_action
       vector.get_value('exec_option')['debug_action'] = debug_action
 
       if action == 'CANCEL':
