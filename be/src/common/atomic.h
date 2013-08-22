@@ -30,6 +30,10 @@ class AtomicUtil {
   static inline void CpuWait() {
     asm volatile("pause\n": : :"memory");
   }
+
+  static inline void MemoryBarrier() {
+    __sync_synchronize();
+  }
 };
 
 // Wrapper for atomic integers.  This should be switched to c++ 11 when

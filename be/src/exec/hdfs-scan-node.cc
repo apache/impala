@@ -665,6 +665,11 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 inline void HdfsScanNode::ScannerThreadHelper() {
   while (!done_ && !runtime_state_->resource_pool()->optional_exceeded()) {
     DiskIoMgr::ScanRange* scan_range;
+    // Take a snapshot of num_unqueued_files_ before calling GetNextRange().
+    // We don't want num_unqueued_files_ to go to zero between the return from
+    // GetNextRange() and the check for when all ranges are complete.
+    int num_unqueued_files = num_unqueued_files_;
+    AtomicUtil::MemoryBarrier();
     Status status = runtime_state_->io_mgr()->GetNextRange(reader_context_, &scan_range);
 
     if (status.ok() && scan_range != NULL) {
@@ -741,7 +746,7 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       return;
     }
 
-    if (scan_range == NULL && num_unqueued_files_ == 0) {
+    if (scan_range == NULL && num_unqueued_files == 0) {
       // All ranges have been queued and GetNextRange() returned NULL. This
       // means that every range is either done or being processed by
       // another thread.
