@@ -836,16 +836,9 @@ class ImpalaShell(cmd.Cmd):
   def do_explain(self, args):
     """Explain the query execution plan"""
     query = self.__create_beeswax_query_handle()
-    # Args is all text except for 'explain', so no need to strip it out
-    query.query = args
+    query.query = "explain %s" % (args,)
     query.configuration = self.__options_to_string_list()
-    print_to_stderr("Explain query: %s" % (query.query,))
-    (explanation, status) = self.__do_rpc(lambda: self.imp_service.explain(query))
-    if status != RpcStatus.OK:
-      return False
-
-    print_to_stderr(explanation.textual)
-    return True
+    return self.__execute_query(query)
 
   def do_history(self, args):
     """Display command history"""
