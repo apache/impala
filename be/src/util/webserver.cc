@@ -142,12 +142,7 @@ Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << http_address_;
 
   stringstream listening_spec;
-  if (IsWildcardAddress(http_address_.hostname)) {
-    listening_spec << http_address_;
-  } else {
-    string port_as_string = lexical_cast<string>(http_address_.port);
-    listening_spec << ":" << port_as_string;
-  }
+  listening_spec << http_address_;
 
   if (IsSecure()) {
     LOG(INFO) << "Webserver: Enabling HTTPS support";
