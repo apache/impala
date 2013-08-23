@@ -115,7 +115,15 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   shared_ptr<SessionState> session;
   TUniqueId session_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(session_handle, &session_id, &secret);
+  Status unique_id_status =
+      THandleIdentifierToTUniqueId(session_handle, &session_id, &secret);
+  if (!unique_id_status.ok()) {
+    status->__set_statusCode(
+        apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+    status->__set_errorMessage(unique_id_status.GetErrorMsg());
+    status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
+    return;
+  }
   GetSessionState(session_id, &session);
   if (session == NULL) {
     status->__set_statusCode(
@@ -197,8 +205,9 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
     shared_ptr<SessionState> session_state;
     TUniqueId session_id;
     TUniqueId secret;
-    THandleIdentifierToTUniqueId(execute_request.sessionHandle.sessionId,
-        &session_id, &secret);
+    RETURN_IF_ERROR(THandleIdentifierToTUniqueId(execute_request.sessionHandle.sessionId,
+        &session_id, &secret));
+
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
     session_state->ToThrift(session_id, &client_request->sessionState);
     lock_guard<mutex> l(session_state->lock);
@@ -289,8 +298,8 @@ void ImpalaServer::CloseSession(
 
   TUniqueId session_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.sessionHandle.sessionId,
-      &session_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   HS2_RETURN_IF_ERROR(return_val,
       CloseSessionInternal(session_id), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(
@@ -330,8 +339,8 @@ void ImpalaServer::ExecuteStatement(
   shared_ptr<SessionState> session;
   TUniqueId session_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.sessionHandle.sessionId,
-      &session_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   GetSessionState(session_id, &session);
   if (session == NULL) {
     HS2_RETURN_IF_ERROR(
@@ -511,7 +520,8 @@ void ImpalaServer::GetOperationStatus(
   // TODO: check secret
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
   lock_guard<mutex> l(query_exec_state_map_lock_);
@@ -532,7 +542,8 @@ void ImpalaServer::CancelOperation(
     const TCancelOperationReq& request) {
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
   Status status = CancelInternal(query_id);
@@ -546,7 +557,8 @@ void ImpalaServer::CloseOperation(
     const TCloseOperationReq& request) {
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
   // TODO: use timeout to get rid of unwanted exec_state.
@@ -565,7 +577,8 @@ void ImpalaServer::GetResultSetMetadata(
   // TODO: check secret
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "GetResultSetMetadata(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state.get() == NULL) {
@@ -614,7 +627,8 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
   // TODO: check secret
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "FetchResults(): query_id=" << PrintId(query_id)
            << " fetch_size=" << request.maxRows;
 
@@ -633,7 +647,8 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   // Convert Operation id to TUniqueId and get the query exec state.
   TUniqueId query_id;
   TUniqueId secret;
-  THandleIdentifierToTUniqueId(request.operationHandle.operationId, &query_id, &secret);
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
   if (exec_state.get() == NULL) {
@@ -652,15 +667,21 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   }
 }
 
-inline void ImpalaServer::THandleIdentifierToTUniqueId(
-    const apache::hive::service::cli::thrift::THandleIdentifier &handle,
+inline Status ImpalaServer::THandleIdentifierToTUniqueId(
+    const apache::hive::service::cli::thrift::THandleIdentifier& handle,
     TUniqueId* unique_id, TUniqueId* secret) {
-  DCHECK_EQ(handle.guid.length(), 16);
-  DCHECK_EQ(handle.secret.length(), 16);
+  if (handle.guid.length() != 16 || handle.secret.length() != 16) {
+    stringstream ss;
+    ss << "Malformed THandleIdentifier (guid size: " << handle.guid.length()
+       << ", expected 16, secret size: " << handle.secret.length() << ", expected 16)";
+    return Status(ss.str());
+  }
   memcpy(&(unique_id->hi), handle.guid.c_str(), 8);
   memcpy(&(unique_id->lo), handle.guid.c_str() + 8, 8);
   memcpy(&(secret->hi), handle.secret.c_str(), 8);
   memcpy(&(secret->lo), handle.secret.c_str() + 8, 8);
+
+  return Status::OK;
 }
 
 inline void ImpalaServer::TUniqueIdToTHandleIdentifier(

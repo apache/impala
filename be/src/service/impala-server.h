@@ -518,8 +518,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results);
 
   // Helper functions to translate between HiveServer2 and Impala structs
-  static void THandleIdentifierToTUniqueId(
-      const apache::hive::service::cli::thrift::THandleIdentifier &handle,
+
+  // Returns !ok() if handle.guid.size() or handle.secret.size() != 16
+  static Status THandleIdentifierToTUniqueId(
+      const apache::hive::service::cli::thrift::THandleIdentifier& handle,
       TUniqueId* unique_id, TUniqueId* secret);
   static void TUniqueIdToTHandleIdentifier(
       const TUniqueId& unique_id, const TUniqueId& secret,
