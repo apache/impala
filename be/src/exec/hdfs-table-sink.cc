@@ -419,6 +419,8 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
+  if (partition->tmp_hdfs_file == NULL) return Status::OK;
+
   Status status = partition->writer->Finalize();
 
   if (status.ok()) {
@@ -432,9 +434,9 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   if (hdfs_ret != 0) {
     status.AddErrorMsg(AppendHdfsErrorMessage("Failed to close HDFS file: ",
         partition->current_file_name));
-  } else {
-    ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
   }
+  partition->tmp_hdfs_file = NULL;
+  ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
 
   return status;
 }
