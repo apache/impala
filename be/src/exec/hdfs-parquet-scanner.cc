@@ -66,7 +66,7 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       // Compute the offset of the file footer
       DCHECK_GT(files[i]->file_length, 0);
       int64_t footer_size = min(static_cast<int64_t>(FOOTER_SIZE), files[i]->file_length);
-      int64_t footer_start = files[i]->file_length - FOOTER_SIZE;
+      int64_t footer_start = files[i]->file_length - footer_size;
 
       ScanRangeMetadata* metadata =
           reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
