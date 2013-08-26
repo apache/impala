@@ -178,12 +178,20 @@ class WorkloadRunner(object):
 
     for thread in threads:
       thread.join()
-      if not thread.success() and exit_on_error:
-        LOG.error("Thread: %s returned with error. Exiting." % thread.name)
-        raise RuntimeError, "Error executing query. Aborting"
-
-      results.append(thread.get_results())
-      LOG.debug(thread.name + " completed")
+      if not thread.success():
+        if exit_on_error:
+          LOG.error("Thread: %s returned with error. Exiting." % thread.name)
+          raise RuntimeError, "Error executing query - '%s'. Aborting" \
+            % thread.get_results().query_error
+        else:
+          LOG.error("Thread: %s returned with error - '%s'. Ignoring." % (thread.name,\
+              thread.get_results().query_error))
+      else:
+        results.append(thread.get_results())
+        LOG.debug(thread.name + " completed")
+    # If all the threads failed, do not call __get_median_execution_result
+    # and return a blank result.
+    if not results: return None
     return self.__get_median_execution_result(results)
 
   def __get_median_execution_result(self, results):
@@ -298,8 +306,8 @@ class WorkloadRunner(object):
               if stop_on_query_error:
                 raise
               LOG.error(e)
-
-          self.__summary += "%s\n" % execution_result
+          if execution_result:
+            self.__summary += "%s\n" % execution_result
 
         hive_execution_result = QueryExecutionResult()
         if self.compare_with_hive or self.skip_impala:
@@ -309,7 +317,8 @@ class WorkloadRunner(object):
                                                          self.prime_cache,
                                                          False, table_format_str,
                                                          query_name)
-          self.__summary += "%s\n" % hive_execution_result
+          if hive_execution_result:
+            self.__summary += "%s\n" % hive_execution_result
         LOG.debug("---------------------------------------------------------------------")
 
         execution_detail = QueryExecutionDetail(executor_name, workload, scale_factor,

@@ -45,6 +45,7 @@ class QueryExecutionResult(object):
     self.success = False
     self.data = data
     self.runtime_profile = runtime_profile
+    self.query_error = str()
 
   def set_result_note(self, note):
     self.__note = note
@@ -203,6 +204,7 @@ def execute_using_impala_beeswax(query, query_options):
     except Exception, e:
       LOG.error(e)
       client.close_connection()
+      exec_result.query_error = str(e)
       return exec_result
     if plugin_runner: plugin_runner.run_plugins_post(context=context, scope="Query")
     results.append(result)
@@ -338,6 +340,7 @@ def run_query_capture_results(cmd, query_result_parse_function, iterations,
     rc, stdout, stderr = execute_shell_cmd(cmd)
   except Exception, e:
     LOG.error('Error while executing query command: %s' % e)
+    execution_result.query_error = str(e)
     return execution_result
   if rc != 0:
     LOG.error(('Command returned with an error:\n'
@@ -352,7 +355,3 @@ def run_query_capture_results(cmd, query_result_parse_function, iterations,
     LOG.error("Query did not run successfully")
     LOG.error("STDERR:\n%s\nSTDOUT:\n%s" % (stderr, stdout))
   return execution_result
-
-# Util functions
-# TODO : Move util functions to a common module.
-
