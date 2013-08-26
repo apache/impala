@@ -73,7 +73,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
       all_ranges_started_(false),
-      counters_reported_(false) {
+      counters_running_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
     // TODO: This parameter has an U-shaped effect on performance: increasing the value
@@ -87,6 +87,12 @@ HdfsScanNode::~HdfsScanNode() {
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  Status status = GetNextInternal(state, row_batch, eos);
+  if (!status.ok() || *eos) StopAndFinalizeCounters();
+  return status;
+}
+
+Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -97,7 +103,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   if (*eos) {
-    UpdateCounters();
     unique_lock<mutex> l(lock_);
     return status_;
   }
@@ -136,7 +141,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
       *eos = true;
-      UpdateCounters();
       // Wake up scanner threads notifying them we are done.
       {
         unique_lock<mutex> l(row_batches_lock_);
@@ -151,8 +155,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   *eos = true;
-  UpdateCounters();
-
   return Status::OK;
 }
 
@@ -350,22 +352,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
-  // Initialize HdfsScanNode specific counters
-  read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
-  per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
-      PER_READ_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
-  scan_ranges_complete_counter_ =
-      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
-  if (DiskInfo::num_disks() < 64) {
-    num_disks_accessed_counter_ =
-        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
-  } else {
-    num_disks_accessed_counter_ = 0;
-  }
-  num_scanner_threads_started_counter_ =
-      ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TCounterType::UNIT);
-
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
 
@@ -478,6 +464,23 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
       hdfs_connection_, &reader_context_, state->query_mem_limit()));
+
+  // Initialize HdfsScanNode specific counters
+  read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
+  per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
+      PER_READ_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
+  scan_ranges_complete_counter_ =
+      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
+  if (DiskInfo::num_disks() < 64) {
+    num_disks_accessed_counter_ =
+        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
+  } else {
+    num_disks_accessed_counter_ = 0;
+  }
+  num_scanner_threads_started_counter_ =
+      ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TCounterType::UNIT);
+
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
   runtime_state_->io_mgr()->set_active_read_thread_counter(reader_context_,
@@ -502,6 +505,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
   runtime_profile()->RegisterBucketingCounters(&active_hdfs_read_thread_counter_,
       &hdfs_read_thread_concurrency_bucket_);
+
+  counters_running_ = true;
 
   int total_splits = 0;
   // Walk all the files on this node and coalesce all the files with the same
@@ -589,6 +594,8 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   if (reader_context_ != NULL) {
     state->io_mgr()->UnregisterReader(reader_context_);
   }
+
+  StopAndFinalizeCounters();
 
   // There should be no active scanner threads and hdfs read threads.
   DCHECK_EQ(active_scanner_thread_counter_.value(), 0);
@@ -809,10 +816,10 @@ void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {
   }
 }
 
-void HdfsScanNode::UpdateCounters() {
+void HdfsScanNode::StopAndFinalizeCounters() {
   unique_lock<mutex> l(lock_);
-  if (counters_reported_) return;
-  counters_reported_ = true;
+  if (!counters_running_) return;
+  counters_running_ = false;
 
   runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
   runtime_profile()->StopSamplingCounterUpdates(average_scanner_thread_concurrency_);

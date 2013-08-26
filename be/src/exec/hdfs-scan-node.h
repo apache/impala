@@ -99,11 +99,7 @@ class HdfsScanNode : public ScanNode {
   // ExecNode methods
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
-
-  // Checks for cancellation at the very beginning and then again after
-  // each call to HdfsScanner::GetNext().
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-
   virtual Status Close(RuntimeState* state);
 
   // ScanNode methods
@@ -405,8 +401,9 @@ class HdfsScanNode : public ScanNode {
       std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;
   FileTypeCountsMap file_type_counts_;
 
-  // If true, counters have already been reported in the runtime profile.
-  bool counters_reported_;
+  // If true, counters are actively running and need to be reported in the runtime
+  // profile.
+  bool counters_running_;
 
   // Called when scanner threads are available for this scan node. This will
   // try to spin up as many scanner threads as the quota allows.
@@ -424,10 +421,15 @@ class HdfsScanNode : public ScanNode {
   void ScannerThread();
   void ScannerThreadHelper();
 
-  // Updates the counters for the entire scan node.  This should be called as soon
-  // as the scan node is complete (before all the spawned threads terminate) to get
-  // the most accurate results.
-  void UpdateCounters();
+  // Checks for eos conditions and returns batches from materialized_row_batches_.
+  Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
+
+  // Stops periodic counters and aggregates counter values for the entire scan node.
+  // This should be called as soon as the scan node is complete to get the most accurate
+  // counter values.
+  // This can be called multiple times, subsequent calls will be ignored.
+  // This must be called on Close() to unregister counters.
+  void StopAndFinalizeCounters();
 };
 
 }
