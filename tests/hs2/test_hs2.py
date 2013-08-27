@@ -33,11 +33,13 @@ def needs_session(fn):
     resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(resp)
     self.session_handle = resp.sessionHandle
-    fn(self)
-    close_session_req = TCLIService.TCloseSessionReq()
-    close_session_req.sessionHandle = resp.sessionHandle
-    TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
-    self.session_handle = None
+    try:
+      fn(self)
+    finally:
+      close_session_req = TCLIService.TCloseSessionReq()
+      close_session_req.sessionHandle = resp.sessionHandle
+      TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
+      self.session_handle = None
   return add_session
 
 class TestHS2(ImpalaTestSuite):
