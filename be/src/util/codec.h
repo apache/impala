@@ -49,8 +49,7 @@ class Codec {
   static const CodecMap CODEC_MAP;
 
   // Create a decompressor.
-  // Input: 
-  //  runtime_state: the current runtime state.
+  // Input:
   //  mem_pool: the memory pool used to store the decompressed data.
   //  reuse: if true the allocated buffer can be reused.
   //  format: the type of decompressor to create.
@@ -58,44 +57,43 @@ class Codec {
   //  decompressor: pointer to the decompressor class to use.
   // If mem_pool is NULL, then the resulting codec will never allocate memory and
   // the caller must be responsible for it.
-  static Status CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                   bool reuse, THdfsCompression::type format,
+  static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
+                                   THdfsCompression::type format,
                                    Codec** decompressor);
 
   // Alternate creator: returns a scoped pointer.
-  static Status CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                   bool reuse, THdfsCompression::type format,
+  static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
+                                   THdfsCompression::type format,
                                    boost::scoped_ptr<Codec>* decompressor);
 
   // Alternate creator: takes a codec string and returns a scoped pointer.
-  static Status CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                   bool reuse, const std::string& codec,
+  static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
+                                   const std::string& codec,
                                    boost::scoped_ptr<Codec>* decompressor);
 
-  // Create the compressor.
-  // Input: 
-  //  runtime_state: the current runtime state.
+  // Create a compressor.
+  // Input:
   //  mem_pool: the memory pool used to store the compressed data.
-  //  format: The type of compressor to create.
   //  reuse: if true the allocated buffer can be reused.
+  //  format: The type of compressor to create.
   // Output:
   //  compressor: pointer to the compressor class to use.
-  static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, THdfsCompression::type format,
-                                 Codec** decompressor);
+  static Status CreateCompressor(MemPool* mem_pool, bool reuse,
+                                 THdfsCompression::type format,
+                                 Codec** compressor);
 
   // Alternate creator: returns a scoped pointer.
-  static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, THdfsCompression::type format,
+  static Status CreateCompressor(MemPool* mem_pool, bool reuse,
+                                 THdfsCompression::type format,
                                  boost::scoped_ptr<Codec>* compressor);
 
   // Alternate creator: takes a codec string and returns a scoped pointer.
   // Input, as above except:
   //  codec: the string representing the codec of the current file.
-  static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, const std::string& codec,
+  static Status CreateCompressor(MemPool* mem_pool, bool reuse,
+                                 const std::string& codec,
                                  boost::scoped_ptr<Codec>* compressor);
-  
+
   // Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
 
@@ -139,7 +137,7 @@ class Codec {
   //   reuse_buffer: if false always allocate a new buffer rather than reuse.
   Codec(MemPool* mem_pool, bool reuse_buffer);
 
-  // Initialize the operation.
+  // Initialize the operation. This should only be called once.
   virtual Status Init() = 0;
 
   // Pool to allocate the buffer to hold transformed data.

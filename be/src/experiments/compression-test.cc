@@ -55,7 +55,7 @@ void TestCompression(int num, int min_len, int max_len, THdfsCompression::type c
   }
 
   scoped_ptr<Codec> compressor;
-  Codec::CreateCompressor(NULL, NULL, false, codec, &compressor);
+  Codec::CreateCompressor(NULL, false, codec, &compressor);
 
   int compressed_len = compressor->MaxOutputLen(offset); 
   uint8_t* compressed_buffer = (uint8_t*)malloc(compressed_len);

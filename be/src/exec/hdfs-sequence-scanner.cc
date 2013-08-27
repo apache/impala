@@ -76,7 +76,7 @@ Status HdfsSequenceScanner::InitNewRange() {
 
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
   if (seq_header->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
+    RETURN_IF_ERROR(Codec::CreateDecompressor(
         data_buffer_pool_.get(), stream_->compact_data(),
         header_->codec, &decompressor_));
   }

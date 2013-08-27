@@ -94,7 +94,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       total_compressed_byte_size_(0),
       total_uncompressed_byte_size_(0),
       def_levels_(NULL), values_buffer_(NULL) {
-    Codec::CreateCompressor(parent_->state_, NULL, false, codec, &compressor_);
+    Codec::CreateCompressor(NULL, false, codec, &compressor_);
 
     def_levels_ = parent_->state_->obj_pool()->Add(
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),

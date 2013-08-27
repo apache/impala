@@ -448,7 +448,7 @@ Status HdfsAvroScanner::InitNewRange() {
   avro_header_ = reinterpret_cast<AvroFileHeader*>(header_);
   template_tuple_ = avro_header_->template_tuple;
   if (header_->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
+    RETURN_IF_ERROR(Codec::CreateDecompressor(
         data_buffer_pool_.get(), stream_->compact_data(),
         header_->compression_type, &decompressor_));
   }

@@ -31,7 +31,6 @@ GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is
   : Codec(mem_pool, reuse_buffer),
     is_deflate_(is_deflate) {
   bzero(&stream_, sizeof(stream_));
-  Init();
 }
 
 GzipDecompressor::~GzipDecompressor() {

@@ -526,12 +526,16 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
 
   // Compress the serialized thrift string.  This uses string keys and is very
   // easy to compress.
-  GzipCompressor compressor(GzipCompressor::ZLIB);
+  scoped_ptr<Codec> compressor;
+  status = Codec::CreateCompressor(NULL, false, THdfsCompression::DEFAULT, &compressor);
+  DCHECK(status.ok()) << status.GetErrorMsg();
+  if (!status.ok()) return;
+
   vector<uint8_t> compressed_buffer;
-  compressed_buffer.resize(compressor.MaxOutputLen(serialized_buffer.size()));
+  compressed_buffer.resize(compressor->MaxOutputLen(serialized_buffer.size()));
   int result_len = compressed_buffer.size();
   uint8_t* compressed_buffer_ptr = &compressed_buffer[0];
-  compressor.ProcessBlock(true, serialized_buffer.size(), &serialized_buffer[0],
+  compressor->ProcessBlock(true, serialized_buffer.size(), &serialized_buffer[0],
       &result_len, &compressed_buffer_ptr);
   compressed_buffer.resize(result_len);
 

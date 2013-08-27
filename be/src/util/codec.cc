@@ -58,8 +58,7 @@ string Codec::GetCodecName(THdfsCompression::type type) {
   return "INVALID";
 }
 
-Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                               bool reuse, const string& codec,
+Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& codec,
                                scoped_ptr<Codec>* compressor) {
   map<const string, const THdfsCompression::type>::const_iterator
       type = CODEC_MAP.find(codec);
@@ -71,23 +70,23 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
   }
   Codec* comp;
   RETURN_IF_ERROR(
-      CreateCompressor(runtime_state, mem_pool, reuse, type->second, &comp));
+      CreateCompressor(mem_pool, reuse, type->second, &comp));
   compressor->reset(comp);
   return Status::OK;
 }
 
-Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                               bool reuse, THdfsCompression::type format,
+Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
+                               THdfsCompression::type format,
                                scoped_ptr<Codec>* compressor) {
   Codec* comp;
   RETURN_IF_ERROR(
-      CreateCompressor(runtime_state, mem_pool, reuse, format, &comp));
+      CreateCompressor(mem_pool, reuse, format, &comp));
   compressor->reset(comp);
   return Status::OK;
 }
 
-Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                               bool reuse, THdfsCompression::type format,
+Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
+                               THdfsCompression::type format,
                                Codec** compressor) {
   switch (format) {
     case THdfsCompression::NONE:
@@ -121,8 +120,7 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
   return (*compressor)->Init();
 }
 
-Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, const string& codec,
+Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse, const string& codec,
                                  scoped_ptr<Codec>* decompressor) {
   map<const string, const THdfsCompression::type>::const_iterator
       type = CODEC_MAP.find(codec);
@@ -134,23 +132,23 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
   }
   Codec* decom;
   RETURN_IF_ERROR(
-      CreateDecompressor(runtime_state, mem_pool, reuse, type->second, &decom));
+      CreateDecompressor(mem_pool, reuse, type->second, &decom));
   decompressor->reset(decom);
   return Status::OK;
 }
 
-Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, THdfsCompression::type format,
+Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
+                                 THdfsCompression::type format,
                                  scoped_ptr<Codec>* decompressor) {
   Codec* decom;
   RETURN_IF_ERROR(
-      CreateDecompressor(runtime_state, mem_pool, reuse, format, &decom));
+      CreateDecompressor(mem_pool, reuse, format, &decom));
   decompressor->reset(decom);
   return Status::OK;
 }
 
-Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, THdfsCompression::type format,
+Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
+                                 THdfsCompression::type format,
                                  Codec** decompressor) {
   switch (format) {
     case THdfsCompression::NONE:

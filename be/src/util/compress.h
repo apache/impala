@@ -38,24 +38,17 @@ class GzipCompressor : public Codec {
     GZIP,
   };
 
-  // If gzip is set then we create gzip otherwise lzip.
-  GzipCompressor(Format format, MemPool* mem_pool = NULL, bool reuse_buffer = false);
-
   virtual ~GzipCompressor();
-
-  // Returns an upper bound on the max compressed length.
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-
-  // Process a block of data.
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
- protected:
-  // Initialize the compressor.
+ private:
+  friend class Codec;
+  GzipCompressor(Format format, MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual Status Init();
 
- private:
   Format format_;
 
   // Structure used to communicate with the library.
@@ -75,54 +68,43 @@ class GzipCompressor : public Codec {
 
 class BzipCompressor : public Codec {
  public:
-  BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipCompressor() { }
-
-  // Returns an upper bound on the max compressed length.
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-
-  // Process a block of data.
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
-  // Initialize the compressor.
+
+ private:
+  friend class Codec;
+  BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual Status Init() { return Status::OK; }
 };
 
 class SnappyBlockCompressor : public Codec {
  public:
-  SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
-  
   virtual ~SnappyBlockCompressor() { }
-
-  // Returns an upper bound on the max compressed length.
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-
-  // Process a block of data.
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
- protected:
-  // Snappy does not need initialization
+ private:
+  friend class Codec;
+  SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual Status Init() { return Status::OK; }
 };
 
 class SnappyCompressor : public Codec {
  public:
-  SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual ~SnappyCompressor() { }
-
-  // Returns an upper bound on the max compressed length.
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-
-  // Process a block of data.
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
-  
- protected:
-  // Snappy does not need initialization
+
+ private:
+  friend class Codec;
+  SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual Status Init() { return Status::OK; }
 };
 

@@ -115,8 +115,7 @@ class HdfsParquetScanner::BaseColumnReader {
     dict_decoder_base_ = NULL;
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
-          parent_->scan_node_->runtime_state(), NULL, false,
-          PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
+          NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
     }
     return Status::OK;
   }

@@ -27,20 +27,18 @@ namespace impala {
 
 class GzipDecompressor : public Codec {
  public:
-  GzipDecompressor(
-      MemPool* mem_pool = NULL, bool reuse_buffer = false, bool is_deflate = false);
   virtual ~GzipDecompressor();
-
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
- protected:
-  // Initialize the decompressor.
+ private:
+  friend class Codec;
+  GzipDecompressor(
+      MemPool* mem_pool = NULL, bool reuse_buffer = false, bool is_deflate = false);
   virtual Status Init();
 
- private:
   // If set assume deflate format, otherwise zlib or gzip
   bool is_deflate_;
 
@@ -53,46 +51,44 @@ class GzipDecompressor : public Codec {
 
 class BzipDecompressor : public Codec {
  public:
-  BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipDecompressor() { }
-
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
- protected:
-  // Bzip does not need initialization
+ private:
+  friend class Codec;
+  BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
+
   virtual Status Init() { return Status::OK; }
 };
 
 class SnappyDecompressor : public Codec {
  public:
-  SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual ~SnappyDecompressor() { }
-
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
- protected:
-  // Snappy does not need initialization
+ private:
+  friend class Codec;
+  SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual Status Init() { return Status::OK; }
 
 };
 
 class SnappyBlockDecompressor : public Codec {
  public:
-  SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~SnappyBlockDecompressor() { }
-
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
                               int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
- protected:
-  // Snappy does not need initialization
+ private:
+  friend class Codec;
+  SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual Status Init() { return Status::OK; }
 };
 

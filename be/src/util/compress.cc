@@ -29,7 +29,6 @@ GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buff
   : Codec(mem_pool, reuse_buffer),
     format_(format) {
   bzero(&stream_, sizeof(stream_));
-  Init();
 }
 
 GzipCompressor::~GzipCompressor() {

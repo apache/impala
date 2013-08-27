@@ -15,6 +15,7 @@
 #include "runtime/row-batch.h"
 
 #include <stdint.h>  // for intptr_t
+#include <boost/scoped_ptr.hpp>
 
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
@@ -22,6 +23,7 @@
 #include "util/decompress.h"
 #include "gen-cpp/Data_types.h"
 
+using namespace boost;
 using namespace std;
 
 namespace impala {
@@ -71,14 +73,18 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
-    SnappyCompressor compressor;
-    int compressed_size = compressor.MaxOutputLen(size);
+    scoped_ptr<Codec> compressor;
+    Status status =
+        Codec::CreateCompressor(NULL, false, THdfsCompression::SNAPPY, &compressor);
+    DCHECK(status.ok()) << status.GetErrorMsg();
+
+    int compressed_size = compressor->MaxOutputLen(size);
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
     }
     uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
     uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
-    compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output);
+    compressor->ProcessBlock(true, size, input, &compressed_size, &compressed_output);
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
@@ -111,11 +117,15 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
     size_t compressed_size = input_batch.tuple_data.size();
     
-    SnappyDecompressor decompressor;
-    int uncompressed_size = decompressor.MaxOutputLen(compressed_size, compressed_data);
+    scoped_ptr<Codec> decompressor;
+    Status status =
+        Codec::CreateDecompressor(NULL, false, THdfsCompression::SNAPPY, &decompressor);
+    DCHECK(status.ok()) << status.GetErrorMsg();
+
+    int uncompressed_size = decompressor->MaxOutputLen(compressed_size, compressed_data);
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
     uint8_t* data = tuple_data_pool_->Allocate(uncompressed_size);
-    Status status = decompressor.ProcessBlock(true, compressed_size, compressed_data,
+    status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
         &uncompressed_size, &data);
     DCHECK(status.ok()) << "RowBatch decompression failed.";
   } else {

@@ -45,9 +45,9 @@ class DecompressorTest : public ::testing::Test{
     scoped_ptr<Codec> decompressor;
 
     EXPECT_TRUE(
-        Codec::CreateCompressor(NULL, &mem_pool_, true, format, &compressor).ok());
+        Codec::CreateCompressor(&mem_pool_, true, format, &compressor).ok());
     EXPECT_TRUE(
-        Codec::CreateDecompressor(NULL, &mem_pool_, true, format, &decompressor).ok());
+        Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor).ok());
 
     CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_), input_);
     if (format != THdfsCompression::BZIP2) {
