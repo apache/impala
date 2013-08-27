@@ -140,7 +140,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
   shared_ptr<QueryExecState> exec_state;
   shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadSessionId(), &session);
+  GetSessionState(ThriftServer::GetThreadConnectionId(), &session);
   DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
@@ -181,7 +181,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   shared_ptr<QueryExecState> exec_state;
   shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadSessionId(), &session);
+  GetSessionState(ThriftServer::GetThreadConnectionId(), &session);
   DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
@@ -417,30 +417,6 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
   Status::DEPRECATED_RPC.ToThrift(&status);
 }
 
-void ImpalaServer::SessionStart(const ThriftServer::SessionContext& session_context) {
-  const TUniqueId& session_id = session_context.session_id;
-  shared_ptr<SessionState> state;
-  state.reset(new SessionState);
-  state->closed = false;
-  state->start_time = TimestampValue::local_time();
-  state->database = "default";
-  state->session_type = TSessionType::BEESWAX;
-  state->network_address = session_context.network_address;
-  // If the username was set by a lower-level transport, use it.
-  if (!session_context.username.empty()) {
-    state->user = session_context.username;
-  }
-
-  lock_guard<mutex> l(session_state_map_lock_);
-  bool success = session_state_map_.insert(make_pair(session_id, state)).second;
-  // The session should not have already existed.
-  DCHECK(success);
-}
-
-void ImpalaServer::SessionEnd(const ThriftServer::SessionContext& session_context) {
-  CloseSessionInternal(session_context.session_id);
-}
-
 Status ImpalaServer::QueryToTClientRequest(const Query& query,
     TClientRequest* request) {
   request->queryOptions = default_query_options_;
@@ -448,7 +424,7 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
-    const TUniqueId& session_id = ThriftServer::GetThreadSessionId();
+    const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
     session->ToThrift(session_id, &request->sessionState);
   }

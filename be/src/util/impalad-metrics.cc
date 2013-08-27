@@ -54,6 +54,11 @@ const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
     "catalog.num-tables";
 const char* ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT =
     "impala-server.num-files-open-for-insert";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS =
+    "impala-server.num-open-hiveserver2-sessions";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS =
+    "impala-server.num-open-beeswax-sessions";
+
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -62,6 +67,8 @@ Metrics::BooleanMetric* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_LAST_REFRESH_TIME = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
+Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = NULL;
+Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
 Metrics::IntMetric* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
@@ -87,6 +94,10 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0L);
   IMPALA_SERVER_NUM_FRAGMENTS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0L);
+  IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0L);
+  IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS, 0L);
 
   // Initialize scan node metrics
   NUM_RANGES_PROCESSED = m->CreateAndRegisterPrimitiveMetric(

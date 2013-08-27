@@ -83,7 +83,7 @@ class ThriftServer;
 // that via the statestore. This still needs to be implemented.
 class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
                      public ImpalaInternalServiceIf,
-                     public ThriftServer::SessionHandlerIf {
+                     public ThriftServer::ConnectionHandlerIf {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
@@ -217,13 +217,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       TQueryOptions* query_options);
 
   // SessionHandlerIf methods
-  // Called when a Beeswax session starts. Registers a new SessionState with the provided
-  // key.
-  virtual void SessionStart(const ThriftServer::SessionContext& session_context);
 
-  // Called when a Beeswax session terminates. Unregisters the SessionState associated
-  // with the provided key.
-  virtual void SessionEnd(const ThriftServer::SessionContext& session_context);
+  // Called when a Beeswax or HS2 connection starts. For Beeswax, registers a new
+  // SessionState associated with the new connection. For HS2, this is a no-op (HS2 has an
+  // explicit CreateSession RPC).
+  virtual void ConnectionStart(const ThriftServer::ConnectionContext& session_context);
+
+  // Called when a Beeswax or HS2 connection terminates. Unregisters all sessions
+  // associated with the closed connection.
+  virtual void ConnectionEnd(const ThriftServer::ConnectionContext& session_context);
 
   // Called when a membership update is received from the state-store. Looks for
   // active nodes that have failed, and cancels any queries running on them.
@@ -341,7 +343,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Close the session and release all resource used by this session.
   // Caller should not hold any locks when calling this function.
-  Status CloseSessionInternal(const TUniqueId& session_id);
+  // If ignore_if_absent is true, returns OK even if a session with the supplied ID does
+  // not exist.
+  Status CloseSessionInternal(const TUniqueId& session_id, bool ignore_if_absent);
 
   // Gets the runtime profile string for a given query_id and writes it to the output
   // stream. First searches for the query id in the map of in-flight queries. If no
@@ -648,6 +652,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<TUniqueId, boost::shared_ptr<SessionState> >
     SessionStateMap;
   SessionStateMap session_state_map_;
+
+  // Protects connection_to_sessions_map_. May be taken before session_state_map_lock_.
+  boost::mutex connection_to_sessions_map_lock_;
+
+  // Map from a connection ID to the associated list of sessions so that all can be closed
+  // when the connection ends. HS2 allows for multiplexing several sessions across a
+  // single connection. If a session has already been closed (only possible via HS2) it is
+  // not removed from this map to avoid the cost of looking it up.
+  typedef boost::unordered_map<TUniqueId, std::vector<TUniqueId> >
+    ConnectionToSessionMap;
+  ConnectionToSessionMap connection_to_sessions_map_;
 
   // Return session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.

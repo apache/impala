@@ -34,7 +34,7 @@
 #include "service/query-exec-state.h"
 #include "util/debug-util.h"
 #include "util/thrift-util.h"
-#include "util/jni-util.h"
+#include "util/impalad-metrics.h"
 
 using namespace std;
 using namespace boost;
@@ -231,20 +231,19 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {
   VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
 
-  const TUniqueId& session_id = ThriftServer::GetThreadSessionId();
-  char session_uuid[16];
-  memcpy((void*)session_uuid, &session_id.hi, 8);
-  memcpy((void*)(session_uuid + 8), &session_id.lo, 8);
-
   // Generate session ID and the secret
+  TUniqueId session_id;
   {
     lock_guard<mutex> l(uuid_lock_);
     uuid secret = uuid_generator_();
-    return_val.sessionHandle.sessionId.guid.assign(session_uuid, 16);
+    uuid session_uuid = uuid_generator_();
+    return_val.sessionHandle.sessionId.guid.assign(
+        session_uuid.begin(), session_uuid.end());
     return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
     DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
     DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
     return_val.__isset.sessionHandle = true;
+    UUIDToTUniqueId(session_uuid, &session_id);
   }
   // create a session state: initialize start time, session type, database and default
   // query options.
@@ -253,11 +252,11 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->session_type = TSessionType::HIVESERVER2;
-  state->network_address = ThriftServer::GetThreadSessionContext()->network_address;
+  state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
 
   // If the username was set by a lower-level transport, use it.
   const ThriftServer::Username& username =
-      ThriftServer::GetThreadSessionContext()->username;
+      ThriftServer::GetThreadConnectionContext()->username;
   if (!username.empty()) {
     state->user = username;
   } else {
@@ -285,6 +284,14 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     session_state_map_.insert(make_pair(session_id, state));
   }
 
+  {
+    lock_guard<mutex> l(connection_to_sessions_map_lock_);
+    const TUniqueId& connection_id = ThriftServer::GetThreadConnectionId();
+    connection_to_sessions_map_[connection_id].push_back(session_id);
+  }
+
+  ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(1L);
+
   return_val.__isset.configuration = true;
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
@@ -301,7 +308,7 @@ void ImpalaServer::CloseSession(
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   HS2_RETURN_IF_ERROR(return_val,
-      CloseSessionInternal(session_id), SQLSTATE_GENERAL_ERROR);
+      CloseSessionInternal(session_id, false), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }

@@ -52,7 +52,8 @@ class TestHS2(ImpalaTestSuite):
     self.hs2_client = TCLIService.Client(self.protocol)
 
   def teardown(self):
-    self.socket.close()
+    if self.socket:
+      self.socket.close()
 
   @staticmethod
   def check_response(response, expected = TCLIService.TStatusCode.SUCCESS_STATUS):
@@ -85,7 +86,7 @@ class TestHS2(ImpalaTestSuite):
 
     # Double close should be an error
     TestHS2.check_response(self.hs2_client.CloseSession(close_session_req),
-                     TCLIService.TStatusCode.ERROR_STATUS)
+                           TCLIService.TStatusCode.ERROR_STATUS)
 
   @needs_session
   def test_execute_select(self):
@@ -112,9 +113,7 @@ class TestHS2(ImpalaTestSuite):
 
   @needs_session
   def test_get_operation_status(self):
-    """
-    Tests that GetOperationStatus returns a valid result for a running query
-    """
+    """Tests that GetOperationStatus returns a valid result for a running query"""
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.statement = "SELECT COUNT(*) FROM functional.alltypes"
@@ -135,10 +134,8 @@ class TestHS2(ImpalaTestSuite):
 
   @needs_session
   def test_malformed_get_operation_status(self):
-    """
-    Tests that a short guid / secret returns an error (regression would be to crash
-    impalad)
-    """
+    """Tests that a short guid / secret returns an error (regression would be to crash
+    impalad)"""
     operation_handle = TCLIService.TOperationHandle()
     operation_handle.operationId = TCLIService.THandleIdentifier()
     operation_handle.operationId.guid = "short"
@@ -159,3 +156,42 @@ class TestHS2(ImpalaTestSuite):
         % (len(operation_handle.operationId.guid),
            len(operation_handle.operationId.secret))
     assert err_msg in get_operation_status_resp.status.errorMessage
+
+  @pytest.mark.execute_serially
+  def test_socket_close_forces_session_close(self):
+    """Test that closing the underlying socket forces the associated session to close.
+    See IMPALA-564"""
+    open_session_req = TCLIService.TOpenSessionReq()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+    num_sessions = self.impalad_test_service.get_metric_value(
+      "impala-server.num-open-hiveserver2-sessions")
+
+    assert num_sessions > 0
+
+    self.socket.close()
+    self.socket = None
+    self.impalad_test_service.wait_for_metric_value(
+      "impala-server.num-open-hiveserver2-sessions", num_sessions - 1)
+
+  @pytest.mark.execute_serially
+  def test_multiple_sessions(self):
+    """Test that multiple sessions on the same socket connection are allowed"""
+    num_sessions = self.impalad_test_service.get_metric_value(
+      "impala-server.num-open-hiveserver2-sessions")
+    session_ids = []
+    for _ in xrange(5):
+      open_session_req = TCLIService.TOpenSessionReq()
+      resp = self.hs2_client.OpenSession(open_session_req)
+      TestHS2.check_response(resp)
+      # Check that all sessions get different IDs
+      assert resp.sessionHandle not in session_ids
+      session_ids.append(resp.sessionHandle)
+
+    self.impalad_test_service.wait_for_metric_value(
+      "impala-server.num-open-hiveserver2-sessions", num_sessions + 5)
+
+    self.socket.close()
+    self.socket = None
+    self.impalad_test_service.wait_for_metric_value(
+      "impala-server.num-open-hiveserver2-sessions", num_sessions)

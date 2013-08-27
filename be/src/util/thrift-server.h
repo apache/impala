@@ -42,23 +42,24 @@ class ThriftServer {
   // Username.
   typedef std::string Username;
 
-  // Per-connection session information.
-  struct SessionContext {
-    TUniqueId session_id;
+  // Per-connection information.
+  struct ConnectionContext {
+    TUniqueId connection_id;
     Username username;
     TNetworkAddress network_address;
+    std::string server_name;
   };
 
-  // Interface class for receiving session creation / termination events.
-  class SessionHandlerIf {
+  // Interface class for receiving connection creation / termination events.
+  class ConnectionHandlerIf {
    public:
-    // Called when a session is established (when a client connects).
-    virtual void SessionStart(const SessionContext& session_context) = 0;
+    // Called when a connection is established (when a client connects).
+    virtual void ConnectionStart(const ConnectionContext& connection_context) = 0;
 
-    // Called when a session is terminated (when a client closes the connection).
-    // After this callback returns, the memory session_context references is no longer
+    // Called when a connection is terminated (when a client closes the connection).
+    // After this callback returns, the memory connection_context references is no longer
     // valid and clients must not refer to it again.
-    virtual void SessionEnd(const SessionContext& session_context) = 0;
+    virtual void ConnectionEnd(const ConnectionContext& connection_context) = 0;
   };
 
   static const int DEFAULT_WORKER_THREADS = 2;
@@ -98,29 +99,30 @@ class ThriftServer {
   // than once.
   Status Start();
 
-  // Sets the session handler which receives events when sessions are created or closed.
-  void SetSessionHandler(SessionHandlerIf* session) {
-    session_handler_ = session;
+  // Sets the connection handler which receives events when connections are created or
+  // closed.
+  void SetConnectionHandler(ConnectionHandlerIf* connection) {
+    connection_handler_ = connection;
   }
 
-  // Returns a unique identifier for the current session. A session is
+  // Returns a unique identifier for the current connection. A connection is
   // identified with the lifetime of a socket connection to this server.
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static const TUniqueId& GetThreadSessionId();
+  static const TUniqueId& GetThreadConnectionId();
 
   // Returns a pointer to a struct that contains information about the current
-  // session. This includes:
-  //   - A unique identifier for the session.
-  //   - The username provided by the underlying transport for the current session, or an
-  //     empty string if the transport did not provide a username. Currently, only the
+  // connection. This includes:
+  //   - A unique identifier for the connection.
+  //   - The username provided by the underlying transport for the current connection, or
+  //     an empty string if the transport did not provide a username. Currently, only the
   //     TSasl transport provides this information.
   //   - The client connection network address.
   // It is only safe to call this method during a Thrift processor RPC
   // implementation. Otherwise, the result of calling this method is undefined.
   // It is also only safe to reference the returned value during an RPC method.
-  static const SessionContext* GetThreadSessionContext();
+  static const ConnectionContext* GetThreadConnectionContext();
 
  private:
   // True if the server has been successfully started, for internal use only
@@ -146,17 +148,17 @@ class ThriftServer {
   boost::scoped_ptr<apache::thrift::server::TServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
 
-  // If not NULL, called when session events happen. Not owned by us.
-  SessionHandlerIf* session_handler_;
+  // If not NULL, called when connection events happen. Not owned by us.
+  ConnectionHandlerIf* connection_handler_;
 
-  // Protects session_contexts_
-  boost::mutex session_contexts_lock_;
+  // Protects connection_contexts_
+  boost::mutex connection_contexts_lock_;
 
-  // Map of active session context to a shared_ptr containing that context; when an item
-  // is removed from the map, it is automatically freed.
-  typedef boost::unordered_map<SessionContext*, boost::shared_ptr<SessionContext> >
-      SessionContextSet;
-  SessionContextSet session_contexts_;
+  // Map of active connection context to a shared_ptr containing that context; when an
+  // item is removed from the map, it is automatically freed.
+  typedef boost::unordered_map<ConnectionContext*, boost::shared_ptr<ConnectionContext> >
+      ConnectionContextSet;
+  ConnectionContextSet connection_contexts_;
 
   // True if using a secure transport
   bool kerberos_enabled_;
@@ -170,7 +172,7 @@ class ThriftServer {
   // Total connections made over the lifetime of this server
   Metrics::IntMetric* total_connections_metric_;
 
-  // Used to generate a unique session id for every connection
+  // Used to generate a unique connection id for every connection
   boost::uuids::random_generator uuid_generator_;
 
   // Helper class which monitors starting servers. Needs access to internal members, and

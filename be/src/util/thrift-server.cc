@@ -72,13 +72,13 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
   virtual void preServe();
 
   // Called when a client connects; we create per-client state and call any
-  // SessionHandlerIf handler.
+  // ConnectionHandlerIf handler.
   virtual void* createContext(shared_ptr<TProtocol> input, shared_ptr<TProtocol> output);
 
-  // Called when a client starts an RPC; we set the thread-local session context.
+  // Called when a client starts an RPC; we set the thread-local connection context.
   virtual void processContext(void* context, shared_ptr<TTransport> output);
 
-  // Called when a client disconnects; we call any SessionHandlerIf handler.
+  // Called when a client disconnects; we call any ConnectionHandlerIf handler.
   virtual void deleteContext(void* serverContext, shared_ptr<TProtocol> input,
       shared_ptr<TProtocol> output);
 
@@ -184,25 +184,26 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
   signal_cond_.notify_all();
 }
 
-// This thread-local variable contains the current session context for whichever
+// This thread-local variable contains the current connection context for whichever
 // thrift server is currently serving a request on the current thread. This includes
-// session state such as the session identifier and the username.
-__thread ThriftServer::SessionContext* __session_context__;
+// connection state such as the connection identifier and the username.
+__thread ThriftServer::ConnectionContext* __connection_context__;
 
 
-const TUniqueId& ThriftServer::GetThreadSessionId() {
-  return __session_context__->session_id;
+const TUniqueId& ThriftServer::GetThreadConnectionId() {
+  return __connection_context__->connection_id;
 }
 
-const ThriftServer::SessionContext* ThriftServer::GetThreadSessionContext() {
-  return __session_context__;
+const ThriftServer::ConnectionContext* ThriftServer::GetThreadConnectionContext() {
+  return __connection_context__;
 }
 
 void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtocol> input,
     shared_ptr<TProtocol> output) {
   TSocket* socket = NULL;
   TTransport* transport = input->getTransport().get();
-  shared_ptr<SessionContext> session_ptr = shared_ptr<SessionContext>(new SessionContext);
+  shared_ptr<ConnectionContext> connection_ptr =
+      shared_ptr<ConnectionContext>(new ConnectionContext);
   if (!thrift_server_->kerberos_enabled_) {
     switch (thrift_server_->server_type_) {
       case Nonblocking:
@@ -220,25 +221,26 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   } else {
     TSaslServerTransport* sasl_transport = static_cast<TSaslServerTransport*>(transport);
     // Get the username from the transport.
-    session_ptr->username = sasl_transport->getUsername();
+    connection_ptr->username = sasl_transport->getUsername();
     socket = static_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
   }
 
   {
-    session_ptr->network_address =
+    connection_ptr->server_name = thrift_server_->name_;
+    connection_ptr->network_address =
         MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 
-    lock_guard<mutex> l(thrift_server_->session_contexts_lock_);
-    uuid session_uuid = thrift_server_->uuid_generator_();
-    UUIDToTUniqueId(session_uuid, &session_ptr->session_id);
+    lock_guard<mutex> l(thrift_server_->connection_contexts_lock_);
+    uuid connection_uuid = thrift_server_->uuid_generator_();
+    UUIDToTUniqueId(connection_uuid, &connection_ptr->connection_id);
 
-    // Add the session to the session map.
-    __session_context__ = session_ptr.get();
-    thrift_server_->session_contexts_[session_ptr.get()] = session_ptr;
+    // Add the connection to the connection map.
+    __connection_context__ = connection_ptr.get();
+    thrift_server_->connection_contexts_[connection_ptr.get()] = connection_ptr;
   }
 
-  if (thrift_server_->session_handler_ != NULL) {
-    thrift_server_->session_handler_->SessionStart(*__session_context__);
+  if (thrift_server_->connection_handler_ != NULL) {
+    thrift_server_->connection_handler_->ConnectionStart(*__connection_context__);
   }
 
   if (thrift_server_->metrics_enabled_) {
@@ -246,29 +248,29 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
     thrift_server_->total_connections_metric_->Increment(1L);
   }
 
-  // Store the __session_context__ in the per-client context. If only this were
+  // Store the __connection_context__ in the per-client context. If only this were
   // accessible from RPC method calls, we wouldn't have to
   // mess around with thread locals.
-  return (void*)__session_context__;
+  return (void*)__connection_context__;
 }
 
 void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
     shared_ptr<TTransport> transport) {
-  __session_context__ = reinterpret_cast<SessionContext*>(context);
+  __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 }
 
 void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext,
     shared_ptr<TProtocol> input, shared_ptr<TProtocol> output) {
 
-  __session_context__ = (SessionContext*) serverContext;
+  __connection_context__ = (ConnectionContext*) serverContext;
 
-  if (thrift_server_->session_handler_ != NULL) {
-    thrift_server_->session_handler_->SessionEnd(*__session_context__);
+  if (thrift_server_->connection_handler_ != NULL) {
+    thrift_server_->connection_handler_->ConnectionEnd(*__connection_context__);
   }
 
   {
-    lock_guard<mutex> l(thrift_server_->session_contexts_lock_);
-    thrift_server_->session_contexts_.erase(__session_context__);
+    lock_guard<mutex> l(thrift_server_->connection_contexts_lock_);
+    thrift_server_->connection_contexts_.erase(__connection_context__);
   }
 
   if (thrift_server_->metrics_enabled_) {
@@ -286,7 +288,7 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
       server_thread_(NULL),
       server_(NULL),
       processor_(processor),
-      session_handler_(NULL),
+      connection_handler_(NULL),
       kerberos_enabled_(false) {
   if (metrics != NULL) {
     metrics_enabled_ = true;

@@ -139,6 +139,9 @@ const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
+const string BEESWAX_SERVER_NAME = "beeswax-frontend";
+const string HS2_SERVER_NAME = "hiveserver2-frontend";
+
 // Execution state of a single plan fragment.
 class ImpalaServer::FragmentExecState {
  public:
@@ -1089,20 +1092,29 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   return Status::OK;
 }
 
-Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id) {
+Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
+    bool ignore_if_absent) {
   // Find the session_state and remove it from the map.
   shared_ptr<SessionState> session_state;
   {
     lock_guard<mutex> l(session_state_map_lock_);
     SessionStateMap::iterator entry = session_state_map_.find(session_id);
     if (entry == session_state_map_.end()) {
-      return Status("Invalid session ID");
+      if (ignore_if_absent) {
+        return Status::OK;
+      } else {
+        return Status("Invalid session ID");
+      }
     }
     session_state = entry->second;
     session_state_map_.erase(session_id);
   }
   DCHECK(session_state != NULL);
-
+  if (session_state->session_type == TSessionType::BEESWAX) {
+    ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS->Increment(-1L);
+  } else {
+    ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(-1L);
+  }
   unordered_set<TUniqueId> inflight_queries;
   {
     lock_guard<mutex> l(session_state->lock);
@@ -1608,6 +1620,60 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
 }
 
+void ImpalaServer::ConnectionStart(
+    const ThriftServer::ConnectionContext& connection_context) {
+  if (connection_context.server_name == BEESWAX_SERVER_NAME) {
+    // Beeswax only allows for one session per connection, so we can share the session ID
+    // with the connection ID
+    const TUniqueId& session_id = connection_context.connection_id;
+    shared_ptr<SessionState> session_state;
+    session_state.reset(new SessionState);
+    session_state->closed = false;
+    session_state->start_time = TimestampValue::local_time();
+    session_state->database = "default";
+    session_state->session_type = TSessionType::BEESWAX;
+    session_state->network_address = connection_context.network_address;
+    // If the username was set by a lower-level transport, use it.
+    if (!connection_context.username.empty()) {
+      session_state->user = connection_context.username;
+    }
+
+    {
+      lock_guard<mutex> l(session_state_map_lock_);
+      bool success =
+          session_state_map_.insert(make_pair(session_id, session_state)).second;
+      // The session should not have already existed.
+      DCHECK(success);
+    }
+    {
+      lock_guard<mutex> l(connection_to_sessions_map_lock_);
+      connection_to_sessions_map_[connection_context.connection_id].push_back(session_id);
+    }
+    ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS->Increment(1L);
+  }
+}
+
+void ImpalaServer::ConnectionEnd(
+    const ThriftServer::ConnectionContext& connection_context) {
+  unique_lock<mutex> l(connection_to_sessions_map_lock_);
+  ConnectionToSessionMap::iterator it =
+      connection_to_sessions_map_.find(connection_context.connection_id);
+
+  // Not every connection must have an associated session
+  if (it == connection_to_sessions_map_.end()) return;
+
+  LOG(INFO) << "Connection from client " << connection_context.network_address
+            << " closed, closing " << it->second.size() << " associated session(s)";
+
+  BOOST_FOREACH(const TUniqueId& session_id, it->second) {
+    Status status = CloseSessionInternal(session_id, true);
+    if (!status.ok()) {
+      LOG(INFO) << "Error closing session " << session_id << ": " << status.GetErrorMsg();
+    }
+  }
+  connection_to_sessions_map_.erase(it);
+}
+
 Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
     ThriftServer** be_server, ImpalaServer** impala_server) {
@@ -1626,11 +1692,11 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support
     // TThreadPoolServer.
     shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
-    *beeswax_server = new ThriftServer("beeswax-frontend", beeswax_processor,
+    *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
         beeswax_port, exec_env->metrics(), FLAGS_fe_service_threads,
         ThriftServer::ThreadPool);
 
-    (*beeswax_server)->SetSessionHandler(handler.get());
+    (*beeswax_server)->SetConnectionHandler(handler.get());
 
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_port;
   }
@@ -1639,9 +1705,10 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // HiveServer2 JDBC driver does not support non-blocking server.
     shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
-    *hs2_server = new ThriftServer("hiveServer2-frontend",
-        hs2_fe_processor, hs2_port, exec_env->metrics(), FLAGS_fe_service_threads,
-        ThriftServer::ThreadPool);
+    *hs2_server = new ThriftServer(HS2_SERVER_NAME, hs2_fe_processor, hs2_port,
+        exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+
+    (*hs2_server)->SetConnectionHandler(handler.get());
 
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
   }

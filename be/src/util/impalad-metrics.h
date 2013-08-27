@@ -44,6 +44,12 @@ class ImpaladMetricKeys {
   // queries
   static const char* IMPALA_SERVER_NUM_FRAGMENTS;
 
+  // Number of open HiveServer2 sessions
+  static const char* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
+
+  // Number of open Beeswax sessions
+  static const char* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
+
   // Number of scan ranges processed
   static const char* TOTAL_SCAN_RANGES_PROCESSED;
 
@@ -87,6 +93,8 @@ class ImpaladMetrics {
   static Metrics::StringMetric* IMPALA_SERVER_LAST_REFRESH_TIME;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;
+  static Metrics::IntMetric* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
+  static Metrics::IntMetric* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static Metrics::IntMetric* NUM_RANGES_PROCESSED;
   static Metrics::IntMetric* NUM_RANGES_MISSING_VOLUME_ID;
   static Metrics::IntMetric* MEM_POOL_TOTAL_BYTES;
