@@ -79,6 +79,9 @@ Status HdfsRCFileScanner::InitNewRange() {
         header_->codec, &decompressor_));
   }
 
+  // All data is copied out of the io buffers, so they can be recycled immediately
+  stream_->set_compact_data(true);
+
   // Allocate the buffers for the key information that is used to read and decode
   // the column data.
   columns_.resize(reinterpret_cast<RcFileHeader*>(header_)->num_cols);

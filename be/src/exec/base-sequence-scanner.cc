@@ -119,6 +119,7 @@ Status BaseSequenceScanner::ProcessSplit() {
   
   // Initialize state for new scan range
   finished_ = false;
+  if (header_->is_compressed) stream_->set_compact_data(true);
   RETURN_IF_ERROR(InitNewRange());
 
   Status status = Status::OK;

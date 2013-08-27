@@ -76,9 +76,6 @@ Status HdfsSequenceScanner::InitNewRange() {
 
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
   if (seq_header->is_compressed) {
-    // For record-compressed data we always want to copy since they tend to be
-    // small and occupy a bigger mempool chunk.
-    if (seq_header->is_row_compressed) stream_->set_compact_data(true);
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         data_buffer_pool_.get(), stream_->compact_data(),
         header_->codec, &decompressor_));
