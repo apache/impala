@@ -97,7 +97,7 @@ class ClusterController(object):
       LOG.error("No host file specified, running command on localhost")
       LOG.error("Error: %s" % e)
 
-  def run_cmd(self, cmd, serial):
+  def run_cmd(self, cmd, serial=False):
     """Run commands locally or remotely.
 
     If in local mode, the command is run locally. When not local,

@@ -26,8 +26,5 @@ class ClearBufferCache(Plugin):
     Plugin.__init__(self, *args, **kwargs)
 
   def run_pre_hook(self, context=None):
-    try:
-      cmd = "sysctl -w vm.drop_caches=3 vm.drop_caches=0"
-      self.cluster_controller.run_cmd(cmd)
-    except Exception as e:
-      print "Could not run command: %s" % cmd
+    cmd = "sysctl -w vm.drop_caches=3 vm.drop_caches=0"
+    self.cluster_controller.run_cmd(cmd)
