@@ -220,7 +220,10 @@ Status Webserver::Start() {
 }
 
 void Webserver::Stop() {
-  if (context_ != NULL) mg_stop(context_);
+  if (context_ != NULL) {
+    mg_stop(context_);
+    context_ = NULL;
+  }
 }
 
 void* Webserver::MongooseCallbackStatic(enum mg_event event,
