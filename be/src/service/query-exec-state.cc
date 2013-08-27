@@ -190,6 +190,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
 }
 
 void ImpalaServer::QueryExecState::Done() {
+  unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::local_time_micros();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));

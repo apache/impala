@@ -95,6 +95,7 @@ class ImpalaServer::QueryExecState {
   void Cancel();
 
   // This is called when the query is done (finished, cancelled, or failed).
+  // Takes lock_: callers must not hold lock() before calling.
   void Done();
 
   ImpalaServer::SessionState* parent_session() const { return parent_session_.get(); }
