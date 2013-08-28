@@ -58,10 +58,9 @@ public class SortInfo {
 
   /**
    * Substitute all the ordering expression according to the substitution map.
-   * @param sMap
    */
-  public void substitute(Expr.SubstitutionMap sMap) {
-    Expr.substituteList(orderingExprs_, sMap);
+  public void substitute(Expr.SubstitutionMap smap) {
+    Expr.substituteList(orderingExprs_, smap);
   }
 }
 

@@ -40,6 +40,7 @@ import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 
@@ -181,20 +182,9 @@ public class AnalyzerTest {
     assertNotNull(node);
     try {
       node.analyze(analyzer);
-    } catch (AnalysisException e) {
+    } catch (ImpalaException e) {
       e.printStackTrace();
-      fail("Analysis error:\n" + e.toString());
-    } catch (AuthorizationException e) {
-      e.printStackTrace();
-      fail("Authorization error:\n" + e.toString());
-    }
-    if (node instanceof SelectStmt) {
-      CheckSelectToThrift((SelectStmt) node);
-    } else if (node instanceof InsertStmt) {
-      InsertStmt insertStmt = (InsertStmt) node;
-      if (insertStmt.getQueryStmt() instanceof SelectStmt) {
-        CheckSelectToThrift((SelectStmt) insertStmt.getQueryStmt());
-      }
+      fail("Error:\n" + e.toString());
     }
     return node;
   }

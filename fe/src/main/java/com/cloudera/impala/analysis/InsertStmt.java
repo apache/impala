@@ -19,6 +19,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -41,34 +44,48 @@ import com.google.common.collect.Sets;
  * whose results are to be inserted.
  */
 public class InsertStmt extends StatementBase {
+  private final static Logger LOG = LoggerFactory.getLogger(InsertStmt.class);
+
   // Insert formats currently supported by Impala.
   private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
       EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
+
   // List of inline views that may be referenced in queryStmt.
   private final WithClause withClause_;
+
   // Target table name as seen by the parser
   private final TableName originalTableName_;
+
   // Target table into which to insert. May be qualified by analyze()
   private TableName targetTableName_;
+
   // Differentiates between INSERT INTO and INSERT OVERWRITE.
   private final boolean overwrite_;
+
   // List of column:value elements from the PARTITION (...) clause.
   // Set to null if no partition was given.
   private final List<PartitionKeyValue> partitionKeyValues_;
+
   // User-supplied hints to control hash partitioning before the table sink in the plan.
   private final List<String> planHints_;
+
   // Select or union whose results are to be inserted. If null, will be set after
   // analysis.
   private QueryStmt queryStmt_;
+
   // False if the original insert statement had a query statement, true if we need to
   // auto-generate one (for insert into tbl();) during analysis.
   private final boolean needsGeneratedQueryStatement_;
+
   // Set in analyze(). Contains metadata of target table to determine type of sink.
   private Table table_;
+
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
   private final List<Expr> partitionKeyExprs_ = new ArrayList<Expr>();
+
   // True if this InsertStmt is the top level query from an EXPLAIN <query>
   private boolean isExplain_ = false;
+
   // True to force re-partitioning before the table sink, false to prevent it. Set in
   // analyze() based on planHints_. Null if no explicit hint was given (the planner
   // should decide whether to re-partition or not).
@@ -120,7 +137,7 @@ public class InsertStmt extends StatementBase {
     List<Expr> selectListExprs;
     if (!needsGeneratedQueryStatement_) {
       queryStmt_.analyze(analyzer);
-      selectListExprs = queryStmt_.getResultExprs();
+      selectListExprs = queryStmt_.getBaseTblResultExprs();
     } else {
       selectListExprs = Lists.newArrayList();
     }
@@ -443,14 +460,6 @@ public class InsertStmt extends StatementBase {
   /**
    * Checks for type compatibility of column and expr.
    * Returns compatible (possibly cast) expr.
-   *
-   * @param column
-   *          Table column.
-   * @param expr
-   *          Expr to be checked for type compatibility with column,
-   * @throws AnalysisException
-   *           If the column and expr type are incompatible, or if casting the
-   *           expr would lead to loss of precision.
    */
   private Expr checkTypeCompatibility(Column column, Expr expr)
       throws AnalysisException {
@@ -467,11 +476,10 @@ public class InsertStmt extends StatementBase {
     // Incompatible types.
     if (!compatibleType.isValid()) {
       throw new AnalysisException(
-          String.format("Target table '%s' is incompatible with SELECT / PARTITION " +
-                        "expressions.\nExpression '%s' (type: %s) is not compatible " +
-                        "with column '%s' (type: %s)",
-                        targetTableName_, expr.toSql(), exprType,
-                        column.getName(), colType));
+          String.format(
+            "Target table '%s' is incompatible with SELECT / PARTITION expressions.\n" +
+            "Expression '%s' (type: %s) is not compatible with column '%s' (type: %s)",
+            targetTableName_, expr.toSql(), exprType, column.getName(), colType));
     }
     // Loss of precision when inserting into the table.
     if (compatibleType != colType && !compatibleType.isNull()) {
@@ -532,9 +540,7 @@ public class InsertStmt extends StatementBase {
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
 
-    if (withClause_ != null) {
-      strBuilder.append(withClause_.toSql() + " ");
-    }
+    if (withClause_ != null) strBuilder.append(withClause_.toSql() + " ");
 
     strBuilder.append("INSERT ");
     if (overwrite_) {

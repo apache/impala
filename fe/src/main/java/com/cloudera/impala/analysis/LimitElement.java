@@ -60,6 +60,11 @@ class LimitElement {
     return limit_;
   }
 
+  public boolean hasLimit() {
+    Preconditions.checkState(isAnalyzed_);
+    return limit_ != -1;
+  }
+
   /**
    * Returns the integer offset, evaluated from the offset expression. Must call
    * analyze() first. If no offsetExpr exists, then 0 (the default offset) is returned.

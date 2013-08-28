@@ -106,17 +106,26 @@ public class HBaseScanNode extends ScanNode {
     this.keyRanges = keyRanges;
   }
 
+  @Override
+  public void init(Analyzer analyzer) throws InternalException {
+    assignConjuncts(analyzer);
+    computeStats(analyzer);
+    // Convert predicates to HBase filters.
+    createHBaseFilters(analyzer);
+
+    // materialize slots in remaining conjuncts
+    analyzer.materializeSlots(conjuncts);
+    computeMemLayout(analyzer);
+  }
+
   /**
-   * This finalize() implementation also includes the computeStats() logic
-   * (and there is no computeStats()), because it's easier to do that during
-   * ValueRange construction.
+   * Also sets suggestedCaching.
    */
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException,
-      AuthorizationException {
+  public void computeStats(Analyzer analyzer) {
     Preconditions.checkNotNull(keyRanges);
     Preconditions.checkState(keyRanges.size() == 1);
-    super.finalize(analyzer);
+    super.computeStats(analyzer);
     HBaseTable tbl = (HBaseTable) desc.getTable();
 
     // If ValueRange is not null, transform it into start/stopKey by printing the values.
@@ -128,14 +137,16 @@ public class HBaseScanNode extends ScanNode {
       if (rowRange.lowerBound != null) {
         Preconditions.checkState(rowRange.lowerBound.isConstant());
         Preconditions.checkState(rowRange.lowerBound instanceof StringLiteral);
-        startKey = convertToBytes(((StringLiteral) rowRange.lowerBound).getValue(),
-                                  !rowRange.lowerBoundInclusive);
+        startKey = convertToBytes(
+            ((StringLiteral) rowRange.lowerBound).getValue(),
+            !rowRange.lowerBoundInclusive);
       }
       if (rowRange.upperBound != null) {
         Preconditions.checkState(rowRange.upperBound.isConstant());
         Preconditions.checkState(rowRange.upperBound instanceof StringLiteral);
-        stopKey = convertToBytes(((StringLiteral) rowRange.upperBound).getValue(),
-                                  rowRange.upperBoundInclusive);
+        stopKey = convertToBytes(
+            ((StringLiteral) rowRange.upperBound).getValue(),
+            rowRange.upperBoundInclusive);
       }
     }
 
@@ -154,14 +165,11 @@ public class HBaseScanNode extends ScanNode {
 
     cardinality *= computeSelectivity();
     cardinality = Math.max(0, cardinality);
-    LOG.debug("finalize HbaseScan: cardinality=" + Long.toString(cardinality));
-
-    // Convert predicates to HBase filters.
-    createHBaseFilters(analyzer);
+    LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality));
 
     // TODO: take actual regions into account
     numNodes = desc.getTable().getNumNodes();
-    LOG.debug("finalize HbaseScan: #nodes=" + Integer.toString(numNodes));
+    LOG.debug("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override
@@ -178,16 +186,15 @@ public class HBaseScanNode extends ScanNode {
   }
 
   // We convert predicates of the form <slotref> op <constant> where slotref is of
-  // type string to HBase filters. We remove the corresponding predicate from the
-  // conjuncts.
+  // type string to HBase filters.
+  // We remove the corresponding predicate from the conjuncts, but we also explicitly
+  // materialize the referenced slots, otherwise our hbase scans don't return correct data.
   // TODO: expand this to generate nested filter lists for arbitrary conjunctions
   // and disjunctions.
   private void createHBaseFilters(Analyzer analyzer) {
     for (SlotDescriptor slot: desc.getSlots()) {
       // TODO: Currently we can only push down predicates on string columns.
-      if (slot.getType() != PrimitiveType.STRING) {
-        continue;
-      }
+      if (slot.getType() != PrimitiveType.STRING) continue;
       // List of predicates that cannot be pushed down as an HBase Filter.
       List<Expr> remainingPreds = new ArrayList<Expr>();
       for (Expr e: conjuncts) {
@@ -209,8 +216,11 @@ public class HBaseScanNode extends ScanNode {
         }
         StringLiteral literal = (StringLiteral) bindingExpr;
         HBaseColumn col = (HBaseColumn) slot.getColumn();
-        filters.add(new THBaseFilter(col.getColumnFamily(), col.getColumnQualifier(),
-              (byte) hbaseOp.ordinal(), literal.getValue()));
+        filters.add(new THBaseFilter(
+            col.getColumnFamily(), col.getColumnQualifier(),
+            (byte) hbaseOp.ordinal(), literal.getValue()));
+
+        analyzer.materializeSlots(Lists.newArrayList(e));
       }
       conjuncts = remainingPreds;
     }
@@ -349,10 +359,10 @@ public class HBaseScanNode extends ScanNode {
       output.append(prefix + "stop key: " + printKey(stopKey) + "\n");
     }
     if (!filters.isEmpty()) {
-      output.append(prefix + "hbase filters: ");
+      output.append(prefix + "hbase filters:");
       if (filters.size() == 1) {
         THBaseFilter filter = filters.get(0);
-        output.append(filter.family + ":" + filter.qualifier + " " +
+        output.append(" " + filter.family + ":" + filter.qualifier + " " +
             CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
             "'" + filter.filter_constant + "'");
       } else {

@@ -6,7 +6,6 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE (finalize)
   |  output: DISTINCT_PC(l_orderkey)
-  |  group by:
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
@@ -16,7 +15,6 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE (merge finalize)
   |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))
-  |  group by:
   |
   2:EXCHANGE
 
@@ -29,7 +27,6 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: DISTINCT_PC(l_orderkey)
-  |  group by:
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
@@ -42,7 +39,6 @@ PLAN FRAGMENT 0
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
-  |  group by:
   |
   1:AGGREGATE
   |  output: DISTINCT_PC(l_orderkey)
@@ -56,7 +52,6 @@ PLAN FRAGMENT 0
 
   6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(l_orderkey)), DISTINCT_PC(DISTINCT_PC(DISTINCT_PC(l_orderkey)))
-  |  group by:
   |
   5:EXCHANGE
 
@@ -69,7 +64,6 @@ PLAN FRAGMENT 1
 
   2:AGGREGATE (merge)
   |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
-  |  group by:
   |
   4:AGGREGATE (merge)
   |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))

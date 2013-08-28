@@ -21,8 +21,8 @@ import com.cloudera.impala.common.AnalysisException;
  * Base class for all Impala SQL statements.
  */
 abstract class StatementBase implements ParseNode {
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     throw new AnalysisException("not implemented");
   }
 

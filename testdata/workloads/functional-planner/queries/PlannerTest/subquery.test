@@ -18,50 +18,60 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    int_col = t2.int_col
+  |    t2.int_col = int_col
   |
-  |----3:SCAN HDFS
-  |       table=functional.alltypes #partitions=2/24 size=40.32KB compact
+  |----2:TOP-N
+  |    |  order by: COUNT(*) DESC
+  |    |  limit: 5
+  |    |
+  |    1:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: int_col
+  |    |  having: COUNT(*) > 1
+  |    |
+  |    0:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=1/4 size=1.57KB
   |
-  2:TOP-N
-  |  order by: COUNT(*) DESC
-  |  limit: 5
-  |
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |  group by: int_col
-  |  having: COUNT(*) > 1
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+  3:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=40.32KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
+  10:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    int_col = t2.int_col
+  |    t2.int_col = int_col
   |
   |----9:EXCHANGE
+  |       limit: 5
   |
+  3:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=40.32KB
+
+PLAN FRAGMENT 2
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
   8:TOP-N
   |  order by: COUNT(*) DESC
   |  limit: 5
   |
   7:EXCHANGE
 
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.32KB
-
-PLAN FRAGMENT 2
+PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
@@ -79,7 +89,7 @@ PLAN FRAGMENT 2
   |
   5:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -92,12 +102,6 @@ PLAN FRAGMENT 3
   |
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=1/4 size=1.57KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-NODE 3:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
 ====
 # simple full scan subquery
 select * from (select y x from (select id y from functional_hbase.alltypessmall) a) b
@@ -122,11 +126,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:alltypessmall
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # subquery doing join
 select * from (select t2.*
@@ -180,21 +179,21 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
-NODE 1:
 ====
 # subquery doing join
 # multiple join predicates;
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
-select * from (select a.*
-from functional.alltypesagg a right outer join functional.alltypessmall b using (id, int_col)
-where a.day >= 6
-and b.month > 2
-and a.tinyint_col = 15
-and b.string_col = '15'
-and a.tinyint_col + b.tinyint_col < 15) x
+select *
+from
+  (select a.*
+   from functional.alltypesagg a
+     right outer join functional.alltypessmall b using (id, int_col)
+   where a.day >= 6
+     and b.month > 2
+     and a.tinyint_col = 15
+     and b.string_col = '15'
+     and a.tinyint_col + b.tinyint_col < 15) x
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -211,7 +210,8 @@ PLAN FRAGMENT 0
   |       predicates: b.string_col = '15'
   |
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+     table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: a.tinyint_col = 15
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -255,15 +255,11 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: a.id, a.int_col
 
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+     table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: a.tinyint_col = 15
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
@@ -308,13 +304,17 @@ NODE 0:
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
 select *
-from (select id, int_col, day, tinyint_col from functional.alltypesagg) a right outer join
-     (select id, int_col, month, string_col, tinyint_col from functional.alltypessmall) b using (id, int_col)
+from
+  (select id, int_col, day, tinyint_col from functional.alltypesagg) a
+  right outer join
+  (select id, int_col, month, string_col, tinyint_col
+   from functional.alltypessmall) b using (id, int_col)
 where a.day >= 6
 and b.month > 2
 and a.tinyint_col = 15
 and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
+and b.id + 15 = 27
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -328,10 +328,11 @@ PLAN FRAGMENT 0
   |
   |----1:SCAN HDFS
   |       table=functional.alltypessmall #partitions=2/4 size=3.17KB compact
-  |       predicates: string_col = '15'
+  |       predicates: id + 15 = 27, string_col = '15'
   |
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+     table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: functional.alltypesagg.id + 15 = 27, functional.alltypesagg.tinyint_col = 15
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -365,7 +366,7 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=functional.alltypessmall #partitions=2/4 size=3.17KB
-     predicates: string_col = '15'
+     predicates: id + 15 = 27, string_col = '15'
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -375,33 +376,22 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: id, int_col
 
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+     table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: functional.alltypesagg.id + 15 = 27, functional.alltypesagg.tinyint_col = 15
 ====
 # subquery join
 # multiple join predicates;
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
 select *
-from (select id, int_col, day, tinyint_col
-      from (select id, int_col, day, tinyint_col from functional.alltypesagg) a0
-      where a0.day >= 6) a
-     right outer join
-     (select id, int_col, month, string_col, tinyint_col from functional.alltypessmall) b using (id, int_col)
+from
+  (select id, int_col, day, tinyint_col
+   from
+     (select id, int_col, day, tinyint_col from functional.alltypesagg) a0
+   where a0.day >= 6) a
+  right outer join
+  (select id, int_col, month, string_col, tinyint_col from functional.alltypessmall) b
+  using (id, int_col)
 where b.month > 2
 and a.tinyint_col = 15
 and b.string_col = '15'
@@ -423,6 +413,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: functional.alltypesagg.tinyint_col = 15
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -467,6 +458,7 @@ PLAN FRAGMENT 3
 
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=5/10 size=372.38KB
+     predicates: functional.alltypesagg.tinyint_col = 15
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -507,15 +499,15 @@ PLAN FRAGMENT 0
   |----3:HASH JOIN
   |    |  join op: INNER JOIN
   |    |  hash predicates:
-  |    |    a.smallint_col = b.id
+  |    |    b.id = a.smallint_col
   |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |    |       predicates: b.float_col > 4.5
+  |    |----1:SCAN HDFS
+  |    |       table=functional.alltypesagg #partitions=1/10 size=73.39KB compact
+  |    |       predicates: a.int_col > 899
   |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypesagg #partitions=1/10 size=73.39KB compact
-  |       predicates: a.int_col > 899
+  |    2:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+  |       predicates: b.float_col > 4.5
   |
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
@@ -524,13 +516,13 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  8:EXCHANGE
+  9:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 9
     UNPARTITIONED
 
   4:HASH JOIN
@@ -539,44 +531,53 @@ PLAN FRAGMENT 1
   |    c.id = a.tinyint_col
   |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
   |
-  |----7:EXCHANGE
+  |----8:EXCHANGE
   |
-  6:EXCHANGE
+  7:EXCHANGE
 
 PLAN FRAGMENT 2
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: b.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 8
     HASH_PARTITIONED: a.tinyint_col
 
   3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
-  |    a.smallint_col = b.id
+  |    b.id = a.smallint_col
   |
-  |----5:EXCHANGE
+  |----6:EXCHANGE
   |
-  1:SCAN HDFS
-     table=functional.alltypesagg #partitions=1/10 size=73.39KB
-     predicates: a.int_col > 899
+  5:EXCHANGE
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: a.smallint_col
 
-  2:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: b.float_col > 4.5
+  1:SCAN HDFS
+     table=functional.alltypesagg #partitions=1/10 size=73.39KB
+     predicates: a.int_col > 899
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 6
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: b.id
+
+  2:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+     predicates: b.float_col > 4.5
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
     HASH_PARTITIONED: c.id
 
   0:SCAN HDFS
@@ -705,36 +706,23 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 select c1, c2, c3
-from (
-  select c1, c2, c3
-  from (
-    select int_col c1, sum(float_col) c2, min(float_col) c3
-    from functional_hbase.alltypessmall
-    group by 1
-  ) x
-  order by 2,3 desc
-  limit 5
+from
+  (select c1, c2, c3
+   from
+     (select int_col c1, sum(float_col) c2, min(float_col) c3
+      from functional_hbase.alltypessmall
+      group by 1) x
+    order by 2,3 desc
+    limit 5
 ) y
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
+  |  order by: c2 ASC, c3 DESC
   |  limit: 5
   |
   1:AGGREGATE (finalize)
@@ -748,7 +736,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
+  |  order by: c2 ASC, c3 DESC
   |  limit: 5
   |
   5:EXCHANGE
@@ -761,7 +749,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   2:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
+  |  order by: c2 ASC, c3 DESC
   |  limit: 5
   |
   4:AGGREGATE (merge finalize)
@@ -783,11 +771,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HBASE
      table:alltypessmall
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select c1, x2
 from (
@@ -811,7 +794,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: MIN(c2) ASC, c1 DESC
+  |  order by: x2 ASC, c1 DESC
   |  limit: 0
   |
   3:AGGREGATE (finalize)
@@ -833,7 +816,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: MIN(c2) ASC, c1 DESC
+  |  order by: x2 ASC, c1 DESC
   |  limit: 0
   |
   3:AGGREGATE (finalize)
@@ -876,11 +859,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HBASE
      table:alltypessmall
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # distinct *
 select distinct *
@@ -942,8 +920,6 @@ PLAN FRAGMENT 3
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # distinct w/ explicit select list
 select distinct id, zip
@@ -1005,8 +981,6 @@ PLAN FRAGMENT 3
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # aggregate with group-by, having
 select *
@@ -1027,7 +1001,7 @@ PLAN FRAGMENT 0
   1:AGGREGATE (finalize)
   |  output: COUNT(*), SUM(functional.alltypesagg.int_col), COUNT(functional.alltypesagg.int_col)
   |  group by: functional.alltypesagg.int_col % 7
-  |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
+  |  having: int_col % 7 IS NOT NULL, COUNT(*) > 10, SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
@@ -1047,7 +1021,7 @@ PLAN FRAGMENT 1
   3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), SUM(SUM(int_col)), SUM(COUNT(int_col))
   |  group by: int_col % 7
-  |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
+  |  having: int_col % 7 IS NOT NULL, COUNT(*) > 10, SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10
   |
   2:EXCHANGE
 
@@ -1064,18 +1038,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # subquery with left outer join
 select j.*, d.*
@@ -1147,11 +1109,6 @@ PLAN FRAGMENT 3
   0:SCAN HDFS
      table=functional.jointbl #partitions=1/1 size=433B
      predicates: a.test_id <= 1006
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/jointbl/data.csv 0:433
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/dimtbl/data.csv 0:171
 ====
 # complex join, having joined subquery on the rhs, and predicate
 # at multiple subquery level
@@ -1187,13 +1144,13 @@ PLAN FRAGMENT 0
   |----3:HASH JOIN
   |    |  join op: INNER JOIN
   |    |  hash predicates:
-  |    |    a.smallint_col = b.id
+  |    |    b.id = a.smallint_col
   |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+  |    |----1:SCAN HDFS
+  |    |       table=functional.alltypesagg #partitions=10/10 size=743.67KB compact
   |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypesagg #partitions=10/10 size=743.67KB compact
+  |    2:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
   |
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
@@ -1201,26 +1158,26 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  11:EXCHANGE
+  12:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: x.smallint_col
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 12
     UNPARTITIONED
 
-  10:AGGREGATE (merge finalize)
+  11:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(x.id))
   |  group by: x.smallint_col
   |
-  9:EXCHANGE
+  10:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: c.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 10
     HASH_PARTITIONED: x.smallint_col
 
   5:AGGREGATE
@@ -1232,68 +1189,55 @@ PLAN FRAGMENT 2
   |  hash predicates:
   |    c.id = a.tinyint_col
   |
-  |----8:EXCHANGE
+  |----9:EXCHANGE
   |
-  7:EXCHANGE
+  8:EXCHANGE
 
 PLAN FRAGMENT 3
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: b.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 9
     HASH_PARTITIONED: a.tinyint_col
 
   3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
-  |    a.smallint_col = b.id
+  |    b.id = a.smallint_col
   |
-  |----6:EXCHANGE
+  |----7:EXCHANGE
   |
-  1:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+  6:EXCHANGE
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: a.smallint_col
 
-  2:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+  1:SCAN HDFS
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: b.id
+
+  2:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
     HASH_PARTITIONED: c.id
 
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
 # complex join, having joined subquery on the lhs, and predicate
 # at multiple subquery level
@@ -1326,91 +1270,96 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    a.tinyint_col = c.id
+  |    c.id = a.tinyint_col
   |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
   |
-  |----3:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       predicates: c.string_col < '7'
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.smallint_col = b.id
-  |
-  |----1:SCAN HDFS
+  |----2:HASH JOIN
+  |    |  join op: INNER JOIN
+  |    |  hash predicates:
+  |    |    b.id = a.smallint_col
+  |    |
+  |    |----0:SCAN HDFS
+  |    |       table=functional.alltypesagg #partitions=1/10 size=73.39KB compact
+  |    |       predicates: a.int_col > 899
+  |    |
+  |    1:SCAN HDFS
   |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
   |       predicates: b.float_col > 4.5
   |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=1/10 size=73.39KB
-     predicates: a.int_col > 899
+  3:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     predicates: c.string_col < '7'
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  7:EXCHANGE
+  9:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: c.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 7
+    EXCHANGE ID: 9
     UNPARTITIONED
 
   4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
-  |    a.tinyint_col = c.id
+  |    c.id = a.tinyint_col
   |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
+  |
+  |----8:EXCHANGE
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: b.id
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: a.tinyint_col
+
+  2:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    b.id = a.smallint_col
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.smallint_col = b.id
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=1/10 size=73.39KB
-     predicates: a.int_col > 899
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: c.string_col < '7'
+  5:EXCHANGE
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: a.smallint_col
+
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=1/10 size=73.39KB
+     predicates: a.int_col > 899
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
     EXCHANGE ID: 5
-    UNPARTITIONED
+    HASH_PARTITIONED: b.id
 
   1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
      predicates: b.float_col > 4.5
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-NODE 3:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c.id
+
+  3:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     predicates: c.string_col < '7'
 ====
 # complex join, having joined aggregate subquery on the rhs, and predicate
 # at multiple subquery level
@@ -1443,13 +1392,13 @@ PLAN FRAGMENT 0
   |    3:HASH JOIN
   |    |  join op: INNER JOIN
   |    |  hash predicates:
-  |    |    a.smallint_col = b.id
+  |    |    b.id = a.smallint_col
   |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+  |    |----1:SCAN HDFS
+  |    |       table=functional.alltypesagg #partitions=10/10 size=743.67KB compact
   |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypesagg #partitions=10/10 size=743.67KB
+  |    2:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
   |
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
@@ -1457,26 +1406,26 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  13:EXCHANGE
+  14:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: x.smallint_col
 
   STREAM DATA SINK
-    EXCHANGE ID: 13
+    EXCHANGE ID: 14
     UNPARTITIONED
 
-  12:AGGREGATE (merge finalize)
+  13:AGGREGATE (merge finalize)
   |  output: SUM(SUM(x.cnt))
   |  group by: x.smallint_col
   |
-  11:EXCHANGE
+  12:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 12
     HASH_PARTITIONED: x.smallint_col
 
   6:AGGREGATE
@@ -1488,7 +1437,7 @@ PLAN FRAGMENT 2
   |  hash predicates:
   |    c.id = b.smallint_col
   |
-  |----10:EXCHANGE
+  |----11:EXCHANGE
   |
   0:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
@@ -1497,20 +1446,20 @@ PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: b.smallint_col
 
   STREAM DATA SINK
-    EXCHANGE ID: 10
+    EXCHANGE ID: 11
     UNPARTITIONED
 
-  9:AGGREGATE (merge finalize)
+  10:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.id))
   |  group by: b.smallint_col
   |
-  8:EXCHANGE
+  9:EXCHANGE
 
 PLAN FRAGMENT 4
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: b.id
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 9
     HASH_PARTITIONED: b.smallint_col
 
   4:AGGREGATE
@@ -1518,90 +1467,115 @@ PLAN FRAGMENT 4
   |  group by: b.smallint_col
   |
   3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
-  |    a.smallint_col = b.id
+  |    b.id = a.smallint_col
   |
-  |----7:EXCHANGE
+  |----8:EXCHANGE
   |
-  1:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+  7:EXCHANGE
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: a.smallint_col
+
+  1:SCAN HDFS
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
     EXCHANGE ID: 7
-    UNPARTITIONED
+    HASH_PARTITIONED: b.id
 
   2:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
-# Constant selects in subqueries
-select * from (select 1, 2) x
+# Values statement in subqueries with predicate
+select * from (select y from (values((1 as y),(11))) a where y < 10) b
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-     merging 1 SELECT CONSTANT
+     predicates: y < 10
+     merging 2 SELECT CONSTANT
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-     merging 1 SELECT CONSTANT
+     predicates: y < 10
+     merging 2 SELECT CONSTANT
 ====
-# Constant selects in subqueries with predicate
-select * from (select y from (select 1 y) a where y < 10) b
+# Mixed constant and non-constant select; the predicate is evaluated directly
+# by the non-const select
+select * from
+  (select y from
+    ((select 1 as y)
+     union all
+     (select tinyint_col from functional.alltypes)) a
+   where y < 10) b
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-     predicates: 1 < 10
-     merging 1 SELECT CONSTANT
+  |  predicates: y < 10
+  |  merging 1 SELECT CONSTANT
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: tinyint_col < 10
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  0:MERGE
-     predicates: 1 < 10
+  2:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  4:MERGE
+     predicates: y < 10
      merging 1 SELECT CONSTANT
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  3:MERGE
+  |  predicates: y < 10
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: tinyint_col < 10
 ====
 # Union of constant selects in subquery
 # TODO: We could combine the merge nodes below.
-select * from (select 1 union all select 2 union all select * from (select 3) y) x
+select * from (select 1 as y union all select 2 union all select * from (select 11) a) b
+where y < 10
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
+  |  predicates: y < 10
   |  merging 2 SELECT CONSTANT
   |
   1:MERGE
+     predicates: 11 < 10
      merging 1 SELECT CONSTANT
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -1617,6 +1591,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   4:MERGE
+     predicates: y < 10
      merging 2 SELECT CONSTANT
 
 PLAN FRAGMENT 2
@@ -1627,53 +1602,26 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:MERGE
+  |  predicates: y < 10
   |
   1:MERGE
-     merging 1 SELECT CONSTANT
-====
-# Values statement in subqueries
-select * from (values(1, 2)) x
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
-====
-# Values statement in subqueries with predicate
-select * from (select y from (values(1 as y)) a where y < 10) b
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     predicates: y < 10
-     merging 1 SELECT CONSTANT
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     predicates: y < 10
+     predicates: 11 < 10
      merging 1 SELECT CONSTANT
 ====
 # Union of values statements in subquery
 # TODO: We could combine the merge nodes below.
-select * from (values(1) union all values(2) union all select * from (values(3)) y) x
+select * from (values(1 as y) union all values(2) union all select * from (values(11)) a) b
+where y < 10
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
+  |  predicates: y < 10
   |  merging 2 SELECT CONSTANT
   |
   1:MERGE
+     predicates: 11 < 10
      merging 1 SELECT CONSTANT
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -1689,6 +1637,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   4:MERGE
+     predicates: y < 10
      merging 2 SELECT CONSTANT
 
 PLAN FRAGMENT 2
@@ -1699,8 +1648,10 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:MERGE
+  |  predicates: y < 10
   |
   1:MERGE
+     predicates: 11 < 10
      merging 1 SELECT CONSTANT
 ====
 # Inner join on inline views made up of unions of constant selects
@@ -1719,10 +1670,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    b = b
   |
-  |----3:MERGE
+  |----2:MERGE
   |       merging 2 SELECT CONSTANT
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    a = a
@@ -1743,7 +1694,7 @@ PLAN FRAGMENT 0
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    a = a
@@ -1760,7 +1711,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  3:MERGE
+  2:MERGE
      merging 2 SELECT CONSTANT
 
 PLAN FRAGMENT 2
@@ -1788,10 +1739,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    b = b
   |
-  |----3:MERGE
+  |----2:MERGE
   |       merging 2 SELECT CONSTANT
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT SEMI JOIN
   |  hash predicates:
   |    x.id = a
@@ -1821,7 +1772,7 @@ PLAN FRAGMENT 1
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT SEMI JOIN (BROADCAST)
   |  hash predicates:
   |    x.id = a
@@ -1838,7 +1789,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  3:MERGE
+  2:MERGE
      merging 2 SELECT CONSTANT
 
 PLAN FRAGMENT 3

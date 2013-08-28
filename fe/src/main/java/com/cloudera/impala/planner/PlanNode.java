@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprId;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
@@ -62,11 +63,18 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // String used for this node in getExplainString().
   protected String displayName;
 
-  protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
+  // unique w/in plan tree; assigned by planner, and not necessarily in c'tor
+  protected PlanNodeId id;
+
   protected long limit; // max. # of rows to be returned; 0: no limit
 
   // ids materialized by the tree rooted at this node
   protected ArrayList<TupleId> tupleIds;
+
+  // ids of the TblRefs "materialized" by this node; identical with tupleIds
+  // if the tree rooted at this node only materializes BaseTblRefs;
+  // useful for during plan generation
+  protected ArrayList<TupleId> tblRefIds_;
 
   // Composition of rows produced by this node. Possibly a superset of tupleIds
   // (the same RowBatch passes through multiple nodes; for instances, join nodes
@@ -85,6 +93,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Fragment that this PlanNode is executed in. Valid only after this PlanNode has been
   // assigned to a fragment. Set and maintained by enclosing PlanFragment.
   protected PlanFragment fragment;
+
+  // if set, needs to be applied by parent node to reference this node's output
+  protected Expr.SubstitutionMap baseTblSmap_;
+
+  // global state of planning wrt conjunct assignment; used by planner as a shortcut
+  // to avoid having to pass assigned conjuncts back and forth
+  // (the planner uses this to save and reset the global state in between join tree
+  // alternatives)
+  protected Set<ExprId> assignedConjuncts_;
 
   // estimate of the output cardinality of this node; set in computeStats();
   // invalid: -1
@@ -109,6 +126,19 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
+    this.tblRefIds_ = Lists.newArrayList(tupleIds);
+    this.cardinality = -1;
+    this.numNodes = -1;
+    this.displayName = displayName;
+  }
+
+  /**
+   * Deferred id assignment.
+   */
+  protected PlanNode(String displayName) {
+    this.limit = -1;
+    this.tupleIds = Lists.newArrayList();
+    this.tblRefIds_ = Lists.newArrayList();
     this.cardinality = -1;
     this.numNodes = -1;
     this.displayName = displayName;
@@ -118,6 +148,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
+    this.tblRefIds_ = Lists.newArrayList();
     this.cardinality = -1;
     this.numNodes = -1;
     this.displayName = displayName;
@@ -130,6 +161,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.id = id;
     this.limit = node.limit;
     this.tupleIds = Lists.newArrayList(node.tupleIds);
+    this.tblRefIds_ = Lists.newArrayList(node.tblRefIds_);
     this.rowTupleIds = Lists.newArrayList(node.rowTupleIds);
     this.nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
     this.conjuncts = Expr.cloneList(node.conjuncts, null);
@@ -140,6 +172,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public PlanNodeId getId() { return id; }
+  public void setId(PlanNodeId id) {
+    Preconditions.checkState(this.id == null);
+    this.id = id;
+  }
   public long getLimit() { return limit; }
   public boolean hasLimit() { return limit > -1; }
   public long getPerHostMemCost() { return perHostMemCost; }
@@ -148,6 +184,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public float getAvgRowSize() { return avgRowSize; }
   public void setFragment(PlanFragment fragment) { this.fragment = fragment; }
   public PlanFragment getFragment() { return fragment; }
+  public List<Expr> getConjuncts() { return conjuncts; }
+  public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+  public void setBaseTblSmap(Expr.SubstitutionMap sMap) { baseTblSmap_ = sMap; }
+  public Set<ExprId> getAssignedConjuncts() { return assignedConjuncts_; }
+  public void setAssignedConjuncts(Set<ExprId> conjuncts) {
+    assignedConjuncts_ = conjuncts;
+  }
 
   /** Set the value of compactData in all children. */
   public void setCompactData(boolean on) {
@@ -163,9 +206,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * @param limit
    */
   public void setLimit(long limit) {
-    if (this.limit == -1 || (limit != -1 && this.limit > limit)) {
-      this.limit = limit;
-    }
+    if (this.limit == -1 || (limit != -1 && this.limit > limit)) this.limit = limit;
   }
 
   public void unsetLimit() { limit = -1; }
@@ -174,6 +215,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     Preconditions.checkState(tupleIds != null);
     return tupleIds;
   }
+
+  public ArrayList<TupleId> getTblRefIds() { return tblRefIds_; }
+  public void setTblRefIds(ArrayList<TupleId> ids) { tblRefIds_ = ids; }
 
   public ArrayList<TupleId> getRowTupleIds() {
     Preconditions.checkState(rowTupleIds != null);
@@ -185,12 +229,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return nullableTupleIds;
   }
 
-  public List<Expr> getConjuncts() { return conjuncts; }
-
   public void addConjuncts(List<Expr> conjuncts) {
-    if (conjuncts == null) {
-      return;
-    }
+    if (conjuncts == null)  return;
     this.conjuncts.addAll(conjuncts);
   }
 
@@ -210,10 +250,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    *
    * root
    * |
-   * |----child 2
+   * |----child 3
    * |      limit:1
    * |
-   * |----child 3
+   * |----child 2
    * |      limit:2
    * |
    * child 1
@@ -225,12 +265,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       TExplainLevel detailLevel) {
     StringBuilder expBuilder = new StringBuilder();
     String detailPrefix = prefix;
+    String filler;
     // Do not traverse into the children of an Exchange node to avoid crossing
     // fragment boundaries.
     if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
       detailPrefix += "|  ";
+      filler = prefix + "|";
     } else {
       detailPrefix += "   ";
+      filler = prefix;
     }
 
     // Print the current node
@@ -249,7 +292,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append(PrintUtils.printMemCost(detailPrefix, perHostMemCost) + "\n");
 
       // Print tuple ids.
-      expBuilder.append(detailPrefix + "tuple ids: ");
+     expBuilder.append(detailPrefix + "tuple ids: ");
       for (TupleId tupleId: tupleIds) {
         String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";
         expBuilder.append(tupleId.asInt() + nullIndicator + " ");
@@ -260,14 +303,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Print the children. Do not traverse into the children of an Exchange node to
     // avoid crossing fragment boundaries.
     if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
-      expBuilder.append(detailPrefix + "\n");
+      expBuilder.append(filler + "\n");
       String childHeadlinePrefix = prefix + "|----";
       String childDetailPrefix = prefix + "|    ";
-      for(int i = 1; i < children.size(); ++i) {
+      for (int i = children.size() - 1; i >= 1; --i) {
         expBuilder.append(
             children.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
                 detailLevel));
-        expBuilder.append(childDetailPrefix + "\n");
+        expBuilder.append(filler + "\n");
       }
       expBuilder.append(children.get(0).getExplainString(prefix, prefix, detailLevel));
     }
@@ -328,25 +371,61 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Computes internal state, including planner-relevant statistics.
-   * Call this once on the root of the plan tree before calling toThrift().
-   * Subclasses need to override this.
+   * Computes the full internal state, including smap and planner-relevant statistics
+   * (calls computeStats()), marks all slots referenced by this node as materialized
+   * and computes the mem layout of all materialized tuples (with the assumption that
+   * slots that are needed by ancestor PlanNodes have already been marked).
+   * Also performs final expr substitution with childrens' smaps and computes internal
+   * state required for toThrift().
+   * This is called directly after construction.
    */
-  public void finalize(Analyzer analyzer) throws InternalException,
-      AuthorizationException {
-    for (PlanNode child: children) {
-      child.finalize(analyzer);
-    }
+  public void init(Analyzer analyzer) throws InternalException, AuthorizationException {
+    assignConjuncts(analyzer);
     computeStats(analyzer);
+    createDefaultSmap();
+  }
+
+  /**
+   * Assign remaining unassigned conjuncts.
+   */
+  protected void assignConjuncts(Analyzer analyzer) {
+    List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
+    conjuncts.addAll(unassigned);
+    analyzer.markConjunctsAssigned(unassigned);
+  }
+
+  /**
+   * Returns an smap that combines the childrens' smaps.
+   */
+  protected Expr.SubstitutionMap getCombinedChildSmap() {
+    if (getChildren().size() == 0) return new Expr.SubstitutionMap();
+    if (getChildren().size() == 1) return getChild(0).getBaseTblSmap();
+    Expr.SubstitutionMap result = Expr.SubstitutionMap.combine(
+        getChild(0).getBaseTblSmap(), getChild(1).getBaseTblSmap());
+    for (int i = 2; i < getChildren().size(); ++i) {
+      result = Expr.SubstitutionMap.combine(result, getChild(i).getBaseTblSmap());
+    }
+    return result;
+  }
+
+  /**
+   * Sets baseTblSmap to compose(existing smap, combined child smap). Also
+   * substitutes 'conjuncts' using the combined child smap.
+   */
+  protected void createDefaultSmap() {
+    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    baseTblSmap_ = Expr.SubstitutionMap.compose(baseTblSmap_, combinedChildSmap);
+    conjuncts = Expr.cloneList(conjuncts, combinedChildSmap);
   }
 
   /**
    * Computes planner statistics: avgRowSize, numNodes, cardinality.
    * Subclasses need to override this.
    * Assumes that it has already been called on all children.
-   * This is broken out of finalize() so that it can be called separately
-   * from finalize() (to facilitate inserting additional nodes during plan
-   * partitioning w/o the need to call finalize() recursively on the whole tree again).
+   * and that DescriptorTable.computePhysMemLayout() has been called.
+   * This is broken out of init() so that it can be called separately
+   * from init() (to facilitate inserting additional nodes during plan
+   * partitioning w/o the need to call init() recursively on the whole tree again).
    */
   protected void computeStats(Analyzer analyzer) {
     avgRowSize = 0.0F;
@@ -354,8 +433,26 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
       avgRowSize += desc.getAvgSerializedSize();
     }
-    if (!children.isEmpty()) {
-      numNodes = getChild(0).numNodes;
+    if (!children.isEmpty()) numNodes = getChild(0).numNodes;
+  }
+
+  /**
+   * Marks all slots referenced in exprs as materialized.
+   */
+  protected void markSlotsMaterialized(Analyzer analyzer, List<Expr> exprs) {
+    List<SlotId> refdIdList = Lists.newArrayList();
+    for (Expr expr: exprs) {
+      expr.getIds(null, refdIdList);
+    }
+    analyzer.getDescTbl().markSlotsMaterialized(refdIdList);
+  }
+
+  /**
+   * Call computeMemLayout() for all materialized tuples.
+   */
+  protected void computeMemLayout(Analyzer analyzer) {
+    for (TupleId id: tupleIds) {
+      analyzer.getDescTbl().getTupleDesc(id).computeMemLayout();
     }
   }
 
@@ -369,20 +466,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       prod *= e.getSelectivity();
     }
     return prod;
-  }
-
-
-  /**
-   * Appends ids of slots that need to be materialized for this tree of nodes.
-   * By default, only slots referenced by conjuncts need to be materialized
-   * (the rationale being that only conjuncts need to be evaluated explicitly;
-   * exprs that are turned into scan predicates, etc., are evaluated implicitly).
-   */
-  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
-    for (PlanNode childNode: children) {
-      childNode.getMaterializedIds(analyzer, ids);
-    }
-    Expr.getIds(getConjuncts(), null, ids);
   }
 
   // Convert this plan node into msg (excluding children), which requires setting
@@ -399,14 +482,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   protected String getExplainString(List<? extends Expr> exprs) {
-    if (exprs == null) {
-      return "";
-    }
+    if (exprs == null) return "";
     StringBuilder output = new StringBuilder();
     for (int i = 0; i < exprs.size(); ++i) {
-      if (i > 0) {
-        output.append(", ");
-      }
+      if (i > 0) output.append(", ");
       output.append(exprs.get(i).toSql());
     }
     return output.toString();
@@ -434,4 +513,5 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void computeCosts(TQueryOptions queryOptions) {
     perHostMemCost = 0;
   }
+
 }

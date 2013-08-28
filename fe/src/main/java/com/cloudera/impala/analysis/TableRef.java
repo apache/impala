@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -25,6 +26,7 @@ import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * An abstract representation of a table reference. The actual table reference could be
@@ -42,7 +44,7 @@ public abstract class TableRef implements ParseNode {
 
   // set after analyzeJoinHints(); true if explicitly set via hints
   private boolean isBroadcastJoin;
-  private boolean isPartitionJoin;
+  private boolean isPartitionedJoin;
 
   // the ref to the left of us, if we're part of a JOIN clause
   protected TableRef leftTblRef;
@@ -50,6 +52,9 @@ public abstract class TableRef implements ParseNode {
   // true if this TableRef has been analyzed; implementing subclass should set it to true
   // at the end of analyze() call.
   protected boolean isAnalyzed;
+
+  // all (logical) TupleIds referenced in the On clause
+  protected List<TupleId> onClauseTupleIds_ = Lists.newArrayList();
 
   // analysis output
   protected TupleDescriptor desc;
@@ -80,17 +85,20 @@ public abstract class TableRef implements ParseNode {
     return (joinOp == null ? JoinOperator.INNER_JOIN : joinOp);
   }
 
-  public ArrayList<String> getJoinHints() {
-    return joinHints;
-  }
-
-  public Expr getOnClause() {
-    return onClause;
-  }
-
-  public List<String> getUsingClause() {
-    return usingColNames;
-  }
+  public ArrayList<String> getJoinHints() { return joinHints; }
+  public Expr getOnClause() { return onClause; }
+  public List<String> getUsingClause() { return usingColNames; }
+  public String getExplicitAlias() { return alias; }
+  public Table getTable() { return getDesc().getTable(); }
+  public void setJoinOp(JoinOperator op) { this.joinOp = op; }
+  public void setOnClause(Expr e) { this.onClause = e; }
+  public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }
+  public TableRef getLeftTblRef() { return leftTblRef; }
+  public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef = leftTblRef; }
+  public void setJoinHints(ArrayList<String> hints) { this.joinHints = hints; }
+  public boolean isBroadcastJoin() { return isBroadcastJoin; }
+  public boolean isPartitionedJoin() { return isPartitionedJoin; }
+  public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
@@ -133,16 +141,19 @@ public abstract class TableRef implements ParseNode {
     }
   }
 
-  public String getExplicitAlias() { return alias; }
-  public Table getTable() { return getDesc().getTable(); }
-  public void setJoinOp(JoinOperator op) { this.joinOp = op; }
-  public void setOnClause(Expr e) { this.onClause = e; }
-  public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }
-  public TableRef getLeftTblRef() { return leftTblRef; }
-  public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef = leftTblRef; }
-  public void setJoinHints(ArrayList<String> hints) { this.joinHints = hints; }
-  public boolean isBroadcastJoin() { return isBroadcastJoin; }
-  public boolean isPartitionJoin() { return isPartitionJoin; }
+  /**
+   * Return the list of tuple ids of the full sequence of table refs up to this one.
+   */
+  public List<TupleId> getAllTupleIds() {
+    Preconditions.checkState(isAnalyzed);
+    if (leftTblRef != null) {
+      List<TupleId> result = leftTblRef.getAllTupleIds();
+      result.add(desc.getId());
+      return result;
+    } else {
+      return Lists.newArrayList(desc.getId());
+    }
+  }
 
   /**
    * Parse hints.
@@ -151,7 +162,7 @@ public abstract class TableRef implements ParseNode {
     if (joinHints == null) return;
     for (String hint: joinHints) {
       if (hint.toUpperCase().equals("BROADCAST")) {
-        if (isPartitionJoin) {
+        if (isPartitionedJoin) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
         isBroadcastJoin = true;
@@ -159,7 +170,7 @@ public abstract class TableRef implements ParseNode {
         if (isBroadcastJoin) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
-        isPartitionJoin = true;
+        isPartitionedJoin = true;
       } else {
         throw new AnalysisException("JOIN hint not recognized: " + hint);
       }
@@ -208,16 +219,20 @@ public abstract class TableRef implements ParseNode {
     }
 
     // at this point, both 'this' and leftTblRef have been analyzed
-    // and registered
+    // and registered;
+    // we register both our logical tid as well as the materialized tids
+    // as being outer-joined
     boolean lhsIsNullable = false;
     boolean rhsIsNullable = false;
     if (joinOp == JoinOperator.LEFT_OUTER_JOIN
         || joinOp == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerOuterJoinedTids(getId().asList(), this);
       analyzer.registerOuterJoinedTids(getMaterializedTupleIds(), this);
       rhsIsNullable = true;
     }
     if (joinOp == JoinOperator.RIGHT_OUTER_JOIN
         || joinOp == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerOuterJoinedTids(leftTblRef.getAllTupleIds(), this);
       analyzer.registerOuterJoinedTids(leftTblRef.getAllMaterializedTupleIds(), this);
       lhsIsNullable = true;
     }
@@ -225,23 +240,29 @@ public abstract class TableRef implements ParseNode {
     if (onClause != null) {
       onClause.analyze(analyzer);
       onClause.checkReturnsBool("ON clause", true);
+      Set<TupleId> onClauseTupleIds = Sets.newHashSet();
       for (Expr e: onClause.getConjuncts()) {
         // Outer join clause conjuncts are registered for this particular table ref
         // (ie, can only be evaluated by the plan node that implements this join).
         // The exception are conjuncts that only pertain to the nullable side
         // of the outer join; those can be evaluated directly when materializing tuples
         // without violating outer join semantics.
+        // TODO: remove this special case
         if (getJoinOp().isOuterJoin()) {
           if (lhsIsNullable && e.isBound(leftTblRef.getId())
               || rhsIsNullable && e.isBound(getId())) {
-            analyzer.registerConjuncts(e, null, false);
+            analyzer.registerConjuncts(e, this, false);
           } else {
             analyzer.registerConjuncts(e, this, false);
           }
         } else {
           analyzer.registerConjuncts(e, null, false);
         }
+        List<TupleId> tupleIds = Lists.newArrayList();
+        e.getIds(tupleIds, null);
+        onClauseTupleIds.addAll(tupleIds);
       }
+      onClauseTupleIds_.addAll(onClauseTupleIds);
     } else if (getJoinOp().isOuterJoin() || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {
       throw new AnalysisException(joinOpToSql() + " requires an ON or USING clause.");
     }

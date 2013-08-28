@@ -20,6 +20,7 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TFloatLiteral;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class FloatLiteral extends LiteralExpr {
@@ -56,6 +57,13 @@ public class FloatLiteral extends LiteralExpr {
       throw new AnalysisException("invalid floating-point literal: " + value, e);
     }
     init(floatValue);
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("value", value)
+        .toString();
   }
 
   @Override

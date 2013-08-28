@@ -44,7 +44,6 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
@@ -53,10 +52,8 @@ import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
@@ -438,8 +435,7 @@ public class Frontend {
    */
   public TExecRequest createExecRequest(
       TClientRequest request, StringBuilder explainString)
-      throws AnalysisException, AuthorizationException, NotImplementedException,
-      InternalException {
+      throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_,
         request.sessionState.database,
         new User(request.sessionState.user));

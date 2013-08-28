@@ -32,6 +32,7 @@ import com.google.common.collect.Lists;
 public class TupleDescriptor {
   private final static Logger LOG = LoggerFactory.getLogger(TupleDescriptor.class);
   private final TupleId id;
+  private String alias_;
   private final ArrayList<SlotDescriptor> slots;
   private Table table;  // underlying table, if there is one
 
@@ -41,6 +42,10 @@ public class TupleDescriptor {
   private int byteSize;  // of all slots plus null indicators
   private int numNullBytes;
 
+  // if true, computeMemLayout() has been called and we can't add any additional
+  // slots
+  private boolean hasMemLayout = false;
+
   private float avgSerializedSize;  // in bytes; includes serialization overhead
 
   TupleDescriptor(int id) {
@@ -49,17 +54,25 @@ public class TupleDescriptor {
   }
 
   public void addSlot(SlotDescriptor desc) {
+    Preconditions.checkState(!hasMemLayout);
     slots.add(desc);
   }
 
   public TupleId getId() { return id; }
   public ArrayList<SlotDescriptor> getSlots() { return slots; }
   public Table getTable() { return table; }
+  public TableName getTableName() {
+    if (table == null) return null;
+    return new TableName(
+        table.getDb() != null ? table.getDb().getName() : null, table.getName());
+  }
   public void setTable(Table tbl) { table = tbl; }
   public int getByteSize() { return byteSize; }
   public float getAvgSerializedSize() { return avgSerializedSize; }
   public boolean getIsMaterialized() { return isMaterialized; }
   public void setIsMaterialized(boolean value) { isMaterialized = value; }
+  public String getAlias() { return alias_; }
+  public void setAlias(String alias) { alias_ = alias; }
 
   public String debugString() {
     String tblStr = (table == null ? "null" : table.getFullName());
@@ -76,6 +89,15 @@ public class TupleDescriptor {
         .toString();
   }
 
+  /**
+   * Materialize all slots.
+   */
+  public void materializeSlots() {
+    for (SlotDescriptor slot: slots) {
+      slot.setIsMaterialized(true);
+    }
+  }
+
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc =
         new TTupleDescriptor(id.asInt(), byteSize, numNullBytes);
@@ -86,7 +108,10 @@ public class TupleDescriptor {
     return ttupleDesc;
   }
 
-  protected void computeMemLayout() {
+  public void computeMemLayout() {
+    if (hasMemLayout) return;
+    hasMemLayout = true;
+
     // sort slots by size
     List<List<SlotDescriptor>> slotsBySize =
         Lists.newArrayListWithCapacity(PrimitiveType.getMaxSlotSize());
@@ -98,17 +123,16 @@ public class TupleDescriptor {
     int numNullableSlots = 0;
     for (SlotDescriptor d: slots) {
       ColumnStats stats = d.getStats();
+      // TODO: fix this, we don't need to serialize non-materialized slots
       if (stats.hasAvgSerializedSize()) {
         avgSerializedSize += d.getStats().getAvgSerializedSize();
       } else {
         // TODO: for computed slots, try to come up with stats estimates
         avgSerializedSize += d.getType().getSlotSize();
       }
-      if (d.getIsMaterialized()) {
+      if (d.isMaterialized()) {
         slotsBySize.get(d.getType().getSlotSize()).add(d);
-        if (d.getIsNullable()) {
-          ++numNullableSlots;
-        }
+        if (d.getIsNullable()) ++numNullableSlots;
       }
     }
     // we shouldn't have anything of size 0
@@ -141,9 +165,7 @@ public class TupleDescriptor {
           d.setNullIndicatorByte(nullIndicatorByte);
           d.setNullIndicatorBit(nullIndicatorBit);
           nullIndicatorBit = (nullIndicatorBit + 1) % 8;
-          if (nullIndicatorBit == 0) {
-            ++nullIndicatorByte;
-          }
+          if (nullIndicatorBit == 0) ++nullIndicatorByte;
         } else {
           // Non-nullable slots will have 0 for the byte offset and -1 for the bit mask
           d.setNullIndicatorBit(-1);

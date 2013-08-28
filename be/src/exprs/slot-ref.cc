@@ -58,6 +58,7 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
     // TODO: create macro MAKE_ERROR() that returns a stream
     stringstream error;
     error << "couldn't resolve slot descriptor " << slot_id_;
+    LOG(INFO) << error.str();
     return Status(error.str());
   }
   if (!slot_desc->is_materialized()) {
@@ -67,7 +68,16 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   }
   // TODO(marcel): get from runtime state
   tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent());
-  DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
+  if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
+    TupleDescriptor* d = state->desc_tbl().GetTupleDescriptor(slot_desc->parent());
+    LOG(INFO) << "invalid idx: " << slot_desc->DebugString()
+              << "\nparent=" << d->DebugString()
+              << "\nrow=" << row_desc.DebugString();
+    stringstream error;
+    error << "invalid tuple_idx";
+    return Status(error.str());
+  }
+  //DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
   tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
   slot_offset_ = slot_desc->tuple_offset();
   null_indicator_offset_ = slot_desc->null_indicator_offset();

@@ -1,0 +1,1061 @@
+# Q3 - Shipping Priority Query
+# Modifications: Added round() calls
+select
+  l_orderkey,
+  round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue,
+  o_orderdate,
+  o_shippriority
+from tpch.customer c,
+  tpch.orders o,
+  tpch.lineitem l
+where
+  c.c_mktsegment = 'BUILDING'
+  and c.c_custkey = o.o_custkey
+  and l.l_orderkey = o.o_orderkey
+  and o_orderdate < '1995-03-15'
+  and l_shipdate > '1995-03-15'
+group by
+  l_orderkey,
+  o_orderdate,
+  o_shippriority
+order by
+  revenue desc,
+  o_orderdate
+limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  6:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  5:AGGREGATE (finalize)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    o.o_custkey = c.c_custkey
+  |
+  |----0:SCAN HDFS
+  |       table=tpch.customer #partitions=1/1 size=23.08MB compact
+  |       predicates: c.c_mktsegment = 'BUILDING'
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    l.l_orderkey = o.o_orderkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.orders #partitions=1/1 size=162.56MB compact
+  |       predicates: o_orderdate < '1995-03-15'
+  |
+  2:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l_shipdate > '1995-03-15'
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  12:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  11:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  6:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  10:AGGREGATE (merge finalize)
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
+
+  5:AGGREGATE
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    o.o_custkey = c.c_custkey
+  |
+  |----8:EXCHANGE
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    l.l_orderkey = o.o_orderkey
+  |
+  |----7:EXCHANGE
+  |
+  2:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l_shipdate > '1995-03-15'
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+     predicates: c.c_mktsegment = 'BUILDING'
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+     predicates: o_orderdate < '1995-03-15'
+====
+# Q3 - Shipping Priority Query
+# straight_join prevents join order optimization
+select straight_join
+  l_orderkey,
+  round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue,
+  o_orderdate,
+  o_shippriority
+from tpch.customer c,
+  tpch.orders o,
+  tpch.lineitem l
+where
+  c.c_mktsegment = 'BUILDING'
+  and c.c_custkey = o.o_custkey
+  and l.l_orderkey = o.o_orderkey
+  and o_orderdate < '1995-03-15'
+  and l_shipdate > '1995-03-15'
+group by
+  l_orderkey,
+  o_orderdate,
+  o_shippriority
+order by
+  revenue desc,
+  o_orderdate
+limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  6:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  5:AGGREGATE (finalize)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    o.o_orderkey = l.l_orderkey
+  |
+  |----2:SCAN HDFS
+  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
+  |       predicates: l_shipdate > '1995-03-15'
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    c.c_custkey = o.o_custkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.orders #partitions=1/1 size=162.56MB compact
+  |       predicates: o_orderdate < '1995-03-15'
+  |
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+     predicates: c.c_mktsegment = 'BUILDING'
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  14:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  13:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
+
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  6:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+  |  limit: 10
+  |
+  12:AGGREGATE (merge finalize)
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  11:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: o.o_orderkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
+
+  5:AGGREGATE
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: l_orderkey, o_orderdate, o_shippriority
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    o.o_orderkey = l.l_orderkey
+  |
+  |----10:EXCHANGE
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    HASH_PARTITIONED: l.l_orderkey
+
+  2:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l_shipdate > '1995-03-15'
+
+PLAN FRAGMENT 4
+  PARTITION: HASH_PARTITIONED: c.c_custkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    HASH_PARTITIONED: o.o_orderkey
+
+  3:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    c.c_custkey = o.o_custkey
+  |
+  |----8:EXCHANGE
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: o.o_custkey
+
+  1:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+     predicates: o_orderdate < '1995-03-15'
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c.c_custkey
+
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+     predicates: c.c_mktsegment = 'BUILDING'
+====
+# Q5 - Local Supplier Volume Query
+# Modifications: Added round() call, converted selects from multiple tables
+# to joins, added limit
+select
+  n_name,
+  round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue
+from tpch.customer,
+  tpch.orders o,
+  tpch.lineitem l,
+  tpch.supplier s,
+  tpch.nation,
+  tpch.region
+where l_orderkey = o_orderkey
+  and l_suppkey = s_suppkey
+  and c_nationkey = s_nationkey
+  and c_custkey = o_custkey
+  and s_nationkey = n_nationkey
+  and n_regionkey = r_regionkey
+  and r_name = 'ASIA'
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
+group by
+  n_name
+order by
+  revenue desc
+limit 100
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  12:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+  |  limit: 100
+  |
+  11:AGGREGATE (finalize)
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: n_name
+  |
+  10:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    n_regionkey = r_regionkey
+  |
+  |----5:SCAN HDFS
+  |       table=tpch.region #partitions=1/1 size=384B compact
+  |       predicates: r_name = 'ASIA'
+  |
+  9:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    s_nationkey = n_nationkey
+  |
+  |----4:SCAN HDFS
+  |       table=tpch.nation #partitions=1/1 size=2.15KB compact
+  |
+  8:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    l_suppkey = s_suppkey
+  |    c_nationkey = s_nationkey
+  |
+  |----3:SCAN HDFS
+  |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
+  |
+  7:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    o_custkey = c_custkey
+  |
+  |----0:SCAN HDFS
+  |       table=tpch.customer #partitions=1/1 size=23.08MB compact
+  |
+  6:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    l_orderkey = o_orderkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.orders #partitions=1/1 size=162.56MB compact
+  |       predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+  |
+  2:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  21:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+  |  limit: 100
+  |
+  20:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: n_name
+
+  STREAM DATA SINK
+    EXCHANGE ID: 20
+    UNPARTITIONED
+
+  12:TOP-N
+  |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+  |  limit: 100
+  |
+  19:AGGREGATE (merge finalize)
+  |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+  |  group by: n_name
+  |
+  18:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 18
+    HASH_PARTITIONED: n_name
+
+  11:AGGREGATE
+  |  output: SUM(l_extendedprice * (1.0 - l_discount))
+  |  group by: n_name
+  |
+  10:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    n_regionkey = r_regionkey
+  |
+  |----17:EXCHANGE
+  |
+  9:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    s_nationkey = n_nationkey
+  |
+  |----16:EXCHANGE
+  |
+  8:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    l_suppkey = s_suppkey
+  |    c_nationkey = s_nationkey
+  |
+  |----15:EXCHANGE
+  |
+  7:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    o_custkey = c_custkey
+  |
+  |----14:EXCHANGE
+  |
+  6:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    l_orderkey = o_orderkey
+  |
+  |----13:EXCHANGE
+  |
+  2:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 17
+    UNPARTITIONED
+
+  5:SCAN HDFS
+     table=tpch.region #partitions=1/1 size=384B
+     predicates: r_name = 'ASIA'
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    UNPARTITIONED
+
+  4:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 15
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=tpch.supplier #partitions=1/1 size=1.33MB
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+
+PLAN FRAGMENT 7
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+     predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+====
+# Q2 - Minimum Cost Supplier Query
+select
+  s.s_acctbal,
+  s.s_name,
+  n.n_name,
+  p.p_partkey,
+  ps.ps_supplycost,
+  p.p_mfgr,
+  s.s_address,
+  s.s_phone,
+  s.s_comment
+from
+  tpch.part p,
+  tpch.supplier s,
+  tpch.partsupp ps,
+  tpch.nation n,
+  tpch.region r
+where
+  p.p_size = 15
+  and p.p_type like '%BRASS'
+  and r.r_name = 'EUROPE'
+  and p.p_partkey = ps.ps_partkey
+  and s.s_suppkey = ps.ps_suppkey
+  and s.s_nationkey = n.n_nationkey
+  and n.n_regionkey = r.r_regionkey
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  8:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    n.n_regionkey = r.r_regionkey
+  |
+  |----4:SCAN HDFS
+  |       table=tpch.region #partitions=1/1 size=384B compact
+  |       predicates: r.r_name = 'EUROPE'
+  |
+  7:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    s.s_nationkey = n.n_nationkey
+  |
+  |----3:SCAN HDFS
+  |       table=tpch.nation #partitions=1/1 size=2.15KB compact
+  |
+  6:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    ps.ps_suppkey = s.s_suppkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
+  |
+  5:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    ps.ps_partkey = p.p_partkey
+  |
+  |----0:SCAN HDFS
+  |       table=tpch.part #partitions=1/1 size=22.83MB compact
+  |       predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
+  |
+  2:SCAN HDFS
+     table=tpch.partsupp #partitions=1/1 size=112.71MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  14:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: ps.ps_suppkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  8:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    n.n_regionkey = r.r_regionkey
+  |
+  |----13:EXCHANGE
+  |
+  7:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    s.s_nationkey = n.n_nationkey
+  |
+  |----12:EXCHANGE
+  |
+  6:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    ps.ps_suppkey = s.s_suppkey
+  |
+  |----11:EXCHANGE
+  |
+  10:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  4:SCAN HDFS
+     table=tpch.region #partitions=1/1 size=384B
+     predicates: r.r_name = 'EUROPE'
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    HASH_PARTITIONED: s.s_suppkey
+
+  1:SCAN HDFS
+     table=tpch.supplier #partitions=1/1 size=1.33MB
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    HASH_PARTITIONED: ps.ps_suppkey
+
+  5:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    ps.ps_partkey = p.p_partkey
+  |
+  |----9:EXCHANGE
+  |
+  2:SCAN HDFS
+     table=tpch.partsupp #partitions=1/1 size=112.71MB
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=tpch.part #partitions=1/1 size=22.83MB
+     predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
+====
+# Q4 - Order Priority Checking Query
+# the largest input is prevented from becoming the leftmost input by the semi-join
+select
+  o_orderpriority,
+  count(*) as order_count
+from tpch.orders
+  left semi join tpch.lineitem
+  on (o_orderkey = l_orderkey and
+      l_commitdate < l_receiptdate)
+where
+  o_orderdate >= '1993-07-01' and
+  o_orderdate < '1993-10-01'
+group by
+  o_orderpriority
+order by
+  o_orderpriority
+limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  3:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: LEFT SEMI JOIN
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
+  |       predicates: l_commitdate < l_receiptdate
+  |
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: o_orderpriority
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  8:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: o_orderpriority
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: o_orderkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: o_orderpriority
+
+  3:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: LEFT SEMI JOIN (PARTITIONED)
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----6:EXCHANGE
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: l_orderkey
+
+  1:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l_commitdate < l_receiptdate
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: o_orderkey
+
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+====
+# the largest input is prevented from becoming the leftmost input by the full outer join
+select o_orderpriority, count(*) as order_count
+from tpch.orders
+  full outer join tpch.lineitem
+  on (o_orderkey = l_orderkey)
+group by o_orderpriority
+order by o_orderpriority limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  3:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: FULL OUTER JOIN
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
+  |
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: o_orderpriority
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  8:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: o_orderpriority
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: o_orderkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: o_orderpriority
+
+  3:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: FULL OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----6:EXCHANGE
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: l_orderkey
+
+  1:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: o_orderkey
+
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+====
+# the largest input is prevented from becoming the leftmost input by the right outer join
+select o_orderpriority, count(*) as order_count
+from tpch.orders
+  right outer join tpch.lineitem
+  on (o_orderkey = l_orderkey)
+group by o_orderpriority
+order by o_orderpriority limit 10
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  3:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
+  |
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: o_orderpriority
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  4:TOP-N
+  |  order by: o_orderpriority ASC
+  |  limit: 10
+  |
+  8:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: o_orderpriority
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: o_orderkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: o_orderpriority
+
+  3:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: o_orderpriority
+  |
+  2:HASH JOIN
+  |  join op: RIGHT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    o_orderkey = l_orderkey
+  |
+  |----6:EXCHANGE
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: l_orderkey
+
+  1:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: o_orderkey
+
+  0:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+====
+# order does not become the leftmost input because of the outer join;
+# the join with nation is done first because it reduces the intermediate output
+select count(*)
+from tpch.customer
+  left outer join tpch.orders on (c_custkey = o_custkey)
+  join tpch.nation on (c_nationkey = n_nationkey)
+where n_name = 'x'
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    c_custkey = o_custkey
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.orders #partitions=1/1 size=162.56MB compact
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    c_nationkey = n_nationkey
+  |
+  |----2:SCAN HDFS
+  |       table=tpch.nation #partitions=1/1 size=2.15KB compact
+  |       predicates: n_name = 'x'
+  |
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |
+  9:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: c_custkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  5:AGGREGATE
+  |  output: COUNT(*)
+  |
+  4:HASH JOIN
+  |  join op: LEFT OUTER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    c_custkey = o_custkey
+  |
+  |----8:EXCHANGE
+  |
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: o_custkey
+
+  1:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c_custkey
+
+  3:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    c_nationkey = n_nationkey
+  |
+  |----6:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  2:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+     predicates: n_name = 'x'
+====

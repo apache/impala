@@ -21,6 +21,7 @@ import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class CastExpr extends Expr {
@@ -51,9 +52,7 @@ public class CastExpr extends Expr {
 
   @Override
   public String toSqlImpl() {
-    if (isImplicit) {
-      return getChild(0).toSql();
-    }
+    if (isImplicit) return getChild(0).toSql();
     return "CAST(" + getChild(0).toSql() + " AS " + targetType.toString() + ")";
   }
 
@@ -72,9 +71,16 @@ public class CastExpr extends Expr {
     msg.setOpcode(opcode);
   }
 
-  public boolean isImplicit() {
-    return isImplicit;
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("isImplicit", isImplicit)
+        .add("target", targetType)
+        .addValue(super.debugString())
+        .toString();
   }
+
+  public boolean isImplicit() { return isImplicit; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
@@ -107,9 +113,7 @@ public class CastExpr extends Expr {
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
+    if (!super.equals(obj)) return false;
     CastExpr expr = (CastExpr) obj;
     return this.opcode == expr.opcode;
   }

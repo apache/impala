@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -53,6 +54,10 @@ public class SelectStmt extends QueryStmt {
   // Set in analyze().
   private String sqlString;
 
+  // substitutes all exprs in this select block to reference base tables
+  // directly
+  private Expr.SubstitutionMap baseTblSmap_ = new Expr.SubstitutionMap();
+
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
              Expr wherePredicate, ArrayList<Expr> groupingExprs,
@@ -78,46 +83,32 @@ public class SelectStmt extends QueryStmt {
   /**
    * @return the original select list items from the query
    */
-  public SelectList getSelectList() {
-    return selectList;
-  }
+  public SelectList getSelectList() { return selectList; }
 
   /**
    * @return the HAVING clause post-analysis and with aliases resolved
    */
-  public Expr getHavingPred() {
-    return havingPred;
-  }
+  public Expr getHavingPred() { return havingPred; }
 
-  public List<TableRef> getTableRefs() {
-    return tableRefs;
-  }
-
-  public Expr getWhereClause() {
-    return whereClause;
-  }
-
-  public AggregateInfo getAggInfo() {
-    return aggInfo;
-  }
-
+  public List<TableRef> getTableRefs() { return tableRefs; }
+  public Expr getWhereClause() { return whereClause; }
+  public AggregateInfo getAggInfo() { return aggInfo; }
   @Override
-  public SortInfo getSortInfo() {
-    return sortInfo_;
-  }
-
+  public SortInfo getSortInfo() { return sortInfo_; }
   @Override
-  public ArrayList<String> getColLabels() {
-    return colLabels;
-  }
+  public ArrayList<String> getColLabels() { return colLabels; }
+  public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
+  /**
+   * Creates resultExprs and baseTblResultExprs.
+   */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     super.analyze(analyzer);
 
     // Replace BaseTableRefs with ViewRefs.
-    substititeViews(analyzer, tableRefs);
+    substituteViews(analyzer, tableRefs);
 
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
@@ -144,13 +135,12 @@ public class SelectStmt extends QueryStmt {
         resultExprs_.add(item.getExpr());
         String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
         SlotRef aliasRef = new SlotRef(null, label);
-        if (aliasSMap_.lhs.contains(aliasRef)) {
+        if (aliasSmap_.containsMappingFor(aliasRef)) {
           // If we have already seen this alias, it refers to more than one column and
           // therefore is ambiguous.
           ambiguousAliasList_.add(aliasRef);
         }
-        aliasSMap_.lhs.add(aliasRef);
-        aliasSMap_.rhs.add(item.getExpr().clone(null));
+        aliasSmap_.addMapping(aliasRef, item.getExpr().clone(null));
         colLabels.add(label);
       }
     }
@@ -171,11 +161,56 @@ public class SelectStmt extends QueryStmt {
     // Remember the SQL string before inline-view expression substitution.
     sqlString = toSql();
 
-    // Substitute expressions to the underlying inline view expressions
-    substituteInlineViewExprs(analyzer);
+    resolveInlineViewRefs(analyzer);
+
+    if (aggInfo != null) LOG.debug("post-analysis " + aggInfo.debugString());
+  }
+
+  /**
+   * Marks all unassigned join predicates as well as exprs in aggInfo and sortInfo.
+   */
+  @Override
+  public void materializeRequiredSlots(Analyzer analyzer) {
+    // mark unassigned join predicates
+    List<Expr> unassigned =
+        analyzer.getUnassignedConjuncts(getTableRefIds(), true);
+    List<Expr> unassignedJoinConjuncts = Lists.newArrayList();
+    for (Expr e: unassigned) {
+      List<TupleId> tids = Lists.newArrayList();
+      e.getIds(tids, null);
+      if (tids.isEmpty()) continue;
+
+      // isOjConjunct: mark this here, getBoundPredicates() won't return it
+      // for the ScanNode;
+      // same if this is for an outer-joined tid and e is from the Where clause
+      // TODO: figure out a better way to do this (should the ScanNode mark
+      // all slots from single-tid predicates as being referenced?)
+      if (tids.size() > 1
+          || analyzer.isOjConjunct(e)
+          || analyzer.isOuterJoined(tids.get(0))
+             && e.isWhereClauseConjunct()
+             && e.contains(IsNullPredicate.class)) {
+        unassignedJoinConjuncts.add(e);
+      }
+      //if (tids.size() > 1) unassignedJoinConjuncts.add(e);
+    }
+    List<Expr> baseTblJoinConjuncts =
+        Expr.cloneList(unassignedJoinConjuncts, baseTblSmap_);
+    materializeSlots(analyzer, baseTblJoinConjuncts);
 
     if (aggInfo != null) {
-      LOG.debug("post-analysis " + aggInfo.debugString());
+      // mark all agg exprs needed for HAVING pred as materialized before calling
+      // AggregateInfo.materializeRequiredSlots(), otherwise they won't show up in
+      // AggregateInfo.getMaterializedAggregateExprs()
+      if (havingPred != null) materializeSlots(analyzer, Lists.newArrayList(havingPred));
+      aggInfo.materializeRequiredSlots(analyzer, baseTblSmap_);
+    }
+
+    if (sortInfo_ != null) {
+      // mark ordering exprs
+      List<Expr> resolvedExprs =
+          Expr.cloneList(sortInfo_.getOrderingExprs(), baseTblSmap_);
+      materializeSlots(analyzer, resolvedExprs);
     }
   }
 
@@ -192,7 +227,7 @@ public class SelectStmt extends QueryStmt {
    * This method is used for substituting views from WITH clauses
    * and views from the catalog.
    */
-  public void substititeViews(Analyzer analyzer, List<TableRef> tblRefs)
+  public void substituteViews(Analyzer analyzer, List<TableRef> tblRefs)
       throws AuthorizationException, AnalysisException {
     for (int i = 0; i < tblRefs.size(); ++i) {
       if (!(tblRefs.get(i) instanceof BaseTableRef)) continue;
@@ -207,49 +242,30 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * This select block might contain inline views.
-   * Substitute all exprs (result of the analysis) of this select block referencing any
-   * of our inlined views, including everything registered with the analyzer.
-   * Expressions created during parsing (such as whereClause) are not touched.
-   */
-  protected void substituteInlineViewExprs(Analyzer analyzer) {
+    * Populates baseTblSmap_ with our combined inline view smap and creates
+    * baseTblResultExprs.
+    */
+  protected void resolveInlineViewRefs(Analyzer analyzer) {
     // Gather the inline view substitution maps from the enclosed inline views
-    Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
     for (TableRef tblRef: tableRefs) {
       if (tblRef instanceof InlineViewRef) {
         InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
-        sMap = Expr.SubstitutionMap.combine(sMap, inlineViewRef.getExprSMap());
+        baseTblSmap_ =
+            Expr.SubstitutionMap.combine(baseTblSmap_, inlineViewRef.getBaseTblSmap());
       }
     }
+    baseTblResultExprs_ = Expr.cloneList(resultExprs_, baseTblSmap_);
+    LOG.info("baseTblSmap_: " + baseTblSmap_.debugString());
+    LOG.info("resultExprs: " + Expr.debugString(resultExprs_));
+    LOG.info("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
+  }
 
-    // we might not have anything to substitute
-    if (sMap.lhs.size() == 0) {
-      return;
+  public List<TupleId> getTableRefIds() {
+    List<TupleId> result = Lists.newArrayList();
+    for (TableRef ref: tableRefs) {
+      result.add(ref.getId());
     }
-
-    // Substitute select list, join clause, where clause, aggregate, order by
-    // and this select block's analyzer expressions
-
-    // select
-    Expr.substituteList(resultExprs_, sMap);
-
-    // aggregation (group by and aggregation expr)
-    if (aggInfo != null) {
-      aggInfo.substitute(sMap);
-    }
-
-    // having
-    if (havingPred != null) {
-      havingPred.substitute(sMap);
-    }
-
-    // ordering
-    if (sortInfo_ != null) {
-      sortInfo_.substitute(sMap);
-    }
-
-    // expressions registered inside the analyzer
-    analyzer.substitute(sMap);
+    return result;
   }
 
   /**
@@ -345,7 +361,7 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException("Column " + ambiguousAlias.toSql() +
             " in group by clause is ambiguous");
       }
-      Expr.substituteList(groupingExprsCopy, aliasSMap_);
+      Expr.substituteList(groupingExprsCopy, aliasSmap_);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).containsAggregate()) {
@@ -360,7 +376,7 @@ public class SelectStmt extends QueryStmt {
     // analyze having clause
     if (havingClause != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred = havingClause.clone(aliasSMap_);
+      havingPred = havingClause.clone(aliasSmap_);
       havingPred.analyze(analyzer);
       havingPred.checkReturnsBool("HAVING clause", true);
       analyzer.registerConjuncts(havingPred, null, false);
@@ -389,7 +405,7 @@ public class SelectStmt extends QueryStmt {
           ? aggInfo.getSecondPhaseDistinctAggInfo()
           : aggInfo;
     Expr.SubstitutionMap combinedSMap =
-        Expr.SubstitutionMap.combine(avgSMap, finalAggInfo.getSMap());
+        Expr.SubstitutionMap.compose(avgSMap, finalAggInfo.getSMap());
     LOG.debug("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output
@@ -479,12 +495,11 @@ public class SelectStmt extends QueryStmt {
       if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
         CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
         outCastExpr.analyze(analyzer);
-        result.rhs.add(outCastExpr);
+        result.addMapping(aggExpr, outCastExpr);
       } else {
         divExpr.analyze(analyzer);
-        result.rhs.add(divExpr);
+        result.addMapping(aggExpr, divExpr);
       }
-      result.lhs.add(aggExpr);
     }
     LOG.debug("avg smap: " + result.debugString());
     return result;

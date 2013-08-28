@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -45,6 +45,9 @@ public class SortNode extends PlanNode {
 
   protected long offset; // The offset of the first row to return
 
+  // set in init() or c'tor
+  private List<Expr> baseTblOrderingExprs_;
+
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
       boolean isDefaultLimit, long offset) {
     super(id, "TOP-N");
@@ -65,6 +68,9 @@ public class SortNode extends PlanNode {
   public SortNode(PlanNodeId id, SortNode inputSortNode, PlanNode child) {
     super(id, inputSortNode, "TOP-N");
     this.info = inputSortNode.info;
+    // set this directly (and don't reassign in init()): inputSortNode's smap
+    // may not be able to remap info.orderingExprs
+    baseTblOrderingExprs_ = inputSortNode.baseTblOrderingExprs_;
     this.useTopN = inputSortNode.useTopN;
     this.isDefaultLimit = inputSortNode.isDefaultLimit;
     this.children.add(child);
@@ -75,16 +81,22 @@ public class SortNode extends PlanNode {
   public void setOffset(long offset) { this.offset = offset; }
 
   @Override
-  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
-    super.getMaterializedIds(analyzer, ids);
-    Expr.getIds(info.getOrderingExprs(), null, ids);
-  }
-
-  @Override
   public void setCompactData(boolean on) { this.compactData = on; }
 
   @Override
   public boolean isBlockingNode() { return true; }
+
+  @Override
+  public void init(Analyzer analyzer) throws InternalException {
+    assignConjuncts(analyzer);
+    computeStats(analyzer);
+    baseTblSmap_ = getChild(0).getBaseTblSmap();
+    // don't set the ordering exprs if they're already set (they were assigned in the
+    // clone c'tor)
+    if (baseTblOrderingExprs_ == null) {
+      baseTblOrderingExprs_ = Expr.cloneList(info.getOrderingExprs(), baseTblSmap_);
+    }
+  }
 
   @Override
   protected void computeStats(Analyzer analyzer) {
@@ -119,7 +131,7 @@ public class SortNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SORT_NODE;
     msg.sort_node = new TSortNode(
-        Expr.treesToThrift(info.getOrderingExprs()), info.getIsAscOrder(), useTopN,
+        Expr.treesToThrift(baseTblOrderingExprs_), info.getIsAscOrder(), useTopN,
         isDefaultLimit);
     msg.sort_node.setNulls_first(info.getNullsFirst());
     msg.sort_node.setOffset(offset);

@@ -27,6 +27,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TStringLiteral;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class StringLiteral extends LiteralExpr {
@@ -69,6 +70,13 @@ public class StringLiteral extends LiteralExpr {
   @Override
   public String getStringValue() {
     return value;
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("value", value)
+        .toString();
   }
 
   @Override

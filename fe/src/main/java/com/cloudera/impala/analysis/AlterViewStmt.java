@@ -31,8 +31,8 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);
     viewDefStmt.analyze(analyzer);

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -23,7 +24,8 @@ import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.FunctionCallExpr;
-import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAggregateFunctionCall;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -82,6 +84,37 @@ public class AggregationNode extends PlanNode {
   public boolean isBlockingNode() { return true; }
 
   @Override
+  public void init(Analyzer analyzer) {
+    // loop over all materialized slots and add binding predicates to 'conjuncts'
+    // TODO: unify this with HdfsScanNode; also, we should be able to apply this
+    // logic to predicates over multiple slots
+    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds.get(0)).getSlots()) {
+      ArrayList<Pair<Expr, Boolean>> bindingPredicates =
+          analyzer.getBoundPredicates(slotDesc.getId(), this);
+      for (Pair<Expr, Boolean> p: bindingPredicates) {
+        if (!analyzer.isConjunctAssigned(p.first)) {
+          conjuncts.add(p.first);
+          if (p.second) analyzer.markConjunctAssigned(p.first);
+        }
+      }
+    }
+
+    // also add remaining unassigned conjuncts
+    assignConjuncts(analyzer);
+    markSlotsMaterialized(analyzer, conjuncts);
+    computeMemLayout(analyzer);
+    // do this at the end so it can take all conjuncts into account
+    computeStats(analyzer);
+
+    // don't call createDefaultSMap(), it would point our conjuncts (= Having clause)
+    // to our input; our conjuncts don't get substituted because they already
+    // refer to our output
+    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    aggInfo.substitute(combinedChildSmap);
+    baseTblSmap_ = aggInfo.getSMap();
+  }
+
+  @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     // This is prone to overflow, because we keep multiplying cardinalities,
@@ -96,10 +129,10 @@ public class AggregationNode extends PlanNode {
     // cardinality: product of # of distinct values produced by grouping exprs
     cardinality = Expr.getNumDistinctValues(aggInfo.getGroupingExprs());
     // take HAVING predicate into account
-    LOG.debug("Agg: cardinality=" + Long.toString(cardinality));
+    LOG.trace("Agg: cardinality=" + Long.toString(cardinality));
     if (cardinality > 0) {
       cardinality = Math.round((double) cardinality * computeSelectivity());
-      LOG.debug("sel=" + Double.toString(computeSelectivity()));
+      LOG.trace("sel=" + Double.toString(computeSelectivity()));
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality < 0) cardinality = -1;
@@ -107,7 +140,7 @@ public class AggregationNode extends PlanNode {
     if (getChild(0).getCardinality() != -1) {
       cardinality = Math.min(getChild(0).getCardinality(), cardinality);
     }
-    LOG.debug("stats Agg: cardinality=" + Long.toString(cardinality));
+    LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality));
   }
 
   private void updateDisplayName() {
@@ -140,7 +173,8 @@ public class AggregationNode extends PlanNode {
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
 
     List<TAggregateFunctionCall> aggregateFunctions = Lists.newArrayList();
-    for (FunctionCallExpr e: aggInfo.getAggregateExprs()) {
+    // only serialize agg exprs that are being materialized
+    for (FunctionCallExpr e: aggInfo.getMaterializedAggregateExprs()) {
       aggregateFunctions.add(e.toTAggregateFunctionCall());
     }
     msg.agg_node = new TAggregationNode(
@@ -160,28 +194,21 @@ public class AggregationNode extends PlanNode {
     if (aggInfo.getAggregateExprs() != null && aggInfo.getAggregateExprs().size() > 0) {
       output.append(detailPrefix + "output: ")
         .append(getExplainString(aggInfo.getAggregateExprs()) + "\n");
-    }
+   }
     // TODO: is this the best way to display this. It currently would
     // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
     // very obvious what that means if you don't already know.
 
     // TODO: group by can be very long. Break it into multiple lines
-    output.append(detailPrefix + "group by: ")
-      .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
+    if (!aggInfo.getGroupingExprs().isEmpty()) {
+      output.append(detailPrefix + "group by: ")
+          .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
+    }
     if (!conjuncts.isEmpty()) {
       output.append(detailPrefix + "having: ")
           .append(getExplainString(conjuncts) + "\n");
     }
     return output.toString();
-  }
-
-  @Override
-  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
-    super.getMaterializedIds(analyzer, ids);
-
-    // we indirectly reference all grouping slots (because we write them)
-    // so they're all materialized.
-    aggInfo.getRefdSlots(ids);
   }
 
   @Override

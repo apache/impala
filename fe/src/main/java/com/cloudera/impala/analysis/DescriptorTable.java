@@ -22,6 +22,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDescriptorTable;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -63,6 +64,7 @@ public class DescriptorTable {
   public TupleDescriptor getTupleDesc(TupleId id) { return tupleDescs.get(id); }
   public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs.get(id); }
   public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs.values(); }
+  public Collection<SlotDescriptor> getSlotDescs() { return slotDescs.values(); }
   public TupleId getMaxTupleId() { return new TupleId(nextTupleId - 1); }
   public SlotId getMaxSlotId() { return new SlotId(nextSlotId - 1); }
 
@@ -70,8 +72,29 @@ public class DescriptorTable {
     referencedTables.add(table);
   }
 
+  /**
+   * Marks all slots in list as materialized.
+   */
+  public void markSlotsMaterialized(List<SlotId> ids) {
+    for (SlotId id: ids) {
+      getSlotDesc(id).setIsMaterialized(true);
+    }
+  }
+
+  /**
+   * Return all ids in slotIds that belong to tupleId.
+   */
+  public List<SlotId> getTupleSlotIds(List<SlotId> slotIds, TupleId tupleId) {
+    List<SlotId> result = Lists.newArrayList();
+    for (SlotId id: slotIds) {
+      if (getSlotDesc(id).getParent().getId().equals(tupleId)) result.add(id);
+    }
+    return result;
+  }
+
   // Computes physical layout parameters of all descriptors.
   // Call this only after the last descriptor was added.
+  // Test-only.
   public void computeMemLayout() {
     for (TupleDescriptor d: tupleDescs.values()) {
       d.computeMemLayout();

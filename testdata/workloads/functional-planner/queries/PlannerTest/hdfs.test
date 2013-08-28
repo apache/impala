@@ -22,8 +22,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # predicate is evaluated by the scan node
 select zip, count(*)
@@ -74,8 +72,6 @@ PLAN FRAGMENT 2
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # all partitions are selected
 select * from functional.alltypes
@@ -128,7 +124,7 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
 ====
 # predicate on first partition key
-select * from functional.alltypes where year = 2009
+select id, month from functional.alltypes where year = 2009
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED

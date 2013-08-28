@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -32,6 +33,7 @@ public class SelectNode extends PlanNode {
   protected SelectNode(PlanNodeId id, PlanNode child) {
     super(id, child.getTupleIds(), "SELECT");
     addChild(child);
+    this.tblRefIds_ = child.tblRefIds_;
     this.rowTupleIds = child.rowTupleIds;
     this.nullableTupleIds = child.nullableTupleIds;
   }

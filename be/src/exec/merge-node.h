@@ -50,6 +50,9 @@ class MergeNode : public ExecNode {
   // Descriptor for tuples this merge node constructs.
   const TupleDescriptor* tuple_desc_;
 
+  // those tuple_desc_->slots() which are materialized, in the same order
+  std::vector<SlotDescriptor*> materialized_slots_;
+
   // Const exprs materialized by this node. These exprs don't refer to any children.
   std::vector<std::vector<Expr*> > const_result_expr_lists_;
 

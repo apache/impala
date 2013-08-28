@@ -15,6 +15,9 @@
 package com.cloudera.impala.common;
 
 import java.util.ArrayList;
+import java.util.List;
+
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 /**
@@ -59,7 +62,16 @@ public class Id<IdType extends Id<IdType>> {
     return list;
   }
 
+  @Override
   public String toString() {
     return Integer.toString(id);
+  }
+
+  public static <C extends Id> String printIds(List<C> ids) {
+    ArrayList<String> l = Lists.newArrayList();
+    for (C id: ids) {
+      l.add(id.toString());
+    }
+    return "(" + Joiner.on(" ").join(l) + ")";
   }
 }

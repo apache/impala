@@ -40,8 +40,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # distinct w/ explicit select list
 select distinct id, zip
@@ -85,8 +83,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # count(distinct)
 select count(distinct id, zip)
@@ -97,7 +93,6 @@ PLAN FRAGMENT 0
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(if(id IS NULL, NULL, zip))
-  |  group by:
   |
   1:AGGREGATE
   |  group by: id, zip
@@ -110,7 +105,6 @@ PLAN FRAGMENT 0
 
   6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(if(id IS NULL, NULL, zip)))
-  |  group by:
   |
   5:EXCHANGE
 
@@ -123,7 +117,6 @@ PLAN FRAGMENT 1
 
   2:AGGREGATE (merge)
   |  output: COUNT(if(id IS NULL, NULL, zip))
-  |  group by:
   |
   4:AGGREGATE (merge)
   |  group by: id, zip
@@ -142,8 +135,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 # count(distinct) w/ grouping
 select tinyint_col, count(distinct int_col, bigint_col)
@@ -196,18 +187,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # count(distinct) and sum(distinct) w/ grouping
 select tinyint_col, count(distinct int_col), sum(distinct int_col)
@@ -260,18 +239,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
 # is ignored
@@ -328,18 +295,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # aggregate fns with and without distinct
 select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
@@ -395,18 +350,6 @@ PLAN FRAGMENT 2
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # test join on inline views containing distinct aggregates to make sure
 # the aggregation info reports the correct tuple ids (from the 2nd phase
@@ -425,7 +368,6 @@ PLAN FRAGMENT 0
   |
   |----5:AGGREGATE (merge finalize)
   |    |  output: COUNT(bigint_col)
-  |    |  group by:
   |    |
   |    4:AGGREGATE
   |    |  group by: bigint_col
@@ -435,7 +377,6 @@ PLAN FRAGMENT 0
   |
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col)
-  |  group by:
   |
   1:AGGREGATE
   |  group by: int_col
@@ -455,7 +396,6 @@ PLAN FRAGMENT 0
   |
   10:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(int_col))
-  |  group by:
   |
   9:EXCHANGE
 
@@ -468,7 +408,6 @@ PLAN FRAGMENT 1
 
   14:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(bigint_col))
-  |  group by:
   |
   13:EXCHANGE
 
@@ -481,7 +420,6 @@ PLAN FRAGMENT 2
 
   5:AGGREGATE (merge)
   |  output: COUNT(bigint_col)
-  |  group by:
   |
   12:AGGREGATE (merge)
   |  group by: bigint_col
@@ -510,7 +448,6 @@ PLAN FRAGMENT 4
 
   2:AGGREGATE (merge)
   |  output: COUNT(int_col)
-  |  group by:
   |
   8:AGGREGATE (merge)
   |  group by: int_col
@@ -529,15 +466,4 @@ PLAN FRAGMENT 5
   |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
-NODE 3:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
 ====

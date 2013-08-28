@@ -25,6 +25,7 @@ import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -94,6 +95,13 @@ public class BinaryPredicate extends Predicate {
     msg.setOpcode(opcode);
   }
 
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("op", op)
+        .addValue(super.debugString())
+        .toString();
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -135,23 +143,28 @@ public class BinaryPredicate extends Predicate {
   /**
    * If predicate is of the form "<slotref> <op> <expr>", returns expr,
    * otherwise returns null. Slotref may be wrapped in a CastExpr.
+   * TODO: revisit CAST handling at the caller
    */
   public Expr getSlotBinding(SlotId id) {
     // check left operand
-    SlotRef slotRef = getChild(0).unwrapSlotRef();
+    SlotRef slotRef = getChild(0).unwrapSlotRef(false);
     if (slotRef != null && slotRef.getSlotId() == id) return getChild(1);
     // check right operand
-    slotRef = getChild(1).unwrapSlotRef();
+    slotRef = getChild(1).unwrapSlotRef(false);
     if (slotRef != null && slotRef.getSlotId() == id) return getChild(0);
     return null;
   }
 
+  /**
+   * If this is an equality predicate between two slots that only require implicit
+   * casts, returns those two slots; otherwise returns null.
+   */
   @Override
   public Pair<SlotId, SlotId> getEqSlots() {
     if (op != Operator.EQ) return null;
-    SlotRef lhs = getChild(0).unwrapSlotRef();
+    SlotRef lhs = getChild(0).unwrapSlotRef(true);
     if (lhs == null) return null;
-    SlotRef rhs = getChild(1).unwrapSlotRef();
+    SlotRef rhs = getChild(1).unwrapSlotRef(true);
     if (rhs == null) return null;
     return new Pair(lhs.getSlotId(), rhs.getSlotId());
   }

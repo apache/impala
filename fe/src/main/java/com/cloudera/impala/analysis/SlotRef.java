@@ -15,6 +15,10 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -26,6 +30,8 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
+  private final static Logger LOG = LoggerFactory.getLogger(SlotRef.class);
+
   private final TableName tblName;
   private final String col;
   private final String label;  // printed in toSql()
@@ -52,16 +58,22 @@ public class SlotRef extends Expr {
     this.label = ToSqlUtils.getHiveIdentSql(col);
   }
 
-  // C'tor for a "pre-analyzed" ref to slot that doesn't correspond to
-  // a table's column.
+  // C'tor for a "pre-analyzed" ref to a slot
   public SlotRef(SlotDescriptor desc) {
     super();
     this.tblName = null;
-    this.col = null;
+    if (desc.getColumn() != null) {
+      this.col = desc.getColumn().getName();
+    } else {
+      this.col = null;
+    }
     this.isAnalyzed = true;
     this.desc = desc;
     this.type = desc.getType();
-    this.label = desc.getLabel();
+    String alias = desc.getParent().getAlias();
+    //this.label =  desc.getLabel();
+    // TODO: should this simply be the SlotDescriptor's label?
+    this.label = (alias != null ? alias + "." : "") + desc.getLabel();
     this.numDistinctValues = desc.getStats().getNumDistinctValues();
   }
 
@@ -96,6 +108,10 @@ public class SlotRef extends Expr {
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.SLOT_REF;
     msg.slot_ref = new TSlotRef(desc.getId().asInt());
+    // we shouldn't be sending exprs over non-materialized slots
+    Preconditions.checkState(desc.isMaterialized());
+    // we also shouldn't have forgotten to compute the mem layout
+    Preconditions.checkState(desc.getByteOffset() != -1);
   }
 
   @Override
@@ -111,57 +127,41 @@ public class SlotRef extends Expr {
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
+    if (!super.equals(obj)) return false;
     SlotRef other = (SlotRef) obj;
     // check slot ids first; if they're both set we only need to compare those
     // (regardless of how the ref was constructed)
     if (desc != null && other.desc != null) {
       return desc.getId().equals(other.desc.getId());
     }
-    if ((tblName == null) != (other.tblName == null)) {
-      return false;
-    }
-    if (tblName != null && !tblName.equals(other.tblName)) {
-      return false;
-    }
-    if ((col == null) != (other.col == null)) {
-      return false;
-    }
-    if (col != null && !col.toLowerCase().equals(other.col.toLowerCase())) {
-      return false;
-    }
+    if ((tblName == null) != (other.tblName == null)) return false;
+    if (tblName != null && !tblName.equals(other.tblName)) return false;
+    if ((col == null) != (other.col == null)) return false;
+    if (col != null && !col.toLowerCase().equals(other.col.toLowerCase())) return false;
     return true;
   }
 
   @Override
-  public boolean isBound(List<TupleId> tids) {
+  public boolean isBoundByTupleIds(List<TupleId> tids) {
     Preconditions.checkState(desc != null);
     for (TupleId tid: tids) {
-      if (tid.equals(desc.getParent().getId())) {
-        return true;
-      }
+      if (tid.equals(desc.getParent().getId())) return true;
     }
     return false;
   }
 
   @Override
-  public boolean isBound(SlotId slotId) {
+  public boolean isBoundBySlotIds(List<SlotId> slotIds) {
     Preconditions.checkState(isAnalyzed);
-    return desc.getId().equals(slotId);
+    return slotIds.contains(desc.getId());
   }
 
   @Override
-  public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
+  public void getIdsHelper(Set<TupleId> tupleIds, Set<SlotId> slotIds) {
     Preconditions.checkState(type != PrimitiveType.INVALID_TYPE);
     Preconditions.checkState(desc != null);
-    if (slotIds != null) {
-      slotIds.add(desc.getId());
-    }
-    if (tupleIds != null) {
-      tupleIds.add(desc.getParent().getId());
-    }
+    if (slotIds != null) slotIds.add(desc.getId());
+    if (tupleIds != null) tupleIds.add(desc.getParent().getId());
   }
 
   public String getColumnName() {

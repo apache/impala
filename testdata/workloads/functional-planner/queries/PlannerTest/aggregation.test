@@ -8,7 +8,6 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE (finalize)
   |  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-  |  group by:
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
@@ -18,7 +17,6 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), SUM(COUNT(tinyint_col)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col))
-  |  group by:
   |
   2:EXCHANGE
 
@@ -31,22 +29,9 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-  |  group by:
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # with grouping
 select tinyint_col, bigint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
@@ -123,7 +108,6 @@ PLAN FRAGMENT 0
   |
   1:AGGREGATE (finalize)
   |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
-  |  group by:
   |  having: COUNT(id) > 0
   |
   0:SCAN HDFS
@@ -138,7 +122,6 @@ PLAN FRAGMENT 0
   |
   4:AGGREGATE (merge finalize)
   |  output: SUM(SUM(id)), SUM(COUNT(id)), SUM(SUM(zip)), SUM(COUNT(zip))
-  |  group by:
   |  having: COUNT(id) > 0
   |
   3:EXCHANGE
@@ -152,7 +135,6 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
-  |  group by:
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B

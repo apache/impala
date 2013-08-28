@@ -74,11 +74,11 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----2:MERGE
-  |       merging 1 SELECT CONSTANT
-  |
   |----3:MERGE
   |       merging 2 SELECT CONSTANT
+  |
+  |----2:MERGE
+  |       merging 1 SELECT CONSTANT
   |
   1:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
@@ -138,10 +138,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = int_col
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
@@ -171,7 +171,7 @@ PLAN FRAGMENT 1
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
@@ -188,7 +188,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypessmall #partitions=4/4 size=6.32KB
 
 PLAN FRAGMENT 3
@@ -200,6 +200,103 @@ PLAN FRAGMENT 3
 
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
+====
+# Multiple dependent views in with-clause
+with t1 as (
+  select int_col c1, tinyint_col c2, max(id) c3
+  from functional.alltypessmall
+  group by 1, 2
+  order by 1,2
+  limit 5),
+t2 as (select c1, c2, c3 from t1),
+t3 as (
+  select c1, c3, max(c2) m2
+  from t2
+  group by c1, c3
+  limit 10),
+t4 as (select c1, c3, m2 from t3)
+select * from t4
+where c1 > 0
+order by c3, c1 desc
+limit 3
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:TOP-N
+  |  order by: c3 ASC, c1 DESC
+  |  limit: 3
+  |
+  4:SELECT
+  |  predicates: c1 > 0
+  |
+  3:AGGREGATE (finalize)
+  |  output: MAX(tinyint_col)
+  |  group by: int_col, MAX(id)
+  |  limit: 10
+  |
+  2:TOP-N
+  |  order by: int_col ASC, tinyint_col ASC
+  |  limit: 5
+  |
+  1:AGGREGATE (finalize)
+  |  output: MAX(id)
+  |  group by: int_col, tinyint_col
+  |
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:TOP-N
+  |  order by: c3 ASC, c1 DESC
+  |  limit: 3
+  |
+  4:SELECT
+  |  predicates: c1 > 0
+  |
+  3:AGGREGATE (finalize)
+  |  output: MAX(tinyint_col)
+  |  group by: int_col, MAX(id)
+  |  limit: 10
+  |
+  9:TOP-N
+  |  order by: int_col ASC, tinyint_col ASC
+  |  limit: 5
+  |
+  8:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: int_col, tinyint_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  2:TOP-N
+  |  order by: int_col ASC, tinyint_col ASC
+  |  limit: 5
+  |
+  7:AGGREGATE (merge finalize)
+  |  output: MAX(MAX(id))
+  |  group by: int_col, tinyint_col
+  |
+  6:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: int_col, tinyint_col
+
+  1:AGGREGATE
+  |  output: MAX(id)
+  |  group by: int_col, tinyint_col
+  |
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
 ====
 # Self-join of with-clause table to make sure the on clause is properly set
 # in the cloned inline-view instances.
@@ -214,10 +311,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = int_col
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
@@ -247,7 +344,7 @@ PLAN FRAGMENT 1
   |
   |----7:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
@@ -263,7 +360,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
 PLAN FRAGMENT 3
@@ -299,10 +396,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = int_col
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
@@ -332,7 +429,7 @@ PLAN FRAGMENT 1
   |
   |----7:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
@@ -348,7 +445,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
 PLAN FRAGMENT 3
@@ -384,10 +481,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = int_col
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    int_col = int_col
@@ -426,7 +523,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 8
     HASH_PARTITIONED: int_col
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
 PLAN FRAGMENT 3
@@ -436,7 +533,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 7
     HASH_PARTITIONED: int_col
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
@@ -480,10 +577,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = int_col
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
@@ -522,7 +619,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     HASH_PARTITIONED: int_col
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
 PLAN FRAGMENT 3
@@ -532,7 +629,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 6
     HASH_PARTITIONED: int_col
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col

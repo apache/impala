@@ -125,9 +125,7 @@ public class PlanFragment {
    */
   public void finalize(Analyzer analyzer, boolean validateFileFormats)
       throws InternalException, NotImplementedException {
-    if (planRoot != null) {
-      setRowTupleIds(planRoot, null);
-    }
+    if (planRoot != null) setRowTupleIds(planRoot, null);
     if (destNodeId != null) {
       Preconditions.checkState(sink == null);
       // we're streaming to an exchange node
@@ -223,14 +221,15 @@ public class PlanFragment {
 
   public TPlanFragment toThrift() {
     TPlanFragment result = new TPlanFragment();
-    if (planRoot != null) {
-      result.setPlan(planRoot.treeToThrift());
-    }
+    // TODO: remove logging output
+    if (planRoot != null) result.setPlan(planRoot.treeToThrift());
     if (outputExprs != null) {
       result.setOutput_exprs(Expr.treesToThrift(outputExprs));
     }
-    if (sink != null) {
-      result.setOutput_sink(sink.toThrift());
+    if (sink != null) result.setOutput_sink(sink.toThrift());
+    if (dataPartition.getPartitionExprs() != null) {
+      List<Expr> c =
+          Expr.cloneList(dataPartition.getPartitionExprs(), planRoot.getBaseTblSmap());
     }
     result.setPartition(dataPartition.toThrift());
     return result;
@@ -240,12 +239,8 @@ public class PlanFragment {
     StringBuilder str = new StringBuilder();
     Preconditions.checkState(dataPartition != null);
     str.append("  PARTITION: " + dataPartition.getExplainString(explainLevel) + "\n");
-    if (sink != null) {
-      str.append(sink.getExplainString("  ", explainLevel) + "\n");
-    }
-    if (planRoot != null) {
-      str.append(planRoot.getExplainString("  ", "  ", explainLevel));
-    }
+    if (sink != null) str.append(sink.getExplainString("  ", explainLevel) + "\n");
+    if (planRoot != null) str.append(planRoot.getExplainString("  ", "  ", explainLevel));
     return str.toString();
   }
 

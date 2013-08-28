@@ -19,6 +19,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TBoolLiteral;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 
 public class BoolLiteral extends LiteralExpr {
   private final boolean value;
@@ -37,6 +38,13 @@ public class BoolLiteral extends LiteralExpr {
     } else {
       throw new AnalysisException("invalid BOOLEAN literal: " + value);
     }
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("value", value)
+        .toString();
   }
 
   @Override

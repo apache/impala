@@ -25,8 +25,8 @@ public interface ParseNode {
    * @param analyzer
    * @throws AnalysisException, InternalException
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException;
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException;
 
   /**
    * @return SQL syntax corresponding to this node.

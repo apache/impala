@@ -23,6 +23,7 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TIntLiteral;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class IntLiteral extends LiteralExpr {
@@ -72,6 +73,13 @@ public class IntLiteral extends LiteralExpr {
 
   public long getValue() {
     return value.longValue();
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("value", value)
+        .toString();
   }
 
   @Override

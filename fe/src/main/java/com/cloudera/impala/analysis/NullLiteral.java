@@ -18,6 +18,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class NullLiteral extends LiteralExpr {
@@ -37,6 +38,11 @@ public class NullLiteral extends LiteralExpr {
   @Override
   public String toSqlImpl() {
     return getStringValue();
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this).toString();
   }
 
   @Override

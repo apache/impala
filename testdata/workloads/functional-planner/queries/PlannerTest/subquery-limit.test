@@ -122,7 +122,6 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = id
-  |  other predicates: id < 5
   |  limit: 5
   |
   |----3:TOP-N
@@ -138,6 +137,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -156,7 +156,6 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = id
-  |  other predicates: id < 5
   |  limit: 5
   |
   |----9:EXCHANGE
@@ -164,6 +163,7 @@ PLAN FRAGMENT 1
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -285,7 +285,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: functional.alltypessmall.id ASC
+  |  order by: id ASC
   |  limit: 5
   |
   1:SELECT
@@ -299,7 +299,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: functional.alltypessmall.id ASC
+  |  order by: id ASC
   |  limit: 5
   |
   1:SELECT
@@ -334,7 +334,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: a.id ASC
+  |  order by: id ASC
   |  limit: 5
   |
   3:SELECT
@@ -356,7 +356,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
-  |  order by: a.id ASC
+  |  order by: id ASC
   |  limit: 5
   |
   3:SELECT
@@ -554,7 +554,6 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = a.id
-  |  other predicates: a.id < 5
   |
   |----3:HASH JOIN
   |    |  join op: INNER JOIN
@@ -570,6 +569,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -595,13 +595,13 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = a.id
-  |  other predicates: a.id < 5
   |
   |----8:EXCHANGE
   |       limit: 10
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -665,7 +665,6 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = a.id
-  |  other predicates: a.id < 5
   |
   |----4:TOP-N
   |    |  order by: a.int_col ASC
@@ -684,6 +683,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -709,13 +709,13 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = a.id
-  |  other predicates: a.id < 5
   |
   |----10:EXCHANGE
   |       limit: 10
   |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -771,7 +771,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: id ASC
+  |  order by: x.id ASC
   |  limit: 100
   |  offset: 4
   |
@@ -787,7 +787,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
-  |  order by: id ASC
+  |  order by: x.id ASC
   |  limit: 100
   |  offset: 4
   |

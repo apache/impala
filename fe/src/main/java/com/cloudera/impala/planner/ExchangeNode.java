@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;

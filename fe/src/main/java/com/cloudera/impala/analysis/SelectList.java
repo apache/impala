@@ -23,16 +23,19 @@ import com.google.common.collect.Lists;
  * Select list items plus distinct clause.
  *
  */
-class SelectList {
+public class SelectList {
   private final ArrayList<SelectListItem> items = Lists.newArrayList();
   private boolean isDistinct;
+  private boolean isStraightJoin;
 
   public SelectList() {
     this.isDistinct = false;
+    this.isStraightJoin = false;
   }
 
   public SelectList(List<SelectListItem> items) {
     isDistinct = false;
+    isStraightJoin = false;
     this.items.addAll(items);
   }
 
@@ -40,13 +43,10 @@ class SelectList {
     return items;
   }
 
-  public boolean isDistinct() {
-    return isDistinct;
-  }
-
-  public void setIsDistinct(boolean value) {
-    isDistinct = value;
-  }
+  public boolean isDistinct() { return isDistinct; }
+  public void setIsDistinct(boolean value) { isDistinct = value; }
+  public boolean isStraightJoin() { return isStraightJoin; }
+  public void setIsStraightJoin(boolean value) { isStraightJoin = value; }
 
   @Override
   public SelectList clone() {
@@ -55,6 +55,7 @@ class SelectList {
       clone.items.add(item.clone());
     }
     clone.setIsDistinct(isDistinct);
+    clone.setIsStraightJoin(isStraightJoin);
     return clone;
   }
 }

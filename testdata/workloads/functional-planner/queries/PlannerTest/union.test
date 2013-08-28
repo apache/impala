@@ -1,3 +1,96 @@
+# binding predicates of b.month equiv class gets propagated into union
+select * from
+  (select year, month from functional.alltypes
+   union all
+   select year, month from functional.alltypes) a
+  inner join
+  functional.alltypessmall b
+  on (a.month = b.month)
+where b.month = 1
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    b.month = month
+  |
+  |----0:MERGE
+  |    |
+  |    |----2:SCAN HDFS
+  |    |       table=functional.alltypes #partitions=2/24 size=40.32KB compact
+  |    |
+  |    1:SCAN HDFS
+  |       table=functional.alltypes #partitions=2/24 size=40.32KB compact
+  |
+  3:SCAN HDFS
+     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: b.month
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    b.month = month
+  |
+  |----9:EXCHANGE
+  |
+  8:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    HASH_PARTITIONED: month
+
+  5:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  7:MERGE
+  |
+  2:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=40.32KB compact
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  6:MERGE
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=40.32KB compact
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: b.month
+
+  3:SCAN HDFS
+     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+====
 // Only UNION ALL, no nested unions
 select * from functional.alltypestiny where year=2009 and month=1
 union all
@@ -10,10 +103,10 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -79,16 +172,16 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
+  |----4:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |       limit: 1
+  |
   |----3:TOP-N
   |    |  order by: int_col ASC
   |    |  limit: 1
   |    |
   |    2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----4:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |       limit: 1
   |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
@@ -196,10 +289,10 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -415,13 +508,13 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----4:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -515,21 +608,21 @@ PLAN FRAGMENT 0
   |
   4:MERGE
   |
-  |----5:SCAN HDFS
+  |----3:AGGREGATE (finalize)
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |    |
+  |    0:MERGE
+  |    |
+  |    |----2:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----6:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  3:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  0:MERGE
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  1:SCAN HDFS
+  5:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -542,7 +635,7 @@ PLAN FRAGMENT 0
   11:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
     EXCHANGE ID: 11
@@ -550,36 +643,12 @@ PLAN FRAGMENT 1
 
   14:MERGE
   |
-  6:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  13:MERGE
-  |
-  5:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 3
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  12:MERGE
-  |
   3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
   8:EXCHANGE
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -591,7 +660,7 @@ PLAN FRAGMENT 4
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -601,6 +670,30 @@ PLAN FRAGMENT 5
   9:MERGE
   |
   1:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  13:MERGE
+  |
+  6:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  12:MERGE
+  |
+  5:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- SCANRANGELOCATIONS
 NODE 1:
@@ -631,21 +724,21 @@ PLAN FRAGMENT 0
   |
   5:MERGE
   |
-  |----6:SCAN HDFS
+  |----4:AGGREGATE (finalize)
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |    |
+  |    0:MERGE
+  |    |
+  |    |----3:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    |----2:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  4:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  0:MERGE
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----3:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  1:SCAN HDFS
+  6:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -658,7 +751,7 @@ PLAN FRAGMENT 0
   12:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
     EXCHANGE ID: 12
@@ -666,24 +759,12 @@ PLAN FRAGMENT 1
 
   14:MERGE
   |
-  6:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  13:MERGE
-  |
   4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
   8:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -695,7 +776,7 @@ PLAN FRAGMENT 3
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -707,7 +788,7 @@ PLAN FRAGMENT 4
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -717,6 +798,18 @@ PLAN FRAGMENT 5
   9:MERGE
   |
   1:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  13:MERGE
+  |
+  6:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- SCANRANGELOCATIONS
 NODE 1:
@@ -740,10 +833,10 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -809,10 +902,10 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -881,10 +974,10 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -956,10 +1049,10 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1212,42 +1305,30 @@ PLAN FRAGMENT 0
   |----6:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----7:SCAN HDFS
+  |----5:AGGREGATE (finalize)
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |    |
+  |    2:MERGE
+  |    |
+  |    |----4:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  4:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  1:MERGE
-  |
-  |----3:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  2:SCAN HDFS
+  1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  11:EXCHANGE
+  10:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  14:MERGE
-  |
-  7:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 10
     UNPARTITIONED
 
   13:MERGE
@@ -1255,28 +1336,40 @@ PLAN FRAGMENT 2
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 10
     UNPARTITIONED
 
   12:MERGE
   |
-  4:AGGREGATE (finalize)
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
-  8:EXCHANGE
+  7:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  9:MERGE
+  |
+  4:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 7
     UNPARTITIONED
 
-  10:MERGE
+  8:MERGE
   |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
@@ -1285,21 +1378,21 @@ PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 10
     UNPARTITIONED
 
-  9:MERGE
+  11:MERGE
   |
-  2:SCAN HDFS
+  1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- SCANRANGELOCATIONS
-NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+NODE 4:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 NODE 6:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
-NODE 7:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
 ====
 // Union unnesting: UNION ALL absorbs the children but not directly the operands
@@ -1317,18 +1410,18 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----5:AGGREGATE (finalize)
+  |----6:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |
-  |    2:MERGE
+  |    3:MERGE
   |    |
-  |    |----4:SCAN HDFS
+  |    |----5:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1/4 size=115B
   |    |
-  |    3:SCAN HDFS
+  |    4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----7:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1337,42 +1430,42 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  11:EXCHANGE
+  10:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  14:MERGE
-  |
-  7:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 10
     UNPARTITIONED
 
   13:MERGE
   |
-  5:AGGREGATE (finalize)
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
-  8:EXCHANGE
+  7:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  9:MERGE
+  |
+  5:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 7
     UNPARTITIONED
 
-  10:MERGE
+  8:MERGE
   |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
@@ -1381,33 +1474,33 @@ PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 10
     UNPARTITIONED
 
-  9:MERGE
+  12:MERGE
   |
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 10
     UNPARTITIONED
 
-  12:MERGE
+  11:MERGE
   |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-NODE 3:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-NODE 4:
+NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
-NODE 7:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+NODE 5:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ====
 // Union unnesting: UNION ALL doesn't absorb the children of a nested union
@@ -1429,18 +1522,18 @@ PLAN FRAGMENT 0
   |----6:MERGE
   |    |  limit: 10
   |    |
-  |    |----7:SCAN HDFS
+  |    |----5:AGGREGATE (finalize)
+  |    |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |    |    |
+  |    |    2:MERGE
+  |    |    |
+  |    |    |----4:SCAN HDFS
+  |    |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |    |
+  |    |    3:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1/4 size=115B
   |    |
-  |    5:AGGREGATE (finalize)
-  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |
-  |    2:MERGE
-  |    |
-  |    |----4:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |    |
-  |    3:SCAN HDFS
+  |    7:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1464,7 +1557,7 @@ PLAN FRAGMENT 1
      limit: 10
 
 PLAN FRAGMENT 2
-  PARTITION: RANDOM
+  PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
     EXCHANGE ID: 11
@@ -1473,25 +1566,12 @@ PLAN FRAGMENT 2
   13:MERGE
   |  limit: 10
   |
-  7:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 3
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  12:MERGE
-  |  limit: 10
-  |
   5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
   8:EXCHANGE
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1503,7 +1583,7 @@ PLAN FRAGMENT 4
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1513,6 +1593,19 @@ PLAN FRAGMENT 5
   9:MERGE
   |
   3:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  12:MERGE
+  |  limit: 10
+  |
+  7:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
 PLAN FRAGMENT 6
@@ -1736,10 +1829,10 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1812,10 +1905,10 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1890,13 +1983,13 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----4:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -1985,13 +2078,13 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
+  |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----4:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -2274,16 +2367,16 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----3:SCAN HDFS
+  |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----5:SCAN HDFS
+  |----3:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -2384,16 +2477,16 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----3:SCAN HDFS
+  |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----5:SCAN HDFS
+  |----3:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -2500,9 +2593,6 @@ PLAN FRAGMENT 0
   |    |
   |    2:MERGE
   |    |
-  |    |----4:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |    |
   |    |----9:TOP-N
   |    |    |  order by: tinyint_col ASC
   |    |    |  limit: 3
@@ -2516,6 +2606,9 @@ PLAN FRAGMENT 0
   |    |    |       table=functional.alltypestiny #partitions=1/4 size=115B
   |    |    |
   |    |    6:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1/4 size=115B
   |    |
   |    3:SCAN HDFS
@@ -2652,12 +2745,6 @@ PLAN FRAGMENT 0
   |
   0:MERGE
   |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----3:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
   |----8:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
@@ -2671,6 +2758,12 @@ PLAN FRAGMENT 0
   |    |       table=functional.alltypestiny #partitions=1/4 size=115B
   |    |
   |    5:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |
+  |----3:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |
+  |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   1:SCAN HDFS
@@ -2799,10 +2892,30 @@ PLAN FRAGMENT 0
 
   9:MERGE
   |
-  |----10:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----11:SCAN HDFS
+  |----8:AGGREGATE (finalize)
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |    |
+  |    0:MERGE
+  |    |
+  |    |----7:TOP-N
+  |    |    |  order by: tinyint_col ASC
+  |    |    |  limit: 3
+  |    |    |
+  |    |    4:MERGE
+  |    |    |
+  |    |    |----6:SCAN HDFS
+  |    |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |    |
+  |    |    5:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    |----3:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    |----2:SCAN HDFS
+  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |    |
+  |    1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
   |----15:TOP-N
@@ -2817,30 +2930,10 @@ PLAN FRAGMENT 0
   |    13:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  8:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  0:MERGE
-  |
-  |----2:SCAN HDFS
+  |----11:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
   |
-  |----3:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  |----7:TOP-N
-  |    |  order by: tinyint_col ASC
-  |    |  limit: 3
-  |    |
-  |    4:MERGE
-  |    |
-  |    |----6:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |    |
-  |    5:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  1:SCAN HDFS
+  10:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -2857,126 +2950,27 @@ PLAN FRAGMENT 1
 
   31:MERGE
   |
-  15:TOP-N
-  |  order by: tinyint_col ASC
-  |  limit: 3
-  |
-  24:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 24
-    UNPARTITIONED
-
-  26:MERGE
-  |
-  14:SCAN HDFS
-     table=functional.alltypestiny #partitions=0/4 size=0B
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 24
-    UNPARTITIONED
-
-  25:MERGE
-  |
-  13:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 27
-    UNPARTITIONED
-
-  30:MERGE
-  |
-  11:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 27
-    UNPARTITIONED
-
-  29:MERGE
-  |
-  10:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 6
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 27
-    UNPARTITIONED
-
-  28:MERGE
-  |
   8:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |
-  19:EXCHANGE
+  22:EXCHANGE
 
-PLAN FRAGMENT 7
+PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
-    EXCHANGE ID: 19
+    EXCHANGE ID: 22
     UNPARTITIONED
 
-  23:MERGE
+  26:MERGE
   |
   7:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
   |
-  16:EXCHANGE
+  19:EXCHANGE
 
-PLAN FRAGMENT 8
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  18:MERGE
-  |
-  6:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 9
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  17:MERGE
-  |
-  5:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 10
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    UNPARTITIONED
-
-  22:MERGE
-  |
-  3:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 11
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -2985,10 +2979,10 @@ PLAN FRAGMENT 11
 
   21:MERGE
   |
-  2:SCAN HDFS
+  6:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 
-PLAN FRAGMENT 12
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -2997,7 +2991,106 @@ PLAN FRAGMENT 12
 
   20:MERGE
   |
+  5:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 22
+    UNPARTITIONED
+
+  25:MERGE
+  |
+  3:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 22
+    UNPARTITIONED
+
+  24:MERGE
+  |
+  2:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 7
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 22
+    UNPARTITIONED
+
+  23:MERGE
+  |
   1:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 8
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  30:MERGE
+  |
+  15:TOP-N
+  |  order by: tinyint_col ASC
+  |  limit: 3
+  |
+  16:EXCHANGE
+
+PLAN FRAGMENT 9
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    UNPARTITIONED
+
+  18:MERGE
+  |
+  14:SCAN HDFS
+     table=functional.alltypestiny #partitions=0/4 size=0B
+
+PLAN FRAGMENT 10
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    UNPARTITIONED
+
+  17:MERGE
+  |
+  13:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 11
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  29:MERGE
+  |
+  11:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+
+PLAN FRAGMENT 12
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  28:MERGE
+  |
+  10:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
 ---- SCANRANGELOCATIONS
 NODE 1:
@@ -3216,118 +3309,102 @@ NODE 5:
 ====
 // UNION ALL in subquery with a WHERE condition in the outer select.
 select x.* from
-  (select * from functional.alltypestiny where year=2009 and month=1
+  (select int_col, bool_col, count(*) as count_col
+   from functional.alltypestiny where year=2009 and month=1 group by 1, 2
    union all
-   select * from functional.alltypestiny where year=2009 and month=1) x
+   select int_col, bool_col, count(*) as count_col
+   from functional.alltypestiny where year=2009 and month=1 group by 1, 2) x
 where x.int_col < 5 and x.bool_col = false
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
   |
-  |----2:SCAN HDFS
+  |----4:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: int_col, bool_col
+  |    |
+  |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |       predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
+  |
+  2:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |  group by: int_col, bool_col
   |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:EXCHANGE
+  9:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: int_col, bool_col
 
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 9
     UNPARTITIONED
 
-  5:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
+  11:MERGE
   |
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
+  8:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: int_col, bool_col
+  |
+  7:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: int_col, bool_col
+
+  4:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: int_col, bool_col
+  |
+  3:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
+
+PLAN FRAGMENT 3
+  PARTITION: HASH_PARTITIONED: int_col, bool_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
     UNPARTITIONED
 
-  4:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
+  10:MERGE
   |
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
----- SCANRANGELOCATIONS
-NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-====
-// UNION DISTINCT in subquery with a WHERE condition in the outer select.
-select x.* from
-  (select * from functional.alltypestiny where year=2009 and month=1
-   union distinct
-   select * from functional.alltypestiny where year=2009 and month=1) x
-where x.int_col < 5 and x.bool_col = false
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
+  6:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: int_col, bool_col
+  |
+  5:EXCHANGE
 
-  3:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  0:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=1/4 size=115B
-  |
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:AGGREGATE (finalize)
-  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: int_col, bool_col
 
-  6:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
-  |
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=1/4 size=115B
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  5:MERGE
-  |  predicates: int_col < 5, bool_col = FALSE
+  2:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: int_col, bool_col
   |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
-NODE 2:
+NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
 ====
 // UNION ALL with only constant selects
@@ -3388,16 +3465,16 @@ PLAN FRAGMENT 0
 
   3:MERGE
   |
-  |----4:SCAN HDFS
+  |----2:AGGREGATE (finalize)
+  |    |  group by: 1, 'a', null, f
+  |    |
+  |    0:MERGE
+  |    |  merging 2 SELECT CONSTANT
+  |    |
+  |    1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B
   |
-  2:AGGREGATE (finalize)
-  |  group by: 1, 'a', null, f
-  |
-  0:MERGE
-  |  merging 2 SELECT CONSTANT
-  |
-  1:SCAN HDFS
+  4:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -3406,7 +3483,7 @@ PLAN FRAGMENT 0
   8:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
     EXCHANGE ID: 8
@@ -3414,24 +3491,12 @@ PLAN FRAGMENT 1
 
   10:MERGE
   |
-  4:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  9:MERGE
-  |
   2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
   |
   5:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
@@ -3441,7 +3506,7 @@ PLAN FRAGMENT 3
   7:MERGE
      merging 2 SELECT CONSTANT
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3451,6 +3516,18 @@ PLAN FRAGMENT 4
   6:MERGE
   |
   1:SCAN HDFS
+     table=functional.alltypestiny #partitions=4/4 size=460B
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  9:MERGE
+  |
+  4:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 ====
 // UNION ALL/DISTINCT with mixed constant selects and non-constant selects and nested unions
@@ -3588,11 +3665,11 @@ PLAN FRAGMENT 0
      merging 3 SELECT CONSTANT
 ====
 // UNION DISTINCT with only values statements
-values(1, 'a', NULL, 10.0f)
+values(1, 'a', NULL, 10.f)
 union distinct
-values(2, 'b', NULL, 20.0f)
+values(2, 'b', NULL, 20.f)
 union distinct
-values(3, 'c', NULL, 30.0f)
+values(3, 'c', NULL, 30.f)
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3626,17 +3703,17 @@ PLAN FRAGMENT 0
 
   3:MERGE
   |
-  |----4:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
+  |----2:AGGREGATE (finalize)
+  |    |  group by: 1, 'a', null, f
+  |    |
+  |    0:MERGE
+  |    |  merging 2 SELECT CONSTANT
+  |    |
+  |    1:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4/4 size=460B
   |
-  2:AGGREGATE (finalize)
-  |  group by: 1, 'a', null, f
-  |
-  0:MERGE
-  |  merging 2 SELECT CONSTANT
-  |
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+  4:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3644,7 +3721,7 @@ PLAN FRAGMENT 0
   8:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: RANDOM
+  PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
     EXCHANGE ID: 8
@@ -3652,24 +3729,12 @@ PLAN FRAGMENT 1
 
   10:MERGE
   |
-  4:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  9:MERGE
-  |
   2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
   |
   5:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
@@ -3679,7 +3744,7 @@ PLAN FRAGMENT 3
   7:MERGE
      merging 2 SELECT CONSTANT
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3690,4 +3755,152 @@ PLAN FRAGMENT 4
   |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  9:MERGE
+  |
+  4:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+====
+# all union output slots are being materialized even though none is referenced by
+# the enclosing scope
+select count(*) from (
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+      double_col, date_string_col, string_col, timestamp_col, year, month
+    from functional.alltypes
+  union distinct
+  select 0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',
+      cast('2009-01-01 00:00:00' as timestamp),2009,1
+  union distinct
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+      double_col, date_string_col, string_col, timestamp_col, year, month
+    from functional.alltypes
+  union distinct
+  select 1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',
+      cast('2009-01-01 00:01:00' as timestamp),2009,1
+  union distinct
+  select 2,true,2,2,2,20,cast(2.2 as float),20.2,'01/01/09','2',
+      cast('2009-01-01 00:02:00.10' as timestamp),2009,1
+) x
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |
+  3:AGGREGATE (finalize)
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |
+  0:MERGE
+  |  merging 3 SELECT CONSTANT
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |
+  3:AGGREGATE (finalize)
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  8:MERGE
+     merging 3 SELECT CONSTANT
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  7:MERGE
+  |
+  2:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  6:MERGE
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+// UNION ALL in subquery with a WHERE condition in the outer select;
+// Where clause conjuncts are used as scan predicates and for partition pruning.
+select x.int_col, x.bool_col, x.month from
+  (select * from functional.alltypestiny where year=2009 
+   union all
+   select * from functional.alltypestiny where year=2009) x
+where x.int_col < 5 and x.bool_col = false and x.month = 1
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:MERGE
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=1/4 size=115B
+  |       predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+  |
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  5:MERGE
+  |
+  2:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  4:MERGE
+  |
+  1:SCAN HDFS
+     table=functional.alltypestiny #partitions=1/4 size=115B
+     predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
 ====

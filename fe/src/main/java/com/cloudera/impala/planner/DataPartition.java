@@ -24,6 +24,7 @@ import com.cloudera.impala.thrift.TDataPartition;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -66,17 +67,9 @@ public class DataPartition {
   public final static DataPartition RANDOM =
       new DataPartition(TPartitionType.RANDOM);
 
-  public boolean isPartitioned() {
-    return type != TPartitionType.UNPARTITIONED;
-  }
-
-  public TPartitionType getType() {
-    return type;
-  }
-
-  public ImmutableList<Expr> getPartitionExprs() {
-    return partitionExprs;
-  }
+  public boolean isPartitioned() { return type != TPartitionType.UNPARTITIONED; }
+  public TPartitionType getType() { return type; }
+  public ImmutableList<Expr> getPartitionExprs() { return partitionExprs; }
 
   public TDataPartition toThrift() {
     TDataPartition result = new TDataPartition(type);
@@ -84,6 +77,13 @@ public class DataPartition {
       result.setPartition_exprs(Expr.treesToThrift(partitionExprs));
     }
     return result;
+  }
+
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("type", type)
+        .addValue(Expr.debugString(partitionExprs))
+        .toString();
   }
 
   /**

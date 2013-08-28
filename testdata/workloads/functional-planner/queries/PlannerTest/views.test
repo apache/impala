@@ -179,7 +179,7 @@ PLAN FRAGMENT 2
      table=functional.alltypes #partitions=24/24 size=478.45KB
 ====
 # view used in an inline view.
-select * from (select * from functional.alltypes_view) t
+select t.id from (select id from functional.alltypes_view) t
 where t.id < 10
 ---- PLAN
 PLAN FRAGMENT 0
@@ -217,28 +217,28 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    int_col = COUNT(a.bigint_col)
   |
-  |----7:TOP-N
+  |----6:TOP-N
   |    |  order by: b.string_col ASC
   |    |  limit: 100
   |    |
-  |    6:AGGREGATE (finalize)
+  |    5:AGGREGATE (finalize)
   |    |  output: COUNT(a.bigint_col)
   |    |  group by: b.string_col
   |    |  having: COUNT(a.bigint_col) > 1
   |    |
-  |    5:HASH JOIN
+  |    4:HASH JOIN
   |    |  join op: INNER JOIN
   |    |  hash predicates:
   |    |    a.id = b.id
   |    |
-  |    |----4:SCAN HDFS
+  |    |----3:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=4/4 size=460B compact
   |    |
-  |    3:SCAN HDFS
+  |    2:SCAN HDFS
   |       table=functional.alltypesagg #partitions=10/10 size=743.67KB
   |       predicates: a.bigint_col < 50
   |
-  2:HASH JOIN
+  7:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = int_col
@@ -269,7 +269,7 @@ PLAN FRAGMENT 1
   |----15:EXCHANGE
   |       limit: 100
   |
-  2:HASH JOIN
+  7:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = int_col
@@ -299,7 +299,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 13
     UNPARTITIONED
 
-  7:TOP-N
+  6:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
   |
@@ -317,18 +317,18 @@ PLAN FRAGMENT 4
     EXCHANGE ID: 11
     HASH_PARTITIONED: b.string_col
 
-  6:AGGREGATE
+  5:AGGREGATE
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
   |
-  5:HASH JOIN
+  4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    a.id = b.id
   |
   |----10:EXCHANGE
   |
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
      predicates: a.bigint_col < 50
 
@@ -339,7 +339,7 @@ PLAN FRAGMENT 5
     EXCHANGE ID: 10
     UNPARTITIONED
 
-  4:SCAN HDFS
+  3:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
 PLAN FRAGMENT 6
@@ -366,10 +366,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -399,7 +399,7 @@ PLAN FRAGMENT 1
   |
   |----7:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -415,7 +415,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 
 PLAN FRAGMENT 3
@@ -452,10 +452,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -485,7 +485,7 @@ PLAN FRAGMENT 1
   |
   |----7:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -501,7 +501,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 
 PLAN FRAGMENT 3
@@ -538,10 +538,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -580,7 +580,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 8
     HASH_PARTITIONED: functional.alltypes.id
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 
 PLAN FRAGMENT 3
@@ -590,7 +590,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 7
     HASH_PARTITIONED: functional.alltypes.id
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -635,10 +635,10 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
@@ -677,7 +677,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 7
     HASH_PARTITIONED: functional.alltypes.id
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 
 PLAN FRAGMENT 3
@@ -687,7 +687,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 6
     HASH_PARTITIONED: functional.alltypes.id
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id

@@ -215,10 +215,10 @@ terminal
   KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REFRESH,
   KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
-  KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE,
-  KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN,
-  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN,
+  KW_STRING, KW_SUM, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION,
+  KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -262,6 +262,7 @@ nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr;
+nonterminal Boolean opt_straight_join;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal String alias_clause;
@@ -1267,15 +1268,29 @@ select_stmt ::=
   ;
 
 select_clause ::=
-  KW_SELECT select_list:l
-  {: RESULT = l; :}
-  | KW_SELECT KW_ALL select_list:l
-  {: RESULT = l; :}
-  | KW_SELECT KW_DISTINCT select_list:l
+  KW_SELECT opt_straight_join:s select_list:l
   {:
-    l.setIsDistinct(true);
+    l.setIsStraightJoin(s);
     RESULT = l;
   :}
+  | KW_SELECT KW_ALL opt_straight_join:s select_list:l
+  {:
+    l.setIsStraightJoin(s);
+    RESULT = l;
+  :}
+  | KW_SELECT KW_DISTINCT opt_straight_join:s select_list:l
+  {:
+    l.setIsDistinct(true);
+    l.setIsStraightJoin(s);
+    RESULT = l;
+  :}
+  ;
+
+opt_straight_join ::=
+  KW_STRAIGHT_JOIN
+  {: RESULT = true; :}
+  | /* empty */
+  {: RESULT = false; :}
   ;
 
 select_list ::=

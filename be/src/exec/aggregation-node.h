@@ -38,6 +38,7 @@ class RuntimeState;
 struct StringValue;
 class Tuple;
 class TupleDescriptor;
+class SlotDescriptor;
 
 // Node for in-memory hash aggregation.
 // The node creates a hash set of aggregation output tuples, which
@@ -130,7 +131,8 @@ class AggregationNode : public ExecNode {
 
   // Codegen for updating aggregate_exprs at slot_idx. Returns NULL if unsuccessful.
   // slot_idx is the idx into aggregate_exprs_ (does not include grouping exprs).
-  llvm::Function* CodegenUpdateSlot(LlvmCodeGen* codegen, int slot_idx);
+  llvm::Function* CodegenUpdateSlot(
+      LlvmCodeGen* codegen, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
 
   // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
   llvm::Function* CodegenUpdateAggTuple(LlvmCodeGen* codegen);

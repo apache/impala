@@ -27,35 +27,6 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
-# full scan
-select * from functional_hbase.alltypessmall
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
-====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
 select * from functional_hbase.alltypessmall
@@ -638,7 +609,7 @@ PLAN FRAGMENT 0
 
   0:SCAN HBASE
      table:alltypessmall
-     hbase filters:
+     hbase filters: 
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
@@ -657,7 +628,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:alltypessmall
-     hbase filters:
+     hbase filters: 
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'

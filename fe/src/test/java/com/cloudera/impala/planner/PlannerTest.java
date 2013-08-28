@@ -21,6 +21,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.RuntimeEnv;
@@ -138,7 +139,7 @@ public class PlannerTest {
         if (!e.getMessage().toLowerCase().equals(expectedErrorMsg.toLowerCase())) {
           errorLog.append("query:\n" + query + "\nExpected error message: '"
               + expectedErrorMsg + "'\nActual error message: '"
-              + e.getMessage() + "'.");
+              + e.getMessage() + "'\n");
         }
       }
     }
@@ -192,55 +193,73 @@ public class PlannerTest {
         locationsStr =
             PrintScanRangeLocations(execRequest.query_exec_request).toString();
       }
-    } catch (AnalysisException e) {
-      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-      return;
-    } catch (InternalException e) {
-      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-      return;
-    } catch (NotImplementedException e) {
-      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
+    } catch (ImpalaException e) {
+      if (e instanceof AnalysisException) {
+        errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
+        return;
+      } else if (e instanceof InternalException) {
+        errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
+        return;
+      } if (e instanceof NotImplementedException) {
+        handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
+      } else if (e instanceof CatalogException) {
+        // TODO: do we need to rethrow?
+        throw (CatalogException) e;
+      } else {
+        errorLog.append(
+            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
+      }
     }
-    if (!isImplemented) {
-      // nothing else to compare
-      return;
-    }
+
+    // nothing else to compare
+    if (!isImplemented) return;
 
     expectedPlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
-    expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-    isImplemented = expectedErrorMsg == null;
-    options.setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
-    explainBuilder = new StringBuilder();
-    actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
-    try {
-      // distributed plan
-      execRequest = frontend.createExecRequest(request, explainBuilder);
-      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
-          || execRequest.stmt_type == TStmtType.QUERY);
-      String explainStr = explainBuilder.toString();
-      actualOutput.append(explainStr);
-      if (!isImplemented) {
-        errorLog.append(
-            "query produced DISTRIBUTEDPLAN\nquery=" + query + "\nplan=\n" + explainStr);
-      } else {
-        LOG.info("distributed plan: " + explainStr);
-        String result = TestUtils.compareOutput(
-            Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
-        if (!result.isEmpty()) {
-          errorLog.append("section " + Section.DISTRIBUTEDPLAN.toString()
-              + " of query:\n" + query + "\n" + result);
+    if (!expectedPlan.isEmpty()) {
+      expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+      isImplemented = expectedErrorMsg == null;
+      options.setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
+      explainBuilder = new StringBuilder();
+      actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
+      try {
+        // distributed plan
+        execRequest = frontend.createExecRequest(request, explainBuilder);
+        Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
+            || execRequest.stmt_type == TStmtType.QUERY);
+        String explainStr = explainBuilder.toString();
+        actualOutput.append(explainStr);
+        if (!isImplemented) {
+          errorLog.append(
+              "query produced DISTRIBUTEDPLAN\nquery=" + query + "\nplan=\n"
+              + explainStr);
+        } else {
+          LOG.info("distributed plan: " + explainStr);
+          String result = TestUtils.compareOutput(
+              Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
+          if (!result.isEmpty()) {
+            errorLog.append("section " + Section.DISTRIBUTEDPLAN.toString()
+                + " of query:\n" + query + "\n" + result);
+          }
+        }
+      } catch (ImpalaException e) {
+        if (e instanceof AnalysisException) {
+          errorLog.append(
+              "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
+          return;
+        } else if (e instanceof InternalException) {
+          errorLog.append(
+              "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
+          return;
+        } if (e instanceof NotImplementedException) {
+          handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
+        } else if (e instanceof CatalogException) {
+          throw (CatalogException) e;
+        } else {
+          errorLog.append(
+              "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
         }
       }
-    } catch (AnalysisException e) {
-      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-      return;
-    } catch (InternalException e) {
-      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-      return;
-    } catch (NotImplementedException e) {
-      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
     }
-
 
     // compare scan range locations
     LOG.info("scan range locations: " + locationsStr);
@@ -305,6 +324,16 @@ public class PlannerTest {
   }
 
   @Test
+  public void testTest() {
+    //runPlannerTestFile("test");
+  }
+
+  @Test
+  public void testPredicatePropagation() {
+    runPlannerTestFile("predicate-propagation");
+  }
+
+  @Test
   public void testConstant() {
     runPlannerTestFile("constant");
   }
@@ -337,6 +366,11 @@ public class PlannerTest {
   @Test
   public void testJoins() {
     runPlannerTestFile("joins");
+  }
+
+  @Test
+  public void testJoinOrder() {
+    runPlannerTestFile("join-order");
   }
 
   @Test

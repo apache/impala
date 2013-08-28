@@ -55,18 +55,29 @@ Status MergeNode::Init(const TPlanNode& tnode) {
 }
 
 Status MergeNode::Prepare(RuntimeState* state) {
+  LOG(INFO) << "MergeNode::prepare";
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
+
+  // prepare materialized_slots_
+  for (int i = 0; i < tuple_desc_->slots().size(); ++i) {
+    SlotDescriptor* desc = tuple_desc_->slots()[i];
+    if (desc->is_materialized()) materialized_slots_.push_back(desc);
+  }
+
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(const_result_expr_lists_[i], state, row_desc()));
-    DCHECK_EQ(const_result_expr_lists_[i].size(), tuple_desc_->slots().size());
+    LOG(INFO) << "const: " << Expr::DebugString(const_result_expr_lists_[i]);
+    DCHECK_EQ(const_result_expr_lists_[i].size(), materialized_slots_.size());
   }
+
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(result_expr_lists_[i], state, child(i)->row_desc()));
-    DCHECK_EQ(result_expr_lists_[i].size(), tuple_desc_->slots().size());
+    LOG(INFO) << "non-const: " << Expr::DebugString(result_expr_lists_[i]);
+    DCHECK_EQ(result_expr_lists_[i].size(), materialized_slots_.size());
   }
   return Status::OK;
 }
@@ -96,9 +107,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     *eos = ReachedLimit();
     if (*eos || row_batch->IsFull()) return Status::OK;
   }
-  if (child_idx_ == INVALID_CHILD_IDX) {
-    child_idx_ = 0;
-  }
+  if (child_idx_ == INVALID_CHILD_IDX) child_idx_ = 0;
 
   // Fetch from children, evaluate corresponding exprs and materialize.
   while (child_idx_ < children_.size()) {
@@ -176,8 +185,10 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
     row->SetTuple(0, *tuple);
 
     // Materialize expr results into tuple.
+    DCHECK_EQ(exprs.size(), materialized_slots_.size());
     for (int i = 0; i < exprs.size(); ++i) {
-      SlotDescriptor* slot_desc = tuple_desc_->slots()[i];
+      // our exprs correspond to materialized slots
+      SlotDescriptor* slot_desc = materialized_slots_[i];
       RawValue::Write(exprs[i]->GetValue(child_row), *tuple, slot_desc,
           row_batch->tuple_data_pool());
     }

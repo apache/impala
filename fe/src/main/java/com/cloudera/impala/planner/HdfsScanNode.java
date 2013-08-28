@@ -16,12 +16,15 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsFileFormat;
@@ -30,6 +33,7 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -47,6 +51,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Scan of a single single table. Currently limited to full-table scans.
@@ -69,96 +74,137 @@ public class HdfsScanNode extends ScanNode {
   // scan ranges than would have been estimated assuming a uniform distribution.
   private final static double SCAN_RANGE_SKEW_FACTOR = 1.2;
 
-  private final HdfsTable tbl;
+  private final HdfsTable tbl_;
 
   // Partitions that are filtered in for scanning by the key ranges
-  private final ArrayList<HdfsPartition> partitions = Lists.newArrayList();
+  private final ArrayList<HdfsPartition> partitions_ = Lists.newArrayList();
 
   // List of scan-range locations. Populated in getScanRangeLocations().
   private List<TScanRangeLocations> scanRanges;
 
-  private List<SingleColumnFilter> keyFilters;
-
-  // Total number of bytes from partitions
-  private long totalBytes = 0;
+  // Total number of bytes from partitions_
+  private long totalBytes_ = 0;
 
   /**
-   * Constructs node to scan given data files of table 'tbl'.
+   * Constructs node to scan given data files of table 'tbl_'.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, HdfsTable tbl) {
     super(id, desc, "SCAN HDFS");
-    this.tbl = tbl;
-  }
-
-  public void setKeyFilters(List<SingleColumnFilter> filters) {
-    Preconditions.checkNotNull(filters);
-    this.keyFilters = filters;
+    tbl_ = tbl;
   }
 
   @Override
   protected String debugString() {
     ToStringHelper helper = Objects.toStringHelper(this);
-    for (HdfsPartition partition: partitions) {
+    for (HdfsPartition partition: partitions_) {
       helper.add("Partition " + partition.getId() + ":", partition.toString());
     }
     return helper.addValue(super.debugString()).toString();
   }
 
   /**
-   * Compute file paths and key values based on key ranges.
-   * This finalize() implementation also includes the computeStats() logic
-   * (and there is no computeStats()), because it's easier to do that during
-   * ValueRange construction.
+   * Populate 'conjuncts' and 'partitions_'.
    */
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException,
-      AuthorizationException {
-    Preconditions.checkNotNull(keyFilters);
-    super.finalize(analyzer);
+  public void init(Analyzer analyzer)
+      throws InternalException, AuthorizationException {
+    // loop over all materialized slots and add predicates to 'conjuncts'
+    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds.get(0)).getSlots()) {
+      ArrayList<Pair<Expr, Boolean>> bindingPredicates =
+          analyzer.getBoundPredicates(slotDesc.getId(), this);
+      for (Pair<Expr, Boolean> p: bindingPredicates) {
+        if (p.second) analyzer.markConjunctAssigned(p.first);
+        conjuncts.add(p.first);
+      }
+    }
+    // also add remaining unassigned conjuncts
+    assignConjuncts(analyzer);
 
-    LOG.debug("collecting partitions for table " + tbl.getName());
-    if (tbl.getPartitions().isEmpty()) {
-      cardinality = tbl.getNumRows();
+    // do partition pruning before deciding which slots to materialize,
+    // we might end up removing some predicates
+    prunePartitions(analyzer);
+
+    // mark all slots referenced by the remaining conjuncts as materialized
+    markSlotsMaterialized(analyzer, conjuncts);
+    computeMemLayout(analyzer);
+
+    // do this at the end so it can take all conjuncts into account
+    computeStats(analyzer);
+
+    // TODO: do we need this?
+    assignedConjuncts_ = analyzer.getAssignedConjuncts();
+  }
+
+  /**
+   * Populate partitions_ based on all applicable conjuncts and remove
+   * conjuncts used for filtering from PlanNode.conjuncts.
+   */
+  private void prunePartitions(Analyzer analyzer)
+      throws InternalException, AuthorizationException {
+    // loop through all partitions_ and prune based on applicable conjuncts;
+    // start with creating a collection of partition filters for the applicable conjuncts
+    List<SlotId> partitionSlots = Lists.newArrayList();
+    for (SlotDescriptor slotDesc:
+        analyzer.getDescTbl().getTupleDesc(tupleIds.get(0)).getSlots()) {
+      Preconditions.checkState(slotDesc.getColumn() != null);
+      if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
+        partitionSlots.add(slotDesc.getId());
+      }
+    }
+    List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
+    Set<Expr> filterConjuncts = Sets.newHashSet();
+    for (Expr conjunct: conjuncts) {
+      if (conjunct.isBoundBySlotIds(partitionSlots)) {
+        partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
+        filterConjuncts.add(conjunct);
+      }
+    }
+    // filterConjuncts are applied implicitly via partition pruning
+    conjuncts.removeAll(filterConjuncts);
+
+    for (HdfsPartition p: tbl_.getPartitions()) {
+      // ignore partitions_ without data
+      if (p.getFileDescriptors().size() == 0) continue;
+
+      Preconditions.checkState(
+          p.getPartitionValues().size() == tbl_.getNumClusteringCols());
+
+      boolean isMatch = true;
+      for (HdfsPartitionFilter filter: partitionFilters) {
+        if (!filter.isMatch(p, analyzer)) {
+          isMatch = false;
+          break;
+        }
+      }
+      if (isMatch) partitions_.add(p);
+    }
+  }
+
+  /**
+   * Also computes totalBytes_
+   */
+  @Override
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
+
+    LOG.debug("collecting partitions for table " + tbl_.getName());
+    if (tbl_.getPartitions().isEmpty()) {
+      cardinality = tbl_.getNumRows();
     } else {
       cardinality = 0;
       boolean hasValidPartitionCardinality = false;
-      for (HdfsPartition p: tbl.getPartitions()) {
-        if (p.getFileDescriptors().size() == 0) {
-          // No point scanning partitions that have no data
-          continue;
-        }
-
-        Preconditions.checkState(
-            p.getPartitionValues().size() == tbl.getNumClusteringCols());
-        // check partition key values against key ranges, if set
-        Preconditions.checkState(keyFilters.size() == p.getPartitionValues().size());
-        boolean matchingPartition = true;
-        for (int i = 0; i < keyFilters.size(); ++i) {
-          SingleColumnFilter keyFilter = keyFilters.get(i);
-          if (keyFilter != null
-              && !keyFilter.isTrue(analyzer, p.getPartitionValues().get(i))) {
-            matchingPartition = false;
-            break;
-          }
-        }
-        if (!matchingPartition) {
-          // skip this partition, it's outside the key filters
-          continue;
-        }
-        // HdfsPartition is immutable, so it's ok to copy by reference
-        partitions.add(p);
-
-        // ignore partitions with missing stats in the hope they don't matter
+      for (HdfsPartition p: partitions_) {
+        // ignore partitions_ with missing stats in the hope they don't matter
         // enough to change the planning outcome
         if (p.getNumRows() > 0) {
           cardinality += p.getNumRows();
           hasValidPartitionCardinality = true;
         }
-        totalBytes += p.getSize();
+        totalBytes_ += p.getSize();
       }
-      // if none of the partitions knew its number of rows, we fall back on
+      // if none of the partitions_ knew its number of rows, we fall back on
       // the table stats
-      if (!hasValidPartitionCardinality) cardinality = tbl.getNumRows();
+      if (!hasValidPartitionCardinality) cardinality = tbl_.getNumRows();
     }
 
     Preconditions.checkState(cardinality >= 0 || cardinality == -1);
@@ -167,11 +213,11 @@ public class HdfsScanNode extends ScanNode {
                 " sel=" + Double.toString(computeSelectivity()));
       cardinality = Math.round((double) cardinality * computeSelectivity());
     }
-    LOG.debug("finalize HdfsScan: cardinality=" + Long.toString(cardinality));
+    LOG.debug("computeStats HdfsScan: cardinality=" + Long.toString(cardinality));
 
-    // TODO: take actual partitions into account
-    numNodes = tbl.getNumNodes();
-    LOG.debug("finalize HdfsScan: #nodes=" + Integer.toString(numNodes));
+    // TODO: take actual partitions_ into account
+    numNodes = tbl_.getNumNodes();
+    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override
@@ -188,7 +234,7 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
     scanRanges = Lists.newArrayList();
-    for (HdfsPartition partition: partitions) {
+    for (HdfsPartition partition: partitions_) {
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
@@ -241,9 +287,9 @@ public class HdfsScanNode extends ScanNode {
     HdfsTable table = (HdfsTable) desc.getTable();
     output.append(prefix + "table=" + table.getFullName());
     // Exclude the dummy default partition from the total partition count.
-    output.append(String.format(" #partitions=%s/%s", partitions.size(),
+    output.append(String.format(" #partitions=%s/%s", partitions_.size(),
         table.getPartitions().size() - 1));
-    output.append(" size=" + PrintUtils.printBytes(totalBytes));
+    output.append(" size=" + PrintUtils.printBytes(totalBytes_));
     if (compactData) {
       output.append(" compact\n");
     } else {
@@ -261,7 +307,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Raises NotImplementedException if any of the partitions uses an unsupported file
+   * Raises NotImplementedException if any of the partitions_ uses an unsupported file
    * format.  This is useful for experimental formats, which we currently don't have.
    * Can only be called after finalize().
    */
@@ -317,7 +363,7 @@ public class HdfsScanNode extends ScanNode {
           Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
     }
 
-    long avgScanRangeBytes = (long) Math.ceil(totalBytes / (double) scanRanges.size());
+    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges.size());
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
     long perThreadIoBuffers =

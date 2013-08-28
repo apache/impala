@@ -1939,8 +1939,8 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, INVALIDATE, " +
-        "LOAD, REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
+        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, " +
+        "INVALIDATE, LOAD, REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -1949,8 +1949,8 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, " +
-        "TRUE, IDENTIFIER\n");
+        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, " +
+        "STRAIGHT_JOIN, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",

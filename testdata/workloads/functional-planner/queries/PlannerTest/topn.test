@@ -35,8 +35,6 @@ PLAN FRAGMENT 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 select zip, count(*)
 from functional.testtbl
@@ -100,8 +98,6 @@ PLAN FRAGMENT 2
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
----- SCANRANGELOCATIONS
-NODE 0:
 ====
 select int_col, sum(float_col)
 from functional_hbase.alltypessmall
@@ -165,11 +161,6 @@ PLAN FRAGMENT 2
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 select int_col, sum(float_col), min(float_col)
 from functional_hbase.alltypessmall
@@ -230,9 +221,4 @@ PLAN FRAGMENT 2
   |
   0:SCAN HBASE
      table:alltypessmall
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
 ====

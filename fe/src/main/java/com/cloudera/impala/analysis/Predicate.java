@@ -59,7 +59,7 @@ public abstract class Predicate extends Expr {
     SlotRef slotRef = null;
     int i = 0;
     for (; i < children.size(); ++i) {
-      slotRef = getChild(i).unwrapSlotRef();
+      slotRef = getChild(i).unwrapSlotRef(false);
       if (slotRef != null) break;
     }
     if (slotRef == null) return false;

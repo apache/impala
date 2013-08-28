@@ -92,15 +92,16 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       }
 
       finalColDefs = columnDefs;
-      Preconditions.checkState(columnDefs.size() == viewDefStmt.getResultExprs().size());
+      Preconditions.checkState(
+          columnDefs.size() == viewDefStmt.getBaseTblResultExprs().size());
       for (int i = 0; i < columnDefs.size(); ++i) {
         // Set type in the column definition from the view-definition statement.
-        columnDefs.get(i).setColType(viewDefStmt.getResultExprs().get(i).getType());
+        columnDefs.get(i).setColType(viewDefStmt.getBaseTblResultExprs().get(i).getType());
       }
     } else {
       // Create list of column definitions from the view-definition statement.
       finalColDefs = Lists.newArrayList();
-      List<Expr> exprs = viewDefStmt.getResultExprs();
+      List<Expr> exprs = viewDefStmt.getBaseTblResultExprs();
       List<String> labels = viewDefStmt.getColLabels();
       Preconditions.checkState(exprs.size() == labels.size());
       for (int i = 0; i < viewDefStmt.getColLabels().size(); ++i) {

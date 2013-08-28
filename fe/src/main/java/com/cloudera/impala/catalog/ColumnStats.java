@@ -84,7 +84,7 @@ public class ColumnStats {
     Preconditions.checkState(expr.getType().isValid());
     ColumnStats stats = new ColumnStats(expr.getType());
     stats.setNumDistinctValues(expr.getNumDistinctValues());
-    SlotRef slotRef = expr.unwrapSlotRef();
+    SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return stats;
     stats.numNulls = slotRef.getDesc().getStats().getNumNulls();
     return stats;

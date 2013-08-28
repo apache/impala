@@ -169,6 +169,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("smallint", new Integer(SqlParserSymbols.KW_SMALLINT));
     keywordMap.put("stats", new Integer(SqlParserSymbols.KW_STATS));
     keywordMap.put("stored", new Integer(SqlParserSymbols.KW_STORED));
+    keywordMap.put("straight_join", new Integer(SqlParserSymbols.KW_STRAIGHT_JOIN));
     keywordMap.put("string", new Integer(SqlParserSymbols.KW_STRING));
     keywordMap.put("sum", new Integer(SqlParserSymbols.KW_SUM));
     keywordMap.put("symbol", new Integer(SqlParserSymbols.KW_SYMBOL));

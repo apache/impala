@@ -28,6 +28,7 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TEqJoinCondition;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -37,6 +38,7 @@ import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Hash join between left child and right child.
@@ -72,19 +74,21 @@ public class HashJoinNode extends PlanNode {
   private DistributionMode distrMode;
 
   // conjuncts of the form "<lhs> = <rhs>", recorded as Pair(<lhs>, <rhs>)
-  private final List<Pair<Expr, Expr> > eqJoinConjuncts;
+  private List<Pair<Expr, Expr> > eqJoinConjuncts;
 
   // join conjuncts from the JOIN clause that aren't equi-join predicates
-  private final List<Expr> otherJoinConjuncts;
+  private List<Expr> otherJoinConjuncts;
 
   public HashJoinNode(
-      PlanNodeId id, PlanNode outer, PlanNode inner, TableRef innerRef,
+      PlanNode outer, PlanNode inner, TableRef innerRef,
       List<Pair<Expr, Expr> > eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
-    super(id, "HASH JOIN");
+    super("HASH JOIN");
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
     tupleIds.addAll(outer.getTupleIds());
     tupleIds.addAll(inner.getTupleIds());
+    tblRefIds_.addAll(outer.getTblRefIds());
+    tblRefIds_.addAll(inner.getTblRefIds());
     this.innerRef = innerRef;
     this.joinOp = innerRef.getJoinOp();
     this.distrMode = DistributionMode.NONE;
@@ -116,6 +120,33 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
+  public void init(Analyzer analyzer) throws InternalException {
+    assignConjuncts(analyzer);
+
+    // Set smap to the combined childrens' smaps and apply that to all conjuncts.
+    createDefaultSmap();
+
+    computeStats(analyzer);
+    assignedConjuncts_ = analyzer.getAssignedConjuncts();
+
+    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    //LOG.info("combinedChildSmap: " + combinedChildSmap.debugString());
+    otherJoinConjuncts = Expr.cloneList(otherJoinConjuncts, combinedChildSmap);
+    //LOG.info("HJ.finalized other conjuncts: " + Expr.toSql(otherJoinConjuncts));
+    //LOG.info("HJ.finalized other conjuncts: " + Expr.debugString(otherJoinConjuncts));
+    List<Pair<Expr, Expr>> newEqJoinConjuncts = Lists.newArrayList();
+    for (Pair<Expr, Expr> c: eqJoinConjuncts) {
+      Pair<Expr, Expr> p =
+          new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap));
+      //LOG.info(p.first.toSql() + " " + p.second.toSql());
+      //LOG.info(p.first.debugString() + " " + p.second.debugString());
+      newEqJoinConjuncts.add(
+          new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap)));
+    }
+    eqJoinConjuncts = newEqJoinConjuncts;
+  }
+
+  @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
 
@@ -143,8 +174,8 @@ public class HashJoinNode extends PlanNode {
 
     long maxNumDistinct = 0;
     for (Pair<Expr, Expr> eqJoinPredicate: eqJoinConjuncts) {
-      if (eqJoinPredicate.first.unwrapSlotRef() == null) continue;
-      SlotRef rhsSlotRef = eqJoinPredicate.second.unwrapSlotRef();
+      if (eqJoinPredicate.first.unwrapSlotRef(false) == null) continue;
+      SlotRef rhsSlotRef = eqJoinPredicate.second.unwrapSlotRef(false);
       if (rhsSlotRef == null) continue;
       SlotDescriptor slotDesc = rhsSlotRef.getDesc();
       if (slotDesc == null) continue;
@@ -192,20 +223,6 @@ public class HashJoinNode extends PlanNode {
       helper.add("lhs" , entry.first).add("rhs", entry.second);
     }
     return helper.toString();
-  }
-
-  @Override
-  public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
-    super.getMaterializedIds(analyzer, ids);
-    // we also need to materialize everything referenced by eqJoinConjuncts
-    // and otherJoinConjuncts
-    for (Pair<Expr, Expr> p: eqJoinConjuncts) {
-      p.first.getIds(null, ids);
-      p.second.getIds(null, ids);
-    }
-    for (Expr e: otherJoinConjuncts) {
-      e.getIds(null, ids);
-    }
   }
 
   @Override

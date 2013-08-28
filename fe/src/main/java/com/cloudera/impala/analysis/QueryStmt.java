@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.google.common.collect.Lists;
 
 /**
@@ -37,20 +38,22 @@ public abstract class QueryStmt extends StatementBase {
   protected ArrayList<OrderByElement> orderByElements_;
   protected final LimitElement limitElement_;
 
-  /**
-   * For a select statment:
-   * List of executable exprs in select clause (star-expanded, ordinals and
-   * aliases substituted, agg output substituted
-   * For a union statement:
-   * List of slotrefs into the tuple materialized by the union.
-   */
-  protected final ArrayList<Expr> resultExprs_ = Lists.newArrayList();
+  // For a select statment:
+  // original list of exprs in select clause (star-expanded, ordinals and
+  // aliases substituted, agg output substituted)
+  // For a union statement:
+  // list of slotrefs into the tuple materialized by the union.
+  protected ArrayList<Expr> resultExprs_ = Lists.newArrayList();
+
+  // For a select statment: select list exprs resolved to base tbl refs
+  // For a union statement: same as resultExprs
+  protected ArrayList<Expr> baseTblResultExprs_ = Lists.newArrayList();
 
   /**
    * Map of expression substitutions for replacing aliases
    * in "order by" or "group by" clauses with their corresponding result expr.
    */
-  protected final Expr.SubstitutionMap aliasSMap_ = new Expr.SubstitutionMap();
+  protected final Expr.SubstitutionMap aliasSmap_ = new Expr.SubstitutionMap();
 
   /**
    * Select list item alias does not have to be unique.
@@ -76,8 +79,8 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     this.analyzer_ = analyzer;
     analyzeLimit(analyzer);
     if (hasWithClause()) withClause_.analyze(analyzer);
@@ -92,15 +95,14 @@ public abstract class QueryStmt extends StatementBase {
     limitElement_.analyze(analyzer);
   }
 
+
   /**
    * Creates sortInfo by resolving aliases and ordinals in the orderingExprs.
    */
   protected void createSortInfo(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (orderByElements_ == null) {
-      // not computing order by
-      return;
-    }
+    // not computing order by
+    if (orderByElements_ == null) return;
 
     ArrayList<Expr> orderingExprs = Lists.newArrayList();
     ArrayList<Boolean> isAscOrder = Lists.newArrayList();
@@ -120,7 +122,7 @@ public abstract class QueryStmt extends StatementBase {
       throw new AnalysisException("Column " + ambiguousAlias.toSql() +
           " in order clause is ambiguous");
     }
-    Expr.substituteList(orderingExprs, aliasSMap_);
+    Expr.substituteList(orderingExprs, aliasSmap_);
     Expr.analyze(orderingExprs, analyzer);
 
     sortInfo_ = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
@@ -142,9 +144,6 @@ public abstract class QueryStmt extends StatementBase {
   /**
    * Substitute exprs of the form "<number>"  with the corresponding
    * expressions.
-   * @param exprs
-   * @param errorPrefix
-   * @throws AnalysisException
    */
   protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix)
       throws AnalysisException;
@@ -172,12 +171,35 @@ public abstract class QueryStmt extends StatementBase {
   public long getOffset() { return limitElement_.getOffset(); }
   public SortInfo getSortInfo() { return sortInfo_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
+  public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
   public void setIsExplain(boolean isExplain) { this.isExplain_ = isExplain; }
   public boolean isExplain() { return isExplain_; }
 
   public void setResultExprs(List<Expr> resultExprs) {
     this.resultExprs_.clear();
     this.resultExprs_.addAll(resultExprs);
+  }
+
+  /**
+   * Mark all slots that need to be materialized for the execution of this stmt.
+   * This excludes slots referenced in resultExprs (it depends on the consumer of
+   * the output of the stmt whether they'll be accessed) and single-table predicates
+   * (the PlanNode that materializes that tuple can decide whether evaluating those
+   * predicates requires slot materialization).
+   * This is called prior to plan tree generation and allows tuple-materializing
+   * PlanNodes to compute their tuple's mem layout.
+   */
+  public abstract void materializeRequiredSlots(Analyzer analyzer);
+
+  /**
+   * Mark slots referenced in exprs as materialized.
+   */
+  protected void materializeSlots(Analyzer analyzer, List<Expr> exprs) {
+    List<SlotId> slotIds = Lists.newArrayList();
+    for (Expr e: exprs) {
+      e.getIds(null, slotIds);
+    }
+    analyzer.getDescTbl().markSlotsMaterialized(slotIds);
   }
 
   public ArrayList<OrderByElement> cloneOrderByElements() {

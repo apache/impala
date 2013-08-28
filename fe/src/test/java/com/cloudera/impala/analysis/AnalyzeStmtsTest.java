@@ -1821,14 +1821,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void cloneTest() {
-    testNumberOfMembers(QueryStmt.class, 9);
-    testNumberOfMembers(UnionStmt.class, 2);
+    testNumberOfMembers(QueryStmt.class, 10);
+    testNumberOfMembers(UnionStmt.class, 7);
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 10);
+    testNumberOfMembers(TableRef.class, 11);
     testNumberOfMembers(BaseTableRef.class, 2);
-    testNumberOfMembers(InlineViewRef.class, 5);
+    testNumberOfMembers(InlineViewRef.class, 6);
     testNumberOfMembers(ViewRef.class, 2);
   }
 

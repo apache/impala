@@ -8,7 +8,7 @@ from functional.testtbl t1 left outer join functional.testtbl t2 on (
     and t2.zip = 94104)
   left outer join functional.testtbl t3 on (
     t1.id = t3.id
-# predicate on t2 is join predicate
+# predicate on t2 is join predicate, not applied by t2 scan
     and t2.id = 15
 # predicate on t1 and t2 is join predicate
     and t1.id - t2.id = 0
@@ -16,11 +16,11 @@ from functional.testtbl t1 left outer join functional.testtbl t2 on (
     and t3.zip = 94720
   )
 where
-# t1 predicate in where clause is applied by scan
+# t1 predicate in where clause is applied by scans (t1; also propagated to t3)
 t1.id > 0
-# t2 predicate in where clause is applied after join
+# t2 predicate in where clause is applied by join and scan
 and t2.id is null
-# t3 predicate in where clause is applied after join
+# t3 predicate in where clause is applied by join and scan
 and t3.id is not null
 # join predicate between t1 and t2 applied after t2 join
 and t1.zip + t2.zip = 10
@@ -37,11 +37,11 @@ PLAN FRAGMENT 0
   |  other join predicates: t2.id = 15, t1.id - t2.id = 0
   |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
-  |       predicates: t3.zip = 94720
+  |       predicates: t3.id > 0, t3.zip = 94720
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
@@ -77,7 +77,7 @@ PLAN FRAGMENT 1
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
@@ -97,9 +97,9 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: t3.zip = 94720
+     predicates: t3.id > 0, t3.zip = 94720
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -111,14 +111,11 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t2.zip = 94104
----- SCANRANGELOCATIONS
-NODE 0:
-NODE 1:
-NODE 3:
 ====
 # the same thing with subqueries; should produce the same result
 select *
-from (select * from functional.testtbl a1) t1 left outer join (select * from functional.testtbl a2) t2 on (
+from (select * from functional.testtbl a1) t1
+  left outer join (select * from functional.testtbl a2) t2 on (
     t1.id - 1 = t2.id + 1 and t1.zip = 94611 and t2.zip = 94104)
   left outer join (select * from functional.testtbl a3) t3 on (
     t1.id = t3.id and t2.id = 15 and t1.id - t2.id = 0 and t3.zip = 94720)
@@ -135,11 +132,11 @@ PLAN FRAGMENT 0
   |  other join predicates: a2.id = 15, a1.id - a2.id = 0
   |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
-  |       predicates: a3.zip = 94720
+  |       predicates: a3.id > 0, a3.zip = 94720
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
@@ -175,7 +172,7 @@ PLAN FRAGMENT 1
   |
   |----6:EXCHANGE
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
@@ -195,9 +192,9 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: a3.zip = 94720
+     predicates: a3.id > 0, a3.zip = 94720
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -209,10 +206,38 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a2.zip = 94104
----- SCANRANGELOCATIONS
-NODE 0:
-NODE 1:
-NODE 3:
+====
+# correct propagation of scan predicates in OJ On clauses:
+# id = 17 must not be applied by the t1 and t3 scans
+select *
+from functional.testtbl t1
+  left outer join functional.testtbl t2 on (
+    t1.id = t2.id and t1.id = 17)
+  join functional.testtbl t3 on (t1.id = t3.id)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    t1.id = t3.id
+  |
+  |----2:SCAN HDFS
+  |       table=functional.testtbl #partitions=0/1 size=0B compact
+  |
+  3:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    t1.id = t2.id
+  |  other join predicates: t1.id = 17
+  |
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0/1 size=0B compact
+  |       predicates: t2.id = 17
+  |
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
 ====
 # correct placement of predicates with right outer joins; t1 and t2 are nullable
 select *
@@ -254,15 +279,15 @@ PLAN FRAGMENT 0
   |  other join predicates: t1.id - t2.id = 0, t3.zip = 94720
   |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: t3.id IS NOT NULL
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
-  |  other join predicates: t2.zip = 94104
+  |  other join predicates: t1.zip = 94611, t2.zip = 94104
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
@@ -270,7 +295,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: t1.zip = 94611
+     predicates: t1.id > 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -302,7 +327,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 8
     HASH_PARTITIONED: t3.id
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t3.id IS NOT NULL
 
@@ -313,11 +338,11 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 7
     HASH_PARTITIONED: t1.id
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: RIGHT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
-  |  other join predicates: t2.zip = 94104
+  |  other join predicates: t1.zip = 94611, t2.zip = 94104
   |
   |----6:EXCHANGE
   |
@@ -343,11 +368,7 @@ PLAN FRAGMENT 5
 
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: t1.zip = 94611
----- SCANRANGELOCATIONS
-NODE 0:
-NODE 1:
-NODE 3:
+     predicates: t1.id > 0
 ====
 # the same thing with subqueries; should produce the same result
 select *
@@ -366,17 +387,17 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    a1.id = a3.id
   |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
-  |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+  |  other predicates: a2.id IS NULL, a1.id > 0, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
   |
-  |----3:SCAN HDFS
+  |----2:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: a3.id IS NOT NULL
   |
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
-  |  other join predicates: a2.zip = 94104
+  |  other join predicates: a1.zip = 94611, a2.zip = 94104
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
@@ -384,7 +405,7 @@ PLAN FRAGMENT 0
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: a1.zip = 94611
+     predicates: a1.id > 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -403,7 +424,7 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    a1.id = a3.id
   |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
-  |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+  |  other predicates: a2.id IS NULL, a1.id > 0, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
   |
   |----8:EXCHANGE
   |
@@ -416,7 +437,7 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 8
     HASH_PARTITIONED: a3.id
 
-  3:SCAN HDFS
+  2:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a3.id IS NOT NULL
 
@@ -427,11 +448,11 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 7
     HASH_PARTITIONED: a1.id
 
-  2:HASH JOIN
+  3:HASH JOIN
   |  join op: RIGHT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
-  |  other join predicates: a2.zip = 94104
+  |  other join predicates: a1.zip = 94611, a2.zip = 94104
   |
   |----6:EXCHANGE
   |
@@ -457,11 +478,7 @@ PLAN FRAGMENT 5
 
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     predicates: a1.zip = 94611
----- SCANRANGELOCATIONS
-NODE 0:
-NODE 1:
-NODE 3:
+     predicates: a1.id > 0
 ====
 # right outer join requires the join op to be partitioned, otherwise non-matches cause
 # duplicates

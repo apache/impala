@@ -74,7 +74,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     for (int i = 0; i < colCnt; ++i) {
       createStmt_.getColumnDescs().add(new ColumnDesc(
           tmpQueryStmt.getColLabels().get(i),
-          tmpQueryStmt.getResultExprs().get(i).getType(), null));
+          tmpQueryStmt.getBaseTblResultExprs().get(i).getType(), null));
     }
     createStmt_.analyze(analyzer);
 

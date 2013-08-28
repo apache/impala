@@ -17,6 +17,7 @@
 #include <math.h>
 #include <sstream>
 #include <boost/functional/hash.hpp>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include <x86intrin.h>
 
@@ -70,6 +71,7 @@ Status AggregationNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_exprs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
+    LOG(INFO) << "AggNode[" << id_ << "]: agg_function:\n" << apache::thrift::ThriftDebugString(tnode.agg_node.aggregate_functions[i]);
     AggFnEvaluator* evaluator;
     RETURN_IF_ERROR(AggFnEvaluator::Create(
         pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
@@ -103,10 +105,20 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
   RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc(), false));
 
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    SlotDescriptor* desc = agg_tuple_desc_->slots()[probe_exprs_.size() + i];
+  int j = probe_exprs_.size();
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
+    // skip non-materialized slots; we don't have evaluators instantiated for those
+    while (!agg_tuple_desc_->slots()[j]->is_materialized()) {
+      DCHECK_LT(j, agg_tuple_desc_->slots().size() - 1)
+          << "#eval= " << aggregate_evaluators_.size()
+          << " #probe=" << probe_exprs_.size();
+      ++j;
+    }
+    SlotDescriptor* desc = agg_tuple_desc_->slots()[j];
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
         tuple_pool_.get(), desc));
+    LOG(INFO) << "AggNode: input_exprs="
+        << Expr::DebugString(aggregate_evaluators_[i]->input_exprs());
   }
 
   // TODO: how many buckets?
@@ -243,6 +255,7 @@ Tuple* AggregationNode::ConstructAggTuple() {
 
   // Initialize aggregate output.
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
+    while (!(*slot_desc)->is_materialized()) ++slot_desc;
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
     evaluator->Init(agg_tuple);
     // Codegen specific path.
@@ -330,10 +343,10 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
 //  ret:                                    ; preds = %src_not_null, %entry
 //    ret void
 //  }
-llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slot_idx) {
-  AggFnEvaluator* evaluator = aggregate_evaluators_[slot_idx];
-  SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[probe_exprs_.size() + slot_idx];
+llvm::Function* AggregationNode::CodegenUpdateSlot(
+    LlvmCodeGen* codegen, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
   int field_idx = slot_desc->field_idx();
+  DCHECK(slot_desc->is_materialized());
 
   LLVMContext& context = codegen->context();
 
@@ -371,6 +384,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
+  LOG(INFO) << "CodegenUpdateSlot: slot_desc=" << slot_desc->DebugString();
   Value* dst_ptr = builder.CreateStructGEP(args[0], field_idx, "dst_slot_ptr");
   Value* result = NULL;
 
@@ -451,8 +465,14 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     }
   }
 
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[probe_exprs_.size() + i];
+  int j = probe_exprs_.size();
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
+    // skip non-materialized slots; we don't have evaluators instantiated for those
+    while (!agg_tuple_desc_->slots()[j]->is_materialized()) {
+      DCHECK_LT(j, agg_tuple_desc_->slots().size() - 1);
+      ++j;
+    }
+    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
     // string and timestamp aggregation currently not supported
@@ -521,9 +541,15 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
 
   // Loop over each expr and generate the IR for that slot.  If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+  j = probe_exprs_.size();
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
+    // skip non-materialized slots; we don't have evaluators instantiated for those
+    while (!agg_tuple_desc_->slots()[j]->is_materialized()) {
+      DCHECK_LT(j, agg_tuple_desc_->slots().size() - 1);
+      ++j;
+    }
+    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[probe_exprs_.size() + i];
     if (evaluator->is_count_star()) {
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
@@ -534,7 +560,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
-      Function* update_slot_fn = CodegenUpdateSlot(codegen, i);
+      Function* update_slot_fn = CodegenUpdateSlot(codegen, evaluator, slot_desc);
       if (update_slot_fn == NULL) return NULL;
       builder.CreateCall2(update_slot_fn, args[1], args[2]);
     }

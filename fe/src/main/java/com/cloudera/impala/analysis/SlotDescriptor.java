@@ -29,10 +29,10 @@ public class SlotDescriptor {
 
   // if false, this slot doesn't need to be materialized in parent tuple
   // (and physical layout parameters are invalid)
-  private boolean isMaterialized;
+  private boolean isMaterialized = false;
 
   // if false, this slot cannot be NULL
-  private boolean isNullable;
+  private boolean isNullable = true;
 
   // physical layout parameters
   private int byteSize;
@@ -47,8 +47,6 @@ public class SlotDescriptor {
     this.id = new SlotId(id);
     this.parent = parent;
     this.byteOffset = -1;  // invalid
-    this.isMaterialized = false;
-    this.isNullable = true;
   }
 
   public int getNullIndicatorByte() { return nullIndicatorByte; }
@@ -68,7 +66,7 @@ public class SlotDescriptor {
     this.column = column;
     this.type = column.getType();
   }
-  public boolean getIsMaterialized() { return isMaterialized; }
+  public boolean isMaterialized() { return isMaterialized; }
   public void setIsMaterialized(boolean value) { isMaterialized = value; }
   public boolean getIsNullable() { return isNullable; }
   public void setIsNullable(boolean value) { isNullable = value; }
@@ -113,6 +111,7 @@ public class SlotDescriptor {
         .add("nullIndicatorByte", nullIndicatorByte)
         .add("nullIndicatorBit", nullIndicatorBit)
         .add("slotIdx", slotIdx)
+        .add("stats", stats)
         .toString();
   }
 }

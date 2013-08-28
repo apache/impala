@@ -127,7 +127,7 @@ public class WithClause implements ParseNode {
     if (stmt instanceof UnionStmt) {
       // Analyze the individual operands that may have a WITH clause themselves.
       UnionStmt unionStmt = (UnionStmt) stmt;
-      for(UnionOperand operand: unionStmt.getUnionOperands()) {
+      for(UnionOperand operand: unionStmt.getOperands()) {
         analyzeQueryStmt(tmpAnalyzer, operand.getQueryStmt(), unresolvedTableRefs);
       }
     } else {

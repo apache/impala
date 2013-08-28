@@ -64,7 +64,9 @@ std::string SlotDescriptor::DebugString() const {
   stringstream out;
   out << "Slot(id=" << id_ << " type=" << TypeToString(type_)
       << " col=" << col_pos_ << " offset=" << tuple_offset_
-      << " null=" << null_indicator_offset_.DebugString() << ")";
+      << " null=" << null_indicator_offset_.DebugString()
+      << " slot_idx=" << slot_idx_ << " field_idx=" << field_idx_
+      << ")";
   return out.str();
 }
 
@@ -265,6 +267,9 @@ int RowDescriptor::GetRowSize() const {
 }
 
 int RowDescriptor::GetTupleIdx(TupleId id) const {
+  if (id >= tuple_idx_map_.size()) {
+    LOG(INFO) << "RowDescriptor: " << DebugString();
+  }
   DCHECK_LT(id, tuple_idx_map_.size());
   return tuple_idx_map_[id];
 }
