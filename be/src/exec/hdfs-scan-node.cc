@@ -651,14 +651,19 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  2. Don't start up if all the ranges have been taken by another thread.
   //  3. Don't start up if the number of ranges left is less than the number of
   //     active scanner threads.
-
-  unique_lock<mutex> lock(lock_);
-  if (done_) return;
-  if (all_ranges_started_) return;
-
+  //  4. Don't start up if there are no thread tokens.
   bool started_scanner = false;
-  while (active_scanner_thread_counter_.value() < progress_.remaining() &&
-      pool->TryAcquireThreadToken()) {
+  while (true) {
+    // The lock must be given up between loops in order to give writers to done_,
+    // all_ranges_started_ etc. a chance to grab the lock.
+    // TODO: This still leans heavily on starvation-free locks, come up with a more
+    // correct way to communicate between this method and ScannerThreadHelper
+    unique_lock<mutex> lock(lock_);
+    if (done_ || all_ranges_started_ ||
+      active_hdfs_read_thread_counter_.value() >= progress_.remaining() ||
+      !pool->TryAcquireThreadToken()) {
+      break;
+    }
     COUNTER_UPDATE(&active_scanner_thread_counter_, 1);
     COUNTER_UPDATE(num_scanner_threads_started_counter_, 1);
     stringstream ss;
@@ -755,6 +760,7 @@ inline void HdfsScanNode::ScannerThreadHelper() {
     }
 
     if (scan_range == NULL && num_unqueued_files == 0) {
+      unique_lock<mutex> l(lock_);
       // All ranges have been queued and GetNextRange() returned NULL. This
       // means that every range is either done or being processed by
       // another thread.
