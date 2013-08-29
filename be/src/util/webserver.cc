@@ -60,11 +60,12 @@ DEFINE_string(webserver_password_file, "",
     "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
     " debug webserver authentication");
 
-// Mongoose requires a non-null return from the callback to signify successful processing
-static void* PROCESSING_COMPLETE = reinterpret_cast<void*>(1);
-
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
+
+// Easy-to-read constants for Mongoose return codes
+static const uint32_t PROCESSING_COMPLETE = 1;
+static const uint32_t NOT_PROCESSED = 0;
 
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
@@ -194,12 +195,16 @@ Status Webserver::Start() {
   // Save the signal handler so we can restore it after mongoose sets it to be ignored.
   sighandler_t sig_chld = signal(SIGCHLD, SIG_DFL);
 
+  mg_callbacks callbacks;
+  memset(&callbacks, 0, sizeof(callbacks));
+  callbacks.begin_request = &Webserver::BeginRequestCallbackStatic;
+  callbacks.log_message = &Webserver::LogMessageCallbackStatic;
+
   // To work around not being able to pass member functions as C callbacks, we store a
   // pointer to this server in the per-server state, and register a static method as the
   // default callback. That method unpacks the pointer to this and calls the real
   // callback.
-  context_ = mg_start(&Webserver::MongooseCallbackStatic, reinterpret_cast<void*>(this),
-      &options[0]);
+  context_ = mg_start(&callbacks, reinterpret_cast<void*>(this), &options[0]);
 
   // Restore the child signal handler so wait() works properly.
   signal(SIGCHLD, sig_chld);
@@ -226,79 +231,74 @@ void Webserver::Stop() {
   }
 }
 
-void* Webserver::MongooseCallbackStatic(enum mg_event event,
-    struct mg_connection* connection) {
-  const struct mg_request_info* request_info = mg_get_request_info(connection);
-  Webserver* instance =
-      reinterpret_cast<Webserver*>(mg_get_user_data(connection));
-  return instance->MongooseCallback(event, connection, request_info);
+int Webserver::LogMessageCallbackStatic(const struct mg_connection* connection,
+    const char* message) {
+  if (message != NULL) {
+    LOG(INFO) << "Webserver: " << message;
+  }
+  return PROCESSING_COMPLETE;
 }
 
-void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* connection,
-    const struct mg_request_info* request_info) {
-  if (event == MG_EVENT_LOG) {
-    const char* msg = mg_get_log_message(connection);
-    if (msg != NULL) {
-      LOG(INFO) << "Webserver: " << msg;
+int Webserver::BeginRequestCallbackStatic(struct mg_connection* connection) {
+  struct mg_request_info* request_info = mg_get_request_info(connection);
+  Webserver* instance = reinterpret_cast<Webserver*>(request_info->user_data);
+  return instance->BeginRequestCallback(connection, request_info);
+}
+
+int Webserver::BeginRequestCallback(struct mg_connection* connection,
+    struct mg_request_info* request_info) {
+  if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
+    if (strncmp(DOC_FOLDER, request_info->uri, DOC_FOLDER_LEN) == 0) {
+      VLOG(2) << "HTTP File access: " << request_info->uri;
+      // Let Mongoose deal with this request; returning NULL will fall through
+      // to the default handler which will serve files.
+      return NOT_PROCESSED;
     }
+  }
+  mutex::scoped_lock lock(path_handlers_lock_);
+  PathHandlerMap::const_iterator it = path_handlers_.find(request_info->uri);
+  if (it == path_handlers_.end()) {
+    mg_printf(connection, "HTTP/1.1 404 Not Found\r\n"
+        "Content-Type: text/plain\r\n\r\n");
+    mg_printf(connection, "No handler for URI %s\r\n\r\n", request_info->uri);
     return PROCESSING_COMPLETE;
   }
-  if (event == MG_NEW_REQUEST) {
-    if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
-      if (strncmp(DOC_FOLDER, request_info->uri, DOC_FOLDER_LEN) == 0) {
-        VLOG(2) << "HTTP File access: " << request_info->uri;
-        // Let Mongoose deal with this request; returning NULL will fall through
-        // to the default handler which will serve files.
-        return NULL;
-      }
-    }
-    mutex::scoped_lock lock(path_handlers_lock_);
-    PathHandlerMap::const_iterator it = path_handlers_.find(request_info->uri);
-    if (it == path_handlers_.end()) {
-      mg_printf(connection, "HTTP/1.1 404 Not Found\r\n"
-                            "Content-Type: text/plain\r\n\r\n");
-      mg_printf(connection, "No handler for URI %s\r\n\r\n", request_info->uri);
-      return PROCESSING_COMPLETE;
-    }
 
-    // Should we render with css styles?
-    bool use_style = true;
+  // Should we render with css styles?
+  bool use_style = true;
 
-    map<string, string> arguments;
-    if (request_info->query_string != NULL) {
-      BuildArgumentMap(request_info->query_string, &arguments);
-    }
-    if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
-      use_style = false;
-    }
+  map<string, string> arguments;
+  if (request_info->query_string != NULL) {
+    BuildArgumentMap(request_info->query_string, &arguments);
+  }
+  if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
+    use_style = false;
+  }
 
-    stringstream output;
-    if (use_style) BootstrapPageHeader(&output);
-    BOOST_FOREACH(const PathHandlerCallback& callback_, it->second.callbacks()) {
-      callback_(arguments, &output);
-    }
-    if (use_style) BootstrapPageFooter(&output);
+  stringstream output;
+  if (use_style) BootstrapPageHeader(&output);
+  BOOST_FOREACH(const PathHandlerCallback& callback_, it->second.callbacks()) {
+    callback_(arguments, &output);
+  }
+  if (use_style) BootstrapPageFooter(&output);
 
-    string str = output.str();
-    // Without styling, render the page as plain text
-    if (arguments.find("raw") != arguments.end()) {
-      mg_printf(connection, "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/plain\r\n"
-                "Content-Length: %d\r\n"
-                "\r\n", (int)str.length());
-    } else {
-      mg_printf(connection, "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/html\r\n"
-                "Content-Length: %d\r\n"
-                "\r\n", (int)str.length());
-    }
-
-    // Make sure to use mg_write for printing the body; mg_printf truncates at 8kb
-    mg_write(connection, str.c_str(), str.length());
-    return PROCESSING_COMPLETE;
+  string str = output.str();
+  // Without styling, render the page as plain text
+  if (arguments.find("raw") != arguments.end()) {
+    mg_printf(connection, "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n", (int)str.length());
   } else {
-    return NULL;
+    mg_printf(connection, "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n", (int)str.length());
   }
+
+  // Make sure to use mg_write for printing the body; mg_printf truncates at 8kb
+  mg_write(connection, str.c_str(), str.length());
+  return PROCESSING_COMPLETE;
 }
 
 void Webserver::RegisterPathHandler(const string& path,

@@ -100,13 +100,17 @@ class Webserver {
   // BootstrapPageHeader.
   void BootstrapPageFooter(std::stringstream* output);
 
-  // Static so that it can act as a function pointer, and then call the next method
-  static void* MongooseCallbackStatic(enum mg_event event,
-      struct mg_connection* connection);
+  // Mongoose callback for log events. Returns mongoose success code.
+  static int LogMessageCallbackStatic(const struct mg_connection* connection,
+      const char* message);
 
-  // Dispatch point for all incoming requests.
-  void* MongooseCallback(enum mg_event event, struct mg_connection* connection,
-      const struct mg_request_info* request_info);
+  // Mongoose callback for HTTP request events. Static so that it can act as a function
+  // pointer, and then call the next method. Returns mongoose success code.
+  static int BeginRequestCallbackStatic(struct mg_connection* connection);
+
+  // Dispatch point for all incoming requests. Returns mongoose success code.
+  int BeginRequestCallback(struct mg_connection* connection,
+      struct mg_request_info* request_info);
 
   // Registered to handle "/", and prints a list of available URIs
   void RootHandler(const ArgumentMap& args, std::stringstream* output);
