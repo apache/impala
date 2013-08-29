@@ -28,7 +28,7 @@ class TestInsertQueries(ImpalaTestSuite):
     # logic to handle all the possible ways NULL needs to be written as ascii
     cls.TestMatrix.add_constraint(lambda v:\
           (v.get_value('table_format').file_format == 'text' and \
-           v.get_value('compression_codec') == 'none'))
+           v.get_value('table_format').compression_codec == 'none'))
 
   @pytest.mark.execute_serially
   def test_insert_null(self, vector):
