@@ -189,30 +189,33 @@ static void RunKinit() {
   bool started = false;
   int failures = 0;
   string kreturn;
-  int ret;
+
   while (true) {
     LOG(INFO) << "Registering "
               << FLAGS_principal << " key_tab file " << FLAGS_keytab_file;
+    bool succeeded = false;
     FILE* fp = popen(sysstream.str().c_str(), "r");
     if (fp == NULL) {
       kreturn = "Failed to execute kinit";
-      ret = -1;
     } else {
       // Read the first 1024 bytes of any output so we have some idea of what
       // happened on failure.
       char buf[1024];
       size_t len = fread(buf, 1, 1024, fp);
       kreturn.assign(buf, len);
-      ret = pclose(fp);
+      // pclose() returns -1 on error. non-zero return codes are used for
+      // other information. We only care about errors, so ignore those.
+      if (pclose(fp) != -1) succeeded = true;
     }
-    if (ret != 0) {
+
+    if (!succeeded) {
       if (!started) {
         LOG(ERROR) << "Exiting: failed to register with kerberos: errno: " << errno
                    << " '" << kreturn << "'";
         exit(1);
       }
-      // Just report the problem, existing report the error.  Existing connections
-      // are ok and we can talk to HDFS until our ticket expires.
+      // We couldn't renew the ticket so just report the error. Existing connections
+      // are ok and we'll try to renew the ticket later.
       ++failures;
       LOG(ERROR) << "Failed to extend kerberos ticket: '" << kreturn
                  << "' errno " << strerror(errno) << ". Failure count: " << failures;
