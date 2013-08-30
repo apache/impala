@@ -589,12 +589,16 @@ Status Coordinator::FinalizeQuery() {
 
 Status Coordinator::WaitForAllBackends() {
   unique_lock<mutex> l(lock_);
-  VLOG_QUERY << "Coordinator waiting for backends to finish, "
-             << num_remaining_backends_ << " remaining";
   while (num_remaining_backends_ > 0 && query_status_.ok()) {
+    VLOG_QUERY << "Coordinator waiting for backends to finish, "
+               << num_remaining_backends_ << " remaining";
     backend_completion_cv_.wait(l);
   }
-  VLOG_QUERY << "All backends finished or error.";
+  if (query_status_.ok()) {
+    VLOG_QUERY << "All backends finished successfully.";
+  } else {
+    VLOG_QUERY << "All backends finished due to one or more errors.";
+  }
 
   return query_status_;
 }
@@ -1200,13 +1204,6 @@ void Coordinator::ReportQuerySummary() {
     }
     query_profile_->AddInfoString("Per Node Peak Memory Usage", info.str());
   }
-
-  if (VLOG_QUERY_IS_ON) {
-    stringstream ss;
-    ss << "Final profile for query_id=" << query_id_ << endl;
-    query_profile_->PrettyPrint(&ss);
-    VLOG_QUERY << ss.str();
-  }
 }
 
 string Coordinator::GetErrorLog() {
@@ -1219,7 +1216,7 @@ string Coordinator::GetErrorLog() {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     lock_guard<mutex> l(backend_exec_states_[i]->lock);
     if (backend_exec_states_[i]->error_log.size() > 0) {
-      ss << "Backend " << i << ":"
+      ss << "Backend " << i << ": "
          << join(backend_exec_states_[i]->error_log, "\n") << "\n";
     }
   }

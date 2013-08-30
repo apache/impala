@@ -117,7 +117,7 @@ static inline void Base64Encode(const char* in, int in_len, stringstream* out) {
       (*out) << "=";
     }
   }
-  DCHECK_EQ(out->str().size() % 4, 0);
+  DCHECK_EQ((out->tellp() - len_before) % 4, 0);
 }
 
 void Base64Encode(const vector<uint8_t>& in, string* out) {

@@ -579,9 +579,7 @@ void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& 
   }
 
   Status status = GetRuntimeProfileStr(unique_id, true, output);
-  if (!status.ok()) {
-    (*output) << status.GetErrorMsg();
-  }
+  if (!status.ok()) (*output) << status.GetErrorMsg();
 }
 
 void ImpalaServer::InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
@@ -851,6 +849,13 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
 
 void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   string encoded_profile_str = query.profile().SerializeToArchiveString();
+
+  if (VLOG_QUERY_IS_ON) {
+    stringstream ss;
+    ss << "Final profile for query_id=" << query.query_id() << endl
+       << encoded_profile_str;
+    VLOG_QUERY << ss.str();
+  }
 
   // If there was an error initialising archival (e.g. directory is
   // not writeable), FLAGS_log_query_to_file will have been set to
