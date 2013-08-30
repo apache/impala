@@ -128,6 +128,5 @@ public class CompoundPredicate extends Predicate {
         break;
     }
     selectivity = Math.max(0.0, Math.min(1.0, selectivity));
-    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 }

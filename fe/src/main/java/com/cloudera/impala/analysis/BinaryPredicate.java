@@ -127,7 +127,6 @@ public class BinaryPredicate extends Predicate {
       // TODO: improve using histograms, once they show up
       selectivity = Expr.defaultSelectivity;
     }
-    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   /**

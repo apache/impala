@@ -72,7 +72,6 @@ public class IsNullPredicate extends Predicate {
         selectivity = Math.max(0.0, Math.min(1.0, selectivity));
       }
     }
-    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   @Override

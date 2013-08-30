@@ -616,7 +616,6 @@ public class Analyzer {
    */
   private void computeValueTransferGraph() {
     int numSlots = descTbl.getMaxSlotId().asInt() + 1;
-    LOG.info("valuetransfer: #slots=" + Integer.toString(numSlots));
     valueTransfer = new boolean[numSlots][numSlots];
     for (int i = 0; i < numSlots; ++i) {
       Arrays.fill(valueTransfer[i], false);

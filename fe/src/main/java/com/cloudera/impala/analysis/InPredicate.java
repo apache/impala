@@ -53,7 +53,6 @@ public class InPredicate extends Predicate {
     } else {
       selectivity = Expr.defaultSelectivity;
     }
-    LOG.info(toSql() + " selectivity: " + Double.toString(selectivity));
   }
 
   @Override

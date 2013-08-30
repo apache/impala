@@ -466,7 +466,6 @@ public class HdfsTable extends Table {
 
         if (partition != null && msPartition.getParameters() != null) {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
-          LOG.info("partition #rows=" + Long.toString(partition.getNumRows()));
         }
       }
 
