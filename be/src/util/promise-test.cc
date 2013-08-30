@@ -16,11 +16,29 @@
 
 #include <gtest/gtest.h>
 #include <boost/thread.hpp>
+#include <sys/resource.h>
 
 using namespace boost;
 using namespace std;
 
 namespace impala {
+
+struct ScopedLimitResetter {
+ public:
+  ScopedLimitResetter() {
+    getrlimit(RLIMIT_CORE, &limit_before_);
+    rlimit limit;
+    limit.rlim_cur = limit.rlim_max = 0;
+    setrlimit(RLIMIT_CORE, &limit);
+  }
+
+  ~ScopedLimitResetter() {
+    setrlimit(RLIMIT_CORE, &limit_before_);
+  }
+
+ private:
+  rlimit limit_before_;
+};
 
 void RunThread(Promise<int64_t>* promise) {
   promise->Set(100);
@@ -34,6 +52,9 @@ TEST(PromiseTest, BasicTest) {
 }
 
 TEST(PromiseDeathTest, RepeatedSetTest) {
+  // This test intentionally causes a crash. Don't generate core files for it.
+  ScopedLimitResetter resetter;
+
   // Hint to gtest that only one thread is being used here. Multiple threads are unsafe
   // for 'death' tests, see
   // https://code.google.com/p/googletest/wiki/AdvancedGuide#Death_Tests for more detail
