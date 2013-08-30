@@ -63,7 +63,6 @@ import com.google.common.base.Preconditions;
  * This implies that a "select *"-query on an HBase table
  * will not have the columns ordered as they were declared in the DDL.
  * They will be ordered by family/qualifier.
- *
  */
 public class HBaseTable extends Table {
   private static final Logger LOG = Logger.getLogger(HBaseTable.class);
