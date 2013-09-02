@@ -1216,7 +1216,7 @@ string Coordinator::GetErrorLog() {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     lock_guard<mutex> l(backend_exec_states_[i]->lock);
     if (backend_exec_states_[i]->error_log.size() > 0) {
-      ss << "Backend " << i << ": "
+      ss << "Backend " << i << ":"
          << join(backend_exec_states_[i]->error_log, "\n") << "\n";
     }
   }
