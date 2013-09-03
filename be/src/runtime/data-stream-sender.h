@@ -65,11 +65,11 @@ class DataStreamSender : public DataSink {
   // Blocks until all rows in batch are placed in their appropriate outgoing
   // buffers (ie, blocks if there are still in-flight rpcs from the last
   // Send() call).
-  virtual Status Send(RuntimeState* state, RowBatch* batch);
+  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
 
   // Flush all buffered data and close all existing channels to destination
   // hosts. Further Send() calls are illegal after calling Close().
-  virtual Status Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state);
 
   // Return total number of bytes sent in TRowBatch.data. If batches are
   // broadcast to multiple receivers, they are counted once per receiver.

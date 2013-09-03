@@ -13,7 +13,10 @@
 // limitations under the License.
 
 #include "util/jni-util.h"
+
 #include <hdfs.h>
+#include <sstream>
+
 #include "common/status.h"
 
 using namespace std;
@@ -97,7 +100,7 @@ Status JniUtil::Init() {
 
   // Throwable toString()
   throwable_to_string_id_ =
-      env->GetStaticMethodID(jni_util_cl_, "throwableToString", 
+      env->GetStaticMethodID(jni_util_cl_, "throwableToString",
           "(Ljava/lang/Throwable;)Ljava/lang/String;");
   if (throwable_to_string_id_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
@@ -134,6 +137,31 @@ Status JniUtil::Cleanup() {
   }
   global_refs_.clear();
   return Status::OK;
+}
+
+Status JniUtil::GetJniExceptionMsg(JNIEnv* env, const string& prefix) {
+  jthrowable exc = (env)->ExceptionOccurred();
+  if (exc == NULL) return Status::OK;
+  env->ExceptionClear();
+  DCHECK(throwable_to_string_id() != NULL);
+  jstring msg = (jstring) env->CallStaticObjectMethod(jni_util_class(),
+      throwable_to_string_id(), exc);
+  jboolean is_copy;
+  string error_msg =
+      (reinterpret_cast<const char*>(env->GetStringUTFChars(msg, &is_copy)));
+
+  jstring stack = (jstring) env->CallStaticObjectMethod(jni_util_class(),
+      throwable_to_stack_trace_id(), exc);
+  const char* c_stack =
+      reinterpret_cast<const char*>(env->GetStringUTFChars(stack, &is_copy));
+  VLOG(1) << string(c_stack);
+
+  env->ExceptionClear();
+  env->DeleteLocalRef(exc);
+
+  stringstream ss;
+  ss << prefix << error_msg;
+  return Status(ss.str());
 }
 
 }

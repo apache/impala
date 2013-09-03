@@ -133,6 +133,9 @@ class RuntimeState {
   // Appends error to the error_log_ if there is space
   void LogError(const std::string& error);
 
+  // If !status.ok(), appends the error to the error_log_
+  void LogError(const Status& status);
+
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
     boost::lock_guard<boost::mutex> l(error_log_lock_);

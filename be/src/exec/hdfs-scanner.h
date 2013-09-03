@@ -96,14 +96,14 @@ class HdfsScanner {
   // One-time initialisation of state that is constant across scan ranges.
   virtual Status Prepare(ScannerContext* context);
 
-  // Process an entire split, reading bytes from the context's streams.  Context is 
+  // Process an entire split, reading bytes from the context's streams.  Context is
   // initialized with the split data (e.g. template tuple, partition descriptor, etc).
   // This function should only return on error or end of scan range.
   virtual Status ProcessSplit() = 0;
 
   // Release all resources the scanner has allocated.  This is the last chance for
   // the scanner to attach any resources to the ScannerContext object.
-  virtual Status Close() = 0;
+  virtual void Close() = 0;
 
   // Scanner subclasses must implement these static functions as well.  Unfortunately,
   // c++ does not allow static virtual functions.
@@ -118,7 +118,7 @@ class HdfsScanner {
   // issued to the io mgr.  There is one scan range for the header and one range for
   // each split.
   // - For columnar formats, the header is parsed and only the relevant byte ranges
-  // should be issued to the io mgr.  This is one range for the metadata and one 
+  // should be issued to the io mgr.  This is one range for the metadata and one
   // range for each column, for each split.
   // This function is how scanners can pick their strategy.
   // void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
@@ -129,17 +129,17 @@ class HdfsScanner {
   // llvm::Function* Codegen(HdfsScanNode*);
 
   static const char* LLVM_CLASS_NAME;
-  
+
  protected:
   // The scan node that started this scanner
   HdfsScanNode* scan_node_;
 
   // RuntimeState for error reporting
   RuntimeState* state_;
-  
+
   // Context for this scanner
   ScannerContext* context_;
-  
+
   // The first stream for context_
   ScannerContext::Stream* stream_;
 
@@ -192,7 +192,7 @@ class HdfsScanner {
   // string slots and we are not compacting data. This is used to decide
   // how to treat buffer memory that contains slot data.
   bool has_noncompact_strings_;
-  
+
   // Number of null bytes in the tuple.
   int32_t num_null_bytes_;
 
@@ -204,12 +204,12 @@ class HdfsScanner {
 
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
-  typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*, 
+  typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*,
       int, int, int, int);
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
 
-  // Create a copy of the conjuncts. Exprs are not thread safe (they store results 
+  // Create a copy of the conjuncts. Exprs are not thread safe (they store results
   // inside the expr) so each scanner needs its own copy.  This is not needed for
   // codegen'd scanners since they evaluate exprs with a different mechanism.
   // TODO: fix exprs
@@ -219,7 +219,7 @@ class HdfsScanner {
   // - partition - partition descriptor for this scanner/scan range
   // - type - type for this scanner
   // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
-  Status InitializeCodegenFn(HdfsPartitionDescriptor* partition, 
+  Status InitializeCodegenFn(HdfsPartitionDescriptor* partition,
       THdfsFileFormat::type type, const std::string& scanner_name);
 
   // Set batch_ to a new row batch and update tuple_mem_ accordingly.
@@ -268,11 +268,11 @@ class HdfsScanner {
   // - 'num_tuples' number of tuples to process
   // - 'max_added_tuples' the maximum number of tuples that should be added to the batch.
   // - 'row_start_index' is the number of rows that have already been processed
-  //   as part of WritePartialTuple.  
+  //   as part of WritePartialTuple.
   // Returns the number of tuples added to the row batch.  This can be less than
   // num_tuples/tuples_till_limit because of failed conjuncts.
   // Returns -1 if parsing should be aborted due to parse errors.
-  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size, 
+  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size,
       FieldLocation* fields, int num_tuples,
       int max_added_tuples, int slots_per_tuple, int row_start_indx);
 
@@ -281,7 +281,7 @@ class HdfsScanner {
   // row_idx is the idx of the row in the current batch that had the parse error
   // Returns false if parsing should be aborted.  In this case parse_status_ is set
   // to the error.
-  // This is called from WriteAlignedTuples.  
+  // This is called from WriteAlignedTuples.
   bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
 
   // Utility function to append an error message for an invalid row.  This is called
@@ -301,7 +301,7 @@ class HdfsScanner {
   //
   // The parsing of the fields and evaluating against conjuncts is combined in this
   // function.  This is done so it can be possible to evaluate conjuncts as slots
-  // are materialized (on partial tuples).  
+  // are materialized (on partial tuples).
   //
   // This function is replaced by a codegen'd function at runtime.  This is
   // the reason that the out error parameters are typed uint8_t instead of bool. We need
@@ -309,25 +309,25 @@ class HdfsScanner {
   // Bool's as out parameters can get converted to bytes by the compiler and rather than
   // implicitly depending on that to happen, we will explicitly type them to bytes.
   // TODO: revisit this
-  bool WriteCompleteTuple(MemPool* pool, FieldLocation* fields, Tuple* tuple, 
-      TupleRow* tuple_row, Tuple* template_tuple, uint8_t* error_fields, 
+  bool WriteCompleteTuple(MemPool* pool, FieldLocation* fields, Tuple* tuple,
+      TupleRow* tuple_row, Tuple* template_tuple, uint8_t* error_fields,
       uint8_t* error_in_row);
 
   // Codegen function to replace WriteCompleteTuple. Should behave identically
   // to WriteCompleteTuple.
   static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*,
       const std::vector<Expr*>& conjuncts);
-  
+
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the
   // resulting function.
-  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*, 
+  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*,
       llvm::Function* write_tuple_fn);
-  
+
   // Report parse error for column @ desc.   If abort_on_error is true, sets
   // parse_status_ to the error message.
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
-  
+
   // Initialize a tuple.
   // TODO: only copy over non-null slots.
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {

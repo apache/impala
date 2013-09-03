@@ -91,8 +91,8 @@ class DataStreamSender::Channel {
   Status GetSendStatus();
 
   // Flush buffered rows and close channel.
-  // Returns error status if any of the preceding rpcs failed, OK otherwise.
-  Status Close();
+  // Logs errors if any of the preceding rpcs failed.
+  void Close(RuntimeState* state);
 
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
 
@@ -292,10 +292,9 @@ Status DataStreamSender::Channel::CloseInternal() {
   return Status::OK;
 }
 
-Status DataStreamSender::Channel::Close() {
-  Status status = CloseInternal();
+void DataStreamSender::Channel::Close(RuntimeState* state) {
+  state->LogError(CloseInternal());
   batch_.reset();
-  return status;
 }
 
 DataStreamSender::DataStreamSender(ObjectPool* pool,
@@ -379,7 +378,7 @@ Status DataStreamSender::Init(RuntimeState* state) {
   return Status::OK;
 }
 
-Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
+Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(profile_->total_time_counter());
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
@@ -421,12 +420,11 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   return Status::OK;
 }
 
-Status DataStreamSender::Close(RuntimeState* state) {
+void DataStreamSender::Close(RuntimeState* state) {
   // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
-    RETURN_IF_ERROR(channels_[i]->Close());
+    channels_[i]->Close(state);
   }
-  return Status::OK;
 }
 
 int64_t DataStreamSender::GetNumDataBytesSent() const {

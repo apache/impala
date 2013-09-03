@@ -139,6 +139,7 @@ class HBaseTableScanner {
 
   // The enclosing HBaseScanNode.
   HBaseScanNode* scan_node_;
+  RuntimeState* state_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass scan_cl_;

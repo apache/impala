@@ -77,7 +77,7 @@ Status BaseSequenceScanner::Prepare(ScannerContext* context) {
   return Status::OK;
 }
 
-Status BaseSequenceScanner::Close() {
+void BaseSequenceScanner::Close() {
   VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
@@ -90,7 +90,6 @@ Status BaseSequenceScanner::Close() {
   }
   scan_node_->ReleaseCodegenFn(file_format(), codegen_fn_);
   codegen_fn_ = NULL;
-  return Status::OK;
 }
 
 Status BaseSequenceScanner::ProcessSplit() {

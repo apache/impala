@@ -349,6 +349,11 @@ Tuple* HdfsScanNode::InitEmptyTemplateTuple() {
   return template_tuple;
 }
 
+void HdfsScanNode::TransferToScanNodePool(MemPool* pool) {
+  unique_lock<mutex> l(lock_);
+  scan_node_pool_->AcquireData(pool, false);
+}
+
 Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   RETURN_IF_ERROR(ScanNode::Prepare(state));
@@ -566,7 +571,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HdfsScanNode::Close(RuntimeState* state) {
+void HdfsScanNode::Close(RuntimeState* state) {
   {
     unique_lock<mutex> l(row_batches_lock_);
     done_ = true;
@@ -603,7 +608,7 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   scanner_pool_.reset(NULL);
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
-  return ScanNode::Close(state);
+  ScanNode::Close(state);
 }
 
 Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges) {

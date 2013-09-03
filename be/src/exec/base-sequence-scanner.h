@@ -28,7 +28,7 @@ class Codec;
 struct HdfsFileDesc;
 class ScannerContext;
 
-// Superclass for all sequence container based file formats: 
+// Superclass for all sequence container based file formats:
 // e.g. SequenceFile, RCFile, Avro
 // Sequence container formats have sync markers periodically in the file.
 // This class is will skip to the start of sync markers for errors and
@@ -39,7 +39,7 @@ class BaseSequenceScanner : public HdfsScanner {
   static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
   virtual Status Prepare(ScannerContext* context);
-  virtual Status Close();
+  virtual void Close();
   virtual Status ProcessSplit();
 
   virtual ~BaseSequenceScanner();
@@ -48,7 +48,7 @@ class BaseSequenceScanner : public HdfsScanner {
   // Size of the sync hash field.
   const static int SYNC_HASH_SIZE = 16;
 
-  // Data that is shared between scan ranges of the same file.  The subclass is 
+  // Data that is shared between scan ranges of the same file.  The subclass is
   // responsible for filling in all these fields in ReadFileHeader
   struct FileHeader {
     virtual ~FileHeader() {}
@@ -69,7 +69,7 @@ class BaseSequenceScanner : public HdfsScanner {
     // (even if the sync is considered part of the header in the file format spec).
     int64_t header_size;
   };
-  
+
   // Subclasses must implement these functions.  The order for calls will be
   //  1. AllocateFileHeader() - called once per file
   //  2. ReadFileHeader() - called once per file
@@ -79,7 +79,7 @@ class BaseSequenceScanner : public HdfsScanner {
   // case of errors and skipped bytes, 4 is repeatedly called, each time
   // starting right after the sync marker.
 
-  // Allocate a file header object for this scanner.  If the scanner needs 
+  // Allocate a file header object for this scanner.  If the scanner needs
   // additional header information, it should subclass FileHeader.
   // The allocated object will be placed in the scan node's pool.
   virtual FileHeader* AllocateFileHeader() = 0;
@@ -91,7 +91,7 @@ class BaseSequenceScanner : public HdfsScanner {
   // the file header.  This function must read the file header (which advances
   // context_ past it) and initialize header_.
   virtual Status ReadFileHeader() = 0;
-  
+
   // Process the current range until the end or an error occurred.  Note this might
   // be called multiple times if we skip over bad data.
   // This function should read from the underlying ScannerContext materializing
@@ -109,7 +109,7 @@ class BaseSequenceScanner : public HdfsScanner {
   // otherwise finished() might not be updated correctly. If finished() returns true after
   // calling this function, scanners must not process any more records.
   Status ReadSync();
-  
+
   // Utility function to advance past the next sync marker, reading bytes from stream_.
   // If no sync is found in the scan range, return Status::OK and sets finished_ to
   // true. It is safe to call this function past eosr.
@@ -122,20 +122,20 @@ class BaseSequenceScanner : public HdfsScanner {
   // Estimate of header size in bytes.  This is initial number of bytes to issue
   // per file.  If the estimate is too low, more bytes will be read as necessary.
   const static int HEADER_SIZE;
-  
+
   // Sync indicator.
   const static int SYNC_MARKER;
 
   // File header for this scan range.  This is not owned by the parent scan node.
   FileHeader* header_;
-  
+
   // If true, this scanner object is only for processing the header.
   bool only_parsing_header_;
-  
+
   // Decompressor class to use, if any.
   boost::scoped_ptr<Codec> decompressor_;
 
-  // Pool to allocate per data block memory.  This should be used with the 
+  // Pool to allocate per data block memory.  This should be used with the
   // decompressor and any other per data block allocations.
   boost::scoped_ptr<MemPool> data_buffer_pool_;
 

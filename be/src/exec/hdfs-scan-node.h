@@ -100,7 +100,7 @@ class HdfsScanNode : public ScanNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state);
 
   // ScanNode methods
   virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
@@ -136,8 +136,6 @@ class HdfsScanNode : public ScanNode {
   RuntimeState* runtime_state() { return runtime_state_; }
 
   DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
-
-  MemPool* scan_node_pool() { return scan_node_pool_.get(); }
 
   const static int SKIP_COLUMN = -1;
 
@@ -195,6 +193,9 @@ class HdfsScanNode : public ScanNode {
   // Scanners can use this method to initialize a template tuple even if there are no
   // materialized partition keys (e.g. to hold Avro default values).
   Tuple* InitEmptyTemplateTuple();
+
+  // Acquires all allocations from pool into scan_node_pool_. Thread-safe.
+  void TransferToScanNodePool(MemPool* pool);
 
   // Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
   HdfsFileDesc* GetFileDesc(const std::string& filename);

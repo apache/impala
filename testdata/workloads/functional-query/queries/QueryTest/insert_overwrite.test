@@ -58,7 +58,6 @@ int
 10
 ====
 ---- QUERY
-# TODO: IMP-240 - Hive will delete data even for inserts that write nothing. When we fix IMP-240, this test should fail. 
 insert overwrite table insert_overwrite_nopart
 select 3
 from tinyinttable
@@ -70,7 +69,7 @@ select count(*) from insert_overwrite_nopart
 ---- TYPES
 bigint
 ---- RESULTS
-10
+0
 ====
 ---- QUERY
 # Static partitioned insert

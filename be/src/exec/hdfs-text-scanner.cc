@@ -80,7 +80,7 @@ Status HdfsTextScanner::ProcessSplit() {
   return Status::OK;
 }
 
-Status HdfsTextScanner::Close() {
+void HdfsTextScanner::Close() {
   AttachPool(boundary_mem_pool_.get());
   AddFinalRowBatch();
   // We must flush any pending batches in the row batch before telling the scan node
@@ -90,7 +90,6 @@ Status HdfsTextScanner::Close() {
 
   scan_node_->ReleaseCodegenFn(THdfsFileFormat::TEXT, codegen_fn_);
   codegen_fn_ = NULL;
-  return Status::OK;
 }
 
 void HdfsTextScanner::InitNewRange() {

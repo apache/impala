@@ -35,10 +35,10 @@ class HBaseTableSink : public DataSink {
   HBaseTableSink(const RowDescriptor& row_desc,
                  const std::vector<TExpr>& select_list_texprs,
                  const TDataSink& tsink);
-  Status Init(RuntimeState* state);
-  Status Send(RuntimeState* state, RowBatch* batch);
-  Status Close(RuntimeState* state);
-  RuntimeProfile* profile() { return runtime_profile_; }
+  virtual Status Init(RuntimeState* state);
+  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual void Close(RuntimeState* state);
+  virtual RuntimeProfile* profile() { return runtime_profile_; }
 
  private:
   // Turn thrift TExpr into Expr and prepare them to run

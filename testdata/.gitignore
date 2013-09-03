@@ -25,3 +25,6 @@ data/test-warehouse
 
 # Generated block ids (hdfs ids) for each table
 block-ids
+
+# Generated data loading files
+load-*-hbase.create

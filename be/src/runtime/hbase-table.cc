@@ -15,6 +15,8 @@
 #include "runtime/hbase-table.h"
 
 #include <string>
+
+#include "runtime/runtime-state.h"
 #include "util/jni-util.h"
 
 using namespace boost;
@@ -40,24 +42,24 @@ HBaseTable::HBaseTable(const string& table_name,
 }
 
 HBaseTable::~HBaseTable() {
-  // This is just a safety to make sure that all jni threads
-  // are released if this object is no longer being used.
-  Close();
+  DCHECK(htable_ == NULL) << "Must call Close()";
 }
 
-Status HBaseTable::Close() {
+void HBaseTable::Close(RuntimeState* state) {
   // If this has already been closed then return out early.
-  if (htable_ == NULL) return Status::OK;
+  if (htable_ == NULL) return;
 
   JNIEnv* env = getJNIEnv();
-  if (env == NULL) return Status("Error creating JNIEnv");
+  if (env == NULL) {
+    state->LogError("HBaseTable::Close(): Error creating JNIEnv");
+  } else {
+    env->CallObjectMethod(htable_, htable_close_id_);
+    state->LogError(JniUtil::GetJniExceptionMsg(env, "HBaseTable::Close(): "));
+    env->DeleteGlobalRef(htable_);
+    state->LogError(JniUtil::GetJniExceptionMsg(env, "HBaseTable::Close(): "));
+  }
 
-  env->CallObjectMethod(htable_, htable_close_id_);
-  RETURN_ERROR_IF_EXC(env);
-  env->DeleteGlobalRef(htable_);
-  RETURN_ERROR_IF_EXC(env);
   htable_ = NULL;
-  return Status::OK;
 }
 
 Status HBaseTable::Init() {

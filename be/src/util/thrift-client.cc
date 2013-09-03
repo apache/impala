@@ -57,11 +57,8 @@ Status ThriftClientImpl::OpenWithRetry(
   return status;
 }
 
-Status ThriftClientImpl::Close() {
-  if (transport_->isOpen()) {
-    transport_->close();
-  }
-  return Status::OK;
+void ThriftClientImpl::Close() {
+  if (transport_->isOpen()) transport_->close();
 }
 
 }

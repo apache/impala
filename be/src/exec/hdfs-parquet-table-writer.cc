@@ -135,6 +135,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // be added.
   void Close() {
     compressor_->Close();
+    if (dict_encoder_base_ != NULL) dict_encoder_base_->ClearIndices();
   }
 
   PrimitiveType type() const { return expr_->type(); }
@@ -366,6 +367,13 @@ inline int HdfsParquetTableWriter::BaseColumnWriter::WriteDictDataPage() {
 
 Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
    int64_t* first_data_page, int64_t* first_dictionary_page) {
+  if (current_page_ == NULL) {
+    // This column/file is empty
+    *first_data_page = *file_pos;
+    *first_dictionary_page = -1;
+    return Status::OK;
+  }
+
   FinalizeCurrentPage();
 
   *first_dictionary_page = -1;
@@ -748,6 +756,10 @@ Status HdfsParquetTableWriter::Finalize() {
   RETURN_IF_ERROR(WriteFileFooter());
   COUNTER_UPDATE(parent_->rows_inserted_counter(), row_count_);
 
+  return Status::OK;
+}
+
+void HdfsParquetTableWriter::Close() {
   // Release all accumulated memory
   for (int i = 0; i < columns_.size(); ++i) {
     columns_[i]->Close();
@@ -755,8 +767,6 @@ Status HdfsParquetTableWriter::Finalize() {
   reusable_col_mem_pool_->FreeAll();
   per_file_mem_pool_->FreeAll();
   compression_staging_buffer_.clear();
-
-  return Status::OK;
 }
 
 Status HdfsParquetTableWriter::WriteFileHeader() {

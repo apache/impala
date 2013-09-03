@@ -23,6 +23,8 @@
 
 namespace impala {
 
+class RuntimeState;
+
 // Class to wrap JNI calls into HTable.
 class HBaseTable {
  public:
@@ -30,7 +32,8 @@ class HBaseTable {
   ~HBaseTable();
 
   // Close and release the HTable wrapped by this class.
-  Status Close();
+  void Close(RuntimeState* state);
+
   // Create all needed java side objects.
   // This call can cause connections to HBase and Zookeeper to be created.
   Status Init();

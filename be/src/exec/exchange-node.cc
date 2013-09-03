@@ -63,10 +63,10 @@ Status ExchangeNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
-Status ExchangeNode::Close(RuntimeState* state) {
+void ExchangeNode::Close(RuntimeState* state) {
   input_batch_.reset();
   if (stream_recvr_ != NULL) stream_recvr_->Close();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {

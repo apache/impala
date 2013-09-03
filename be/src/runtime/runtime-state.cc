@@ -156,6 +156,11 @@ void RuntimeState::LogError(const string& error) {
   }
 }
 
+void RuntimeState::LogError(const Status& status) {
+  if (status.ok()) return;
+  LogError(status.GetErrorMsg());
+}
+
 void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {
   lock_guard<mutex> l(error_log_lock_);
   if (unreported_error_idx_ < error_log_.size()) {

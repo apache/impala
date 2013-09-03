@@ -55,6 +55,9 @@ class DictEncoderBase {
   // The number of entries in the dictionary.
   virtual int num_entries() const = 0;
 
+  // Clears all the indices (but leaves the dictionary).
+  void ClearIndices() { buffered_indices_.clear(); }
+
   // Returns a conservative estimate of the number of bytes needed to encode the buffered
   // indices. Used to size the buffer passed to WriteData.
   // TODO: better estimate
@@ -230,7 +233,7 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
   }
   // TODO(skye): fix overflow logic
   encoder.Flush();
-  buffered_indices_.clear();
+  ClearIndices();
   return 1 + encoder.len();
 }
 

@@ -46,7 +46,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   virtual ~HdfsParquetScanner();
   virtual Status Prepare(ScannerContext* context);
-  virtual Status Close();
+  virtual void Close();
   virtual Status ProcessSplit();
 
   // Issue just the footer range for each file.  We'll then parse the footer and pick

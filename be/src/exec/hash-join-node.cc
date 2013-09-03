@@ -136,11 +136,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HashJoinNode::Close(RuntimeState* state) {
+void HashJoinNode::Close(RuntimeState* state) {
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
   probe_batch_.reset();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 void HashJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* status) {

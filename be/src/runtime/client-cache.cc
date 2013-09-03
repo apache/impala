@@ -73,10 +73,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method, void** clie
   const string ipaddress = info->ipaddress();
   int port = info->port();
 
-  // We don't expect Close() to fail. Even if it fails, we should continue on to delete
-  // the transport and remove it from the map.
-  Status status = info->Close();
-  DCHECK(status.ok());
+  info->Close();
 
   // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does
   // not clean up internal buffers it reopens. To work around this issue, create a new

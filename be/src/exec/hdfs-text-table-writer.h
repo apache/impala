@@ -49,6 +49,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   virtual Status Init() { return Status::OK; }
   virtual Status Finalize() { return Status::OK; }
   virtual Status InitNewFile() { return Status::OK; }
+  virtual void Close() { }
   virtual uint64_t default_block_size() { return 0; }
 
   // Appends delimited string representation of the rows in the batch to output partition.

@@ -342,11 +342,14 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
       }
       case AVRO_STRING:
       case AVRO_BYTES: {
+        // Mempools aren't thread safe so make a local one and transfer it
+        // to the scan node pool.
+        MemPool pool(scan_node_->mem_tracker());
         char* v;
         if (avro_string_get(default_value, &v)) DCHECK(false);
         StringValue sv(v);
-        RawValue::Write(&sv, avro_header_->template_tuple, slot_desc,
-                        scan_node_->scan_node_pool());
+        RawValue::Write(&sv, avro_header_->template_tuple, slot_desc, &pool);
+        scan_node_->TransferToScanNodePool(&pool);
         break;
       }
       case AVRO_NULL:

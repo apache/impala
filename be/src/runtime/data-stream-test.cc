@@ -399,23 +399,25 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num, int channel_buffer_size,
               TPartitionType::type partition_type) {
+    RuntimeState state(TUniqueId(), TQueryOptions(), "", "", &exec_env_);
+    state.set_desc_tbl(desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink =
         (partition_type == TPartitionType::UNPARTITIONED ? broadcast_sink_ : hash_sink_);
     DataStreamSender sender(
         &obj_pool_, *row_desc_, sink, dest_, channel_buffer_size);
-    EXPECT_TRUE(sender.Init(&runtime_state_).ok());
+    EXPECT_TRUE(sender.Init(&state).ok());
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
     int next_val = 0;
     for (int i = 0; i < NUM_BATCHES; ++i) {
       GetNextBatch(batch.get(), &next_val);
       VLOG_QUERY << "sender " << sender_num << ": #rows=" << batch->num_rows();
-      info.status = sender.Send(NULL, batch.get());
+      info.status = sender.Send(&state, batch.get(), false);
       if (!info.status.ok()) break;
     }
     VLOG_QUERY << "closing sender" << sender_num;
-    info.status = sender.Close(NULL);
+    sender.Close(&state);
     info.num_bytes_sent = sender.GetNumDataBytesSent();
 
     batch->Reset();

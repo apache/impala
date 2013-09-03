@@ -255,7 +255,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   return Status::OK;
 }
 
-Status HBaseScanNode::Close(RuntimeState* state) {
+void HBaseScanNode::Close(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
 
@@ -267,7 +267,7 @@ Status HBaseScanNode::Close(RuntimeState* state) {
 
   // Report total number of errors.
   if (num_errors_ > 0) state->ReportFileErrors(table_name_, num_errors_);
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const {

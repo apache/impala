@@ -44,7 +44,7 @@ class HBaseScanNode : public ScanNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   // Close the hbase_scanner_, and report errors.
-  virtual Status Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state);
 
   virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
 
@@ -94,7 +94,7 @@ class HBaseScanNode : public ScanNode {
 
   // List of pointers to family/qualifier/binary encoding in same sort order as
   // sorted_non_key_slots_.
-  // The memory pointed to by the list-elements is owned by the corresponding 
+  // The memory pointed to by the list-elements is owned by the corresponding
   // HBaseTableDescriptor.
   std::vector<const HBaseTableDescriptor::HBaseColumnDescriptor* > sorted_cols_;
 

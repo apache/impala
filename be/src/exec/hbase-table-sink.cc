@@ -65,7 +65,7 @@ Status HBaseTableSink::Init(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
+Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Since everything is set up just forward everything to the writer.
   RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
@@ -73,17 +73,13 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
   return Status::OK;
 }
 
-Status HBaseTableSink::Close(RuntimeState* state) {
+void HBaseTableSink::Close(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (hbase_table_writer_.get() != NULL) {
-    RETURN_IF_ERROR(hbase_table_writer_->Close(state));
+    hbase_table_writer_->Close(state);
     hbase_table_writer_.reset(NULL);
   }
-
-  // Return OK even if the hbase_table_writer_ was null.
-  // Assume that there's nothing to close if it's null.
-  return Status::OK;
 }
 
 }  // namespace impala

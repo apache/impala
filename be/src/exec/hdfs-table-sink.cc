@@ -368,7 +368,7 @@ inline Status HdfsTableSink::GetOutputPartition(
   return Status::OK;
 }
 
-Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
+Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   // If there are no partition keys then just pass the whole batch to one partition.
@@ -416,51 +416,51 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
       partition->second.second.clear();
     }
   }
+
+  if (eos) {
+    // Close Hdfs files, and update stats in runtime state.
+    for (PartitionMap::iterator cur_partition =
+            partition_keys_to_output_partitions_.begin();
+        cur_partition != partition_keys_to_output_partitions_.end();
+        ++cur_partition) {
+      RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
+    }
+  }
   return Status::OK;
 }
 
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
   if (partition->tmp_hdfs_file == NULL) return Status::OK;
+  RETURN_IF_ERROR(partition->writer->Finalize());
+  // Track total number of appended rows per partition in runtime
+  // state. partition->num_rows counts number of rows appended is per-file.
+  (*state->num_appended_rows())[partition->partition_name] += partition->num_rows;
+  ClosePartitionFile(state, partition);
+  return Status::OK;
+}
 
-  Status status = partition->writer->Finalize();
+void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
+  if (partition->tmp_hdfs_file == NULL) return;
+  partition->writer->Close();
 
-  if (status.ok()) {
-    // Track total number of appended rows per partition in runtime
-    // state. partition->num_rows counts number of rows appended is per-file.
-    (*state->num_appended_rows())[partition->partition_name] += partition->num_rows;
-  }
-
-  // Close file.
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {
-    status.AddErrorMsg(AppendHdfsErrorMessage("Failed to close HDFS file: ",
+    state->LogError(AppendHdfsErrorMessage("Failed to close HDFS file: ",
         partition->current_file_name));
   }
   partition->tmp_hdfs_file = NULL;
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
-
-  return status;
 }
 
-Status HdfsTableSink::Close(RuntimeState* state) {
+void HdfsTableSink::Close(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  Status status;
-  // Close Hdfs files, and copy return stats to runtime state.
   for (PartitionMap::iterator cur_partition =
-           partition_keys_to_output_partitions_.begin();
-       cur_partition != partition_keys_to_output_partitions_.end();
-       ++cur_partition) {
-    // We need to call FinalizePartitionFile even if there is an error to make
-    // sure every file is closed.
-    Status s = FinalizePartitionFile(state, cur_partition->second.first);
-    if (status.ok()) {
-      status = s;
-    } else {
-      state->LogError(s.GetErrorMsg());
-    }
+          partition_keys_to_output_partitions_.begin();
+      cur_partition != partition_keys_to_output_partitions_.end();
+      ++cur_partition) {
+    ClosePartitionFile(state, cur_partition->second.first);
   }
-  return status;
 }
 
 Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {

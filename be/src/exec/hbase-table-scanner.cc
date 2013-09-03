@@ -83,6 +83,7 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
 HBaseTableScanner::HBaseTableScanner(
     HBaseScanNode* scan_node, HBaseTableFactory* htable_factory, RuntimeState* state)
   : scan_node_(scan_node),
+    state_(state),
     htable_factory_(htable_factory),
     htable_(NULL),
     scan_(NULL),
@@ -646,7 +647,7 @@ void HBaseTableScanner::Close(JNIEnv* env) {
   if (keyvalues_ != NULL) env->DeleteGlobalRef(keyvalues_);
 
   // Close the HTable so that the connections are not kept around.
-  if (htable_.get() != NULL) htable_->Close();
+  if (htable_.get() != NULL) htable_->Close(state_);
 
   value_pool_->FreeAll();
   buffer_pool_->FreeAll();

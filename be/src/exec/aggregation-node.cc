@@ -245,10 +245,10 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   return Status::OK;
 }
 
-Status AggregationNode::Close(RuntimeState* state) {
+void AggregationNode::Close(RuntimeState* state) {
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 AggregationTuple* AggregationNode::ConstructAggTuple() {

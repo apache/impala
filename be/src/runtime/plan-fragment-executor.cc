@@ -268,8 +268,8 @@ Status PlanFragmentExecutor::OpenInternal() {
 
   // If there is a sink, do all the work of driving it here, so that
   // when this returns the query has actually finished
-  RowBatch* batch;
-  while (true) {
+  while (!done_) {
+    RowBatch* batch;
     RETURN_IF_ERROR(GetNextInternal(&batch));
     if (batch == NULL) break;
     if (VLOG_ROW_IS_ON) {
@@ -281,7 +281,7 @@ Status PlanFragmentExecutor::OpenInternal() {
     }
 
     SCOPED_TIMER(profile()->total_time_counter());
-    RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
+    RETURN_IF_ERROR(sink_->Send(runtime_state(), batch, done_));
   }
 
   // Close the sink *before* stopping the report thread. Close may
@@ -292,10 +292,7 @@ Status PlanFragmentExecutor::OpenInternal() {
   // either in error or have returned a status report with done =
   // true, so tearing down any data stream state (a separate
   // channel) in Close is safe.
-
-  // TODO: If this returns an error, the d'tor will call Close again. We should
-  // audit the sinks to check that this is ok, or change that behaviour.
-  RETURN_IF_ERROR(sink_->Close(runtime_state()));
+  sink_->Close(runtime_state());
 
   // Setting to NULL ensures that the d'tor won't double-close the sink.
   sink_.reset(NULL);
@@ -390,6 +387,8 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
     ReleaseThreadToken();
     StopReportThread();
     SendReport(true);
+    // GetNext() uses *batch = NULL to signal the end.
+    if (*batch != NULL && (*batch)->num_rows() == 0) *batch = NULL;
   }
 
   return status;
@@ -405,12 +404,11 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
     row_batch_->Reset();
     SCOPED_TIMER(profile()->total_time_counter());
     RETURN_IF_ERROR(plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
+    *batch = row_batch_.get();
     if (row_batch_->num_rows() > 0) {
       COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());
-      *batch = row_batch_.get();
       break;
     }
-    *batch = NULL;
   }
 
   return Status::OK;

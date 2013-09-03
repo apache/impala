@@ -43,11 +43,12 @@ class DataSink {
   virtual Status Init(RuntimeState* state) = 0;
 
   // Send a row batch into this sink.
-  virtual Status Send(RuntimeState* state, RowBatch* batch) = 0;
+  // eos should be true when the last batch is passed to Send()
+  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos) = 0;
 
   // Releases all resources that were allocated in Init()/Send().
   // Further Send() calls are illegal after calling Close().
-  virtual Status Close(RuntimeState* state) = 0;
+  virtual void Close(RuntimeState* state) = 0;
 
   // Creates a new data sink from thrift_sink. A pointer to the
   // new sink is written to *sink, and is owned by the caller.
@@ -56,7 +57,7 @@ class DataSink {
     const TPlanFragmentExecParams& params,
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
 
-  // Returns the runtime profile for the sink.  
+  // Returns the runtime profile for the sink.
   virtual RuntimeProfile* profile() = 0;
 };
 

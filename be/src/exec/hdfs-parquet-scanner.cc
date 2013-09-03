@@ -314,7 +314,7 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   return Status::OK;
 }
 
-Status HdfsParquetScanner::Close() {
+void HdfsParquetScanner::Close() {
   vector<THdfsCompression::type> compression_types;
   for (int i = 0; i < column_readers_.size(); ++i) {
     if (column_readers_[i]->decompressed_data_pool_.get() != NULL) {
@@ -331,7 +331,6 @@ Status HdfsParquetScanner::Close() {
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
   assemble_rows_timer_.UpdateCounter();
-  return Status::OK;
 }
 
 HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
@@ -746,6 +745,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
         RETURN_IF_ERROR(CommitRows(num_to_commit));
       }
 
+      *eosr = true;
+      return Status::OK;
+    } else if (file_metadata_.num_rows == 0) {
+      // Empty file
       *eosr = true;
       return Status::OK;
     }

@@ -55,7 +55,7 @@ class ThriftClientImpl {
 
   // Close the connection with the remote server. May be called
   // repeatedly.
-  Status Close();
+  void Close();
 
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port)

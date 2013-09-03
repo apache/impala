@@ -238,6 +238,7 @@ class PlanFragmentExecutor {
   Status OpenInternal();
 
   // Executes GetNext() logic and returns resulting status.
+  // sets done_ to true if the last row batch was returned.
   Status GetNextInternal(RowBatch** batch);
 
   // Stops report thread, if one is running. Blocks until report thread terminates.

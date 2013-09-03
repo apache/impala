@@ -155,6 +155,8 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
             // encoded. Convert the value to big-endian.
             data = binary_value;
             data_len = output_exprs_byte_sizes_[j];
+            DCHECK(data_len == 1 || data_len == 2 || data_len == 4 || data_len == 8)
+              << data_len;
             BitUtil::ByteSwap(binary_value, value, data_len);
           }
 
@@ -258,18 +260,22 @@ Status HBaseTableWriter::CreateByteArray(JNIEnv* env, const void* data, int data
   return Status::OK;
 }
 
-Status HBaseTableWriter::Close(RuntimeState* state) {
+void HBaseTableWriter::Close(RuntimeState* state) {
   // Guard against double closing.
   if (table_.get() != NULL) {
-    RETURN_IF_ERROR(table_->Close());
-    table_.reset(NULL);
+    table_->Close(state);
+    table_.reset();
   }
 
   // The jni should already have everything cleaned at this point
   // but try again just in case there was an error that caused
   // AppendRowBatch to exit out before calling CleanUpJni.
-  RETURN_IF_ERROR(CleanUpJni());
-  return Status::OK;
+  Status status = CleanUpJni();
+  if (!status.ok()) {
+    stringstream ss;
+    ss << "HBaseTableWriter::Close ran into an issue: " << status.GetErrorMsg();
+    state->LogError(ss.str());
+  }
 }
 
 }  // namespace impala

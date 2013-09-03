@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_JNI_UTIL_H
 
 #include <jni.h>
+#include <string>
 #include <vector>
 
 #define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
@@ -111,23 +112,7 @@
 #define RETURN_ERROR_IF_EXC(env) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != NULL) { \
-      (env)->ExceptionClear(); \
-      DCHECK((JniUtil::throwable_to_string_id()) != NULL); \
-      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_string_id()), exc); \
-      jboolean is_copy; \
-      const char* c_msg = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_stack_trace_id()), exc); \
-      const char* c_stack = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      VLOG(1) << std::string(c_stack); \
-      (env)->ExceptionClear(); \
-      (env)->DeleteLocalRef(exc); \
-      return Status(c_msg); \
-    } \
+    if (exc != NULL) return JniUtil::GetJniExceptionMsg(env);\
   } while (false)
 
 #define EXIT_IF_JNIERROR(stmt) \
@@ -218,6 +203,10 @@ class JniUtil {
 
   // Delete all global references: class members, and those stored in global_refs_.
   static Status Cleanup();
+
+  // Returns the error message for 'e'. If no exception, returns Status::OK
+  // Prefix, if non-empty will be prepended to the error message.
+  static Status GetJniExceptionMsg(JNIEnv* env, const std::string& prefx = "");
 
  private:
   static jclass jni_util_cl_;

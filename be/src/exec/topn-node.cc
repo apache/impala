@@ -117,9 +117,9 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK;
 }
 
-Status TopNNode::Close(RuntimeState* state) {
+void TopNNode::Close(RuntimeState* state) {
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 // Insert if either not at the limit or it's a new TopN tuple_row

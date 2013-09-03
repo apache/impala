@@ -148,9 +148,9 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK;
 }
 
-Status MergeNode::Close(RuntimeState* state) {
+void MergeNode::Close(RuntimeState* state) {
   child_row_batch_.reset();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,

@@ -93,18 +93,16 @@ Status ExecNode::Prepare(RuntimeState* state) {
 ExecNode::~ExecNode() {
 }
 
-Status ExecNode::Close(RuntimeState* state) {
-  Status status = ExecDebugAction(TExecNodePhase::CLOSE, state);
+void ExecNode::Close(RuntimeState* state) {
   if (rows_returned_counter_ != NULL) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
   for (int i = 0; i < children_.size(); ++i) {
-    status.AddError(children_[i]->Close(state));
+    children_[i]->Close(state);
   }
   if (mem_tracker() != NULL) {
     DCHECK_EQ(mem_tracker()->consumption(), 0) << "Leaked memory.";
   }
-  return status;
 }
 
 void ExecNode::AddRuntimeExecOption(const string& str) {

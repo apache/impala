@@ -126,8 +126,6 @@ class DataStreamMgr {
     PlanNodeId dest_node_id() const { return dest_node_id_; }
 
    private:
-    RuntimeState* state_;
-
     TUniqueId fragment_instance_id_;
     PlanNodeId dest_node_id_;
     const RowDescriptor& row_desc_;

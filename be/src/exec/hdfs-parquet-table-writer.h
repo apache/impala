@@ -56,7 +56,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   // Initialize column information.
   virtual Status Init();
-  
+
   // Initializes a new file.  This resets the file metadata object and writes
   // the file header to the output file.
   virtual Status InitNewFile();
@@ -68,7 +68,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   // Write out all the data.
   virtual Status Finalize();
-  
+
+  virtual void Close();
+
   virtual uint64_t default_block_size() { return HDFS_BLOCK_SIZE; }
 
  private:
@@ -94,7 +96,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   class BoolColumnWriter;
   friend class BoolColumnWriter;
 
-  // Fills in the schema portion of the file metadata, converting the schema in 
+  // Fills in the schema portion of the file metadata, converting the schema in
   // table_desc_ into the format in the file metadata
   Status CreateSchema();
 
@@ -105,9 +107,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   Status WriteFileFooter();
 
   // Flushes the current row group to file.  This will compute the final
-  // offsets of column chunks, updating the file metadata.  
+  // offsets of column chunks, updating the file metadata.
   Status FlushCurrentRowGroup();
-  
+
   // Adds a row group to the metadata and updates current_row_group_ to the
   // new row group.  current_row_group_ will be flushed.
   Status AddRowGroup();
@@ -141,7 +143,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // in a few places.
   int64_t file_pos_;
 
-  // Memory for column/block buffers that are reused for the duration of the 
+  // Memory for column/block buffers that are reused for the duration of the
   // writer (i.e. reused across files).
   boost::scoped_ptr<MemPool> reusable_col_mem_pool_;
 
@@ -153,7 +155,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   // calls since the writer may stop in the middle of a row batch and ask for a new
   // file.
   int row_idx_;
-    
+
   // Staging buffer to use to compress data.  This is used only if compression is
   // enabled and is reused between all data pages.
   std::vector<uint8_t> compression_staging_buffer_;

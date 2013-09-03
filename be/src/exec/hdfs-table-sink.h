@@ -123,11 +123,11 @@ class HdfsTableSink : public DataSink {
   virtual Status Init(RuntimeState* state);
 
   // Append all rows in batch to the temporary Hdfs files corresponding to partitions.
-  virtual Status Send(RuntimeState* state, RowBatch* batch);
+  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
 
   // Move temporary Hdfs files to final locations.
   // Remove original Hdfs files if overwrite was specified.
-  virtual Status Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state);
 
   // Get the block size of the current file opened for this partition.
   // This is a utility routine that can be called by specific table
@@ -183,8 +183,11 @@ class HdfsTableSink : public DataSink {
   void BuildHdfsFileNames(OutputPartition* output);
 
   // Updates runtime stats of HDFS with rows written, then closes the file associated with
-  // the partition.
+  // the partition by calling ClosePartitionFile()
   Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition);
+
+  // Closes the hdfs file for this partition as well as the writer.
+  void ClosePartitionFile(RuntimeState* state, OutputPartition* partition);
 
   // Descriptor of target table. Set in Init().
   const HdfsTableDescriptor* table_desc_;

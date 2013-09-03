@@ -51,14 +51,14 @@ class HdfsTableWriter {
   // 2. InitNewFile()
   // 3. AppendRowBatch() - called repeatedly
   // 4. Finalize()
-  // For files formats that are splittable (and therefore can be written to an 
+  // For files formats that are splittable (and therefore can be written to an
   // arbitrarily large file), 1-4 is called once.
   // For files formats that are not splittable (i.e. columnar formats, compressed
   // text), 1) is called once and 2-4) is called repeatedly for each file.
 
   // Do initialization of writer.
   virtual Status Init() = 0;
-  
+
   // Called when a new file is started.
   virtual Status InitNewFile() = 0;
 
@@ -79,12 +79,15 @@ class HdfsTableWriter {
   // This is called once for each call to InitNewFile()
   virtual Status Finalize() = 0;
 
+  // Called once when this writer should cleanup any resources.
+  virtual void Close() = 0;
+
   // Default block size to use for this file format.  If the file format doesn't
   // care, it should return 0 and the hdfs config default will be used.
   virtual uint64_t default_block_size() = 0;
 
  protected:
-  // Write to the current hdfs file. 
+  // Write to the current hdfs file.
   // Note: there is a noticeable overhead with this call.  Callers should buffer
   // writes.
   Status Write(const char* data, int32_t len) {

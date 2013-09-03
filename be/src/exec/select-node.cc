@@ -102,9 +102,9 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   return output_batch->IsFull() || output_batch->AtResourceLimit();
 }
 
-Status SelectNode::Close(RuntimeState* state) {
+void SelectNode::Close(RuntimeState* state) {
   child_row_batch_.reset();
-  return ExecNode::Close(state);
+  ExecNode::Close(state);
 }
 
 }

@@ -46,7 +46,7 @@ class HBaseTableWriter {
   Status AppendRowBatch(RowBatch* batch);
 
   // Calls to Close release the HBaseTable.
-  Status Close(RuntimeState* state);
+  void Close(RuntimeState* state);
 
   // Create all needed java side objects.
   // This call may cause connections to HBase and Zookeeper to be created.
