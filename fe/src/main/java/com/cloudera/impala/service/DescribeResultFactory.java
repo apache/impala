@@ -94,7 +94,7 @@ public class DescribeResultFactory {
     StringBuilder sb = new StringBuilder();
     // First add all the columns (includes partition columns).
     sb.append(MetaDataFormatUtils.getAllColumnsInformation(msTable.getSd().getCols(),
-        msTable.getPartitionKeys()));
+        msTable.getPartitionKeys(), false));
     // Add the extended table metadata information.
     sb.append(MetaDataFormatUtils.getTableInformation(hiveTable));
 

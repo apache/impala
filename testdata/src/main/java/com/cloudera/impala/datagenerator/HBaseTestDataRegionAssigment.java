@@ -2,61 +2,33 @@
 
 package com.cloudera.impala.datagenerator;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.List;
-import java.util.Iterator;
 import java.util.ArrayList;
-import java.util.NavigableMap;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.NavigableMap;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.util.Merge;
-import org.apache.hadoop.hbase.ClusterStatus;
-import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hbase.Chore;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.NotServingRegionException;
-import org.apache.hadoop.hbase.Stoppable;
-import org.apache.hadoop.hbase.catalog.MetaEditor;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.ClusterStatus;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.catalog.MetaReader;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HConnection;
-import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.MetaScanner;
-import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PairOfSameType;
 import org.apache.hadoop.hbase.util.Threads;
-
-import com.google.common.collect.Iterators;
-import com.google.common.collect.Sets;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
-import org.apache.hadoop.util.ToolRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 
 /**
  * Splits HBase tables into regions and deterministically assigns regions to region
@@ -187,7 +159,7 @@ class HBaseTestDataRegionAssigment {
       throws IOException, InterruptedException {
     long start = System.currentTimeMillis();
     HRegionInfo daughterA = null, daughterB = null;
-    HTable metaTable = new HTable(conf, HConstants.META_TABLE_NAME);
+    HTable metaTable = new HTable(conf, TableName.META_TABLE_NAME);
 
     try {
       while (System.currentTimeMillis() - start < timeout) {
@@ -196,9 +168,9 @@ class HBaseTestDataRegionAssigment {
           break;
         }
 
-        HRegionInfo region = MetaReader.parseCatalogResult(result).getFirst();
+        HRegionInfo region = HRegionInfo.getHRegionInfo(result);
         if(region.isSplitParent()) {
-          PairOfSameType<HRegionInfo> pair = MetaReader.getDaughterRegions(result);
+          PairOfSameType<HRegionInfo> pair = HRegionInfo.getDaughterRegions(result);
           daughterA = pair.getFirst();
           daughterB = pair.getSecond();
           break;
@@ -258,7 +230,7 @@ class HBaseTestDataRegionAssigment {
     while (System.currentTimeMillis() - start < timeout) {
       Result result = getRegionRow(metaTable, hri.getRegionName());
       if (result != null) {
-        HRegionInfo info = MetaReader.parseCatalogResult(result).getFirst();
+        HRegionInfo info = HRegionInfo.getHRegionInfo(result);
         if (info != null && !info.isOffline()) {
           break;
         }

@@ -89,9 +89,25 @@
     <dependency>
       <groupId>parquet</groupId>
       <artifactId>parquet-hive</artifactId>
-      <version>${env.IMPALA_PARQUET_VERSION}</version>
+      <version>1.1.1</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-${env.IMPALA_PARQUET_VERSION}-cdh4.5.0.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.1.1.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase-client</artifactId>
+      <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-client-${hbase.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase-common</artifactId>
+      <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-common-${hbase.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -114,6 +130,7 @@
       <artifactId>libthrift</artifactId>
       <version>${env.IMPALA_THRIFT_VERSION}</version>
     </dependency>
+
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
@@ -123,13 +140,9 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-hbase-handler</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase</artifactId>
-      <version>${hbase.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-hbase-handler-${hive.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -168,7 +181,54 @@
       <artifactId>hive-jdbc</artifactId>
       <version>${hive.version}</version>
     </dependency>
+<<<<<<< HEAD
 
+=======
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derby</artifactId>
+      <version>10.4.2.0</version>
+    </dependency>
+   <!-- The datanucleus dependencies are copied directly from Hive's pom.xml
+        to make our FE build work -->
+   <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-api-jdo</artifactId>
+      <version>3.2.1</version>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.jdo</groupId>
+          <artifactId>jdo2-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-core</artifactId>
+      <version>3.2.2</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-rdbms</artifactId>
+      <version>3.2.1</version>
+      <scope>compile</scope>
+    </dependency>
+>>>>>>> c034ff7... Changes to make Impala work on CDH5. Mostly fixing up dependency versions. Minor code changes to address HBase API changes.
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
       <groupId>postgresql</groupId>
@@ -176,9 +236,25 @@
       <version>9.0-801.jdbc4</version>
     </dependency>
     <dependency>
+<<<<<<< HEAD
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
       <version>10.4.2.0</version>
+=======
+      <groupId>commons-dbcp</groupId>
+      <artifactId>commons-dbcp</artifactId>
+      <version>1.4</version>
+    </dependency>
+    <dependency>
+      <groupId>javax.jdo</groupId>
+      <artifactId>jdo-api</artifactId>
+      <version>3.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.antlr</groupId>
+      <artifactId>antlr-runtime</artifactId>
+      <version>3.3</version>
+>>>>>>> c034ff7... Changes to make Impala work on CDH5. Mostly fixing up dependency versions. Minor code changes to address HBase API changes.
     </dependency>
 
     <dependency>

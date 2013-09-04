@@ -20,36 +20,31 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.io.hfile.Compression;
+import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hive.service.cli.thrift.TColumn;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TPrimitiveType;
-import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -400,15 +395,15 @@ public class HBaseTable extends Table {
             Result r = rs.next();
             if (r == null) break;
             currentRowCount += 1;
-            for (KeyValue kv : r.list()) {
+            for (Cell c: r.list()) {
               // some extra row size added to make up for shared overhead
-              currentRowSize += kv.getRowLength() // row key
+              currentRowSize += c.getRowLength() // row key
                   + 4 // row key length field
-                  + kv.getFamilyLength() // Column family bytes
+                  + c.getFamilyLength() // Column family bytes
                   + 4  // family length field
-                  + kv.getQualifierLength() // qualifier bytes
+                  + c.getQualifierLength() // qualifier bytes
                   + 4 // qualifier length field
-                  + kv.getValueLength() // length of the value
+                  + c.getValueLength() // length of the value
                   + 4 // value length field
                   + 10; // extra overhead for hfile index, checksums, metadata, etc
             }
@@ -452,6 +447,17 @@ public class HBaseTable extends Table {
     FileSystem fs = tableDir.getFileSystem(hbaseConf_);
     Path regionDir = tableDir.suffix("/" + info.getEncodedName());
     return fs.getContentSummary(regionDir).getLength();
+  }
+
+  /**
+   * Returns hbase's root directory: i.e. <code>hbase.rootdir</code> from
+   * the given configuration as a qualified Path.
+   * Method copied from HBase FSUtils.java to avoid depending on HBase server.
+   */
+  public static Path getRootDir(final Configuration c) throws IOException {
+    Path p = new Path(c.get(HConstants.HBASE_DIR));
+    FileSystem fs = p.getFileSystem(c);
+    return p.makeQualified(fs);
   }
 
   /**

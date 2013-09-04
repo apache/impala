@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <!--
-  Copyright (c) 2012 Cloudera, Inc. All rights reserved.  
+  Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -17,8 +17,7 @@
   <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>Builds test data generators</name>
-
+  <name>Build some test data</name>
   <properties>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
@@ -46,8 +45,36 @@
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase</artifactId>
+      <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-client-${hbase.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase-common</artifactId>
+      <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-common-${hbase.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>1.1.1</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.6.4</version>
     </dependency>
   </dependencies>
 
