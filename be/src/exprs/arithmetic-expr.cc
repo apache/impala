@@ -148,6 +148,11 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
       result = builder.CreateSRem(lhs_value, rhs_value, "tmp_mod");
       break;
 
+    case TExprOpcode::MATH_FMOD_FLOAT_FLOAT:
+    case TExprOpcode::MATH_FMOD_DOUBLE_DOUBLE:
+      result = builder.CreateFRem(lhs_value, rhs_value, "tmp_fmod");
+      break;
+
     case TExprOpcode::BITAND_CHAR_CHAR:
     case TExprOpcode::BITAND_SHORT_SHORT:
     case TExprOpcode::BITAND_INT_INT:
