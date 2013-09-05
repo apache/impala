@@ -22,16 +22,22 @@ set -e
 . $IMPALA_HOME/bin/set-pythonpath.sh
 EXPLORATION_STRATEGY=core
 
+NUM_ITERATIONS=1
+
 # parse command line options
-while getopts "e:" OPTION
+while getopts "e:n:" OPTION
 do
   case "$OPTION" in
     e)
       EXPLORATION_STRATEGY=$OPTARG
       ;;
+    n)
+      NUM_ITERATIONS=$OPTARG
+      ;;
     ?)
-      echo "run-all-tests.sh [-e <exploration_strategy>]. The default exploration"\
-           "strategy is 'core'."
+      echo "run-all-tests.sh [-e <exploration_strategy>] [-n <num_iters>]"
+      echo "[-e] The exploration strategy to use. Default exploration is 'core'."
+      echo "[-n] The number of times to run the tests. Default is 1."
       exit 1;
       ;;
   esac
@@ -51,37 +57,40 @@ echo "Split and assign HBase regions"
 # before running any test.
 ${IMPALA_HOME}/testdata/bin/split-hbase.sh
 
-# Preemptively force kill impalads and the statestore to clean up any running instances.
-# The BE unit tests cannot run when impalads are started.
-${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
+for i in $(seq 1 $NUM_ITERATIONS)
+do
+  # Preemptively force kill impalads and the statestore to clean up any running instances.
+  # The BE unit tests cannot run when impalads are started.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
 
-# Run backend tests.
-${IMPALA_HOME}/bin/run-backend-tests.sh
+  # Run backend tests.
+  ${IMPALA_HOME}/bin/run-backend-tests.sh
 
-# Run the remaining tests against an external Impala test cluster.
-${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
-    --wait_for_cluster --cluster_size=3
+  # Run the remaining tests against an external Impala test cluster.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
+      --wait_for_cluster --cluster_size=3
 
-# Run some queries using run-workload to verify run-workload has not been broken.
-${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
-    --table_format=text/none
+  # Run some queries using run-workload to verify run-workload has not been broken.
+  ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
+      --table_format=text/none
 
-# Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
-# functional-query workload because the larger datasets (ex. tpch) are not generated
-# in all table formats.
-${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
-    --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
+  # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
+  # functional-query workload because the larger datasets (ex. tpch) are not generated
+  # in all table formats.
+  ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
+      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
-${IMPALA_HOME}/tests/run-process-failure-tests.sh
+  ${IMPALA_HOME}/tests/run-process-failure-tests.sh
 
-# Run JUnit frontend tests
-# Requires a running impalad cluster because some tests (such as DataErrorTest and
-# JdbcTest) queries against an impala cluster.
-# TODO: Currently planner tests require running the end-to-end tests first
-# so data is inserted into tables. This will go away once we move the planner
-# tests to the new python framework.
-${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${FE_LOG_DIR}\
-    --wait_for_cluster --cluster_size=3
+  # Run JUnit frontend tests
+  # Requires a running impalad cluster because some tests (such as DataErrorTest and
+  # JdbcTest) queries against an impala cluster.
+  # TODO: Currently planner tests require running the end-to-end tests first
+  # so data is inserted into tables. This will go away once we move the planner
+  # tests to the new python framework.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${FE_LOG_DIR}\
+      --wait_for_cluster --cluster_size=3
 
-cd $IMPALA_FE_DIR
-mvn test
+  cd $IMPALA_FE_DIR
+  mvn test
+done
