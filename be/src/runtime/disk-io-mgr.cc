@@ -27,6 +27,11 @@ DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
 
+// Turning this to false will make asan much more effective for IO buffer related
+// bugs.
+DEFINE_bool(reuse_io_buffers, true, "(Advanced) If true, IoMgr will reuse IoBuffers "
+                                     "across queries.");
+
 // Defaults to constrain the queue size.  These constants don't matter much since
 // the IoMgr will dynamically find the optimal number.
 static const int MAX_QUEUE_CAPACITY = 256;
@@ -564,16 +569,22 @@ void DiskIoMgr::GcIoBuffers() {
   for (list<char*>::iterator iter = free_buffers_.begin();
       iter != free_buffers_.end(); ++iter) {
     process_mem_tracker_->Release(max_read_size_);
-    delete[] *iter;
     --num_allocated_buffers_;
+    delete[] *iter;
   }
   free_buffers_.clear();
 }
 
 void DiskIoMgr::ReturnFreeBuffer(char* buffer) {
   DCHECK(buffer != NULL);
-  unique_lock<mutex> lock(free_buffers_lock_);
-  free_buffers_.push_back(buffer);
+  if (FLAGS_reuse_io_buffers) {
+    unique_lock<mutex> lock(free_buffers_lock_);
+    free_buffers_.push_back(buffer);
+  } else {
+    process_mem_tracker_->Release(max_read_size_);
+    --num_allocated_buffers_;
+    delete[] buffer;
+  }
   if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
     ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Increment(1L);
   }

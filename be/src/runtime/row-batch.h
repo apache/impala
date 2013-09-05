@@ -153,14 +153,15 @@ class RowBatch {
     memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_ * sizeof(Tuple*));
   }
 
-  // Swaps all of the row batch state with 'other'.  This is used for scan nodes
-  // which produce RowBatches asynchronously.  Typically, an ExecNode is handed
-  // a row batch to populate (pull model) but ScanNodes have multiple threads
-  // which push row batches.  This function is used to swap the pushed row batch
-  // contents with the row batch that's passed from the caller.
+  // Acquires state from the 'src' row batch into this row batch. This includes all IO
+  // buffers and tuple data.
+  // This row batch must be empty and have the same row descriptor as the src batch.
+  // This is used for scan nodes which produce RowBatches asynchronously.  Typically,
+  // an ExecNode is handed a row batch to populate (pull model) but ScanNodes have
+  // multiple threads which push row batches.
   // TODO: this is wasteful and makes a copy that's unnecessary.  Think about cleaning
   // this up.
-  void Swap(RowBatch* other);
+  void AcquireState(RowBatch* src);
 
   // Create a serialized version of this row batch in output_batch, attaching all of the
   // data it references to output_batch.tuple_data. output_batch.tuple_data will be
@@ -188,7 +189,7 @@ class RowBatch {
  private:
   MemTracker* mem_tracker_;  // not owned
 
-  // All members below need to be handled in RowBatch::Swap()
+  // All members below need to be handled in RowBatch::AcquireState()
 
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
   int num_rows_;  // # of committed rows

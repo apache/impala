@@ -241,29 +241,28 @@ int RowBatch::GetBatchSize(const TRowBatch& batch) {
   return result;
 }
 
-void RowBatch::Swap(RowBatch* other) {
-  DCHECK(row_desc_.Equals(other->row_desc_));
-  DCHECK_EQ(num_tuples_per_row_, other->num_tuples_per_row_);
-  DCHECK_EQ(tuple_ptrs_size_, other->tuple_ptrs_size_);
+void RowBatch::AcquireState(RowBatch* src) {
+  DCHECK(row_desc_.Equals(src->row_desc_));
+  DCHECK_EQ(num_tuples_per_row_, src->num_tuples_per_row_);
+  DCHECK_EQ(tuple_ptrs_size_, src->tuple_ptrs_size_);
+  DCHECK_EQ(capacity_, src->capacity_);
 
   // The destination row batch should be empty.
   DCHECK(!has_in_flight_row_);
+  DCHECK_EQ(num_rows_, 0);
 
-  DCHECK(io_buffers_.empty());
-  for (int i = 0; i < io_buffers_.size(); ++i) {
-    DiskIoMgr::BufferDescriptor* buffer = io_buffers_[i];
-    other->io_buffers_.push_back(buffer);
-    buffer->SetMemTracker(other->mem_tracker_);
+  for (int i = 0; i < src->io_buffers_.size(); ++i) {
+    DiskIoMgr::BufferDescriptor* buffer = src->io_buffers_[i];
+    io_buffers_.push_back(buffer);
+    buffer->SetMemTracker(mem_tracker_);
   }
-  io_buffers_.clear();
+  src->io_buffers_.clear();
 
-  std::swap(has_in_flight_row_, other->has_in_flight_row_);
-  std::swap(num_rows_, other->num_rows_);
-  std::swap(capacity_, other->capacity_);
-  std::swap(tuple_ptrs_, other->tuple_ptrs_);
-
-  DCHECK_EQ(tuple_data_pool_->GetTotalChunkSizes(), 0);
-  tuple_data_pool_->AcquireData(other->tuple_data_pool_.get(), false);
+  has_in_flight_row_ = src->has_in_flight_row_;
+  num_rows_ = src->num_rows_;
+  capacity_ = src->capacity_;
+  std::swap(tuple_ptrs_, src->tuple_ptrs_);
+  tuple_data_pool_->AcquireData(src->tuple_data_pool_.get(), false);
 }
 
 // TODO: consider computing size of batches as they are built up

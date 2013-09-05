@@ -127,7 +127,7 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
   if (materialized_batch != NULL) {
     num_owned_io_buffers_ -= materialized_batch->num_io_buffers();
     row_batch_consumed_cv_.notify_one();
-    row_batch->Swap(materialized_batch);
+    row_batch->AcquireState(materialized_batch);
     // Update the number of materialized rows instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
     // for the limit case but we want to avoid the synchronized writes to
@@ -150,6 +150,7 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
       state->io_mgr()->CancelReader(reader_context_);
       row_batch_consumed_cv_.notify_all();
     }
+    DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
     delete materialized_batch;
     *eos = false;
     return Status::OK;
