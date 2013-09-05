@@ -38,7 +38,6 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Appender;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.PropertyConfigurator;
@@ -269,16 +268,12 @@ public class JniFrontend {
    * The return type is a serialised TGetFunctionsResult object.
    * @see Frontend#getTableNames
    */
-  public byte[] getFunctionNames(byte[] thriftGetFunctionsParams) throws ImpalaException {
+  public byte[] getFunctions(byte[] thriftGetFunctionsParams) throws ImpalaException {
     TGetFunctionsParams params = new TGetFunctionsParams();
     deserializeThrift(params, thriftGetFunctionsParams);
-    // If the session was not set it indicates this is an internal Impala call.
-    User user = params.isSetSession() ?
-        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
-    List<String> fns = frontend.getFunctionNames(params.pattern, user);
 
     TGetFunctionsResult result = new TGetFunctionsResult();
-    result.setFns(fns);
+    result.setFn_signatures(frontend.getFunctions(params.db, params.pattern));
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
       return serializer.serialize(result);

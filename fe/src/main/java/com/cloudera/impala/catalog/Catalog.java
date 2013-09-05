@@ -17,7 +17,6 @@ package com.cloudera.impala.catalog;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.Privilege;
@@ -67,7 +67,7 @@ public class Catalog {
   //TODO: Make the reload interval configurable.
   private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
   private final boolean lazy;
-  private AtomicInteger nextTableId;
+  private final AtomicInteger nextTableId;
   private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(0);
   // Cache of database metadata.
   private final CatalogObjectCache<Db> dbCache = new CatalogObjectCache<Db>(
@@ -83,10 +83,6 @@ public class Catalog {
           }
         }
       });
-
-  // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
-  // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
-  private HashMap<String, List<Udf>> udfs;
 
   private final ScheduledExecutorService policyReader =
       Executors.newScheduledThreadPool(1);
@@ -145,8 +141,6 @@ public class Catalog {
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
-
-    loadUdfs();
   }
 
   public Catalog() {
@@ -187,51 +181,27 @@ public class Catalog {
   }
 
   /**
-   * Loads the registered UDFs to the catalog. This shouldn't take very long
-   * so we can probably just do this up front.
-   */
-  public void loadUdfs() {
-    udfs = new HashMap<String, List<Udf>>();
-    // TODO: figure out how to persist udfs and load this now.
-  }
-
-  /**
    * Adds a UDF to the catalog.
    * Returns true if the UDF was successfully added.
-   * Returns false if the UDF already exists or the user doesn't have create
-   * permissions.
+   * Returns false if the UDF already exists.
+   * TODO: allow adding a UDF to a global scope. We probably want this to resolve
+   * after the local scope.
+   * e.g. if we had fn() and db.fn(). If the current database is 'db', fn() would
+   * resolve first to db.fn().
    */
-  public boolean addUdf(Udf udf, User user) {
-    // TODO: add this to persistent store
-    synchronized (udfs) {
-      Udf fn = getUdf(udf.getDesc(), user, Privilege.CREATE, true);
-      if (fn != null) return false;
-      List<Udf> functions = udfs.get(udf.getDesc().getName());
-      if (functions == null) {
-        functions = Lists.newArrayList();
-        udfs.put(udf.getDesc().getName(), functions);
-      }
-      functions.add(udf);
-    }
-    return true;
+  public boolean addUdf(Udf udf) {
+    Db db = getDbInternal(udf.dbName());
+    if (db == null) return false;
+    return db.addUdf(udf);
   }
 
   /**
    * Removes a UDF from the catalog. Returns true if the UDF was removed.
    */
-  public boolean removeUdf(Function desc, User user) {
-    // TODO: remove this from persistent store.
-    synchronized (udfs) {
-      Udf udf = getUdf(desc, user, Privilege.DROP, true);
-      if (udf == null) return false;
-      List<Udf> functions = udfs.get(desc.getName());
-      Preconditions.checkNotNull(functions);
-      boolean exists = functions.remove(udf);
-      if (functions.isEmpty()) {
-        udfs.remove(desc.getName());
-      }
-      return exists;
-    }
+  public boolean removeUdf(Function desc) {
+    Db db = getDbInternal(desc.dbName());
+    if (db == null) return false;
+    return db.removeUdf(desc);
   }
 
   /**
@@ -240,38 +210,34 @@ public class Catalog {
    * will be returned. If exactMatch is false, an arbitrary compatible
    * (i.e. implicitly castable) function will be returned.
    */
-  public Udf getUdf(Function desc, User user,
-      Privilege privilege, boolean exactMatch) {
-    // TODO: authorization
-    synchronized (udfs) {
-      List<Udf> functions = udfs.get(desc.getName());
-      if (functions == null) return null;
-      for (Udf f: functions) {
-        if (desc.equals(f.getDesc())) return f;
-      }
-      if (exactMatch) return null;
-      for (Udf f: functions) {
-        if (desc.isCompatible(f.getDesc())) return f;
-      }
-    }
-    return null;
+  public Udf getUdf(Function desc, boolean exactMatch) {
+    Db db = getDbInternal(desc.dbName());
+    if (db == null) return null;
+    return db.getUdf(desc, exactMatch);
   }
 
   /**
-   * Returns all the UDFs visible to this user.
+   * Returns all the UDFs in this DB.
+   * @throws DatabaseNotFoundException
    */
-  public List<String> getUdfNames(String pattern, User user) {
-    List<String> names = Lists.newArrayList();
-    synchronized (udfs) {
-      for (List<Udf> functions: udfs.values()) {
-        for (Udf f: functions) {
-          names.add(f.getDesc().signatureString());
-        }
-      }
+  public List<String> getUdfNames(String dbName, String pattern)
+      throws DatabaseNotFoundException {
+    Db db = getDbInternal(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    // TODO: authorization
-    names = filterStringsByPattern(names, pattern);
-    return names;
+    return filterStringsByPattern(db.getAllUdfs(), pattern);
+  }
+
+  /**
+   * Returns true if there is a UDF with this function name. Parameters
+   * are ignored
+   * @throws DatabaseNotFoundException
+   */
+  public boolean udfExists(FunctionName name) {
+    Db db = getDbInternal(name.getDb());
+    if (db == null) return false;
+    return db.udfExists(name);
   }
 
   /**

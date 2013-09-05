@@ -59,7 +59,7 @@ Frontend::Frontend() {
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
-    {"getFunctionNames", "([B)[B", &get_fn_names_id_},
+    {"getFunctions", "([B)[B", &get_functions_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"execDdlRequest", "([B)[B", &exec_ddl_request_id_},
     {"resetMetadata", "([B)V", &reset_metadata_id_},
@@ -96,7 +96,7 @@ void Frontend::LoadJniFrontendMethod(JNIEnv* jni_env,
 }
 
 template <typename T>
-Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& arg) {
+Status Frontend::CallJniMethod(const jmethodID& method, const T& arg) {
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
   JniLocalFrame jni_frame;
@@ -110,7 +110,7 @@ Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& a
 }
 
 template <typename T, typename R>
-Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& arg,
+Status Frontend::CallJniMethod(const jmethodID& method, const T& arg,
     R* response) {
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
@@ -127,7 +127,7 @@ Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& a
 }
 
 template <typename T>
-Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& arg,
+Status Frontend::CallJniMethod(const jmethodID& method, const T& arg,
     string* response) {
   JNIEnv* jni_env = getJNIEnv();
   jbyteArray request_bytes;
@@ -148,20 +148,20 @@ Status Frontend::CallJniMethodWithThriftArgs(const jmethodID& method, const T& a
 
 Status Frontend::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   VLOG_QUERY << "UpdateMetastore()";
-  return CallJniMethodWithThriftArgs(update_metastore_id_, catalog_update);
+  return CallJniMethod(update_metastore_id_, catalog_update);
 }
 
 Status Frontend::ExecDdlRequest(const TDdlExecRequest& params, TDdlExecResponse* resp) {
-  return CallJniMethodWithThriftArgs(exec_ddl_request_id_, params, resp);
+  return CallJniMethod(exec_ddl_request_id_, params, resp);
 }
 
 Status Frontend::ResetMetadata(const TResetMetadataParams& params) {
-  return CallJniMethodWithThriftArgs(reset_metadata_id_, params);
+  return CallJniMethod(reset_metadata_id_, params);
 }
 
 Status Frontend::DescribeTable(const TDescribeTableParams& params,
     TDescribeTableResult* response) {
-  return CallJniMethodWithThriftArgs(describe_table_id_, params, response);
+  return CallJniMethod(describe_table_id_, params, response);
 }
 
 Status Frontend::GetTableNames(const string& db, const string* pattern,
@@ -176,38 +176,34 @@ Status Frontend::GetTableNames(const string& db, const string* pattern,
     params.__set_session(*session);
   }
 
-  return CallJniMethodWithThriftArgs(get_table_names_id_, params, table_names);
+  return CallJniMethod(get_table_names_id_, params, table_names);
 }
 
 Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
     TGetDbsResult* db_names) {
   TGetDbsParams params;
-  if (pattern != NULL) {
-    params.__set_pattern(*pattern);
-  }
-  if (session != NULL) {
-    params.__set_session(*session);
-  }
-
-  return CallJniMethodWithThriftArgs(get_db_names_id_, params, db_names);
-}
-
-Status Frontend::GetFunctionNames(const string* pattern, const TSessionState* session,
-    TGetFunctionsResult* fn_names) {
-  TGetFunctionsParams params;
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
-  return CallJniMethodWithThriftArgs(get_fn_names_id_, params, fn_names);
+  return CallJniMethod(get_db_names_id_, params, db_names);
+}
+
+Status Frontend::GetFunctions(const string& db, const string* pattern,
+    const TSessionState* session, TGetFunctionsResult* functions) {
+  TGetFunctionsParams params;
+  params.__set_db(db);
+  if (pattern != NULL) params.__set_pattern(*pattern);
+  if (session != NULL) params.__set_session(*session);
+  return CallJniMethod(get_functions_id_, params, functions);
 }
 
 Status Frontend::GetExecRequest(
     const TClientRequest& request, TExecRequest* result) {
-  return CallJniMethodWithThriftArgs(create_exec_request_id_, request, result);
+  return CallJniMethod(create_exec_request_id_, request, result);
 }
 
 Status Frontend::GetExplainPlan(
     const TClientRequest& query_request, string* explain_string) {
-  return CallJniMethodWithThriftArgs(
+  return CallJniMethod(
       get_explain_plan_id_, query_request, explain_string);
 }
 
@@ -236,7 +232,7 @@ Status Frontend::ValidateSettings() {
 
 Status Frontend::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
     TMetadataOpResponse* result) {
-  return CallJniMethodWithThriftArgs(exec_hs2_metadata_op_id_, request, result);
+  return CallJniMethod(exec_hs2_metadata_op_id_, request, result);
 }
 
 Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
@@ -256,7 +252,7 @@ Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
 }
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
-  return CallJniMethodWithThriftArgs(load_table_data_id_, request, response);
+  return CallJniMethod(load_table_data_id_, request, response);
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {

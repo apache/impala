@@ -20,10 +20,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -348,11 +348,13 @@ public class Frontend {
   }
 
   /**
-   * Returns all function names that match the pattern and
-   * are accessible to the given user. If pattern is null, matches all functions.
+   * Returns all function signatures that match the pattern. If pattern is null,
+   * matches all functions.
+   * @throws DatabaseNotFoundException
    */
-  public List<String> getFunctionNames(String fnPattern, User user) {
-    return catalog.getUdfNames(fnPattern, user);
+  public List<String> getFunctions(String dbName, String fnPattern)
+      throws DatabaseNotFoundException {
+    return catalog.getUdfNames(dbName, fnPattern);
   }
 
   /**

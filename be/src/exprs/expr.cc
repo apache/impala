@@ -357,7 +357,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
     }
-    case TExprNodeType::UDF: {
+    case TExprNodeType::UDF_CALL: {
       return Status("UDFs are not yet implemented.");
     }
     default:
@@ -369,7 +369,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
 
 struct MemLayoutData {
   int expr_idx;
-  int byte_size;  
+  int byte_size;
   bool variable_length;
 
   // TODO: sort by type as well?  Any reason to do this?
@@ -390,7 +390,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
 
   vector<MemLayoutData> data;
   data.resize(exprs.size());
-  
+
   // Collect all the byte sizes and sort them
   for (int i = 0; i < exprs.size(); ++i) {
     data[i].expr_idx = i;
@@ -410,7 +410,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
   int max_alignment = sizeof(int64_t);
   int current_alignment = data[0].byte_size;
   int byte_offset = 0;
-  
+
   offsets->resize(exprs.size());
   offsets->clear();
   *var_result_begin = -1;
@@ -608,7 +608,7 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
   LlvmCodeGen::FnPrototype prototype(codegen, name, ret_type);
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", 
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null",
         codegen->GetPtrType(TYPE_NULL)));
 
   Function* function = prototype.GeneratePrototype();
@@ -654,7 +654,7 @@ void Expr::CodegenSetIsNullArg(LlvmCodeGen* codegen, BasicBlock* block, bool val
   builder.CreateStore(value, is_null_ptr);
 }
 
-Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* caller, 
+Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* caller,
     Value* args[3], BasicBlock* null_block, BasicBlock* not_null_block,
     const char* result_var_name) {
   DCHECK(codegen_fn() != NULL);
@@ -666,7 +666,7 @@ Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* caller,
   return result;
 }
 
-Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* parent, 
+Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* parent,
     BasicBlock* null_block, BasicBlock* not_null_block, const char* result_var_name) {
   Function::arg_iterator parent_args = parent->getParent()->arg_begin();
   Value* args[3] = { parent_args++, parent_args++, parent_args };
@@ -674,7 +674,7 @@ Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* parent,
       codegen, parent, args, null_block, not_null_block, result_var_name);
 }
 
-// typedefs for jitted compute functions  
+// typedefs for jitted compute functions
 typedef bool (*BoolComputeFn)(TupleRow*, char* , bool*);
 typedef int8_t (*TinyIntComputeFn)(TupleRow*, char*, bool*);
 typedef int16_t (*SmallIntComputeFn)(TupleRow*, char*, bool*);
@@ -772,7 +772,7 @@ Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
 // define double @ExprFn(i8** %row, i8* %state_data, i1* %is_null) {
 // entry:
 //   %0 = bitcast i8** %row to %"class.impala::TupleRow"*
-//   %1 = call i8* @IrExprGetValue(%"class.impala::Expr"* 
+//   %1 = call i8* @IrExprGetValue(%"class.impala::Expr"*
 //      inttoptr (i64 194529872 to %"class.impala::Expr"*), %"class.impala::TupleRow"* %0)
 //   %2 = icmp eq i8* %1, null
 //   store i1 %2, i1* %is_null
@@ -807,11 +807,11 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
 
   Function* function = CreateComputeFnPrototype(codegen, "ExprFn");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  
+
   // Get the llvm input arguments to the codegen'd function
   Function::arg_iterator args_it = function->arg_begin();
   Value* args[3] = { args_it++, args_it++, args_it };
-  
+
   builder.SetInsertPoint(entry_block);
 
   // Convert the llvm types to ComputeFn compatible types
@@ -822,7 +822,7 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
   Value* result = builder.CreateCall2(interpreted_fn, this_llvm, row);
   Value* is_null = builder.CreateIsNull(result);
   builder.CreateStore(is_null, args[2]);
-  
+
   BasicBlock* null_block, *not_null_block;
   codegen->CreateIfElseBlocks(function, "null", "not_null",
       &null_block, &not_null_block);
@@ -834,10 +834,10 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
   builder.SetInsertPoint(not_null_block);
   // Convert the void* ComputeFn return value to the typed llvm version
   switch (type()) {
-    case TYPE_NULL: 
+    case TYPE_NULL:
       builder.CreateRet(codegen->false_value());
       break;
-    
+
     case TYPE_STRING: {
       Value* cast_ptr_value = builder.CreateBitCast(result, codegen->GetPtrType(type()));
       builder.CreateRet(cast_ptr_value);

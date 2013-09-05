@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
+import com.cloudera.impala.thrift.TFunctionName;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -32,10 +33,12 @@ import com.google.common.collect.Lists;
  * Represents a CREATE FUNCTION statement.
  */
 public class CreateFunctionStmt extends StatementBase {
-  private final FunctionName fnName_;
   private final Udf function_;
   private final boolean ifNotExists_;
   private final String comment_;
+
+  // Set in analyze()
+  private String sqlString_;
 
   /**
    * Builds a CREATE FUNCTION statement
@@ -48,15 +51,14 @@ public class CreateFunctionStmt extends StatementBase {
              This is the classpath for Java functions and the symbol for native functions.
    * @param ifNotExists - If true, no errors are thrown if the function already exists
    */
-  public CreateFunctionStmt(ArrayList<String> fnNamePath, ArrayList<PrimitiveType> fnArgs,
+  public CreateFunctionStmt(FunctionName fnName, ArrayList<PrimitiveType> fnArgs,
       PrimitiveType retType, HdfsURI location, String binaryName,
       boolean ifNotExists, String comment) {
     Preconditions.checkNotNull(fnArgs);
     Preconditions.checkNotNull(location);
     Preconditions.checkNotNull(binaryName);
 
-    this.fnName_ = new FunctionName(fnNamePath);
-    this.function_ = new Udf("", fnArgs, retType, location, binaryName);
+    this.function_ = new Udf(fnName, fnArgs, retType, location, binaryName);
     this.comment_ = comment;
     this.ifNotExists_ = ifNotExists;
   }
@@ -65,34 +67,21 @@ public class CreateFunctionStmt extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
 
   @Override
-  public String toSql() {
-    StringBuilder sb = new StringBuilder("CREATE ");
-    sb.append("FUNCTION ");
-    if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    sb.append(function_.getDesc().signatureString());
-    sb.append(" RETURNS ");
-    sb.append(function_.getDesc().getReturnType());
-    sb.append(" LOCATION ");
-    sb.append(function_.getLocation());
-    sb.append(" ");
-    sb.append(function_.getBinaryName());
-    if (comment_ != null) sb.append(" COMMENT = '" + comment_ + "'");
-    return sb.toString();
-  }
+  public String toSql() { return sqlString_; }
 
   public TCreateFunctionParams toThrift() {
     TCreateFunctionParams params = new TCreateFunctionParams();
-    params.setFn_name(function_.getDesc().getName());
+    params.setFn_name(new TFunctionName(function_.dbName(), function_.functionName()));
     params.setLocation(function_.getLocation().toString());
     params.setBinary_name(function_.getBinaryName());
     List<TPrimitiveType> types = Lists.newArrayList();
-    if (function_.getDesc().getNumArgs() > 0) {
-      for (PrimitiveType t: function_.getDesc().getArgs()) {
+    if (function_.getNumArgs() > 0) {
+      for (PrimitiveType t: function_.getArgs()) {
         types.add(t.toThrift());
       }
     }
     params.setArg_types(types);
-    params.setRet_type(function_.getDesc().getReturnType().toThrift());
+    params.setRet_type(function_.getReturnType().toThrift());
     params.setComment(getComment());
     params.setIf_not_exists(getIfNotExists());
     return params;
@@ -102,24 +91,44 @@ public class CreateFunctionStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     // Validate function name is legal
-    fnName_.analyze(analyzer);
-    if (OpcodeRegistry.instance().getFunctionOperator(fnName_.getName()) !=
-        FunctionOperator.INVALID_OPERATOR) {
-      // TODO: should we allow overloaded version of the builtins?
+    function_.getName().analyze(analyzer);
+
+    // If the function name is not fully qualified, it can't be the same as a builtin
+    if (!function_.getName().isFullyQualified() &&
+        OpcodeRegistry.instance().getFunctionOperator(
+            function_.functionName()) != FunctionOperator.INVALID_OPERATOR) {
       throw new AnalysisException("Function cannot have the same name as a builtin: " +
-          fnName_.getName());
+          function_.functionName());
     }
 
-    function_.getDesc().setName(fnName_.getName());
+    String dbName = analyzer.getTargetDbName(function_.getName());
+    function_.getName().setDb(dbName);
 
-    if (analyzer.getCatalog().getUdf(function_.getDesc(),
-        analyzer.getUser(), Privilege.CREATE, true) != null && !ifNotExists_) {
+    if (analyzer.getCatalog().getDb(
+        dbName, analyzer.getUser(), Privilege.CREATE) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    }
+    if (analyzer.getCatalog().getUdf(function_,true) != null &&
+        !ifNotExists_) {
       throw new AnalysisException(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
-          function_.getDesc().signatureString());
+          function_.signatureString());
     }
 
     function_.getLocation().analyze(analyzer, Privilege.CREATE);
 
     // TODO: check binaryName_ exists
+
+    StringBuilder sb = new StringBuilder("CREATE ");
+    sb.append("FUNCTION ");
+    if (ifNotExists_) sb.append("IF NOT EXISTS ");
+    sb.append(function_.signatureString());
+    sb.append(" RETURNS ");
+    sb.append(function_.getReturnType());
+    sb.append(" LOCATION ");
+    sb.append(function_.getLocation());
+    sb.append(" ");
+    sb.append(function_.getBinaryName());
+    if (comment_ != null) sb.append(" COMMENT = '" + comment_ + "'");
+    sqlString_ = sb.toString();
   }
 }

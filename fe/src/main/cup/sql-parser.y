@@ -234,6 +234,7 @@ nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal ArrayList<String> optional_ident_list;
 nonterminal TableName table_name;
+nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
 nonterminal Predicate predicate, between_predicate, comparison_predicate,
   compound_predicate, in_predicate, like_predicate;
@@ -309,7 +310,6 @@ nonterminal String optional_kw_table;
 nonterminal Boolean overwrite_val;
 
 // For Create/Drop/Show function ddl
-nonterminal ArrayList<String> fully_qualified_function_name;
 nonterminal ArrayList<PrimitiveType> function_def_args;
 nonterminal ArrayList<PrimitiveType> function_def_arg_list;
 nonterminal CreateFunctionStmt create_function_stmt;
@@ -551,7 +551,7 @@ create_tbl_stmt ::=
 
 create_function_stmt ::=
   KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
-  fully_qualified_function_name:fn_name function_def_args:fn_args
+  function_name:fn_name function_def_args:fn_args
   KW_RETURNS primitive_type:return_type
   KW_LOCATION STRING_LITERAL:location STRING_LITERAL:fn_path 
   comment_val:comment 
@@ -742,7 +742,7 @@ drop_tbl_or_view_stmt ::=
   ;
 
 drop_function_stmt ::=
-  KW_DROP KW_FUNCTION if_exists_val:if_exists fully_qualified_function_name:fn_name
+  KW_DROP KW_FUNCTION if_exists_val:if_exists function_name:fn_name
   function_def_args:fn_args
   {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
   ;
@@ -821,20 +821,6 @@ static_partition_key_value ::=
   // Static partition key values.
   IDENT:column EQUAL expr:e
   {: RESULT = new PartitionKeyValue(column, e); :}
-  ;
-
-fully_qualified_function_name ::=
-  IDENT:id
-  {:
-    ArrayList<String> list = new ArrayList<String>();
-    list.add(id);
-    RESULT = list;
-  :}
-  | fully_qualified_function_name:list DOT IDENT:id
-  {:
-    list.add(id);
-    RESULT = list;
-  :}
   ;
 
 function_def_args ::=
@@ -1056,7 +1042,11 @@ show_functions_stmt ::=
   KW_SHOW KW_FUNCTIONS
   {: RESULT = new ShowFunctionsStmt(); :}
   | KW_SHOW KW_FUNCTIONS show_pattern:showPattern
-  {: RESULT = new ShowFunctionsStmt(showPattern); :}
+  {: RESULT = new ShowFunctionsStmt(null, showPattern); :}
+  | KW_SHOW KW_FUNCTIONS KW_IN IDENT:db
+  {: RESULT = new ShowFunctionsStmt(db, null); :}
+  | KW_SHOW KW_FUNCTIONS KW_IN IDENT:db show_pattern:showPattern
+  {: RESULT = new ShowFunctionsStmt(db, showPattern); :}
   ;
 
 show_pattern ::=
@@ -1160,6 +1150,13 @@ table_name ::=
   {: RESULT = new TableName(null, tbl); :}
   | IDENT:db DOT IDENT:tbl
   {: RESULT = new TableName(db, tbl); :}
+  ;
+
+function_name ::=
+  IDENT:fn
+  {: RESULT = new FunctionName(null, fn); :}
+  | IDENT:db DOT IDENT:fn
+  {: RESULT = new FunctionName(db, fn); :}
   ;
 
 from_clause ::=
@@ -1412,10 +1409,10 @@ non_pred_expr ::=
   {: RESULT = e; :}
   | literal:l
   {: RESULT = l; :}
-  | IDENT:functionName LPAREN RPAREN
-  {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
-  | IDENT:functionName LPAREN func_arg_list:exprs RPAREN
-  {: RESULT = new FunctionCallExpr(functionName, exprs); :}
+  | function_name:fn_name LPAREN RPAREN
+  {: RESULT = new FunctionCallExpr(fn_name, new ArrayList<Expr>()); :}
+  | function_name:fn_name LPAREN func_arg_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr(fn_name, exprs); :}
   /* Since "IF" is a keyword, need to special case this function */
   | KW_IF LPAREN func_arg_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
@@ -1497,14 +1494,20 @@ timestamp_arithmetic_expr ::=
   // Timestamp arithmetic expr that looks like a function call.
   // We use func_arg_list instead of expr to avoid a shift/reduce conflict with
   // func_arg_list on COMMA, and report an error if the list contains more than one expr.
-  | IDENT:functionName LPAREN func_arg_list:l COMMA
+  // Although we don't want to accept function names as the expr, we can't parse it
+  // it as just an IDENT due to the precedence conflict with function_name.
+  | function_name:functionName LPAREN func_arg_list:l COMMA
     KW_INTERVAL expr:v IDENT:u RPAREN
   {:
     if (l.size() > 1) {
       // Report parsing failure on keyword interval.
       parser.parseError("interval", SqlParserSymbols.KW_INTERVAL);
     }
-    RESULT = new TimestampArithmeticExpr(functionName, l.get(0), v, u);
+    if (functionName.getDb() != null) {
+      // This function should not fully qualified
+      throw new Exception("interval should not be qualified by database name");
+    }
+    RESULT = new TimestampArithmeticExpr(functionName.getFunction(), l.get(0), v, u);
   :}
   ;
 

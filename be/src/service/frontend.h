@@ -78,8 +78,8 @@ class Frontend {
   // be set to the user's current session. If this is an Impala internal request,
   // the session should be set to NULL which will skip privilege checks returning all
   // results.
-  Status GetFunctionNames(const std::string* pattern, const TSessionState* session,
-      TGetFunctionsResult* fn_names);
+  Status GetFunctions(const std::string& db, const std::string* pattern,
+      const TSessionState* session, TGetFunctionsResult* functions);
 
   // Returns (in the output parameter) the result of a DESCRIBE table command. This
   // command retrieves table metadata, such as the column definitions. The metadata
@@ -133,7 +133,7 @@ class Frontend {
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
-  jmethodID get_fn_names_id_; // JniFrontend.getFnNames
+  jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID exec_ddl_request_id_; // JniFrontend.execDdlRequest
   jmethodID reset_metadata_id_; // JniFrontend.resetMetadata
@@ -148,12 +148,12 @@ class Frontend {
 
   // Utility methods to avoid repeating lots of the JNI call boilerplate.
   template <typename T>
-  Status CallJniMethodWithThriftArgs(const jmethodID& method, const T& arg);
+  Status CallJniMethod(const jmethodID& method, const T& arg);
   template <typename T, typename R>
-  Status CallJniMethodWithThriftArgs(
+  Status CallJniMethod(
       const jmethodID& method, const T& arg, R* response);
   template <typename T>
-  Status CallJniMethodWithThriftArgs(
+  Status CallJniMethod(
       const jmethodID& method, const T& arg, std::string* response);
 };
 

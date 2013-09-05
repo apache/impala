@@ -38,7 +38,7 @@ enum TExprNodeType {
   SLOT_REF,
   STRING_LITERAL,
   TUPLE_IS_NULL_PRED,
-  UDF
+  UDF_CALL,
 }
 
 enum TAggregationOp {
@@ -110,7 +110,7 @@ struct TStringLiteral {
   1: required string value;
 }
 
-struct TUdfExpr {
+struct TUdfCallExpr {
   // Path in hdfs where the binary is
   1: required string location
 
@@ -138,7 +138,7 @@ struct TExprNode {
   15: optional TSlotRef slot_ref
   16: optional TStringLiteral string_literal
   17: optional TTupleIsNullPredicate tuple_is_null_pred
-  18: optional TUdfExpr udf_expr
+  18: optional TUdfCallExpr udf_call_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

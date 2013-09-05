@@ -80,7 +80,7 @@ public class TimestampArithmeticExpr extends Expr {
   // C'tor for function-call like arithmetic, e.g., 'date_add(a, interval b year)'.
   public TimestampArithmeticExpr(String funcName, Expr e1, Expr e2,
       String timeUnitIdent) {
-    this.funcName = funcName;
+    this.funcName = funcName.toLowerCase();
     this.timeUnitIdent = timeUnitIdent;
     this.intervalFirst = false;
     children.add(e1);
@@ -107,9 +107,9 @@ public class TimestampArithmeticExpr extends Expr {
 
     if (funcName != null) {
       // Set op based on funcName for function-call like version.
-      if (funcName.toUpperCase().equals("DATE_ADD")) {
+      if (funcName.equals("date_add")) {
         op = ArithmeticExpr.Operator.ADD;
-      } else if (funcName.toUpperCase().equals("DATE_SUB")) {
+      } else if (funcName.equals("date_sub")) {
         op = ArithmeticExpr.Operator.SUBTRACT;
       } else {
         throw new AnalysisException("Encountered function name '" + funcName +
@@ -147,14 +147,15 @@ public class TimestampArithmeticExpr extends Expr {
     }
     String funcOpName = String.format("%sS_%s", timeUnit.toString(),
         (op == ArithmeticExpr.Operator.ADD) ? "ADD" : "SUB");
-    FunctionOperator funcOp = OpcodeRegistry.instance().getFunctionOperator(funcOpName);
+    FunctionOperator funcOp =
+        OpcodeRegistry.instance().getFunctionOperator(funcOpName);
     OpcodeRegistry.BuiltinFunction match =
         OpcodeRegistry.instance().getFunctionInfo(funcOp, true, argTypes);
     // We have already done type checking to ensure the function will resolve.
     Preconditions.checkNotNull(match);
-    Preconditions.checkState(match.getDesc().getReturnType() == PrimitiveType.TIMESTAMP);
+    Preconditions.checkState(match.getReturnType() == PrimitiveType.TIMESTAMP);
     opcode = match.opcode;
-    type = match.getDesc().getReturnType();
+    type = match.getReturnType();
   }
 
   @Override

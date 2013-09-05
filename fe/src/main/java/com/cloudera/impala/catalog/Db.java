@@ -14,15 +14,18 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.HashMap;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -46,6 +49,10 @@ public class Db {
   private static final Object tableMapCreationLock = new Object();
   private final String name;
   private final Catalog parentCatalog;
+
+  // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
+  // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
+  private HashMap<String, List<Udf>> udfs;
 
   // Table metadata cache.
   private final CatalogObjectCache<Table> tableCache = new CatalogObjectCache<Table>(
@@ -106,6 +113,13 @@ public class Db {
     synchronized (tableMapCreationLock) {
       tableCache.add(hiveClient.getAllTables(name));
     }
+
+    loadUdfs();
+  }
+
+  private void loadUdfs() {
+    udfs = new HashMap<String, List<Udf>>();
+    // TODO: figure out how to persist udfs.
   }
 
   /**
@@ -197,5 +211,95 @@ public class Db {
    */
   public void invalidateTable(String tableName) {
     tableCache.invalidate(tableName);
+  }
+
+  /**
+   * Returns all the UDFs in this DB.
+   */
+  public List<String> getAllUdfs() {
+    List<String> names = Lists.newArrayList();
+    synchronized (udfs) {
+      for (List<Udf> functions: udfs.values()) {
+        for (Udf f: functions) {
+          names.add(f.signatureString());
+        }
+      }
+    }
+    return names;
+  }
+
+  /**
+   * Returns the number of udfs in this database.
+   */
+  public int numUdfs() {
+    synchronized (udfs) {
+      return udfs.size();
+    }
+  }
+
+  /**
+   * See comment in Catalog.
+   */
+  public boolean udfExists(FunctionName name) {
+    synchronized (udfs) {
+      List<Udf> functions = udfs.get(name.getFunction());
+      return functions != null;
+    }
+  }
+
+  /*
+   * See comment in Catalog.
+   */
+  public Udf getUdf(Function desc, boolean exactMatch) {
+    synchronized (udfs) {
+      List<Udf> functions = udfs.get(desc.functionName());
+      if (functions == null) return null;
+
+      for (Udf f: functions) {
+        if (desc.equals(f)) return f;
+      }
+      if (exactMatch) return null;
+
+      for (Udf f: functions) {
+        if (f.isSupertype(desc)) return f;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * See comment in Catalog.
+   */
+  public boolean addUdf(Udf udf) {
+    // TODO: add this to persistent store
+    synchronized (udfs) {
+      Udf fn = getUdf(udf, true);
+      if (fn != null) return false;
+      List<Udf> functions = udfs.get(udf.functionName());
+      if (functions == null) {
+        functions = Lists.newArrayList();
+        udfs.put(udf.functionName(), functions);
+      }
+      functions.add(udf);
+    }
+    return true;
+  }
+
+  /**
+   * See comment in Catalog.
+   */
+  public boolean removeUdf(Function desc) {
+    // TODO: remove this from persistent store.
+    synchronized (udfs) {
+      Udf udf = getUdf(desc, true);
+      if (udf == null) return false;
+      List<Udf> functions = udfs.get(desc.functionName());
+      Preconditions.checkNotNull(functions);
+      boolean exists = functions.remove(udf);
+      if (functions.isEmpty()) {
+        udfs.remove(desc.functionName());
+      }
+      return exists;
+    }
   }
 }

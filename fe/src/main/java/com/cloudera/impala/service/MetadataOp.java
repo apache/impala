@@ -196,10 +196,10 @@ public class MetadataOp {
   }
 
   /**
-   * Contains lists of databases, lists of table belonging to the dbs, and list of columns
-   *  belonging to the tables.
+   * Contains lists of databases, lists of table belonging to the dbs, list of columns
+   *  belonging to the tables, and list of udfs.
    */
-  private static class DbsTablesColumns {
+  private static class DbsMetadata {
      // the list of database
     public List<String> dbs = Lists.newArrayList();
 
@@ -208,6 +208,9 @@ public class MetadataOp {
 
     // columns[i][j] are the columns of tableNames[j] in dbs[i]
     public List<List<List<Column>>> columns = Lists.newArrayList();
+
+    // udfs[i] are the udfs within dbs[i]
+    public List<List<String>> udfs = Lists.newArrayList();
   }
 
   /**
@@ -220,15 +223,17 @@ public class MetadataOp {
    * the "tableName" search pattern.
    * DbsTablesColumns.columns[i][j] contains the list of columns of table[j] in dbs[i]
    * that satisfy the search condition "columnName".
+   * DbsTablesColumns.udfs[i] contains the list of udfs inside dbs[i] that satisfy
+   * the "functionName" search pattern.
    *
    * If tableName is null, then DbsTablesColumns.tableNames and DbsTablesColumns.columns
    * will not be populated.
    * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
-  private static DbsTablesColumns getDbsTablesColumns(Catalog catalog, String catalogName,
-      String schemaName, String tableName, String columnName, User user)
+  private static DbsMetadata getDbsMetadata(Catalog catalog, String catalogName,
+      String schemaName, String tableName, String columnName, String functionName, User user)
       throws ImpalaException {
-    DbsTablesColumns result = new DbsTablesColumns();
+    DbsMetadata result = new DbsMetadata();
 
     // Hive does not have a catalog concept. Returns nothing if the request specifies an
     // non-empty catalog pattern.
@@ -240,19 +245,22 @@ public class MetadataOp {
     String convertedSchemaPattern = convertPattern(schemaName);
     String convertedTablePattern = convertPattern(tableName);
     String convertedColumnPattern = convertPattern(columnName);
+    String convertedFunctionPattern = convertPattern(functionName);
     Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
     Pattern tablePattern = Pattern.compile(convertedTablePattern);
     Pattern columnPattern = Pattern.compile(convertedColumnPattern);
+    Pattern functionPattern = Pattern.compile(convertedFunctionPattern);
 
     for (String dbName: catalog.getAllDbNames(user)) {
       if (!schemaPattern.matcher(dbName).matches()) {
         continue;
       }
 
+      Db db = catalog.getDb(dbName, user, Privilege.ANY);
+
       List<String> tableList = Lists.newArrayList();
       List<List<Column>> tablesColumnsList = Lists.newArrayList();
       if (tableName != null) {
-        Db db = catalog.getDb(dbName, user, Privilege.ANY);
         for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
           if (!tablePattern.matcher(tabName).matches()) {
             continue;
@@ -271,6 +279,16 @@ public class MetadataOp {
           }
           tablesColumnsList.add(columns);
         }
+      }
+      if (functionName != null) {
+        List<String> udfs = db.getAllUdfs();
+        List<String> filteredUdfs = Lists.newArrayList();
+        for (String udf: udfs) {
+          if (functionPattern.matcher(udf).matches()) {
+            filteredUdfs.add(udf);
+          }
+        }
+        result.udfs.add(filteredUdfs);
       }
 
       result.dbs.add(dbName);
@@ -300,15 +318,15 @@ public class MetadataOp {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
 
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
-    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, tableName, columnName, user);
+    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+        schemaName, tableName, columnName, null, user);
 
-    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
-      String dbName = dbsTablesColumns.dbs.get(i);
-      for (int j = 0; j < dbsTablesColumns.tableNames.get(i).size(); ++j) {
-        String tabName = dbsTablesColumns.tableNames.get(i).get(j);
-        for (int k = 0; k < dbsTablesColumns.columns.get(i).get(j).size(); ++k) {
-          Column column = dbsTablesColumns.columns.get(i).get(j).get(k);
+    for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
+      String dbName = dbsMetadata.dbs.get(i);
+      for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
+        String tabName = dbsMetadata.tableNames.get(i).get(j);
+        for (int k = 0; k < dbsMetadata.columns.get(i).get(j).size(); ++k) {
+          Column column = dbsMetadata.columns.get(i).get(j).get(k);
           PrimitiveType colType = column.getType();
           TResultRow row = new TResultRow();
           row.colVals = Lists.newArrayList();
@@ -358,11 +376,11 @@ public class MetadataOp {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.
-    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, null, null, user);
+    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+        schemaName, null, null, null, user);
 
-    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
-      String dbName = dbsTablesColumns.dbs.get(i);
+    for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
+      String dbName = dbsMetadata.dbs.get(i);
       TResultRow row = new TResultRow();
       row.colVals = Lists.newArrayList();
       row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEM
@@ -402,13 +420,13 @@ public class MetadataOp {
     }
 
     // Get the list of schemas, tables that satisfy the search conditions.
-    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
-        schemaName, tableName, null, user);
+    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+        schemaName, tableName, null, null, user);
 
-    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
-      String dbName = dbsTablesColumns.dbs.get(i);
-      for (int j = 0; j < dbsTablesColumns.tableNames.get(i).size(); ++j) {
-        String tabName = dbsTablesColumns.tableNames.get(i).get(j);
+    for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
+      String dbName = dbsMetadata.dbs.get(i);
+      for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
+        String tabName = dbsMetadata.tableNames.get(i).get(j);
         TResultRow row = new TResultRow();
         row.colVals = Lists.newArrayList();
         row.colVals.add(EMPTY_COL_VAL);
@@ -454,14 +472,15 @@ public class MetadataOp {
     row.colVals.add(createTColumnValue(name)); // SPECIFIC_NAME
     return row;
   }
-  
+
   /**
    * Executes the GetFunctions HiveServer2 operation and returns TMetadataOpResponse.
    * Returns the list of functions that fit the search patterns.
    * catalogName, schemaName and functionName are JDBC search patterns.
+   * @throws ImpalaException
    */
-  public static TMetadataOpResponse getFunctions(Catalog catalog, String catalogName, 
-      String schemaName, String functionName, User user) {
+  public static TMetadataOpResponse getFunctions(Catalog catalog, String catalogName,
+      String schemaName, String functionName, User user) throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_FUNCTIONS_MD);
 
     // Impala's built-in functions do not have a catalog name or schema name.
@@ -475,13 +494,15 @@ public class MetadataOp {
       if (!functionPattern.matcher(builtinFn).matches()) continue;
       result.results.add(createFunctionResultRow(builtinFn));
     }
-    
-    List<String> udfs = catalog.getUdfNames(functionName, user);
-    for (String udf: udfs) {
-      // TODO: does this need to fill out more of the cols in the HS2 result?
-      result.results.add(createFunctionResultRow(udf));
-    }    
-    
+
+    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+        schemaName, null, null, functionName, user);
+    for (List<String> udfs: dbsMetadata.udfs) {
+      for (String udf: udfs) {
+        result.results.add(createFunctionResultRow(udf));
+      }
+    }
+
     return result;
   }
 

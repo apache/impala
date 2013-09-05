@@ -183,9 +183,4 @@ public class PartitionSpec implements ParseNode {
     }
     return String.format("PARTITION (%s)", Joiner.on(", ").join(partitionSpecStr));
   }
-
-  @Override
-  public String debugString() {
-    return toSql();
-  }
 }

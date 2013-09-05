@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
@@ -24,19 +23,23 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TUdfExpr;
+import com.cloudera.impala.thrift.TUdfCallExpr;
 import com.google.common.base.Joiner;
 
 public class FunctionCallExpr extends Expr {
-  private final String functionName_;
+  private final FunctionName functionName_;
 
   // The udf function if this function call is for a UDF.
   private Udf udf_;
 
-  public FunctionCallExpr(String functionName, List<Expr> params) {
+  public FunctionCallExpr(FunctionName functionName, List<Expr> params) {
     super();
-    this.functionName_ = functionName.toLowerCase();
+    this.functionName_ = functionName;
     children.addAll(params);
+  }
+
+  public FunctionCallExpr(String functionName, List<Expr> params) {
+    this(new FunctionName(functionName), params);
   }
 
   @Override
@@ -55,10 +58,10 @@ public class FunctionCallExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     if (udf_ != null) {
-      msg.node_type = TExprNodeType.UDF;
-      msg.setUdf_expr(new TUdfExpr());
-      msg.udf_expr.location = udf_.getLocation().toString();
-      msg.udf_expr.setBinary_fn_name(udf_.getBinaryName());
+      msg.node_type = TExprNodeType.UDF_CALL;
+      msg.setUdf_call_expr(new TUdfCallExpr());
+      msg.udf_call_expr.location = udf_.getLocation().toString();
+      msg.udf_call_expr.setBinary_fn_name(udf_.getBinaryName());
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
       msg.setOpcode(opcode);
@@ -76,25 +79,32 @@ public class FunctionCallExpr extends Expr {
     Function fnDesc = null;
 
     // First check if this is a builtin
-    FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(functionName_);
+    FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(
+        functionName_.getFunction());
     if (op != FunctionOperator.INVALID_OPERATOR) {
       OpcodeRegistry.BuiltinFunction match =
           OpcodeRegistry.instance().getFunctionInfo(op, true, argTypes);
       if (match != null) {
         this.opcode = match.opcode;
-        fnDesc = match.getDesc();
+        fnDesc = match;
       }
     } else {
       // Next check if it is a UDF
+      String dbName = analyzer.getTargetDbName(functionName_);
+      functionName_.setDb(dbName);
+
+      if (!analyzer.getCatalog().udfExists(functionName_)) {
+        throw new AnalysisException(functionName_ + "() unknown");
+      }
+
       Function searchDesc = new Function(functionName_,
           argTypes, PrimitiveType.INVALID_TYPE, false);
-      Udf udf = analyzer.getCatalog().getUdf(
-          searchDesc, analyzer.getUser(), Privilege.SELECT, false);
-      if (udf == null) {
-        throw new AnalysisException(functionName_ + " unknown");
+
+      Udf udf = analyzer.getCatalog().getUdf(searchDesc, false);
+      if (udf != null) {
+        udf_ = udf;
+        fnDesc = udf;
       }
-      udf_ = udf;
-      fnDesc = udf.getDesc();
     }
 
     if (fnDesc != null) {
@@ -109,7 +119,7 @@ public class FunctionCallExpr extends Expr {
       }
       this.type = fnDesc.getReturnType();
     } else {
-      String error = String.format("No matching function with those arguments: %s (%s)",
+      String error = String.format("No matching function with those arguments: %s(%s)",
           functionName_, Joiner.on(", ").join(argTypes));
       throw new AnalysisException(error);
     }

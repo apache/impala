@@ -1,50 +1,75 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-
-import org.apache.commons.lang.StringUtils;
-
 import com.cloudera.impala.common.AnalysisException;
-import com.google.common.base.Preconditions;
+import com.cloudera.impala.thrift.TFunctionName;
 
 /**
- * Class to represent fully qualified function names. Names are similar to java
- * fully qualified class names e.g. <scope>.<scope>.<name>.
- * The identifier must be alphanumeric and the first character of each part of the
- * path must not be a digit.
+ * Class to represent a function name. Function names are specified as
+ * db.function_name.
  */
 public class FunctionName {
-  // Components of the eventual function path
-  // e.g. {'cloudera', 'udf', 'MyUdf' }
-  private final ArrayList<String> scopedNameList_;
-  private String fullyQualifiedName_;
+  private String db_;
+  private final String fn_;
 
-  public FunctionName(ArrayList<String> scopedNameList) {
-    this.scopedNameList_ = scopedNameList;
-    Preconditions.checkNotNull(scopedNameList);
-    Preconditions.checkState(!scopedNameList_.isEmpty());
+  public FunctionName(String db, String fn) {
+    db_ = db;
+    fn_ = fn.toLowerCase();
+    if (db_ != null) db_ = db_.toLowerCase();
   }
 
-  String getName() { return fullyQualifiedName_; }
+  public FunctionName(String fn) {
+    db_ = null;
+    fn_ = fn.toLowerCase();
+  }
+
+  public FunctionName(TFunctionName thriftName) {
+    db_ = thriftName.db_name.toLowerCase();
+    fn_ = thriftName.function_name.toLowerCase();
+  }
+
+  public String getDb() { return db_; }
+  public String getFunction() { return fn_; }
+  public boolean isFullyQualified() { return db_ != null; }
+
+  @Override
+  public String toString() {
+    if (db_ == null) return fn_;
+    return db_ + "." + fn_;
+  }
+
+  public void setDb(String db) { db_ = db; }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < scopedNameList_.size(); ++i) {
-      String s = scopedNameList_.get(i);
-      if (s.length() == 0) {
-        throw new AnalysisException("Empty path not allowed.");
-      }
-      if (!StringUtils.isAlphanumeric(s)) {
-        throw new AnalysisException(
-            "Function names must be all alphanumeric. Invalid name: " + s);
-      }
-      if (Character.isDigit(s.charAt(0))) {
-        throw new AnalysisException("Function cannot start with a digit: " + s);
-      }
-
-      sb.append(s);
-      if (i != scopedNameList_.size() - 1) sb.append('.');
+    if (fn_.length() == 0) {
+      throw new AnalysisException("Function name can not be empty.");
     }
-    fullyQualifiedName_ = sb.toString();
+    for (int i = 0; i < fn_.length(); ++i) {
+      if (!isValidCharacter(fn_.charAt(i))) {
+        throw new AnalysisException(
+            "Function names must be all alphanumeric or underscore. " +
+            "Invalid name: " + fn_);
+      }
+    }
+    if (Character.isDigit(fn_.charAt(0))) {
+      throw new AnalysisException("Function cannot start with a digit: " + fn_);
+    }
+  }
+
+  private boolean isValidCharacter(char c) {
+    return Character.isLetterOrDigit(c) || c == '_';
   }
 }

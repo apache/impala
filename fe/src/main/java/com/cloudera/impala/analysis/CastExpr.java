@@ -43,7 +43,7 @@ public class CastExpr extends Expr {
       OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
           FunctionOperator.CAST, true, getChild(0).getType(), type);
       Preconditions.checkState(match != null);
-      Preconditions.checkState(match.getDesc().getReturnType() == type);
+      Preconditions.checkState(match.getReturnType() == type);
       this.opcode = match.opcode;
     }
   }
@@ -100,7 +100,7 @@ public class CastExpr extends Expr {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType);
     }
-    Preconditions.checkState(match.getDesc().getReturnType() == targetType);
+    Preconditions.checkState(match.getReturnType() == targetType);
     this.opcode = match.opcode;
   }
 

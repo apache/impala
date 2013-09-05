@@ -1,4 +1,16 @@
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright 2013 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package com.cloudera.impala.analysis;
 
@@ -1109,6 +1121,9 @@ public class ParserTest {
     ParsesOk("SHOW FUNCTIONS");
     ParsesOk("SHOW FUNCTIONS LIKE 'pattern'");
     ParsesOk("SHOW FUNCTIONS LIKE 'p*ttern'");
+    ParsesOk("SHOW FUNCTIONS");
+    ParsesOk("SHOW FUNCTIONS in DB LIKE 'pattern'");
+    ParsesOk("SHOW FUNCTIONS in DB");
   }
 
   @Test
@@ -1175,13 +1190,13 @@ public class ParserTest {
 
     // Try more interesting function names
     ParsesOk("CREATE FUNCTION User.Foo() RETURNS INT LOCATION 'a' 'b'");
-    ParsesOk("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a' 'b'");
     ParsesOk("CREATE FUNCTION `Foo`() RETURNS INT LOCATION 'a' 'b'");
     ParsesOk("CREATE FUNCTION `Foo.Bar`() RETURNS INT LOCATION 'a' 'b'");
     ParsesOk("CREATE FUNCTION `Foo`.Bar() RETURNS INT LOCATION 'a' 'b'");
 
     // Bad function name
     ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a' 'b'");
+    ParserError("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a' 'b'");
     ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a' 'b'");
     ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a' 'b'");
 
@@ -1634,7 +1649,6 @@ public class ParserTest {
     ParsesOk("DROP FUNCTION Foo.Foo(INT)");
     ParsesOk("DROP FUNCTION IF EXISTS Foo()");
     ParsesOk("DROP FUNCTION IF EXISTS Foo(INT)");
-    ParsesOk("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
 
     ParserError("DROP");
     ParserError("DROP Foo");
@@ -1660,6 +1674,7 @@ public class ParserTest {
     ParserError("DROP FUNCTION Foo..(INT) RETURNS INT");
     ParserError("DROP FUNCTION Foo(NULL) RETURNS INT");
     ParserError("DROP FUNCTION Foo(INT) RETURNS NULL");
+    ParserError("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
   }
 
   @Test

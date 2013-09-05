@@ -233,9 +233,4 @@ public class WithClause implements ParseNode {
     }
     return "WITH " + Joiner.on(",").join(viewStrings);
   }
-
-  @Override
-  public String debugString() {
-    return toSql();
-  }
 }

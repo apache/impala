@@ -32,6 +32,4 @@ public interface ParseNode {
    * @return SQL syntax corresponding to this node.
    */
   public String toSql();
-
-  public String debugString();
 }

@@ -21,12 +21,12 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.User;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -166,31 +166,31 @@ public class CatalogTest {
 
     checkHBaseTableCols(hbaseDb, "alltypessmall", "functional_hbase.alltypessmall",
         new String[]
-          {"id", "bigint_col", "bool_col", "date_string_col", "double_col", "float_col", 
+          {"id", "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
            "int_col", "month", "smallint_col", "string_col", "timestamp_col",
            "tinyint_col", "year"},
         new String[]
           {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col", 
+          {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
            "int_col", "month", "smallint_col", "string_col", "timestamp_col",
            "tinyint_col", "year"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT, 
+           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
            PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.SMALLINT,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
            PrimitiveType.TINYINT, PrimitiveType.INT});
 
-    checkHBaseTableCols(hbaseDb, "hbasealltypeserror", 
+    checkHBaseTableCols(hbaseDb, "hbasealltypeserror",
         "functional_hbase.hbasealltypeserror",
         new String[]
-          {"id", "bigint_col", "bool_col","date_string_col", "double_col", "float_col", 
+          {"id", "bigint_col", "bool_col","date_string_col", "double_col", "float_col",
            "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new String[]
           {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bigint_col", "bool_col","date_string_col", "double_col", "float_col", 
+          {null, "bigint_col", "bool_col","date_string_col", "double_col", "float_col",
            "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
@@ -213,41 +213,41 @@ public class CatalogTest {
            PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
            PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.STRING,
            PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT});
-    
+
     checkHBaseTableCols(hbaseDb, "alltypesagg", "functional_hbase.alltypesagg",
         new String[]
-          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
         new String[]
           {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE, 
-           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT, 
-           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
            PrimitiveType.TINYINT, PrimitiveType.INT});
 
     checkHBaseTableCols(hbaseDb, "stringids", "functional_hbase.alltypesagg",
         new String[]
-          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+          {"id", "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
         new String[]
           {":key", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"},
         new String[]
-          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col", 
+          {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
         new PrimitiveType[]
           {PrimitiveType.STRING, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE, 
-           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT, 
-           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP, 
+           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
            PrimitiveType.TINYINT, PrimitiveType.INT});
 
     checkTableCols(defaultDb, "greptiny", 0,
@@ -380,7 +380,7 @@ public class CatalogTest {
   @Test
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
-   HBaseTable table = 
+   HBaseTable table =
         (HBaseTable)getDb(catalog, "functional_hbase").getTable("internal_hbase_table");
     assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
@@ -481,8 +481,7 @@ public class CatalogTest {
 
   @Test
   public void TestUdf() throws CatalogException {
-    User user = ImpalaInternalAdminUser.getInstance();
-    List<String> fnNames = catalog.getUdfNames("", user);
+    List<String> fnNames = catalog.getUdfNames("default", "");
     assertEquals(fnNames.size(), 0);
 
     ArrayList<PrimitiveType> args1 = Lists.newArrayList();
@@ -490,79 +489,79 @@ public class CatalogTest {
     ArrayList<PrimitiveType> args3 = Lists.newArrayList(PrimitiveType.TINYINT);
 
     catalog.removeUdf(
-        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+        new Function(new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 0);
 
-    Udf udf1 = new Udf(
-        "Foo", args1, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf1, user);
-    fnNames = catalog.getUdfNames(null, user);
+    Udf udf1 = new Udf(new FunctionName("default", "Foo"),
+        args1, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf1);
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo()"));
 
     // Same function name, overloaded arguments
-    Udf udf2 = new Udf(
-        "Foo", args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf2, user);
-    fnNames = catalog.getUdfNames(null, user);
+    Udf udf2 = new Udf(new FunctionName("default", "Foo"),
+        args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf2);
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Add a function with a new name
-    Udf udf3 = new Udf(
-        "Bar", args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf3, user);
-    fnNames = catalog.getUdfNames(null, user);
+    Udf udf3 = new Udf(new FunctionName("default", "Bar"),
+        args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+    catalog.addUdf(udf3);
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 3);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop Foo()
-    catalog.removeUdf(
-        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop it again, no-op
-    catalog.removeUdf(
-        new Function("Foo", args1, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(), no-op
-    catalog.removeUdf(
-        new Function("Bar", args1, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "Bar"), args1, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(tinyint), no-op
-    catalog.removeUdf(
-        new Function("Bar", args3, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "Bar"), args3, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(int)
-    catalog.removeUdf(
-        new Function("Bar", args2, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "Bar"), args2, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Drop foo(int)
-    catalog.removeUdf(
-        new Function("foo", args2, PrimitiveType.INVALID_TYPE, false), user);
-    fnNames = catalog.getUdfNames(null, user);
+    catalog.removeUdf(new Function(
+        new FunctionName("default", "foo"), args2, PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getUdfNames("default", null);
     assertEquals(fnNames.size(), 0);
   }
 

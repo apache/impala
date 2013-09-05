@@ -39,17 +39,9 @@ public class TableName {
     this.tbl = tbl;
   }
 
-  public String getDb() {
-    return db;
-  }
-
-  public String getTbl() {
-    return tbl;
-  }
-
-  public boolean isEmpty() {
-    return tbl.isEmpty();
-  }
+  public String getDb() { return db; }
+  public String getTbl() { return tbl; }
+  public boolean isEmpty() { return tbl.isEmpty(); }
 
   /**
    * Checks whether the db and table name meet the Metastore's requirements.

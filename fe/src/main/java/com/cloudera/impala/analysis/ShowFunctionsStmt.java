@@ -14,9 +14,11 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TShowFunctionsParams;
+import com.google.common.base.Preconditions;
 
 /**
  * Representation of a SHOW FUNCTIONS [pattern] statement.
@@ -30,20 +32,36 @@ public class ShowFunctionsStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
   private final String pattern_;
 
+  // DB (if any) as seen by the parser
+  private final String parsedDb_;
+
+  // Set during analysis
+  private String postAnalysisDb_;
+
   /**
    * Default constructor, which creates a show statement which returns all
    * functions.
    */
   public ShowFunctionsStmt() {
-    this(null);
+    this(null, null);
   }
 
   /**
    * Constructs a show statement which matches all functions against the
    * supplied pattern.
    */
-  public ShowFunctionsStmt(String pattern) {
+  public ShowFunctionsStmt(String db, String pattern) {
+    this.parsedDb_ = db;
     this.pattern_ = pattern;
+  }
+
+  /**
+   * Can only be called after analysis, returns the name of the database that
+   * this show will search against.
+   */
+  public String getDb() {
+    Preconditions.checkNotNull(postAnalysisDb_);
+    return postAnalysisDb_;
   }
 
   public String getPattern() { return pattern_; }
@@ -60,11 +78,16 @@ public class ShowFunctionsStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    // Nothing to do here
+    postAnalysisDb_ = (parsedDb_ == null ? analyzer.getDefaultDb() : parsedDb_);
+    if (analyzer.getCatalog().getDb(
+        postAnalysisDb_, analyzer.getUser(), Privilege.ANY) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb_);
+    }
   }
 
   public TShowFunctionsParams toThrift() {
     TShowFunctionsParams params = new TShowFunctionsParams();
+    params.setDb(getDb());
     params.setShow_pattern(getPattern());
     return params;
   }

@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
+import com.cloudera.impala.thrift.TFunctionName;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.collect.Lists;
 
@@ -32,7 +33,6 @@ import com.google.common.collect.Lists;
  * by adding a DropStatementBase class.
  */
 public class DropFunctionStmt extends StatementBase {
-  private final FunctionName fnName_;
   private final Function desc_;
   private final boolean ifExists_;
 
@@ -40,15 +40,13 @@ public class DropFunctionStmt extends StatementBase {
    * Constructor for building the drop statement. If ifExists is true, an error will not
    * be thrown if the function does not exist.
    */
-  public DropFunctionStmt(ArrayList<String> fnNamePath, ArrayList<PrimitiveType> fnArgs,
+  public DropFunctionStmt(FunctionName fnName, ArrayList<PrimitiveType> fnArgs,
       boolean ifExists) {
-    this.fnName_ = new FunctionName(fnNamePath);
-    this.desc_ = new Function("", fnArgs, PrimitiveType.INVALID_TYPE, false);
+    this.desc_ = new Function(fnName, fnArgs, PrimitiveType.INVALID_TYPE, false);
     this.ifExists_ = ifExists;
   }
 
-  public String getFunction() { return desc_.getName(); }
-
+  public FunctionName getFunction() { return desc_.getName(); }
   public boolean getIfExists() { return ifExists_; }
 
   @Override
@@ -62,7 +60,8 @@ public class DropFunctionStmt extends StatementBase {
 
   public TDropFunctionParams toThrift() {
     TDropFunctionParams params = new TDropFunctionParams();
-    params.setFn_name(getFunction());
+    params.setFn_name(
+        new TFunctionName(desc_.getName().getDb(), desc_.getName().getFunction()));
     List<TPrimitiveType> types = Lists.newArrayList();
     if (desc_.getNumArgs() > 0) {
       for (PrimitiveType t: desc_.getArgs()) {
@@ -77,11 +76,15 @@ public class DropFunctionStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    // Validate function name is legal
-    fnName_.analyze(analyzer);
-    desc_.setName(fnName_.getName());
-    if (analyzer.getCatalog().getUdf(
-        desc_, analyzer.getUser(), Privilege.DROP, true) == null && !ifExists_) {
+    desc_.getName().analyze(analyzer);
+    String dbName = analyzer.getTargetDbName(desc_.getName());
+    desc_.getName().setDb(dbName);
+    if (analyzer.getCatalog().getDb(dbName, analyzer.getUser(), Privilege.DROP) == null
+        && !ifExists_) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    }
+
+    if (analyzer.getCatalog().getUdf(desc_, true) == null && !ifExists_) {
       throw new AnalysisException(
           Analyzer.FN_DOES_NOT_EXIST_ERROR_MSG + desc_.signatureString());
     }

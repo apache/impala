@@ -48,7 +48,6 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       // using the value.
       const string* table_name =
           params->__isset.show_pattern ? &(params->show_pattern) : NULL;
-      // TODO: refactor ImpalaServer->GetXXX outside of impala-server.
       TGetTablesResult table_names;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
           &session, &table_names));
@@ -67,12 +66,12 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
     }
     case TDdlType::SHOW_FUNCTIONS: {
       const TShowFunctionsParams* params = &exec_request.show_fns_params;
-      TGetFunctionsResult fn_names;
+      TGetFunctionsResult functions;
       const string* fn_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
-          frontend_->GetFunctionNames(fn_pattern, &session, &fn_names));
-      SetResultSet(fn_names.fns);
+          frontend_->GetFunctions(params->db, fn_pattern, &session, &functions));
+      SetResultSet(functions.fn_signatures);
       return Status::OK;
     }
     case TDdlType::DESCRIBE: {

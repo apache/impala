@@ -1,89 +1,118 @@
 # Drop the dummy udfs this test uses.
 ====
 ---- QUERY
-drop function if exists functionddltest.fn()
+drop function if exists function_ddl_test.fn()
 ====
 ---- QUERY
-drop function if exists functionddltest.fn(int)
+drop function if exists function_ddl_test.fn(int)
 ====
 ---- QUERY
-drop function if exists functionddltest.fn(int, string)
+drop function if exists function_ddl_test.fn(int, string)
 ====
 ---- QUERY
-drop function if exists functionddltest.fn(string, int)
+drop function if exists function_ddl_test.fn(string, int)
 ====
 ---- QUERY
-drop function if exists functionddltest.fn2(int)
+drop function if exists function_ddl_test.fn2(int)
 ====
 ---- QUERY
-drop function if exists functionddltest.fn2(int, string)
+drop function if exists function_ddl_test.fn2(int, string)
 ====
+---- QUERY
+create database if not exists function_ddl_test
 ---- QUERY
 # Verify all the test functions are removed
-show functions like 'functionddltest.*'
+show functions in function_ddl_test
 ---- RESULTS
 ---- TYPES
 STRING
 ====
 ---- QUERY
 # Add them and test function overloading.
-create function functionddltest.fn() RETURNS int LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn() RETURNS int LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-create function functionddltest.fn(int) RETURNS double LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn(int) RETURNS double LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-create function functionddltest.fn(int, string) 
+create function function_ddl_test.fn(int, string) 
 RETURNS int LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-create function functionddltest.fn(string, int) 
+create function function_ddl_test.fn(string, int) 
 RETURNS int LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-create function functionddltest.fn2(int) RETURNS int LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn2(int) RETURNS int LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-create function functionddltest.fn2(int, string) 
+create function function_ddl_test.fn2(int, string) 
 RETURNS int LOCATION '/test' 'foo.class'
 ====
 ---- QUERY
-show functions like 'functionddltest.*'
+show functions in function_ddl_test
 ---- RESULTS
-'functionddltest.fn()'
-'functionddltest.fn(INT)'
-'functionddltest.fn(INT, STRING)'
-'functionddltest.fn(STRING, INT)'
-'functionddltest.fn2(INT)'
-'functionddltest.fn2(INT, STRING)'
+'fn()'
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
+'fn2(INT, STRING)'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-drop function functionddltest.fn2(int, string)
+drop function function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
-show functions like 'functionddltest.*'
+show functions in function_ddl_test
 ---- RESULTS
-'functionddltest.fn()'
-'functionddltest.fn(INT)'
-'functionddltest.fn(INT, STRING)'
-'functionddltest.fn(STRING, INT)'
-'functionddltest.fn2(INT)'
+'fn()'
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-drop function if exists functionddltest.fn2(int, string)
+drop function if exists function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
-show functions like 'functionddltest.*'
+show functions in function_ddl_test
 ---- RESULTS
-'functionddltest.fn()'
-'functionddltest.fn(INT)'
-'functionddltest.fn(INT, STRING)'
-'functionddltest.fn(STRING, INT)'
-'functionddltest.fn2(INT)'
+'fn()'
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
+---- TYPES
+STRING
+====
+---- QUERY
+use function_ddl_test
+====
+---- QUERY
+show functions;
+---- RESULTS
+'fn()'
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function fn()
+====
+---- QUERY
+show functions;
+---- RESULTS
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
 ---- TYPES
 STRING
 ====

@@ -259,10 +259,5 @@ public class InlineViewRef extends TableRef {
   }
 
   @Override
-  public String debugString() {
-    return tableRefToSql();
-  }
-
-  @Override
   public TableRef clone() { return new InlineViewRef(this); }
 }

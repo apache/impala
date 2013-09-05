@@ -123,7 +123,7 @@ public class ArithmeticExpr extends Expr {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
             "types: " + toSql());
       }
-      Preconditions.checkState(type == match.getDesc().getReturnType() || type.isNull());
+      Preconditions.checkState(type == match.getReturnType() || type.isNull());
       opcode = match.opcode;
       return;
     }

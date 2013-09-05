@@ -145,10 +145,19 @@ struct TCreateDbParams {
   4: optional bool if_not_exists
 }
 
+// Represents a fully qualified function name.
+struct TFunctionName {
+  // Name of the function's parent database. Null to specify an unqualified function name.
+  1: required string db_name
+
+  // Name of the function
+  2: required string function_name
+}
+
 // Parameters of CREATE FUNCTION commands
 struct TCreateFunctionParams {
   // Fully qualified function name of the function to create
-  1: required string fn_name
+  1: required TFunctionName fn_name
 
   // HDFS path for the function binary. This binary must exist at the time the
   // function is created.
@@ -446,7 +455,7 @@ struct TDropTableOrViewParams {
 // Parameters of DROP FUNCTION commands
 struct TDropFunctionParams {
   // Fully qualified name of the function to drop
-  1: required string fn_name
+  1: required TFunctionName fn_name
   
   // The types of the arguments to the function
   2: required list<Types.TPrimitiveType> arg_types;
@@ -485,13 +494,16 @@ struct TShowDbsParams {
 
 // Parameters for SHOW FUNCTIONS commands
 struct TShowFunctionsParams {
+  // Database to use for SHOW FUNCTIONS
+  1: optional string db
+
   // Optional pattern to match function names. If not set, all functions are returned.
-  1: optional string show_pattern
+  2: optional string show_pattern
 }
 
 // Parameters for SHOW TABLES commands
 struct TShowTablesParams {
-  // Database to use for SHOW TABLE
+  // Database to use for SHOW TABLES
   1: optional string db
 
   // Optional pattern to match tables names. If not set, all tables from the given
@@ -499,21 +511,24 @@ struct TShowTablesParams {
   2: optional string show_pattern
 }
 
-// Arguments to getFunctionNames(), which returns a list of function names that match
-// an optional pattern. Parameters for SHOW FUNCTIONS.
+// Arguments to getFunctions(), which returns a list of non-qualified function 
+// signatures that match an optional pattern. Parameters for SHOW FUNCTIONS.
 struct TGetFunctionsParams {
-  // If not set, match every function
-  1: optional string pattern
+  // Database to use for SHOW FUNCTIONS
+  1: optional string db
 
+  // If not set, match every function
+  2: optional string pattern
+  
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the functions this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  2: optional TSessionState session
+  3: optional TSessionState session
 }
 
-// getFunctionNames() returns a list of function names
+// getFunctions() returns a list of function signatures
 struct TGetFunctionsResult {
-  1: list<string> fns
+  1: list<string> fn_signatures
 }
 
 // Parameters for the USE db command

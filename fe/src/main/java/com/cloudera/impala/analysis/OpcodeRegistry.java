@@ -51,6 +51,29 @@ public class OpcodeRegistry {
   private static OpcodeRegistry instance = new OpcodeRegistry();
 
   /**
+   * Contains all the information about a builtin function.
+   * TODO: merge with Function and Udf
+   */
+  public static class BuiltinFunction extends Function {
+    public TExprOpcode opcode;
+    public FunctionOperator operator;
+
+    // Constructor for searching, specifying the op and arguments
+    public BuiltinFunction(FunctionOperator operator, PrimitiveType[] args) {
+      super(new FunctionName(operator.toString()),
+          args, PrimitiveType.INVALID_TYPE, false);
+      this.operator = operator;
+    }
+
+    private BuiltinFunction(TExprOpcode opcode, FunctionOperator operator,
+        boolean varArgs, PrimitiveType ret, PrimitiveType[] args) {
+      super(new FunctionName(opcode.toString()), args, ret, varArgs);
+      this.operator = operator;
+      this.opcode = opcode;
+    }
+  }
+
+  /**
    * This is a mapping of Operator,#args to builtins with a fixed number of arguments.
    * The builtin is defined by the operator enum and the arguments
    * and is a one to one mapping to opcodes.
@@ -99,55 +122,6 @@ public class OpcodeRegistry {
   }
 
   /**
-   * Contains all the information about a builtin function.
-   */
-  public static class BuiltinFunction {
-    public TExprOpcode opcode;
-    public FunctionOperator operator;
-    public Function desc;
-
-    // Constructor for searching, specifying the op and arguments
-    public BuiltinFunction(FunctionOperator operator, PrimitiveType[] args) {
-      this.operator = operator;
-      this.desc = new Function(operator.toString(),
-          args, PrimitiveType.INVALID_TYPE, false);
-    }
-
-    private BuiltinFunction(TExprOpcode opcode, FunctionOperator operator,
-        boolean varArgs, PrimitiveType ret, PrimitiveType[] args) {
-      this.operator = operator;
-      this.opcode = opcode;
-      this.desc = new Function(opcode.toString(), args, ret, varArgs);
-    }
-
-    /**
-     * Returns if the 'this' function has a compatible signature with the 'other'. The op
-     * and number of arguments must match and it must be allowed to implicitly cast
-     * each argument of this signature to the matching argument in 'other'
-     */
-    public boolean isCompatible(BuiltinFunction other) {
-      return desc.isCompatible(other.getDesc());
-    }
-
-    @Override
-    /**
-     * Functions are equal with C++/Java function signature semantics.  They are
-     * equal if the operation and all the arguments are the same.
-     */
-    public boolean equals(Object o) {
-      if (o == null || !(o instanceof BuiltinFunction)) {
-        return false;
-      }
-      BuiltinFunction s = (BuiltinFunction) o;
-      return desc.equals(s.getDesc());
-    }
-
-    public Function getDesc() {
-      return desc;
-    }
-  }
-
-  /**
    * Returns the set of function names.
    * @return
    */
@@ -161,10 +135,8 @@ public class OpcodeRegistry {
    * Returns INVALID_OP is that function name is unknown.
    */
   public FunctionOperator getFunctionOperator(String fnName) {
-    String lookup = fnName.toLowerCase();
-    if (functionNameMap.containsKey(lookup)) {
-      return functionNameMap.get(lookup);
-    }
+    fnName = fnName.toLowerCase();
+    if (functionNameMap.containsKey(fnName)) return functionNameMap.get(fnName);
     return FunctionOperator.INVALID_OPERATOR;
   }
 
@@ -190,16 +162,14 @@ public class OpcodeRegistry {
     } else if(varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
       functions = varArgOperations.get(varArgsLookup);
     }
-    if (functions == null) {
-      return null;
-    }
+    if (functions == null) return null;
     BuiltinFunction compatibleMatch = null;
     BuiltinFunction search = new BuiltinFunction(op, argTypes);
     for (BuiltinFunction function : functions) {
       if (search.equals(function)) {
         return function;
       } else if (allowImplicitCasts && compatibleMatch == null
-          && function.isCompatible(search)) {
+          && function.isSupertype(search)) {
         compatibleMatch = function;
       }
     }
@@ -259,11 +229,11 @@ public class OpcodeRegistry {
   }
 
   public boolean addFunctionMapping(String functionName, FunctionOperator op) {
-    if (functionNameMap.containsKey(functionName)) {
+    if (functionNameMap.containsKey(functionName.toLowerCase())) {
       LOG.error("OpcodeRegistry: Function mapping already exists: " + functionName);
       return false;
     }
-    functionNameMap.put(functionName, op);
+    functionNameMap.put(functionName.toLowerCase(), op);
     return true;
   }
 

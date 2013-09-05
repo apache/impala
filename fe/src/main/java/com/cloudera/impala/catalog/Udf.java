@@ -16,14 +16,15 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 
+import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 
 /**
  * Internal representation of a UDF description.
  * TODO: unify this with builtins.
  */
-public class Udf {
-  private final Function desc_;
+public class Udf extends Function {
+
   // Absolute path in HDFS for the binary that contains this UDF.
   // e.g. /udfs/udfs.jar
   private final HdfsURI location_;
@@ -32,18 +33,13 @@ public class Udf {
   // UDF. e.g. org.example.MyUdf.class.
   private final String binaryName_;
 
-  public Udf(String fnName, ArrayList<PrimitiveType> argTypes,
+  public Udf(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
       PrimitiveType retType, HdfsURI location, String binaryName) {
-    PrimitiveType[] args = null;
-    if (argTypes.size() > 0) {
-      args = argTypes.toArray(new PrimitiveType[argTypes.size()]);
-    }
-    this.desc_ = new Function(fnName, args, retType, false);
+    super(fnName, argTypes, retType, false);
     this.location_ = location;
     this.binaryName_ = binaryName;
   }
 
-  public Function getDesc() { return desc_; }
   public HdfsURI getLocation() { return location_; }
   public String getBinaryName() { return binaryName_; }
 }

@@ -16,64 +16,71 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 
+import com.cloudera.impala.analysis.FunctionName;
+import com.google.common.base.Joiner;
+
 
 /**
  * Utility class to describe a function.
  */
 public class Function {
   // User specified function name e.g. "Add"
-  private String name_;
+  private FunctionName name_;
 
   private final PrimitiveType retType_;
-  // Array of parameter types.  null if this function does not have parameters.
+  // Array of parameter types.  empty array if this function does not have parameters.
   private PrimitiveType[] argTypes_;
   private final boolean varArgs_;
 
-  public Function(String name, PrimitiveType[] argTypes,
+  public Function(FunctionName name, PrimitiveType[] argTypes,
       PrimitiveType retType, boolean varArgs) {
-    this.name_ = name.toLowerCase();
+    this.name_ = name;
     this.varArgs_ = varArgs;
-    this.argTypes_ = (argTypes != null && argTypes.length > 0) ? argTypes : null;
+    if (argTypes == null) {
+      argTypes_ = new PrimitiveType[0];
+    } else {
+      this.argTypes_ = argTypes;
+    }
     this.retType_ = retType;
   }
 
-  public Function(String name, ArrayList<PrimitiveType> args,
+  public Function(FunctionName name, ArrayList<PrimitiveType> args,
       PrimitiveType retType, boolean varArgs) {
     this(name, (PrimitiveType[])null, retType, varArgs);
     if (args.size() > 0) {
       argTypes_ = args.toArray(new PrimitiveType[args.size()]);
+    } else {
+      argTypes_ = new PrimitiveType[0];
     }
   }
 
-  public String getName() { return name_; }
+  public FunctionName getName() { return name_; }
+  public String functionName() { return name_.getFunction(); }
+  public String dbName() { return name_.getDb(); }
   public PrimitiveType getReturnType() { return retType_; }
   public PrimitiveType[] getArgs() { return argTypes_; }
   // Returns the number of arguments to this function.
-  public int getNumArgs() { return argTypes_ == null ? 0 : argTypes_.length; }
-  public void setName(String name) { name_ = name; }
+  public int getNumArgs() { return argTypes_.length; }
+  public void setName(FunctionName name) { name_ = name; }
 
   // Returns a string with the signature in human readable format:
   // FnName(argtype1, argtyp2).  e.g. Add(int, int)
   public String signatureString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(name_);
-    sb.append("(");
-    for (int i = 0; argTypes_ != null && i <argTypes_.length; ++i) {
-      sb.append(argTypes_[i]);
-      if (i != argTypes_.length - 1) sb.append(", ");
-    }
-    sb.append(")");
+    sb.append(name_.getFunction())
+      .append("(")
+      .append(Joiner.on(", ").join(argTypes_))
+      .append(")");
     return sb.toString();
   }
 
   /**
-    * Returns true if the 'this' signature is compatible with the 'other' signature. The
-    * number of arguments must match and it must be allowed to implicitly cast
-    * each argument of this signature to the matching argument in 'other'.
-    * TODO: look into how we resolve implicitly castable functions. Is there a rule
+   * Returns true if 'this' is a supertype of 'other'. Each argument in other must
+   * be implicitly castable to the matching argument in this.
+   * TODO: look into how we resolve implicitly castable functions. Is there a rule
     * for "most" compatible or maybe return an error if it is ambiguous?
-    */
-  public boolean isCompatible(Function other) {
+   */
+  public boolean isSupertype(Function other) {
     if (!varArgs_ && other.argTypes_.length != this.argTypes_.length) return false;
     if (varArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
@@ -103,8 +110,6 @@ public class Function {
     if (o == null || !(o instanceof Function)) return false;
 
     Function s = (Function) o;
-    if (s.argTypes_ == null && this.argTypes_ == null) return true;
-    if (s.argTypes_ == null || this.argTypes_ == null) return false;
     if (s.argTypes_.length != this.argTypes_.length) return false;
 
     for (int i = 0; i < this.argTypes_.length; ++i) {

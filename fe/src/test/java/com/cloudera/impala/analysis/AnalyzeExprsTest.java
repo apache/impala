@@ -1,4 +1,16 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package com.cloudera.impala.analysis;
 
@@ -16,8 +28,10 @@ import org.junit.Test;
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public class AnalyzeExprsTest extends AnalyzerTest {
 
@@ -770,9 +784,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select coalesce('a', 'b', 'c')");
     // Need at least one argument.
     AnalysisError("select concat()",
-                  "No matching function with those arguments: concat ()");
+                  "No matching function with those arguments: concat()");
     AnalysisError("select coalesce()",
-                  "No matching function with those arguments: coalesce ()");
+                  "No matching function with those arguments: coalesce()");
   }
 
   /**
@@ -790,10 +804,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Cannot cast non-null args to match a signature.
     AnalysisError("select substring(1, NULL, NULL)",
         "No matching function with those arguments: " +
-            "substring (TINYINT, NULL_TYPE, NULL_TYPE)");
+            "substring(TINYINT, NULL_TYPE, NULL_TYPE)");
     AnalysisError("select substring(NULL, 'a', NULL)",
         "No matching function with those arguments: " +
-            "substring (NULL_TYPE, STRING, NULL_TYPE)");
+            "substring(NULL_TYPE, STRING, NULL_TYPE)");
 
     // Test vararg functions with 'concat' as representative.
     AnalyzesOk("select concat(NULL, 'a', 'b')");
@@ -803,13 +817,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Cannot cast non-null args to match a signature.
     AnalysisError("select concat(NULL, 1, 'b')",
         "No matching function with those arguments: " +
-            "concat (NULL_TYPE, TINYINT, STRING)");
+            "concat(NULL_TYPE, TINYINT, STRING)");
     AnalysisError("select concat('a', NULL, 1)",
         "No matching function with those arguments: " +
-            "concat (STRING, NULL_TYPE, TINYINT)");
+            "concat(STRING, NULL_TYPE, TINYINT)");
     AnalysisError("select concat(1, 'b', NULL)",
         "No matching function with those arguments: " +
-            "concat (TINYINT, STRING, NULL_TYPE)");
+            "concat(TINYINT, STRING, NULL_TYPE)");
   }
 
   @Test
@@ -890,12 +904,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // if() only accepts three arguments
     AnalysisError("select if(true, false, true, true)",
-        "No matching function with those arguments: if (BOOLEAN, BOOLEAN, BOOLEAN, " +
+        "No matching function with those arguments: if(BOOLEAN, BOOLEAN, BOOLEAN, " +
         "BOOLEAN)");
     AnalysisError("select if(true, false)",
-        "No matching function with those arguments: if (BOOLEAN, BOOLEAN)");
+        "No matching function with those arguments: if(BOOLEAN, BOOLEAN)");
     AnalysisError("select if(false)",
-        "No matching function with those arguments: if (BOOLEAN)");
+        "No matching function with those arguments: if(BOOLEAN)");
 
     // Test IsNull() conditional function.
     for (PrimitiveType t: PrimitiveType.values()) {
@@ -906,11 +920,43 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
     // IsNull() requires two arguments.
     AnalysisError("select isnull(1)",
-        "No matching function with those arguments: isnull (TINYINT)");
+        "No matching function with those arguments: isnull(TINYINT)");
     AnalysisError("select isnull(1, 2, 3)",
-        "No matching function with those arguments: isnull (TINYINT, TINYINT, TINYINT)");
+        "No matching function with those arguments: isnull(TINYINT, TINYINT, TINYINT)");
     // Incompatible types.
     AnalysisError("select isnull('a', true)",
-        "No matching function with those arguments: isnull (STRING, BOOLEAN)");
+        "No matching function with those arguments: isnull(STRING, BOOLEAN)");
+  }
+
+  @Test
+  public void TestUdfs() {
+    HdfsURI dummyUri = new HdfsURI("");
+
+    AnalysisError("select udf()", "default.udf() unknown");
+    AnalysisError("select functional.udf()", "functional.udf() unknown");
+    AnalysisError("select udf(1)", "default.udf() unknown");
+
+    // Add a udf default.udf(), default.udf(int) and functional.udf(double)
+    catalog.addUdf(new Udf(new FunctionName("default", "udf"),
+        new ArrayList<PrimitiveType>(), PrimitiveType.INT, dummyUri, null));
+    catalog.addUdf(new Udf(new FunctionName("default", "udf"),
+        Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT, dummyUri, null));
+    catalog.addUdf(new Udf(new FunctionName("functional", "udf"),
+        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, dummyUri, null));
+
+    AnalyzesOk("select udf()");
+    AnalyzesOk("select default.udf()");
+    AnalyzesOk("select udf(1)");
+    AnalyzesOk("select udf(cast (1.1 as INT))");
+    AnalyzesOk("select udf(cast(1.1 as TINYINT))");
+    AnalysisError("select udf(1.1)",
+        "No matching function with those arguments: default.udf(DOUBLE)");
+
+    AnalyzesOk("select functional.udf(1.1)");
+    AnalysisError("select functional.udf('Hello')",
+        "No matching function with those arguments: functional.udf(STRING)");
+
+    AnalysisError("select udf(1, 2)",
+         "No matching function with those arguments: default.udf(TINYINT, TINYINT)");
   }
 }

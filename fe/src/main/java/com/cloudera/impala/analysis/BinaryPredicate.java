@@ -112,7 +112,7 @@ public class BinaryPredicate extends Predicate {
     OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
         op.toFunctionOp(), true, compatibleType, compatibleType);
     Preconditions.checkState(match != null);
-    Preconditions.checkState(match.getDesc().getReturnType() == PrimitiveType.BOOLEAN);
+    Preconditions.checkState(match.getReturnType() == PrimitiveType.BOOLEAN);
     this.opcode = match.opcode;
 
     // determine selectivity

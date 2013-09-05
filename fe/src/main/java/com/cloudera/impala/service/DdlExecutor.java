@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -316,12 +317,12 @@ public class DdlExecutor {
     }
     PrimitiveType retType = PrimitiveType.fromThrift(params.ret_type);
     HdfsURI location = new HdfsURI(params.location);
-    Udf udf = new Udf(params.fn_name, argTypes, retType,
+    Udf udf = new Udf(new FunctionName(params.fn_name), argTypes, retType,
         location, params.binary_name);
-    LOG.info(String.format("Adding UDF %s", udf.getDesc().signatureString()));
-    boolean added = catalog.addUdf(udf, internalUser);
+    LOG.info(String.format("Adding UDF %s", udf.signatureString()));
+    boolean added = catalog.addUdf(udf);
     if (!added && !params.if_not_exists) {
-      throw new AlreadyExistsException("Function " + udf.getDesc().signatureString() +
+      throw new AlreadyExistsException("Function " + udf.signatureString() +
           " already exists.");
     }
   }
@@ -333,15 +334,20 @@ public class DdlExecutor {
    *
    * @param dbName - The name of the database to drop
    * @param ifExists - If true, no errors will be thrown if the database does not exist.
+   * @throws AuthorizationException
    */
   public void dropDatabase(TDropDbParams params)
       throws MetaException, NoSuchObjectException, InvalidOperationException,
-      org.apache.thrift.TException {
+      org.apache.thrift.TException, AuthorizationException {
     Preconditions.checkNotNull(params);
     Preconditions.checkState(params.getDb() != null && !params.getDb().isEmpty(),
         "Null or empty database name passed as argument to Catalog.dropDatabase");
 
     LOG.info("Dropping database " + params.getDb());
+    Db db = catalog.getDb(params.db, internalUser, Privilege.DROP);
+    if (db != null && db.numUdfs() > 0) {
+      throw new InvalidObjectException("Database " + db.getName() + " is not empty");
+    }
     MetaStoreClient msClient = catalog.getMetaStoreClient();
     synchronized (metastoreDdlLock) {
       try {
@@ -382,10 +388,10 @@ public class DdlExecutor {
     for (TPrimitiveType t: params.arg_types) {
       argTypes.add(PrimitiveType.fromThrift(t));
     }
-    Function desc = new Function(
-        params.fn_name, argTypes, PrimitiveType.INVALID_TYPE, false);
+    Function desc = new Function(new FunctionName(params.fn_name),
+        argTypes, PrimitiveType.INVALID_TYPE, false);
     LOG.info(String.format("Dropping UDF %s", desc.signatureString()));
-    boolean removed = catalog.removeUdf(desc, internalUser);
+    boolean removed = catalog.removeUdf(desc);
     if (!removed && !params.if_exists) {
       throw new NoSuchObjectException(
           "Function: " + desc.signatureString() + " does not exist.");

@@ -986,6 +986,9 @@ public class Analyzer {
   public String getTargetDbName(TableName tableName) {
     return tableName.isFullyQualified() ? tableName.getDb() : getDefaultDb();
   }
+  public String getTargetDbName(FunctionName fnName) {
+    return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
+  }
 
   public void setIsExplain(boolean isExplain) { this.isExplain = isExplain; }
   public boolean isExplain() { return isExplain; }

@@ -1,12 +1,29 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package com.cloudera.impala.analysis;
+
+import java.util.ArrayList;
 
 import junit.framework.Assert;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.collect.Lists;
 
 public class AnalyzeDDLTest extends AnalyzerTest {
 
@@ -653,22 +670,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestCreateDropFunction() throws AnalysisException {
-    final String udf_suffix = " LOCATION '/foo' 'foo.class'";
-    // TODO: Add tests for if exists when we can persist functions in the catalog
-    AnalyzesOk("create function foo() RETURNS int" + udf_suffix);
-    AnalyzesOk("create function foo(int, int, string) RETURNS int" + udf_suffix);
+  public void TestFunction() throws AnalysisException {
+    final String udfSuffix = " LOCATION '/foo' 'foo.class'";
 
-    // Try some functions names expressed as paths
-    AnalyzesOk("create function A.B() RETURNS int" + udf_suffix);
-    AnalyzesOk("create function A.B1() RETURNS int" + udf_suffix);
-    AnalyzesOk("create function A.B1.C() RETURNS int" + udf_suffix);
-    AnalyzesOk("create function A.`B1C`() RETURNS int" + udf_suffix);
+    AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
+    AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
+
+    // Try some fully qualified function names
+    AnalyzesOk("create function functional.B() RETURNS int" + udfSuffix);
+    AnalyzesOk("create function functional.B1() RETURNS int" + udfSuffix);
+    AnalyzesOk("create function functional.`B1C`() RETURNS int" + udfSuffix);
+
+    // Name with underscore
+    AnalyzesOk("create function A_B() RETURNS int" + udfSuffix);
 
     // Try to create a function with the same name as a builtin
-    AnalysisError("create function sin(double) RETURNS double" + udf_suffix,
+    AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
         "Function cannot have the same name as a builtin: sin");
-    AnalysisError("create function sin() RETURNS double" + udf_suffix,
+    AnalysisError("create function sin() RETURNS double" + udfSuffix,
         "Function cannot have the same name as a builtin: sin");
 
     // Try to create with a bad location
@@ -676,20 +695,47 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "URI path must be absolute: bad-location");
 
     // Try creating functions with illegal function names.
-    AnalysisError("create function A_B() RETURNS int" + udf_suffix,
-        "Function names must be all alphanumeric. Invalid name: A_B");
-    AnalysisError("create function 123A() RETURNS int" + udf_suffix,
-        "Function cannot start with a digit: 123A");
-    AnalysisError("create function A.`1A`() RETURNS int" + udf_suffix,
-        "Function cannot start with a digit: 1A");
-    AnalysisError("create function A.`ABC-D`() RETURNS int" + udf_suffix,
-        "Function names must be all alphanumeric. Invalid name: ABC-D");
+    AnalysisError("create function 123A() RETURNS int" + udfSuffix,
+        "Function cannot start with a digit: 123a");
+    AnalysisError("create function A.`1A`() RETURNS int" + udfSuffix,
+        "Function cannot start with a digit: 1a");
+    AnalysisError("create function A.`ABC-D`() RETURNS int" + udfSuffix,
+        "Function names must be all alphanumeric or underscore. Invalid name: abc-d");
+    AnalysisError("create function baddb.f() RETURNS int" + udfSuffix,
+        "Database does not exist: baddb");
 
     // Try dropping functions.
-    // TODO: drop an existent function when we can persist functions in the catalog
     AnalyzesOk("drop function if exists foo()");
     AnalysisError("drop function foo()", "Function does not exist: foo()");
+    AnalyzesOk("drop function if exists a.foo()");
+    AnalysisError("drop function a.foo()", "Database does not exist: a");
     AnalyzesOk("drop function if exists foo()");
+
+    // Add a udf default.TestFn() and default.TestFn(double)
+    catalog.addUdf(new Udf(new FunctionName("default", "TestFn"),
+        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
+    catalog.addUdf(new Udf(new FunctionName("default", "TestFn"),
+        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null));
+
+    AnalysisError("create function TestFn() RETURNS INT " + udfSuffix,
+        "Function already exists: testfn()");
+    AnalysisError("create function TestFn(double) RETURNS INT " + udfSuffix,
+        "Function already exists: testfn(DOUBLE)");
+    AnalyzesOk("create function TestFn(int) RETURNS INT " + udfSuffix);
+
+    // Create a function with the same signature in a different db
+    AnalyzesOk("create function functional.TestFn() RETURNS INT " + udfSuffix);
+
+    AnalyzesOk("drop function TestFn()");
+    AnalyzesOk("drop function TestFn(double)");
+    AnalysisError("drop function TestFn(int)", "Function does not exist: testfn(INT)");
+    AnalysisError(
+        "drop function functional.TestFn()", "Function does not exist: testfn()");
+
+    catalog.addUdf(new Udf(new FunctionName("functional", "TestFn"),
+        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null));
+    AnalysisError(
+        "drop database functional", "Cannot drop non-empty database: functional");
   }
 
   @Test
