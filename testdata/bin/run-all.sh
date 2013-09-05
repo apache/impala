@@ -30,6 +30,7 @@ fi
 $IMPALA_HOME/testdata/bin/kill-all.sh
 
 # Start up DFS, then Hbase
+echo "Starting all cluster services..."
 $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER}
 $IMPALA_HOME/testdata/bin/run-hbase.sh
 
