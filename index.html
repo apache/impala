@@ -1,65 +1,148 @@
+
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
   <head>
-    <meta charset='utf-8' />
-    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
-    <meta name="description" content="Cloudera Impala : " />
-
-    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
-
+    <meta charset="utf-8">
     <title>Cloudera Impala</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le styles -->
+    <link href="../css/bootstrap.css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+
+      /* Custom container */
+      .container-narrow {
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      .container-narrow > hr {
+        margin: 30px 0;
+      }
+
+      /* Main marketing message and sign up button */
+      .jumbotron {
+        margin: 60px 0;
+        text-align: center;
+      }
+      .jumbotron h1 {
+        font-size: 72px;
+        line-height: 1;
+      }
+      .jumbotron .btn {
+        font-size: 21px;
+        padding: 14px 24px;
+      }
+
+      /* Supporting marketing content */
+      .marketing {
+        margin: 60px 0;
+      }
+      .marketing p + h4 {
+        margin-top: 28px;
+      }
+    </style>
+    <link href="../css/bootstrap-responsive.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.js"></script>
+    <![endif]-->
+
+   
   </head>
 
   <body>
 
-    <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-        <header class="inner">
-          <a id="forkme_banner" href="https://github.com/cloudera/impala">View on GitHub</a>
+    <div class="container-narrow">
 
-          <h1 id="project_title">Cloudera Impala</h1>
-          <h2 id="project_tagline"></h2>
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://www.cloudera.com/content/cloudera/en/products/cdh/impala.html">cloudera.com</a></li>
+          <li><a href="http://www.cloudera.com/content/support/en/documentation/cloudera-impala/cloudera-impala-documentation-v1-latest.html">Documentation</a></li>
+          <li><a href="http://www.cloudera.com/content/support/en/downloads.html">Downloads</a></li>
+          <li><a href="https://github.com/cloudera/impala">GitHub</a></li>
+        </ul>
+        <h3 class="muted">Cloudera Impala</h3>
+      </div>
 
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/cloudera/impala/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/cloudera/impala/tarball/master">Download this project as a tar.gz file</a>
-            </section>
-        </header>
-    </div>
+      <hr>
 
-    <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
-        <h3>
-<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Cloudera Impala</h3>
+       <div class="jumbotron">
+        <h1>Ride Impala!</h1>
+        <img src="img/impala-logo.png" width="91" height="170">
+        <p class="lead">Cloudera Impala is a modern, open source, distributed SQL query engine<br>
+ for Apache Hadoop.</p>
+        <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Impala/latest/Installing-and-Using-Impala/ciiu_cm_installation.html" class="btn btn-primary btn-large">Install Impala</a> <a href="http://www.cloudera.com/content/support/en/downloads/download-components/download-products.html?productID=F6mO278Rvo" class="btn btn-primary btn-large">Try Impala in a VM</a>
 
-<p>
-Cloudera Impala is an open source Massively Parallel Processing (MPP) query engine that runs natively on Apache Hadoop. The Apache-licensed Impala project brings scalable parallel database technology to Hadoop, enabling users to issue low-latency SQL queries to data stored in HDFS and Apache HBase without requiring data movement or transformation. Impala is integrated from the ground up as part of the Hadoop ecosystem and leverages the same flexible file and data formats, metadata, security and resource management frameworks used by MapReduce, Apache Hive, Apache Pig and other components of the Hadoop stack.</p>
+       </div>
+      
 
-<p>With Impala, analysts and data scientists now have the ability to perform real-time, “speed of thought” analytics on data stored in Hadoop via SQL or through Business Intelligence (BI) tools. The result is that large-scale data processing (via MapReduce) and interactive queries can be done on the same system using the same data and metadata – removing the need to migrate data sets into specialized systems and/or proprietary formats simply to perform analysis.
+      <hr>
 
-<h3>
-<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+      <div class="row-fluid marketing">
+        <div class="span6">
+          <h4>Do BI-style Queries on Hadoop</h4>
+          <p>Impala provides low latency and high concurrency for BI/analytic queries on Hadoop (not delivered by batch frameworks such as Apache Hive). Impala also scales linearly, even in multitenant environments.</p>
+        
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+          <h4>Unify Your Infrastructure</h4>
+          <p>Utilize the same file and data formats and metadata, security, and resource management frameworks as your Hadoop deployment -- no redundant infrastructure or data conversion/duplication.</p>
 
-<h3>
-<a name="support-or-contact" class="anchor" href="#support-or-contact"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+          <h4>Implement Quickly </h4>
+          <p>For  Hive users, Impala utilizes the same metadata, ODBC driver, SQL syntax, and user interface as  Hive -- so you needn't worry about re-inventing the implementation wheel.</p>
+        </div>
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
-      </section>
-    </div>
+        <div class="span6">
+          <h4>Count on Enterprise-class Security</h4>
+          <p>Impala is integrated native Hadoop security and  Kerberos for authentication, and via the Sentry module, you can ensure that the right users and applications are authorized for the right data.</p>
 
-    <!-- FOOTER  -->
-    <div id="footer_wrap" class="outer">
-      <footer class="inner">
-        <p class="copyright">Cloudera Impala maintained by <a href="https://github.com/cloudera">cloudera</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
-      </footer>
-    </div>
+         <h4>Retain Freedom from Lock-in</h4>
+          <p>Impala is open source (Apache License), so you can self-support in perpetuity if you wish. However, 24x7 technical support is available via a Cloudera Enterprise subscription add-on.</p>
 
-    
+         <h4>Expand the Hadoop User-verse</h4>
+          <p>With Impala, more  users -- whether using SQL queries or BI applications -- can interact with more data through a single repository and metadata store from source through analysis.</p>
+        </div>
+      </div>
+      <hr>
+       <div class="row-fluid">
+        <div class="span12">
+          <h2>The Latest</h2>
+          
+          <p><a href="http://globalknowledgeblog.com/technology/have-a-need-for-speed-use-cloudera-impala-for-real-time-hadoop-queries/">Have a Need for Speed? Use Cloudera Impala for Real-Time Hadoop Queries</a> (Aug. 19, 2013)</a></p>
+          <p><a href="http://blog.cloudera.com/blog/2013/08/visualization-on-impala-big-real-time-and-raw/">Visualization on Impala: Big, Real-Time, and Raw</a> (Aug. 19, 2013)</p>
+           <p><a href="http://blog.cloudera.com/blog/2013/07/announcing-parquet-1-0-columnar-storage-for-hadoop/">Announcing Parquet 1.0: Columnar Storage for Hadoop</a> (July 30, 2013)</p>
+           <p><a href="http://blog.cloudera.com/blog/2013/07/with-sentry-cloudera-fills-hadoops-enterprise-security-gap/">With Sentry, Cloudera Fills Hadoop’s Enterprise Security Gap</a> (July 24, 2013)</p>
+        <p><a href="http://blog.cloudera.com/blog/2013/07/breaking-news-cloudera-impala-is-fast-really-fast/">Breaking News: Cloudera Impala is Fast. Really Fast.</a> (July 19, 2013)</p>
+          
+           <p><a class="btn" href="https://delicious.com/clouderadev/impala">More &raquo;</a></p>
+        </div>
+        
+        <hr>
+
+      <div class="footer">
+        <p><small>Copyright &copy; 2013 Cloudera. All rights reserved. Cloudera Impala is a registered trademark of Cloudera in the United States and in jurisdictions throughout the world. All other company and product names may be trade names or trademarks of their respective owners.</small></p>
+      </div>
+
+    </div> <!-- /container -->
+
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../js/jquery.js"></script>
+    <script src="../js/bootstrap-transition.js"></script>
+    <script src="../js/bootstrap-scrollspy.js"></script>
+    <script src="../js/bootstrap-tab.js"></script>
+    <script src="../js/bootstrap-tooltip.js"></script>
+    <script src="../js/bootstrap-popover.js"></script>
+    <script src="../js/bootstrap-button.js"></script>
+    <script src="../js/bootstrap-collapse.js"></script>
+    <script src="../js/bootstrap-typeahead.js"></script>
 
   </body>
 </html>
