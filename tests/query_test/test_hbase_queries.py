@@ -28,12 +28,7 @@ class TestHBaseQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/hbase-filters', vector)
 
   def test_hbase_inserts(self, vector):
-    try:
-      self.run_test_case('QueryTest/hbase-inserts', vector)
-    except AssertionError:
-      msg = ('IMPALA-579 - Insert into a binary encoded hbase table produces'
-             ' incorrect results')
-      pytest.xfail(msg)
+    self.run_test_case('QueryTest/hbase-inserts', vector)
 
   def test_hbase_subquery(self, vector):
     self.run_test_case('QueryTest/hbase-subquery', vector)
