@@ -59,6 +59,14 @@
       <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-common-${hbase.version}.jar</systemPath>
     </dependency>
 
+   <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase-protocol</artifactId>
+      <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-protocol-${hbase.version}.jar</systemPath>
+    </dependency>
+
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>

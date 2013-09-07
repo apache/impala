@@ -31,4 +31,8 @@ for jar in `ls ${IMPALA_HOME}/fe/target/dependency/*.jar`; do
   CLASSPATH=${CLASSPATH}:$jar
 done
 
+for jar in `ls ${IMPALA_HOME}/testdata/target/dependency/*.jar`; do
+  CLASSPATH=${CLASSPATH}:$jar
+done
+
 export CLASSPATH
