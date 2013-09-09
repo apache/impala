@@ -38,6 +38,8 @@ Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* file
   return Status::OK;
 }
 
-
+bool IsHiddenFile(const string& filename) {
+  return !filename.empty() && (filename[0] == '.' || filename[0] == '_');
 }
 
+}

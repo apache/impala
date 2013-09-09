@@ -30,6 +30,7 @@ from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
 from tests.common.query_executor import JdbcQueryExecOptions, execute_using_jdbc
+from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 # Imports required for Hive Metastore Client
 from hive_metastore import ThriftHiveMetastore
@@ -43,6 +44,7 @@ IMPALAD_HS2_HOST_PORT = pytest.config.option.impalad.split(':')[0] + ":" + \
     pytest.config.option.impalad_hs2_port
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
+HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -78,6 +80,11 @@ class ImpalaTestSuite(BaseTestSuite):
     # The ImpalaBeeswaxClient is used to execute queries in the test suite
     cls.client = cls.create_impala_client()
     cls.impalad_test_service = ImpaladService(IMPALAD.split(':')[0])
+    if pytest.config.option.namenode_http_address is None:
+      cls.hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
+    else:
+      host, port = pytest.config.option.namenode_http_address.split(":")
+      cls.hdfs_client = get_hdfs_client()
 
   @classmethod
   def teardown_class(cls):

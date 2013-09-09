@@ -27,6 +27,7 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -61,6 +62,7 @@
 using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
+using namespace boost::filesystem;
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
 
@@ -491,7 +493,6 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   return query_status_;
 }
 
-
 Status Coordinator::FinalizeQuery() {
   // All backends must have reported their final statuses before finalization,
   // which is a post-condition of Wait.
@@ -533,14 +534,13 @@ Status Coordinator::FinalizeQuery() {
         if (existing_files == NULL) {
           return GetHdfsErrorMsg("Could not list directory: ", part_path);
         }
-        Status delete_status = Status::OK;
         for (int i = 0; i < num_files; ++i) {
-          if (existing_files[i].mKind == kObjectKindFile) {
-            partition_create_ops.Add(DELETE, string(existing_files[i].mName));
+          const string filename = path(existing_files[i].mName).filename().string();
+          if (existing_files[i].mKind == kObjectKindFile && !IsHiddenFile(filename)) {
+            partition_create_ops.Add(DELETE, existing_files[i].mName);
           }
         }
         hdfsFreeFileInfo(existing_files, num_files);
-        RETURN_IF_ERROR(delete_status);
       } else {
         // This is a partition directory, not the root directory; we can delete
         // recursively with abandon, after checking that it ever existed.

@@ -30,5 +30,7 @@ std::string GetHdfsErrorMsg(const std::string& prefix, const std::string& file =
 // Return the size, in bytes, of a file from the hdfs connection.
 Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize);
 
+bool IsHiddenFile(const std::string& filename);
+
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H

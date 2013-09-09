@@ -3,6 +3,7 @@
 # py.test configuration module
 #
 import logging
+import os
 from common.test_result_verifier import QueryTestResult
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
@@ -30,6 +31,16 @@ def pytest_addoption(parser):
 
   parser.addoption("--hive_server2", default="localhost:11050", help=\
                    "Hive's HiveServer2 host:port to connect to.")
+
+
+  default_xml_path = os.path.join(os.environ['IMPALA_HOME'],
+                                  "fe/target/test-classes/minicluster-conf.xml")
+  parser.addoption("--minicluster_xml_conf", default=default_xml_path, help=\
+                   "The full path to the HDFS xml configuration file")
+
+  parser.addoption("--namenode_http_address", default=None, help=\
+                   "The host:port for the HDFS Namenode's WebHDFS interface. Takes" \
+                   " precedence over any configuration read from --minicluster_xml_conf")
 
   parser.addoption("--update_results", action="store_true", default=False, help=\
                    "If set, will generate new results for all tests run instead of "\

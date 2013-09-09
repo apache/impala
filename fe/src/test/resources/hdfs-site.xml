@@ -25,4 +25,8 @@
     <value>134217728</value>
   </property>
 
+  <property>
+    <name>dfs.webhdfs.enabled</name>
+    <value>true</value>
+  </property>
 </configuration>
