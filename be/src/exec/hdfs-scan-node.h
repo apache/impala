@@ -286,7 +286,7 @@ class HdfsScanNode : public ScanNode {
   hdfsFS hdfs_connection_;
 
   // Map of HdfsScanner objects to file types.  Only one scanner object will be
-  // created for each file type.  Objects stored in scanner_pool_.
+  // created for each file type.  Objects stored in runtime_state's pool.
   typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
 
@@ -299,11 +299,6 @@ class HdfsScanNode : public ScanNode {
   boost::mutex codgend_fn_map_lock_;
   typedef std::map<THdfsFileFormat::type, std::list<llvm::Function*> > CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
-
-  // Pool for storing allocated scanner objects.  We don't want to use the
-  // runtime pool to ensure that the scanner objects are deleted before this
-  // object is.
-  boost::scoped_ptr<ObjectPool> scanner_pool_;
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
@@ -332,16 +327,9 @@ class HdfsScanNode : public ScanNode {
   // Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
 
-  // Lock and condition variables protecting materialized_row_batches_.  Row batches are
-  // produced asynchronously by the scanner threads and consumed by the main thread in
-  // GetNext.  Row batches must be processed by the main thread in the order they are
-  // queued to avoid freeing attached resources prematurely (row batches will never depend
-  // on resources attached to earlier batches in the queue).
-  // This lock cannot be taken together with any other locks except lock_.
-  boost::mutex row_batches_lock_;
-  boost::condition_variable row_batch_added_cv_;
-  boost::condition_variable row_batch_consumed_cv_;
-  std::list<RowBatch*> materialized_row_batches_;
+  // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
+  // threads and consumed by the main thread.
+  boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
 
   // Maximum size of materialized_row_batches_.
   int max_materialized_row_batches_;
@@ -377,6 +365,7 @@ class HdfsScanNode : public ScanNode {
   // Flag signaling that all scanner threads are done.  This could be because they
   // are finished, an error/cancellation occurred, or the limit was reached.
   // Setting this to true triggers the scanner threads to clean up.
+  // This should not be explicitly set. Instead, call SetDone().
   bool done_;
 
   // Set to true if all ranges have started. Some of the ranges may still be in
@@ -423,6 +412,10 @@ class HdfsScanNode : public ScanNode {
 
   // Checks for eos conditions and returns batches from materialized_row_batches_.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
+
+  // sets done_ to true and triggers threads to cleanup. Cannot be calld with
+  // any locks taken. Calling it repeatedly ignores subsequent calls.
+  void SetDone();
 
   // Stops periodic counters and aggregates counter values for the entire scan node.
   // This should be called as soon as the scan node is complete to get the most accurate

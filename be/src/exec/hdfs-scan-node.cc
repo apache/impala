@@ -69,7 +69,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
-      scanner_pool_(new ObjectPool()),
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
@@ -82,6 +81,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
     // Investigate and tune this.
     max_materialized_row_batches_ = 10 * DiskInfo::num_disks();
   }
+  materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
 }
 
 HdfsScanNode::~HdfsScanNode() {
@@ -100,33 +100,15 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
 
   {
     unique_lock<mutex> l(lock_);
-    *eos = per_file_splits_.size() == 0 || ReachedLimit() || !status_.ok();
-  }
-
-  if (*eos) {
-    unique_lock<mutex> l(lock_);
-    return status_;
-  }
-
-  RowBatch* materialized_batch = NULL;
-  {
-    unique_lock<mutex> l(row_batches_lock_);
-    while (materialized_row_batches_.empty() && !done_) {
-      row_batch_added_cv_.wait(l);
-    }
-
-    // Return any errors
-    if (!status_.ok()) return status_;
-
-    if (!materialized_row_batches_.empty()) {
-      materialized_batch = materialized_row_batches_.front();
-      materialized_row_batches_.pop_front();
+    if (ReachedLimit() || !status_.ok()) {
+      *eos = true;
+      return status_;
     }
   }
 
+  RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
     num_owned_io_buffers_ -= materialized_batch->num_io_buffers();
-    row_batch_consumed_cv_.notify_one();
     row_batch->AcquireState(materialized_batch);
     // Update the number of materialized rows instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
@@ -142,13 +124,7 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
       *eos = true;
-      // Wake up scanner threads notifying them we are done.
-      {
-        unique_lock<mutex> l(row_batches_lock_);
-        done_ = true;
-      }
-      state->io_mgr()->CancelReader(reader_context_);
-      row_batch_consumed_cv_.notify_all();
+      SetDone();
     }
     DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
     delete materialized_batch;
@@ -316,7 +292,7 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
       return NULL;
   }
   DCHECK(scanner != NULL);
-  scanner_pool_->Add(scanner);
+  runtime_state_->obj_pool()->Add(scanner);
   return scanner;
 }
 
@@ -464,7 +440,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
 
   if (per_file_splits_.empty()) {
-    done_ = true;
+    SetDone();
     return Status::OK;
   }
 
@@ -543,7 +519,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 
   if (total_splits == 0) {
-    done_ = true;
+    SetDone();
     return Status::OK;
   }
 
@@ -568,32 +544,17 @@ Status HdfsScanNode::Open(RuntimeState* state) {
         this, per_type_files[THdfsFileFormat::LZO_TEXT]));
   }
 
-  done_ = progress_.done();
+  if (progress_.done()) SetDone();
   return Status::OK;
 }
 
 void HdfsScanNode::Close(RuntimeState* state) {
-  {
-    unique_lock<mutex> l(row_batches_lock_);
-    done_ = true;
-  }
-  if (reader_context_ != NULL) {
-    state->io_mgr()->CancelReader(reader_context_);
-    row_batch_consumed_cv_.notify_all();
-  }
-  state->resource_pool()->SetThreadAvailableCb(NULL);
+  SetDone();
 
+  state->resource_pool()->SetThreadAvailableCb(NULL);
   scanner_threads_.JoinAll();
 
-  // There are materialized batches that have not been returned to the parent node.
-  // Clean those up now.
-  for (list<RowBatch*>::iterator it = materialized_row_batches_.begin();
-       it != materialized_row_batches_.end(); ++it) {
-    num_owned_io_buffers_ -= (*it)->num_io_buffers();
-    delete *it;
-  }
-  materialized_row_batches_.clear();
-
+  num_owned_io_buffers_ -= materialized_row_batches_->Cleanup();
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
 
   if (reader_context_ != NULL) {
@@ -606,7 +567,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
   DCHECK_EQ(active_scanner_thread_counter_.value(), 0);
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
-  scanner_pool_.reset(NULL);
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
   ScanNode::Close(state);
@@ -634,18 +594,7 @@ void HdfsScanNode::MarkFileDescIssued(const HdfsFileDesc* desc) {
 }
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
-  {
-    unique_lock<mutex> l(row_batches_lock_);
-    while (UNLIKELY(materialized_row_batches_.size() >= max_materialized_row_batches_
-        && !done_)) {
-      row_batch_consumed_cv_.wait(l);
-    }
-
-    // We must enqueue row_batch even if we're done (rather than dropping it) in case
-    // already queued batches depend on its attached resources.
-    materialized_row_batches_.push_back(row_batch);
-  }
-  row_batch_added_cv_.notify_one();
+  materialized_row_batches_->AddBatch(row_batch);
 }
 
 void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
@@ -731,39 +680,29 @@ inline void HdfsScanNode::ScannerThreadHelper() {
     }
 
     if (!status.ok()) {
-      unique_lock<mutex> l(lock_);
-      // If there was already an error, the main thread will do the cleanup
-      if (!status_.ok()) break;
+      {
+        unique_lock<mutex> l(lock_);
+        // If there was already an error, the main thread will do the cleanup
+        if (!status_.ok()) return;
 
-      if (status.IsCancelled()) {
-        // Scan node should be the only thing that initiated scanner threads to see
-        // cancelled (i.e. limit reached).  No need to do anything here.
-        DCHECK(done_);
-        break;
+        if (status.IsCancelled()) {
+          // Scan node should be the only thing that initiated scanner threads to see
+          // cancelled (i.e. limit reached).  No need to do anything here.
+          DCHECK(done_);
+          return;
+        }
+        status_ = status;
       }
 
       if (status.IsMemLimitExceeded()) runtime_state_->LogMemLimitExceeded();
-
-
-      status_ = status;
-      {
-        unique_lock<mutex> l(row_batches_lock_);
-        done_ = true;
-      }
-      // Notify the disk which will trigger tear down of all threads.
-      runtime_state_->io_mgr()->CancelReader(reader_context_);
-      // Notify the main thread which reports the error
-      row_batch_added_cv_.notify_one();
+      SetDone();
+      return;
     }
 
     // Done with range and it completed successfully
     if (progress_.done()) {
       // All ranges are finished.  Indicate we are done.
-      {
-        unique_lock<mutex> l(row_batches_lock_);
-        done_ = true;
-      }
-      row_batch_added_cv_.notify_one();
+      SetDone();
       return;
     }
 
@@ -773,7 +712,7 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       // means that every range is either done or being processed by
       // another thread.
       all_ranges_started_ = true;
-      break;
+      return;
     }
   }
 }
@@ -803,6 +742,18 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
       ++file_type_counts_[make_pair(file_type, compression_types[i])];
     }
   }
+}
+
+void HdfsScanNode::SetDone() {
+  {
+    unique_lock<mutex> l(lock_);
+    if (done_) return;
+    done_ = true;
+  }
+  if (reader_context_ != NULL) {
+    runtime_state_->io_mgr()->CancelReader(reader_context_);
+  }
+  materialized_row_batches_->Shutdown();
 }
 
 void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {

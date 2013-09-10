@@ -23,6 +23,7 @@
 #include "runtime/descriptors.h"  // for RowDescriptor
 #include "runtime/mem-tracker.h"  // used in RETURN_IF_MEM_LIMIT_EXCEEDED()
 #include "util/runtime-profile.h"
+#include "util/blocking-queue.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
@@ -150,6 +151,41 @@ class ExecNode {
 
  protected:
   friend class DataSink;
+
+  // Extends blocking queue for row batches. Row batches have a property that
+  // they must be processed in the order they were produced, even in cancellation
+  // paths. Preceding row batches can contain ptrs to memory in subsequent row batches
+  // and we need to make sure those ptrs stay valid.
+  // Row batches that are added after Shutdown() are queued in another queue, which can
+  // be cleaned up during Close().
+  // All functions are thread safe.
+  class RowBatchQueue : public BlockingQueue<RowBatch*> {
+   public:
+    // max_batches is the maximum number of row batches that can be queued.
+    // When the queue is full, producers will block.
+    RowBatchQueue(int max_batches);
+    ~RowBatchQueue();
+
+    // Adds a batch to the queue. This is blocking if the queue is full.
+    void AddBatch(RowBatch* batch);
+
+    // Gets a row batch from the queue. Returns NULL if there are no more.
+    // This function blocks.
+    // Returns NULL after Shutdown().
+    RowBatch* GetBatch();
+
+    // Deletes all row batches in cleanup_queue_. Not valid to call AddBatch()
+    // after this is called.
+    // Returns the number of io buffers that were released (for debug tracking)
+    int Cleanup();
+
+   private:
+    // Lock protecting cleanup_queue_
+    SpinLock lock_;
+
+    // Queue of orphaned row batches
+    std::list<RowBatch*> cleanup_queue_;
+  };
 
   int id_;  // unique w/in single plan tree
   TPlanNodeType::type type_;

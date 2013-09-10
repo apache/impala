@@ -561,18 +561,19 @@ class ScopedTimer {
     sw_.Start();
   }
 
-  void Stop() {
-    sw_.Stop();
-  }
-
-  void Start() {
-    sw_.Start();
-  }
+  void Stop() { sw_.Stop(); }
+  void Start() { sw_.Start(); }
 
   void UpdateCounter() {
     if (counter_ != NULL) {
       counter_->Update(sw_.ElapsedTime());
     }
+  }
+
+  // Updates the underlying counter for the final time and clears the pointer to it.
+  void ReleaseCounter() {
+    UpdateCounter();
+    counter_ = NULL;
   }
 
   // Update counter when object is destroyed

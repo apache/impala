@@ -330,7 +330,8 @@ void HdfsParquetScanner::Close() {
   // If this was a metadata only read (i.e. count(*)), there are no columns.
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
-  assemble_rows_timer_.UpdateCounter();
+  assemble_rows_timer_.Stop();
+  assemble_rows_timer_.ReleaseCounter();
 }
 
 HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(

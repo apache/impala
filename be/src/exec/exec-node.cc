@@ -49,6 +49,45 @@ int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
   return p->metadata();
 }
 
+ExecNode::RowBatchQueue::RowBatchQueue(int max_batches) : BlockingQueue(max_batches) {
+}
+
+ExecNode::RowBatchQueue::~RowBatchQueue() {
+  DCHECK(cleanup_queue_.empty());
+}
+
+void ExecNode::RowBatchQueue::AddBatch(RowBatch* batch) {
+  if (!BlockingPut(batch)) {
+    ScopedSpinLock l(&lock_);
+    cleanup_queue_.push_back(batch);
+  }
+}
+
+RowBatch* ExecNode::RowBatchQueue::GetBatch() {
+  RowBatch* result;
+  if (BlockingGet(&result)) return result;
+  return NULL;
+}
+
+int ExecNode::RowBatchQueue::Cleanup() {
+  int num_io_buffers = 0;
+
+  RowBatch* batch = NULL;
+  while ((batch = GetBatch()) != NULL) {
+    num_io_buffers += batch->num_io_buffers();
+    delete batch;
+  }
+
+  ScopedSpinLock l(&lock_);
+  for (list<RowBatch*>::iterator it = cleanup_queue_.begin();
+      it != cleanup_queue_.end(); ++it) {
+    num_io_buffers += (*it)->num_io_buffers();
+    delete *it;
+  }
+  cleanup_queue_.clear();
+  return num_io_buffers;
+}
+
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : id_(tnode.node_id),
     type_(tnode.node_type),
