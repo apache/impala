@@ -25,6 +25,8 @@ using namespace std;
 using namespace impala;
 
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
+DEFINE_int32(non_impala_fe_v, 0, "(Advanced) The log level (equivalent to --v) for "
+    "non-Impala classes in the Frontend (0: INFO, 1 and 2: DEBUG, 3: TRACE)");
 
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
@@ -48,9 +50,23 @@ struct Frontend::FrontendMethodDescriptor {
   jmethodID* method_id;
 };
 
+TLogLevel::type FlagToTLogLevel(int flag) {
+  switch (flag) {
+    case 0:
+      return TLogLevel::INFO;
+    case 1:
+      return TLogLevel::VLOG;
+    case 2:
+      return TLogLevel::VLOG_2;
+    case 3:
+    default:
+      return TLogLevel::VLOG_3;
+  }
+}
+
 Frontend::Frontend() {
   FrontendMethodDescriptor methods[] = {
-    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", &fe_ctor_},
+    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
@@ -83,7 +99,8 @@ Frontend::Frontend() {
       jni_env->NewStringUTF(FLAGS_authorization_policy_provider_class.c_str());
 
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
-      policy_file_path, policy_provider_class_name);
+      policy_file_path, policy_provider_class_name, FlagToTLogLevel(FLAGS_v),
+      FlagToTLogLevel(FLAGS_non_impala_fe_v));
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }

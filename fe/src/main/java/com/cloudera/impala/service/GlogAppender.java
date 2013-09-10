@@ -17,14 +17,18 @@ package com.cloudera.impala.service;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.Level;
+import org.apache.log4j.Appender;
+import org.apache.log4j.PropertyConfigurator;
 
 import java.util.Map;
+import java.util.Properties;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
 import com.google.common.base.Preconditions;
 
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TLogSeverity;
+import com.cloudera.impala.thrift.TLogLevel;
 
 /**
  * log4j appender which calls into C++ code to log messages at their correct severities
@@ -40,17 +44,17 @@ public class GlogAppender extends AppenderSkeleton {
   // Required implementation by superclass
   public void close() { }
 
-  private TLogSeverity levelToSeverity(Level level) {
+  private TLogLevel levelToSeverity(Level level) {
     Preconditions.checkState(!level.equals(Level.OFF));
     // TODO: Level does not work well in a HashMap or switch statement due to some
     // strangeness with equality testing.
-    if (level.equals(Level.TRACE)) return TLogSeverity.VERBOSE;
-    if (level.equals(Level.DEBUG)) return TLogSeverity.VERBOSE;
-    if (level.equals(Level.ALL)) return TLogSeverity.VERBOSE;
-    if (level.equals(Level.ERROR)) return TLogSeverity.ERROR;
-    if (level.equals(Level.FATAL)) return TLogSeverity.FATAL;
-    if (level.equals(Level.INFO)) return TLogSeverity.INFO;
-    if (level.equals(Level.WARN)) return TLogSeverity.WARN;
+    if (level.equals(Level.TRACE)) return TLogLevel.VLOG_3;
+    if (level.equals(Level.ALL)) return TLogLevel.VLOG_3;
+    if (level.equals(Level.DEBUG)) return TLogLevel.VLOG;
+    if (level.equals(Level.ERROR)) return TLogLevel.ERROR;
+    if (level.equals(Level.FATAL)) return TLogLevel.FATAL;
+    if (level.equals(Level.INFO)) return TLogLevel.INFO;
+    if (level.equals(Level.WARN)) return TLogLevel.WARN;
 
     throw new IllegalStateException("Unknown log level: " + level.toString());
   }
@@ -67,5 +71,62 @@ public class GlogAppender extends AppenderSkeleton {
     int lineNumber = Integer.parseInt(event.getLocationInformation().getLineNumber());
     String fileName = event.getLocationInformation().getFileName();
     FeSupport.LogToGlog(levelToSeverity(level).getValue(), msg, fileName, lineNumber);
+  }
+
+  /**
+   * Returns a log4j level string corresponding to the Glog log level
+   */
+  private static String log4jLevelForTLogLevel(TLogLevel logLevel) throws InternalException {
+    switch (logLevel) {
+      case INFO:
+        return "INFO";
+      case WARN:
+        return "WARN";
+      case ERROR:
+        return "ERROR";
+      case FATAL:
+        return "FATAL";
+      case VLOG:
+      case VLOG_2:
+        return "DEBUG";
+      case VLOG_3:
+        return "TRACE";
+      default:
+        throw new InternalException("Unknown log level:" + logLevel);
+    }
+  }
+
+  /**
+   * Manually override Log4j root logger configuration. Any values in log4j.properties not
+   * overridden (that is, anything but the root logger and its default level) will
+   * continue to have effect.
+   *
+   *  - impalaLogLevel - the maximum log level for com.cloudera.impala.* classes
+   *  - otherLogLevel - the maximum log level for all other classes
+   */
+  static void Install(TLogLevel impalaLogLevel, TLogLevel otherLogLevel)
+      throws InternalException {
+    Properties properties = new Properties();
+    properties.setProperty("log4j.appender.glog", GlogAppender.class.getName());
+
+    // These settings are relatively subtle. log4j provides many ways to filter log
+    // messages, and configuring them in the right order is a bit of black magic.
+    //
+    // The 'Threshold' property supercedes everything, so must be set to its most
+    // permissive and applies to any message sent to the glog appender.
+    //
+    // The 'rootLogger' property controls the default maximum logging level (where more
+    // verbose->larger logging level) for the entire space of classes. This will apply to
+    // all non-Impala classes, so is set to otherLogLevel.
+    //
+    // Finally we can configure per-package logging which overrides the rootLogger
+    // setting. In order to control Impala's logging independently of the rest of the
+    // world, we set the log level for com.cloudera.impala.
+    properties.setProperty("log4j.rootLogger",
+        log4jLevelForTLogLevel(otherLogLevel) + ",glog");
+    properties.setProperty("log4j.appender.glog.Threshold", "TRACE");
+    properties.setProperty("log4j.logger.com.cloudera.impala",
+        log4jLevelForTLogLevel(impalaLogLevel));
+    PropertyConfigurator.configure(properties);
   }
 };

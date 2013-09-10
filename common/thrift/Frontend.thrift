@@ -456,7 +456,7 @@ struct TDropTableOrViewParams {
 struct TDropFunctionParams {
   // Fully qualified name of the function to drop
   1: required TFunctionName fn_name
-  
+
   // The types of the arguments to the function
   2: required list<Types.TPrimitiveType> arg_types;
 
@@ -511,7 +511,7 @@ struct TShowTablesParams {
   2: optional string show_pattern
 }
 
-// Arguments to getFunctions(), which returns a list of non-qualified function 
+// Arguments to getFunctions(), which returns a list of non-qualified function
 // signatures that match an optional pattern. Parameters for SHOW FUNCTIONS.
 struct TGetFunctionsParams {
   // Database to use for SHOW FUNCTIONS
@@ -519,7 +519,7 @@ struct TGetFunctionsParams {
 
   // If not set, match every function
   2: optional string pattern
-  
+
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the functions this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
@@ -713,10 +713,10 @@ struct TDdlExecRequest {
 
   // Parameters for SHOW FUNCTIONS
   15: optional TShowFunctionsParams show_fns_params
-  
+
   // Parameters for CREATE FUNCTION
   16: optional TCreateFunctionParams create_fn_params
-  
+
   // Parameters for DROP FUNCTION
   17: optional TDropFunctionParams drop_fn_params
 }
@@ -815,8 +815,10 @@ struct TExecRequest {
 }
 
 // Convenience type to map between log4j levels and glog severity
-enum TLogSeverity {
-  VERBOSE,
+enum TLogLevel {
+  VLOG_3,
+  VLOG_2
+  VLOG,
   INFO,
   WARN,
   ERROR,

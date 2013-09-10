@@ -83,8 +83,10 @@ Java_com_cloudera_impala_service_FeSupport_NativeLogger(
     JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
     int line_number) {
 
-  // Mimic the behaviour of VLOG(1) by ignoring verbose log messages when appropriate.
-  if (severity == TLogSeverity::VERBOSE && !VLOG_IS_ON(1)) return;
+  // Mimic the behaviour of VLOG(N) by ignoring verbose log messages when appropriate.
+  if (severity == TLogLevel::VLOG && !VLOG_IS_ON(1)) return;
+  if (severity == TLogLevel::VLOG_2 && !VLOG_IS_ON(2)) return;
+  if (severity == TLogLevel::VLOG_3 && !VLOG_IS_ON(3)) return;
 
   // Unused required argument to GetStringUTFChars
   jboolean dummy;
@@ -92,25 +94,28 @@ Java_com_cloudera_impala_service_FeSupport_NativeLogger(
   const char* str = env->GetStringUTFChars(msg, &dummy);
   int log_level = google::INFO;
   switch (severity) {
-    case TLogSeverity::VERBOSE:
+    case TLogLevel::VLOG:
+    case TLogLevel::VLOG_2:
+    case TLogLevel::VLOG_3:
       log_level = google::INFO;
       break;
-    case TLogSeverity::INFO:
+    case TLogLevel::INFO:
       log_level = google::INFO;
       break;
-    case TLogSeverity::WARN:
+    case TLogLevel::WARN:
       log_level = google::WARNING;
       break;
-    case TLogSeverity::ERROR:
+    case TLogLevel::ERROR:
       log_level = google::ERROR;
       break;
-    case TLogSeverity::FATAL:
+    case TLogLevel::FATAL:
       log_level = google::FATAL;
       break;
     default:
-      DCHECK(false) << "Unrecognised TLogSeverity: " << log_level;
+      DCHECK(false) << "Unrecognised TLogLevel: " << log_level;
   }
   google::LogMessage(filename, line_number, log_level).stream() << string(str);
+
   env->ReleaseStringUTFChars(msg, str);
   env->ReleaseStringUTFChars(file, filename);
 }

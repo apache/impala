@@ -24,7 +24,6 @@ import java.net.URLConnection;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -71,6 +70,7 @@ import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
+import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TResetMetadataParams;
@@ -92,8 +92,15 @@ public class JniFrontend {
    * Create a new instance of the Jni Frontend.
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
-      String policyProviderClassName) throws InternalException {
-    InitLogging();
+      String policyProviderClassName, int impalaLogLevel, int otherLogLevel)
+      throws InternalException {
+    // This trick saves having to pass a TLogLevel enum, which is an object and more
+    // complex to pass through JNI.
+    TLogLevel impalaLevel = TLogLevel.values()[impalaLogLevel];
+    TLogLevel otherLevel = TLogLevel.values()[otherLogLevel];
+    GlogAppender.Install(impalaLevel, otherLevel);
+    LOG.info(String.format("Frontend logging initialised. Impala: %s, All other: %s",
+        impalaLevel, otherLevel));
 
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.
@@ -101,20 +108,6 @@ public class JniFrontend {
         authorizationPolicyFile, policyProviderClassName);
     authorizationConfig.validateConfig();
     frontend = new Frontend(lazy, authorizationConfig);
-  }
-
-  /**
-   * Manually override Log4j root logger configuration. Any values in log4j.properties not
-   * overridden (that is, anything but the root logger and the base threshhold) will
-   * continue to have effect.
-   */
-  private static void InitLogging() {
-    Properties properties = new Properties();
-    properties.setProperty("log4j.appender.glog",
-                           GlogAppender.class.getName());
-    properties.setProperty("log4j.rootLogger", "info,glog");
-    properties.setProperty("log4j.threshhold", "INFO");
-    PropertyConfigurator.configure(properties);
   }
 
   /**
