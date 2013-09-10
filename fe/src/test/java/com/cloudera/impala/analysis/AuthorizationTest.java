@@ -328,7 +328,8 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
 
-    AuthzError("create table functional.tbl as select 1",
+    AuthzError("create table functional.tbl tblproperties('a'='b')" +
+        " as select 1",
         "User '%s' does not have privileges to execute 'CREATE' on: " +
         "functional.tbl");
 
@@ -536,6 +537,8 @@ public class AuthorizationTest {
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET FILEFORMAT PARQUETFILE");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET TBLPROPERTIES " +
+        "('a'='b', 'c'='d')");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20500/test-warehouse/new_table'");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
@@ -625,6 +628,9 @@ public class AuthorizationTest {
 
     // Unqualified table name.
     AuthzError("ALTER TABLE alltypes ADD COLUMNS (c1 int)",
+        "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
+
+    AuthzError("ALTER TABLE alltypes SET TBLPROPERTIES ('a'='b', 'c'='d')",
         "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
   }
 

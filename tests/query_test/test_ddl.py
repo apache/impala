@@ -4,6 +4,7 @@
 import logging
 import pytest
 import shlex
+from tests.common.test_result_verifier import *
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
@@ -68,7 +69,47 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_views_ddl(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/views-ddl', vector)
-  
+
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
     self.run_test_case('QueryTest/functions-ddl', vector)
+
+  @pytest.mark.execute_serially
+  def test_create_alter_tbl_properties(self, vector):
+    self.client.execute("drop table if exists test_alter_tbl")
+
+    # Specify TBLPROPERTIES at CREATE time
+    self.client.execute(\
+        "create table test_alter_tbl (i int) tblproperties ('p1'='v0', 'p1'='v1')")
+    properties = self.__get_tbl_properties('test_alter_tbl')
+
+    assert len(properties) == 2
+    # The transient_lastDdlTime is variable, so don't verify the value.
+    assert 'transient_lastDdlTime' in properties
+    del properties['transient_lastDdlTime']
+    assert {'p1': 'v1'} == properties
+
+    # Modify the TBLPROPERTIES using ALTER TABLE SET.
+    self.client.execute("alter table test_alter_tbl set tblproperties "\
+        "('prop1'='val1', 'p2'='val2', 'p2'='val3', ''='')")
+    properties = self.__get_tbl_properties('test_alter_tbl')
+
+    assert len(properties) == 5
+    assert 'transient_lastDdlTime' in properties
+    del properties['transient_lastDdlTime']
+    assert {'p1': 'v1', 'prop1': 'val1', 'p2': 'val3', '': ''} == properties
+
+  def __get_tbl_properties(self, table_name):
+    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
+    result = self.client.execute("describe formatted " + table_name)
+    match = False
+    properties = dict();
+    for row in result.data:
+      if 'Table Parameters:' in row:
+        match = True
+      elif match:
+        row = row.split('\t')
+        if (row[1] == 'NULL'):
+          break
+        properties[row[1].rstrip()] = row[2].rstrip()
+    return properties

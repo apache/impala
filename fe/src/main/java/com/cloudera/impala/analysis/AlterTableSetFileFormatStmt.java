@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
@@ -25,36 +24,25 @@ import com.cloudera.impala.thrift.TAlterTableType;
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.
  */
-public class AlterTableSetFileFormatStmt extends AlterTableStmt {
-  private final FileFormat fileFormat;
-  private final PartitionSpec partitionSpec;
+public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
+  private final FileFormat fileFormat_;
 
   public AlterTableSetFileFormatStmt(TableName tableName,
       PartitionSpec partitionSpec, FileFormat fileFormat) {
-    super(tableName);
-    this.fileFormat = fileFormat;
-    this.partitionSpec = partitionSpec;
-    if (partitionSpec != null) {
-      partitionSpec.setTableName(tableName);
-    }
+    super(tableName, partitionSpec);
+    this.fileFormat_ = fileFormat;
   }
 
-  public FileFormat getFileFormat() {
-    return fileFormat;
-  }
-
-  public PartitionSpec getPartitionSpec() {
-    return partitionSpec;
-  }
+  public FileFormat getFileFormat() { return fileFormat_; }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_FILE_FORMAT);
     TAlterTableSetFileFormatParams fileFormatParams =
-        new TAlterTableSetFileFormatParams(fileFormat.toThrift());
-    if (partitionSpec != null) {
-      fileFormatParams.setPartition_spec(partitionSpec.toThrift());
+        new TAlterTableSetFileFormatParams(fileFormat_.toThrift());
+    if (getPartitionSpec() != null) {
+      fileFormatParams.setPartition_spec(getPartitionSpec().toThrift());
     }
     params.setSet_file_format_params(fileFormatParams);
     return params;
@@ -64,13 +52,5 @@ public class AlterTableSetFileFormatStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    // Altering the table, rather than the partition.
-    if (partitionSpec == null) {
-      return;
-    }
-
-    partitionSpec.setPartitionShouldExist();
-    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec.analyze(analyzer);
   }
 }

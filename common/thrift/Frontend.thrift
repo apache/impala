@@ -211,6 +211,7 @@ enum TAlterTableType {
   RENAME_VIEW,
   SET_FILE_FORMAT,
   SET_LOCATION,
+  SET_TBL_PROPERTIES,
 }
 
 // Represents a single item in a partition spec (column name + value)
@@ -274,6 +275,12 @@ struct TAlterTableChangeColParams {
   2: required TColumnDef new_col_def
 }
 
+// Parameters for ALTER TABLE SET TBLPROPERTIES commands.
+struct TAlterTableSetTblPropertiesParams {
+  // Map of property names to property values
+  1: required map<string, string> table_properties
+}
+
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
 struct TAlterTableSetFileFormatParams {
   // New file format
@@ -322,6 +329,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE SET LOCATION
   10: optional TAlterTableSetLocationParams set_location_params
+
+  // Parameters for ALTER TABLE SET TBLPROPERTIES
+  11: optional TAlterTableSetTblPropertiesParams set_tbl_properties_params
 }
 
 // Parameters of CREATE TABLE LIKE commands
@@ -386,6 +396,9 @@ struct TCreateTableParams {
 
   // Optional storage location for the table
   10: optional string location
+
+  // Map of property names to property values
+  11: optional map<string, string> table_properties
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

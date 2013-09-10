@@ -366,10 +366,10 @@ public class ParserTest {
     ParsesOk("select a union " +
         "((select b) union (select c) order by 1 limit 1)");
     ParsesOk("select a union " +
-    		"((select b) union " +
-    		"  ((select c) union (select d) " +
-    		"   order by 1 limit 1) " +
-    		" order by 1 limit 1)");
+        "((select b) union " +
+        "  ((select c) union (select d) " +
+        "   order by 1 limit 1) " +
+        " order by 1 limit 1)");
 
     // Union in insert query.
     ParsesOk("insert into table t select a from test union select a from test");
@@ -1354,6 +1354,19 @@ public class ParserTest {
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION abc");
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION");
     ParserError("ALTER TABLE TestDb.Foo SET");
+
+    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('a'='b')");
+    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('abc'='123')");
+    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('abc'='123', 'a'='1')");
+    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('a'='1', 'b'='2', 'c'='3')");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ( )");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a', 'b')");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a'='b',)");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a'=b)");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES (a='b')");
+    ParserError("ALTER TABLE Foo SET TBLPROPERTIES (a=b)");
+    // Setting TBLPROPERTIES on a partition is not allowed
+    ParserError("ALTER TABLE Foo PARTITION (s='str') SET TBLPROPERTIES ('a'='b')");
   }
 
   @Test
@@ -1395,6 +1408,8 @@ public class ParserTest {
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string)");
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) LOCATION '/test-warehouse/'");
     ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/'");
+    ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
+        "TBLPROPERTIES ('123'='1234')");
 
     // Partitioned tables
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (j string)");
@@ -1420,6 +1435,16 @@ public class ParserTest {
           "CREATE EXTERNAL TABLE Foo (f float) COMMENT 'c' STORED AS %s LOCATION '/b'",
           format));
     }
+
+    // Table Properties
+    ParsesOk("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'='b', 'c'='d', 'e'='f')");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ()");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a')");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'=)");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'=c)");
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES (a='c')");
+
     ParserError("CREATE TABLE Foo (i int, s string) STORED AS SEQFILE");
     ParserError("CREATE TABLE Foo (i int, s string) STORED TEXTFILE");
     ParserError("CREATE TABLE Foo LIKE Bar STORED AS TEXT");
@@ -1455,7 +1480,7 @@ public class ParserTest {
     ParserError("CREATE TABLE T (i int) ESCAPED BY '\0'");
 
     // Order should be: [comment] [partition by cols] [row format] [stored as FILEFORMAT]
-    // [location]
+    // [location] [tblproperties (...)]
     ParserError("CREATE TABLE Foo (d double) COMMENT 'c' PARTITIONED BY (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE ROW FORMAT DELIMITED");
@@ -1463,6 +1488,7 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' STORED AS RCFILE");
+    ParserError("CREATE TABLE Foo (d double) TBLPROPERTIES('a'='b') LOCATION 'a'");
 
     // Location and comment need to be string literals, file format is not
     ParserError("CREATE TABLE Foo (d double) LOCATION a");
@@ -1573,6 +1599,7 @@ public class ParserTest {
     ParsesOk("CREATE TABLE IF NOT EXISTS Foo.Bar LOCATION '/a/b' AS SELECT * from foo");
     ParsesOk("CREATE TABLE Foo STORED AS PARQUETFILE AS SELECT 1");
     ParsesOk("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
 
     // With clause works
     ParsesOk("CREATE TABLE Foo AS with t1 as (select 1) select * from t1");

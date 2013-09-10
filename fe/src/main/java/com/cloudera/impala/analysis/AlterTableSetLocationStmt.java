@@ -25,37 +25,26 @@ import com.google.common.base.Preconditions;
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET LOCATION statement.
  */
-public class AlterTableSetLocationStmt extends AlterTableStmt {
-  private final HdfsURI location;
-  private final PartitionSpec partitionSpec;
+public class AlterTableSetLocationStmt extends AlterTableSetStmt {
+  private final HdfsURI location_;
 
   public AlterTableSetLocationStmt(TableName tableName,
       PartitionSpec partitionSpec, HdfsURI location) {
-    super(tableName);
+    super(tableName, partitionSpec);
     Preconditions.checkNotNull(location);
-    this.location = location;
-    this.partitionSpec = partitionSpec;
-    if (partitionSpec != null) {
-      partitionSpec.setTableName(tableName);
-    }
+    this.location_ = location;
   }
 
-  public HdfsURI getLocation() {
-    return location;
-  }
-
-  public PartitionSpec getPartitionSpec() {
-    return partitionSpec;
-  }
+  public HdfsURI getLocation() { return location_; }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_LOCATION);
     TAlterTableSetLocationParams locationParams =
-        new TAlterTableSetLocationParams(location.toString());
-    if (partitionSpec != null) {
-      locationParams.setPartition_spec(partitionSpec.toThrift());
+        new TAlterTableSetLocationParams(location_.toString());
+    if (getPartitionSpec() != null) {
+      locationParams.setPartition_spec(getPartitionSpec().toThrift());
     }
     params.setSet_location_params(locationParams);
     return params;
@@ -65,14 +54,6 @@ public class AlterTableSetLocationStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (location != null) location.analyze(analyzer, Privilege.ALL);
-
-    // Altering the table rather than the partition.
-    if (partitionSpec == null) {
-      return;
-    }
-    partitionSpec.setPartitionShouldExist();
-    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec.analyze(analyzer);
+    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
   }
 }

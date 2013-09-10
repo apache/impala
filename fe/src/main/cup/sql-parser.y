@@ -22,6 +22,7 @@ import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java_cup.runtime.Symbol;
 import com.google.common.collect.Lists;
@@ -183,9 +184,9 @@ terminal
   KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, 
   KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, 
   KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SET, KW_SHOW,
-  KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TERMINATED, 
-  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_USE, 
-  KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES,
+  KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION,
+  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -296,6 +297,8 @@ nonterminal String field_terminator_val;
 nonterminal String line_terminator_val;
 nonterminal String escaped_by_val;
 nonterminal String terminator_val;
+nonterminal HashMap tbl_properties;
+nonterminal HashMap tbl_properties_map;
 // Used to simplify commands that accept either KW_DATABASE(S) or KW_SCHEMA(S)
 nonterminal String db_or_schema_kw;
 nonterminal String dbs_or_schemas_kw;
@@ -304,7 +307,6 @@ nonterminal String optional_kw_column;
 // Used to simplify commands where KW_TABLE is optional
 nonterminal String optional_kw_table;
 nonterminal Boolean overwrite_val;
-
 
 // For Create/Drop/Show function ddl
 nonterminal ArrayList<String> fully_qualified_function_name;
@@ -473,6 +475,15 @@ alter_tbl_stmt ::=
   {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsURI(location)); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
+  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
+    KW_TBLPROPERTIES LPAREN tbl_properties_map:properties RPAREN
+  {:
+    // Include unnecessary partition_spec to avoid a shift/reduce conflict on KW_SET.
+    if (partition != null) {
+      parser.parseError("partition", SqlParserSymbols.KW_PARTITION);
+    }
+    RESULT = new AlterTableSetTblProperties(table, properties);
+  :}
   ;
 
 optional_kw_column ::=
@@ -514,13 +525,14 @@ create_tbl_as_select_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
   table_name:table comment_val:comment row_format_val:row_format
   file_format_create_table_val:file_format location_val:location
+  tbl_properties:properties
   KW_AS query_stmt:query
   {:
     // Initialize with empty List of columns and partition columns. The
     // columns will be added from the query statment during analysis
     CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
         new ArrayList<ColumnDef>(), external, comment, row_format,
-        file_format, location, if_not_exists);
+        file_format, location, if_not_exists, properties);
     RESULT = new CreateTableAsSelectStmt(create_stmt, query);
   :}
   ;
@@ -530,9 +542,10 @@ create_tbl_stmt ::=
   table_name:table LPAREN column_def_list:col_defs RPAREN
   partition_column_defs:partition_col_defs comment_val:comment
   row_format_val:row_format file_format_create_table_val:file_format location_val:location
+  tbl_properties:properties
   {:
     RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
-        row_format, file_format, location, if_not_exists);
+        row_format, file_format, location, if_not_exists, properties);
   :}
   ;
 
@@ -626,6 +639,27 @@ file_format_val ::=
   {: RESULT = FileFormat.SEQUENCEFILE; :}
   | KW_RCFILE
   {: RESULT = FileFormat.RCFILE; :}
+  ;
+
+tbl_properties ::=
+  KW_TBLPROPERTIES LPAREN tbl_properties_map:map RPAREN
+  {: RESULT = map; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+tbl_properties_map ::=
+  STRING_LITERAL:key EQUAL STRING_LITERAL:value
+  {:
+    HashMap<String, String> properties = new HashMap<String, String>();
+    properties.put(key, value);
+    RESULT = properties;
+  :}
+  | tbl_properties_map:properties COMMA STRING_LITERAL:key EQUAL STRING_LITERAL:value
+  {:
+    properties.put(key, value);
+    RESULT = properties;
+  :}
   ;
 
 partition_column_defs ::=

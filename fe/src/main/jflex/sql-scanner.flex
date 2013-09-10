@@ -156,6 +156,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("sum", new Integer(SqlParserSymbols.KW_SUM));
     keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tables", new Integer(SqlParserSymbols.KW_TABLES));
+    keywordMap.put("tblproperties", new Integer(SqlParserSymbols.KW_TBLPROPERTIES));
     keywordMap.put("terminated", new Integer(SqlParserSymbols.KW_TERMINATED)); 
     keywordMap.put("textfile", new Integer(SqlParserSymbols.KW_TEXTFILE));
     keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));

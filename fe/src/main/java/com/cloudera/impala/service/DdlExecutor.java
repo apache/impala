@@ -205,6 +205,10 @@ public class DdlExecutor {
         alterTableSetLocation(TableName.fromThrift(params.getTable_name()),
             partitionSpec, setLocationParams.getLocation());
         break;
+      case SET_TBL_PROPERTIES:
+        alterTableSetTblProperties(TableName.fromThrift(params.getTable_name()),
+            params.getSet_tbl_properties_params().getTable_properties());
+        break;
       default:
         throw new UnsupportedOperationException(
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
@@ -858,6 +862,24 @@ public class DdlExecutor {
   }
 
   /**
+   * Appends to the table property metadata for the given table, replacing the values
+   * of any keys that already exist.
+   */
+  private void alterTableSetTblProperties(TableName tableName,
+      Map<String, String> tblProperties) throws MetaException, InvalidObjectException,
+      TException, DatabaseNotFoundException, TableNotFoundException,
+      TableLoadingException, AuthorizationException {
+    Preconditions.checkState(tblProperties != null);
+    synchronized (metastoreDdlLock) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+      for (Map.Entry<String, String> prop: tblProperties.entrySet()) {
+        msTbl.getParameters().put(prop.getKey(), prop.getValue());
+      }
+      applyAlterTable(msTbl);
+    }
+  }
+
+  /**
    * Applies an ALTER TABLE command to the metastore table. The caller should take the
    * metastoreDdlLock before calling this method.
    * Note: The metastore interface is not very safe because it only accepts a
@@ -963,7 +985,11 @@ public class DdlExecutor {
     tbl.setDbName(tableName.getDb());
     tbl.setTableName(tableName.getTbl());
     tbl.setOwner(params.getOwner());
-    tbl.setParameters(new HashMap<String, String>());
+    if (params.isSetTable_properties()) {
+      tbl.setParameters(params.getTable_properties());
+    } else {
+      tbl.setParameters(new HashMap<String, String>());
+    }
 
     if (params.getComment() != null) {
       tbl.getParameters().put("comment", params.getComment());
