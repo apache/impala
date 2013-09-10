@@ -69,7 +69,9 @@ class DataStreamSender::Channel {
       fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
-      in_flight_batch_(NULL) {
+      rpc_thread_("DataStreamSender", "SenderThread", 1, 1,
+          bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2)),
+      rpc_in_flight_(false) {
   }
 
   // Initialize channel.
@@ -114,22 +116,35 @@ class DataStreamSender::Channel {
   scoped_ptr<RowBatch> batch_;
   TRowBatch thrift_batch_;
 
-  // accessed by rpc_thread_ and by channel only if there is no in-flight rpc
-  TRowBatch* in_flight_batch_;
-  scoped_ptr<Thread> rpc_thread_;  // sender thread
-  Status rpc_status_;  // status of most recently finished TransmitData rpc
+  // We want to reuse the rpc thread to prevent creating a thread per rowbatch.
+  // TODO: currently we only have one batch in flight, but we should buffer more
+  // batches. This is a bit tricky since the channels share the outgoing batch
+  // pointer we need some mechanism to coordinate when the batch is all done.
+  // TODO: if the order of row batches does not matter, we can consider increasing
+  // the number of threads.
+  ThreadPool<TRowBatch*> rpc_thread_; // sender thread.
+  condition_variable rpc_done_cv_;   // signaled when rpc_in_flight_ is set to true.
+  mutex rpc_thread_lock_; // Lock with rpc_done_cv_ protecting rpc_in_flight_
+  bool rpc_in_flight_;  // true if the rpc_thread_ is busy sending.
 
-  // Synchronously call TransmitData() on a client from client_cache_ and update
-  // rpc_status_ based on return value (or set to error if RPC failed).
-  // Should only run in rpc_thread_.
-  void TransmitData();
+  Status rpc_status_;  // status of most recently finished TransmitData rpc
 
   // Serialize batch_ into thrift_batch_ and send via SendBatch().
   // Returns SendBatch() status.
   Status SendCurrentBatch();
 
+  // Synchronously call TransmitData() on a client from client_cache_ and update
+  // rpc_status_ based on return value (or set to error if RPC failed).
+  // Called from a thread from the rpc_thread_ pool.
+  void TransmitData(int thread_id, const TRowBatch*);
+  void TransmitDataHelper(const TRowBatch*);
+
+  // Waits for the rpc thread pool to finish the current rpc.
+  void WaitForRpc();
+
   Status CloseInternal();
 };
+
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
@@ -144,30 +159,43 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
            << " dest_node=" << dest_node_id_ << " #rows=" << batch->num_rows;
   // return if the previous batch saw an error
   RETURN_IF_ERROR(GetSendStatus());
-  DCHECK(in_flight_batch_ == NULL);
-  in_flight_batch_ = batch;
-  rpc_thread_.reset(new Thread("data-stream-sender", "rpc-thread",
-                               &DataStreamSender::Channel::TransmitData, this));
+  {
+    unique_lock<mutex> l(rpc_thread_lock_);
+    rpc_in_flight_ = true;
+  }
+  if (!rpc_thread_.Offer(batch)) {
+    unique_lock<mutex> l(rpc_thread_lock_);
+    rpc_in_flight_ = false;
+  }
   return Status::OK;
 }
 
-void DataStreamSender::Channel::TransmitData() {
-  DCHECK(in_flight_batch_ != NULL);
+void DataStreamSender::Channel::TransmitData(int thread_id, const TRowBatch* batch) {
+  DCHECK(rpc_in_flight_);
+  TransmitDataHelper(batch);
+
+  {
+    unique_lock<mutex> l(rpc_thread_lock_);
+    rpc_in_flight_ = false;
+  }
+  rpc_done_cv_.notify_one();
+}
+
+void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
+  DCHECK(batch != NULL);
   try {
     VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
              << " dest_node=" << dest_node_id_
-             << " #rows=" << in_flight_batch_->num_rows;
+             << " #rows=" << batch->num_rows;
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
     params.__set_dest_fragment_instance_id(fragment_instance_id_);
     params.__set_dest_node_id(dest_node_id_);
-    params.__set_row_batch(*in_flight_batch_);  // yet another copy
+    params.__set_row_batch(*batch);  // yet another copy
     params.__set_eos(false);
 
     ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
-    if (!rpc_status_.ok()) {
-      return;
-    }
+    if (!rpc_status_.ok()) return;
 
     TTransmitDataResult res;
     {
@@ -187,7 +215,7 @@ void DataStreamSender::Channel::TransmitData() {
     if (res.status.status_code != TStatusCode::OK) {
       rpc_status_ = res.status;
     } else {
-      num_data_bytes_sent_ += RowBatch::GetBatchSize(*in_flight_batch_);
+      num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
       VLOG_ROW << "incremented #data_bytes_sent="
                << num_data_bytes_sent_;
     }
@@ -197,7 +225,13 @@ void DataStreamSender::Channel::TransmitData() {
     rpc_status_ = Status(msg.str());
     return;
   }
-  in_flight_batch_ = NULL;
+}
+
+void DataStreamSender::Channel::WaitForRpc() {
+  unique_lock<mutex> l(rpc_thread_lock_);
+  while (rpc_in_flight_) {
+    rpc_done_cv_.wait(l);
+  }
 }
 
 Status DataStreamSender::Channel::AddRow(TupleRow* row) {
@@ -228,7 +262,7 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
 Status DataStreamSender::Channel::SendCurrentBatch() {
   // make sure there's no in-flight TransmitData() call that might still want to
   // access thrift_batch_
-  if (rpc_thread_.get() != NULL) rpc_thread_->Join();
+  WaitForRpc();
   {
     SCOPED_TIMER(parent_->serialize_batch_timer_);
     int uncompressed_bytes = batch_->Serialize(&thrift_batch_);
@@ -241,8 +275,7 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
 }
 
 Status DataStreamSender::Channel::GetSendStatus() {
-  // TODO: This is getting called before rpc_thread_ is initialised
-  if (rpc_thread_.get() != NULL) rpc_thread_->Join();
+  WaitForRpc();
   if (!rpc_status_.ok()) {
     LOG(ERROR) << "channel send status: " << rpc_status_.GetErrorMsg();
   }
@@ -294,6 +327,7 @@ Status DataStreamSender::Channel::CloseInternal() {
 
 void DataStreamSender::Channel::Close(RuntimeState* state) {
   state->LogError(CloseInternal());
+  rpc_thread_.DrainAndShutdown();
   batch_.reset();
 }
 
