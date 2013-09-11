@@ -30,6 +30,7 @@ def calculate_stddev(values):
 
 def calculate_median(values):
   """Return the median of a numeric iterable."""
+  if all([v is None for v in values]): return None
   sorted_values = sorted(values)
   length = len(sorted_values)
   if length % 2 == 0:

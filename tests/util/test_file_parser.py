@@ -19,14 +19,8 @@ SUBSECTION_DELIMITER = "----"
 # from a query test file
 class QueryTestSectionReader(object):
   @staticmethod
-  def build_query(query_section_text, table_format_info, scale_factor):
-    """
-    Build a well formed query.
-
-    Given the various test parameters, construct the query that will be executed. This
-    does more work than replace_table_suffix because it needs to properly replace the
-    database name based on the given scale factor
-    """
+  def build_query(query_section_text):
+    """Build a query by stripping comments and trailing semi-colons."""
     query_section_text = remove_comments(query_section_text)
     return query_section_text.rstrip(';')
 

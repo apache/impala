@@ -26,11 +26,12 @@ from os.path import isfile, isdir
 from random import choice
 from sys import exit
 from time import sleep
-from tests.common.workload_runner import WorkloadRunner, QueryExecutionDetail
+from tests.common.workload_runner import WorkloadRunner
 from tests.util.plugin_runner import PluginRunner
 
 # Options
-# TODO: Find ways to reduce the number of options.
+# TODO: Group the options for user friendliness and readability.
+# TODO: Find a way to reduce the number of options.
 parser = OptionParser()
 parser.add_option("-p", "--profiler", dest="profiler",
                   action="store_true", default = False,
@@ -62,8 +63,6 @@ parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
                   help="The command to use for executing hive queries")
 parser.add_option("-i", "--iterations", type="int", dest="iterations", default=1,
                   help="Number of times to run each query.")
-parser.add_option("--prime_cache", dest="prime_cache", action="store_true",
-                  default= False, help="Whether or not to prime the buffer cache. ")
 parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
                   help="Number of clients (threads) to use when executing each query.")
 parser.add_option("--query_names", dest="query_names", default=None,
@@ -73,6 +72,18 @@ parser.add_option("--table_formats", dest="table_formats", default=None, help=\
                   "table formats. Ex. --table_formats=seq/snap/block,text/none")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
+parser.add_option("--execution_scope", dest="execution_scope", default="query",
+                  help=("The unit of execution for a workload and its test vectors. The "
+                        "default scope is 'query'; In this scope, user provided "
+                        "execution parameters like number of iterations and number of "
+                        "clents will operate on on a single query, which is a "
+                        "combination of the workload, scale factor and test vector. "
+                        "When 'workload' is specified as the scope, the execution "
+                        "paramaters will operate over a set of queries under a "
+                        "workload, scale factor and a test vector"))
+parser.add_option("--shuffle_query_exec_order", dest="shuffle_queries",
+                  action="store_true", default=False, help=("Randomizes the order "
+                    "of query execution. Useful when the execution scope is a workload"))
 
 parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
                   default=False, help="If set, enables talking to a kerberized impalad")
@@ -120,27 +131,28 @@ def save_results(result_map, output_csv_file, is_impala_result=True):
   csv_writer = csv.writer(open(output_csv_file, 'wb'), delimiter='|',
                           quoting=csv.QUOTE_MINIMAL)
 
-  for query_tuple, execution_results in result_map.iteritems():
-    for result in execution_results:
-      query, query_name = query_tuple
-      append_row_to_csv_file(csv_writer, query, query_name,
+  for query, exec_results in result_map.iteritems():
+    for result in exec_results:
+      append_row_to_csv_file(csv_writer, query,
         result[0] if is_impala_result else result[1])
 
-def append_row_to_csv_file(csv_writer, query, query_name, result):
+def append_row_to_csv_file(csv_writer, query, result):
   """
   Write the results to a CSV file with '|' as the delimiter.
   """
   # Replace non-existent values with N/A for reporting results.
-  std_dev, avg_time = result.execution_result.std_dev, result.execution_result.avg_time
-  if not std_dev: std_dev = 'N/A'
-  if not avg_time: avg_time = 'N/A'
-  compression_str = '%s/%s' % (result.compression_codec, result.compression_type)
-  if compression_str == 'none/none':
-    compression_str = 'none'
-  csv_writer.writerow([result.executor, result.workload, result.scale_factor,
-                       query, query_name, result.file_format, compression_str,
-                       avg_time, std_dev, options.num_clients, options.iterations,
-                       result.execution_result.runtime_profile])
+  if not result.std_dev: result.std_dev = 'N/A'
+  if not result.avg_time: result.avg_time = 'N/A'
+  compression_str = '%s/%s' % (query.test_vector.compression_codec,
+                               query.test_vector.compression_type)
+  if compression_str == 'none/none': compression_str = 'none'
+  # The number of iterations in the performance database is a query execution parameter.
+  # Since the query is run only once when executing at a 'workload' scope, reset it to 1
+  num_iters = options.iterations if options.execution_scope.lower() == 'query' else 1
+  csv_writer.writerow([result.executor_name, query.workload, query.scale_factor,
+                       query.query_str, query.name, query.test_vector.file_format,
+                       compression_str, result.avg_time, result.std_dev,
+                       options.num_clients, num_iters, result.runtime_profile])
 
 def enumerate_query_files(base_directory):
   """

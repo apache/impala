@@ -175,7 +175,6 @@ if __name__ == "__main__":
     dataset_dir = os.path.join(DATASET_DIR, dataset)
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
-
     copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
 
     generated_hbase_file = 'load-%s-%s-hbase.create' % (workload,

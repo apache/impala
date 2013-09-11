@@ -132,8 +132,7 @@ class ImpalaTestSuite(BaseTestSuite):
         self.client.refresh()
 
       # TODO: support running query tests against different scale factors
-      query = QueryTestSectionReader.build_query(
-          test_section['QUERY'], table_format_info, scale_factor='')
+      query = QueryTestSectionReader.build_query( test_section['QUERY'])
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
@@ -169,7 +168,7 @@ class ImpalaTestSuite(BaseTestSuite):
     DROP PARTITIONS <table name> - Drop all partitions from the table
     RELOAD - Reload the catalog
     """
-    setup_section = QueryTestSectionReader.build_query(setup_section, table_format, '')
+    setup_section = QueryTestSectionReader.build_query(setup_section)
     for row in setup_section.split('\n'):
       row = row.lstrip()
       if row.startswith('RESET'):
