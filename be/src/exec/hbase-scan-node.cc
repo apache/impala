@@ -100,7 +100,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
-  hbase_scanner_->set_num_requested_keyvalues(sorted_non_key_slots_.size());
+  hbase_scanner_->set_num_requested_cells(sorted_non_key_slots_.size());
 
   return Status::OK;
 }
@@ -124,7 +124,7 @@ void HBaseScanNode::WriteTextSlot(
       stringstream ss;
       ss << "Error converting column " << family
           << ":" << qualifier << ": "
-          << "'" << reinterpret_cast<char*>(value) << "' TO "
+          << "'" << string(reinterpret_cast<char*>(value), value_length) << "' TO "
           << TypeToString(slot->type());
       state->LogError(ss.str());
     }

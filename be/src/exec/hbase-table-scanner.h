@@ -51,13 +51,18 @@ class HBaseScanNode;
 // value will cause extra round trips to the HBase region server. This value can
 // be overridden by the query option hbase_caching. FE will also suggest a max value such
 // that it won't put too much memory pressure on the region server.
-
+//
+// HBase version compatibility: Starting from HBase 0.95.2 result rows are represented by
+// Cells instead of KeyValues (prior HBase versions). To mitigate this API
+// incompatibility the Cell class and its methods are replaced with corresponding
+// KeyValue equivalents if the Cell is not found in the classpath. The HBase version
+// detection and KeyValue/Cell replacements are performed in Init().
+//
 // Note: When none of the requested family/qualifiers exist in a particular row,
 // HBase will not return the row at all, leading to "missing" NULL values.
 // TODO: Related to filtering, there is a special filter that allows only selecting the
-//       keyvalues.
-//       Currently, if only the row key is requested
-//       all keyvalues are fetched from HBase (since there is no family/qualifier
+//       cells. Currently, if only the row key is requested
+//       all cells are fetched from HBase (since there is no family/qualifier
 //       restriction).
 // TODO: Enable time travel.
 class HBaseTableScanner {
@@ -130,8 +135,8 @@ class HBaseTableScanner {
   // Close HTable and ResultScanner.
   void Close(JNIEnv* env);
 
-  void set_num_requested_keyvalues(int num_requested_keyvalues) {
-    num_requested_keyvalues_ = num_requested_keyvalues;
+  void set_num_requested_cells(int num_requested_cells) {
+    num_requested_cells_ = num_requested_cells;
   }
 
  private:
@@ -145,8 +150,8 @@ class HBaseTableScanner {
   static jclass scan_cl_;
   static jclass resultscanner_cl_;
   static jclass result_cl_;
-  static jclass immutable_bytes_writable_cl_;
-  static jclass keyvalue_cl_;
+  // Cell or KeyValue class depending on HBase version (see class comment).
+  static jclass cell_cl_;
   static jclass hconstants_cl_;
   static jclass filter_list_cl_;
   static jclass filter_list_op_cl_;
@@ -163,20 +168,19 @@ class HBaseTableScanner {
   static jmethodID scan_set_stop_row_id_;
   static jmethodID resultscanner_next_id_;
   static jmethodID resultscanner_close_id_;
-  static jmethodID result_get_bytes_id_;
   static jmethodID result_raw_id_;
-  static jmethodID immutable_bytes_writable_get_id_;
-  static jmethodID immutable_bytes_writable_get_length_id_;
-  static jmethodID immutable_bytes_writable_get_offset_id_;
-  static jmethodID keyvalue_get_buffer_id_;
-  static jmethodID keyvalue_get_family_offset_id_;
-  static jmethodID keyvalue_get_family_length_id_;
-  static jmethodID keyvalue_get_qualifier_offset_id_;
-  static jmethodID keyvalue_get_qualifier_length_id_;
-  static jmethodID keyvalue_get_row_offset_id_;
-  static jmethodID keyvalue_get_row_length_id_;
-  static jmethodID keyvalue_get_value_offset_id_;
-  static jmethodID keyvalue_get_value_length_id_;
+  static jmethodID cell_get_row_array_;
+  static jmethodID cell_get_family_array_;
+  static jmethodID cell_get_qualifier_array_;
+  static jmethodID cell_get_value_array_;
+  static jmethodID cell_get_family_offset_id_;
+  static jmethodID cell_get_family_length_id_;
+  static jmethodID cell_get_qualifier_offset_id_;
+  static jmethodID cell_get_qualifier_length_id_;
+  static jmethodID cell_get_row_offset_id_;
+  static jmethodID cell_get_row_length_id_;
+  static jmethodID cell_get_value_offset_id_;
+  static jmethodID cell_get_value_length_id_;
   static jmethodID filter_list_ctor_;
   static jmethodID filter_list_add_filter_id_;
   static jmethodID single_column_value_filter_ctor_;
@@ -201,40 +205,31 @@ class HBaseTableScanner {
   jobject resultscanner_;  // Java type ResultScanner
 
   // Helper members for retrieving results from a scan. Updated in Next() and
-  // used by GetRowKey() and GetValue().
-  jobjectArray keyvalues_;  // Java type KeyValue[]. Result of resultscanner_.next().raw()
-  void* buffer_;  // C version of resultscanner_.next().getBytes()
-  int buffer_length_;  // size of buffer
+  // used by GetRowKey() and GetValue(). Result of resultscanner_.next().raw()
+  // Java type Cell[] or KeyValue[] depending on HBase version.
+  jobjectArray cells_;
 
-  // The offset of the ImmutableByteWritable (returned by result_.getBytes()).
-  int result_bytes_offset_;
+  // Current position in cells_. Incremented in NextValue(). Reset in Next().
+  int cell_index_;
 
-  // Current position in keyvalues_. Incremented in NextValue(). Reset in Next().
-  int keyvalue_index_;
-
-  // Number of requested keyvalues (i.e., the number of added family/qualifier pairs).
+  // Number of requested cells (i.e., the number of added family/qualifier pairs).
   // Set in StartScan().
-  int num_requested_keyvalues_;
+  int num_requested_cells_;
 
-  // number of cols requested in addition to num_requested_keyvalues_, to work around
+  // number of cols requested in addition to num_requested_cells_, to work around
   // hbase bug
   int num_addl_requested_cols_;
 
-  // Number of keyvalues returned from last result_.raw().
-  int num_keyvalues_;
+  // Number of cells returned from last result_.raw().
+  int num_cells_;
 
-  // Indicates whether all requested keyvalues are present in the current keyvalues_.
+  // Indicates whether all requested cells are present in the current cells_.
   // If set to true, all family/qualifier comparisons are avoided in NextValue().
-  bool all_keyvalues_present_;
+  bool all_cells_present_;
 
-  // Pool for allocating keys/values retrieved from HBase scan.
-  // We need a temporary copy for each value, in order to
-  // add a null-terminator which is required for our current text-conversion functions.
+  // Pool for allocating keys/values retrieved from HBase.
   // Memory allocated from this pool is valid until the following Next().
   boost::scoped_ptr<MemPool> value_pool_;
-
-  // Pool for allocating buffer_
-  boost::scoped_ptr<MemPool> buffer_pool_;
 
   // Number of rows for caching that will be passed to scanners.
   // Set in the HBase call Scan.setCaching();
@@ -246,11 +241,10 @@ class HBaseTableScanner {
   // HBase specific counters
   RuntimeProfile::Counter* scan_setup_timer_;
 
-  // Lexicographically compares s with the string at offset in buffer_ having given
-  // length.
+  // Lexicographically compares s with the string in data having given length.
   // Returns a value > 0 if s is greater, a value < 0 if s is smaller,
   // and 0 if they are equal.
-  int CompareStrings(const std::string& s, int offset, int length);
+  int CompareStrings(const std::string& s, void* data, int length);
 
   // Turn strings into Java byte array.
   Status CreateByteArray(JNIEnv* env, const std::string& s, jbyteArray* bytes);
@@ -262,13 +256,25 @@ class HBaseTableScanner {
   // Initialize the scan to the given range
   Status InitScanRange(JNIEnv* env, const ScanRange& scan_range);
 
-  // Return the row key length and row key offset from buffer_
-  inline Status GetRowKeyLengthAndOffSet(JNIEnv* env, int* length, int* offset);
+  // Copies the row key of cell into value_pool_ and returns it via *data and *length.
+  inline void GetRowKey(JNIEnv* env, jobject cell, void** data, int* length);
 
-  // Return the column value length and offset for the given column family name and
-  // qualifier. If there's no match for the family and qualifier, is_null is set to true.
-  inline Status GetValueLengthAndOffset(JNIEnv* env, const std::string& family,
-      const std::string& qualifier, int* length, int* offset, bool* is_null);
+  // Copies the column family of cell into value_pool_ and returns it
+  // via *data and *length.
+  inline void GetFamily(JNIEnv* env, jobject cell, void** data, int* length);
+
+  // Copies the column qualifier of cell into value_pool_ and returns it
+  // via *data and *length.
+  inline void GetQualifier(JNIEnv* env, jobject cell, void** data, int* length);
+
+  // Copies the value of cell into value_pool_ and returns it via *data and *length.
+  inline void GetValue(JNIEnv* env, jobject cell, void** data, int* length);
+
+  // Returns the current value of cells_[cell_index_] in *data and *length
+  // if its family/qualifier match the given family/qualifier.
+  // Otherwise, sets *is_null to true indicating a mismatch in family or qualifier.
+  inline Status GetCurrentValue(JNIEnv* env, const std::string& family,
+      const std::string& qualifier, void** data, int* length, bool* is_null);
 
   // Write to a tuple slot with the given hbase binary formatted data, which is in
   // big endian.
