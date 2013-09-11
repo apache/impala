@@ -196,32 +196,11 @@ class HBaseTestDataRegionAssigment {
       IOUtils.closeQuietly(metaTable);
     }
   }
-  
+
   private static Result getRegionRow(HTable metaTable, byte[] regionName)
       throws IOException {
     Get get = new Get(regionName);
     return metaTable.get(get);
-  }
-  
-  private static void blockUntilRegionIsOpened(Configuration conf, long timeout,
-      HRegionInfo hri) throws IOException, InterruptedException {
-    long start = System.currentTimeMillis();
-    HTable table = new HTable(conf, hri.getTableName());
-
-    try {
-      Get get = new Get(hri.getStartKey());
-      while (System.currentTimeMillis() - start < timeout) {
-        try {
-          table.get(get);
-          break;
-        } catch(IOException ex) {
-          //wait some more
-        }
-        Threads.sleep(10);
-      }
-    } finally {
-      IOUtils.closeQuietly(table);
-    }
   }
 
   private static void blockUntilRegionIsInMeta(HTable metaTable, long timeout,
@@ -236,6 +215,41 @@ class HBaseTestDataRegionAssigment {
         }
       }
       Threads.sleep(10);
+    }
+  }
+
+  /**
+  * Starting with HBase 0.95.2 the Get class' c'tor no longer accepts
+  * empty key strings leading to the rather undesirable behavior that this method
+  * is not guaranteed to succeed. This method repeatedly attempts to 'get' the start key
+  * of the given region from the region server to detect when the region server becomes
+  * available. However, the first region has an empty array as the start key causing the
+  * Get c'tor to throw an exception as stated above. The end key cannot be used instead
+  * because it is an exclusive upper bound.
+  */
+  private static void blockUntilRegionIsOpened(Configuration conf, long timeout,
+      HRegionInfo hri) throws IOException, InterruptedException {
+    long start = System.currentTimeMillis();
+    HTable table = new HTable(conf, hri.getTableName());
+
+    try {
+      byte [] row = hri.getStartKey();
+      // Check for null/empty row. If we find one, use a key that is likely to
+      // be in first region. If key '0' happens not to be in the given region
+      // then an exception will be thrown.
+      if (row == null || row.length <= 0) row = new byte [] {'0'};
+      Get get = new Get(row);
+      while (System.currentTimeMillis() - start < timeout) {
+        try {
+          table.get(get);
+          break;
+        } catch(IOException ex) {
+          //wait some more
+        }
+        Threads.sleep(10);
+      }
+    } finally {
+      IOUtils.closeQuietly(table);
     }
   }
 
