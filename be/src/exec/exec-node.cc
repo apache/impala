@@ -49,7 +49,8 @@ int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
   return p->metadata();
 }
 
-ExecNode::RowBatchQueue::RowBatchQueue(int max_batches) : BlockingQueue(max_batches) {
+ExecNode::RowBatchQueue::RowBatchQueue(int max_batches) :
+    BlockingQueue<RowBatch*>(max_batches) {
 }
 
 ExecNode::RowBatchQueue::~RowBatchQueue() {
@@ -64,7 +65,7 @@ void ExecNode::RowBatchQueue::AddBatch(RowBatch* batch) {
 }
 
 RowBatch* ExecNode::RowBatchQueue::GetBatch() {
-  RowBatch* result;
+  RowBatch* result = NULL;
   if (BlockingGet(&result)) return result;
   return NULL;
 }
