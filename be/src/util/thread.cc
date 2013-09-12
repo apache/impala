@@ -23,6 +23,7 @@
 
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/cgroups-util.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/url-coding.h"
@@ -271,6 +272,15 @@ void ThreadGroup::JoinAll() {
   BOOST_FOREACH(const Thread& thread, threads_) {
     thread.Join();
   }
+}
+
+Status ThreadGroup::AssignToCgroup(const string& prefix, const string& cgroup) const {
+  // BOOST_FOREACH + ptr_vector + const are not compatible
+  for (ptr_vector<Thread>::const_iterator it = threads_.begin();
+       it != threads_.end(); ++it) {
+    RETURN_IF_ERROR(AssignThreadToCgroup(*it, prefix, cgroup));
+  }
+  return Status::OK;
 }
 
 }

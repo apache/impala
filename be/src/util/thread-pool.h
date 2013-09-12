@@ -111,6 +111,10 @@ class ThreadPool {
     Join();
   }
 
+  Status AssignToCgroup(const std::string& prefix, const std::string& cgroup) const {
+    return threads_.AssignToCgroup(prefix, cgroup);
+  }
+
  private:
   // Driver method for each thread in the pool. Continues to read work from the queue
   // until the pool is shutdown.

@@ -26,6 +26,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 add_library(Util
   authorization.cc
   benchmark.cc
+  cgroups-util.cc
   codec.cc
   compress.cc
   cpu-info.cc

@@ -162,6 +162,10 @@ class ThreadGroup {
   // deadlock will predictably ensue.
   void JoinAll();
 
+  // Assigns all threads to the cgroup at <prefix>/<path>. Returns an error if any
+  // assignment was not possible, but does not undo previously succesful assignments.
+  Status AssignToCgroup(const std::string& prefix, const std::string& cgroup) const;
+
  private:
   // All the threads grouped by this set.
   boost::ptr_vector<Thread> threads_;
