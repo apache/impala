@@ -2,4 +2,4 @@
 # Allows for defining constraints on which file formats to generate for an individual
 # table. The table name should match the base table name defined in the schema template
 # file.
-table_name:store_sales_flat, constraint:restrict_to, table_format:text/none/none
+table_name:store_sales_unpartitioned, constraint:restrict_to, table_format:text/none/none
