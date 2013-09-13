@@ -319,6 +319,7 @@ public class DdlExecutor {
     HdfsURI location = new HdfsURI(params.location);
     Udf udf = new Udf(new FunctionName(params.fn_name), argTypes, retType,
         location, params.binary_name);
+    udf.setUdfType(params.udf_type);
     LOG.info(String.format("Adding UDF %s", udf.signatureString()));
     boolean added = catalog.addUdf(udf);
     if (!added && !params.if_not_exists) {

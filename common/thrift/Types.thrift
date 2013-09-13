@@ -68,3 +68,15 @@ struct TUniqueId {
   1: required i64 hi
   2: required i64 lo
 }
+
+enum TUdfType {
+  // Hive UDFs, loaded from *.jar
+  HIVE,
+
+  // Native-interface, precompiled UDFs loaded from *.so
+  NATIVE,
+
+  // Native-interface, precompiled to IR; loaded from *.ll
+  IR,
+}
+

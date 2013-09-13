@@ -116,6 +116,8 @@ struct TUdfCallExpr {
 
   // Name of the class/function in the binary for this udf
   2: required string binary_fn_name
+
+  3: required Types.TUdfType udf_type
 }
 
 // This is essentially a union over the subclasses of Expr.

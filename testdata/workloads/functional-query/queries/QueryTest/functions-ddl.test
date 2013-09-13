@@ -30,25 +30,25 @@ STRING
 ====
 ---- QUERY
 # Add them and test function overloading.
-create function function_ddl_test.fn() RETURNS int LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn() RETURNS int LOCATION '/test.so' 'foo.class'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int) RETURNS double LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn(int) RETURNS double LOCATION '/test.so' 'foo.class'
 ====
 ---- QUERY
 create function function_ddl_test.fn(int, string) 
-RETURNS int LOCATION '/test' 'foo.class'
+RETURNS int LOCATION '/test.jar' 'foo.class'
 ====
 ---- QUERY
 create function function_ddl_test.fn(string, int) 
-RETURNS int LOCATION '/test' 'foo.class'
+RETURNS int LOCATION '/test.ll' 'foo.class'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int) RETURNS int LOCATION '/test' 'foo.class'
+create function function_ddl_test.fn2(int) RETURNS int LOCATION '/test.so' 'foo.class'
 ====
 ---- QUERY
 create function function_ddl_test.fn2(int, string) 
-RETURNS int LOCATION '/test' 'foo.class'
+RETURNS int LOCATION '/test.so' 'foo.class'
 ====
 ---- QUERY
 show functions in function_ddl_test

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TUdfType;
 
 /**
  * Internal representation of a UDF description.
@@ -33,6 +34,8 @@ public class Udf extends Function {
   // UDF. e.g. org.example.MyUdf.class.
   private final String binaryName_;
 
+  private TUdfType udfType_;
+
   public Udf(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
       PrimitiveType retType, HdfsURI location, String binaryName) {
     super(fnName, argTypes, retType, false);
@@ -42,4 +45,7 @@ public class Udf extends Function {
 
   public HdfsURI getLocation() { return location_; }
   public String getBinaryName() { return binaryName_; }
+  public TUdfType getUdfType() { return udfType_; }
+
+  public void setUdfType(TUdfType type) { udfType_ = type; }
 }

@@ -671,7 +671,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestFunction() throws AnalysisException {
-    final String udfSuffix = " LOCATION '/foo' 'foo.class'";
+    final String udfSuffix = " LOCATION '/foo.jar' 'foo.class'";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
@@ -684,6 +684,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Name with underscore
     AnalyzesOk("create function A_B() RETURNS int" + udfSuffix);
 
+    // Locations for all the udfs types.
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.so' 'a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.ll' 'a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.SO' 'a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' 'a'");
+
     // Try to create a function with the same name as a builtin
     AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
         "Function cannot have the same name as a builtin: sin");
@@ -693,6 +699,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Try to create with a bad location
     AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' 'class'",
         "URI path must be absolute: bad-location");
+
+    // Try creating udfs with unknown extensions
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary' 'a'",
+        "Unknown udf binary type: '/binary'. Binary must end in .jar, .so or .ll");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.a' 'a'",
+        "Unknown udf binary type: '/binary.a'. Binary must end in .jar, .so or .ll");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.so.' 'a'",
+        "Unknown udf binary type: '/binary.so.'. Binary must end in .jar, .so or .ll");
+
 
     // Try creating functions with illegal function names.
     AnalysisError("create function 123A() RETURNS int" + udfSuffix,

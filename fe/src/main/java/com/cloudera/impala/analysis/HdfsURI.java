@@ -80,4 +80,6 @@ public class HdfsURI {
     // location string the caller passed in.
     return uriPath == null ? location : uriPath.toString();
   }
+
+  public String getLocation() { return location; }
 }

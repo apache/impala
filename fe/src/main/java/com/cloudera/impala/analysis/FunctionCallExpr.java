@@ -62,6 +62,7 @@ public class FunctionCallExpr extends Expr {
       msg.setUdf_call_expr(new TUdfCallExpr());
       msg.udf_call_expr.location = udf_.getLocation().toString();
       msg.udf_call_expr.setBinary_fn_name(udf_.getBinaryName());
+      msg.udf_call_expr.setUdf_type(udf_.getUdfType());
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
       msg.setOpcode(opcode);

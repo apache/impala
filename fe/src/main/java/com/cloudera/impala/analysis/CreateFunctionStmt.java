@@ -26,6 +26,7 @@ import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionName;
 import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TUdfType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -74,6 +75,7 @@ public class CreateFunctionStmt extends StatementBase {
     params.setFn_name(new TFunctionName(function_.dbName(), function_.functionName()));
     params.setLocation(function_.getLocation().toString());
     params.setBinary_name(function_.getBinaryName());
+    params.setUdf_type(function_.getUdfType());
     List<TPrimitiveType> types = Lists.newArrayList();
     if (function_.getNumArgs() > 0) {
       for (PrimitiveType t: function_.getArgs()) {
@@ -114,9 +116,33 @@ public class CreateFunctionStmt extends StatementBase {
           function_.signatureString());
     }
 
+    // TODO: check binaryName_ exists
     function_.getLocation().analyze(analyzer, Privilege.CREATE);
 
-    // TODO: check binaryName_ exists
+    // Check the file type from the binary type to infer the type of the UDF
+    // TODO: we could consider adding this as part of the create function ddl
+    // but there seems to be little reason to deviate from the standard extensions
+    // and just adds more boilerplate to the create ddl.
+    TUdfType udfType = null;
+    String udfBinaryPath = function_.getLocation().getLocation();
+    int udfSuffixIndex = udfBinaryPath.lastIndexOf(".");
+    if (udfSuffixIndex != -1) {
+      String suffix = udfBinaryPath.substring(udfSuffixIndex + 1);
+      if (suffix.equalsIgnoreCase("jar")) {
+        udfType = TUdfType.HIVE;
+      } else if (suffix.equalsIgnoreCase("so")) {
+        udfType = TUdfType.NATIVE;
+      } else if (suffix.equalsIgnoreCase("ll")) {
+        udfType = TUdfType.IR;
+      }
+    }
+
+    if (udfType == null) {
+      throw new AnalysisException("Unknown udf binary type: '" + udfBinaryPath +
+          "'. Binary must end in .jar, .so or .ll");
+    }
+
+    function_.setUdfType(udfType);
 
     StringBuilder sb = new StringBuilder("CREATE ");
     sb.append("FUNCTION ");

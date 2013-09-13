@@ -166,17 +166,20 @@ struct TCreateFunctionParams {
   // Name of function in the binary
   3: required string binary_name;
 
+  // Type of the udf. e.g. hive, native, ir
+  4: required Types.TUdfType udf_type;
+
   // The types of the arguments to the function
-  4: required list<Types.TPrimitiveType> arg_types;
+  5: required list<Types.TPrimitiveType> arg_types;
 
   // Return type for the function.
-  5: required Types.TPrimitiveType ret_type;
+  6: required Types.TPrimitiveType ret_type;
 
   // Optional comment to attach to the function
-  6: optional string comment
+  7: optional string comment
 
   // Do not throw an error if a function of the same signature already exists.
-  7: optional bool if_not_exists
+  8: optional bool if_not_exists
 }
 
 // Valid table file formats
