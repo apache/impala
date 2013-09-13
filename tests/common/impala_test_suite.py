@@ -280,11 +280,13 @@ class ImpalaTestSuite(BaseTestSuite):
     query = Query()
     query.query_str = stmt
     # Run the statement targeting Hive
-    exec_opts = JdbcQueryExecOptions(iterations=1, impalad=HIVE_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecOptions(\
+        iterations=1, impalad=HIVE_HS2_HOST_PORT, transport="SASL")
     hive_results = execute_using_jdbc(query, exec_opts).data
 
     # Run the statement targeting Impala
-    exec_opts = JdbcQueryExecOptions(iterations=1, impalad=IMPALAD_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecOptions(\
+        iterations=1, impalad=IMPALAD_HS2_HOST_PORT, transport="NOSASL")
     impala_results = execute_using_jdbc(query, exec_opts).data
 
     # Compare the results

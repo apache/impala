@@ -151,6 +151,25 @@
       <version>${hadoop.version}</version>
     </dependency>
 
+    <!-- Until there are stable versions of Hive 0.11-CDH5 make sure to
+         use systemPath for the following dependencies to have them in sync.
+         Not doing so can lead to extremely hard to diagnose problems with 
+         JDBC connectivity to Impala. -->
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-service</artifactId>
+      <scope>system</scope>
+      <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-service-${hive.version}.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-jdbc</artifactId>
+      <scope>system</scope>
+      <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-jdbc-${hive.version}.jar</systemPath>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-metastore</artifactId>
@@ -169,16 +188,6 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-shims</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-service</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-jdbc</artifactId>
       <version>${hive.version}</version>
     </dependency>
 <<<<<<< HEAD
