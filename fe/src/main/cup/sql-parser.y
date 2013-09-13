@@ -108,30 +108,54 @@ parser code {:
     unrecovered_syntax_error(errorToken);
   }
 
-  // Returns error string, consisting of the original
-  // stmt with a '^' under the offending token. Assumes
+  // Returns error string, consisting of a shortened offending line
+  // with a '^' under the offending token. Assumes
   // that parse() has been called and threw an exception
   public String getErrorMsg(String stmt) {
     if (errorToken == null || stmt == null) return null;
     String[] lines = stmt.split("\n");
     StringBuffer result = new StringBuffer();
-    result.append(getErrorTypeMessage(errorToken.sym) + " at:\n");
+    result.append(getErrorTypeMessage(errorToken.sym) + " in line ");
+    result.append(errorToken.left);
+    result.append(":\n");
 
-    // print lines up to and including the one with the error
-    for (int i = 0; i < errorToken.left; ++i) {
-      result.append(lines[i]);
+    // errorToken.left is the line number of error.
+    // errorToken.right is the column number of the error. 
+    String errorLine = lines[errorToken.left - 1];
+    int maxPrintLength = 60;
+    int errorLoc = 0;
+    if (errorLine.length() <= maxPrintLength) {
+      // The line is short. Print the entire line.
+      result.append(errorLine);
       result.append('\n');
+      errorLoc = errorToken.right;
+    } else {
+      // The line is too long. Print maxPrintLength/2 characters before the error and
+      // after the error.
+      int contextLength = maxPrintLength / 2 - 3;
+      String leftSubStr;
+      if (errorToken.right > maxPrintLength / 2) {
+        leftSubStr = "..." + errorLine.substring(errorToken.right - contextLength,
+           errorToken.right);
+      } else {
+        leftSubStr = errorLine.substring(0, errorToken.right);
+      }
+      errorLoc = leftSubStr.length();
+      result.append(leftSubStr);
+      if (errorLine.length() - errorToken.right > maxPrintLength / 2) {
+        result.append(errorLine.substring(errorToken.right,
+           errorToken.right + contextLength) + "...");
+      } else {
+        result.append(errorLine.substring(errorToken.right));
+      }
+      result.append("\n");
     }
+
     // print error indicator
-    for (int i = 0; i < errorToken.right - 1; ++i) {
+    for (int i = 0; i < errorLoc - 1; ++i) {
       result.append(' ');
     }
     result.append("^\n");
-    // print remaining lines
-    for (int i = errorToken.left; i < lines.length; ++i) {
-      result.append(lines[i]);
-      result.append('\n');
-    }
 
     // only report encountered and expected tokens for syntax errors
     if (errorToken.sym == SqlParserSymbols.UNMATCHED_STRING_LITERAL ||

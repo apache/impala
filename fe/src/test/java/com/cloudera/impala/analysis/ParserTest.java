@@ -1722,7 +1722,7 @@ public class ParserTest {
 
     // missing select
     ParserError("c, b, c from t",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
@@ -1731,7 +1731,7 @@ public class ParserTest {
 
     // missing select list
     ParserError("select from t",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
@@ -1741,7 +1741,7 @@ public class ParserTest {
 
     // missing from
     ParserError("select c, b, c where a = 5",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
@@ -1750,7 +1750,7 @@ public class ParserTest {
 
     // missing table list
     ParserError("select c, b, c from where a = 5",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select c, b, c from where a = 5\n" +
         "                    ^\n" +
         "Encountered: WHERE\n" +
@@ -1758,7 +1758,7 @@ public class ParserTest {
 
     // missing predicate in where clause (no group by)
     ParserError("select c, b, c from t where",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
@@ -1767,7 +1767,7 @@ public class ParserTest {
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
@@ -1776,19 +1776,19 @@ public class ParserTest {
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
-        "Unmatched string literal at:\n" +
+        "Unmatched string literal in line 1:\n" +
         "select c, \"b, c from t\n" +
         "           ^\n");
 
     // unmatched string literal starting with '
     ParserError("select c, 'b, c from t",
-        "Unmatched string literal at:\n" +
+        "Unmatched string literal in line 1:\n" +
         "select c, 'b, c from t\n" +
         "           ^\n");
 
     // test placement of error indicator ^ on queries with multiple lines
     ParserError("select (i + 5)(1 - i) from t",
-        "Syntax error at:\n" +
+        "Syntax error in line 1:\n" +
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
@@ -1798,8 +1798,7 @@ public class ParserTest {
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
-        "Syntax error at:\n" +
-        "select (i + 5)\n" +
+        "Syntax error in line 2:\n" +
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
@@ -1808,15 +1807,41 @@ public class ParserTest {
         "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
-        "Syntax error at:\n" +
-        "select (i + 5)\n" +
+        "Syntax error in line 2:\n" +
         "(1 - i)\n" +
         "^\n" +
-        "from t\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
         "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+
+    // Long line: error in the middle
+    ParserError("select c, b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
+        "Syntax error in line 1:\n" +
+        "... b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c,...\n" +
+        "                             ^\n" +
+        "Encountered: IDENTIFIER\n" +
+        "Expected: FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, ORDER, " +
+        "RIGHT, UNION, USING, WHERE, COMMA\n");
+
+    // Long line: error close to the start
+    ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
+        "Syntax error in line 1:\n" +
+        "select a a a, b, c,c,c,c,c,c,c,c,c,c,c,...\n" +
+        "           ^\n" +
+        "Encountered: IDENTIFIER\n" +
+        "Expected: FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, ORDER, " +
+        "RIGHT, UNION, USING, WHERE, COMMA\n");
+
+    // Long line: error close to the end
+    ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",
+        "Syntax error in line 1:\n" +
+        "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
+        "                             ^\n" +
+        "Encountered: COMMA\n" +
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+
   }
 
   @Test
