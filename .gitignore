@@ -31,3 +31,4 @@ shell/build/
 tests/results
 hdfs-data/
 avro_schemas/
+cluster_logs/
