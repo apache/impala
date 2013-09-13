@@ -1,5 +1,8 @@
-# Drop the dummy udfs this test uses.
 ====
+---- QUERY
+create database if not exists function_ddl_test
+====
+# Drop the dummy udfs this test uses.
 ---- QUERY
 drop function if exists function_ddl_test.fn()
 ====
@@ -18,8 +21,6 @@ drop function if exists function_ddl_test.fn2(int)
 ---- QUERY
 drop function if exists function_ddl_test.fn2(int, string)
 ====
----- QUERY
-create database if not exists function_ddl_test
 ---- QUERY
 # Verify all the test functions are removed
 show functions in function_ddl_test

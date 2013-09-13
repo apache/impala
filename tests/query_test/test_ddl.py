@@ -76,6 +76,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_create_alter_tbl_properties(self, vector):
+    self.client.execute("use default")
     self.client.execute("drop table if exists test_alter_tbl")
 
     # Specify TBLPROPERTIES at CREATE time
