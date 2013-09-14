@@ -21,7 +21,9 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.serde.serdeConstants;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.planner.DataSink;
@@ -171,6 +173,21 @@ public abstract class Table {
       table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     }
     return table;
+  }
+
+  /**
+   * Gets the PrimitiveType from the given FieldSchema. Throws a TableLoadingException
+   * if the FieldSchema does not represent a supported primitive type.
+   */
+  protected PrimitiveType getPrimitiveType(FieldSchema fs)
+      throws TableLoadingException {
+    // catch currently unsupported hive schema elements
+    if (!serdeConstants.PrimitiveTypes.contains(fs.getType())) {
+      throw new TableLoadingException(String.format(
+          "Failed to load metadata for table '%s' due to unsupported " +
+          "column type '%s' in column '%s'", getName(), fs.getType(), fs.getName()));
+    }
+    return getPrimitiveType(fs.getType());
   }
 
   protected static PrimitiveType getPrimitiveType(String typeName) {

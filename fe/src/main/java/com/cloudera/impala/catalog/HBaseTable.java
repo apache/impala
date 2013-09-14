@@ -249,7 +249,7 @@ public class HBaseTable extends Table {
         FieldSchema s = fieldSchemas.get(i);
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
-            getPrimitiveType(s.getType()), s.getComment(), -1);
+            getPrimitiveType(s), s.getComment(), -1);
         tmpCols.add(col);
       }
 

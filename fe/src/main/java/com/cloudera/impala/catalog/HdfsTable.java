@@ -361,13 +361,7 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s: fieldSchemas) {
-      // catch currently unsupported hive schema elements
-      if (!serdeConstants.PrimitiveTypes.contains(s.getType())) {
-        throw new TableLoadingException(
-            String.format("Failed to load metadata for table '%s' due to unsupported " +
-                "column type '%s' in column '%s'", getName(), s.getType(), s.getName()));
-      }
-      PrimitiveType type = getPrimitiveType(s.getType());
+      PrimitiveType type = getPrimitiveType(s);
       // Check if we support partitioning on columns of such a type.
       if (pos < numClusteringCols && !type.supportsTablePartitioning()) {
         throw new TableLoadingException(

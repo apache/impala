@@ -35,6 +35,7 @@ table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 
 table_name:map_table, constraint:restrict_to, table_format:text/none/none
+table_name:map_table_hbase, constraint:restrict_to, table_format:hbase/none/none
 table_name:array_table, constraint:restrict_to, table_format:text/none/none
 
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none

@@ -386,12 +386,17 @@ public class CatalogTest {
   }
 
   @Test(expected = TableLoadingException.class)
-  public void testMapColumnsFails() throws TableLoadingException {
+  public void testMapColumnFails() throws TableLoadingException {
     Table table = getDb(catalog, "functional").getTable("map_table");
   }
 
   @Test(expected = TableLoadingException.class)
-  public void testArrayColumnsFails() throws TableLoadingException {
+  public void testMapColumnFailsOnHBaseTable() throws TableLoadingException {
+    Table table = getDb(catalog, "functional_hbase").getTable("map_table_hbase");
+  }
+
+  @Test(expected = TableLoadingException.class)
+  public void testArrayColumnFails() throws TableLoadingException {
     Table table = getDb(catalog, "functional").getTable("array_table");
   }
 
