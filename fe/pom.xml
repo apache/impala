@@ -111,6 +111,20 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase-protocol</artifactId>
+      <version>${hbase.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hbase-${hbase.version}/lib/hbase-protocol-${hbase.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.cloudera.htrace</groupId>
+      <artifactId>htrace-core</artifactId>
+      <version>2.00</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.shiro</groupId>
       <artifactId>shiro-core</artifactId>
       <version>1.2.1</version>

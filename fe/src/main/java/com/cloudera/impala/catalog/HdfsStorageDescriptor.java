@@ -58,6 +58,7 @@ public class HdfsStorageDescriptor {
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", // (seq / text / parquet)
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe", // (avro)
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe", // (rc)
+      "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe", // (rc)
       ParquetHiveSerDe.class.getName()); // (parquet)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);

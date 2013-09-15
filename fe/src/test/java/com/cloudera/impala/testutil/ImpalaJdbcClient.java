@@ -48,6 +48,13 @@ public class ImpalaJdbcClient {
   private final static String HIVE_SERVER2_DRIVER_NAME =
       "org.apache.hive.jdbc.HiveDriver";
 
+  // Hive uses simple SASL by default. The auth configuration 'none' (both for the client
+  // and the server) correspond to using simple SASL.
+  private final static String SASL_AUTH_SPEC = ";auth=none";
+
+  // As of Hive 0.11 'noSasl' is case sensitive. See HIVE-4232 for more details.
+  private final static String NOSASL_AUTH_SPEC = ";auth=noSasl";
+
   // The default connection string connects to localhost at the default hs2_port without
   // Sasl.
   private final static String DEFAULT_CONNECTION_STRING =
@@ -127,7 +134,8 @@ public class ImpalaJdbcClient {
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {
-    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, DEFAULT_CONNECTION_STRING);
+    return new ImpalaJdbcClient(
+        HIVE_SERVER2_DRIVER_NAME, DEFAULT_CONNECTION_STRING + NOSASL_AUTH_SPEC);
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {
@@ -195,10 +203,9 @@ public class ImpalaJdbcClient {
     }
     // Append appropriate auth option to connection string.
     if (useSasl) {
-      connStr = connStr + ";auth=none";
+      connStr = connStr + SASL_AUTH_SPEC;
     } else {
-      // As of Hive 0.11 'noSasl' is case sensitive. See HIVE-4232 for more details.
-      connStr = connStr + ";auth=noSasl";
+      connStr = connStr + NOSASL_AUTH_SPEC;
     }
 
     String query = cmdArgs.getOptionValue("q");
