@@ -1131,12 +1131,13 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (map_col map<int, s
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
--- TODO: Combine this table and the 'map_table' above when the data loading framework
--- has better support for specifying the executor (Hive vs Impala) for a table section.
 map_table_hbase
 ---- COLUMNS
 key string
 map_col map<string, string>
+---- LOAD
+-- TODO: Combine this table and the 'map_table' above when the data loading framework
+-- has better support for specifying the executor (Hive vs Impala) for a table section.
 ====
 ---- DATASET
 functional
