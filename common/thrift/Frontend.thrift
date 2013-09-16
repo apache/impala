@@ -188,6 +188,7 @@ enum TFileFormat {
   RCFILE,
   SEQUENCEFILE,
   TEXTFILE,
+  AVROFILE,
 }
 
 // Represents a fully qualified table name.
@@ -287,15 +288,24 @@ struct TAlterTableChangeColParams {
   2: required TColumnDef new_col_def
 }
 
-// Parameters for ALTER TABLE SET TBLPROPERTIES commands.
+// The table property type.
+enum TTablePropertyType {
+  TBL_PROPERTY,
+  SERDE_PROPERTY
+}
+
+// Parameters for ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES commands.
 struct TAlterTableSetTblPropertiesParams {
-  // Map of property names to property values
-  1: required map<string, string> table_properties
+  // The target table property that is being altered.
+  1: required TTablePropertyType target
+
+  // Map of property names to property values.
+  2: required map<string, string> properties
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
 struct TAlterTableSetFileFormatParams {
-  // New file format
+  // New file format.
   1: required TFileFormat file_format
 
   // An optional partition spec, set if modifying the fileformat of a partition.
@@ -304,7 +314,7 @@ struct TAlterTableSetFileFormatParams {
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
 struct TAlterTableSetLocationParams {
-  // New HDFS storage location of the table
+  // New HDFS storage location of the table.
   1: required string location
 
   // An optional partition spec, set if modifying the location of a partition.
@@ -409,8 +419,11 @@ struct TCreateTableParams {
   // Optional storage location for the table
   10: optional string location
 
-  // Map of property names to property values
+  // Map of table property names to property values
   11: optional map<string, string> table_properties
+
+  // Map of serde property names to property values
+  12: optional map<string, string> serde_properties
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

@@ -19,13 +19,13 @@ import java.util.EnumSet;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.service.DdlExecutor;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -35,8 +35,8 @@ import com.google.common.base.Preconditions;
 public class CreateTableAsSelectStmt extends StatementBase {
   private final CreateTableStmt createStmt_;
   private final InsertStmt insertStmt_;
-  private final static EnumSet<FileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(FileFormat.PARQUETFILE, FileFormat.TEXTFILE);
+  private final static EnumSet<TFileFormat> SUPPORTED_INSERT_FORMATS =
+      EnumSet.of(TFileFormat.PARQUETFILE, TFileFormat.TEXTFILE);
 
   /**
    * Builds a CREATE TABLE AS SELECT statement

@@ -79,9 +79,10 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("use default")
     self.client.execute("drop table if exists test_alter_tbl")
 
-    # Specify TBLPROPERTIES at CREATE time
-    self.client.execute(\
-        "create table test_alter_tbl (i int) tblproperties ('p1'='v0', 'p1'='v1')")
+    # Specify TBLPROPERTIES and SERDEPROPERTIES at CREATE time
+    self.client.execute("""create table test_alter_tbl (i int)
+    with serdeproperties ('s1'='s2', 's3'='s4')
+    tblproperties ('p1'='v0', 'p1'='v1')""")
     properties = self.__get_tbl_properties('test_alter_tbl')
 
     assert len(properties) == 2
@@ -89,6 +90,15 @@ class TestDdlStatements(ImpalaTestSuite):
     assert 'transient_lastDdlTime' in properties
     del properties['transient_lastDdlTime']
     assert {'p1': 'v1'} == properties
+
+    properties = self.__get_serde_properties('test_alter_tbl')
+    assert {'s1': 's2', 's3': 's4'} == properties
+
+    # Modify the SERDEPROPERTIES using ALTER TABLE SET.
+    self.client.execute("alter table test_alter_tbl set serdeproperties "\
+        "('s1'='new', 's5'='s6')")
+    properties = self.__get_serde_properties('test_alter_tbl')
+    assert {'s1': 'new', 's3': 's4', 's5': 's6'} == properties
 
     # Modify the TBLPROPERTIES using ALTER TABLE SET.
     self.client.execute("alter table test_alter_tbl set tblproperties "\
@@ -102,11 +112,19 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def __get_tbl_properties(self, table_name):
     """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
+    return self.__get_properties('Table Parameters:', table_name)
+
+  def __get_serde_properties(self, table_name):
+    """Extracts the serde properties mapping from the output of DESCRIBE FORMATTED"""
+    return self.__get_properties('Storage Desc Params:', table_name)
+
+  def __get_properties(self, section_name, table_name):
+    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
     result = self.client.execute("describe formatted " + table_name)
     match = False
     properties = dict();
     for row in result.data:
-      if 'Table Parameters:' in row:
+      if section_name in row:
         match = True
       elif match:
         row = row.split('\t')

@@ -22,6 +22,7 @@ import parquet.hive.DeprecatedParquetInputFormat;
 import parquet.hive.DeprecatedParquetOutputFormat;
 import parquet.hive.serde.ParquetHiveSerDe;
 
+import com.cloudera.impala.thrift.TFileFormat;
 import com.google.common.base.Preconditions;
 
 public class HiveStorageDescriptorFactory {
@@ -31,7 +32,7 @@ public class HiveStorageDescriptorFactory {
    * RC file.
    * TODO: Add support for Avro and HBase
    */
-  public static StorageDescriptor createSd(FileFormat fileFormat, RowFormat rowFormat) {
+  public static StorageDescriptor createSd(TFileFormat fileFormat, RowFormat rowFormat) {
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
 
@@ -41,6 +42,7 @@ public class HiveStorageDescriptorFactory {
       case RCFILE: sd = createRcFileSd(); break;
       case SEQUENCEFILE: sd = createSequenceFileSd(); break;
       case TEXTFILE: sd = createTextSd(); break;
+      case AVROFILE: sd = createAvroSd(); break;
       default: throw new UnsupportedOperationException(
           "Unsupported file format: " + fileFormat);
     }
@@ -96,6 +98,21 @@ public class HiveStorageDescriptorFactory {
     sd.setOutputFormat(org.apache.hadoop.hive.ql.io.RCFileOutputFormat.class.getName());
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe.class.getName());
+    sd.setCompressed(false);
+    return sd;
+  }
+
+  private static StorageDescriptor createAvroSd() {
+    StorageDescriptor sd = createGenericSd();
+    sd.setInputFormat(
+        org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat.class.getName());
+    sd.setOutputFormat(
+        org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat.class.getName());
+    sd.getSerdeInfo().setSerializationLib(
+        org.apache.hadoop.hive.serde2.avro.AvroSerDe.class.getName());
+    // Writing compressed Avro tables is done using a session level configuration
+    // setting, it is not specified as part of the table metadata. This compression
+    // property has a different purpose.
     sd.setCompressed(false);
     return sd;
   }

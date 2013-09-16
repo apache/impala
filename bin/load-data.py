@@ -143,9 +143,7 @@ def copy_avro_schemas_to_hdfs(schemas_dir):
     print 'Avro schema dir (%s) does not exist. Skipping copy to HDFS.' % schemas_dir
     return
 
-  # Create warehouse directory if it doesn't already exist
-  if exec_hadoop_fs_cmd("-test -d " + options.hive_warehouse_dir, expect_success=False):
-    exec_hadoop_fs_cmd("-mkdir -p " + options.hive_warehouse_dir)
+  exec_hadoop_fs_cmd("-mkdir -p " + options.hive_warehouse_dir)
   exec_hadoop_fs_cmd("-put -f %s %s/" % (schemas_dir, options.hive_warehouse_dir))
 
 def exec_hadoop_fs_cmd(args, expect_success=True):
@@ -178,6 +176,8 @@ if __name__ == "__main__":
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
 
+    copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
+
     generated_hbase_file = 'load-%s-%s-hbase.create' % (workload,
                                                         options.exploration_strategy)
     if os.path.exists(generated_hbase_file):
@@ -187,16 +187,6 @@ if __name__ == "__main__":
         'load-%s-%s-impala-generated.sql' % (workload, options.exploration_strategy)
     if os.path.exists(generated_impala_file):
       exec_impala_query_from_file(os.path.join(dataset_dir, generated_impala_file))
-
-    generated_avro_file = \
-        'load-%s-%s-avro-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_avro_file):
-      # We load Avro tables separately due to bugs in the Avro SerDe.
-      # generate-schema-statements.py separates the avro statements into a
-      # separate file to get around this.
-      # See https://issues.apache.org/jira/browse/HIVE-4195.
-      copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
-      exec_hive_query_from_file(os.path.join(dataset_dir, generated_avro_file))
 
     generated_hive_file =\
         'load-%s-%s-hive-generated.sql' % (workload, options.exploration_strategy)

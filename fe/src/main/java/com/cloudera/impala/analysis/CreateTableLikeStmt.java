@@ -16,11 +16,11 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
@@ -33,7 +33,7 @@ public class CreateTableLikeStmt extends StatementBase {
   private final TableName srcTableName;
   private final boolean isExternal;
   private final String comment;
-  private final FileFormat fileFormat;
+  private final TFileFormat fileFormat;
   private final HdfsURI location;
   private final boolean ifNotExists;
 
@@ -53,7 +53,7 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String comment, FileFormat fileFormat, HdfsURI location,
+      boolean isExternal, String comment, TFileFormat fileFormat, HdfsURI location,
       boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
@@ -66,9 +66,13 @@ public class CreateTableLikeStmt extends StatementBase {
     this.ifNotExists = ifNotExists;
   }
 
-  public String getTbl() {
-    return tableName.getTbl();
-  }
+  public String getTbl() { return tableName.getTbl(); }
+  public String getSrcTbl() { return srcTableName.getTbl(); }
+  public boolean isExternal() { return isExternal; }
+  public boolean getIfNotExists() { return ifNotExists; }
+  public String getComment() { return comment; }
+  public TFileFormat getFileFormat() { return fileFormat; }
+  public HdfsURI getLocation() { return location; }
 
   /**
    * Can only be called after analysis, returns the name of the database the table will
@@ -77,10 +81,6 @@ public class CreateTableLikeStmt extends StatementBase {
   public String getDb() {
     Preconditions.checkNotNull(dbName);
     return dbName;
-  }
-
-  public String getSrcTbl() {
-    return srcTableName.getTbl();
   }
 
   /**
@@ -92,26 +92,6 @@ public class CreateTableLikeStmt extends StatementBase {
     return srcDbName;
   }
 
-  public boolean isExternal() {
-    return isExternal;
-  }
-
-  public boolean getIfNotExists() {
-    return ifNotExists;
-  }
-
-  public String getComment() {
-    return comment;
-  }
-
-  public FileFormat getFileFormat() {
-    return fileFormat;
-  }
-
-  public HdfsURI getLocation() {
-    return location;
-  }
-
   public String getOwner() {
     Preconditions.checkNotNull(owner);
     return owner;
@@ -120,30 +100,16 @@ public class CreateTableLikeStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
-    if (isExternal) {
-      sb.append("EXTERNAL ");
-    }
+    if (isExternal) sb.append("EXTERNAL ");
     sb.append("TABLE ");
-    if (ifNotExists) {
-      sb.append("IF NOT EXISTS ");
-    }
-    if (tableName.getDb() != null) {
-      sb.append(tableName.getDb() + ".");
-    }
+    if (ifNotExists) sb.append("IF NOT EXISTS ");
+    if (tableName.getDb() != null) sb.append(tableName.getDb() + ".");
     sb.append(tableName.getTbl() + " LIKE ");
-    if (srcTableName.getDb() != null) {
-      sb.append(srcTableName.getDb() + ".");
-    }
+    if (srcTableName.getDb() != null) sb.append(srcTableName.getDb() + ".");
     sb.append(srcTableName.getTbl());
-    if (comment != null) {
-      sb.append(" COMMENT '" + comment + "'");
-    }
-    if (fileFormat != null) {
-      sb.append(" STORED AS " + fileFormat);
-    }
-    if (location != null) {
-      sb.append(" LOCATION '" + location + "'");
-    }
+    if (comment != null) sb.append(" COMMENT '" + comment + "'");
+    if (fileFormat != null) sb.append(" STORED AS " + fileFormat);
+    if (location != null) sb.append(" LOCATION '" + location + "'");
     return sb.toString();
   }
 
@@ -154,9 +120,7 @@ public class CreateTableLikeStmt extends StatementBase {
     params.setOwner(getOwner());
     params.setIs_external(isExternal());
     params.setComment(comment);
-    if (fileFormat != null) {
-      params.setFile_format(fileFormat.toThrift());
-    }
+    if (fileFormat != null) params.setFile_format(fileFormat);
     params.setLocation(location == null ? null : location.toString());
     params.setIf_not_exists(getIfNotExists());
     return params;

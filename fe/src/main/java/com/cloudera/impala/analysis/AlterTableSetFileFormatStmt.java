@@ -15,32 +15,32 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableType;
+import com.cloudera.impala.thrift.TFileFormat;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.
  */
 public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
-  private final FileFormat fileFormat_;
+  private final TFileFormat fileFormat_;
 
   public AlterTableSetFileFormatStmt(TableName tableName,
-      PartitionSpec partitionSpec, FileFormat fileFormat) {
+      PartitionSpec partitionSpec, TFileFormat fileFormat) {
     super(tableName, partitionSpec);
     this.fileFormat_ = fileFormat;
   }
 
-  public FileFormat getFileFormat() { return fileFormat_; }
+  public TFileFormat getFileFormat() { return fileFormat_; }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_FILE_FORMAT);
     TAlterTableSetFileFormatParams fileFormatParams =
-        new TAlterTableSetFileFormatParams(fileFormat_.toThrift());
+        new TAlterTableSetFileFormatParams(fileFormat_);
     if (getPartitionSpec() != null) {
       fileFormatParams.setPartition_spec(getPartitionSpec().toThrift());
     }

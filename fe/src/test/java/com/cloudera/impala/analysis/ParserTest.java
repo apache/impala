@@ -26,8 +26,8 @@ import java.util.ArrayList;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.google.common.collect.Lists;
 
 public class ParserTest {
@@ -1341,7 +1341,7 @@ public class ParserTest {
   @Test
   public void TestAlterTableSet() {
     // Supported file formats
-    for (FileFormat format: FileFormat.values()) {
+    for (TFileFormat format: TFileFormat.values()) {
       ParsesOk("ALTER TABLE Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo PARTITION (a=1) SET FILEFORMAT " + format);
@@ -1370,18 +1370,23 @@ public class ParserTest {
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION");
     ParserError("ALTER TABLE TestDb.Foo SET");
 
-    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('a'='b')");
-    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('abc'='123')");
-    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('abc'='123', 'a'='1')");
-    ParsesOk("ALTER TABLE Foo SET TBLPROPERTIES ('a'='1', 'b'='2', 'c'='3')");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ( )");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a', 'b')");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a'='b',)");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES ('a'=b)");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES (a='b')");
-    ParserError("ALTER TABLE Foo SET TBLPROPERTIES (a=b)");
-    // Setting TBLPROPERTIES on a partition is not allowed
-    ParserError("ALTER TABLE Foo PARTITION (s='str') SET TBLPROPERTIES ('a'='b')");
+    String[] tblPropTypes = {"TBLPROPERTIES", "SERDEPROPERTIES"};
+    for (String propType: tblPropTypes) {
+      ParsesOk(String.format("ALTER TABLE Foo SET %s ('a'='b')", propType));
+      ParsesOk(String.format("ALTER TABLE Foo SET %s ('abc'='123')", propType));
+      ParsesOk(String.format("ALTER TABLE Foo SET %s ('abc'='123', 'a'='1')", propType));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo SET %s ('a'='1', 'b'='2', 'c'='3')", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s ( )", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s ('a', 'b')", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s ('a'='b',)", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s ('a'=b)", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s (a='b')", propType));
+      ParserError(String.format("ALTER TABLE Foo SET %s (a=b)", propType));
+      // Setting TBLPROPERTIES/SERDEPROPERTIES on a partition is not currently allowed
+      ParserError(String.format(
+          "ALTER TABLE Foo PARTITION (s='str') SET %s ('a'='b')", propType));
+    }
   }
 
   @Test
@@ -1441,7 +1446,7 @@ public class ParserTest {
     ParsesOk("CREATE TABLE T (i int COMMENT 'hi') PARTITIONED BY (j int COMMENT 'bye')");
 
     // Supported file formats
-    for (FileFormat format: FileFormat.values()) {
+    for (TFileFormat format: TFileFormat.values()) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk(String.format(
@@ -1452,13 +1457,24 @@ public class ParserTest {
     }
 
     // Table Properties
-    ParsesOk("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'='b', 'c'='d', 'e'='f')");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ()");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a')");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'=)");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('a'=c)");
-    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES (a='c')");
+    String[] tblPropTypes = {"TBLPROPERTIES", "WITH SERDEPROPERTIES"};
+    for (String propType: tblPropTypes) {
+      ParsesOk(String.format(
+          "CREATE TABLE Foo (i int) %s ('a'='b', 'c'='d', 'e'='f')", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s ()", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s ('a')", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s ('a'=)", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s ('a'=c)", propType));
+      ParserError(String.format("CREATE TABLE Foo (i int) %s (a='c')", propType));
+    }
+    ParsesOk("CREATE TABLE Foo (i int) WITH SERDEPROPERTIES ('a'='b') " +
+        "TBLPROPERTIES ('c'='d', 'e'='f')");
+    // TBLPROPERTIES must go after SERDEPROPERTIES
+    ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('c'='d', 'e'='f') " +
+        "WITH SERDEPROPERTIES ('a'='b')");
+
+    ParserError("CREATE TABLE Foo (i int) SERDEPROPERTIES ('a'='b')");
 
     ParserError("CREATE TABLE Foo (i int, s string) STORED AS SEQFILE");
     ParserError("CREATE TABLE Foo (i int, s string) STORED TEXTFILE");
@@ -1494,8 +1510,8 @@ public class ParserTest {
     ParserError("CREATE TABLE T (i int) ROWS TERMINATED BY '\0'");
     ParserError("CREATE TABLE T (i int) ESCAPED BY '\0'");
 
-    // Order should be: [comment] [partition by cols] [row format] [stored as FILEFORMAT]
-    // [location] [tblproperties (...)]
+    // Order should be: [comment] [partition by cols] [row format] [serdeproperties (..)]
+    // [stored as FILEFORMAT] [location] [tblproperties (...)]
     ParserError("CREATE TABLE Foo (d double) COMMENT 'c' PARTITIONED BY (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE ROW FORMAT DELIMITED");
@@ -1504,6 +1520,7 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) TBLPROPERTIES('a'='b') LOCATION 'a'");
+    ParserError("CREATE TABLE Foo (i int) LOCATION 'a' WITH SERDEPROPERTIES('a'='b')");
 
     // Location and comment need to be string literals, file format is not
     ParserError("CREATE TABLE Foo (d double) LOCATION a");

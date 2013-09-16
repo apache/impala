@@ -19,19 +19,24 @@ import java.util.HashMap;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
 import com.cloudera.impala.thrift.TAlterTableType;
+import com.cloudera.impala.thrift.TTablePropertyType;
 import com.google.common.base.Preconditions;
 
 /**
-* Represents an ALTER TABLE SET TBLPROPERTIES ('p1'='v1', ...) statement.
+* Represents an ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES ('p1'='v1', ...) statement.
 */
 public class AlterTableSetTblProperties extends AlterTableSetStmt {
+  private final TTablePropertyType targetProperty_;
   private final HashMap<String, String> tblProperties_;
 
   public AlterTableSetTblProperties(TableName tableName,
+      TTablePropertyType targetProperty,
       HashMap<String, String> tblProperties) {
    super(tableName, null);
    Preconditions.checkNotNull(tblProperties);
-   this.tblProperties_ = tblProperties;
+   Preconditions.checkNotNull(targetProperty);
+   targetProperty_ = targetProperty;
+   tblProperties_ = tblProperties;
   }
 
   public HashMap<String, String> getTblProperties() { return tblProperties_; }
@@ -42,7 +47,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    params.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
    TAlterTableSetTblPropertiesParams tblPropertyParams =
        new TAlterTableSetTblPropertiesParams();
-   tblPropertyParams.setTable_properties(tblProperties_);
+   tblPropertyParams.setTarget(targetProperty_);
+   tblPropertyParams.setProperties(tblProperties_);
    params.setSet_tbl_properties_params(tblPropertyParams);
    return params;
   }

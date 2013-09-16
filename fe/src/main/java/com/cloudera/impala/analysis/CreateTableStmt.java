@@ -21,12 +21,14 @@ import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.FileFormat;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.RowFormat;
+import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -41,11 +43,12 @@ public class CreateTableStmt extends StatementBase {
   private final String comment_;
   private final boolean isExternal_;
   private final boolean ifNotExists_;
-  private final FileFormat fileFormat_;
+  private final TFileFormat fileFormat_;
   private final ArrayList<ColumnDef> partitionColumnDefs_;
   private final RowFormat rowFormat_;
   private final TableName tableName_;
   private final Map<String, String> tblProperties_;
+  private final Map<String, String> serdeProperties_;
   private HdfsURI location_;
 
   // Set during analysis
@@ -65,11 +68,14 @@ public class CreateTableStmt extends StatementBase {
    * @param location - The HDFS location of where the table data will stored.
    * @param ifNotExists - If true, no errors are thrown if the table already exists.
    * @param tblProperties - Optional map of key/values to persist with table metadata.
+   * @param serdeProperties - Optional map of key/values to persist with table serde
+   *                          metadata.
    */
   public CreateTableStmt(TableName tableName, List<ColumnDef> columnDefs,
       List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
-      RowFormat rowFormat, FileFormat fileFormat, HdfsURI location,
-      boolean ifNotExists, Map<String, String> tblProperties) {
+      RowFormat rowFormat, TFileFormat fileFormat, HdfsURI location,
+      boolean ifNotExists, Map<String, String> tblProperties,
+      Map<String, String> serdeProperties) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
@@ -86,6 +92,7 @@ public class CreateTableStmt extends StatementBase {
     this.rowFormat_ = rowFormat;
     this.tableName_ = tableName;
     this.tblProperties_ = tblProperties;
+    this.serdeProperties_ = serdeProperties;
   }
 
   public String getTbl() { return tableName_.getTbl(); }
@@ -97,7 +104,7 @@ public class CreateTableStmt extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
   public HdfsURI getLocation() { return location_; }
   public void setLocation(HdfsURI location) { this.location_ = location; }
-  public FileFormat getFileFormat() { return fileFormat_; }
+  public TFileFormat getFileFormat() { return fileFormat_; }
   public RowFormat getRowFormat() { return rowFormat_; }
 
   /**
@@ -121,22 +128,14 @@ public class CreateTableStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
-    if (isExternal_) {
-      sb.append("EXTERNAL ");
-    }
+    if (isExternal_) sb.append("EXTERNAL ");
     sb.append("TABLE ");
-    if (ifNotExists_) {
-      sb.append("IF NOT EXISTS ");
-    }
-    if (tableName_.getDb() != null) {
-      sb.append(tableName_.getDb() + ".");
-    }
+    if (ifNotExists_) sb.append("IF NOT EXISTS ");
+    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl() + " (");
     sb.append(Joiner.on(", ").join(columnDefs_));
     sb.append(")");
-    if (comment_ != null) {
-      sb.append(" COMMENT = '" + comment_ + "'");
-    }
+    if (comment_ != null) sb.append(" COMMENT = '" + comment_ + "'");
 
     if (partitionColumnDefs_.size() > 0) {
       sb.append(String.format(" PARTITIONED BY (%s)",
@@ -156,20 +155,28 @@ public class CreateTableStmt extends StatementBase {
       }
     }
 
-    sb.append(" STORED AS " + fileFormat_.getDescription());
+    if (serdeProperties_ != null) {
+      sb.append(
+          " WITH SERDEPROPERTIES " + propertyMapToSql(serdeProperties_));
+    }
+
+    sb.append(" STORED AS " + fileFormat_.toString());
 
     if (location_ != null) {
       sb.append(" LOCATION = '" + location_ + "'");
     }
     if (tblProperties_ != null) {
-      sb.append(" TBLPROPERTIES (");
-      List<String> properties = Lists.newArrayList();
-      for (Map.Entry<String, String> entry: tblProperties_.entrySet()) {
-        properties.add(String.format("'{0}'='{1}'", entry.getKey(), entry.getValue()));
-      }
-      sb.append(Joiner.on(", ").join(properties) + ")");
+      sb.append(" TBLPROPERTIES " + propertyMapToSql(tblProperties_));
     }
     return sb.toString();
+  }
+
+  private static String propertyMapToSql(Map<String, String> propertyMap) {
+    List<String> properties = Lists.newArrayList();
+    for (Map.Entry<String, String> entry: propertyMap.entrySet()) {
+      properties.add(String.format("'{0}'='{1}'", entry.getKey(), entry.getValue()));
+    }
+    return "(" + Joiner.on(", ").join(properties) + ")";
   }
 
   public TCreateTableParams toThrift() {
@@ -186,11 +193,10 @@ public class CreateTableStmt extends StatementBase {
     params.setComment(comment_);
     params.setLocation(location_ == null ? null : location_.toString());
     params.setRow_format(rowFormat_.toThrift());
-    params.setFile_format(fileFormat_.toThrift());
+    params.setFile_format(fileFormat_);
     params.setIf_not_exists(getIfNotExists());
-    if (tblProperties_ != null) {
-      params.setTable_properties(tblProperties_);
-    }
+    if (tblProperties_ != null) params.setTable_properties(tblProperties_);
+    if (serdeProperties_ != null) params.setSerde_properties(serdeProperties_);
     return params;
   }
 
@@ -237,6 +243,20 @@ public class CreateTableStmt extends StatementBase {
       }
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
+      }
+    }
+
+    if (fileFormat_ == TFileFormat.AVROFILE) {
+      // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+      // taking precedence.
+      List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+      schemaSearchLocations.add(serdeProperties_);
+      schemaSearchLocations.add(tblProperties_);
+      try {
+        HdfsTable.getAvroSchema(schemaSearchLocations,
+            dbName_ + "." + tableName_.getTbl(), false);
+      } catch (TableLoadingException e) {
+        throw new AnalysisException(e.getMessage(), e);
       }
     }
   }

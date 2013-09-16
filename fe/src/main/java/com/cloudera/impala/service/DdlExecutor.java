@@ -44,7 +44,6 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
@@ -66,6 +65,7 @@ import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
+import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateDbParams;
@@ -78,6 +78,7 @@ import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Joiner;
@@ -194,8 +195,7 @@ public class DdlExecutor {
           fileFormatPartitionSpec = fileFormatParams.getPartition_spec();
         }
         alterTableSetFileFormat(TableName.fromThrift(params.getTable_name()),
-            fileFormatPartitionSpec,
-            FileFormat.fromThrift(fileFormatParams.getFile_format()));
+            fileFormatPartitionSpec, fileFormatParams.getFile_format());
         break;
       case SET_LOCATION:
         TAlterTableSetLocationParams setLocationParams = params.getSet_location_params();
@@ -208,7 +208,7 @@ public class DdlExecutor {
         break;
       case SET_TBL_PROPERTIES:
         alterTableSetTblProperties(TableName.fromThrift(params.getTable_name()),
-            params.getSet_tbl_properties_params().getTable_properties());
+            params.getSet_tbl_properties_params());
         break;
       default:
         throw new UnsupportedOperationException(
@@ -494,8 +494,7 @@ public class DdlExecutor {
       ImpalaException, TableLoadingException, TableNotFoundException {
     Preconditions.checkNotNull(params);
 
-    FileFormat fileFormat = params.isSetFile_format() ?
-        FileFormat.fromThrift(params.getFile_format()) : null;
+    TFileFormat fileFormat = params.isSetFile_format() ? params.getFile_format() : null;
     String comment = params.isSetComment() ? params.getComment() : null;
     TableName tblName = TableName.fromThrift(params.getTable_name());
     TableName srcTblName = TableName.fromThrift(params.getSrc_table_name());
@@ -802,10 +801,10 @@ public class DdlExecutor {
    * reloaded on the next access.
    */
   private void alterTableSetFileFormat(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, FileFormat fileFormat) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException,
-      AuthorizationException {
+      List<TPartitionKeyValue> partitionSpec, TFileFormat fileFormat)
+      throws MetaException, InvalidObjectException, org.apache.thrift.TException,
+      DatabaseNotFoundException, PartitionNotFoundException, TableNotFoundException,
+      TableLoadingException, AuthorizationException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock) {
@@ -830,13 +829,12 @@ public class DdlExecutor {
    * Helper method for setting the file format on a given storage descriptor.
    */
   private static void setStorageDescriptorFileFormat(StorageDescriptor sd,
-      FileFormat fileFormat) {
+      TFileFormat fileFormat) {
     StorageDescriptor tempSd =
         HiveStorageDescriptorFactory.createSd(fileFormat, RowFormat.DEFAULT_ROW_FORMAT);
     sd.setInputFormat(tempSd.getInputFormat());
     sd.setOutputFormat(tempSd.getOutputFormat());
-    sd.getSerdeInfo().setSerializationLib(
-        tempSd.getSerdeInfo().getSerializationLib());
+    sd.getSerdeInfo().setSerializationLib(tempSd.getSerdeInfo().getSerializationLib());
   }
 
   /**
@@ -873,14 +871,23 @@ public class DdlExecutor {
    * of any keys that already exist.
    */
   private void alterTableSetTblProperties(TableName tableName,
-      Map<String, String> tblProperties) throws MetaException, InvalidObjectException,
-      TException, DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException, AuthorizationException {
-    Preconditions.checkState(tblProperties != null);
+      TAlterTableSetTblPropertiesParams params) throws MetaException,
+      InvalidObjectException, TException, DatabaseNotFoundException,
+      TableNotFoundException, TableLoadingException, AuthorizationException {
+    Map<String, String> properties = params.getProperties();
+    Preconditions.checkNotNull(properties);
     synchronized (metastoreDdlLock) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-      for (Map.Entry<String, String> prop: tblProperties.entrySet()) {
-        msTbl.getParameters().put(prop.getKey(), prop.getValue());
+      switch (params.getTarget()) {
+        case TBL_PROPERTY:
+          msTbl.getParameters().putAll(properties);
+          break;
+        case SERDE_PROPERTY:
+          msTbl.getSd().getSerdeInfo().getParameters().putAll(properties);
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unknown target TTablePropertyType: " + params.getTarget());
       }
       applyAlterTable(msTbl);
     }
@@ -1009,8 +1016,15 @@ public class DdlExecutor {
     }
 
     StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(
-        FileFormat.fromThrift(params.getFile_format()),
-        RowFormat.fromThrift(params.getRow_format()));
+        params.getFile_format(), RowFormat.fromThrift(params.getRow_format()));
+
+    if (params.isSetSerde_properties()) {
+      if (sd.getSerdeInfo().getParameters() == null) {
+        sd.getSerdeInfo().setParameters(params.getSerde_properties());
+      } else {
+        sd.getSerdeInfo().getParameters().putAll(params.getSerde_properties());
+      }
+    }
 
     if (params.getLocation() != null) {
       sd.setLocation(params.getLocation());

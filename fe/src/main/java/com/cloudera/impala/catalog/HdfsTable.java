@@ -662,7 +662,13 @@ public class HdfsTable extends Table {
 
       // populate Avro schema if necessary
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-        avroSchema = getAvroSchema();
+        // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+        // taking precedence.
+        List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+        schemaSearchLocations.add(
+            getMetaStoreTable().getSd().getSerdeInfo().getParameters());
+        schemaSearchLocations.add(getMetaStoreTable().getParameters());
+        avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations, getFullName(), true);
       }
     } catch (TableLoadingException e) {
       throw e;
@@ -693,21 +699,18 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Gets an Avro table's JSON schema. The schema may be specified as a string
-   * literal or provided as an HDFS/http URL that points to the schema. The schema
-   * can be specified in the TBLPROPERTIES or in the SERDEPROPERTIES, with the
-   * latter taking precedence. This function does not perform any validation on
-   * the returned string (e.g., it may not be a valid schema).
+   * Gets an Avro table's JSON schema from the list of given table property search
+   * locations. The schema may be specified as a string literal or provided as an
+   * HDFS/http URL that points to the schema. This function does not perform any
+   * validation on the returned string (e.g., it may not be a valid schema).
+   * If downloadSchema is true and the schema was found to be specified as a SCHEMA_URL,
+   * this function will attempt to download the schema from the given URL. Otherwise,
+   * only the the URL string will be returned.
+   * Throws a TableLoadingException if no schema is found or if there was any error
+   * extracting the schema.
    */
-  private String getAvroSchema() throws TableLoadingException {
-    org.apache.hadoop.hive.metastore.api.Table msTbl = this.getMetaStoreTable();
-
-    // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
-    // taking precedence.
-    List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
-    schemaSearchLocations.add(msTbl.getSd().getSerdeInfo().getParameters());
-    schemaSearchLocations.add(msTbl.getParameters());
-
+  public static String getAvroSchema(List<Map<String, String>> schemaSearchLocations,
+      String tableName, boolean downloadSchema) throws TableLoadingException {
     String url = null;
     // Search all locations and break out on the first valid schema found.
     for (Map<String, String> schemaLocation: schemaSearchLocations) {
@@ -724,20 +727,20 @@ public class HdfsTable extends Table {
     }
 
     if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
-      throw new TableLoadingException("No Avro schema provided for table " + name);
+      throw new TableLoadingException("No Avro schema provided for table: " + tableName);
     }
-    return loadAvroSchemaFromUrl(url);
-  }
 
-  private static String loadAvroSchemaFromUrl(String url)
-      throws TableLoadingException {
     if (!url.toLowerCase().startsWith("hdfs://") &&
         !url.toLowerCase().startsWith("http://")) {
       throw new TableLoadingException("avro.schema.url must be of form " +
           "\"http://path/to/schema/file\" or " +
           "\"hdfs://namenode:port/path/to/schema/file\", got " + url);
     }
+    return downloadSchema ? loadAvroSchemaFromUrl(url) : url;
+  }
 
+  private static String loadAvroSchemaFromUrl(String url)
+      throws TableLoadingException {
     if (url.toLowerCase().startsWith("hdfs://")) {
       try {
         return FileSystemUtil.readFile(new Path(url));

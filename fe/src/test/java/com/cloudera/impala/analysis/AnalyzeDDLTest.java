@@ -567,6 +567,22 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
         "Type 'DATETIME' is not supported as partition-column type in column: d");
 
+    // Analysis of Avro schemas
+    AnalyzesOk("create table foo (i int) with serdeproperties ('avro.schema.url'=" +
+        "'hdfs://schema.avsc') stored as avrofile");
+    AnalyzesOk("create table foo (i int) stored as avrofile tblproperties " +
+        "('avro.schema.url'='hdfs://schema.avsc')");
+    AnalyzesOk("create table foo (i int) stored as avrofile tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\"}')");
+    AnalysisError("create table foo (i int) stored as avrofile",
+        "No Avro schema provided for table: default.foo");
+    AnalysisError("create table foo (i int) stored as avrofile tblproperties ('a'='b')",
+        "No Avro schema provided for table: default.foo");
+    AnalysisError("create table foo (i int) stored as avrofile tblproperties " +
+        "('avro.schema.url'='schema.avsc')", "avro.schema.url must be of form " +
+        "\"http://path/to/schema/file\" or \"hdfs://namenode:port/path/to/schema/file" +
+        "\", got schema.avsc");
+
     // Invalid database name.
     AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",
         "Invalid database name: ???");

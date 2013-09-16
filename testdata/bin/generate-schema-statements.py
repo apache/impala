@@ -111,9 +111,7 @@ FILE_FORMAT_MAP = {
   'text_lzo':
     "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
-  'avro':
-    "\nINPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'" +
-    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'",
+  'avro': 'AVROFILE',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'"
   }
 
@@ -181,8 +179,6 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     tblproperties = "TBLPROPERTIES ('avro.schema.url'=" \
         "'hdfs://%s/%s/%s/{table_name}.json')" \
         % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
-    # Override specified row format
-    row_format_stmt = "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'"
   elif file_format == 'parquet':
     row_format_stmt = str()
 
@@ -372,13 +368,6 @@ def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
   # TODO: This method has become very unwieldy. It has to be re-factored sooner than
   # later.
-
-  # The Avro SerDe causes strange problems with other unrelated tables (e.g.,
-  # Avro files will be written to LZO-compressed text tables). We generate
-  # separate schema statement files for Avro tables so we can invoke Hive
-  # completely separately for them.
-  # See https://issues.apache.org/jira/browse/HIVE-4195.
-  avro_output = Statements()
   # Parquet statements to be executed separately by Impala
   impala_output = Statements()
   impala_load = Statements()
@@ -462,8 +451,6 @@ def generate_statements(output_name, test_vectors, sections,
       output = impala_output
       if create_hive or file_format == 'hbase':
         output = hive_output
-      if file_format == 'avro':
-        output = avro_output
       elif codec == 'lzo':
         output = hive_output
 
@@ -539,7 +526,6 @@ def generate_statements(output_name, test_vectors, sections,
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
-  avro_output.write_to_file('load-' + output_name + '-avro-generated.sql')
   impala_output.write_to_file('load-' + output_name + '-impala-generated.sql')
   impala_load.write_to_file('load-' + output_name + '-impala-load-generated.sql')
   hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')

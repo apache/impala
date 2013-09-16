@@ -23,13 +23,13 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.FileFormat;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.thrift.TFileFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -38,12 +38,11 @@ import com.google.common.collect.Sets;
 /**
  * Representation of a single insert statement, including the select statement
  * whose results are to be inserted.
- *
  */
 public class InsertStmt extends StatementBase {
   // Insert formats currently supported by Impala.
-  private final static EnumSet<FileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(FileFormat.PARQUETFILE, FileFormat.TEXTFILE);
+  private final static EnumSet<TFileFormat> SUPPORTED_INSERT_FORMATS =
+      EnumSet.of(TFileFormat.PARQUETFILE, TFileFormat.TEXTFILE);
   // List of inline views that may be referenced in queryStmt.
   private final WithClause withClause;
   // Target table name as seen by the parser
