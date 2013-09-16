@@ -1,3 +1,4 @@
+# TODO: Change these tests to use the partitioned TPCH tables.
 # Q1 - Pricing Summary Report Query
 # Modifications: Remove ORDER BY, added ROUND() calls
 select
@@ -70,18 +71,12 @@ PLAN FRAGMENT 2
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 ====
 # Q2 - Minimum Cost Supplier Query
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp1
@@ -557,21 +552,14 @@ PLAN FRAGMENT 4
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.customer/customer.tbl 0:24196144
@@ -702,21 +690,14 @@ PLAN FRAGMENT 3
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 ====
 # Q5 - Local Supplier Volume Query
@@ -967,21 +948,14 @@ PLAN FRAGMENT 7
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.supplier/supplier.tbl 0:1399184
@@ -1044,18 +1018,12 @@ PLAN FRAGMENT 1
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 ====
 # Q8 - National Market Share Query
 # Modifications: Got rid of subquery, converted select from multiple tables to joins,
@@ -1391,21 +1359,14 @@ PLAN FRAGMENT 11
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.part/part.tbl 0:23935125
@@ -1678,27 +1639,19 @@ PLAN FRAGMENT 8
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.part/part.tbl 0:23935125
 NODE 3:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 5:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.partsupp/partsupp.tbl 0:118184616
 NODE 7:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.supplier/supplier.tbl 0:1399184
 NODE 9:
@@ -1909,21 +1862,14 @@ PLAN FRAGMENT 6
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.customer/customer.tbl 0:24196144
@@ -2256,21 +2202,14 @@ PLAN FRAGMENT 4
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 ====
 # Q13 - Customer Distribution Query
@@ -2426,8 +2365,7 @@ PLAN FRAGMENT 5
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 134217728:36234433
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.customer/customer.tbl 0:24196144
@@ -2526,18 +2464,12 @@ PLAN FRAGMENT 3
      tuple ids: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.part/part.tbl 0:23935125
 ====
@@ -3483,18 +3415,12 @@ PLAN FRAGMENT 2
      tuple ids: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:134217728
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:82773432
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.part/part.tbl 0:23935125
 ====

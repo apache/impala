@@ -19,4 +19,10 @@
     <value>/var/lib/hadoop-hdfs/socket._PORT</value>
   </property>
 
+  <!-- 128MB HDFS block size -->
+  <property>
+    <name>dfs.block.size</name>
+    <value>134217728</value>
+  </property>
+
 </configuration>
