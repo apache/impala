@@ -35,16 +35,25 @@ HdfsTextTableWriter::HdfsTextTableWriter(HdfsTableSink* parent,
                                          RuntimeState* state, OutputPartition* output,
                                          const HdfsPartitionDescriptor* partition,
                                          const HdfsTableDescriptor* table_desc,
-                                         const vector<Expr*>& output_exprs) 
+                                         const vector<Expr*>& output_exprs)
     : HdfsTableWriter(parent, state, output, partition, table_desc, output_exprs) {
   tuple_delim_ = partition->line_delim();
   field_delim_ = partition->field_delim();
   escape_char_ = partition->escape_char();
-  
+
   // The default stringstream output precision is not very high, making it impossible
-  // to properly output doubles (they get rounded to ints).  Set a more reasonable 
+  // to properly output doubles (they get rounded to ints).  Set a more reasonable
   // precision.
   rowbatch_stringstream_.precision(RawValue::ASCII_PRECISION);
+}
+
+Status HdfsTableWriter::Init() {
+  parent_->mem_tracker()->Consume(HDFS_FLUSH_WRITE_SIZE);
+  return Status::OK;
+}
+
+void HdfsTableWriter::Close() {
+  parent_->mem_tracker()->Release(HDFS_FLUSH_WRITE_SIZE);
 }
 
 Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
@@ -57,12 +66,11 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
     limit = row_group_indices.size();
   }
   COUNTER_UPDATE(parent_->rows_inserted_counter(), limit);
-      
+
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-    
-  string rowbatch_string;
+
   {
     SCOPED_TIMER(parent_->encode_timer());
     for (int row_idx = 0; row_idx < limit; ++row_idx) {
@@ -95,17 +103,25 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
       rowbatch_stringstream_ << tuple_delim_;
       ++output_->num_rows;
     }
-    rowbatch_string = rowbatch_stringstream_.str();
   }
 
-  {
-    // Write row batch to hdfs.
+  if (rowbatch_stringstream_.tellp() >= HDFS_FLUSH_WRITE_SIZE || true) {
+    string rowbatch_string = rowbatch_stringstream_.str();
     SCOPED_TIMER(parent_->hdfs_write_timer());
     RETURN_IF_ERROR(Write(rowbatch_string.data(), rowbatch_string.size()));
+    rowbatch_stringstream_.str(string());
   }
-  rowbatch_stringstream_.str(string());
 
   *new_file = false;
+  return Status::OK;
+}
+
+Status HdfsTextTableWriter::Finalize() {
+  // Write the remaining buffered bytes to hdfs.
+  string rowbatch_string = rowbatch_stringstream_.str();
+  SCOPED_TIMER(parent_->hdfs_write_timer());
+  RETURN_IF_ERROR(Write(rowbatch_string.data(), rowbatch_string.size()));
+  rowbatch_stringstream_.str(string());
   return Status::OK;
 }
 

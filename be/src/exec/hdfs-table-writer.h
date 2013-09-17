@@ -87,9 +87,11 @@ class HdfsTableWriter {
   virtual uint64_t default_block_size() = 0;
 
  protected:
+  // Size to buffer output before calling Write() (which calls hdfsWrite), in bytes
+  // to minimize the overhead of Write()
+  static const int HDFS_FLUSH_WRITE_SIZE = 50 * 1024;
+
   // Write to the current hdfs file.
-  // Note: there is a noticeable overhead with this call.  Callers should buffer
-  // writes.
   Status Write(const char* data, int32_t len) {
     return Write(reinterpret_cast<const uint8_t*>(data), len);
   }

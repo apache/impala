@@ -47,12 +47,14 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   // There is nothing to do for text.
   virtual Status Init() { return Status::OK; }
-  virtual Status Finalize() { return Status::OK; }
+  virtual Status Finalize();
   virtual Status InitNewFile() { return Status::OK; }
   virtual void Close() { }
   virtual uint64_t default_block_size() { return 0; }
 
   // Appends delimited string representation of the rows in the batch to output partition.
+  // The resulting output is buffered until HDFS_FLUSH_WRITE_SIZE before being written
+  // to HDFS.
   Status AppendRowBatch(RowBatch* current_row,
                         const std::vector<int32_t>& row_group_indices, bool* new_file);
 
