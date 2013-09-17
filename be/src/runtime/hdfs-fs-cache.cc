@@ -17,6 +17,8 @@
 #include <boost/thread/locks.hpp>
 
 #include "common/logging.h"
+#include "util/debug-util.h"
+#include "util/error-util.h"
 
 using namespace std;
 using namespace boost;
@@ -27,9 +29,10 @@ HdfsFsCache::~HdfsFsCache() {
   for (HdfsFsMap::iterator i = fs_map_.begin(); i != fs_map_.end(); ++i) {
     int status = hdfsDisconnect(i->second);
     if (status != 0) {
+      string error_msg = GetStrErrMsg();
       // TODO: add error details
       LOG(ERROR) << "hdfsDisconnect(\"" << i->first.first << "\", " << i->first.second
-                 << ") failed: " << " Error(" << errno << "): " << strerror(errno);
+                 << ") failed: " << error_msg;
     }
   }
 }

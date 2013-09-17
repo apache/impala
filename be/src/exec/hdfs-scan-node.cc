@@ -42,6 +42,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/error-util.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/periodic-counter-updater.h"
@@ -382,8 +383,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
+    string error_msg = GetStrErrMsg();
     stringstream ss;
-    ss << "Failed to connect to HDFS." << "\nError(" << errno << "):" << strerror(errno);
+    ss << "Failed to connect to HDFS." << "\n" << error_msg;
     return Status(ss.str());
   }
 

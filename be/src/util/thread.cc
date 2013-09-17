@@ -21,6 +21,8 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/url-coding.h"
@@ -236,8 +238,8 @@ void Thread::SuperviseThread(const string& name, const string& category,
     Thread::ThreadFunctor functor, Promise<int64_t>* thread_started) {
   int64_t system_tid = syscall(SYS_gettid);
   if (system_tid == -1) {
-    LOG_EVERY_N(INFO, 100) << "Could not determine thread ID: "
-                           << string(strerror(errno));
+    string error_msg = GetStrErrMsg();
+    LOG_EVERY_N(INFO, 100) << "Could not determine thread ID: " << error_msg;
   }
   // Make a copy, since we want to refer to these variables after the unsafe point below.
   string category_copy = category;

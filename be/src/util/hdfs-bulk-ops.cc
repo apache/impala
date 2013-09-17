@@ -17,6 +17,8 @@
 #include <vector>
 #include <boost/foreach.hpp>
 
+#include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/hdfs-util.h"
 
 using namespace std;
@@ -60,6 +62,7 @@ void HdfsOp::Execute() const {
   }
 
   if (err == -1) {
+    string error_msg = GetStrErrMsg();
     stringstream ss;
     ss << "Hdfs op (";
     switch (op_) {
@@ -76,9 +79,9 @@ void HdfsOp::Execute() const {
         ss << "DELETE_THEN_CREATE " << src_;
         break;
     }
-    ss << ") failed, error was: ";
+    ss << ") failed, error was: " << error_msg;
 
-    op_set_->AddError(AppendHdfsErrorMessage(ss.str()), this);
+    op_set_->AddError(ss.str(), this);
   }
 
   op_set_->MarkOneOpDone();

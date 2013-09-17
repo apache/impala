@@ -13,22 +13,19 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_UTIL_HDFS_UTIL_H
-#define IMPALA_UTIL_HDFS_UTIL_H
+#ifndef IMPALA_UTIL_ERROR_UTIL_H
+#define IMPALA_UTIL_ERROR_UTIL_H
 
 #include <string>
-#include <hdfs.h>
-#include "common/status.h"
+#include <boost/cstdint.hpp>
 
 namespace impala {
 
-// Utility function to get error messages from HDFS. This function takes prefix/file and
-// appends errno to it. Note: any stdlib function can reset errno, this should be called
-// immediately following the failed call into libhdfs.
-std::string GetHdfsErrorMsg(const std::string& prefix, const std::string& file = "");
-
-// Return the size, in bytes, of a file from the hdfs connection.
-Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize);
+// Returns the error message for errno. We should not use strerror directly
+// as that is not thread safe.
+// Returns empty string if errno is 0.
+std::string GetStrErrMsg();
 
 }
-#endif // IMPALA_UTIL_HDFS_UTIL_H
+
+#endif

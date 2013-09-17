@@ -14,6 +14,7 @@
 
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-internal.h"
+#include "util/error-util.h"
 
 using namespace boost;
 using namespace impala;
@@ -244,27 +245,30 @@ Status DiskIoMgr::ScanRange::OpenScanRange(hdfsFS hdfs_connection) {
     // the handle across multiple scan ranges of a file?
     hdfs_file_ = hdfsOpenFile(hdfs_connection, file_, O_RDONLY, 0, 0, 0);
     if (hdfs_file_ == NULL) {
-      return Status(AppendHdfsErrorMessage("Failed to open HDFS file ", file_));
+      return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
     if (hdfsSeek(hdfs_connection, hdfs_file_, offset_) != 0) {
+      string error_msg = GetHdfsErrorMsg("");
       stringstream ss;
-      ss << "Error seeking to " << offset_ << " in file: " << file_;
-      return Status(AppendHdfsErrorMessage(ss.str()));
+      ss << "Error seeking to " << offset_ << " in file: " << file_ << " " << error_msg;
+      return Status(ss.str());
     }
   } else {
     if (local_file_ != NULL) return Status::OK;
 
     local_file_ = fopen(file_, "r");
     if (local_file_ == NULL) {
+      string error_msg = GetStrErrMsg();
       stringstream ss;
-      ss << "Could not open file: " << file_ << ": " << strerror(errno);
+      ss << "Could not open file: " << file_ << ": " << error_msg;
       return Status(ss.str());
     }
     if (fseek(local_file_, offset_, SEEK_SET) == -1) {
+      string error_msg = GetStrErrMsg();
       stringstream ss;
       ss << "Could not seek to " << offset_ << " for file: " << file_
-         << ": " << strerror(errno);
+         << ": " << error_msg;
       return Status(ss.str());
     }
   }
@@ -319,8 +323,7 @@ Status DiskIoMgr::ScanRange::ReadFromScanRange(hdfsFS hdfs_connection,
       int last_read = hdfsRead(hdfs_connection, hdfs_file_,
           buffer + *bytes_read, bytes_to_read - *bytes_read);
       if (last_read == -1) {
-        return Status(
-            AppendHdfsErrorMessage("Error reading from HDFS file: ", file_));
+        return Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
       } else if (last_read == 0) {
         // No more bytes in the file.  The scan range went past the end
         *eosr = true;
@@ -332,9 +335,10 @@ Status DiskIoMgr::ScanRange::ReadFromScanRange(hdfsFS hdfs_connection,
     DCHECK(local_file_ != NULL);
     *bytes_read = fread(buffer, 1, bytes_to_read, local_file_);
     if (*bytes_read < 0) {
+      string error_msg = GetStrErrMsg();
       stringstream ss;
       ss << "Could not read from " << file_ << " at byte offset: "
-         << bytes_read_ << ": " << strerror(errno);
+         << bytes_read_ << ": " << error_msg;
       return Status(ss.str());
     }
   }

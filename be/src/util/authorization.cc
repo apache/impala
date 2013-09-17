@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "util/authorization.h"
+
 #include <stdio.h>
 #include <signal.h>
 #include <boost/algorithm/string.hpp>
@@ -27,7 +29,8 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
-#include "authorization.h"
+#include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/network-util.h"
 
 using namespace std;
@@ -209,8 +212,9 @@ static void RunKinit() {
     }
 
     if (!succeeded) {
+      string error_msg = GetStrErrMsg();
       if (!started) {
-        LOG(ERROR) << "Exiting: failed to register with kerberos: errno: " << errno
+        LOG(ERROR) << "Exiting: failed to register with kerberos: " << error_msg
                    << " '" << kreturn << "'";
         exit(1);
       }
@@ -218,7 +222,7 @@ static void RunKinit() {
       // are ok and we'll try to renew the ticket later.
       ++failures;
       LOG(ERROR) << "Failed to extend kerberos ticket: '" << kreturn
-                 << "' errno " << strerror(errno) << ". Failure count: " << failures;
+                 << "' " << error_msg << ". Failure count: " << failures;
     } else {
       VLOG_CONNECTION << "kinit returned: '" << kreturn << "'";
     }
@@ -254,10 +258,8 @@ Status InitKerberos(const string& appname) {
     string hostname;
     Status status = GetHostname(&hostname);
     if (!status.ok()) {
-      stringstream ss;
-      ss << "InitKerberos call to gethostname failed: errno " << errno;
-      LOG(ERROR) << ss;
-      return Status(ss.str());
+      status.AddErrorMsg("InitKerberos call to GetHostname failed.");
+      return status;
     }
     FLAGS_principal.replace(off, HOSTNAME_PATTERN.size(), hostname);
   }
@@ -290,8 +292,9 @@ Status GetKerberosTransportFactory(const string& principal,
 
   // The "keytab" callback is never called.  Set the file name in the environment.
   if (setenv("KRB5_KTNAME", key_tab_file.c_str(), 1)) {
+    string error_msg = GetStrErrMsg();
     stringstream ss;
-    ss << "Kerberos could not set KRB5_KTNAME: errno " << errno;
+    ss << "Kerberos could not set KRB5_KTNAME: " << error_msg;
     LOG(ERROR) << ss;
     return Status(ss.str());
   }

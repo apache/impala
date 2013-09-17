@@ -34,6 +34,7 @@ add_library(Util
   decompress.cc
   default-path-handlers.cc
   disk-info.cc
+  error-util.cc
   hdfs-util.cc
   hdfs-bulk-ops.cc
   impalad-metrics.cc

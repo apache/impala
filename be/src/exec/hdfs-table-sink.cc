@@ -168,7 +168,7 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   // Get Hdfs connection from runtime state.
   hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
-    return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
+    return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
   }
 
   rows_inserted_counter_ =
@@ -261,7 +261,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   const char* tmp_hdfs_file_name_template_cstr =
       output_partition->current_file_name.c_str();
   if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_template_cstr) == 0) {
-    return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
+    return Status(GetHdfsErrorMsg("Temporary HDFS file already exists: ",
         output_partition->current_file_name));
   }
   uint64_t block_size = output_partition->partition_descriptor->block_size();
@@ -270,7 +270,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
       tmp_hdfs_file_name_template_cstr, O_WRONLY, 0, 0, block_size);
   if (output_partition->tmp_hdfs_file == NULL) {
-    return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
+    return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
         output_partition->current_file_name));
   } else {
     ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
@@ -448,7 +448,7 @@ void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* par
 
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {
-    state->LogError(AppendHdfsErrorMessage("Failed to close HDFS file: ",
+    state->LogError(GetHdfsErrorMsg("Failed to close HDFS file: ",
         partition->current_file_name));
   }
   partition->tmp_hdfs_file = NULL;
@@ -470,10 +470,8 @@ Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_
       output_partition->current_file_name.c_str());
 
   if (info == NULL) {
-    stringstream msg;
-    msg << "Failed to get info on temporary HDFS file."
-        << output_partition->current_file_name;
-    return Status(AppendHdfsErrorMessage(msg.str()));
+    return Status(GetHdfsErrorMsg("Failed to get info on temporary HDFS file: ",
+        output_partition->current_file_name));
   }
 
   *size = info->mBlockSize;

@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "util/network-util.h"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <limits.h>
-
 #include <sstream>
-
 #include <boost/foreach.hpp>
 
-#include "util/network-util.h"
+#include "util/debug-util.h"
+#include "util/error-util.h"
 
 using namespace std;
 using namespace impala;
@@ -36,8 +37,9 @@ Status GetHostname(string* hostname) {
   char name[HOST_NAME_MAX];
   int ret = gethostname(name, HOST_NAME_MAX);
   if (ret != 0) {
+    string error_msg = GetStrErrMsg();
     stringstream ss;
-    ss << "Could not get hostname: errno: " << errno;
+    ss << "Could not get hostname: " << error_msg;
     return Status(ss.str());
   }
   *hostname = string(name);

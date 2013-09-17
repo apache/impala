@@ -12,32 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/hdfs-util.h"
-
-#include <sstream>
-#include <string.h>
-
 #include "util/error-util.h"
+
+#include <errno.h>
+#include <string.h>
+#include <sstream>
 
 using namespace std;
 
 namespace impala {
 
-string GetHdfsErrorMsg(const string& prefix, const string& file) {
-  string error_msg = GetStrErrMsg();
+string GetStrErrMsg() {
+  // Save errno. "<<" could reset it.
+  int e = errno;
+  if (e == 0) return "";
   stringstream ss;
-  ss << prefix << file << "\n" << error_msg;
+  char buf[1024];
+  ss << "Error(" << e << "): " << strerror_r(e, buf, 1024);
   return ss.str();
 }
 
-Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize) {
-  hdfsFileInfo* info = hdfsGetPathInfo(connection, filename);
-  if (info == NULL) return Status(GetHdfsErrorMsg("Failed to get file info ", filename));
-  *filesize = info->mSize;
-  hdfsFreeFileInfo(info, 1);
-  return Status::OK;
 }
-
-
-}
-

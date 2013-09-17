@@ -531,7 +531,7 @@ Status Coordinator::FinalizeQuery() {
         hdfsFileInfo* existing_files =
             hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
         if (existing_files == NULL) {
-          return AppendHdfsErrorMessage("Could not list directory: ", part_path);
+          return GetHdfsErrorMsg("Could not list directory: ", part_path);
         }
         Status delete_status = Status::OK;
         for (int i = 0; i < num_files; ++i) {
