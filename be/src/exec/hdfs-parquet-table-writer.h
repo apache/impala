@@ -71,14 +71,19 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   virtual void Close();
 
-  virtual uint64_t default_block_size() { return HDFS_BLOCK_SIZE; }
+  // Returns the target HDFS block size to use. This can either be a query option
+  // or the default value: 'HDFS_BLOCK_SIZE'
+  virtual uint64_t default_block_size();
 
  private:
-  // Default data page size.  In bytes.
+  // Default data page size. In bytes.
   static const int DATA_PAGE_SIZE = 64 * 1024;
 
-  // Default hdfs block size.  In Bytes.
+  // Default hdfs block size. In bytes.
   static const int HDFS_BLOCK_SIZE = 1024 * 1024 * 1024;
+
+  // Align block sizes to this constant. In bytes.
+  static const int HDFS_BLOCK_ALIGNMENT = 1024 * 1024;
 
   // Default row group size.  In bytes.
   static const int ROW_GROUP_SIZE = HDFS_BLOCK_SIZE;

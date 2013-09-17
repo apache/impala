@@ -111,6 +111,9 @@ enum TImpalaQueryOptions {
   // If the table is small and the table is used several time, set it to true to improve
   // performance. 
   HBASE_CACHE_BLOCKS,
+
+  // Target file size for inserts into parquet tables. 0 uses the default.
+  PARQUET_FILE_SIZE,
 }
 
 // The summary of an insert.

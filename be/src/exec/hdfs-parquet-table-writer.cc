@@ -669,6 +669,17 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   return Status::OK;
 }
 
+uint64_t HdfsParquetTableWriter::default_block_size() {
+  if (state_->query_options().__isset.parquet_file_size &&
+      state_->query_options().parquet_file_size > 0) {
+    // HDFS does not like block sizes that are not aligned
+    int64_t file_size = state_->query_options().parquet_file_size;
+    return BitUtil::RoundUp(file_size, HDFS_BLOCK_ALIGNMENT);
+  }
+  DCHECK_EQ(HDFS_BLOCK_SIZE % HDFS_BLOCK_ALIGNMENT, 0);
+  return HDFS_BLOCK_SIZE;
+}
+
 Status HdfsParquetTableWriter::InitNewFile() {
   DCHECK(current_row_group_ == NULL);
 

@@ -197,6 +197,9 @@ public class ImpaladClientExecutor {
         case HBASE_CACHE_BLOCKS:
           optionValue = String.valueOf(queryOptions.isHbase_cache_blocks());
           break;
+        case PARQUET_FILE_SIZE:
+          optionValue = String.valueOf(queryOptions.getParquet_file_size());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

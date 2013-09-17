@@ -1247,6 +1247,9 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_hbase_cache_blocks(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::PARQUET_FILE_SIZE:
+        query_options->__set_parquet_file_size(atoi(value.c_str()));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1492,6 +1495,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::HBASE_CACHE_BLOCKS:
         val << query_option.hbase_cache_blocks;
+        break;
+      case TImpalaQueryOptions::PARQUET_FILE_SIZE:
+        val << query_option.parquet_file_size;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

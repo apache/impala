@@ -347,7 +347,12 @@ inline Status HdfsTableSink::GetOutputPartition(
 
     OutputPartition* partition = state->obj_pool()->Add(new OutputPartition());
     BuildHdfsFileNames(partition);
-    RETURN_IF_ERROR(InitOutputPartition(state, *partition_descriptor, partition));
+    Status status = InitOutputPartition(state, *partition_descriptor, partition);
+    if (!status.ok()) {
+      // TODO: the error handling paths need to be revisited.
+      if (partition->writer.get() != NULL) partition->writer->Close();
+      return status;
+    }
 
     // Save the partition name so that the coordinator can create partition
     // directory structure if needed
@@ -444,8 +449,6 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
 
 void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
   if (partition->tmp_hdfs_file == NULL) return;
-  partition->writer->Close();
-
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {
     state->LogError(GetHdfsErrorMsg("Failed to close HDFS file: ",
@@ -461,6 +464,7 @@ void HdfsTableSink::Close(RuntimeState* state) {
           partition_keys_to_output_partitions_.begin();
       cur_partition != partition_keys_to_output_partitions_.end();
       ++cur_partition) {
+    cur_partition->second.first->writer->Close();
     ClosePartitionFile(state, cur_partition->second.first);
   }
 }
