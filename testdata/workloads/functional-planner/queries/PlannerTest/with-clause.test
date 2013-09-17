@@ -7,13 +7,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -24,7 +24,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Basic test with a single with-clause view that references a catalog view.
@@ -36,13 +36,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -53,11 +53,11 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Multiple views in with-clause. Only one view is used.
-with t1 as (select int_col x, bigint_col y from functional.alltypes), 
+with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select x, y from t2
 ---- PLAN
@@ -66,18 +66,18 @@ PLAN FRAGMENT 0
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Multiple views in with-clause. All views are used in a union.
-with t1 as (select int_col x, bigint_col y from functional.alltypes), 
+with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select * from t1 union all select * from t2 union all select * from t3
 ---- PLAN
@@ -85,25 +85,25 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----2:MERGE
   |       merging 1 SELECT CONSTANT
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----3:MERGE
   |       merging 2 SELECT CONSTANT
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -113,11 +113,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   3:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -127,11 +127,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   2:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -141,15 +141,15 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   1:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Multiple views in with-clause. All views are used in a join.
-with t1 as (select int_col x, bigint_col y from functional.alltypes), 
+with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select int_col x, bigint_col y from functional.alltypestiny),
 t3 as (select int_col x, bigint_col y from functional.alltypessmall)
 select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
@@ -161,31 +161,31 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypessmall #partitions=4 size=6.32KB compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:EXCHANGE
-     tuple ids: 0 2 4 
+     tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -198,23 +198,23 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----6:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----5:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -224,8 +224,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB compact
-     tuple ids: 4 
+     table=functional.alltypessmall #partitions=4 size=6.32KB
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -235,8 +235,8 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 2 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 2
 ====
 ---- QUERY
 # Self-join of with-clause table to make sure the on clause is properly set
@@ -251,31 +251,31 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
-     tuple ids: 0 2 4 
+     tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -288,22 +288,22 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----7:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----6:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -313,8 +313,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 4 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -324,8 +324,8 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: int_col
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 2 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -336,7 +336,7 @@ PLAN FRAGMENT 4
 
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Self-join of with-clause table to make sure the using clause is properly set
@@ -351,31 +351,31 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
-     tuple ids: 0 2 4 
+     tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -388,22 +388,22 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----7:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----6:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -413,8 +413,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 4 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -424,8 +424,8 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: int_col
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 2 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -436,7 +436,7 @@ PLAN FRAGMENT 4
 
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Self-join of with-clause table to make sure the join op is properly set
@@ -451,31 +451,31 @@ PLAN FRAGMENT 0
   |  join op: FULL OUTER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0N 2N 4N 
-  |  
+  |  tuple ids: 0N 2N 4N
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2N 
-  |  
+  |  tuple ids: 0 2N
+  |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 0N 2N 4N 
+     tuple ids: 0N 2N 4N
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -488,13 +488,13 @@ PLAN FRAGMENT 1
   |  join op: FULL OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0N 2N 4N 
-  |  
+  |  tuple ids: 0N 2N 4N
+  |
   |----8:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   7:EXCHANGE
-     tuple ids: 0 2N 
+     tuple ids: 0 2N
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -504,8 +504,8 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: int_col
 
   3:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 4 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: int_col
@@ -518,13 +518,13 @@ PLAN FRAGMENT 3
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2N 
-  |  
+  |  tuple ids: 0 2N
+  |
   |----6:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -534,8 +534,8 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: int_col
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 2 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -546,7 +546,7 @@ PLAN FRAGMENT 5
 
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Self-join of with-clause table to make sure join hints are properly set
@@ -563,31 +563,31 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
-     tuple ids: 0 2 4 
+     tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -600,13 +600,13 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 4 
-  |  
+  |  tuple ids: 0 2 4
+  |
   |----7:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:EXCHANGE
-     tuple ids: 0 2 
+     tuple ids: 0 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -616,8 +616,8 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: int_col
 
   3:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 4 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -630,14 +630,14 @@ PLAN FRAGMENT 3
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = int_col
-  |  tuple ids: 0 2 
-  |  
+  |  tuple ids: 0 2
+  |
   |----5:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -647,8 +647,8 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B compact
-     tuple ids: 2 
+     table=functional.alltypestiny #partitions=4 size=460B
+     tuple ids: 2
 ====
 ---- QUERY
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
@@ -662,18 +662,18 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: <slot 8> ASC
   |  limit: 1
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:MERGE
   |       merging 1 SELECT CONSTANT
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -681,10 +681,10 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: <slot 8> ASC
   |  limit: 1
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -694,11 +694,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -708,11 +708,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
@@ -726,18 +726,18 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: <slot 8> ASC
   |  limit: 1
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:MERGE
   |       merging 1 SELECT CONSTANT
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -745,10 +745,10 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: <slot 8> ASC
   |  limit: 1
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -758,11 +758,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -772,11 +772,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Test with clause in an insert statement.
@@ -792,7 +792,7 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: functional.alltypestiny.year, functional.alltypestiny.month
@@ -802,7 +802,7 @@ PLAN FRAGMENT 0
     partitions: functional.alltypestiny.year,functional.alltypestiny.month
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -813,7 +813,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 ---- QUERY
 # Test with clause in an insert statement and in its query statement.
@@ -830,15 +830,15 @@ PLAN FRAGMENT 0
     partitions: <slot 63>,<slot 64>
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -848,7 +848,7 @@ PLAN FRAGMENT 0
     partitions: <slot 63>,<slot 64>
 
   3:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -858,11 +858,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -872,9 +872,9 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   4:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====

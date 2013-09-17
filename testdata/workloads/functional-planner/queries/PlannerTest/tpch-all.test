@@ -25,18 +25,18 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate <= '1998-09-02'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_returnflag, l_linestatus
@@ -48,10 +48,10 @@ PLAN FRAGMENT 1
   3:AGGREGATE
   |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * (1.0 - l_discount))), SUM(SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax))), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
   |  group by: l_returnflag, l_linestatus
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -63,12 +63,12 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate <= '1998-09-02'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -110,47 +110,47 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    n.n_regionkey = r.r_regionkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----7:SCAN HDFS
   |       table=tpch.region #partitions=1 size=384B compact
   |       predicates: r.r_name = 'EUROPE'
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
   |       predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps.ps_suppkey
@@ -162,31 +162,31 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n.n_regionkey = r.r_regionkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----13:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----12:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----11:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   10:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -196,9 +196,9 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   7:SCAN HDFS
-     table=tpch.region #partitions=1 size=384B compact
+     table=tpch.region #partitions=1 size=384B
      predicates: r.r_name = 'EUROPE'
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -208,8 +208,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 3 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -219,8 +219,8 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: s.s_suppkey
 
   3:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 2 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -233,14 +233,14 @@ PLAN FRAGMENT 4
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----9:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -250,9 +250,9 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
+     table=tpch.part #partitions=1 size=22.83MB
      predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
-     tuple ids: 1 
+     tuple ids: 1
 ====
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
 select
@@ -270,11 +270,11 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: MIN(ps_supplycost)
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: p_partkey
@@ -285,10 +285,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: MIN(MIN(ps_supplycost))
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -300,11 +300,11 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: MIN(ps_supplycost)
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select
@@ -332,22 +332,22 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    t1.p_partkey = t2.p_partkey
   |    t1.ps_supplycost = t2.ps_min_supplycost
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -355,10 +355,10 @@ PLAN FRAGMENT 0
   6:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   5:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -370,21 +370,21 @@ PLAN FRAGMENT 1
   3:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    t1.p_partkey = t2.p_partkey
   |    t1.ps_supplycost = t2.ps_min_supplycost
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----4:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1 size=108.41KB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -394,8 +394,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB compact
-     tuple ids: 1 
+     table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1 size=6.37KB
+     tuple ids: 1
 ====
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
@@ -427,39 +427,39 @@ PLAN FRAGMENT 0
   6:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   5:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
   |       predicates: c.c_mktsegment = 'BUILDING'
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o_orderdate < '1995-03-15'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate > '1995-03-15'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -467,10 +467,10 @@ PLAN FRAGMENT 0
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   11:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
@@ -482,15 +482,15 @@ PLAN FRAGMENT 1
   6:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   10:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   9:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -502,30 +502,30 @@ PLAN FRAGMENT 2
   5:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----8:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----7:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate > '1995-03-15'
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -535,9 +535,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
+     table=tpch.customer #partitions=1 size=23.08MB
      predicates: c.c_mktsegment = 'BUILDING'
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -547,9 +547,9 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o_orderdate < '1995-03-15'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -590,32 +590,32 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:AGGREGATE
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -623,10 +623,10 @@ PLAN FRAGMENT 0
   10:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   9:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: o_orderpriority
@@ -638,19 +638,19 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:AGGREGATE
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   8:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   7:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -661,21 +661,21 @@ PLAN FRAGMENT 2
 
   3:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----6:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -685,9 +685,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -733,69 +733,69 @@ PLAN FRAGMENT 0
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   11:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n_regionkey = r_regionkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----9:SCAN HDFS
   |       table=tpch.region #partitions=1 size=384B compact
   |       predicates: r_name = 'ASIA'
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = n_nationkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----7:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = c_nationkey
   |    o_custkey = c_custkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -803,10 +803,10 @@ PLAN FRAGMENT 0
   21:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   20:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: n_name
@@ -818,15 +818,15 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   19:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: n_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   18:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -838,57 +838,57 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n_regionkey = r_regionkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----17:EXCHANGE
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = n_nationkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----16:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = c_nationkey
   |    o_custkey = c_custkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----15:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----14:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----13:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -898,9 +898,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:SCAN HDFS
-     table=tpch.region #partitions=1 size=384B compact
+     table=tpch.region #partitions=1 size=384B
      predicates: r_name = 'ASIA'
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -910,8 +910,8 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 4 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -921,8 +921,8 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
-     tuple ids: 3 
+     table=tpch.customer #partitions=1 size=23.08MB
+     tuple ids: 3
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -932,8 +932,8 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 2 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 2
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -943,9 +943,9 @@ PLAN FRAGMENT 7
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -981,24 +981,24 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE
   |  output: SUM(l_extendedprice * l_discount)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * l_discount))
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1009,13 +1009,13 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: SUM(l_extendedprice * l_discount)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1064,89 +1064,89 @@ PLAN FRAGMENT 0
   16:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   15:AGGREGATE
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   14:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = n2.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 6 7 
-  |  
+  |  tuple ids: 0 1 2 3 4 5 6 7
+  |
   |----13:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 7 
-  |    
+  |       tuple ids: 7
+  |
   12:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n1.n_regionkey = r_regionkey
-  |  tuple ids: 0 1 2 3 4 5 6 
-  |  
+  |  tuple ids: 0 1 2 3 4 5 6
+  |
   |----11:SCAN HDFS
   |       table=tpch.region #partitions=1 size=384B compact
   |       predicates: r_name = 'AMERICA'
-  |       tuple ids: 6 
-  |    
+  |       tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    c_nationkey = n1.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----9:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o_custkey = c_custkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----7:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_partkey = p_partkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
   |       predicates: p_type = 'ECONOMY ANODIZED STEEL'
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o_orderdate >= '1995-01-01', o_orderdate < '1996-12-31'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -1154,10 +1154,10 @@ PLAN FRAGMENT 0
   29:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   28:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: year(o_orderdate)
@@ -1169,15 +1169,15 @@ PLAN FRAGMENT 1
   16:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   27:AGGREGATE
   |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: year(o_orderdate)
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   26:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: o_custkey
@@ -1189,46 +1189,46 @@ PLAN FRAGMENT 2
   15:AGGREGATE
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   14:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = n2.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 6 7 
-  |  
+  |  tuple ids: 0 1 2 3 4 5 6 7
+  |
   |----25:EXCHANGE
-  |       tuple ids: 7 
-  |    
+  |       tuple ids: 7
+  |
   12:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n1.n_regionkey = r_regionkey
-  |  tuple ids: 0 1 2 3 4 5 6 
-  |  
+  |  tuple ids: 0 1 2 3 4 5 6
+  |
   |----24:EXCHANGE
-  |       tuple ids: 6 
-  |    
+  |       tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    c_nationkey = n1.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----23:EXCHANGE
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    o_custkey = c_custkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----22:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   21:EXCHANGE
-     tuple ids: 0 1 2 3 
+     tuple ids: 0 1 2 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1238,8 +1238,8 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   13:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 7 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 7
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1249,9 +1249,9 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   11:SCAN HDFS
-     table=tpch.region #partitions=1 size=384B compact
+     table=tpch.region #partitions=1 size=384B
      predicates: r_name = 'AMERICA'
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1261,8 +1261,8 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 5 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 5
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1272,8 +1272,8 @@ PLAN FRAGMENT 6
     HASH_PARTITIONED: c_custkey
 
   7:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
-     tuple ids: 4 
+     table=tpch.customer #partitions=1 size=23.08MB
+     tuple ids: 4
 
 PLAN FRAGMENT 7
   PARTITION: HASH_PARTITIONED: l_suppkey
@@ -1286,13 +1286,13 @@ PLAN FRAGMENT 7
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----20:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   19:EXCHANGE
-     tuple ids: 0 1 2 
+     tuple ids: 0 1 2
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -1302,8 +1302,8 @@ PLAN FRAGMENT 8
     HASH_PARTITIONED: s_suppkey
 
   5:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 3 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 3
 
 PLAN FRAGMENT 9
   PARTITION: RANDOM
@@ -1316,23 +1316,23 @@ PLAN FRAGMENT 9
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_partkey = p_partkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----18:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----17:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 10
   PARTITION: RANDOM
@@ -1342,9 +1342,9 @@ PLAN FRAGMENT 10
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
+     table=tpch.part #partitions=1 size=22.83MB
      predicates: p_type = 'ECONOMY ANODIZED STEEL'
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 11
   PARTITION: RANDOM
@@ -1354,9 +1354,9 @@ PLAN FRAGMENT 11
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o_orderdate >= '1995-01-01', o_orderdate < '1996-12-31'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1416,68 +1416,68 @@ PLAN FRAGMENT 0
   12:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   11:AGGREGATE
   |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----9:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----7:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_suppkey = ps.ps_suppkey
   |    l.l_partkey = ps.ps_partkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.partsupp #partitions=1 size=112.71MB compact
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
   |       predicates: p.p_name LIKE '%green%'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -1485,10 +1485,10 @@ PLAN FRAGMENT 0
   22:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   21:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: n.n_name, year(o.o_orderdate)
@@ -1500,15 +1500,15 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   20:AGGREGATE
   |  output: SUM(SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity))
   |  group by: n.n_name, year(o.o_orderdate)
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   19:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -1520,47 +1520,47 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 4 5 
-  |  
+  |  tuple ids: 0 1 2 3 4 5
+  |
   |----18:EXCHANGE
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----17:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_suppkey = ps.ps_suppkey
   |    l.l_partkey = ps.ps_partkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----16:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----15:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   14:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1570,8 +1570,8 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 5 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1581,8 +1581,8 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 4 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1592,8 +1592,8 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.partsupp #partitions=1 size=112.71MB compact
-     tuple ids: 3 
+     table=tpch.partsupp #partitions=1 size=112.71MB
+     tuple ids: 3
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1603,8 +1603,8 @@ PLAN FRAGMENT 6
     HASH_PARTITIONED: o.o_orderkey
 
   3:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
-     tuple ids: 2 
+     table=tpch.orders #partitions=1 size=162.56MB
+     tuple ids: 2
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -1617,14 +1617,14 @@ PLAN FRAGMENT 7
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----13:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -1634,9 +1634,9 @@ PLAN FRAGMENT 8
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
+     table=tpch.part #partitions=1 size=22.83MB
      predicates: p.p_name LIKE '%green%'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1699,48 +1699,48 @@ PLAN FRAGMENT 0
   8:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   7:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    c.c_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o.o_orderdate >= '1993-10-01', o.o_orderdate < '1994-01-01'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_returnflag = 'R'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -1748,10 +1748,10 @@ PLAN FRAGMENT 0
   16:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   15:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
@@ -1763,15 +1763,15 @@ PLAN FRAGMENT 1
   8:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   14:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   13:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: o.o_custkey
@@ -1783,28 +1783,28 @@ PLAN FRAGMENT 2
   7:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    c.c_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----12:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----11:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   10:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1814,8 +1814,8 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
-     tuple ids: 3 
+     table=tpch.nation #partitions=1 size=2.15KB
+     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1825,8 +1825,8 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: c.c_custkey
 
   3:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
-     tuple ids: 2 
+     table=tpch.customer #partitions=1 size=23.08MB
+     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1839,15 +1839,15 @@ PLAN FRAGMENT 5
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----9:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_returnflag = 'R'
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1857,9 +1857,9 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o.o_orderdate >= '1993-10-01', o.o_orderdate < '1994-01-01'
-     tuple ids: 1 
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1896,32 +1896,32 @@ PLAN FRAGMENT 0
   5:AGGREGATE
   |  output: SUM(ps_supplycost * ps_availqty)
   |  group by: ps_partkey
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = ps.ps_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.partsupp #partitions=1 size=112.71MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n.n_nationkey = s.s_nationkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.nation #partitions=1 size=2.15KB
      predicates: n.n_name = 'GERMANY'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps_partkey
@@ -1932,10 +1932,10 @@ PLAN FRAGMENT 0
   11:AGGREGATE
   |  output: SUM(SUM(ps_supplycost * ps_availqty))
   |  group by: ps_partkey
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   10:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s.s_suppkey
@@ -1947,19 +1947,19 @@ PLAN FRAGMENT 1
   5:AGGREGATE
   |  output: SUM(ps_supplycost * ps_availqty)
   |  group by: ps_partkey
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    s.s_suppkey = ps.ps_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----9:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   8:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1969,8 +1969,8 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: ps.ps_suppkey
 
   3:SCAN HDFS
-     table=tpch.partsupp #partitions=1 size=112.71MB compact
-     tuple ids: 2 
+     table=tpch.partsupp #partitions=1 size=112.71MB
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: n.n_nationkey
@@ -1983,13 +1983,13 @@ PLAN FRAGMENT 3
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    n.n_nationkey = s.s_nationkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----7:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   6:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1999,8 +1999,8 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: s.s_nationkey
 
   1:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 1 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2012,7 +2012,7 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=tpch.nation #partitions=1 size=2.15KB
      predicates: n.n_name = 'GERMANY'
-     tuple ids: 0 
+     tuple ids: 0
 ====
 insert overwrite table tpch.q11_sum_tmp
 select sum(part_value) as total_value
@@ -2026,12 +2026,12 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE
   |  output: SUM(part_value)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q11_part_tmp #partitions=1 size=509.46KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2041,11 +2041,11 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  output: SUM(SUM(part_value))
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2056,12 +2056,12 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: SUM(part_value)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q11_part_tmp #partitions=1 size=509.46KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Q12 - Shipping Mode and Order Priority Query
 # Modifications: Converted select from multiple tables to joins, added limit
@@ -2101,27 +2101,27 @@ PLAN FRAGMENT 0
   4:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:AGGREGATE
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   |  group by: l_shipmode
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2129,10 +2129,10 @@ PLAN FRAGMENT 0
   10:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   9:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_shipmode
@@ -2144,15 +2144,15 @@ PLAN FRAGMENT 1
   4:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   8:AGGREGATE
   |  output: SUM(SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END)), SUM(SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END))
   |  group by: l_shipmode
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   7:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -2164,19 +2164,19 @@ PLAN FRAGMENT 2
   3:AGGREGATE
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   |  group by: l_shipmode
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----6:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   5:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2186,8 +2186,8 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: o.o_orderkey
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
-     tuple ids: 1 
+     table=tpch.orders #partitions=1 size=162.56MB
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2199,7 +2199,7 @@ PLAN FRAGMENT 4
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -2239,32 +2239,32 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:AGGREGATE
   |  output: COUNT(1)
   |  group by: COUNT(o_orderkey)
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:AGGREGATE
   |  output: COUNT(o_orderkey)
   |  group by: c_custkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0N 1 
-  |  
+  |  tuple ids: 0N 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.orders #partitions=1 size=162.56MB
      predicates: NOT o.o_comment LIKE '%special%requests%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2272,10 +2272,10 @@ PLAN FRAGMENT 0
   13:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   12:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_count
@@ -2287,15 +2287,15 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   11:AGGREGATE
   |  output: SUM(COUNT(1))
   |  group by: c_count
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   10:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: c_custkey
@@ -2307,15 +2307,15 @@ PLAN FRAGMENT 2
   4:AGGREGATE
   |  output: COUNT(1)
   |  group by: COUNT(o_orderkey)
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   9:AGGREGATE
   |  output: SUM(COUNT(o_orderkey))
   |  group by: c_custkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   8:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: o.o_custkey
@@ -2327,19 +2327,19 @@ PLAN FRAGMENT 3
   3:AGGREGATE
   |  output: COUNT(o_orderkey)
   |  group by: c_custkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0N 1 
-  |  
+  |  tuple ids: 0N 1
+  |
   |----7:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   6:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2349,8 +2349,8 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: c.c_custkey
 
   1:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
-     tuple ids: 1 
+     table=tpch.customer #partitions=1 size=23.08MB
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2362,7 +2362,7 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=tpch.orders #partitions=1 size=162.56MB
      predicates: NOT o.o_comment LIKE '%special%requests%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
@@ -2387,34 +2387,34 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:AGGREGATE
   |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   6:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l.l_partkey
@@ -2425,20 +2425,20 @@ PLAN FRAGMENT 1
 
   3:AGGREGATE
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----5:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   4:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2448,8 +2448,8 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: p.p_partkey
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
-     tuple ids: 1 
+     table=tpch.part #partitions=1 size=22.83MB
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2461,7 +2461,7 @@ PLAN FRAGMENT 3
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -2491,12 +2491,12 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_suppkey
@@ -2507,10 +2507,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2522,12 +2522,12 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-     tuple ids: 0 
+     tuple ids: 0
 ====
 insert overwrite table tpch.max_revenue
 select max(total_revenue)
@@ -2541,12 +2541,12 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE
   |  output: MAX(total_revenue)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.revenue #partitions=1 size=137.60KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2556,11 +2556,11 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  output: MAX(MAX(total_revenue))
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2571,12 +2571,12 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  output: MAX(total_revenue)
-  |  group by: 
-  |  tuple ids: 1 
-  |  
+  |  group by:
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.revenue #partitions=1 size=137.60KB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Modifications - Added limit
 select
@@ -2599,31 +2599,31 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    r.total_revenue = m.max_revenue
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.max_revenue #partitions=1 size=10B compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = r.supplier_no
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.revenue #partitions=1 size=137.60KB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2631,10 +2631,10 @@ PLAN FRAGMENT 0
   9:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   8:EXCHANGE
-     tuple ids: 0 1 2 
+     tuple ids: 0 1 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2646,29 +2646,29 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    r.total_revenue = m.max_revenue
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----7:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_suppkey = r.supplier_no
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----6:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2678,8 +2678,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.max_revenue #partitions=1 size=10B compact
-     tuple ids: 2 
+     table=tpch.max_revenue #partitions=1 size=10B
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2689,8 +2689,8 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.revenue #partitions=1 size=137.60KB compact
-     tuple ids: 1 
+     table=tpch.revenue #partitions=1 size=137.60KB
+     tuple ids: 1
 ====
 # Q16 - Parts/Supplier Relation Query
 insert overwrite table tpch.supplier_tmp
@@ -2707,7 +2707,7 @@ PLAN FRAGMENT 0
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
      predicates: NOT s_comment LIKE '%Customer%Complaints%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: RANDOM
@@ -2718,7 +2718,7 @@ PLAN FRAGMENT 0
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
      predicates: NOT s_comment LIKE '%Customer%Complaints%'
-     tuple ids: 0 
+     tuple ids: 0
 ====
 insert overwrite table tpch.q16_tmp
 select p_brand, p_type, p_size, ps_suppkey
@@ -2740,26 +2740,26 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.supplier_tmp #partitions=1 size=47.73KB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
   |       predicates: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: RANDOM
@@ -2771,23 +2771,23 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----6:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----5:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2797,8 +2797,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.supplier_tmp #partitions=1 size=47.73KB compact
-     tuple ids: 2 
+     table=tpch.supplier_tmp #partitions=1 size=47.73KB
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2808,9 +2808,9 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
+     table=tpch.part #partitions=1 size=22.83MB
      predicates: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-     tuple ids: 1 
+     tuple ids: 1
 ====
 # Modifications: Added limit
 select p_brand, p_type, p_size, count(distinct ps_suppkey) as supplier_cnt
@@ -2831,21 +2831,21 @@ PLAN FRAGMENT 0
   3:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   2:AGGREGATE
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   1:AGGREGATE
   |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   0:SCAN HDFS
      table=tpch.q16_tmp #partitions=1 size=27.10MB
      predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -2853,10 +2853,10 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   6:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: p_brand, p_type, p_size
@@ -2868,19 +2868,19 @@ PLAN FRAGMENT 1
   3:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   2:AGGREGATE
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   5:AGGREGATE
   |  group by: p_brand, p_type, p_size, ps_suppkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   4:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2891,12 +2891,12 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   0:SCAN HDFS
      table=tpch.q16_tmp #partitions=1 size=27.10MB
      predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Q17 - Small-Quantity-Order Revenue Query
 insert overwrite table tpch.lineitem_tmp
@@ -2913,11 +2913,11 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(l_quantity), COUNT(l_quantity)
   |  group by: l_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_partkey
@@ -2928,10 +2928,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: SUM(SUM(l_quantity)), SUM(COUNT(l_quantity))
   |  group by: l_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2943,11 +2943,11 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity), COUNT(l_quantity)
   |  group by: l_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Modifications: Converted selects from multiple tables to joins,
 # added round() call, removed subquery
@@ -2967,45 +2967,45 @@ PLAN FRAGMENT 0
 
   5:AGGREGATE
   |  output: SUM(l_extendedprice)
-  |  group by: 
-  |  tuple ids: 3 
-  |  
+  |  group by:
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    p.p_partkey = lt.t_partkey
   |  other predicates: l.l_quantity < lt.t_avg_quantity
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.lineitem_tmp #partitions=1 size=2.18MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
   |       predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:AGGREGATE
   |  output: SUM(SUM(l_extendedprice))
-  |  group by: 
-  |  tuple ids: 3 
-  |  
+  |  group by:
+  |  tuple ids: 3
+  |
   8:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3016,31 +3016,31 @@ PLAN FRAGMENT 1
 
   5:AGGREGATE
   |  output: SUM(l_extendedprice)
-  |  group by: 
-  |  tuple ids: 3 
-  |  
+  |  group by:
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    p.p_partkey = lt.t_partkey
   |  other predicates: l.l_quantity < lt.t_avg_quantity
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----7:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----6:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3050,8 +3050,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.lineitem_tmp #partitions=1 size=2.18MB compact
-     tuple ids: 2 
+     table=tpch.lineitem_tmp #partitions=1 size=2.18MB
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3061,9 +3061,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
+     table=tpch.part #partitions=1 size=22.83MB
      predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-     tuple ids: 1 
+     tuple ids: 1
 ====
 # Q18 - Large Value Customer Query
 insert overwrite table tpch.q18_tmp
@@ -3080,11 +3080,11 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_orderkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_orderkey
@@ -3095,10 +3095,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: SUM(SUM(l_quantity))
   |  group by: l_orderkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3110,11 +3110,11 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_orderkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Modifications: Cast o_totalprice column due to float/double values not
 # allowed in GROUP BY.
@@ -3149,47 +3149,47 @@ PLAN FRAGMENT 0
   8:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   7:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_orderkey = t.l_orderkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.q18_tmp #partitions=1 size=16.13MB compact
   |       predicates: t.t_sum_quantity > 300.0
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1 size=23.08MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3197,10 +3197,10 @@ PLAN FRAGMENT 0
   16:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   15:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
@@ -3212,15 +3212,15 @@ PLAN FRAGMENT 1
   8:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   14:AGGREGATE
   |  output: SUM(SUM(l_quantity))
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   13:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -3232,37 +3232,37 @@ PLAN FRAGMENT 2
   7:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_orderkey = t.l_orderkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----12:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----11:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----10:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   9:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3272,9 +3272,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.q18_tmp #partitions=1 size=16.13MB compact
+     table=tpch.q18_tmp #partitions=1 size=16.13MB
      predicates: t.t_sum_quantity > 300.0
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3284,8 +3284,8 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.customer #partitions=1 size=23.08MB compact
-     tuple ids: 2 
+     table=tpch.customer #partitions=1 size=23.08MB
+     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -3295,8 +3295,8 @@ PLAN FRAGMENT 5
     HASH_PARTITIONED: o.o_orderkey
 
   1:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
-     tuple ids: 1 
+     table=tpch.orders #partitions=1 size=162.56MB
+     tuple ids: 1
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -3307,7 +3307,7 @@ PLAN FRAGMENT 6
 
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # Q19 - Discounted Revenue Query
 # Modifications: Added round() calls
@@ -3348,34 +3348,34 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
   |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1 size=22.83MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3386,22 +3386,22 @@ PLAN FRAGMENT 1
 
   3:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
   |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----4:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3411,8 +3411,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.part #partitions=1 size=22.83MB compact
-     tuple ids: 1 
+     table=tpch.part #partitions=1 size=22.83MB
+     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -3439,12 +3439,12 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.part #partitions=1 size=22.83MB
      predicates: p_name LIKE 'forest%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: p_partkey
@@ -3454,10 +3454,10 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3468,12 +3468,12 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  group by: p_partkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.part #partitions=1 size=22.83MB
      predicates: p_name LIKE 'forest%'
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_2
 insert overwrite table tpch.q20_tmp2
@@ -3498,12 +3498,12 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_partkey, l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_partkey, l_suppkey
@@ -3514,10 +3514,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: SUM(SUM(l_quantity))
   |  group by: l_partkey, l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3529,12 +3529,12 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_partkey, l_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_3
 insert overwrite table tpch.q20_tmp3
@@ -3558,26 +3558,26 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = t1.p_partkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.q20_tmp1 #partitions=1 size=13.42KB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = t2.l_partkey
   |    ps.ps_suppkey = t2.l_suppkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.q20_tmp2 #partitions=1 size=7.83MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: RANDOM
@@ -3589,24 +3589,24 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = t1.p_partkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----6:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = t2.l_partkey
   |    ps.ps_suppkey = t2.l_suppkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----5:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1 size=112.71MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3616,8 +3616,8 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.q20_tmp1 #partitions=1 size=13.42KB compact
-     tuple ids: 2 
+     table=tpch.q20_tmp1 #partitions=1 size=13.42KB
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3627,8 +3627,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.q20_tmp2 #partitions=1 size=7.83MB compact
-     tuple ids: 1 
+     table=tpch.q20_tmp2 #partitions=1 size=7.83MB
+     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
@@ -3646,12 +3646,12 @@ PLAN FRAGMENT 0
 
   1:AGGREGATE
   |  group by: ps_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q20_tmp3 #partitions=1 size=77.49KB
      predicates: ps_availqty > sum_quantity
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps_suppkey
@@ -3661,10 +3661,10 @@ PLAN FRAGMENT 0
 
   3:AGGREGATE
   |  group by: ps_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3675,12 +3675,12 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  group by: ps_suppkey
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.q20_tmp3 #partitions=1 size=77.49KB
      predicates: ps_availqty > sum_quantity
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_5
 # Modifications: Added limit
@@ -3703,32 +3703,32 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = t4.ps_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.q20_tmp4 #partitions=1 size=20.98KB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
   |       predicates: n.n_name = 'CANADA'
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3736,10 +3736,10 @@ PLAN FRAGMENT 0
   9:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   8:EXCHANGE
-     tuple ids: 0 1 2 
+     tuple ids: 0 1 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3751,29 +3751,29 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_suppkey = t4.ps_suppkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----7:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----6:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1 size=1.33MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3783,8 +3783,8 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.q20_tmp4 #partitions=1 size=20.98KB compact
-     tuple ids: 2 
+     table=tpch.q20_tmp4 #partitions=1 size=20.98KB
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3794,9 +3794,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
+     table=tpch.nation #partitions=1 size=2.15KB
      predicates: n.n_name = 'CANADA'
-     tuple ids: 1 
+     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q21
 # Q21 - Suppliers Who Kept Orders Waiting Query
@@ -3837,72 +3837,72 @@ PLAN FRAGMENT 0
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   11:AGGREGATE
   |  output: COUNT(*)
   |  group by: s_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    l1.l_orderkey = l3.l_orderkey
   |  other join predicates: l3.l_suppkey != l1.l_suppkey
   |  other predicates: l3.l_orderkey IS NULL
-  |  tuple ids: 0 1 2 3 4 5N 
-  |  
+  |  tuple ids: 0 1 2 3 4 5N
+  |
   |----9:SCAN HDFS
   |       table=tpch.lineitem #partitions=1 size=718.94MB compact
   |       predicates: l3.l_receiptdate > l3.l_commitdate
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: LEFT SEMI JOIN
   |  hash predicates:
   |    l1.l_orderkey = l2.l_orderkey
   |  other predicates: l2.l_suppkey != l1.l_suppkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----7:SCAN HDFS
   |       table=tpch.lineitem #partitions=1 size=718.94MB compact
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1 size=2.15KB compact
   |       predicates: n_name = 'SAUDI ARABIA'
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l1.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
   |       predicates: o_orderstatus = 'F'
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l1.l_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.supplier #partitions=1 size=1.33MB compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3910,10 +3910,10 @@ PLAN FRAGMENT 0
   22:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   21:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s_name
@@ -3925,15 +3925,15 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   20:AGGREGATE
   |  output: SUM(COUNT(*))
   |  group by: s_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   19:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l1.l_orderkey
@@ -3945,31 +3945,31 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: COUNT(*)
   |  group by: s_name
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   10:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
   |  hash predicates:
   |    l1.l_orderkey = l3.l_orderkey
   |  other join predicates: l3.l_suppkey != l1.l_suppkey
   |  other predicates: l3.l_orderkey IS NULL
-  |  tuple ids: 0 1 2 3 4 5N 
-  |  
+  |  tuple ids: 0 1 2 3 4 5N
+  |
   |----18:EXCHANGE
-  |       tuple ids: 5 
-  |    
+  |       tuple ids: 5
+  |
   8:HASH JOIN
   |  join op: LEFT SEMI JOIN (PARTITIONED)
   |  hash predicates:
   |    l1.l_orderkey = l2.l_orderkey
   |  other predicates: l2.l_suppkey != l1.l_suppkey
-  |  tuple ids: 0 1 2 3 4 
-  |  
+  |  tuple ids: 0 1 2 3 4
+  |
   |----17:EXCHANGE
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   16:EXCHANGE
-     tuple ids: 0 1 2 3 
+     tuple ids: 0 1 2 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3979,9 +3979,9 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:SCAN HDFS
-     table=tpch.lineitem #partitions=1 size=718.94MB compact
+     table=tpch.lineitem #partitions=1 size=718.94MB
      predicates: l3.l_receiptdate > l3.l_commitdate
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3991,8 +3991,8 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: l2.l_orderkey
 
   7:SCAN HDFS
-     table=tpch.lineitem #partitions=1 size=718.94MB compact
-     tuple ids: 4 
+     table=tpch.lineitem #partitions=1 size=718.94MB
+     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -4005,32 +4005,32 @@ PLAN FRAGMENT 5
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  tuple ids: 0 1 2 3 
-  |  
+  |  tuple ids: 0 1 2 3
+  |
   |----15:EXCHANGE
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l1.l_orderkey = o.o_orderkey
-  |  tuple ids: 0 1 2 
-  |  
+  |  tuple ids: 0 1 2
+  |
   |----14:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l1.l_suppkey = s.s_suppkey
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----13:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1 size=718.94MB
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -4040,9 +4040,9 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   5:SCAN HDFS
-     table=tpch.nation #partitions=1 size=2.15KB compact
+     table=tpch.nation #partitions=1 size=2.15KB
      predicates: n_name = 'SAUDI ARABIA'
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -4052,9 +4052,9 @@ PLAN FRAGMENT 7
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
+     table=tpch.orders #partitions=1 size=162.56MB
      predicates: o_orderstatus = 'F'
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -4064,8 +4064,8 @@ PLAN FRAGMENT 8
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.supplier #partitions=1 size=1.33MB compact
-     tuple ids: 1 
+     table=tpch.supplier #partitions=1 size=1.33MB
+     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q22_QUERY_1
 # Q22 - Global Sales Opportunity Query
@@ -4099,12 +4099,12 @@ PLAN FRAGMENT 0
   1:AGGREGATE
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
   |  group by: substr(c_name, 1, 1)
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
      predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: substr(c_name, 1, 1)
@@ -4115,10 +4115,10 @@ PLAN FRAGMENT 0
   3:AGGREGATE
   |  output: SUM(SUM(c_acctbal)), SUM(COUNT(c_acctbal))
   |  group by: substr(c_name, 1, 1)
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4130,12 +4130,12 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
   |  group by: substr(c_name, 1, 1)
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
      predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     tuple ids: 0 
+     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q22_QUERY_2
 # Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
@@ -4173,39 +4173,39 @@ PLAN FRAGMENT 0
   6:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   5:AGGREGATE
   |  output: COUNT(*), SUM(c_acctbal)
   |  group by: substring(c_phone, 1, 2)
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    c.c_custkey = o.o_custkey
   |  other predicates: o_custkey IS NULL
-  |  tuple ids: 0 1 2N 
-  |  
+  |  tuple ids: 0 1 2N
+  |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1 size=162.56MB compact
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    substr(c.c_name, 1, 1) = ct.cust_name_char
   |  other predicates: c.c_acctbal > ct.avg_acctbal
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----1:SCAN HDFS
   |       table=tpch.q22_customer_tmp1 #partitions=1 size=9B compact
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
      predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -4213,10 +4213,10 @@ PLAN FRAGMENT 0
   13:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   12:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: substring(c_phone, 1, 2)
@@ -4228,15 +4228,15 @@ PLAN FRAGMENT 1
   6:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   11:AGGREGATE
   |  output: SUM(COUNT(*)), SUM(SUM(c_acctbal))
   |  group by: substring(c_phone, 1, 2)
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   10:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: c.c_custkey
@@ -4248,20 +4248,20 @@ PLAN FRAGMENT 2
   5:AGGREGATE
   |  output: COUNT(*), SUM(c_acctbal)
   |  group by: substring(c_phone, 1, 2)
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:HASH JOIN
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    c.c_custkey = o.o_custkey
   |  other predicates: o_custkey IS NULL
-  |  tuple ids: 0 1 2N 
-  |  
+  |  tuple ids: 0 1 2N
+  |
   |----9:EXCHANGE
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   8:EXCHANGE
-     tuple ids: 0 1 
+     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -4271,8 +4271,8 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: o.o_custkey
 
   3:SCAN HDFS
-     table=tpch.orders #partitions=1 size=162.56MB compact
-     tuple ids: 2 
+     table=tpch.orders #partitions=1 size=162.56MB
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -4286,15 +4286,15 @@ PLAN FRAGMENT 4
   |  hash predicates:
   |    substr(c.c_name, 1, 1) = ct.cust_name_char
   |  other predicates: c.c_acctbal > ct.avg_acctbal
-  |  tuple ids: 0 1 
-  |  
+  |  tuple ids: 0 1
+  |
   |----7:EXCHANGE
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   0:SCAN HDFS
      table=tpch.customer #partitions=1 size=23.08MB
      predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -4304,6 +4304,6 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=tpch.q22_customer_tmp1 #partitions=1 size=9B compact
-     tuple ids: 1 
+     table=tpch.q22_customer_tmp1 #partitions=1 size=9B
+     tuple ids: 1
 ====

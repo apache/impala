@@ -443,6 +443,9 @@ public class Planner {
       doBroadcast = false;
     }
 
+    // The rhs tree is going to send data through an exchange node which effectively
+    // compacts the data. No reason to do it again at the rhs root node.
+    rhsTree.setCompactData(false);
     if (doBroadcast) {
       node.setDistributionMode(HashJoinNode.DistributionMode.BROADCAST);
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
