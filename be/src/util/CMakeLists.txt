@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Without this option Mongoose looks up the SSL library at run-time
+# Without this option Squeasel looks up the SSL library at run-time
 # and may not guess the correct name on some distributions
-SET_SOURCE_FILES_PROPERTIES(${MONGOOSE_SRC_DIR}/mongoose.c PROPERTIES
+SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c PROPERTIES
   COMPILE_FLAGS -DNO_SSL_DL)
 
 # where to put generated libraries
@@ -64,7 +64,7 @@ add_library(Util
 )
 
 add_library(Webserver STATIC
-  ${MONGOOSE_SRC_DIR}/mongoose.c
+  ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc
 )
 

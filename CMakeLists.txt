@@ -45,8 +45,8 @@ find_package(HDFS REQUIRED)
 include_directories(SYSTEM ${HDFS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${HDFS_LIBS})
 
-find_package(Mongoose REQUIRED)
-include_directories(SYSTEM ${MONGOOSE_INCLUDE_DIR})
+find_package(Squeasel REQUIRED)
+include_directories(SYSTEM ${SQUEASEL_INCLUDE_DIR})
 
 # find GLog headers and libs.  Must include glog headers before the other
 # google libraries.  They all have a config.h and we want glog's to be picked
@@ -160,7 +160,7 @@ add_subdirectory(common/thrift)
 add_subdirectory(be)
 
 # Run FE and BE tests
-add_custom_target(testall 
+add_custom_target(testall
   COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/fe mvn test
   COMMAND ${CMAKE_SOURCE_DIR}/bin/runbackendtests.sh
 )

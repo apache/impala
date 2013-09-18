@@ -16,7 +16,7 @@
 #ifndef IMPALA_UTIL_WEBSERVER_H
 #define IMPALA_UTIL_WEBSERVER_H
 
-#include <mongoose/mongoose.h>
+#include <squeasel/squeasel.h>
 #include <string>
 #include <map>
 #include <boost/function.hpp>
@@ -27,7 +27,7 @@
 
 namespace impala {
 
-// Wrapper class for the Mongoose web server library. Clients may register callback
+// Wrapper class for the Squeasel web server library. Clients may register callback
 // methods which produce output for a given URL path
 class Webserver {
  public:
@@ -100,17 +100,17 @@ class Webserver {
   // BootstrapPageHeader.
   void BootstrapPageFooter(std::stringstream* output);
 
-  // Mongoose callback for log events. Returns mongoose success code.
-  static int LogMessageCallbackStatic(const struct mg_connection* connection,
+  // Squeasel callback for log events. Returns squeasel success code.
+  static int LogMessageCallbackStatic(const struct sq_connection* connection,
       const char* message);
 
-  // Mongoose callback for HTTP request events. Static so that it can act as a function
-  // pointer, and then call the next method. Returns mongoose success code.
-  static int BeginRequestCallbackStatic(struct mg_connection* connection);
+  // Squeasel callback for HTTP request events. Static so that it can act as a function
+  // pointer, and then call the next method. Returns squeasel success code.
+  static int BeginRequestCallbackStatic(struct sq_connection* connection);
 
-  // Dispatch point for all incoming requests. Returns mongoose success code.
-  int BeginRequestCallback(struct mg_connection* connection,
-      struct mg_request_info* request_info);
+  // Dispatch point for all incoming requests. Returns squeasel success code.
+  int BeginRequestCallback(struct sq_connection* connection,
+      struct sq_request_info* request_info);
 
   // Registered to handle "/", and prints a list of available URIs
   void RootHandler(const ArgumentMap& args, std::stringstream* output);
@@ -132,8 +132,8 @@ class Webserver {
   // The address of the interface on which to run this webserver.
   TNetworkAddress http_address_;
 
-  // Handle to Mongoose context; owned and freed by Mongoose internally
-  struct mg_context* context_;
+  // Handle to Squeasel context; owned and freed by Squeasel internally
+  struct sq_context* context_;
 };
 
 }
