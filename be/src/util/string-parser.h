@@ -135,7 +135,9 @@ class StringParser {
   // This is considerably faster than glibc's implementation (>100x why???)
   // No special case handling needs to be done for overflows, the floating point spec
   // already does it and will cap the values to -inf/inf
-  // TODO: Also, if input contains scientific notation, fall back to strtod
+  // To avoid inaccurate conversions this function falls back to strtod for
+  // scientific notation.
+  // TOOD: Investigate using intrinsics to speed up the slow strtod path.
   template <typename T>
   static inline T StringToFloat(const char* s, int len, ParseResult* result) {
     // Use double here to not lose precision while accumulating the result
@@ -143,17 +145,22 @@ class StringParser {
     bool negative = false;
     int i = 0;
     double divide = 1;
-    double magnitude = 1;
+    bool decimal = false;
+    int64_t remainder = 0;
     switch (*s) {
-      case '-': negative = true;
-      case '+': i = 1;
+    case '-': negative = true;
+    case '+': i = 1;
     }
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
-        val = val * 10 + s[i] - '0';
-        divide *= magnitude;
+        if (decimal) {
+          remainder = remainder * 10 + s[i] - '0';
+          divide *= 10;
+        } else {
+          val = val * 10 + s[i] - '0';
+        }
       } else if (s[i] == '.') {
-        magnitude = 10;
+        decimal = true;
       } else if (s[i] == 'e' || s[i] == 'E') {
         break;
       } else {
@@ -162,19 +169,22 @@ class StringParser {
       }
     }
 
-    val /= divide;
+    val += remainder / divide;
 
     if (i < len && (s[i] == 'e' || s[i] == 'E')) {
-      ++i;
-      int exp = StringToInt<int>(s + i, len - i, result);
-      if (UNLIKELY(*result != PARSE_SUCCESS)) return 0;
-      while (exp > 0) {
-        val *= 10;
-        exp--;
-      }
-      while (exp < 0) {
-        val *= 0.1;
-        exp++;
+      // Create a C-string from s starting after the optional '-' sign and fall back to
+      // strtod to avoid conversion inaccuracy for scientific notation.
+      // Do not use boost::lexical_cast because it causes codegen to crash for an
+      // unknown reason (exception handling?).
+      char c_str[len - negative + 1];
+      memcpy(c_str, s + negative, len - negative);
+      c_str[len - negative] = '\0';
+      char* s_end;
+      val = strtod(c_str, &s_end);
+      // Require the entire string to be parsed, otherwise return an error.
+      if (UNLIKELY((val == 0 && c_str == s_end) || (s_end != c_str + len - negative))) {
+        *result = PARSE_FAILURE;
+        return val;
       }
     }
 

@@ -2030,7 +2030,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=tpch.q11_part_tmp #partitions=1 size=509.46KB
+     table=tpch.q11_part_tmp #partitions=1 size=509.48KB
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
@@ -2060,7 +2060,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=tpch.q11_part_tmp #partitions=1 size=509.46KB
+     table=tpch.q11_part_tmp #partitions=1 size=509.48KB
      tuple ids: 0
 ====
 # Q12 - Shipping Mode and Order Priority Query
