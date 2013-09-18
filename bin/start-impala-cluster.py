@@ -60,9 +60,7 @@ MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d")
-# Setting -logbuflevel to -1 to make the be logs stream to the logfile.
-# -v=1 generates more output in the be logs (runtime profiles etc.)
-BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=1 --logbuflevel=-1"
+BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=1"
 DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 
 def exec_impala_process(cmd, args, stderr_log_file_path):
