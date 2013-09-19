@@ -140,7 +140,4 @@ class TestCancellationSerial(TestCancellation):
   def test_cancel_insert(self, vector):
     self.execute_cancel_test(vector)
     metric_verifier = MetricVerifier(self.impalad_test_service)
-    try:
-      metric_verifier.verify_no_open_files(timeout=30)
-    except AssertionError:
-      pytest.xfail("IMPALA-551: File handle leak for INSERT")
+    metric_verifier.verify_no_open_files(timeout=30)

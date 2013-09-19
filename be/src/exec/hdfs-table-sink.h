@@ -80,6 +80,8 @@ struct OutputPartition {
 
   // The descriptor for this partition.
   const HdfsPartitionDescriptor* partition_descriptor;
+
+  OutputPartition();
 };
 
 // The sink consumes all row batches of its child execution tree, and writes the evaluated
@@ -153,6 +155,7 @@ class HdfsTableSink : public DataSink {
   // temporary directory and then moved to the real partition directory by the
   // coordinator in a finalization step. The temporary file's current location
   // and final destination are recorded in the state parameter.
+  // If this function fails, the tmp file is cleaned up.
   Status CreateNewTmpFile(RuntimeState* state, OutputPartition* output_partition);
 
   // Key is the concatenation of the evaluated

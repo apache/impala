@@ -56,6 +56,11 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
   unique_id_str_ = unique_id_ss.str();
 }
 
+OutputPartition::OutputPartition()
+    : hdfs_connection(NULL), tmp_hdfs_file(NULL), num_rows(0), num_files(0),
+      partition_descriptor(NULL) {
+}
+
 Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare select list expressions.
   // Disable codegen for these - they would be unused anyway.
@@ -248,13 +253,12 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
   output_partition->num_files = 0;
 }
 
-//TODO: Clean up temporary files on error.
 Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
   SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
   stringstream filename;
   filename << output_partition->tmp_hdfs_file_name_template
-      << "." << output_partition->num_files;
+           << "." << output_partition->num_files;
   output_partition->current_file_name = filename.str();
   // Check if tmp_hdfs_file_name_template exists.
   const char* tmp_hdfs_file_name_template_cstr =
@@ -282,8 +286,12 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   ++output_partition->num_files;
   output_partition->num_rows = 0;
-  RETURN_IF_ERROR(output_partition->writer->InitNewFile());
-  return Status::OK;
+  Status status = output_partition->writer->InitNewFile();
+  if (!status.ok()) {
+    ClosePartitionFile(state, output_partition);
+    hdfsDelete(hdfs_connection_, output_partition->current_file_name.c_str(), 0);
+  }
+  return status;
 }
 
 Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
@@ -348,7 +356,9 @@ inline Status HdfsTableSink::GetOutputPartition(
     BuildHdfsFileNames(partition);
     Status status = InitOutputPartition(state, *partition_descriptor, partition);
     if (!status.ok()) {
-      // TODO: the error handling paths need to be revisited.
+      // We failed to create the output partition successfully. Clean it up now
+      // as it is not added to partition_keys_to_output_partitions_ so won't be
+      // cleaned up in Close().
       if (partition->writer.get() != NULL) partition->writer->Close();
       return status;
     }
