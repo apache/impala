@@ -4,6 +4,7 @@
 import logging
 import pytest
 import shlex
+import time
 from tests.common.test_result_verifier import *
 from subprocess import call
 from tests.common.test_vector import *
@@ -24,12 +25,12 @@ class TestDdlStatements(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
-
   def setup_method(self, method):
     self.cleanup()
     # Get the current number of queries that are in the 'EXCEPTION' state. Used for
     # verification after running each test case.
     self.start_exception_count = self.query_exception_count()
+    self.cleanup_hdfs_dirs()
 
   def teardown_method(self, method):
     self.cleanup()
@@ -52,8 +53,8 @@ class TestDdlStatements(ImpalaTestSuite):
     # Cleanup the test table HDFS dirs between test runs so there are no errors the next
     # time a table is created with the same location. This also helps remove any stale
     # data from the last test run.
-    call(["hadoop", "fs", "-rm", "-r", "-f", "/test-warehouse/t1_tmp1/"], shell=False)
-    call(["hadoop", "fs", "-rm", "-r", "-f", "/test-warehouse/t_part_tmp/"], shell=False)
+    self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
+    self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
   @pytest.mark.execute_serially
   def test_create(self, vector):
@@ -93,6 +94,37 @@ class TestDdlStatements(ImpalaTestSuite):
     for i in xrange(1, 5):
       self.client.execute(create_fn_stmt)
       self.client.execute(drop_fn_stmt)
+
+  @pytest.mark.execute_serially
+  def test_create_alter_bulk_partition(self, vector):
+    # Only run during exhaustive exploration strategy, this doesn't add a lot of extra
+    # coverage to the existing test cases and takes a couple minutes to execute.
+    if self.exploration_strategy() != 'exhaustive': return
+
+    self.client.execute("use default")
+    self.client.execute("drop table if exists foo_part")
+    self.client.execute("create table foo_part(i int) partitioned by(j int, s string)")
+
+    # Add some partitions
+    for i in xrange(10):
+      start = time.time()
+      self.client.execute("alter table foo_part add partition(j=%d, s='%s')" % (i, i))
+      print 'ADD PARTITION #%d exec time: %s' % (i, time.time() - start)
+
+    # Modify one of the partitions
+    self.client.execute("""alter table foo_part partition(j=5, s='5')
+        set fileformat parquetfile""")
+
+    # Add some more partitions
+    for i in xrange(10, 50):
+      start = time.time()
+      self.client.execute("alter table foo_part add partition(j=%d,s='%s')" % (i,i))
+      print 'ADD PARTITION #%d exec time: %s' % (i, time.time() - start)
+
+    # Insert data and verify it shows up.
+    self.client.execute("insert into table foo_part partition(j=5, s='5') select 1")
+    assert '1' == self.execute_scalar("select count(*) from foo_part")
+    self.client.execute("drop table foo_part")
 
   @pytest.mark.execute_serially
   def test_create_alter_tbl_properties(self, vector):

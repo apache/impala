@@ -210,6 +210,7 @@ public class HdfsPartition {
   private final List<FileDescriptor> fileDescriptors;
   private final String location;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
+  private boolean isDirty_ = false;
 
   public HdfsStorageDescriptor getInputFormatDescriptor() {
     return fileFormatDescriptor;
@@ -233,6 +234,14 @@ public class HdfsPartition {
   public HdfsTable getTable() { return table; }
   public void setNumRows(long numRows) { this.numRows = numRows; }
   public long getNumRows() { return numRows; }
+
+  /**
+   * Marks this partition's metadata as "dirty" indicating that changes have been
+   * made and this partition's metadata should not be reused during the next
+   * incremental metadata refresh.
+   */
+  public void markDirty() { isDirty_ = true; }
+  public boolean isDirty() { return isDirty_; }
 
   /**
    * Returns an immutable list of partition key expressions

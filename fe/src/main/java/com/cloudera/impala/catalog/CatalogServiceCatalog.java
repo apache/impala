@@ -24,6 +24,7 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
 
 /**
@@ -154,6 +155,28 @@ public class CatalogServiceCatalog extends Catalog {
       return table;
     } catch (ImpalaException e) {
       return new IncompleteTable(getNextTableId(), db, tableName, e);
+    }
+  }
+
+  /**
+   * Updates the cached lastDdlTime for the given table. The lastDdlTime is used during
+   * the metadata refresh() operations to determine if there have been any external
+   * (outside of Impala) modifications to the table.
+   */
+  public void updateLastDdlTime(TTableName tblName, long ddlTime) {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(tblName.getDb_name());
+      if (db == null) return;
+      try {
+        Table tbl = db.getTable(tblName.getTable_name());
+        if (tbl == null) return;
+        tbl.updateLastDdlTime(ddlTime);
+      } catch (Exception e) {
+        // Swallow all exceptions.
+      }
+    } finally {
+      catalogLock_.writeLock().unlock();
     }
   }
 }

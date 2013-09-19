@@ -75,8 +75,8 @@ public abstract class Table implements CatalogObject {
   // map from lowercase column name to Column object.
   protected final Map<String, Column> colsByName;
 
-  // The lastDdlTime recorded in the table parameter; -1 if not set
-  protected final long lastDdlTime;
+  // The lastDdlTime for this table; -1 if not set
+  protected long lastDdlTime;
 
   // Set of supported table types.
   protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES =
@@ -116,6 +116,16 @@ public abstract class Table implements CatalogObject {
   @Override
   public void setCatalogVersion(long catalogVersion) {
     catalogVersion_ = catalogVersion;
+  }
+
+  /**
+   * Updates the lastDdlTime for this Table, if the new value is greater
+   * than the existing value. Does nothing if the new value is less than
+   * or equal to the existing value.
+   */
+  public void updateLastDdlTime(long ddlTime) {
+    // Ensure the lastDdlTime never goes backwards.
+    if (ddlTime > lastDdlTime) lastDdlTime = ddlTime;
   }
 
   /**

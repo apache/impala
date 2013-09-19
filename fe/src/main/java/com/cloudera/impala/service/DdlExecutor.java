@@ -85,6 +85,7 @@ import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateMetastoreRequest;
 import com.cloudera.impala.thrift.TUpdateMetastoreResponse;
 import com.google.common.base.Joiner;
@@ -94,6 +95,8 @@ import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Class used to execute DDL operations.
+ * TODO: Look in to ways to avoid the explosion of exception types in the throws
+ * clause of these methods.
  */
 public class DdlExecutor {
   private final CatalogServiceCatalog catalog;
@@ -833,7 +836,11 @@ public class DdlExecutor {
             partition.getMetaStorePartition();
         Preconditions.checkNotNull(msPartition);
         setStorageDescriptorFileFormat(msPartition.getSd(), fileFormat);
-        applyAlterPartition(tableName, msPartition);
+        try {
+          applyAlterPartition(tableName, msPartition);
+        } finally {
+          partition.markDirty();
+        }
       }
     }
   }
@@ -873,7 +880,11 @@ public class DdlExecutor {
             partition.getMetaStorePartition();
         Preconditions.checkNotNull(msPartition);
         msPartition.getSd().setLocation(location);
-        applyAlterPartition(tableName, msPartition);
+        try {
+          applyAlterPartition(tableName, msPartition);
+        } finally {
+          partition.markDirty();
+        }
       }
     }
   }
@@ -918,12 +929,16 @@ public class DdlExecutor {
   private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException {
     MetaStoreClient msClient = catalog.getMetaStoreClient();
+    long lastDdlTime = -1;
     try {
-      updateLastDdlTime(msTbl, null);
+      lastDdlTime = calculateDdlTime(msTbl);
+      msTbl.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     } finally {
       msClient.release();
+      catalog.updateLastDdlTime(
+          new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
     }
   }
 
@@ -965,19 +980,39 @@ public class DdlExecutor {
     return fsList;
   }
 
-  /**
+   /**
    * Sets the table parameter 'transient_lastDdlTime' to System.currentTimeMillis()/1000
    * in the given msTbl. 'transient_lastDdlTime' is guaranteed to be changed.
    * If msClient is not null then this method applies alter_table() to update the
    * Metastore. Otherwise, the caller is responsible for the final update.
    */
-  public static void updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
+  public long updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
       MetaStoreClient msClient) throws MetaException, NoSuchObjectException, TException {
     Preconditions.checkNotNull(msTbl);
     LOG.debug("Updating lastDdlTime for table: " + msTbl.getTableName());
-    long lastDdlTime = Catalog.getLastDdlTime(msTbl);
+    Map<String, String> params = msTbl.getParameters();
+    long lastDdlTime = calculateDdlTime(msTbl);
+    params.put("transient_lastDdlTime", Long.toString(lastDdlTime));
+    msTbl.setParameters(params);
+    if (msClient != null) {
+      msClient.getHiveClient().alter_table(
+          msTbl.getDbName(), msTbl.getTableName(), msTbl);
+    }
+    catalog.updateLastDdlTime(
+        new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
+    return lastDdlTime;
+  }
+
+  /**
+   * Calculates the next transient_lastDdlTime value. This is exactly how Hive updates
+   * the last ddl time.
+   */
+  private static long calculateDdlTime(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    // This is exactly how Hive updates the last ddl time.
+    long existingLastDdlTime = Catalog.getLastDdlTime(msTbl);
     long currentTime = System.currentTimeMillis() / 1000;
-    while (lastDdlTime == currentTime) {
+    while (existingLastDdlTime == currentTime) {
       // We need to make sure that lastDdlTime will be changed but we don't want to set
       // lastDdlTime to a future time when this function returns. If the last DDL and
       // this one happened within a sec, sleep for a second.
@@ -986,15 +1021,9 @@ public class DdlExecutor {
       } catch (InterruptedException e) {}
       currentTime = System.currentTimeMillis() / 1000;
     }
-    Map<String, String> params = msTbl.getParameters();
-    // This is exactly how Hive updates the last ddl time.
-    params.put("transient_lastDdlTime", Long.toString(currentTime));
-    msTbl.setParameters(params);
-    if (msClient != null) {
-      msClient.getHiveClient().alter_table(
-          msTbl.getDbName(), msTbl.getTableName(), msTbl);
-    }
+    return currentTime;
   }
+
   /**
    * Utility function that creates a hive.metastore.api.Table object based on the given
    * TCreateTableParams.
@@ -1149,7 +1178,7 @@ public class DdlExecutor {
         // if the alteration fails in the metastore.
         org.apache.hadoop.hive.metastore.api.Table msTbl =
             table.getMetaStoreTable().deepCopy();
-        DdlExecutor.updateLastDdlTime(msTbl, msClient);
+        updateLastDdlTime(msTbl, msClient);
       } catch (Exception e) {
         throw new InternalException("Error updating lastDdlTime", e);
       } finally {
