@@ -42,7 +42,12 @@ hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
   HdfsFsMap::iterator i = fs_map_.find(make_pair(host, port));
   if (i == fs_map_.end()) {
     hdfsBuilder* hdfs_builder = hdfsNewBuilder();
-    hdfsBuilderSetNameNode(hdfs_builder, host.c_str());
+    if (!host.empty()) {
+      hdfsBuilderSetNameNode(hdfs_builder, host.c_str());
+    } else {
+      // Connect to local filesystem
+      hdfsBuilderSetNameNode(hdfs_builder, NULL);
+    }
     hdfsBuilderSetNameNodePort(hdfs_builder, port);
     hdfsFS conn = hdfsBuilderConnect(hdfs_builder);
     DCHECK(conn != NULL);
@@ -56,6 +61,10 @@ hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
 hdfsFS HdfsFsCache::GetDefaultConnection() {
   // "default" uses the default NameNode configuration from the XML configuration files.
   return GetConnection("default", 0);
+}
+
+hdfsFS HdfsFsCache::GetLocalConnection() {
+  return GetConnection("", 0);
 }
 
 }

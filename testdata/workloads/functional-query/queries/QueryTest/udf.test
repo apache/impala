@@ -1,0 +1,177 @@
+====
+---- QUERY
+create database if not exists udf_test;
+====
+# Test identity functions
+---- QUERY
+drop function if exists udf_test.boolean_identity(boolean);
+
+create function udf_test.boolean_identity(boolean) returns boolean
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_10BooleanValE';
+
+select udf_test.boolean_identity(true);
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+drop function if exists udf_test.tinyint_identity(tinyint);
+
+create function udf_test.tinyint_identity(tinyint) returns tinyint
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_10TinyIntValE';
+
+select udf_test.tinyint_identity(10);
+---- TYPES
+tinyint
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.smallint_identity(smallint);
+
+create function udf_test.smallint_identity(smallint) returns smallint
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_11SmallIntValE';
+
+select udf_test.smallint_identity(10);
+---- TYPES
+smallint
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.int_identity(int);
+
+create function udf_test.int_identity(int) returns int
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_6IntValE';
+
+select udf_test.int_identity(10);
+---- TYPES
+int
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.bigint_identity(bigint);
+
+create function udf_test.bigint_identity(bigint) returns bigint
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_9BigIntValE';
+
+select udf_test.bigint_identity(10);
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.float_identity(float);
+
+create function udf_test.float_identity(float) returns float
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_8FloatValE';
+
+select udf_test.float_identity(10.0);
+---- TYPES
+float
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.double_identity(double);
+
+create function udf_test.double_identity(double) returns double
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_9DoubleValE';
+
+select udf_test.double_identity(10.0);
+---- TYPES
+double
+---- RESULTS
+10
+====
+---- QUERY
+drop function if exists udf_test.string_identity(string);
+
+create function udf_test.string_identity(string) returns string
+location '/test-warehouse/libTestUdfs.so'
+'_Z8IdentityPN10impala_udf10UdfContextERKNS_9StringValE';
+
+select udf_test.string_identity("why hello there");
+---- TYPES
+string
+---- RESULTS
+'why hello there'
+====
+# Test UDFs with different arguments
+---- QUERY
+drop function if exists
+udf_test.all_types_fn(string, boolean, tinyint, smallint, int, bigint, float, double);
+
+create function udf_test.all_types_fn(
+    string, boolean, tinyint, smallint, int, bigint, float, double)
+returns int
+location '/test-warehouse/libTestUdfs.so'
+'_Z8AllTypesPN10impala_udf10UdfContextERKNS_9StringValERKNS_10BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValERKNS_8FloatValERKNS_9DoubleValE';
+
+select udf_test.all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
+---- TYPES
+int
+---- RESULTS
+29
+====
+---- QUERY
+drop function if exists udf_test.no_args();
+
+create function udf_test.no_args() returns string
+location '/test-warehouse/libTestUdfs.so'
+'_Z6NoArgsPN10impala_udf10UdfContextE';
+
+select udf_test.no_args();
+---- TYPES
+string
+---- RESULTS
+'string'
+====
+# Test UDFs over tables
+---- QUERY
+select sum(udf_test.bigint_identity(bigint_col)) from functional.alltypes
+---- TYPES
+bigint
+---- RESULTS
+328500
+====
+---- QUERY
+select udf_test.string_identity(a) from functional.tinytable;
+---- TYPES
+string
+---- RESULTS
+'aaaaaaa'
+'ccccc'
+'eeeeeeee'
+====
+---- QUERY
+select sum(udf_test.all_types_fn(
+    string_col, bool_col, tinyint_col, smallint_col,
+    int_col, bigint_col, float_col, double_col))
+from functional.alltypes;
+---- TYPES
+bigint
+---- RESULTS
+# Verify with 'select sum(length(string_col)) + sum(cast(bool_col as int))
+#  + sum(tinyint_col) + sum(smallint_col) + sum(int_col) + sum(bigint_col)
+#  + sum(cast(float_col as bigint)) + sum(cast(double_col as bigint))
+#  from functional.alltypes;'
+799350
+====
+---- QUERY
+select udf_test.no_args() from alltypes limit 1;
+---- TYPES
+string
+---- RESULTS
+'string'
+====

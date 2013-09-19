@@ -27,6 +27,8 @@ add_library(TestUtil STATIC
   desc-tbl-builder.cc
 )
 
+add_library(TestUdfs SHARED test-udfs.cc)
+
 add_executable(mini-impala-cluster
   mini-impala-cluster.cc
 )

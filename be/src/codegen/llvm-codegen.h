@@ -193,6 +193,9 @@ class LlvmCodeGen {
   // "class.impala::AggregationNode"
   llvm::Type* GetType(const std::string& name);
 
+  // Returns the pointer type of the type returned by GetType(name)
+  llvm::PointerType* GetPtrType(const std::string& name);
+
   // Returns reference to llvm context object.  Each LlvmCodeGen has its own
   // context to allow multiple threads to be calling into llvm at the same time.
   llvm::LLVMContext& context() { return *context_.get(); }
@@ -345,7 +348,9 @@ class LlvmCodeGen {
   // Simple wrappers to reduce code verbosity
   llvm::Type* boolean_type() { return GetType(TYPE_BOOLEAN); }
   llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
+  llvm::Type* int_type() { return GetType(TYPE_INT); }
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
+  llvm::Type* string_val_type() { return string_val_type_; }
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
 

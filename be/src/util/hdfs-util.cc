@@ -16,9 +16,11 @@
 
 #include <sstream>
 #include <string.h>
+#include <boost/filesystem.hpp>
 
 #include "util/error-util.h"
 
+using namespace boost;
 using namespace std;
 
 namespace impala {
@@ -40,6 +42,24 @@ Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* file
 
 bool IsHiddenFile(const string& filename) {
   return !filename.empty() && (filename[0] == '.' || filename[0] == '_');
+}
+
+Status CopyHdfsFile(const hdfsFS& src_conn, const char* src_path,
+                    const hdfsFS& dst_conn, const char* dst_dir,
+                    string* dst_path) {
+  int error = hdfsCopy(src_conn, src_path, dst_conn, dst_dir);
+  if (error != 0) {
+    string error_msg = GetHdfsErrorMsg("");
+    stringstream ss;
+    ss << "Failed to copy " << src_path << " to " << dst_dir << ": " << error_msg;
+    return Status(ss.str());
+  }
+  filesystem::path src(src_path);
+  filesystem::path dst(dst_dir);
+  // Append src.filename() to dst
+  dst /= src.filename();
+  *dst_path = dst.native();
+  return Status::OK;
 }
 
 }

@@ -389,6 +389,7 @@ class Expr {
   friend class CaseExpr;
   friend class InPredicate;
   friend class FunctionCall;
+  friend class NativeUdfExpr;
 
   Expr(PrimitiveType type, bool is_slotref = false);
   Expr(const TExprNode& node, bool is_slotref = false);
@@ -429,6 +430,27 @@ class Expr {
   // TODO: not implemented, always 0
   int scratch_buffer_size_;
 
+  // Returns an llvm::Function* with signature:
+  // <subclass of AnyVal> ComputeFn(int8_t* context, TupleRow* row)
+  //
+  // The function should evaluate this expr over 'row' and return the result as the
+  // appropriate type of AnyVal.
+  // For now, 'context' is a placeholder and is always NULL. This will eventually be
+  // replaced by an ExprContext* argument.
+  //
+  // The default implementation produces a wrapper around GetValue().
+  virtual Status GetIRComputeFn(RuntimeState* state, llvm::Function** fn);
+
+  // Helper function to create an empty Function* with the appropriate signature to be
+  // returned by GetIRComputeFn(). 'name' is the name of the returned Function*. The
+  // arguments to the function are returned in 'args'.
+  llvm::Function* CreateIRFunctionPrototype(LlvmCodeGen* codegen, const std::string& name,
+                                            llvm::Value* (*args)[2]);
+
+  // Returns the type of the AnyVal subclass corresponding to 'type'.
+  // For example, 'type' = TYPE_INT => the llvm type of IntVal ({i1, i32})
+  llvm::Type* GetUdfValType(LlvmCodeGen* codegen, PrimitiveType type);
+
   // Create a compute function prototype.
   // The signature is:
   // <expr ret type> ComputeFn(TupleRow* row, char* state_data, bool* is_null)
@@ -457,7 +479,6 @@ class Expr {
 
  private:
   friend class ExprTest;
-  friend class QueryJitter;
 
   // Create a new Expr based on texpr_node.node_type within 'pool'.
   static Status CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr);

@@ -46,6 +46,7 @@ add_library(Exprs
   timestamp-literal.cc
   timezone_db.cc
   tuple-is-null-predicate.cc
+  native-udf-expr.cc
   utility-functions.cc
 )
 

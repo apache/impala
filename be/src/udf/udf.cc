@@ -142,6 +142,6 @@ bool UdfContextImpl::CheckLocalAlloctionsEmpty() {
 }
 
 StringVal::StringVal(UdfContext* context, int len)
-  : ptr(context->impl()->AllocateLocal(len)), len(len) {
+  : len(len), ptr(context->impl()->AllocateLocal(len)) {
 }
 

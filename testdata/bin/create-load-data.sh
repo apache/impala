@@ -124,3 +124,6 @@ hive -f create_table.sql
 popd
 
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
+
+# Copy the test UDF library into HDFS
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so /test-warehouse

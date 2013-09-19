@@ -293,6 +293,10 @@ Type* LlvmCodeGen::GetType(const string& name) {
   return module_->getTypeByName(name);
 }
 
+PointerType* LlvmCodeGen::GetPtrType(const string& name) {
+  return PointerType::get(GetType(name), 0);
+}
+
 // Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead
 // cast it to an int and then to 'type'.
 Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, void* ptr) {
@@ -360,7 +364,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
     }
   }
 
-  if (!is_corrupt_) is_corrupt_ = llvm::verifyFunction(*fn, ReturnStatusAction);
+  if (!is_corrupt_) is_corrupt_ = llvm::verifyFunction(*fn, PrintMessageAction);
 
   if (is_corrupt_) {
     string fn_name = fn->getName(); // llvm has some fancy operator overloading

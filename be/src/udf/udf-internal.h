@@ -29,6 +29,9 @@ namespace impala {
 // hide the details from the external header.
 class UdfContextImpl {
  public:
+  // Create a UdfContext. The caller is responsible for calling delete on it.
+  static impala_udf::UdfContext* CreateContext() { return new impala_udf::UdfContext(); }
+
   UdfContextImpl(impala_udf::UdfContext* parent);
 
   // Allocates a buffer of 'byte_size' with "local" memory management. These

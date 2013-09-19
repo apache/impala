@@ -122,6 +122,7 @@ class UdfContext {
   ~UdfContext();
 
  private:
+  friend class impala::UdfContextImpl;
   UdfContext();
 
   // Disable copy ctor and assignment operator
@@ -398,16 +399,16 @@ struct TimestampVal : public AnyVal {
 // Note: there is a difference between a NULL string (is_null == true) and an
 // empty string (len == 0).
 struct StringVal : public AnyVal {
-  uint8_t* ptr;
   int len;
+  uint8_t* ptr;
 
   // Construct a StringVal from ptr/len. Note: this does not make a copy of ptr
   // so the buffer must exist as long as this StringVal does.
-  StringVal(uint8_t* ptr = NULL, int len = 0) : ptr(ptr), len(len) {}
+  StringVal(uint8_t* ptr = NULL, int len = 0) : len(len), ptr(ptr) {}
 
   // Construct a StringVal from NULL-terminated c-string. Note: this does not make a
   // copy of ptr so the underlying string must exist as long as this StringVal does.
-  StringVal(const char* ptr) : ptr((uint8_t*)ptr), len(strlen(ptr)) {}
+  StringVal(const char* ptr) : len(strlen(ptr)), ptr((uint8_t*)ptr) {}
 
   static StringVal null() {
     StringVal sv;

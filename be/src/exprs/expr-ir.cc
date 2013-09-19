@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "exprs/expr.h"
+#include "udf/udf.h"
 
 #ifdef IR_COMPILE
 
@@ -22,6 +23,9 @@ extern "C"
 void* IrExprGetValue(Expr* expr, TupleRow* row) {
   return expr->GetValue(row);
 }
+
+// Dummy function to force compilation of UdfContext type
+void dummy(impala_udf::UdfContext) { }
 
 #else
 #error "This file should only be compiled by clang."
