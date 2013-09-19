@@ -121,13 +121,6 @@ class RuntimeState {
 
   void SetInstanceMemTracker(MemTracker* tracker) {
     instance_mem_tracker_ = tracker;
-    mem_trackers_.push_back(tracker);
-  }
-
-  // Registers a tracker for this RuntimState (Fragment Instance). The usage for
-  // these trackers is output when the mem limit is exceeded.
-  void RegisterMemTracker(MemTracker* tracker) {
-    mem_trackers_.push_back(tracker);
   }
 
   // Appends error to the error_log_ if there is space
@@ -222,9 +215,6 @@ class RuntimeState {
   PartitionRowCount num_appended_rows_;
 
   RuntimeProfile profile_;
-
-  // all registered mem trackers; not owned
-  std::vector<MemTracker*> mem_trackers_;
 
   // Fragment instance memory tracker.  Also contained in mem_trackers_
   MemTracker* instance_mem_tracker_;

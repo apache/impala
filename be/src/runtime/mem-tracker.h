@@ -54,6 +54,9 @@ class MemTracker {
 
   ~MemTracker();
 
+  // Removes this tracker from parent_->child_trackers_.
+  void UnregisterFromParent();
+
   // Returns a MemTracker object for query 'id'.  Calling this with the same id will
   // return the same MemTracker object.  An example of how this is used is to pass it
   // the same query id for all fragments of that query running on this machine.  This
@@ -97,7 +100,7 @@ class MemTracker {
     return false;
   }
 
-  bool LimitExceeded() {
+  bool LimitExceeded() const {
     return limit_ >= 0 && limit_ < consumption_->current_value();
   }
 
@@ -107,10 +110,8 @@ class MemTracker {
   int64_t peak_consumption() const { return consumption_->value(); }
   MemTracker* parent() const { return parent_; }
 
-  std::string LogUsage(const std::string& prefix);
-
-  // Logs the usage of all the trackers, separated by new line
-  static std::string LogUsage(const std::vector<MemTracker*>& trackers);
+  // Logs the usage of this tracker and all of its children (recursively).
+  std::string LogUsage(const std::string& prefix = "") const;
 
   void EnableLogging(bool enable, bool log_stack) {
     enable_logging_ = enable;
@@ -145,6 +146,22 @@ class MemTracker {
   std::vector<MemTracker*> all_trackers_;  // this tracker plus all of its ancestors
   std::vector<MemTracker*> limit_trackers_;  // all_trackers_ with valid limits
 
+  // All the child trackers of this tracker. Used for error reporting only.
+  // i.e., Updating a parent tracker does not update the children.
+  mutable boost::mutex child_trackers_lock_;
+  std::list<MemTracker*> child_trackers_;
+
+  // Iterator into parent_->child_trackers_ for this object. Stored to have O(1)
+  // remove.
+  std::list<MemTracker*>::iterator child_tracker_it_;
+
+  // If true, calls UnregisterFromParent() in the dtor. This is only used for
+  // the query wide trackers to remove it from the process mem tracker. The
+  // process tracker never gets deleted so it is safe to reference it in the dtor.
+  // The query tracker has lifetime shared by multiple plan fragments so it's hard
+  // to do cleanup another way.
+  bool auto_unregister_;
+
   // If true, logs to INFO every consume/release called. Used for debugging.
   bool enable_logging_;
   // If true, log the stack as well.
@@ -154,8 +171,14 @@ class MemTracker {
   // limit_trackers_
   void Init();
 
+  // Adds tracker to child_trackers_
+  void AddChildTracker(MemTracker* tracker);
+
   // Logs the stack of the current consume/release. Used for debugging only.
   void LogUpdate(bool is_consume, int64_t bytes);
+
+  static std::string LogUsage(const std::string& prefix,
+      const std::list<MemTracker*>& trackers);
 };
 
 }

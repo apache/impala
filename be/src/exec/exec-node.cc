@@ -116,7 +116,6 @@ Status ExecNode::Prepare(RuntimeState* state) {
   mem_tracker_.reset(new MemTracker(
       runtime_profile_.get(), -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
-  state->RegisterMemTracker(mem_tracker_.get());
 
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,

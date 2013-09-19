@@ -389,7 +389,6 @@ Status DataStreamSender::Init(RuntimeState* state) {
 
   mem_tracker_.reset(
       new MemTracker(profile(), -1, "DataStreamSender", state->instance_mem_tracker()));
-  state->RegisterMemTracker(mem_tracker_.get());
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
   uncompressed_bytes_counter_ =

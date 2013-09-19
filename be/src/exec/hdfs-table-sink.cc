@@ -175,7 +175,6 @@ Status HdfsTableSink::Init(RuntimeState* state) {
       ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
   mem_tracker_.reset(
       new MemTracker(profile(), -1, profile()->name(), state->instance_mem_tracker()));
-  state->RegisterMemTracker(mem_tracker_.get());
   encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
 

@@ -56,7 +56,6 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
   buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer(*)");
   data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
   first_batch_wait_timer_ = ADD_TIMER(profile, "FirstBatchArrivalWaitTime");
-  state->RegisterMemTracker(&mem_tracker_);
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {

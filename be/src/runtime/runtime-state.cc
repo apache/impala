@@ -176,8 +176,10 @@ void RuntimeState::LogMemLimitExceeded() {
     is_mem_limit_exceeded_ = true;
   }
   DCHECK(instance_mem_tracker_ != NULL);
+  MemTracker* query_mem_tracker = instance_mem_tracker_->parent();
+  DCHECK(query_mem_tracker != NULL);
   stringstream ss;
-  ss << "Memory Limit Exceeded\n" << MemTracker::LogUsage(mem_trackers_);
+  ss << "Memory Limit Exceeded\n" << query_mem_tracker->LogUsage();
   LogError(ss.str());
 }
 
