@@ -150,6 +150,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${GLOG_INCLUDE_DIR}"
   "-I${GFLAGS_INCLUDE_DIR}"
   "-I${RAPIDJSON_INCLUDE_DIR}"
+  "-I${AVRO_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib

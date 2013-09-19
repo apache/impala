@@ -407,15 +407,22 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
         if (seq_fn != NULL) {
           codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
         }
+
+        vector<Expr*> conjuncts_copy_avro;
+        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_avro, false));
+        Function* avro_fn = HdfsAvroScanner::Codegen(this, conjuncts_copy_avro);
+        if (avro_fn != NULL) codegend_fn_map_[THdfsFileFormat::AVRO].push_back(avro_fn);
       }
     } else {
       // Codegen function is thread safe, we can just use a single copy of the conjuncts
       Function* text_fn = HdfsTextScanner::Codegen(this, conjuncts());
       Function* seq_fn = HdfsSequenceScanner::Codegen(this, conjuncts());
+      Function* avro_fn = HdfsAvroScanner::Codegen(this, conjuncts());
       if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT].push_back(text_fn);
       if (seq_fn != NULL) {
         codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
       }
+      if (avro_fn != NULL) codegend_fn_map_[THdfsFileFormat::AVRO].push_back(avro_fn);
     }
   }
 

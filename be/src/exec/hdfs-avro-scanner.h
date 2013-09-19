@@ -39,9 +39,11 @@
 //     - sync marker
 //
 //
-// This implementation reads one data block at a time, using the schema from the
-// file header to decode the serialized objects. If possible, non-materialized
-// columns are skipped without being read.
+// This implementation reads one data block at a time, using the schema from the file
+// header to decode the serialized objects. If possible, non-materialized columns are
+// skipped without being read. If codegen is enabled, we codegen a function based on the
+// table schema that parses records, materializes them to tuples, and evaluates the
+// conjuncts.
 //
 // The Avro C library is used to parse the file's schema and the table's schema, which are
 // then resolved according to the Avro spec and transformed into our own schema
@@ -59,7 +61,9 @@
 //
 // TODO:
 // - implement SkipComplex()
-// - codegen
+// - codegen a function per unique file schema, rather than just the table schema
+// - once Exprs are thread-safe, we can cache the jitted function directly
+// - microbenchmark codegen'd functions (this and other scanners)
 
 #include "exec/base-sequence-scanner.h"
 
@@ -82,14 +86,17 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state);
   virtual ~HdfsAvroScanner();
 
+  // Codegen parsing records, writing tuples and evaluating predicates.
+  static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
+
  protected:
   // Implementation of BaseSeqeunceScanner super class methods
-  virtual Status Prepare(ScannerContext* context);
   virtual FileHeader* AllocateFileHeader();
   // TODO: check that file schema matches metadata schema
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
+  virtual void Close();
 
   virtual THdfsFileFormat::type file_format() const {
     return THdfsFileFormat::AVRO;
@@ -126,6 +133,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     // necessary (i.e., all materialized fields are present in the file schema).
     // template_tuple_ is set to this value.
     Tuple* template_tuple;
+
+    // True if this file can use the codegen'd version of DecodeAvroData() (i.e. its
+    // schema matches the table schema), false otherwise.
+    bool use_codegend_decode_avro_data;
   };
 
   AvroFileHeader* avro_header_;
@@ -139,6 +150,12 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const std::string AVRO_SNAPPY_CODEC;
   static const std::string AVRO_DEFLATE_CODEC;
 
+  typedef int (*DecodeAvroDataFn)(HdfsAvroScanner*, int, MemPool*, uint8_t**,
+                                  Tuple*, TupleRow*);
+
+  // The codegen'd version of DecodeAvroData() if available, NULL otherwise.
+  DecodeAvroDataFn codegend_decode_avro_data_;
+
   // Utility function for decoding and parsing file header metadata
   Status ParseMetadata();
 
@@ -150,45 +167,63 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   // Utility function that maps the Avro library's type representation to our
   // own. Used to convert a ValidSchema to a vector of SchemaElements.
-  SchemaElement ConvertSchemaNode(const avro_schema_t& node);
+  static SchemaElement ConvertSchemaNode(const avro_schema_t& node);
 
   // Returns Status::OK iff a value of avro_type can be used to populate slot_desc.
   Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_type_t avro_type);
 
-  // Decodes records, copies the data into tuples, and commits the tuple rows.
-  // - max_tuples: the maximum number of tuples to write and commit
-  // - num_records: the number of records remaining in this data block. This is
-  //       decremented by the number of records decoded.
+  // Decodes records and copies the data into tuples.
+  // Returns the number of tuples to be committed.
+  // - max_tuples: the maximum number of tuples to write
   // - data: serialized record data. Is advanced as records are read.
-  // - data_len: the length of data. Is decremented as records are read.
   // - pool: memory pool to allocate string data from
   // - tuple: tuple pointer to copy objects to
   // - tuple_row: tuple row of written tuples
-  Status DecodeAvroData(int max_tuples, int64_t* num_records, MemPool* pool,
-                        uint8_t** data, int* data_len, Tuple* tuple, TupleRow* tuple_row);
+  int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
+                        Tuple* tuple, TupleRow* tuple_row);
 
-  // Read the primitive type 'element' from 'data' and write it to the slot in 'tuple'
-  // specified by 'slot_desc'. String data is allocated from pool if necessary. 'data' is
-  // advanced past the element read and 'data_len' is decremented appropriately if there
-  // is no error. Returns true if no error.
-  bool ReadPrimitive(const SchemaElement& element, const SlotDescriptor& slot_desc,
-                     MemPool* pool, uint8_t** data, int* data_len, Tuple* tuple);
+  // Materializes a single tuple from serialized record data.
+  void MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tuple);
 
-  // Advance 'data' past the primitive type 'element' and decrement 'data_len'
-  // appropriately. Avoids reading 'data' when possible. Returns true if no error.
-  bool SkipPrimitive(const SchemaElement& element, uint8_t** data, int* data_len);
+  // Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
+  // functions.
+  static llvm::Function* CodegenDecodeAvroData(LlvmCodeGen* codegen,
+                                               llvm::Function* materialize_tuple_fn,
+                                               const std::vector<Expr*>& conjuncts);
 
-  // Advance 'data' past the complex type 'element' and decrement 'data_len'
-  // appropriately. Avoids reading 'data' when possible. Returns true if no error. By
-  // skipping complex types, we can execute queries over tables with nested data types if
-  // none of those columns are materialized.
-  // TODO: implement this function
-  bool SkipComplex(const SchemaElement& element, uint8_t** data, int* data_len);
+  // Codegens a version of MaterializeTuple() that reads records based on the table
+  // schema.
+  // TODO: Codegen a function for each unique file schema.
+  static llvm::Function* CodegenMaterializeTuple(HdfsScanNode* node,
+                                                 LlvmCodeGen* codegen);
 
-  // Utility function that uses element.null_union_position to set 'type' to the next
-  // primitive type we should read from 'data'.
-  bool ReadUnionType(const SchemaElement& element, uint8_t** data, int* data_len,
-                     avro_type_t* type);
+  // The following are cross-compiled functions for parsing a serialized Avro primitive
+  // type and writing it to a slot. They can also be used for skipping a field without
+  // writing it to a slot by setting 'write_slot' to false.
+  // - data: Serialized record data. Is advanced past the read field.
+  // The following arguments are used only if 'write_slot' is true:
+  // - slot: The tuple slot to write the parsed field into.
+  // - type: The type of the slot. (This is necessary because there is not a 1:1 mapping
+  //         between Avro types and Impala's primitive types.)
+  // - pool: MemPool for string data.
+  void ReadAvroBoolean(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroInt32(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroInt64(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroFloat(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroDouble(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroString(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+
+  // Reads and advances 'data' past the union branch index and returns true if the
+  // corresponding element is non-null. 'null_union_position' must be 0 or 1.
+  bool ReadUnionType(int null_union_position, uint8_t** data);
+
+  static const char* LLVM_CLASS_NAME;
 };
 } // namespace impala
 

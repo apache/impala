@@ -501,7 +501,10 @@ Function* LlvmCodeGen::OptimizeFunctionWithExprs(Function* fn) {
 }
 
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
-  if (!VerifyFunction(function)) return NULL;
+  if (!VerifyFunction(function)) {
+    function->eraseFromParent(); // deletes function
+    return NULL;
+  }
   if (FLAGS_dump_ir) function->dump();
   return function;
 }

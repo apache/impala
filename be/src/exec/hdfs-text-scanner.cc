@@ -131,7 +131,7 @@ void HdfsTextScanner::ResetScanner() {
       boundary_mem_pool_->Allocate(scan_node_->tuple_desc()->byte_size()));
 
   // Initialize codegen fn
-  InitializeCodegenFn(
+  InitializeWriteTuplesFn(
       context_->partition_descriptor(), THdfsFileFormat::TEXT, "HdfsTextScanner");
 }
 

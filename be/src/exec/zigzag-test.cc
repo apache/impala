@@ -32,15 +32,11 @@ void TestZInt(int32_t value) {
   EXPECT_TRUE(plen <= ReadWriteUtil::MAX_ZINT_LEN);
 
   uint8_t* buf_ptr = static_cast<uint8_t*>(buf);
-  int buf_len = sizeof(buf);
-  int32_t val;
-  Status status;
-  bool success = ReadWriteUtil::ReadZInt(&buf_ptr, &buf_len, &val, &status);
-  EXPECT_TRUE(success);
-  EXPECT_TRUE(status.ok());
-  EXPECT_GE(buf_len, 0);
-  EXPECT_LT(buf_len, sizeof(buf));
+  int32_t val = ReadWriteUtil::ReadZInt(&buf_ptr);
   EXPECT_EQ(value, val);
+  int len = buf_ptr - buf;
+  EXPECT_GT(len, 0);
+  EXPECT_LE(len, sizeof(buf));
 }
 
 void TestZLong(int64_t value) {
@@ -49,15 +45,11 @@ void TestZLong(int64_t value) {
   EXPECT_TRUE(plen <= ReadWriteUtil::MAX_ZLONG_LEN);
 
   uint8_t* buf_ptr = static_cast<uint8_t*>(buf);
-  int buf_len = sizeof(buf);
-  int64_t val;
-  Status status;
-  bool success = ReadWriteUtil::ReadZLong(&buf_ptr, &buf_len, &val, &status);
-  EXPECT_TRUE(success);
-  EXPECT_TRUE(status.ok());
-  EXPECT_GE(buf_len, 0);
-  EXPECT_LT(buf_len, sizeof(buf));
+  int64_t val = ReadWriteUtil::ReadZLong(&buf_ptr);
   EXPECT_EQ(value, val);
+  int len = buf_ptr - buf;
+  EXPECT_GT(len, 0);
+  EXPECT_LE(len, sizeof(buf));
 }
 
 // Test put and get of zigzag integers and longs.
@@ -85,23 +77,6 @@ TEST(ZigzagTest, Basic) {
     TestZLong(value);
     TestZLong((static_cast<int64_t>(value) << 32) | value);
   }
-}
-
-TEST(ZigzagTest, Failure) {
-  uint8_t* buf;
-  int buf_len = 0;
-  int32_t val32;
-  Status status;
-  bool success = ReadWriteUtil::ReadZInt(&buf, &buf_len, &val32, &status);
-  EXPECT_FALSE(success);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(buf_len, 0);
-
-  int64_t val64;
-  success = ReadWriteUtil::ReadZLong(&buf, &buf_len, &val64, &status);
-  EXPECT_FALSE(success);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(buf_len, 0);
 }
 }
 

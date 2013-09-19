@@ -248,10 +248,9 @@ class LlvmCodeGen {
   llvm::Function* ReplaceCallSites(llvm::Function* caller, bool update_in_place,
       llvm::Function* new_fn, const std::string& target_name, int* num_replaced);
 
-  // Verify and optimize function.  This should be called at the end for each
-  // codegen'd function.  If the function does not verify, it will return NULL,
-  // otherwise, it will optimize, mark the function for inlining and return the
-  // function object.
+  // Verify and optimize function.  This should be called at the end for each codegen'd
+  // function.  If the function does not verify, it will delete the function and return
+  // NULL, otherwise, it will optimize and return the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
   
   // Inline all function calls for 'fn'.  'fn' is modified in place.  Returns

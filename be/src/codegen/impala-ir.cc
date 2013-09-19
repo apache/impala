@@ -20,6 +20,7 @@
 #ifdef IR_COMPILE
 #include "exec/aggregation-node-ir.cc"
 #include "exec/hash-join-node-ir.cc"
+#include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exprs/expr-ir.cc"
 #include "runtime/string-value-ir.cc"

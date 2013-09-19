@@ -117,7 +117,7 @@ class ExecNode {
   // Codegen'd signature is bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow*);
   // The first two arguments are ignored (the Expr's are baked into the codegen)
   // but it is included so the signature can match EvalConjuncts.
-  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen,
+  static llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen,
       const std::vector<Expr*>& conjuncts);
 
   // Returns a string representation in DFS order of the plan rooted at this.

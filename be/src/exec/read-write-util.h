@@ -76,17 +76,18 @@ class ReadWriteUtil {
   // Determines the total length in bytes of a Writable VInt/VLong from the first byte.
   static int DecodeVIntSize(int8_t byte);
 
+  // Read a zig-zag encoded long. This is the integer encoding defined by google.com
+  // protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
+  // *buf is incremented past the encoded long.
+  static int64_t ReadZLong(uint8_t** buf);
+
+  // Read a zig-zag encoded int.
+  static int32_t ReadZInt(uint8_t** buf);
+
   // The following methods read data from a buffer without assuming the buffer is long
   // enough. If the buffer isn't long enough or another error occurs, they return false
   // and update the status with the error. Otherwise they return true. buffer is advanced
   // past the data read and buf_len is decremented appropriately.
-
-  // Read a zig-zag encoded long. This is the integer encoding defined by google.com
-  // protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
-  static bool ReadZLong(uint8_t** buf, int* buf_len, int64_t* val, Status* status);
-
-  // Read a zig-zag encoded int.
-  static bool ReadZInt(uint8_t** buf, int* buf_len, int32_t* val, Status* status);
 
   // Read a native type T (e.g. bool, float) directly into output (i.e. input is cast
   // directly to T and incremented by sizeof(T)).
@@ -163,33 +164,23 @@ inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong)
   return len;
 }
 
-inline bool ReadWriteUtil::ReadZInt(uint8_t** buf, int* buf_len, int32_t* val,
-                                    Status* status) {
-  int64_t zlong;
-  RETURN_IF_FALSE(ReadZLong(buf, buf_len, &zlong, status));
-  *val = static_cast<int32_t>(zlong);
-  return true;
+inline int32_t ReadWriteUtil::ReadZInt(uint8_t** buf) {
+  int64_t zlong = ReadZLong(buf);
+  return static_cast<int32_t>(zlong);
 }
 
-inline bool ReadWriteUtil::ReadZLong(uint8_t** buf, int* buf_len, int64_t* val,
-                                     Status* status) {
+inline int64_t ReadWriteUtil::ReadZLong(uint8_t** buf) {
   uint64_t zlong = 0;
   int shift = 0;
   bool more;
   do {
     DCHECK_LE(shift, 64);
-    if (UNLIKELY(*buf_len < 1)) {
-      *status = Status("Insufficient buffer length");
-      return false;
-    }
     zlong |= static_cast<uint64_t>(**buf & 0x7f) << shift;
     shift += 7;
     more = (**buf & 0x80) != 0;
     ++(*buf);
-    --(*buf_len);
   } while (more);
-  *val = (zlong >> 1) ^ -(zlong & 1);
-  return true;
+  return (zlong >> 1) ^ -(zlong & 1);
 }
 
 template <class T>

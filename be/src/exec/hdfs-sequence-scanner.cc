@@ -82,7 +82,7 @@ Status HdfsSequenceScanner::InitNewRange() {
   }
   
   // Initialize codegen fn
-  RETURN_IF_ERROR(InitializeCodegenFn(hdfs_partition, 
+  RETURN_IF_ERROR(InitializeWriteTuplesFn(hdfs_partition,
       THdfsFileFormat::SEQUENCE_FILE, "HdfsSequenceScanner"));
   return Status::OK;
 }

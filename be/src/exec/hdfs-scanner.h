@@ -216,10 +216,11 @@ class HdfsScanner {
   Status CreateConjunctsCopy();
 
   // Initializes write_tuples_fn_ to the jitted function if codegen is possible.
+  // Also sets codegen_fn_.
   // - partition - partition descriptor for this scanner/scan range
   // - type - type for this scanner
   // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
-  Status InitializeCodegenFn(HdfsPartitionDescriptor* partition,
+  Status InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
       THdfsFileFormat::type type, const std::string& scanner_name);
 
   // Set batch_ to a new row batch and update tuple_mem_ accordingly.

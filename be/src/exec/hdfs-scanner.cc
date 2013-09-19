@@ -91,7 +91,7 @@ Status HdfsScanner::CreateConjunctsCopy() {
   return Status::OK;
 }
 
-Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
+Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
   codegen_fn_ = scan_node_->GetCodegenFn(type);
 
