@@ -168,7 +168,7 @@ class HBaseTableScanner {
   static jmethodID scan_set_stop_row_id_;
   static jmethodID resultscanner_next_id_;
   static jmethodID resultscanner_close_id_;
-  static jmethodID result_raw_id_;
+  static jmethodID result_raw_cells_id_;
   static jmethodID cell_get_row_array_;
   static jmethodID cell_get_family_array_;
   static jmethodID cell_get_qualifier_array_;

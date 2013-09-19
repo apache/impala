@@ -47,7 +47,7 @@ jmethodID HBaseTableScanner::scan_set_start_row_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_stop_row_id_ = NULL;
 jmethodID HBaseTableScanner::resultscanner_next_id_ = NULL;
 jmethodID HBaseTableScanner::resultscanner_close_id_ = NULL;
-jmethodID HBaseTableScanner::result_raw_id_ = NULL;
+jmethodID HBaseTableScanner::result_raw_cells_id_ = NULL;
 jmethodID HBaseTableScanner::cell_get_row_array_ = NULL;
 jmethodID HBaseTableScanner::cell_get_family_array_ = NULL;
 jmethodID HBaseTableScanner::cell_get_qualifier_array_ = NULL;
@@ -188,10 +188,10 @@ Status HBaseTableScanner::Init() {
 
   // Result method ids.
   if (has_cell_class) {
-    result_raw_id_ = env->GetMethodID(result_cl_, "raw",
+    result_raw_cells_id_ = env->GetMethodID(result_cl_, "rawCells",
         "()[Lorg/apache/hadoop/hbase/Cell;");
   } else {
-    result_raw_id_ = env->GetMethodID(result_cl_, "raw",
+    result_raw_cells_id_ = env->GetMethodID(result_cl_, "raw",
         "()[Lorg/apache/hadoop/hbase/KeyValue;");
   }
   RETURN_ERROR_IF_EXC(env);
@@ -474,8 +474,8 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
 
   if (cells_ != NULL) env->DeleteGlobalRef(cells_);
   // cells_ = result.raw();
-  cells_ =
-      reinterpret_cast<jobjectArray>(env->CallObjectMethod(result, result_raw_id_));
+  cells_ = reinterpret_cast<jobjectArray>(
+      env->CallObjectMethod(result, result_raw_cells_id_));
   cells_ = reinterpret_cast<jobjectArray>(env->NewGlobalRef(cells_));
   num_cells_ = env->GetArrayLength(cells_);
   // Check that raw() didn't return more cells than expected.
