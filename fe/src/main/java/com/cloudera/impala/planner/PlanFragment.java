@@ -203,7 +203,9 @@ public class PlanFragment {
     Preconditions.checkNotNull(dataPartition);
     long result = 1;
     int numNodes = getNumNodes();
-    Preconditions.checkState(numNodes >= 1);
+    Preconditions.checkState(numNodes >= 0);
+    // The number of nodes is zero for empty tables.
+    if (numNodes == 0) return 0;
     for (Expr expr: exprs) {
       long numDistinct = expr.getNumDistinctValues();
       if (numDistinct == -1) {
