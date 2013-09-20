@@ -228,6 +228,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
 }
 
 void DataStreamSender::Channel::WaitForRpc() {
+  SCOPED_TIMER(parent_->state_->total_network_wait_timer());
   unique_lock<mutex> l(rpc_thread_lock_);
   while (rpc_in_flight_) {
     rpc_done_cv_.wait(l);
@@ -380,6 +381,7 @@ DataStreamSender::~DataStreamSender() {
 
 Status DataStreamSender::Init(RuntimeState* state) {
   DCHECK(state != NULL);
+  state_ = state;
   stringstream title;
   title << "DataStreamSender (dst_id=" << dest_node_id_ << ")";
   profile_ = pool_->Add(new RuntimeProfile(pool_, title.str()));

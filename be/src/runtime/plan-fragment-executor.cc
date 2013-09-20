@@ -72,6 +72,7 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 }
 
 Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
+  fragment_sw_.Start();
   const TPlanFragmentExecParams& params = request.params;
   query_id_ = params.query_id;
 
@@ -298,11 +299,7 @@ Status PlanFragmentExecutor::OpenInternal() {
   sink_.reset(NULL);
   done_ = true;
 
-  ReleaseThreadToken();
-
-  StopReportThread();
-  SendReport(true);
-
+  FragmentComplete();
   return Status::OK;
 }
 
@@ -383,10 +380,7 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
                << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
-    // Query is done, return the thread token
-    ReleaseThreadToken();
-    StopReportThread();
-    SendReport(true);
+    FragmentComplete();
     // GetNext() uses *batch = NULL to signal the end.
     if (*batch != NULL && (*batch)->num_rows() == 0) *batch = NULL;
   }
@@ -412,6 +406,22 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
   }
 
   return Status::OK;
+}
+
+void PlanFragmentExecutor::FragmentComplete() {
+  fragment_sw_.Stop();
+  int64_t cpu_and_wait_time = fragment_sw_.ElapsedTime();
+  fragment_sw_ = MonotonicStopWatch();
+  int64_t cpu_time = cpu_and_wait_time -
+      runtime_state_->total_storage_wait_timer()->value() -
+      runtime_state_->total_network_wait_timer()->value();
+  // Timing is not perfect.
+  if (cpu_time < 0) cpu_time = 0;
+  runtime_state_->total_cpu_timer()->Update(cpu_time);
+
+  ReleaseThreadToken();
+  StopReportThread();
+  SendReport(true);
 }
 
 void PlanFragmentExecutor::UpdateStatus(const Status& status) {

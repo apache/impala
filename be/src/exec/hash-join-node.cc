@@ -144,11 +144,16 @@ void HashJoinNode::Close(RuntimeState* state) {
 }
 
 void HashJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* status) {
-  status->Set(ConstructHashTable(state));
+  Status s;
+  {
+    SCOPED_TIMER(state->total_cpu_timer());
+    s= ConstructHashTable(state);
+  }
   // Release the thread token as soon as possible (before the main thread joins
   // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
   // we'd keep the additional thread busy the whole time.
   state->resource_pool()->ReleaseThreadToken(false);
+  status->Set(s);
 }
 
 Status HashJoinNode::ConstructHashTable(RuntimeState* state) {

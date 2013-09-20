@@ -632,6 +632,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 }
 
 inline void HdfsScanNode::ScannerThreadHelper() {
+  SCOPED_TIMER(runtime_state_->total_cpu_timer());
   while (!done_ && !runtime_state_->resource_pool()->optional_exceeded()) {
     DiskIoMgr::ScanRange* scan_range;
     // Take a snapshot of num_unqueued_files_ before calling GetNextRange().

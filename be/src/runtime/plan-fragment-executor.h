@@ -196,6 +196,9 @@ class PlanFragmentExecutor {
   // of the execution.
   RuntimeProfile::Counter* average_thread_tokens_;
 
+  // Stopwatch for this entire fragment. Started in Prepare(), stopped in Close().
+  MonotonicStopWatch fragment_sw_;
+
   // Memory usage of this fragment instance
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
@@ -228,6 +231,9 @@ class PlanFragmentExecutor {
   // If we're transitioning to an error status, stops report thread and
   // sends a final report.
   void UpdateStatus(const Status& status);
+
+  // Called when the fragment execution is complete to finalize counters.
+  void FragmentComplete();
 
   // Executes Open() logic and returns resulting status. Does not set status_.
   // If this plan fragment has no sink, OpenInternal() does nothing.

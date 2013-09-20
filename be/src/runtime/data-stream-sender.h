@@ -80,6 +80,7 @@ class DataStreamSender : public DataSink {
  private:
   class Channel;
 
+  RuntimeState* state_;
   ObjectPool* pool_;
   const RowDescriptor& row_desc_;
   bool broadcast_;  // if true, send all rows on all channels

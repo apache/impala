@@ -101,6 +101,11 @@ Status RuntimeState::Init(
     resource_pool_ = exec_env->thread_mgr()->RegisterPool();
     DCHECK(resource_pool_ != NULL);
   }
+
+  total_cpu_timer_ = ADD_TIMER(runtime_profile(), "TotalCpuTime");
+  total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
+  total_network_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkWaitTime");
+
   return Status::OK;
 }
 

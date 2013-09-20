@@ -137,8 +137,10 @@ Status ScannerContext::Stream::GetNextBuffer() {
   }
 
   if (!eosr) {
+    SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
     RETURN_IF_ERROR(scan_range_->GetNext(&io_buffer_));
   } else {
+    SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
     int64_t offset = file_offset() + boundary_buffer_bytes_left_;
     int read_past_buffer_size = read_past_size_cb_.empty() ?
                                 DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);

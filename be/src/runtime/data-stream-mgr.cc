@@ -47,7 +47,8 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
     num_remaining_senders_(num_senders),
-    mem_tracker_(profile, -1, "DataStreamMgr", state->instance_mem_tracker()) {
+    mem_tracker_(profile, -1, "DataStreamMgr", state->instance_mem_tracker()),
+    received_first_batch_(false) {
   bytes_received_counter_ =
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
   deserialize_row_batch_timer_ =

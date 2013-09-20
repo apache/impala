@@ -160,6 +160,14 @@ class RuntimeState {
   // sets the state to mem limit exceeded and logs all the registered trackers
   void LogMemLimitExceeded();
 
+  RuntimeProfile::Counter* total_cpu_timer() { return total_cpu_timer_; }
+  RuntimeProfile::Counter* total_storage_wait_timer() {
+    return total_storage_wait_timer_;
+  }
+  RuntimeProfile::Counter* total_network_wait_timer() {
+    return total_network_wait_timer_;
+  }
+
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -215,6 +223,15 @@ class RuntimeState {
   PartitionRowCount num_appended_rows_;
 
   RuntimeProfile profile_;
+
+  // Total CPU time (across all threads), including all wait times.
+  RuntimeProfile::Counter* total_cpu_timer_;
+
+  // Total time waiting in storage (across all threads)
+  RuntimeProfile::Counter* total_storage_wait_timer_;
+
+  // Total time waiting in network (across all threads)
+  RuntimeProfile::Counter* total_network_wait_timer_;
 
   // Fragment instance memory tracker.  Also contained in mem_trackers_
   MemTracker* instance_mem_tracker_;
