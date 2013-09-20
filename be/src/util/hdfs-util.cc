@@ -47,18 +47,22 @@ bool IsHiddenFile(const string& filename) {
 Status CopyHdfsFile(const hdfsFS& src_conn, const char* src_path,
                     const hdfsFS& dst_conn, const char* dst_dir,
                     string* dst_path) {
-  int error = hdfsCopy(src_conn, src_path, dst_conn, dst_dir);
+
+  // Append the source filename to the destination directory. Also add the process ID to
+  // the filename so multiple processes don't clobber each other's files.
+  filesystem::path src(src_path);
+  stringstream dst;
+  dst << dst_dir << "/" << src.stem().native() << "." << getpid()
+      << src.extension().native();
+  *dst_path = dst.str();
+
+  int error = hdfsCopy(src_conn, src_path, dst_conn, dst_path->c_str());
   if (error != 0) {
     string error_msg = GetHdfsErrorMsg("");
     stringstream ss;
     ss << "Failed to copy " << src_path << " to " << dst_dir << ": " << error_msg;
     return Status(ss.str());
   }
-  filesystem::path src(src_path);
-  filesystem::path dst(dst_dir);
-  // Append src.filename() to dst
-  dst /= src.filename();
-  *dst_path = dst.native();
   return Status::OK;
 }
 
