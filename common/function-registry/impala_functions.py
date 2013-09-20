@@ -122,6 +122,7 @@ functions = [
   ['String_Length', 'INT', ['STRING'], 'StringFunctions::Length', ['length']],
   ['String_Lower', 'STRING', ['STRING'], 'StringFunctions::Lower', ['lower', 'lcase']],
   ['String_Upper', 'STRING', ['STRING'], 'StringFunctions::Upper', ['upper', 'ucase']],
+  ['String_InitCap', 'STRING', ['STRING'], 'StringFunctions::InitCap', ['initcap']],
   ['String_Reverse', 'STRING', ['STRING'], 'StringFunctions::Reverse', ['reverse']],
   ['String_Translate', 'STRING', ['STRING', 'STRING', 'STRING'], 
         'StringFunctions::Translate', ['translate']],

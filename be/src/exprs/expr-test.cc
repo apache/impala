@@ -1173,6 +1173,19 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("upper(NULL)", TYPE_STRING);
   TestIsNull("ucase(NULL)", TYPE_STRING);
 
+  TestStringValue("initcap('')", "");
+  TestStringValue("initcap('a')", "A");
+  TestStringValue("initcap('hello')", "Hello");
+  TestStringValue("initcap('h e l l o')", "H E L L O");
+  TestStringValue("initcap('hello this is a message')", "Hello This Is A Message");
+  TestStringValue("initcap('Hello This Is A Message')", "Hello This Is A Message");
+  TestStringValue("initcap(' hello    tHis  IS A _  MeSsAgE')", " Hello    This  "
+      "Is A _  Message");
+  TestStringValue("initcap('HELLO THIS IS A MESSAGE')", "Hello This Is A Message");
+  TestStringValue("initcap(' hello\vthis\nis\ra\tlong\fmessage')", " Hello\vThis"
+      "\nIs\rA\tLong\fMessage");
+  TestIsNull("initcap(NULL)", TYPE_STRING);
+
   TestValue("length('')", TYPE_INT, 0);
   TestValue("length('a')", TYPE_INT, 1);
   TestValue("length('abcdefg')", TYPE_INT, 7);

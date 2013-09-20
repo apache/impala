@@ -37,6 +37,7 @@ class StringFunctions {
   static void* Length(Expr* e, TupleRow* row);
   static void* Lower(Expr* e, TupleRow* row);
   static void* Upper(Expr* e, TupleRow* row);
+  static void* InitCap(Expr* e, TupleRow* row);
   static void* Reverse(Expr* e, TupleRow* row);
   static void* Translate(Expr* e, TupleRow* row);
   static void* Trim(Expr* e, TupleRow* row);

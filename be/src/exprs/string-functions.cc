@@ -14,6 +14,7 @@
 
 #include "exprs/string-functions.h"
 
+#include <cctype>
 #include <boost/regex.hpp>
 
 #include "exprs/expr.h"
@@ -250,6 +251,35 @@ void* StringFunctions::Upper(Expr* e, TupleRow* row) {
   std::transform(str->ptr, str->ptr + str->len,
                  e->result_.string_val.ptr, ::toupper);
 
+  return &e->result_.string_val;
+}
+
+// Implementation of InitCap
+//   string initcap(string input)
+// Returns a string identical to the input, but with the first character
+// of each word mapped to its upper-case equivalent. All other characters
+// will be mapped to their lower-case equivalents. If input == NULL it
+// will return NULL
+void* StringFunctions::InitCap(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* op = e->children()[0];
+  StringValue* str = reinterpret_cast<StringValue*>(op->GetValue(row));
+  if (str == NULL) return NULL;
+
+  e->result_.string_data.resize(str->len);
+  e->result_.SyncStringVal();
+
+  char* result_ptr = e->result_.string_val.ptr;
+  bool word_start = true;
+  for (int32_t i = 0; i < str->len; ++i) {
+    if (isspace(str->ptr[i])) {
+      result_ptr[i] = str->ptr[i];
+      word_start = true;
+    } else {
+      result_ptr[i] = (word_start ? toupper(str->ptr[i]) : tolower(str->ptr[i]));
+      word_start = false;
+    }
+  }
   return &e->result_.string_val;
 }
 
