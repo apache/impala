@@ -325,6 +325,34 @@ const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
+// Work item for ImpalaServer::cancellation_thread_pool_.
+class CancellationWork {
+ public:
+  CancellationWork(const TUniqueId& query_id, const Status& cause)
+    : query_id_(query_id), cause_(cause) {
+  }
+
+  CancellationWork() {
+  }
+
+  const TUniqueId& query_id() const { return query_id_; }
+  const Status& cause() const { return cause_; }
+
+  bool operator<(const CancellationWork& other) const {
+    return query_id_ < other.query_id_;
+  }
+
+  bool operator==(const CancellationWork& other) const {
+    return query_id_ == other.query_id_;
+  }
+
+ private:
+  // Id of query to be canceled.
+  TUniqueId query_id_;
+
+  // Error status containing a list of failed impalads causing the cancellation.
+  Status cause_;
+};
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     : exec_env_(exec_env) {
@@ -413,7 +441,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialise the cancellation thread pool with 5 (by default) threads. The max queue
   // size is deliberately set so high that it should never fill; if it does the
   // cancellations will get ignored and retried on the next statestore heartbeat.
-  cancellation_thread_pool_.reset(new ThreadPool<TUniqueId>(
+  cancellation_thread_pool_.reset(new ThreadPool<CancellationWork>(
           "impala-server", "cancellation-worker",
       FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
@@ -1108,14 +1136,14 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   return Status::OK;
 }
 
-Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
+Status ImpalaServer::CancelInternal(const TUniqueId& query_id, const Status* cause) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid or unknown query handle");
 
   lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
   // TODO: can we call Coordinator::Cancel() here while holding lock?
-  exec_state->Cancel();
+  exec_state->Cancel(cause);
   return Status::OK;
 }
 
@@ -1540,11 +1568,13 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   state->network_address = network_address;
 }
 
-void ImpalaServer::CancelFromThreadPool(uint32_t thread_id, const TUniqueId& query_id) {
-  Status status = CancelInternal(query_id);
+void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
+    const CancellationWork& cancellation_work) {
+  Status status =
+      CancelInternal(cancellation_work.query_id(), &cancellation_work.cause());
   if (!status.ok()) {
-    VLOG_QUERY << "Query cancellation (" << query_id << ") did not succeed: "
-               << status.GetErrorMsg();
+    VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
+               << ") did not succeed: " << status.GetErrorMsg();
   }
 }
 
@@ -1587,25 +1617,32 @@ void ImpalaServer::MembershipCallback(
       current_membership.insert(backend.second);
     }
 
-    set<TUniqueId> queries_to_cancel;
+    // Maps from query id (to be cancelled) to a list of failed Impalads that are
+    // the cause of the cancellation.
+    map<TUniqueId, vector<TNetworkAddress> > queries_to_cancel;
     {
       // Build a list of queries that are running on failed hosts (as evidenced by their
       // absence from the membership list).
       // TODO: crash-restart failures can give false negatives for failed Impala demons.
       lock_guard<mutex> l(query_locations_lock_);
-      QueryLocations::const_iterator backend = query_locations_.begin();
-      while (backend != query_locations_.end()) {
-        if (current_membership.find(backend->first) == current_membership.end()) {
-          queries_to_cancel.insert(backend->second.begin(), backend->second.end());
-          exec_env_->client_cache()->CloseConnections(backend->first);
+      QueryLocations::const_iterator loc_entry = query_locations_.begin();
+      while (loc_entry != query_locations_.end()) {
+        if (current_membership.find(loc_entry->first) == current_membership.end()) {
+          unordered_set<TUniqueId>::const_iterator query_id = loc_entry->second.begin();
+          // Add failed backend locations to all queries that ran on that backend.
+          for(; query_id != loc_entry->second.end(); ++query_id) {
+            vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
+            failed_hosts.push_back(loc_entry->first);
+          }
+          exec_env_->client_cache()->CloseConnections(loc_entry->first);
           // We can remove the location wholesale once we know backend's failed. To do so
           // safely during iteration, we have to be careful not in invalidate the current
           // iterator, so copy the iterator to do the erase(..) and advance the original.
-          QueryLocations::const_iterator failed_backend = backend;
-          ++backend;
+          QueryLocations::const_iterator failed_backend = loc_entry;
+          ++loc_entry;
           query_locations_.erase(failed_backend);
         } else {
-          ++backend;
+          ++loc_entry;
         }
       }
     }
@@ -1619,8 +1656,18 @@ void ImpalaServer::MembershipCallback(
       // Since we are the only producer for this pool, we know that this cannot block
       // indefinitely since the queue is large enough to accept all new cancellation
       // requests.
-      BOOST_FOREACH(const TUniqueId& query_id, queries_to_cancel) {
-        cancellation_thread_pool_->Offer(query_id);
+      map<TUniqueId, vector<TNetworkAddress> >::iterator cancellation_entry;
+      for (cancellation_entry = queries_to_cancel.begin();
+          cancellation_entry != queries_to_cancel.end();
+          ++cancellation_entry) {
+        stringstream cause_msg;
+        cause_msg << "Cancelled due to unreachable impalad(s): ";
+        for (int i = 0; i < cancellation_entry->second.size(); ++i) {
+          cause_msg << cancellation_entry->second[i];
+          if (i + 1 != cancellation_entry->second.size()) cause_msg << ", ";
+        }
+        cancellation_thread_pool_->Offer(
+            CancellationWork(cancellation_entry->first, Status(cause_msg.str())));
       }
     }
   }
@@ -1777,6 +1824,5 @@ shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
     return i->second;
   }
 }
-
 
 }

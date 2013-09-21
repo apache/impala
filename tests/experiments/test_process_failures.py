@@ -135,6 +135,9 @@ class TestProcessFailures(ImpalaTestSuite):
     worker_impalad = self.cluster.get_different_impalad(impalad)
     print "Coordinator impalad: %s Worker impalad: %s" % (impalad, worker_impalad)
 
+    # Start executing a query. It will be cancelled due to a killed worker.
+    handle = client.execute_query_async(QUERY)
+
     statestored = self.cluster.statestored
     worker_impalad.kill()
 
@@ -142,6 +145,24 @@ class TestProcessFailures(ImpalaTestSuite):
     statestored.service.wait_for_live_backends(CLUSTER_SIZE - 1, timeout=30)
     # Wait until the impalad registers another instance went down.
     impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE - 1, timeout=30)
+
+    # Wait until the in-flight query has been cancelled.
+    impalad.service.wait_for_query_state(client, handle,\
+                                         client.query_states['EXCEPTION'])
+
+    # The in-flight query should have been cancelled, reporting a failed worker as the
+    # cause. The query may have been cancelled because the state store detected a failed
+    # node, or because a stream sender failed to establish a thrift connection. It is
+    # non-deterministic which of those paths will initiate cancellation, but in either
+    # case the query status should include the failed (or unreachable) worker.
+    assert client.get_state(handle) == client.query_states['EXCEPTION']
+    query_status = impalad.service.get_query_status(handle.id)
+    if query_status is None:
+      assert False, "Could not find 'Query Status' section in profile of "\
+                  "query with id %s:\n%s" % (handle.id)
+    failed_hostport = "%s:%s" % (worker_impalad.service.hostname,\
+                                 worker_impalad.service.be_port)
+    assert failed_hostport in query_status
 
     # Should work fine even if a worker is down.
     self.execute_query_using_client(client, QUERY, vector)

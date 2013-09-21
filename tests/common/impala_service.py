@@ -80,9 +80,10 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000):
+  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000):
     super(ImpaladService, self).__init__(hostname, webserver_port)
     self.beeswax_port = beeswax_port
+    self.be_port = be_port
 
   def get_num_known_live_backends(self, timeout=30, interval=1):
     LOG.info("Getting num_known_live_backends from %s:%s" %\
@@ -107,6 +108,34 @@ class ImpaladService(BaseImpalaService):
             (expected_value, value))
       sleep(1)
     assert 0, 'num_known_live_backends did not reach expected value in time'
+
+  def read_query_profile_page(self, query_id, timeout=10, interval=1):
+    """Fetches the raw contents of the query's runtime profile webpage.
+    Fails an assertion if Impala's webserver is unavailable or the query's
+    profile page doesn't exist."""
+    return self.read_debug_webpage("query_profile?query_id=%s&raw" % (query_id))
+
+  def get_query_status(self, query_id):
+    """Gets the 'Query Status' section of the query's runtime profile."""
+    page = self.read_query_profile_page(query_id)
+    status_line =\
+        next((x for x in page.split('\n') if re.search('Query Status:', x)), None)
+    return status_line.split('Query Status:')[1].strip()
+
+  def wait_for_query_state(self, client, query_handle, target_state,
+                           timeout=10, interval=1):
+    """Keeps polling for the query's state using client in the given interval until
+    the query's state reaches the target state or the given timeout has been reached."""
+    start_time = time()
+    while (time() - start_time < timeout):
+      try:
+        query_state = client.get_state(query_handle)
+      except Exception as e:
+        pass
+      if query_state == target_state:
+        return
+      sleep(interval)
+    return
 
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad"""

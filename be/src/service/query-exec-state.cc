@@ -342,14 +342,14 @@ Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* r
   return Status::OK;
 }
 
-void ImpalaServer::QueryExecState::Cancel() {
+void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   // If the query is completed, no need to cancel.
   if (eos_) return;
   // we don't want multiple concurrent cancel calls to end up executing
   // Coordinator::Cancel() multiple times
   if (query_state_ == QueryState::EXCEPTION) return;
   query_state_ = QueryState::EXCEPTION;
-  if (coord_.get() != NULL) coord_->Cancel();
+  if (coord_.get() != NULL) coord_->Cancel(cause);
 }
 
 Status ImpalaServer::QueryExecState::UpdateMetastore() {

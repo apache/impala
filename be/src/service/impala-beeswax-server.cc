@@ -442,28 +442,14 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
 
 inline void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,
     QueryHandle* handle) {
-  stringstream stringstream;
-  stringstream << query_id.hi << " " << query_id.lo;
-  handle->__set_id(stringstream.str());
-  handle->__set_log_context(stringstream.str());
+  string query_id_str = PrintId(query_id);
+  handle->__set_id(query_id_str);
+  handle->__set_log_context(query_id_str);
 }
 
 inline void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
     TUniqueId* query_id) {
-  char_separator<char> sep(" ");
-  tokenizer< char_separator<char> > tokens(handle.id, sep);
-  int i = 0;
-  BOOST_FOREACH(const string& t, tokens) {
-    StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
-    int64_t id = StringParser::StringToInt<int64_t>(
-        t.c_str(), t.length(), &parse_result);
-    if (i == 0) {
-      query_id->hi = id;
-    } else {
-      query_id->lo = id;
-    }
-    ++i;
-  }
+  ParseId(handle.id, query_id);
 }
 
 void ImpalaServer::RaiseBeeswaxException(const string& msg, const char* sql_state) {

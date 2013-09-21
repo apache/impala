@@ -125,8 +125,9 @@ class Coordinator {
   Status GetNext(RowBatch** batch, RuntimeState* state);
 
   // Cancel execution of query. This includes the execution of the local plan fragment,
-  // if any, as well as all plan fragments on remote nodes.
-  void Cancel();
+  // if any, as well as all plan fragments on remote nodes. Sets query_status_ to
+  // the given cause if non-NULL. Otherwise, sets query_status_ to Status::CANCELLED.
+  void Cancel(const Status* cause = NULL);
 
   // Updates status and query execution metadata of a particular
   // fragment; if 'status' is an error status or if 'done' is true,

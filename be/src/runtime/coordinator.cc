@@ -894,12 +894,12 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   return exec_state->status;
 }
 
-void Coordinator::Cancel() {
+void Coordinator::Cancel(const Status* cause) {
   lock_guard<mutex> l(lock_);
   // if the query status indicates an error, cancellation has already been initiated
   if (!query_status_.ok()) return;
   // prevent others from cancelling a second time
-  query_status_ = Status::CANCELLED;
+  query_status_ = (cause != NULL) ? *cause : Status::CANCELLED;
   CancelInternal();
 }
 

@@ -46,6 +46,7 @@ namespace impala {
 
 class ExecEnv;
 class DataSink;
+class CancellationWork;
 class Coordinator;
 class RowDescriptor;
 class TCatalogUpdate;
@@ -337,10 +338,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Returns true if it found a registered exec_state, otherwise false.
   bool UnregisterQuery(const TUniqueId& query_id);
 
-  // Initiates query cancellation. Returns OK unless query_id is not found.
+  // Initiates query cancellation reporting the given cause as the query status.
+  // Assumes deliberate cancellation by the user if the cause is NULL.
+  // Returns OK unless query_id is not found.
   // Queries still need to be unregistered, usually via Close, after cancellation.
   // Caller should not hold any locks when calling this function.
-  Status CancelInternal(const TUniqueId& query_id);
+  Status CancelInternal(const TUniqueId& query_id, const Status* cause = NULL);
 
   // Close the session and release all resource used by this session.
   // Caller should not hold any locks when calling this function.
@@ -556,9 +559,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       QueryStateToTOperationState(const beeswax::QueryState::type& query_state);
 
   // Helper method to process cancellations that result from failed backends, called from
-  // the cancellation thread pool. Calls CancelInternal directly, but has a signature
-  // compatible with the thread pool.
-  void CancelFromThreadPool(uint32_t thread_id, const TUniqueId& query_id);
+  // the cancellation thread pool. The cancellation_work contains the query id to cancel
+  // and a cause listing the failed backends that led to cancellation. Calls
+  // CancelInternal directly, but has a signature compatible with the thread pool.
+  void CancelFromThreadPool(uint32_t thread_id,
+      const CancellationWork& cancellation_work);
 
   // For access to GetTableNames and DescribeTable
   friend class DdlExecutor;
@@ -596,7 +601,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Thread pool to process cancellation requests that come from failed Impala demons to
   // avoid blocking the statestore callback.
-  boost::scoped_ptr<ThreadPool<TUniqueId> > cancellation_thread_pool_;
+  boost::scoped_ptr<ThreadPool<CancellationWork> > cancellation_thread_pool_;
 
   // map from query id to exec state; QueryExecState is owned by us and referenced
   // as a shared_ptr to allow asynchronous deletion

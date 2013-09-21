@@ -89,10 +89,10 @@ class ImpalaServer::QueryExecState {
   // is taken before calling UpdateQueryStatus
   Status UpdateQueryStatus(const Status& status);
 
-  // Sets state to EXCEPTION and cancels coordinator.
+  // Sets state to EXCEPTION and cancels coordinator with the given cause.
   // Caller needs to hold lock_.
   // Does nothing if the query has reached EOS.
-  void Cancel();
+  void Cancel(const Status* cause = NULL);
 
   // This is called when the query is done (finished, cancelled, or failed).
   // Takes lock_: callers must not hold lock() before calling.
