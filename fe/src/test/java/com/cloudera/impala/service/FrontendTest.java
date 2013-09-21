@@ -58,9 +58,9 @@ public class FrontendTest {
     // DatabaseMetaData.getTypeInfo has 18 columns.
     assertEquals(18, resp.result_set_metadata.columnDescs.size());
     assertEquals(18, resp.results.get(0).colVals.size());
-    // All primitives types, except INVALID_TYPE, DATE and DATETIME, should be returned.
-    // Therefore #supported types =  PrimitiveType.values().length - 3.
-    assertEquals(PrimitiveType.values().length - 3, resp.results.size());
+    // All primitives types, except INVALID_TYPE, DATE, DATETIME and CHAR, should be
+    // returned. Therefore #supported types =  PrimitiveType.values().length - 4.
+    assertEquals(PrimitiveType.values().length - 4, resp.results.size());
   }
 
   @Test

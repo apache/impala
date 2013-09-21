@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TShowFunctionsParams;
 import com.google.common.base.Preconditions;
 
@@ -35,24 +36,20 @@ public class ShowFunctionsStmt extends StatementBase {
   // DB (if any) as seen by the parser
   private final String parsedDb_;
 
+  // If true, show UDAs, otherwise, show UDFs
+  private final boolean isAggregate_;
+
   // Set during analysis
   private String postAnalysisDb_;
-
-  /**
-   * Default constructor, which creates a show statement which returns all
-   * functions.
-   */
-  public ShowFunctionsStmt() {
-    this(null, null);
-  }
 
   /**
    * Constructs a show statement which matches all functions against the
    * supplied pattern.
    */
-  public ShowFunctionsStmt(String db, String pattern) {
-    this.parsedDb_ = db;
-    this.pattern_ = pattern;
+  public ShowFunctionsStmt(String db, String pattern, boolean isAggregate) {
+    parsedDb_ = db;
+    pattern_ = pattern;
+    isAggregate_ = isAggregate;
   }
 
   /**
@@ -87,6 +84,7 @@ public class ShowFunctionsStmt extends StatementBase {
 
   public TShowFunctionsParams toThrift() {
     TShowFunctionsParams params = new TShowFunctionsParams();
+    params.setType(isAggregate_ ? TFunctionType.AGGREGATE : TFunctionType.SCALAR);
     params.setDb(getDb());
     params.setShow_pattern(getPattern());
     return params;

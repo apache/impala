@@ -42,7 +42,10 @@ public enum PrimitiveType {
   STRING("STRING", 16, TPrimitiveType.STRING),
   // Unsupported scalar types.
   BINARY("BINARY", -1, TPrimitiveType.BINARY),
-  DECIMAL("DECIMAL", -1, TPrimitiveType.DECIMAL);
+  DECIMAL("DECIMAL", -1, TPrimitiveType.DECIMAL),
+
+  // Fixed length char array.
+  CHAR("CHAR", -1, TPrimitiveType.CHAR);
 
   private final String description;
   private final int slotSize;  // size of tuple slot for this type
@@ -72,6 +75,7 @@ public enum PrimitiveType {
       case DOUBLE: return DOUBLE;
       case STRING: return STRING;
       case TIMESTAMP: return TIMESTAMP;
+      case CHAR: return CHAR;
     }
     return INVALID_TYPE;
   }

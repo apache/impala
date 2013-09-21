@@ -60,9 +60,9 @@ public class FunctionCallExpr extends Expr {
     if (udf_ != null) {
       msg.node_type = TExprNodeType.UDF_CALL;
       msg.setUdf_call_expr(new TUdfCallExpr());
-      msg.udf_call_expr.location = udf_.getLocation().toString();
-      msg.udf_call_expr.setBinary_fn_name(udf_.getBinaryName());
-      msg.udf_call_expr.setUdf_type(udf_.getUdfType());
+      msg.udf_call_expr.setBinary_location(udf_.getLocation().toString());
+      msg.udf_call_expr.setSymbol_name(udf_.getSymbolName());
+      msg.udf_call_expr.setBinary_type(udf_.getBinaryType());
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
       msg.setOpcode(opcode);
@@ -94,17 +94,21 @@ public class FunctionCallExpr extends Expr {
       String dbName = analyzer.getTargetDbName(functionName_);
       functionName_.setDb(dbName);
 
-      if (!analyzer.getCatalog().udfExists(functionName_)) {
+      if (!analyzer.getCatalog().functionExists(functionName_)) {
         throw new AnalysisException(functionName_ + "() unknown");
       }
 
       Function searchDesc = new Function(functionName_,
           argTypes, PrimitiveType.INVALID_TYPE, false);
 
-      Udf udf = analyzer.getCatalog().getUdf(searchDesc, false);
-      if (udf != null) {
-        udf_ = udf;
-        fnDesc = udf;
+      Function fn = analyzer.getCatalog().getFunction(searchDesc, false);
+      if (fn != null) {
+        if (fn instanceof Udf) {
+          udf_ = (Udf)fn;
+          fnDesc = fn;
+        } else {
+          throw new AnalysisException(functionName_ + "() is not a UDF");
+        }
       }
     }
 

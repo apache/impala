@@ -25,6 +25,7 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Lists;
@@ -52,7 +53,8 @@ public class Db {
 
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
-  private HashMap<String, List<Udf>> udfs;
+  // This includes both UDFs and UDAs
+  private HashMap<String, List<Function>> functions;
 
   // Table metadata cache.
   private final CatalogObjectCache<Table> tableCache = new CatalogObjectCache<Table>(
@@ -118,7 +120,7 @@ public class Db {
   }
 
   private void loadUdfs() {
-    udfs = new HashMap<String, List<Udf>>();
+    functions = new HashMap<String, List<Function>>();
     // TODO: figure out how to persist udfs.
   }
 
@@ -214,14 +216,17 @@ public class Db {
   }
 
   /**
-   * Returns all the UDFs in this DB.
+   * Returns all the function signatures in this DB.
    */
-  public List<String> getAllUdfs() {
+  public List<String> getAllFunctionSignatures(TFunctionType type) {
     List<String> names = Lists.newArrayList();
-    synchronized (udfs) {
-      for (List<Udf> functions: udfs.values()) {
-        for (Udf f: functions) {
-          names.add(f.signatureString());
+    synchronized (functions) {
+      for (List<Function> fns: functions.values()) {
+        for (Function f: fns) {
+          if ((type == TFunctionType.SCALAR && f instanceof Udf) ||
+               type == TFunctionType.AGGREGATE && f instanceof Uda) {
+            names.add(f.signatureString());
+          }
         }
       }
     }
@@ -229,38 +234,37 @@ public class Db {
   }
 
   /**
-   * Returns the number of udfs in this database.
+   * Returns the number of functions in this database.
    */
-  public int numUdfs() {
-    synchronized (udfs) {
-      return udfs.size();
+  public int numFunctions() {
+    synchronized (functions) {
+      return functions.size();
     }
   }
 
   /**
    * See comment in Catalog.
    */
-  public boolean udfExists(FunctionName name) {
-    synchronized (udfs) {
-      List<Udf> functions = udfs.get(name.getFunction());
-      return functions != null;
+  public boolean functionExists(FunctionName name) {
+    synchronized (functions) {
+      return functions.get(name.getFunction()) != null;
     }
   }
 
   /*
    * See comment in Catalog.
    */
-  public Udf getUdf(Function desc, boolean exactMatch) {
-    synchronized (udfs) {
-      List<Udf> functions = udfs.get(desc.functionName());
-      if (functions == null) return null;
+  public Function getFunction(Function desc, boolean exactMatch) {
+    synchronized (functions) {
+      List<Function> fns = functions.get(desc.functionName());
+      if (fns == null) return null;
 
-      for (Udf f: functions) {
+      for (Function f: fns) {
         if (desc.equals(f)) return f;
       }
       if (exactMatch) return null;
 
-      for (Udf f: functions) {
+      for (Function f: fns) {
         if (f.isSupertype(desc)) return f;
       }
     }
@@ -270,17 +274,16 @@ public class Db {
   /**
    * See comment in Catalog.
    */
-  public boolean addUdf(Udf udf) {
+  public boolean addFunction(Function fn) {
     // TODO: add this to persistent store
-    synchronized (udfs) {
-      Udf fn = getUdf(udf, true);
-      if (fn != null) return false;
-      List<Udf> functions = udfs.get(udf.functionName());
-      if (functions == null) {
-        functions = Lists.newArrayList();
-        udfs.put(udf.functionName(), functions);
+    synchronized (functions) {
+      if (getFunction(fn, true) != null) return false;
+      List<Function> fns = functions.get(fn.functionName());
+      if (fns == null) {
+        fns = Lists.newArrayList();
+        functions.put(fn.functionName(), fns);
       }
-      functions.add(udf);
+      fns.add(fn);
     }
     return true;
   }
@@ -288,16 +291,16 @@ public class Db {
   /**
    * See comment in Catalog.
    */
-  public boolean removeUdf(Function desc) {
+  public boolean removeFunction(Function desc) {
     // TODO: remove this from persistent store.
-    synchronized (udfs) {
-      Udf udf = getUdf(desc, true);
-      if (udf == null) return false;
-      List<Udf> functions = udfs.get(desc.functionName());
-      Preconditions.checkNotNull(functions);
-      boolean exists = functions.remove(udf);
-      if (functions.isEmpty()) {
-        udfs.remove(desc.functionName());
+    synchronized (functions) {
+      Function fn = getFunction(desc, true);
+      if (fn == null) return false;
+      List<Function> fns = functions.get(desc.functionName());
+      Preconditions.checkNotNull(fns);
+      boolean exists = fns.remove(fn);
+      if (fns.isEmpty()) {
+        functions.remove(desc.functionName());
       }
       return exists;
     }

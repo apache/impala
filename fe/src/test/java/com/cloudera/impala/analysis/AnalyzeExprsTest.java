@@ -237,7 +237,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestNullCasts() throws AnalysisException {
    for (PrimitiveType type: PrimitiveType.values()) {
      // Cannot cast to INVALID_TYPE, NULL_TYPE or unsupported types.
-     if (!type.isValid() || type.isNull() || !type.isSupported()) {
+     if (!type.isValid() || type.isNull() || !type.isSupported() ||
+          type == PrimitiveType.CHAR) {
        continue;
      }
      checkExprType("select cast(null as " + type + ")", type);
@@ -937,12 +938,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select udf(1)", "default.udf() unknown");
 
     // Add a udf default.udf(), default.udf(int) and functional.udf(double)
-    catalog.addUdf(new Udf(new FunctionName("default", "udf"),
+    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
         new ArrayList<PrimitiveType>(), PrimitiveType.INT, dummyUri, null));
-    catalog.addUdf(new Udf(new FunctionName("default", "udf"),
+    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT, dummyUri, null));
-    catalog.addUdf(new Udf(new FunctionName("functional", "udf"),
-        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, dummyUri, null));
+    Udf udf = new Udf(new FunctionName("functional", "udf"),
+        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, dummyUri, null);
+    catalog.addFunction(udf);
 
     AnalyzesOk("select udf()");
     AnalyzesOk("select default.udf()");
@@ -958,5 +960,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select udf(1, 2)",
          "No matching function with those arguments: default.udf(TINYINT, TINYINT)");
+    catalog.removeFunction(udf);
   }
 }

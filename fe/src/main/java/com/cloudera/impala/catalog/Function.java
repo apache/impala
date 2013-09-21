@@ -17,6 +17,8 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 
 import com.cloudera.impala.analysis.FunctionName;
+import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Joiner;
 
 
@@ -31,6 +33,12 @@ public class Function {
   // Array of parameter types.  empty array if this function does not have parameters.
   private PrimitiveType[] argTypes_;
   private final boolean varArgs_;
+
+  // Absolute path in HDFS for the binary that contains this function.
+  // e.g. /udfs/udfs.jar
+  private HdfsURI location_;
+
+  private TFunctionBinaryType binaryType_;
 
   public Function(FunctionName name, PrimitiveType[] argTypes,
       PrimitiveType retType, boolean varArgs) {
@@ -61,7 +69,12 @@ public class Function {
   public PrimitiveType[] getArgs() { return argTypes_; }
   // Returns the number of arguments to this function.
   public int getNumArgs() { return argTypes_.length; }
+  public HdfsURI getLocation() { return location_; }
+  public TFunctionBinaryType getBinaryType() { return binaryType_; }
+
   public void setName(FunctionName name) { name_ = name; }
+  public void setLocation(HdfsURI loc) { location_ = loc; }
+  public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
 
   // Returns a string with the signature in human readable format:
   // FnName(argtype1, argtyp2).  e.g. Add(int, int)

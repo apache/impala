@@ -154,32 +154,49 @@ struct TFunctionName {
   2: required string function_name
 }
 
+// Arguments for creating Udfs.
+struct TCreateUdfParams {
+  // Name of function in the binary
+  1: required string symbol_name;
+}
+
+struct TCreateUdaParams {
+  1: required string update_fn_name;
+  2: required string init_fn_name;
+  // This function does not need to be specified by the UDA.
+  3: optional string serialize_fn_name;
+  4: required string merge_fn_name;
+  5: required string finalize_fn_name;
+  6: required Types.TColumnType intermediate_type;
+}
+
 // Parameters of CREATE FUNCTION commands
 struct TCreateFunctionParams {
   // Fully qualified function name of the function to create
   1: required TFunctionName fn_name
 
+  // Type of the udf. e.g. hive, native, ir
+  2: required Types.TFunctionBinaryType fn_binary_type;
+
   // HDFS path for the function binary. This binary must exist at the time the
   // function is created.
-  2: required string location
-
-  // Name of function in the binary
-  3: required string binary_name;
-
-  // Type of the udf. e.g. hive, native, ir
-  4: required Types.TUdfType udf_type;
+  3: required string location
 
   // The types of the arguments to the function
-  5: required list<Types.TPrimitiveType> arg_types;
+  4: required list<Types.TPrimitiveType> arg_types;
 
   // Return type for the function.
-  6: required Types.TPrimitiveType ret_type;
+  5: required Types.TPrimitiveType ret_type;
 
   // Optional comment to attach to the function
-  7: optional string comment
+  6: optional string comment
 
   // Do not throw an error if a function of the same signature already exists.
-  8: optional bool if_not_exists
+  7: optional bool if_not_exists
+
+  // Only one of the below is set.
+  8: optional TCreateUdfParams udf_params
+  9: optional TCreateUdaParams uda_params
 }
 
 // Valid table file formats
@@ -510,11 +527,14 @@ struct TShowDbsParams {
 
 // Parameters for SHOW FUNCTIONS commands
 struct TShowFunctionsParams {
+  // Type of function to show.
+  1: Types.TFunctionType type
+
   // Database to use for SHOW FUNCTIONS
-  1: optional string db
+  2: optional string db
 
   // Optional pattern to match function names. If not set, all functions are returned.
-  2: optional string show_pattern
+  3: optional string show_pattern
 }
 
 // Parameters for SHOW TABLES commands
@@ -530,16 +550,18 @@ struct TShowTablesParams {
 // Arguments to getFunctions(), which returns a list of non-qualified function
 // signatures that match an optional pattern. Parameters for SHOW FUNCTIONS.
 struct TGetFunctionsParams {
+  1: required Types.TFunctionType type
+
   // Database to use for SHOW FUNCTIONS
-  1: optional string db
+  2: optional string db
 
   // If not set, match every function
-  2: optional string pattern
+  3: optional string pattern
 
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the functions this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  3: optional TSessionState session
+  4: optional TSessionState session
 }
 
 // getFunctions() returns a list of function signatures

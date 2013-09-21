@@ -45,6 +45,7 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -181,27 +182,27 @@ public class Catalog {
   }
 
   /**
-   * Adds a UDF to the catalog.
-   * Returns true if the UDF was successfully added.
-   * Returns false if the UDF already exists.
-   * TODO: allow adding a UDF to a global scope. We probably want this to resolve
+   * Adds a function to the catalog.
+   * Returns true if the function was successfully added.
+   * Returns false if the function already exists.
+   * TODO: allow adding a function to a global scope. We probably want this to resolve
    * after the local scope.
    * e.g. if we had fn() and db.fn(). If the current database is 'db', fn() would
    * resolve first to db.fn().
    */
-  public boolean addUdf(Udf udf) {
-    Db db = getDbInternal(udf.dbName());
+  public boolean addFunction(Function fn) {
+    Db db = getDbInternal(fn.dbName());
     if (db == null) return false;
-    return db.addUdf(udf);
+    return db.addFunction(fn);
   }
 
   /**
-   * Removes a UDF from the catalog. Returns true if the UDF was removed.
+   * Removes a function from the catalog. Returns true if the function was removed.
    */
-  public boolean removeUdf(Function desc) {
+  public boolean removeFunction(Function desc) {
     Db db = getDbInternal(desc.dbName());
     if (db == null) return false;
-    return db.removeUdf(desc);
+    return db.removeFunction(desc);
   }
 
   /**
@@ -210,34 +211,34 @@ public class Catalog {
    * will be returned. If exactMatch is false, an arbitrary compatible
    * (i.e. implicitly castable) function will be returned.
    */
-  public Udf getUdf(Function desc, boolean exactMatch) {
+  public Function getFunction(Function desc, boolean exactMatch) {
     Db db = getDbInternal(desc.dbName());
     if (db == null) return null;
-    return db.getUdf(desc, exactMatch);
+    return db.getFunction(desc, exactMatch);
   }
 
   /**
-   * Returns all the UDFs in this DB.
+   * Returns all the function for 'type' in this DB.
    * @throws DatabaseNotFoundException
    */
-  public List<String> getUdfNames(String dbName, String pattern)
-      throws DatabaseNotFoundException {
+  public List<String> getFunctionSignatures(TFunctionType type, String dbName,
+      String pattern) throws DatabaseNotFoundException {
     Db db = getDbInternal(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    return filterStringsByPattern(db.getAllUdfs(), pattern);
+    return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
   }
 
   /**
-   * Returns true if there is a UDF with this function name. Parameters
+   * Returns true if there is a function with this function name. Parameters
    * are ignored
    * @throws DatabaseNotFoundException
    */
-  public boolean udfExists(FunctionName name) {
+  public boolean functionExists(FunctionName name) {
     Db db = getDbInternal(name.getDb());
     if (db == null) return false;
-    return db.udfExists(name);
+    return db.functionExists(name);
   }
 
   /**

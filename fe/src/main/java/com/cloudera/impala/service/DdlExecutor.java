@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.TableName;
@@ -54,6 +55,7 @@ import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
+import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
@@ -73,6 +75,7 @@ import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TCreateUdaParams;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
@@ -317,13 +320,27 @@ public class DdlExecutor {
     }
     PrimitiveType retType = PrimitiveType.fromThrift(params.ret_type);
     HdfsURI location = new HdfsURI(params.location);
-    Udf udf = new Udf(new FunctionName(params.fn_name), argTypes, retType,
-        location, params.binary_name);
-    udf.setUdfType(params.udf_type);
-    LOG.info(String.format("Adding UDF %s", udf.signatureString()));
-    boolean added = catalog.addUdf(udf);
+    Function fn = null;
+    if (params.isSetUdf_params()) {
+      Udf udf = new Udf(new FunctionName(params.fn_name), argTypes, retType,
+          location, params.udf_params.symbol_name);
+      LOG.info(String.format("Adding UDF %s", udf.signatureString()));
+      fn = udf;
+    } else {
+      Preconditions.checkState(params.isSetUda_params());
+      TCreateUdaParams p = params.uda_params;
+      Uda uda = new Uda(new FunctionName(params.fn_name), argTypes, retType,
+          ColumnType.fromThrift(p.intermediate_type),
+          location, p.update_fn_name, p.init_fn_name, p.serialize_fn_name,
+          p.merge_fn_name, p.finalize_fn_name);
+      LOG.info(String.format("Adding UDA %s", uda.signatureString()));
+      fn = uda;
+    }
+    fn.setBinaryType(params.fn_binary_type);
+
+    boolean added = catalog.addFunction(fn);
     if (!added && !params.if_not_exists) {
-      throw new AlreadyExistsException("Function " + udf.signatureString() +
+      throw new AlreadyExistsException("Function " + fn.signatureString() +
           " already exists.");
     }
   }
@@ -346,7 +363,7 @@ public class DdlExecutor {
 
     LOG.info("Dropping database " + params.getDb());
     Db db = catalog.getDb(params.db, internalUser, Privilege.DROP);
-    if (db != null && db.numUdfs() > 0) {
+    if (db != null && db.numFunctions() > 0) {
       throw new InvalidObjectException("Database " + db.getName() + " is not empty");
     }
     MetaStoreClient msClient = catalog.getMetaStoreClient();
@@ -392,7 +409,7 @@ public class DdlExecutor {
     Function desc = new Function(new FunctionName(params.fn_name),
         argTypes, PrimitiveType.INVALID_TYPE, false);
     LOG.info(String.format("Dropping UDF %s", desc.signatureString()));
-    boolean removed = catalog.removeUdf(desc);
+    boolean removed = catalog.removeFunction(desc);
     if (!removed && !params.if_exists) {
       throw new NoSuchObjectException(
           "Function: " + desc.signatureString() + " does not exist.");

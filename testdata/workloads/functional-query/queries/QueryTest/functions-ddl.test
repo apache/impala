@@ -22,6 +22,12 @@ drop function if exists function_ddl_test.fn2(int)
 drop function if exists function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
+drop function if exists function_ddl_test.agg_fn(int)
+====
+---- QUERY
+drop function if exists function_ddl_test.agg_fn(int, string)
+====
+---- QUERY
 # Verify all the test functions are removed
 show functions in function_ddl_test
 ---- RESULTS
@@ -29,26 +35,42 @@ show functions in function_ddl_test
 STRING
 ====
 ---- QUERY
+# Verify all the test functions are removed
+show aggregate functions in function_ddl_test
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
 # Add them and test function overloading.
-create function function_ddl_test.fn() RETURNS int LOCATION '/test.so' 'foo.class'
+create function function_ddl_test.fn() RETURNS int LOCATION '/test.so' SYMBOL='foo'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int) RETURNS double LOCATION '/test.so' 'foo.class'
+create function function_ddl_test.fn(int) RETURNS double LOCATION '/test.so' SYMBOL='foo'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int, string) 
-RETURNS int LOCATION '/test.jar' 'foo.class'
+create function function_ddl_test.fn(int, string)
+RETURNS int LOCATION '/test.jar' SYMBOL='foo.class'
 ====
 ---- QUERY
-create function function_ddl_test.fn(string, int) 
-RETURNS int LOCATION '/test.ll' 'foo.class'
+create function function_ddl_test.fn(string, int)
+RETURNS int LOCATION '/test.ll' SYMBOL='foo.class'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int) RETURNS int LOCATION '/test.so' 'foo.class'
+create function function_ddl_test.fn2(int)
+RETURNS int LOCATION '/test.so' SYMBOL='foo.class'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int, string) 
-RETURNS int LOCATION '/test.so' 'foo.class'
+create function function_ddl_test.fn2(int, string)
+RETURNS int LOCATION '/test.so' SYMBOL='foo'
+====
+---- QUERY
+create aggregate function function_ddl_test.agg_fn(int)
+RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
+====
+---- QUERY
+create aggregate function function_ddl_test.agg_fn(int, string)
+RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
 ====
 ---- QUERY
 show functions in function_ddl_test
@@ -59,6 +81,14 @@ show functions in function_ddl_test
 'fn(STRING, INT)'
 'fn2(INT)'
 'fn2(INT, STRING)'
+---- TYPES
+STRING
+====
+---- QUERY
+show aggregate functions in function_ddl_test
+---- RESULTS
+'agg_fn(INT)'
+'agg_fn(INT, STRING)'
 ---- TYPES
 STRING
 ====
@@ -114,6 +144,16 @@ show functions;
 'fn(INT, STRING)'
 'fn(STRING, INT)'
 'fn2(INT)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function agg_fn(int)
+====
+---- QUERY
+show aggregate functions;
+---- RESULTS
+'agg_fn(INT, STRING)'
 ---- TYPES
 STRING
 ====

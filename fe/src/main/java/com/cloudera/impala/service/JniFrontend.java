@@ -266,7 +266,8 @@ public class JniFrontend {
     deserializeThrift(params, thriftGetFunctionsParams);
 
     TGetFunctionsResult result = new TGetFunctionsResult();
-    result.setFn_signatures(frontend.getFunctions(params.db, params.pattern));
+    result.setFn_signatures(
+        frontend.getFunctions(params.type, params.db, params.pattern));
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
       return serializer.serialize(result);

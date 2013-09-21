@@ -204,9 +204,10 @@ Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
   return CallJniMethod(get_db_names_id_, params, db_names);
 }
 
-Status Frontend::GetFunctions(const string& db, const string* pattern,
-    const TSessionState* session, TGetFunctionsResult* functions) {
+Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
+    const string* pattern, const TSessionState* session, TGetFunctionsResult* functions) {
   TGetFunctionsParams params;
+  params.__set_type(fn_type);
   params.__set_db(db);
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);

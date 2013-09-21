@@ -95,8 +95,12 @@ public class AnalysisContext {
       return stmt instanceof CreateDbStmt;
     }
 
-    public boolean isCreateFunctionStmt() {
-      return stmt instanceof CreateFunctionStmt;
+    public boolean isCreateUdfStmt() {
+      return stmt instanceof CreateUdfStmt;
+    }
+
+    public boolean isCreateUdaStmt() {
+      return stmt instanceof CreateUdaStmt;
     }
 
     public boolean isLoadDataStmt() {
@@ -138,8 +142,8 @@ public class AnalysisContext {
           isCreateTableLikeStmt() || isCreateTableStmt() || isCreateViewStmt() ||
           isCreateDbStmt() || isDropDbStmt() || isDropTableOrViewStmt() ||
           isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt() ||
-          isCreateFunctionStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
-          isCreateTableAsSelectStmt();
+          isCreateUdfStmt() || isCreateUdaStmt() || isShowFunctionsStmt() ||
+          isDropFunctionStmt() || isCreateTableAsSelectStmt();
     }
 
     public boolean isDmlStmt() {
@@ -181,9 +185,14 @@ public class AnalysisContext {
       return (CreateDbStmt) stmt;
     }
 
-    public CreateFunctionStmt getCreateFunctionStmt() {
-      Preconditions.checkState(isCreateFunctionStmt());
-      return (CreateFunctionStmt) stmt;
+    public CreateUdfStmt getCreateUdfStmt() {
+      Preconditions.checkState(isCreateUdfStmt());
+      return (CreateUdfStmt) stmt;
+    }
+
+    public CreateUdaStmt getCreateUdaStmt() {
+      Preconditions.checkState(isCreateUdfStmt());
+      return (CreateUdaStmt) stmt;
     }
 
     public DropDbStmt getDropDbStmt() {

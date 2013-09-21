@@ -70,7 +70,7 @@ class Frontend {
   Status GetDbNames(const std::string* pattern, const TSessionState* session,
       TGetDbsResult* table_names);
 
-  // Return all functions matching the optional argument 'pattern'.
+  // Return all functions of 'type' that match the optional argument 'pattern'.
   // If pattern is NULL match all functions, otherwise match only those functions that
   // match the pattern string.
   // The TSessionState parameter is used to filter results of metadata operations when
@@ -78,8 +78,9 @@ class Frontend {
   // be set to the user's current session. If this is an Impala internal request,
   // the session should be set to NULL which will skip privilege checks returning all
   // results.
-  Status GetFunctions(const std::string& db, const std::string* pattern,
-      const TSessionState* session, TGetFunctionsResult* functions);
+  Status GetFunctions(TFunctionType::type fn_type, const std::string& db,
+      const std::string* pattern, const TSessionState* session,
+      TGetFunctionsResult* functions);
 
   // Returns (in the output parameter) the result of a DESCRIBE table command. This
   // command retrieves table metadata, such as the column definitions. The metadata

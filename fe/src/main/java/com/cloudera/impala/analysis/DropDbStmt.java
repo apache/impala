@@ -76,7 +76,7 @@ public class DropDbStmt extends StatementBase {
     if (analyzer.getDefaultDb().toLowerCase().equals(dbName.toLowerCase())) {
       throw new AnalysisException("Cannot drop current default database: " + dbName);
     }
-    if (db != null && db.numUdfs() > 0) {
+    if (db != null && db.numFunctions() > 0) {
       throw new AnalysisException("Cannot drop non-empty database: " + dbName);
     }
   }

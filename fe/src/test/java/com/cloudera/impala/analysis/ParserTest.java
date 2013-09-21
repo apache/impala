@@ -1124,6 +1124,15 @@ public class ParserTest {
     ParsesOk("SHOW FUNCTIONS");
     ParsesOk("SHOW FUNCTIONS in DB LIKE 'pattern'");
     ParsesOk("SHOW FUNCTIONS in DB");
+
+    ParsesOk("SHOW AGGREGATE FUNCTIONS");
+    ParsesOk("SHOW AGGREGATE FUNCTIONS LIKE 'pattern'");
+    ParsesOk("SHOW AGGREGATE FUNCTIONS LIKE 'p*ttern'");
+    ParsesOk("SHOW AGGREGATE FUNCTIONS");
+    ParsesOk("SHOW AGGREGATE FUNCTIONS in DB LIKE 'pattern'");
+    ParsesOk("SHOW AGGREGATE FUNCTIONS in DB");
+
+    ParserError("SHOW UNKNOWN FUNCTIONS");
   }
 
   @Test
@@ -1178,30 +1187,27 @@ public class ParserTest {
 
   @Test
   public void TestCreateFunction() {
-    ParsesOk("CREATE FUNCTION Foo() RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParsesOk("CREATE FUNCTION Foo() RETURNS INT LOCATION 'f.jar' SYMBOL='class.Udf'");
     ParsesOk("CREATE FUNCTION Foo(INT, INT) RETURNS STRING LOCATION " +
-        "'f.jar' 'class.Udf'");
+        "'f.jar' SYMBOL='class.Udf'");
     ParsesOk("CREATE FUNCTION Foo(INT, DOUBLE) RETURNS STRING LOCATION " +
-        "'f.jar' 'class.Udf'");
+        "'f.jar' SYMBOL='class.Udf'");
     ParsesOk("CREATE FUNCTION Foo() RETURNS STRING LOCATION " +
-        "'f.jar' 'class.Udf' COMMENT 'hi'");
-    ParsesOk(
-        "CREATE FUNCTION IF NOT EXISTS Foo() RETURNS INT LOCATION 'foo.jar' 'class.Udf'");
+        "'f.jar' SYMBOL='class.Udf' COMMENT='hi'");
+    ParsesOk("CREATE FUNCTION IF NOT EXISTS Foo() RETURNS INT LOCATION 'foo.jar' " +
+        "SYMBOL='class.Udf'");
 
     // Try more interesting function names
-    ParsesOk("CREATE FUNCTION User.Foo() RETURNS INT LOCATION 'a' 'b'");
-    ParsesOk("CREATE FUNCTION `Foo`() RETURNS INT LOCATION 'a' 'b'");
-    ParsesOk("CREATE FUNCTION `Foo.Bar`() RETURNS INT LOCATION 'a' 'b'");
-    ParsesOk("CREATE FUNCTION `Foo`.Bar() RETURNS INT LOCATION 'a' 'b'");
+    ParsesOk("CREATE FUNCTION User.Foo() RETURNS INT LOCATION 'a'");
+    ParsesOk("CREATE FUNCTION `Foo`() RETURNS INT LOCATION 'a'");
+    ParsesOk("CREATE FUNCTION `Foo.Bar`() RETURNS INT LOCATION 'a'");
+    ParsesOk("CREATE FUNCTION `Foo`.Bar() RETURNS INT LOCATION 'a'");
 
     // Bad function name
-    ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a' 'b'");
-    ParserError("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a' 'b'");
-    ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a' 'b'");
-    ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a' 'b'");
-
-    // Missing binary function name
-    ParserError("CREATE FUNCTION FOO() RETURNS INT LOCATION 'foo.jar'");
+    ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a'");
+    ParserError("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a'");
+    ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a'");
+    ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a'");
 
     // Missing location
     ParserError("CREATE FUNCTION FOO() RETURNS INT");
@@ -1209,19 +1215,63 @@ public class ParserTest {
     // Missing return type
     ParserError("CREATE FUNCTION FOO() LOCATION 'foo.jar'");
 
+    // Bad opt args
+    ParserError("CREATE FUNCTION Foo() RETURNS INT SYMBOL='1' LOCATION 'a'");
+    ParserError("CREATE FUNCTION Foo() RETURNS INT LOCATION 'a' SYMBOL");
+    ParserError("CREATE FUNCTION Foo() RETURNS INT LOCATION 'a' SYMBOL='1' SYMBOL='2'");
+
     // Missing arguments
-    ParserError("CREATE FUNCTION Foo RETURNS INT LOCATION 'f.jar' 'class.Udf'");
-    ParserError("CREATE FUNCTION Foo(INT,) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
-    ParserError("CREATE FUNCTION FOO RETURNS INT LOCATION 'foo.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION Foo RETURNS INT LOCATION 'f.jar'");
+    ParserError("CREATE FUNCTION Foo(INT,) RETURNS INT LOCATION 'f.jar'");
+    ParserError("CREATE FUNCTION FOO RETURNS INT LOCATION 'foo.jar'");
 
     // NULL return type or argument type.
-    ParserError("CREATE FUNCTION Foo(NULL) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
-    ParserError("CREATE FUNCTION Foo(NULL, INT) RETURNS INT LOCATION 'f.jar' 'f.class'");
-    ParserError("CREATE FUNCTION Foo(INT, NULL) RETURNS INT LOCATION 'f.jar' 'f.class'");
-    ParserError("CREATE FUNCTION Foo() RETURNS NULL LOCATION 'f.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION Foo(NULL) RETURNS INT LOCATION 'f.jar'");
+    ParserError("CREATE FUNCTION Foo(NULL, INT) RETURNS INT LOCATION 'f.jar'");
+    ParserError("CREATE FUNCTION Foo(INT, NULL) RETURNS INT LOCATION 'f.jar'");
+    ParserError("CREATE FUNCTION Foo() RETURNS NULL LOCATION 'f.jar'");
 
     // Variadic args not yet supported
-    ParserError("CREATE FUNCTION Foo(...) RETURNS INT LOCATION 'f.jar' 'class.Udf'");
+    ParserError("CREATE FUNCTION Foo(...) RETURNS INT LOCATION 'f.jar'");
+  }
+
+  @Test
+  public void TestCreateAggregate() {
+    String loc = " LOCATION 'f.so' UPDATE_FN='class' ";
+    String c = "CREATE AGGREGATE FUNCTION Foo() RETURNS INT ";
+
+    ParsesOk(c + loc);
+    ParsesOk(c + "INTERMEDIATE STRING" + loc + "comment='c'");
+    ParsesOk(c + loc + "comment='abcd'");
+    ParsesOk(c + loc + "init_fn='InitFnSymbol'");
+    ParsesOk(c + loc + "init_fn='I' merge_fn='M'");
+    ParsesOk(c + loc + "merge_fn='M' init_fn='I'");
+    ParsesOk(c + loc + "merge_fn='M' Init_fn='I' serialize_fn='S' Finalize_fn='F'");
+    ParsesOk(c + loc + "Init_fn='M' Finalize_fn='I' merge_fn='S' serialize_fn='F'");
+    ParsesOk(c + loc + "merge_fn='M'");
+    ParsesOk(c + "INTERMEDIATE CHAR(10)" + loc);
+
+    ParserError("CREATE UNKNOWN FUNCTION " + "Foo() RETURNS INT" + loc);
+    ParserError(c + loc + "init_fn='1' init_fn='1'");
+    ParserError(c + loc + "unknown='1'");
+
+    // CHAR must specify size
+    ParserError(c + "INTERMEDIATE CHAR()" + loc);
+    ParserError(c + "INTERMEDIATE CHAR(ab)" + loc);
+    ParserError(c + "INTERMEDIATE CHAR('')" + loc);
+    ParserError(c + "INTERMEDIATE CHAR('10')" + loc);
+    ParserError(c + "INTERMEDIATE CHAR(-10)" + loc);
+    // Parses okay, will fail in analysis
+    ParsesOk(c + "INTERMEDIATE CHAR(0)" + loc);
+
+    // CHAR can't be used anywhere else
+    ParserError("CREATE AGGREGATE FUNCTION foo(CHAR(10)) RETURNS INT" + loc);
+    ParserError("CREATE AGGREGATE FUNCTION foo(int) RETURNS CHAR(10)" + loc);
+
+    // Optional args must be at the end
+    ParserError("CREATE UNKNOWN FUNCTION " + "Foo() RETURNS INT" + loc);
+    ParserError("CREATE AGGREGATE FUNCTION Foo() init_fn='1' RETURNS INT" + loc);
+    ParserError(c + "init_fn='1'" + loc);
   }
 
   @Test
@@ -1662,9 +1712,9 @@ public class ParserTest {
     ParsesOk("DROP DATABASE IF EXISTS Foo");
     ParsesOk("DROP SCHEMA IF EXISTS Foo");
     ParsesOk("DROP FUNCTION Foo()");
-    ParsesOk("DROP FUNCTION Foo(INT)");
+    ParsesOk("DROP AGGREGATE FUNCTION Foo(INT)");
     ParsesOk("DROP FUNCTION Foo.Foo(INT)");
-    ParsesOk("DROP FUNCTION IF EXISTS Foo()");
+    ParsesOk("DROP AGGREGATE FUNCTION IF EXISTS Foo()");
     ParsesOk("DROP FUNCTION IF EXISTS Foo(INT)");
 
     ParserError("DROP");
@@ -1685,6 +1735,7 @@ public class ParserTest {
     ParserError("DROP FUNCTION Foo(");
     ParserError("DROP FUNCTION Foo");
     ParserError("DROP FUNCTION");
+    ParserError("DROP BLAH FUNCTION");
     ParserError("DROP IF EXISTS FUNCTION Foo()");
     ParserError("DROP FUNCTION Foo(INT) RETURNS INT");
     ParserError("DROP FUNCTION Foo.(INT) RETURNS INT");
@@ -1692,6 +1743,7 @@ public class ParserTest {
     ParserError("DROP FUNCTION Foo(NULL) RETURNS INT");
     ParserError("DROP FUNCTION Foo(INT) RETURNS NULL");
     ParserError("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
+    ParserError("DROP BLAH FUNCTION IF EXISTS Foo.A.Foo(INT)");
   }
 
   @Test

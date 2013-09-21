@@ -341,7 +341,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
     case TExprNodeType::UDF_CALL:
-      if (texpr_node.udf_call_expr.udf_type == TUdfType::HIVE) {
+      if (texpr_node.udf_call_expr.binary_type == TFunctionBinaryType::HIVE) {
         return Status("Hive UDFs are not yet implemented.");
       }
       *expr = pool->Add(new NativeUdfExpr(texpr_node));

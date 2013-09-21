@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TFunctionName;
 
 /**
@@ -66,6 +67,13 @@ public class FunctionName {
     }
     if (Character.isDigit(fn_.charAt(0))) {
       throw new AnalysisException("Function cannot start with a digit: " + fn_);
+    }
+
+    // If the function name is not fully qualified, it must not be the same as a builtin
+    if (!isFullyQualified() && OpcodeRegistry.instance().getFunctionOperator(
+          getFunction()) != FunctionOperator.INVALID_OPERATOR) {
+      throw new AnalysisException(
+          "Function cannot have the same name as a builtin: " + getFunction());
     }
   }
 

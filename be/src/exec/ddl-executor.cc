@@ -69,8 +69,8 @@ Status DdlExecutor::Exec(const TDdlExecRequest& exec_request,
       TGetFunctionsResult functions;
       const string* fn_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
-      RETURN_IF_ERROR(
-          frontend_->GetFunctions(params->db, fn_pattern, &session, &functions));
+      RETURN_IF_ERROR(frontend_->GetFunctions(
+          params->type, params->db, fn_pattern, &session, &functions));
       SetResultSet(functions.fn_signatures);
       return Status::OK;
     }

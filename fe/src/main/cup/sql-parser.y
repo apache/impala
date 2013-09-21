@@ -121,8 +121,11 @@ parser code {:
     result.append(":\n");
 
     // errorToken.left is the line number of error.
-    // errorToken.right is the column number of the error. 
+    // errorToken.right is the column number of the error.
     String errorLine = lines[errorToken.left - 1];
+    // If the error is that additional tokens are expected past the end, errorToken.right
+    // will be past the end of the string.
+    int lastCharIndex = Math.min(errorLine.length(), errorToken.right);
     int maxPrintLength = 60;
     int errorLoc = 0;
     if (errorLine.length() <= maxPrintLength) {
@@ -137,7 +140,7 @@ parser code {:
       String leftSubStr;
       if (errorToken.right > maxPrintLength / 2) {
         leftSubStr = "..." + errorLine.substring(errorToken.right - contextLength,
-           errorToken.right);
+            lastCharIndex);
       } else {
         leftSubStr = errorLine.substring(0, errorToken.right);
       }
@@ -147,7 +150,7 @@ parser code {:
         result.append(errorLine.substring(errorToken.right,
            errorToken.right + contextLength) + "...");
       } else {
-        result.append(errorLine.substring(errorToken.right));
+        result.append(errorLine.substring(lastCharIndex));
       }
       result.append("\n");
     }
@@ -196,22 +199,24 @@ parser code {:
 
 // List of keywords. Please keep them sorted alphabetically.
 terminal
-  KW_ADD, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG, KW_AVROFILE, KW_BETWEEN,
-  KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_COLUMN, KW_COLUMNS,
-  KW_COMMENT, KW_COUNT, KW_CREATE, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE,
-  KW_DATETIME, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC,
-  KW_DISTINCTPCSA, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS,
-  KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FLOAT, KW_FORMAT,
-  KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_GROUP_CONCAT,
-  KW_HAVING, KW_IF, KW_IN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERVAL, KW_INTO,
-  KW_INVALIDATE, KW_IS, KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD,
-  KW_LOCATION, KW_MAX, KW_METADATA, KW_MIN, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER,
-  KW_OUTER, KW_OVERWRITE, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE,
-  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE,
-  KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_TABLE, KW_TABLES,
-  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO,
-  KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG, KW_AVROFILE,
+  KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR,
+  KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COUNT, KW_CREATE, KW_DATA, KW_DATABASE,
+  KW_DATABASES, KW_DATE, KW_DATETIME, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT,
+  KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
+  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
+  KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS,
+  KW_GROUP, KW_GROUP_CONCAT, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH,
+  KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IS,
+  KW_JOIN, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAX,
+  KW_MERGE_FN, KW_METADATA, KW_MIN, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER,
+  KW_OVERWRITE, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REFRESH,
+  KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA,
+  KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
+  KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM, KW_SYMBOL, KW_TABLE,
+  KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP,
+  KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES,
+  KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -339,9 +344,16 @@ nonterminal Boolean overwrite_val;
 // For Create/Drop/Show function ddl
 nonterminal ArrayList<PrimitiveType> function_def_args;
 nonterminal ArrayList<PrimitiveType> function_def_arg_list;
-nonterminal CreateFunctionStmt create_function_stmt;
+nonterminal Boolean opt_is_aggregate_fn;
+nonterminal ColumnType opt_aggregate_fn_intermediate_type;
+nonterminal CreateUdfStmt create_udf_stmt;
+nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
+nonterminal ColumnType aggregate_intermediate_type;
+// Accepts space separated key='v' arguments.
+nonterminal HashMap create_function_args_map;
+nonterminal CreateFunctionStmtBase.OptArg create_function_arg_key;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -356,6 +368,16 @@ precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left LPAREN, RPAREN;
 // Support chaining of timestamp arithmetic exprs.
 precedence left KW_INTERVAL;
+
+// These tokens need to be at the end for create_function_args_map to accept
+// no keys. Otherwise, the grammar has shift/reduce conflicts.
+precedence left KW_COMMENT;
+precedence left KW_SYMBOL;
+precedence left KW_UPDATE_FN;
+precedence left KW_FINALIZE_FN;
+precedence left KW_INIT_FN;
+precedence left KW_MERGE_FN;
+precedence left KW_SERIALIZE_FN;
 
 start with stmt;
 
@@ -388,8 +410,10 @@ stmt ::=
   {: RESULT = create_view; :}
   | create_db_stmt:create_db
   {: RESULT = create_db; :}
-  | create_function_stmt:create_function
-  {: RESULT = create_function; :}
+  | create_udf_stmt:create_udf
+  {: RESULT = create_udf; :}
+  | create_uda_stmt:create_uda
+  {: RESULT = create_uda; :}
   | drop_db_stmt:drop_db
   {: RESULT = drop_db; :}
   | drop_tbl_or_view_stmt:drop_tbl
@@ -563,7 +587,7 @@ create_tbl_as_select_stmt ::=
   KW_AS query_stmt:query
   {:
     // Initialize with empty List of columns and partition columns. The
-    // columns will be added from the query statment during analysis
+    // columns will be added from the query statement during analysis
     CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
         new ArrayList<ColumnDef>(), external, comment, row_format,
         file_format, location, if_not_exists, tbl_props, serde_props);
@@ -583,15 +607,28 @@ create_tbl_stmt ::=
   :}
   ;
 
-create_function_stmt ::=
+create_udf_stmt ::=
   KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
   function_name:fn_name function_def_args:fn_args
   KW_RETURNS primitive_type:return_type
-  KW_LOCATION STRING_LITERAL:location STRING_LITERAL:fn_path 
-  comment_val:comment 
+  KW_LOCATION STRING_LITERAL:binary_path
+  create_function_args_map:arg_map
   {:
-    RESULT = new CreateFunctionStmt(fn_name, fn_args, return_type,
-        new HdfsURI(location), fn_path, if_not_exists, comment);
+    RESULT = new CreateUdfStmt(fn_name, fn_args, return_type, new HdfsURI(binary_path),
+        if_not_exists, arg_map);
+  :}
+  ;
+
+create_uda_stmt ::=
+  KW_CREATE KW_AGGREGATE KW_FUNCTION if_not_exists_val:if_not_exists
+  function_name:fn_name function_def_args:fn_args
+  KW_RETURNS primitive_type:return_type
+  opt_aggregate_fn_intermediate_type:intermediate_type
+  KW_LOCATION STRING_LITERAL:binary_path
+  create_function_args_map:arg_map
+  {:
+    RESULT = new CreateUdaStmt(fn_name, fn_args, return_type, intermediate_type,
+        new HdfsURI(binary_path), if_not_exists, arg_map);
   :}
   ;
 
@@ -745,7 +782,7 @@ view_column_defs ::=
   | /* empty */
   {: RESULT = null; :}
   ;
-  
+
 view_column_def_list ::=
   view_column_def:col_def
   {:
@@ -771,7 +808,7 @@ alter_view_stmt ::=
   | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
   ;
-  
+
 drop_db_stmt ::=
   KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name
   {: RESULT = new DropDbStmt(db_name, if_exists); :}
@@ -785,9 +822,10 @@ drop_tbl_or_view_stmt ::=
   ;
 
 drop_function_stmt ::=
-  KW_DROP KW_FUNCTION if_exists_val:if_exists function_name:fn_name
+  KW_DROP opt_is_aggregate_fn:is_aggregate KW_FUNCTION
+      if_exists_val:if_exists function_name:fn_name
   function_def_args:fn_args
-  {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
+  {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists, is_aggregate); :}
   ;
 
 db_or_schema_kw ::=
@@ -887,6 +925,64 @@ function_def_arg_list ::=
   :}
   ;
 
+opt_is_aggregate_fn ::=
+  KW_AGGREGATE
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
+// TODO: remove this when the char(n) type is supported everywhere.
+aggregate_intermediate_type ::=
+  primitive_type:type
+  {: RESULT = ColumnType.createType(type); :}
+  | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
+  {: RESULT = ColumnType.createCharType(len.intValue()); :}
+  ;
+
+opt_aggregate_fn_intermediate_type ::=
+  KW_INTERMEDIATE aggregate_intermediate_type:type
+  {: RESULT = type; :}
+  |
+  {: RESULT = null; :}
+  ;
+
+create_function_args_map ::=
+  create_function_arg_key:key EQUAL STRING_LITERAL:value
+  {:
+    HashMap<CreateFunctionStmtBase.OptArg, String> args =
+        new HashMap<CreateFunctionStmtBase.OptArg, String>();
+    args.put(key, value);
+    RESULT = args;
+  :}
+  | create_function_args_map:args create_function_arg_key:key EQUAL STRING_LITERAL:value
+  {:
+    if (args.containsKey(key)) throw new Exception("Duplicate argument key: " + key);
+    args.put(key, value);
+    RESULT = args;
+  :}
+  |
+  {: RESULT = new HashMap<CreateFunctionStmtBase.OptArg, String>(); :}
+  ;
+
+// Any keys added here must also be added to the end of the precedence list.
+create_function_arg_key ::=
+  KW_COMMENT
+  {: RESULT = CreateFunctionStmtBase.OptArg.COMMENT; :}
+  | KW_SYMBOL
+  {: RESULT = CreateFunctionStmtBase.OptArg.SYMBOL; :}
+  | KW_UPDATE_FN
+  {: RESULT = CreateFunctionStmtBase.OptArg.UPDATE_FN; :}
+  | KW_INIT_FN
+  {: RESULT = CreateFunctionStmtBase.OptArg.INIT_FN; :}
+  | KW_SERIALIZE_FN
+  {: RESULT = CreateFunctionStmtBase.OptArg.SERIALIZE_FN; :}
+  | KW_MERGE_FN
+  {: RESULT = CreateFunctionStmtBase.OptArg.MERGE_FN; :}
+  | KW_FINALIZE_FN
+  {: RESULT = CreateFunctionStmtBase.OptArg.FINALIZE_FN; :}
+  ;
+
 // Our parsing of UNION is slightly different from MySQL's:
 // http://dev.mysql.com/doc/refman/5.5/en/union.html
 //
@@ -948,7 +1044,7 @@ with_table_ref_list ::=
   | with_table_ref_list:list COMMA with_table_ref:t
   {:
     list.add(t);
-    RESULT = list; 
+    RESULT = list;
   :}
   ;
 
@@ -1082,14 +1178,15 @@ show_dbs_stmt ::=
   ;
 
 show_functions_stmt ::=
-  KW_SHOW KW_FUNCTIONS
-  {: RESULT = new ShowFunctionsStmt(); :}
-  | KW_SHOW KW_FUNCTIONS show_pattern:showPattern
-  {: RESULT = new ShowFunctionsStmt(null, showPattern); :}
-  | KW_SHOW KW_FUNCTIONS KW_IN IDENT:db
-  {: RESULT = new ShowFunctionsStmt(db, null); :}
-  | KW_SHOW KW_FUNCTIONS KW_IN IDENT:db show_pattern:showPattern
-  {: RESULT = new ShowFunctionsStmt(db, showPattern); :}
+  KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS
+  {: RESULT = new ShowFunctionsStmt(null, null, is_aggregate); :}
+  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS show_pattern:showPattern
+  {: RESULT = new ShowFunctionsStmt(null, showPattern, is_aggregate); :}
+  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS KW_IN IDENT:db
+  {: RESULT = new ShowFunctionsStmt(db, null, is_aggregate); :}
+  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS KW_IN IDENT:db
+      show_pattern:showPattern
+  {: RESULT = new ShowFunctionsStmt(db, showPattern, is_aggregate); :}
   ;
 
 show_pattern ::=

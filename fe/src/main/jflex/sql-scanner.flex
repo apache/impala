@@ -50,9 +50,10 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
   static {
     keywordMap.put("&&", new Integer(SqlParserSymbols.KW_AND));
     keywordMap.put("add", new Integer(SqlParserSymbols.KW_ADD));
+    keywordMap.put("aggregate", new Integer(SqlParserSymbols.KW_AGGREGATE));
     keywordMap.put("all", new Integer(SqlParserSymbols.KW_ALL));
     keywordMap.put("alter", new Integer(SqlParserSymbols.KW_ALTER));
-    keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));    
+    keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
     keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));
     keywordMap.put("asc", new Integer(SqlParserSymbols.KW_ASC));
     keywordMap.put("avg", new Integer(SqlParserSymbols.KW_AVG));
@@ -62,8 +63,9 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("boolean", new Integer(SqlParserSymbols.KW_BOOLEAN));
     keywordMap.put("by", new Integer(SqlParserSymbols.KW_BY));
     keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
-    keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));    
+    keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));
     keywordMap.put("change", new Integer(SqlParserSymbols.KW_CHANGE));
+    keywordMap.put("char", new Integer(SqlParserSymbols.KW_CHAR));
     keywordMap.put("column", new Integer(SqlParserSymbols.KW_COLUMN));
     keywordMap.put("columns", new Integer(SqlParserSymbols.KW_COLUMNS));
     keywordMap.put("comment", new Integer(SqlParserSymbols.KW_COMMENT));
@@ -89,9 +91,10 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("exists", new Integer(SqlParserSymbols.KW_EXISTS));
     keywordMap.put("explain", new Integer(SqlParserSymbols.KW_EXPLAIN));
     keywordMap.put("external", new Integer(SqlParserSymbols.KW_EXTERNAL));
-    keywordMap.put("false", new Integer(SqlParserSymbols.KW_FALSE));    
+    keywordMap.put("false", new Integer(SqlParserSymbols.KW_FALSE));
     keywordMap.put("fields", new Integer(SqlParserSymbols.KW_FIELDS));
     keywordMap.put("fileformat", new Integer(SqlParserSymbols.KW_FILEFORMAT));
+    keywordMap.put("finalize_fn", new Integer(SqlParserSymbols.KW_FINALIZE_FN));
     keywordMap.put("float", new Integer(SqlParserSymbols.KW_FLOAT));
     keywordMap.put("format", new Integer(SqlParserSymbols.KW_FORMAT));
     keywordMap.put("formatted", new Integer(SqlParserSymbols.KW_FORMATTED));
@@ -104,13 +107,15 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("having", new Integer(SqlParserSymbols.KW_HAVING));
     keywordMap.put("if", new Integer(SqlParserSymbols.KW_IF));
     keywordMap.put("in", new Integer(SqlParserSymbols.KW_IN));
+    keywordMap.put("init_fn", new Integer(SqlParserSymbols.KW_INIT_FN));
     keywordMap.put("inner", new Integer(SqlParserSymbols.KW_INNER));
     keywordMap.put("inpath", new Integer(SqlParserSymbols.KW_INPATH));
     keywordMap.put("insert", new Integer(SqlParserSymbols.KW_INSERT));
     keywordMap.put("int", new Integer(SqlParserSymbols.KW_INT));
     keywordMap.put("integer", new Integer(SqlParserSymbols.KW_INT));
+    keywordMap.put("intermediate", new Integer(SqlParserSymbols.KW_INTERMEDIATE));
     keywordMap.put("interval", new Integer(SqlParserSymbols.KW_INTERVAL));
-    keywordMap.put("into", new Integer(SqlParserSymbols.KW_INTO)); 
+    keywordMap.put("into", new Integer(SqlParserSymbols.KW_INTO));
     keywordMap.put("invalidate", new Integer(SqlParserSymbols.KW_INVALIDATE));
     keywordMap.put("is", new Integer(SqlParserSymbols.KW_IS));
     keywordMap.put("join", new Integer(SqlParserSymbols.KW_JOIN));
@@ -121,20 +126,21 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("load", new Integer(SqlParserSymbols.KW_LOAD));
     keywordMap.put("location", new Integer(SqlParserSymbols.KW_LOCATION));
     keywordMap.put("max", new Integer(SqlParserSymbols.KW_MAX));
+    keywordMap.put("merge_fn", new Integer(SqlParserSymbols.KW_MERGE_FN));
     keywordMap.put("metadata", new Integer(SqlParserSymbols.KW_METADATA));
-    keywordMap.put("min", new Integer(SqlParserSymbols.KW_MIN));    
+    keywordMap.put("min", new Integer(SqlParserSymbols.KW_MIN));
     keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
     keywordMap.put("null", new Integer(SqlParserSymbols.KW_NULL));
-    keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));    
+    keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));
     keywordMap.put("||", new Integer(SqlParserSymbols.KW_OR));
-    keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));    
+    keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));
     keywordMap.put("order", new Integer(SqlParserSymbols.KW_ORDER));
     keywordMap.put("outer", new Integer(SqlParserSymbols.KW_OUTER));
     keywordMap.put("overwrite", new Integer(SqlParserSymbols.KW_OVERWRITE));
     keywordMap.put("parquetfile", new Integer(SqlParserSymbols.KW_PARQUETFILE));
     keywordMap.put("partition", new Integer(SqlParserSymbols.KW_PARTITION));
     keywordMap.put("partitioned", new Integer(SqlParserSymbols.KW_PARTITIONED));
-    keywordMap.put("rcfile", new Integer(SqlParserSymbols.KW_RCFILE));   
+    keywordMap.put("rcfile", new Integer(SqlParserSymbols.KW_RCFILE));
     keywordMap.put("real", new Integer(SqlParserSymbols.KW_DOUBLE));
     keywordMap.put("refresh", new Integer(SqlParserSymbols.KW_REFRESH));
     keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
@@ -150,16 +156,18 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("semi", new Integer(SqlParserSymbols.KW_SEMI));
     keywordMap.put("sequencefile", new Integer(SqlParserSymbols.KW_SEQUENCEFILE));
     keywordMap.put("serdeproperties", new Integer(SqlParserSymbols.KW_SERDEPROPERTIES));
+    keywordMap.put("serialize_fn", new Integer(SqlParserSymbols.KW_SERIALIZE_FN));
     keywordMap.put("set", new Integer(SqlParserSymbols.KW_SET));
     keywordMap.put("show", new Integer(SqlParserSymbols.KW_SHOW));
     keywordMap.put("smallint", new Integer(SqlParserSymbols.KW_SMALLINT));
     keywordMap.put("stored", new Integer(SqlParserSymbols.KW_STORED));
     keywordMap.put("string", new Integer(SqlParserSymbols.KW_STRING));
     keywordMap.put("sum", new Integer(SqlParserSymbols.KW_SUM));
+    keywordMap.put("symbol", new Integer(SqlParserSymbols.KW_SYMBOL));
     keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tables", new Integer(SqlParserSymbols.KW_TABLES));
     keywordMap.put("tblproperties", new Integer(SqlParserSymbols.KW_TBLPROPERTIES));
-    keywordMap.put("terminated", new Integer(SqlParserSymbols.KW_TERMINATED)); 
+    keywordMap.put("terminated", new Integer(SqlParserSymbols.KW_TERMINATED));
     keywordMap.put("textfile", new Integer(SqlParserSymbols.KW_TEXTFILE));
     keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));
     keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP));
@@ -167,6 +175,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("to", new Integer(SqlParserSymbols.KW_TO));
     keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
     keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
+    keywordMap.put("update_fn", new Integer(SqlParserSymbols.KW_UPDATE_FN));
     keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
     keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));
@@ -175,7 +184,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("where", new Integer(SqlParserSymbols.KW_WHERE));
     keywordMap.put("with", new Integer(SqlParserSymbols.KW_WITH));
   }
-    
+
   // map from token id to token description
   public static final Map<Integer, String> tokenIdMap =
       new HashMap<Integer, String>();
@@ -185,7 +194,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
       Map.Entry<String, Integer> pairs = (Map.Entry<String, Integer>) it.next();
       tokenIdMap.put(pairs.getValue(), pairs.getKey().toUpperCase());
     }
-    
+
     // add non-keyword tokens
     tokenIdMap.put(new Integer(SqlParserSymbols.IDENT), "IDENTIFIER");
     tokenIdMap.put(new Integer(SqlParserSymbols.COMMA), "COMMA");
@@ -217,12 +226,12 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
     tokenIdMap.put(new Integer(SqlParserSymbols.NUMERIC_OVERFLOW), "NUMERIC OVERFLOW");
   }
-  
-  public static boolean isKeyword(Integer tokenId) {        
+
+  public static boolean isKeyword(Integer tokenId) {
     String token = tokenIdMap.get(tokenId);
     return keywordMap.containsKey(token.toLowerCase());
   }
-    
+
   private Symbol newToken(int id, Object value) {
     return new Symbol(id, yyline+1, yycolumn+1, value);
   }
@@ -313,7 +322,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
   return newToken(SqlParserSymbols.IDENT, trimmedIdent);
 }
 
-{IdentifierOrKw} {  
+{IdentifierOrKw} {
   String text = yytext();
   Integer kw_id = keywordMap.get(text.toLowerCase());
   if (kw_id != null) {

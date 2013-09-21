@@ -36,7 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.CreateFunctionStmt;
+import com.cloudera.impala.analysis.CreateUdaStmt;
+import com.cloudera.impala.analysis.CreateUdfStmt;
 import com.cloudera.impala.analysis.DropFunctionStmt;
 import com.cloudera.impala.analysis.DropTableOrViewStmt;
 import com.cloudera.impala.analysis.InsertStmt;
@@ -77,6 +78,7 @@ import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -230,9 +232,14 @@ public class Frontend {
       ddl.ddl_type = TDdlType.CREATE_DATABASE;
       ddl.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
-    } else if (analysis.isCreateFunctionStmt()) {
+    } else if (analysis.isCreateUdfStmt()) {
       ddl.ddl_type = TDdlType.CREATE_FUNCTION;
-      CreateFunctionStmt stmt = (CreateFunctionStmt)analysis.getStmt();
+      CreateUdfStmt stmt = (CreateUdfStmt)analysis.getStmt();
+      ddl.setCreate_fn_params(stmt.toThrift());
+      metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
+    } else if (analysis.isCreateUdaStmt()) {
+      ddl.ddl_type = TDdlType.CREATE_FUNCTION;
+      CreateUdaStmt stmt = (CreateUdaStmt)analysis.getStmt();
       ddl.setCreate_fn_params(stmt.toThrift());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isDropDbStmt()) {
@@ -352,9 +359,9 @@ public class Frontend {
    * matches all functions.
    * @throws DatabaseNotFoundException
    */
-  public List<String> getFunctions(String dbName, String fnPattern)
+  public List<String> getFunctions(TFunctionType type, String dbName, String fnPattern)
       throws DatabaseNotFoundException {
-    return catalog.getUdfNames(dbName, fnPattern);
+    return catalog.getFunctionSignatures(type, dbName, fnPattern);
   }
 
   /**

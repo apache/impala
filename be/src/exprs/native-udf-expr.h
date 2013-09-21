@@ -70,7 +70,7 @@ class NativeUdfExpr: public Expr {
   // HDFS/local path and name of the compiled UDF binary
   std::string hdfs_location_;
   std::string local_location_;
-  std::string binary_fn_name_;
+  std::string symbol_name_;
 
   // Handle to the library at location_ returned by dlopen()
   void* dl_handle_;

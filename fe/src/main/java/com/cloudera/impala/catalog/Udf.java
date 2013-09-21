@@ -18,34 +18,28 @@ import java.util.ArrayList;
 
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
-import com.cloudera.impala.thrift.TUdfType;
 
 /**
- * Internal representation of a UDF description.
+ * Internal representation of a UDF.
  * TODO: unify this with builtins.
  */
 public class Udf extends Function {
-
-  // Absolute path in HDFS for the binary that contains this UDF.
-  // e.g. /udfs/udfs.jar
-  private final HdfsURI location_;
-
   // The name inside the binary at location_ that contains this particular
   // UDF. e.g. org.example.MyUdf.class.
-  private final String binaryName_;
-
-  private TUdfType udfType_;
+  private String symbolName_;
 
   public Udf(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
-      PrimitiveType retType, HdfsURI location, String binaryName) {
+      PrimitiveType retType) {
     super(fnName, argTypes, retType, false);
-    this.location_ = location;
-    this.binaryName_ = binaryName;
   }
 
-  public HdfsURI getLocation() { return location_; }
-  public String getBinaryName() { return binaryName_; }
-  public TUdfType getUdfType() { return udfType_; }
+  public Udf(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
+    PrimitiveType retType, HdfsURI location, String symbolName) {
+    super(fnName, argTypes, retType, false);
+    setLocation(location);
+    setSymbolName(symbolName);
+  }
 
-  public void setUdfType(TUdfType type) { udfType_ = type; }
+  public void setSymbolName(String s) { symbolName_ = s; }
+  public String getSymbolName() { return symbolName_; }
 }

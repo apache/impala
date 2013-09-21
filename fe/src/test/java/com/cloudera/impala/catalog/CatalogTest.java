@@ -29,6 +29,7 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -553,30 +554,32 @@ public class CatalogTest {
 
   @Test
   public void TestUdf() throws CatalogException {
-    List<String> fnNames = catalog.getUdfNames("default", "");
+    List<String> fnNames =
+        catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", "");
     assertEquals(fnNames.size(), 0);
 
     ArrayList<PrimitiveType> args1 = Lists.newArrayList();
     ArrayList<PrimitiveType> args2 = Lists.newArrayList(PrimitiveType.INT);
     ArrayList<PrimitiveType> args3 = Lists.newArrayList(PrimitiveType.TINYINT);
 
-    catalog.removeUdf(
-        new Function(new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    catalog.removeFunction(
+        new Function(new FunctionName("default", "Foo"), args1,
+            PrimitiveType.INVALID_TYPE, false));
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 0);
 
     Udf udf1 = new Udf(new FunctionName("default", "Foo"),
         args1, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf1);
-    fnNames = catalog.getUdfNames("default", null);
+    catalog.addFunction(udf1);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo()"));
 
     // Same function name, overloaded arguments
     Udf udf2 = new Udf(new FunctionName("default", "Foo"),
         args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf2);
-    fnNames = catalog.getUdfNames("default", null);
+    catalog.addFunction(udf2);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
@@ -584,56 +587,56 @@ public class CatalogTest {
     // Add a function with a new name
     Udf udf3 = new Udf(new FunctionName("default", "Bar"),
         args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
-    catalog.addUdf(udf3);
-    fnNames = catalog.getUdfNames("default", null);
+    catalog.addFunction(udf3);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 3);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop Foo()
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop it again, no-op
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(), no-op
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "Bar"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(tinyint), no-op
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "Bar"), args3, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(int)
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "Bar"), args2, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Drop foo(int)
-    catalog.removeUdf(new Function(
+    catalog.removeFunction(new Function(
         new FunctionName("default", "foo"), args2, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getUdfNames("default", null);
+    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 0);
   }
 

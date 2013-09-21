@@ -686,8 +686,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestFunction() throws AnalysisException {
-    final String udfSuffix = " LOCATION '/foo.jar' 'foo.class'";
+  public void TestUdf() throws AnalysisException {
+    final String udfSuffix = " LOCATION '/foo.jar' SYMBOL='foo.class'";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
@@ -701,10 +701,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function A_B() RETURNS int" + udfSuffix);
 
     // Locations for all the udfs types.
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.so' 'a'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.ll' 'a'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.SO' 'a'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' 'a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.so' SYMBOL='a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.ll' SYMBOL='a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.SO' SYMBOL='a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
 
     // Try to create a function with the same name as a builtin
     AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
@@ -713,17 +713,21 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Function cannot have the same name as a builtin: sin");
 
     // Try to create with a bad location
-    AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' 'class'",
+    AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' SYMBOL='c'",
         "URI path must be absolute: bad-location");
 
     // Try creating udfs with unknown extensions
-    AnalysisError("create function foo() RETURNS int LOCATION '/binary' 'a'",
-        "Unknown udf binary type: '/binary'. Binary must end in .jar, .so or .ll");
-    AnalysisError("create function foo() RETURNS int LOCATION '/binary.a' 'a'",
-        "Unknown udf binary type: '/binary.a'. Binary must end in .jar, .so or .ll");
-    AnalysisError("create function foo() RETURNS int LOCATION '/binary.so.' 'a'",
-        "Unknown udf binary type: '/binary.so.'. Binary must end in .jar, .so or .ll");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary' SYMBOL='a'",
+        "Unknown binary type: '/binary'. Binary must end in .jar, .so or .ll");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.a' SYMBOL='a'",
+        "Unknown binary type: '/binary.a'. Binary must end in .jar, .so or .ll");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.so.' SYMBOL='a'",
+        "Unknown binary type: '/binary.so.'. Binary must end in .jar, .so or .ll");
 
+    // Try with missing symbol
+    // TODO: Add tests for checking the symbol exists
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.so'",
+        "Argument 'SYMBOL' must be set.");
 
     // Try creating functions with illegal function names.
     AnalysisError("create function 123A() RETURNS int" + udfSuffix,
@@ -743,9 +747,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function if exists foo()");
 
     // Add a udf default.TestFn() and default.TestFn(double)
-    catalog.addUdf(new Udf(new FunctionName("default", "TestFn"),
+    catalog.addFunction(new Udf(new FunctionName("default", "TestFn"),
         new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
-    catalog.addUdf(new Udf(new FunctionName("default", "TestFn"),
+    catalog.addFunction(new Udf(new FunctionName("default", "TestFn"),
         Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null));
 
     AnalysisError("create function TestFn() RETURNS INT " + udfSuffix,
@@ -763,10 +767,64 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError(
         "drop function functional.TestFn()", "Function does not exist: testfn()");
 
-    catalog.addUdf(new Udf(new FunctionName("functional", "TestFn"),
-        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null));
+    Udf udf = new Udf(new FunctionName("functional", "TestFn"),
+        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null);
+    catalog.addFunction(udf);
     AnalysisError(
         "drop database functional", "Cannot drop non-empty database: functional");
+    catalog.removeFunction(udf);
+
+    AnalysisError("create function f() returns int " + udfSuffix +
+        "init_fn='a'", "Optional argument 'INIT_FN' should not be set");
+    AnalysisError("create function f() returns int " + udfSuffix +
+        "serialize_fn='a'", "Optional argument 'SERIALIZE_FN' should not be set");
+    AnalysisError("create function f() returns int " + udfSuffix +
+        "merge_fn='a'", "Optional argument 'MERGE_FN' should not be set");
+    AnalysisError("create function f() returns int " + udfSuffix +
+        "finalize_fn='a'", "Optional argument 'FINALIZE_FN' should not be set");
+  }
+
+  @Test
+  public void TestUda() throws AnalysisException {
+    final String loc = " LOCATION '/foo.so' update_fn='UpdateFn' ";
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc);
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" +
+        " LOCATION '/foo.so' UPDATE_FN='updateFn'");
+    AnalyzesOk("create aggregate function foo(int, int) RETURNS int" + loc);
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc);
+    AnalyzesOk("create aggregate function foo(string, double) " +
+        "RETURNS string INTERMEDIATE STRING" + loc);
+    AnalyzesOk("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE CHAR(10)" + loc);
+
+    // Udf only arguments must not be set.
+    AnalysisError("create aggregate function foo(int) RETURNS int" + loc + "SYMBOL='Bad'",
+        "Optional argument 'SYMBOL' should not be set.");
+
+    // Invalid char(0) type.
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE CHAR(0) LOCATION '/foo.so' UPDATE_FN='b'",
+        "Array size must be > 0. Size was set to: 0.");
+
+    AnalysisError("create aggregate function foo() RETURNS int" + loc,
+        "UDA must take at least 1 argument.");
+    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+        "'/foo.jar' UPDATE_FN='b'", "Java UDAs are not supported.");
+
+    // If the update fn name does not contain 'update', we can't guess the other
+    // symbol names.
+    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+        "'/foo.ll' UPDATE_FN='Fn'", "Could not infer symbol for init() function.");
+    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+        "'/foo.ll' UPDATE_FN='Fn' init_fn='init'",
+        "Could not infer symbol for merge() function.");
+    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+        "'/foo.ll' UPDATE_FN='Fn' init_fn='init' merge_fn='merge'",
+        "Could not infer symbol for finalize() function.");
+    AnalyzesOk("create aggregate function foo(int) RETURNS int LOCATION " +
+        "'/foo.ll' UPDATE_FN='Fn' init_fn='init' merge_fn='merge' finalize_fn='finalize'");
+
+    // TODO: Add tests for checking the symbol exists
   }
 
   @Test

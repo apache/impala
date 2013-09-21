@@ -37,7 +37,16 @@ enum TPrimitiveType {
   STRING,
   // Unsupported types
   BINARY,
-  DECIMAL
+  DECIMAL,
+  // CHAR(n). Currently only supported in UDAs
+  CHAR,
+}
+
+struct TColumnType {
+  1: required TPrimitiveType type
+
+  // Only set if type == CHAR_ARRAY
+  2: optional i32 len
 }
 
 enum TStmtType {
@@ -69,7 +78,12 @@ struct TUniqueId {
   2: required i64 lo
 }
 
-enum TUdfType {
+enum TFunctionType {
+  SCALAR,
+  AGGREGATE,
+}
+
+enum TFunctionBinaryType {
   // Hive UDFs, loaded from *.jar
   HIVE,
 

@@ -31,6 +31,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultRow;
@@ -197,7 +198,7 @@ public class MetadataOp {
 
   /**
    * Contains lists of databases, lists of table belonging to the dbs, list of columns
-   *  belonging to the tables, and list of udfs.
+   * belonging to the tables, and list of user functions.
    */
   private static class DbsMetadata {
      // the list of database
@@ -209,13 +210,14 @@ public class MetadataOp {
     // columns[i][j] are the columns of tableNames[j] in dbs[i]
     public List<List<List<Column>>> columns = Lists.newArrayList();
 
-    // udfs[i] are the udfs within dbs[i]
-    public List<List<String>> udfs = Lists.newArrayList();
+    // functions[i] are the functions within dbs[i]
+    public List<List<String>> functions = Lists.newArrayList();
   }
 
   /**
-   * Returns the list of schemas, tables and columns that satisfy the search pattern.
-   * catalogName, schemaName, tableName and columnName are JDBC search patterns.
+   * Returns the list of schemas, tables, columns and user functions that satisfy the
+   * search pattern. catalogName, schemaName, tableName, columnName and functionName
+   * are JDBC search patterns.
    *
    * The return value DbsTablesColumns.dbs contains the list of databases that satisfy
    * the "schemaName" search pattern.
@@ -223,16 +225,16 @@ public class MetadataOp {
    * the "tableName" search pattern.
    * DbsTablesColumns.columns[i][j] contains the list of columns of table[j] in dbs[i]
    * that satisfy the search condition "columnName".
-   * DbsTablesColumns.udfs[i] contains the list of udfs inside dbs[i] that satisfy
-   * the "functionName" search pattern.
+   * DbsTablesColumns.functions[i] contains the list of functions inside dbs[i] that
+   * satisfy the "functionName" search pattern.
    *
    * If tableName is null, then DbsTablesColumns.tableNames and DbsTablesColumns.columns
    * will not be populated.
    * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
   private static DbsMetadata getDbsMetadata(Catalog catalog, String catalogName,
-      String schemaName, String tableName, String columnName, String functionName, User user)
-      throws ImpalaException {
+      String schemaName, String tableName, String columnName, String functionName,
+      User user) throws ImpalaException {
     DbsMetadata result = new DbsMetadata();
 
     // Hive does not have a catalog concept. Returns nothing if the request specifies an
@@ -281,14 +283,15 @@ public class MetadataOp {
         }
       }
       if (functionName != null) {
-        List<String> udfs = db.getAllUdfs();
-        List<String> filteredUdfs = Lists.newArrayList();
-        for (String udf: udfs) {
-          if (functionPattern.matcher(udf).matches()) {
-            filteredUdfs.add(udf);
+        List<String> fns = db.getAllFunctionSignatures(TFunctionType.SCALAR);
+        fns.addAll(db.getAllFunctionSignatures(TFunctionType.AGGREGATE));
+        List<String> filteredFns = Lists.newArrayList();
+        for (String fn: fns) {
+          if (functionPattern.matcher(fn).matches()) {
+            filteredFns.add(fn);
           }
         }
-        result.udfs.add(filteredUdfs);
+        result.functions.add(filteredFns);
       }
 
       result.dbs.add(dbName);
@@ -443,7 +446,7 @@ public class MetadataOp {
   }
 
   /**
-   * Executes the GetTables HiveServer2 operation and returns Impala supported types.
+   * Executes the GetTypeInfo HiveServer2 operation and returns Impala supported types.
    */
   public static TMetadataOpResponse getTypeInfo() {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TYPEINFO_MD);
@@ -497,9 +500,9 @@ public class MetadataOp {
 
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
         schemaName, null, null, functionName, user);
-    for (List<String> udfs: dbsMetadata.udfs) {
-      for (String udf: udfs) {
-        result.results.add(createFunctionResultRow(udf));
+    for (List<String> fns: dbsMetadata.functions) {
+      for (String fn: fns) {
+        result.results.add(createFunctionResultRow(fn));
       }
     }
 
@@ -513,7 +516,8 @@ public class MetadataOp {
     for (PrimitiveType ptype: PrimitiveType.values()) {
       if (ptype.equals(PrimitiveType.INVALID_TYPE) ||
           ptype.equals(PrimitiveType.DATE) ||
-          ptype.equals(PrimitiveType.DATETIME)) {
+          ptype.equals(PrimitiveType.DATETIME) ||
+          ptype.equals(PrimitiveType.CHAR)) {
         continue;
       }
       TResultRow row = new TResultRow();

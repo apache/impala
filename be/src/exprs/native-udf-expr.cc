@@ -34,8 +34,8 @@ DEFINE_string(local_library_dir, "/tmp",
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
     udf_context_(UdfContextImpl::CreateContext()),
-    hdfs_location_(node.udf_call_expr.location),
-    binary_fn_name_(node.udf_call_expr.binary_fn_name),
+    hdfs_location_(node.udf_call_expr.binary_location),
+    symbol_name_(node.udf_call_expr.symbol_name),
     dl_handle_(NULL),
     udf_wrapper_(NULL) {
   DCHECK(node.node_type == TExprNodeType::UDF_CALL);
@@ -168,7 +168,7 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   // Dynamically load the UDF
   RETURN_IF_ERROR(DynamicOpen(state, local_location_, RTLD_NOW, &dl_handle_));
   void* udf_ptr;
-  RETURN_IF_ERROR(DynamicLookup(state, dl_handle_, binary_fn_name_.c_str(), &udf_ptr));
+  RETURN_IF_ERROR(DynamicLookup(state, dl_handle_, symbol_name_.c_str(), &udf_ptr));
 
   // Convert UDF function pointer to llvm::Function*
   Type* return_type = GetUdfValType(codegen, type_);
@@ -180,7 +180,7 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   }
   FunctionType* udf_type = FunctionType::get(return_type, arg_types, false);
   Function* udf = Function::Create(
-      udf_type, GlobalValue::ExternalLinkage, binary_fn_name_, codegen->module());
+      udf_type, GlobalValue::ExternalLinkage, symbol_name_, codegen->module());
   codegen->execution_engine()->addGlobalMapping(udf, udf_ptr);
 
   // Create wrapper that computes args and calls UDF
@@ -220,7 +220,7 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
 
 string NativeUdfExpr::DebugString() const {
   stringstream out;
-  out << "NativeUdfExpr(location= " << hdfs_location_ << " binary_fn_name= "
-      << binary_fn_name_ << " " << Expr::DebugString() << ")";
+  out << "NativeUdfExpr(location= " << hdfs_location_ << " symbol_name= "
+      << symbol_name_ << " " << Expr::DebugString() << ")";
   return out.str();
 }
