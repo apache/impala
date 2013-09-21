@@ -210,11 +210,13 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
   DCHECK_GE(num_tuples, 0);
   if (num_tuples == 0) return 0;
 
-  if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
   if (template_tuple_ == NULL) {
+    // Must be conjuncts on constant exprs.
+    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
     return num_tuples;
   } else {
     row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
+    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
     row = next_row(row);
 
     for (int n = 1; n < num_tuples; ++n) {

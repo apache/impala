@@ -675,6 +675,17 @@ tinyint
 ---- RESULTS
 ====
 ---- QUERY
+# Test that conjuncts are evaluated properly against partition columns if no other
+# columns are referenced (i.e., there are no materialized slots). This test relies
+# on partition pruning not kicking in due to the disjunction (IMPALA-505).
+select count(*) from alltypes
+where (year = 2009 and month = 1) or (year = 2009 and month = 2)
+---- TYPES
+bigint
+---- RESULTS
+590
+====
+---- QUERY
 # Test multi files non-partitioned table (hdfs)
 select count(*) from AllTypesAggMultiFilesNoPart
 ---- TYPES
