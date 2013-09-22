@@ -26,3 +26,4 @@ add_library(Rpc
 )
 
 ADD_BE_TEST(thrift-util-test)
+ADD_BE_TEST(thrift-server-test)

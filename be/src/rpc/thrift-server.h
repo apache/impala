@@ -85,7 +85,14 @@ class ThriftServer {
       Metrics* metrics = NULL, int num_worker_threads = DEFAULT_WORKER_THREADS,
       ServerType server_type = Threaded);
 
+  // Enables secure access over SSL. Must be called before Start(). The arguments are
+  // paths to certificate and private key files in .PEM format, respectively. If either
+  // file does not exist, an error is returned.
+  Status EnableSsl(const std::string& certificate, const std::string& private_key);
+
   int port() const { return port_; }
+
+  bool ssl_enabled() const { return ssl_enabled_; }
 
   // Blocks until the server stops and exits its main thread.
   void Join();
@@ -125,11 +132,30 @@ class ThriftServer {
   static const ConnectionContext* GetThreadConnectionContext();
 
  private:
+  // Creates a transport factory which itself creates new transport objects when a
+  // connection is made. Returns OK unless there was a Thrift error.
+  Status CreateTransportFactory(
+      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* transport_factory);
+
+  // Creates the server socket on which this server listens. May be SSL enabled. Returns
+  // OK unless there was a Thrift error.
+  Status CreateSocket(
+      boost::shared_ptr<apache::thrift::transport::TServerTransport>* socket);
+
   // True if the server has been successfully started, for internal use only
   bool started_;
 
   // The port on which the server interface is exposed
   int port_;
+
+  // True if the server socket only accepts SSL connections
+  bool ssl_enabled_;
+
+  // Path to certificate file in .PEM format
+  std::string certificate_path_;
+
+  // Path to private key file in .PEM format
+  std::string private_key_path_;
 
   // How many worker threads to use to serve incoming requests
   // (requests are queued if no thread is immediately available)

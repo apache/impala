@@ -38,6 +38,7 @@ from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from ImpalaService.ImpalaService import TPingImpalaServiceResp
 from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
+from thrift.transport import TSSLSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
@@ -103,6 +104,8 @@ class ImpalaShell(cmd.Cmd):
     self.history_file = os.path.expanduser("~/.impalahistory")
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
     self.show_profiles = options.show_profiles
+    self.ssl_enabled = options.ssl
+    self.ca_cert = options.ca_cert
     # Stores the state of user input until a delimiter is seen.
     self.partial_cmd = str()
     # Stores the old prompt while the user input is incomplete.
@@ -423,8 +426,19 @@ class ImpalaShell(cmd.Cmd):
 
        A non-kerberized impalad just needs a simple buffered transport. For
        the kerberized version, a sasl transport is created.
+
+       If SSL is enabled, a TSSLSocket underlies the transport stack; otherwise a TSocket
+       is used.
     """
-    sock = TSocket(self.impalad[0], int(self.impalad[1]))
+    host, port = self.impalad[0], int(self.impalad[1])
+    if self.ssl_enabled:
+      if self.ca_cert is None:
+        # No CA cert means don't try to verify the certificate
+        sock = TSSLSocket.TSSLSocket(host, port, validate=False)
+      else:
+        sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=self.ca_cert)
+    else:
+      sock = TSocket(host, port)
     if not self.use_kerberos:
       return TBufferedTransport(sock)
     # Initializes a sasl client
@@ -973,6 +987,14 @@ if __name__ == "__main__":
                     help="Refresh Impala catalog after connecting")
   parser.add_option("-d", "--database", dest="default_db", default=None,
                     help="Issue a use database command on startup.")
+  parser.add_option("--ssl", dest="ssl", default=False, action="store_true",
+                    help="Connect to Impala via SSL-secured connection")
+  parser.add_option("--ca_cert", dest="ca_cert", default=None, help=("Full path to "
+                    "certificate file used to authenticate Impala's SSL certificate."
+                    " May either be a copy of Impala's certificate (for self-signed "
+                    "certs) or the certificate of a trusted third-party CA. If not set, "
+                    "but SSL is enabled, the shell will NOT verify Impala's server "
+                    "certificate"))
   options, args = parser.parse_args()
 
   # Arguments that could not be parsed are stored in args. Print an error and exit.
@@ -987,7 +1009,7 @@ if __name__ == "__main__":
 
   if options.use_kerberos:
     # The sasl module is bundled with the shell.
-    print_to_stderr("Starting Impala Shell in secure mode (using Kerberos)")
+    print_to_stderr("Starting Impala Shell using Kerberos authentication")
     try:
       import sasl
     except ImportError:
@@ -1000,7 +1022,14 @@ if __name__ == "__main__":
       options.kerberos_service_name = 'impala'
     print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
   else:
-     print_to_stderr("Starting Impala Shell in unsecure mode")
+     print_to_stderr("Starting Impala Shell without Kerberos authentication")
+
+  if options.ssl:
+    if options.ca_cert is None:
+      print_to_stderr("SSL is enabled. Impala server certificates will NOT be verified"\
+                      " (set --ca_cert to change)")
+    else:
+      print_to_stderr("SSL is enabled")
 
   if options.output_file:
     try:

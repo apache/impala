@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -24,6 +25,8 @@
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TSocket.h>
+#include <thrift/transport/TSSLServerSocket.h>
+#include <thrift/transport/TSSLSocket.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <gflags/gflags.h>
@@ -40,6 +43,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace boost::filesystem;
 using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -281,6 +285,7 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
     int port, Metrics* metrics, int num_worker_threads, ServerType server_type)
     : started_(false),
       port_(port),
+      ssl_enabled_(false),
       num_worker_threads_(num_worker_threads),
       server_type_(server_type),
       name_(name),
@@ -304,14 +309,75 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
   }
 }
 
+Status ThriftServer::CreateSocket(shared_ptr<TServerTransport>* socket) {
+  if (ssl_enabled()) {
+    // This 'factory' is only called once, since CreateSocket() is only called from
+    // Start()
+    shared_ptr<TSSLSocketFactory> socket_factory(new TSSLSocketFactory());
+    try {
+      socket_factory->loadCertificate(certificate_path_.c_str());
+      socket_factory->loadPrivateKey(private_key_path_.c_str());
+      socket->reset(new TSSLServerSocket(port_, socket_factory));
+    } catch (TTransportException& e) {
+      stringstream err_msg;
+      err_msg << "Could not create SSL socket: " << e.what();
+      return Status(err_msg.str());
+    }
+    return Status::OK;
+  } else {
+    socket->reset(new TServerSocket(port_));
+    return Status::OK;
+  }
+}
+
+Status ThriftServer::CreateTransportFactory(
+    shared_ptr<TTransportFactory>* transport_factory) {
+  if (!FLAGS_principal.empty()) {
+    if (FLAGS_keytab_file.empty()) {
+      LOG(ERROR) << "Kerberos principal, '" << FLAGS_principal <<
+          "' specified, but no keyfile";
+      return Status("no keyfile");
+    }
+    RETURN_IF_ERROR(GetKerberosTransportFactory(FLAGS_principal,
+            FLAGS_keytab_file, transport_factory));
+    kerberos_enabled_ = true;
+  } else {
+    transport_factory->reset(server_type_ == Nonblocking ?
+        new TTransportFactory() : new TBufferedTransportFactory());
+  }
+  return Status::OK;
+}
+
+Status ThriftServer::EnableSsl(const string& certificate, const string& private_key) {
+  DCHECK(!started_);
+  if (certificate.empty()) return Status("SSL certificate path may not be blank");
+  if (private_key.empty()) return Status("SSL private key path may not be blank");
+
+  if (!exists(certificate)) {
+    stringstream err_msg;
+    err_msg << "Certificate file " << certificate << " does not exist";
+    return Status(err_msg.str());
+  }
+
+  // TODO: Consider warning if private key file is world-readable
+  if (!exists(private_key)) {
+    stringstream err_msg;
+    err_msg << "Private key file " << private_key << " does not exist";
+    return Status(err_msg.str());
+  }
+
+  ssl_enabled_ = true;
+  certificate_path_ = certificate;
+  private_key_path_ = private_key;
+  return Status::OK;
+}
+
 Status ThriftServer::Start() {
   DCHECK(!started_);
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
   shared_ptr<ThreadManager> thread_mgr;
   shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("thrift-server", name_));
-  shared_ptr<TServerTransport> fe_server_transport;
-  shared_ptr<TTransportFactory> transport_factory;
 
   // TODO: The thrift non-blocking server needs to be fixed.
   if (server_type_ == Nonblocking && !FLAGS_principal.empty()) {
@@ -320,51 +386,31 @@ Status ThriftServer::Start() {
     return (Status(mesg));
   }
 
+  // Note - if you change the transport types here, you must check that the
+  // logic in createContext is still accurate.
+  shared_ptr<TServerTransport> server_socket;
+  shared_ptr<TTransportFactory> transport_factory;
+  RETURN_IF_ERROR(CreateSocket(&server_socket));
+  RETURN_IF_ERROR(CreateTransportFactory(&transport_factory));
+
   if (server_type_ != Threaded) {
     thread_mgr = ThreadManager::newSimpleThreadManager(num_worker_threads_);
     thread_mgr->threadFactory(thread_factory);
     thread_mgr->start();
   }
 
-  if (!FLAGS_principal.empty()) {
-    if (FLAGS_keytab_file.empty()) {
-      LOG(ERROR) << "Kerberos principal, '" << FLAGS_principal <<
-          "' specified, but no keyfile";
-      return Status("no keyfile");
-    }
-    RETURN_IF_ERROR(GetKerberosTransportFactory(FLAGS_principal,
-        FLAGS_keytab_file, &transport_factory));
-    kerberos_enabled_ = true;
-  }
-
-  // Note - if you change the transport types here, you must check that the
-  // logic in createContext is still accurate.
-  TServerSocket* server_socket;
   switch (server_type_) {
     case Nonblocking:
-      if (transport_factory.get() == NULL) {
-        transport_factory.reset(new TTransportFactory());
-      }
       server_.reset(new TNonblockingServer(processor_,
           transport_factory, transport_factory,
           protocol_factory, protocol_factory, port_, thread_mgr));
       break;
     case ThreadPool:
-      fe_server_transport.reset(new TServerSocket(port_));
-      if (transport_factory.get() == NULL) {
-        transport_factory.reset(new TBufferedTransportFactory());
-      }
-      server_.reset(new TThreadPoolServer(processor_, fe_server_transport,
+      server_.reset(new TThreadPoolServer(processor_, server_socket,
           transport_factory, protocol_factory, thread_mgr));
       break;
     case Threaded:
-      server_socket = new TServerSocket(port_);
-      //      server_socket->setAcceptTimeout(500);
-      fe_server_transport.reset(server_socket);
-      if (transport_factory.get() == NULL) {
-        transport_factory.reset(new TBufferedTransportFactory());
-      }
-      server_.reset(new TThreadedServer(processor_, fe_server_transport,
+      server_.reset(new TThreadedServer(processor_, server_socket,
           transport_factory, protocol_factory, thread_factory));
       break;
     default:
@@ -379,7 +425,8 @@ Status ThriftServer::Start() {
 
   RETURN_IF_ERROR(event_processor->StartAndWaitForServer());
 
-  LOG(INFO) << "ThriftServer '" << name_ << "' started on port: " << port_;
+  LOG(INFO) << "ThriftServer '" << name_ << "' started on port: " << port_
+            << (ssl_enabled() ? "s" : "");
   DCHECK(started_);
   return Status::OK;
 }

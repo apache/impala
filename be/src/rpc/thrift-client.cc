@@ -20,9 +20,12 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::transport;
 
+DECLARE_string(ssl_client_ca_certificate);
+
 namespace impala {
 
 Status ThriftClientImpl::Open() {
+  if (!socket_create_status_.ok()) return socket_create_status_;
   try {
     if (!transport_->isOpen()) {
       transport_->open();
@@ -58,7 +61,28 @@ Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
 }
 
 void ThriftClientImpl::Close() {
-  if (transport_->isOpen()) transport_->close();
+  if (transport_.get() != NULL && transport_->isOpen()) transport_->close();
+}
+
+Status ThriftClientImpl::CreateSocket() {
+  if (!ssl_) {
+    socket_.reset(new TSocket(ipaddress_, port_));
+  } else {
+    try {
+      TSSLSocketFactory factory;
+      // TODO: No need to do this every time we create a socket, the factory can be
+      // shared. But since there may be many certificates, this needs some slightly more
+      // complex infrastructure to do right.
+      factory.loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
+      socket_ = factory.createSocket(ipaddress_, port_);
+    } catch (const TTransportException& ex) {
+      stringstream err_msg;
+      err_msg << "Failed to create socket: " << ex.what();
+      return Status(err_msg.str());
+    }
+  }
+
+  return Status::OK;
 }
 
 }

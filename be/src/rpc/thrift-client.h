@@ -22,6 +22,7 @@
 #include <common/status.h>
 #include <thrift/Thrift.h>
 #include <thrift/transport/TSocket.h>
+#include <thrift/transport/TSSLSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <sstream>
@@ -58,13 +59,20 @@ class ThriftClientImpl {
   void Close();
 
  protected:
-  ThriftClientImpl(const std::string& ipaddress, int port)
-    : ipaddress_(ipaddress),
-      port_(port),
-      socket_(new apache::thrift::transport::TSocket(ipaddress, port)) {
+  ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
+      : ipaddress_(ipaddress), port_(port), ssl_(ssl) {
+    socket_create_status_ = CreateSocket();
   }
+
+  // Create a new socket without opening it. Returns an error if the socket could not
+  // be created.
+  Status CreateSocket();
+
   std::string ipaddress_;
   int port_;
+  bool ssl_;
+
+  Status socket_create_status_;
 
   // Sasl Client object.  Contains client kerberos identification data.
   // Will be NULL if kerberos is not being used.
@@ -80,9 +88,10 @@ class ThriftClientImpl {
 // Utility client to a Thrift server. The parameter type is the Thrift interface type that
 // the server implements.
 template <class InterfaceType>
-class ThriftClient : public ThriftClientImpl{
+class ThriftClient : public ThriftClientImpl {
  public:
-  ThriftClient(const std::string& ipaddress, int port,
+  // If ssl is true, the Thrift client will attempt to connect via SSL.
+  ThriftClient(const std::string& ipaddress, int port, bool ssl = false,
       ThriftServer::ServerType server_type = ThriftServer::Threaded);
 
   // Returns the object used to actually make RPCs against the remote server
@@ -93,9 +102,9 @@ class ThriftClient : public ThriftClientImpl{
 };
 
 template <class InterfaceType>
-ThriftClient<InterfaceType>::ThriftClient(
-    const std::string& ipaddress, int port, ThriftServer::ServerType server_type)
-      : ThriftClientImpl(ipaddress, port),
+ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port,
+    bool ssl, ThriftServer::ServerType server_type)
+    : ThriftClientImpl(ipaddress, port, ssl),
         iface_(new InterfaceType(protocol_)) {
 
   switch (server_type) {

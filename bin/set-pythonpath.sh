@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # set the python path for test modules and beeswax
-PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
+PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py
 
 # There should be just a single version of python that created the
 # site-packages directory.
@@ -23,6 +23,9 @@ PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
 for PYTHON_DIR in ${THRIFT_HOME}/python/lib/python*/site-packages; do
     PYTHONPATH=$PYTHONPATH:${PYTHON_DIR}/
 done
+
+# Add Hive after Thrift because Hive supplies its own Thrift modules
+PYTHONPATH=$PYTHONPATH:$HIVE_HOME/lib/py
 
 # Add all the built eggs to the python path
 for EGG in ${IMPALA_HOME}/shell/ext-py/*/dist/*.egg; do

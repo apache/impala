@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
   }
 
   // this blocks until the beeswax and hs2 servers terminate
-  beeswax_server->Start();
-  hs2_server->Start();
+  EXIT_IF_ERROR(beeswax_server->Start());
+  EXIT_IF_ERROR(hs2_server->Start());
   ImpaladMetrics::IMPALA_SERVER_READY->Update(true);
   LOG(INFO) << "Impala has started.";
   beeswax_server->Join();

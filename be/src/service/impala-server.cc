@@ -126,6 +126,17 @@ DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of 
 DEFINE_int32(cancellation_thread_pool_size, 5,
     "(Advanced) Size of the thread-pool processing cancellations due to node failure");
 
+DEFINE_string(ssl_server_certificate, "", "The full path to the SSL certificate file used"
+    " to authenticate Impala to clients. If set, both Beeswax and HiveServer2 ports will "
+    "only accept SSL connections");
+DEFINE_string(ssl_private_key, "", "The full path to the private key used as a "
+    "counterpart to the public key contained in --ssl_server_certificate. If "
+    "--ssl_server_certificate is set, this option must be set as well.");
+DEFINE_string(ssl_client_ca_certificate, "", "(Advanced) The full path to a certificate "
+    "used by Thrift clients to check the validity of a server certificate. May either be "
+    "a certificate for a third-party Certificate Authority, or a copy of the certificate "
+    "the client expects to receive from the server.");
+
 namespace impala {
 
 ThreadManager* fe_tm;
@@ -1785,6 +1796,11 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
         ThriftServer::ThreadPool);
 
     (*beeswax_server)->SetConnectionHandler(handler.get());
+    if (!FLAGS_ssl_server_certificate.empty()) {
+      LOG(INFO) << "Enabling SSL for Beeswax";
+      RETURN_IF_ERROR((*beeswax_server)->EnableSsl(
+              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+    }
 
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_port;
   }
@@ -1797,6 +1813,11 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
         exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     (*hs2_server)->SetConnectionHandler(handler.get());
+    if (!FLAGS_ssl_server_certificate.empty()) {
+      LOG(INFO) << "Enabling SSL for HiveServer2";
+      RETURN_IF_ERROR((*hs2_server)->EnableSsl(
+              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+    }
 
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
   }

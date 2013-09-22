@@ -35,6 +35,7 @@ class StateStore;
 //
 // TODO: Static StartCluster method which runs one or more
 // ImpalaServer(s) and an optional StateStore.
+// TODO: Fix occasional abort when object is destroyed.
 class InProcessImpalaServer {
  public:
   // Initialises the server, but does not start any network-attached
@@ -56,7 +57,7 @@ class InProcessImpalaServer {
   // there was an error joining.
   Status Join();
 
-  ImpalaServer* impala_server() { return impala_server_.get(); }
+  ImpalaServer* impala_server() { return impala_server_; }
 
  private:
   // Hostname for this server, usually FLAGS_hostname
@@ -65,8 +66,10 @@ class InProcessImpalaServer {
   // Port to start the backend server on
   const uint32_t backend_port_;
 
-  // The ImpalaServer that handles client and backend requests
-  boost::scoped_ptr<ImpalaServer> impala_server_;
+  // The ImpalaServer that handles client and backend requests. Not owned by this class;
+  // instead it's owned via shared_ptrs in the ThriftServers. See CreateImpalaServer for
+  // details.
+  ImpalaServer* impala_server_;
 
   // ExecEnv holds much of the per-service state
   boost::scoped_ptr<ExecEnv> exec_env_;
