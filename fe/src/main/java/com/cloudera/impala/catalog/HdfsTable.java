@@ -382,10 +382,23 @@ public class HdfsTable extends Table {
       }
 
       // we should never see more than one ColumnStatisticsObj here
-      if (colStats.getStatsObj().size() > 1) {
+      if (colStats.getStatsObj().size() > 1) continue;
+
+      if (!ColumnStats.isSupportedColType(col.getType())) {
+        LOG.warn(String.format("Column stats are available for table %s / " +
+            "column '%s', but Impala does not currently support column stats for this " +
+            "type of column (%s)",  name, col.getName(), col.getType().toString()));
         continue;
       }
-      col.updateStats(colStats.getStatsObj().get(0).getStatsData());
+
+      // Update the column stats data
+      if (!col.updateStats(colStats.getStatsObj().get(0).getStatsData())) {
+        LOG.warn(String.format("Applying the column stats update to table %s / " +
+            "column '%s' did not succeed because column type (%s) was not compatible " +
+            "with the column stats data. Performance may suffer until column stats are" +
+            " regenerated for this column.",
+            name, col.getName(), col.getType().toString()));
+      }
     }
   }
 

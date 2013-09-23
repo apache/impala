@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.EnumSet;
+
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
@@ -32,16 +34,27 @@ import com.google.common.base.Preconditions;
 public class ColumnStats {
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
 
+  // Set of the currently supported column stats column types.
+  private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
+      PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
+      PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
+      PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TINYINT);
+
   private float avgSerializedSize;  // in bytes; includes serialization overhead
   private long maxSize;  // in bytes
   private long numDistinctValues;
   private long numNulls;
 
-  /**
-   * For fixed-length type (those which don't need additional storage besides
-   * the slot they occupy), sets avgSerializedSize and maxSize to their slot size.
-   */
   public ColumnStats(PrimitiveType colType) {
+    initColStats(colType);
+  }
+
+  /**
+   * Initializes all column stats values as "unknown". For fixed-length type
+   * (those which don't need additional storage besides the slot they occupy),
+   * sets avgSerializedSize and maxSize to their slot size.
+   */
+  private void initColStats(PrimitiveType colType) {
     avgSerializedSize = -1;
     maxSize = -1;
     numDistinctValues = -1;
@@ -67,47 +80,79 @@ public class ColumnStats {
   public boolean hasMaxSize() { return maxSize >= 0; }
   public boolean hasNumDistinctValues() { return numDistinctValues >= 0; }
 
-  public void update(PrimitiveType colType, ColumnStatisticsData statsData) {
+  /**
+   * Updates the stats with the given ColumnStatisticsData. If the ColumnStatisticsData
+   * is not compatible with the given colType, all stats are initialized based on
+   * initColStats().
+   * Returns false if the ColumnStatisticsData data was incompatible with the given
+   * column type, otherwise returns true.
+   */
+  public boolean update(PrimitiveType colType, ColumnStatisticsData statsData) {
+    Preconditions.checkState(SUPPORTED_COL_TYPES.contains(colType));
+    initColStats(colType);
+    boolean isCompatible = false;
     switch (colType) {
       case BOOLEAN:
-        Preconditions.checkState(statsData.isSetBooleanStats());
-        BooleanColumnStatsData boolStats = statsData.getBooleanStats();
-        numNulls = boolStats.getNumNulls();
+        isCompatible = statsData.isSetBooleanStats();
+        if (isCompatible) {
+          BooleanColumnStatsData boolStats = statsData.getBooleanStats();
+          numNulls = boolStats.getNumNulls();
+        }
         break;
       case TINYINT:
       case SMALLINT:
       case INT:
       case BIGINT:
-        Preconditions.checkState(statsData.isSetLongStats());
-        LongColumnStatsData longStats = statsData.getLongStats();
-        numDistinctValues = longStats.getNumDVs();
-        numNulls = longStats.getNumNulls();
+        isCompatible = statsData.isSetLongStats();
+        if (isCompatible) {
+          LongColumnStatsData longStats = statsData.getLongStats();
+          numDistinctValues = longStats.getNumDVs();
+          numNulls = longStats.getNumNulls();
+        }
         break;
       case FLOAT:
       case DOUBLE:
-        Preconditions.checkState(statsData.isSetDoubleStats());
-        DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
-        numDistinctValues = doubleStats.getNumDVs();
-        numNulls = doubleStats.getNumNulls();
+        isCompatible = statsData.isSetDoubleStats();
+        if (isCompatible) {
+          DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
+          numDistinctValues = doubleStats.getNumDVs();
+          numNulls = doubleStats.getNumNulls();
+        }
         break;
       case STRING:
-        Preconditions.checkState(statsData.isSetStringStats());
-        StringColumnStatsData stringStats = statsData.getStringStats();
-        numDistinctValues = stringStats.getNumDVs();
-        numNulls = stringStats.getNumNulls();
-        maxSize = stringStats.getMaxColLen();
-        avgSerializedSize = PrimitiveType.STRING.getSlotSize()
-            + Double.valueOf(stringStats.getAvgColLen()).floatValue();
+        isCompatible = statsData.isSetStringStats();
+        if (isCompatible) {
+          StringColumnStatsData stringStats = statsData.getStringStats();
+          numDistinctValues = stringStats.getNumDVs();
+          numNulls = stringStats.getNumNulls();
+          maxSize = stringStats.getMaxColLen();
+          avgSerializedSize = PrimitiveType.STRING.getSlotSize()
+              + Double.valueOf(stringStats.getAvgColLen()).floatValue();
+        }
         break;
       case BINARY:
-        Preconditions.checkState(statsData.isSetBinaryStats());
-        BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
-        numNulls = binaryStats.getNumNulls();
-        maxSize = binaryStats.getMaxColLen();
-        avgSerializedSize = PrimitiveType.BINARY.getSlotSize()
-            + Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+        isCompatible = statsData.isSetStringStats();
+        if (isCompatible) {
+          BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
+          numNulls = binaryStats.getNumNulls();
+          maxSize = binaryStats.getMaxColLen();
+          avgSerializedSize = PrimitiveType.BINARY.getSlotSize()
+              + Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+        }
+        break;
+      default:
+        Preconditions.checkState(false,
+            "Unexpected column type: " + colType.toString());
         break;
     }
+    return isCompatible;
+  }
+
+  /**
+   * Returns true if the given PrimitiveType supports column stats updates.
+   */
+  public static boolean isSupportedColType(PrimitiveType colType) {
+    return SUPPORTED_COL_TYPES.contains(colType);
   }
 
   @Override

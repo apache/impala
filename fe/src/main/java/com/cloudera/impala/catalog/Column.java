@@ -68,9 +68,10 @@ public class Column {
 
   public ColumnStats getStats() { return stats; }
 
-  public void updateStats(ColumnStatisticsData statsData) {
-    stats.update(type, statsData);
+  public boolean updateStats(ColumnStatisticsData statsData) {
+    boolean statsDataCompatibleWithColType = stats.update(type, statsData);
     LOG.info("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
+    return statsDataCompatibleWithColType;
   }
 
   @Override

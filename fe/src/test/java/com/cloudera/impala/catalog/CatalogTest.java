@@ -16,6 +16,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -27,6 +28,7 @@ import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -375,6 +377,71 @@ public class CatalogTest {
         stringCol.getStats().getAvgSerializedSize() > PrimitiveType.STRING.getSlotSize());
     assertEquals(stringCol.getStats().getMaxSize(), 3);
     assertTrue(!stringCol.getStats().hasNulls());
+  }
+
+  /**
+   * Verifies that updating column stats data for a type that isn't compatible with
+   * the column type results in the stats being set to "unknown". This is a regression
+   * test for IMPALA-588, where this used to result in a Preconditions failure.
+   */
+  @Test
+  public void testColStatsColTypeMismatch() throws Exception {
+    // First load a table that has column stats.
+    getDb(catalog, "functional").invalidateTable("functional");
+    HdfsTable table = (HdfsTable) getDb(catalog, "functional").getTable("alltypesagg");
+
+    // Now attempt to update a column's stats with mismatched stats data and ensure
+    // we get the expected results.
+    MetaStoreClient client = catalog.getMetaStoreClient();
+    try {
+      // Load some string stats data and use it to update the stats of different
+      // typed columns.
+      ColumnStatisticsData stringColStatsData = client.getHiveClient()
+          .getTableColumnStatistics("functional", "alltypesagg", "string_col")
+          .getStatsObj().get(0).getStatsData();
+
+      assertTrue(!table.getColumn("int_col").updateStats(stringColStatsData));
+      assertStatsUnknown(table.getColumn("int_col"));
+
+      assertTrue(!table.getColumn("double_col").updateStats(stringColStatsData));
+      assertStatsUnknown(table.getColumn("double_col"));
+
+      assertTrue(!table.getColumn("bool_col").updateStats(stringColStatsData));
+      assertStatsUnknown(table.getColumn("bool_col"));
+
+      // Do the same thing, but apply bigint stats to a string column.
+      ColumnStatisticsData bigIntCol = client.getHiveClient()
+          .getTableColumnStatistics("functional", "alltypes", "bigint_col")
+          .getStatsObj().get(0).getStatsData();
+      assertTrue(!table.getColumn("string_col").updateStats(bigIntCol));
+      assertStatsUnknown(table.getColumn("string_col"));
+
+      // Now try to apply a matching column stats data and ensure it succeeds.
+      assertTrue(table.getColumn("string_col").updateStats(stringColStatsData));
+      assertEquals(3, table.getColumn("string_col").getStats().getMaxSize());
+
+      // Finally, try to update stats for a column type that doesn't support stats
+      try {
+        table.getColumn("timestamp_col").updateStats(stringColStatsData);
+        assertTrue("Expected update to fail for unsupported stat column type.", false);
+      } catch (IllegalStateException e) {
+        // Ignore
+      }
+    } finally {
+      // Make sure to invalidate the metadata so the next test isn't using bad col stats
+      getDb(catalog, "functional").invalidateTable("functional");
+      client.release();
+    }
+  }
+
+  private void assertStatsUnknown(Column column) {
+    assertEquals(-1, column.getStats().getNumDistinctValues());
+    assertEquals(-1, column.getStats().getNumNulls());
+    double expectedSize = column.getType().isFixedLengthType() ?
+        column.getType().getSlotSize() : -1;
+
+    assertEquals(expectedSize, column.getStats().getAvgSerializedSize(), 0.0001);
+    assertEquals(expectedSize, column.getStats().getMaxSize(), 0.0001);
   }
 
   @Test
