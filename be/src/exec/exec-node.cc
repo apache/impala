@@ -101,11 +101,11 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     num_rows_returned_(0),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL) {
-  Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
-  DCHECK(status.ok())
-      << "ExecNode c'tor: deserialization of conjuncts failed:\n"
-      << status.GetErrorMsg();
   InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
+}
+
+Status ExecNode::Init(const TPlanNode& tnode) {
+  return Expr::CreateExprTrees(pool_, tnode.conjuncts, &conjuncts_);
 }
 
 Status ExecNode::Prepare(RuntimeState* state) {
@@ -221,35 +221,35 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::HASH_JOIN_NODE:
       *node = pool->Add(new HashJoinNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::EXCHANGE_NODE:
       *node = pool->Add(new ExchangeNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::SELECT_NODE:
       *node = pool->Add(new SelectNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     case TPlanNodeType::SORT_NODE:
       if (tnode.sort_node.use_top_n) {
         *node = pool->Add(new TopNNode(pool, tnode, descs));
       } else {
-      // TODO: Need Sort Node
-      //  *node = pool->Add(new SortNode(pool, tnode, descs));
+        // TODO: Need Sort Node
+        //  *node = pool->Add(new SortNode(pool, tnode, descs));
         error_msg << "ORDER BY with no LIMIT not implemented";
         return Status(error_msg.str());
       }
-      return Status::OK;
+      break;
     case TPlanNodeType::MERGE_NODE:
       *node = pool->Add(new MergeNode(pool, tnode, descs));
-      return Status::OK;
+      break;
     default:
       map<int, const char*>::const_iterator i =
           _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
@@ -260,6 +260,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       error_msg << str << " not implemented";
       return Status(error_msg.str());
   }
+  RETURN_IF_ERROR((*node)->Init(tnode));
   return Status::OK;
 }
 

@@ -41,12 +41,6 @@ HashJoinNode::HashJoinNode(
     process_build_batch_fn_(NULL),
     codegen_process_probe_batch_fn_(NULL),
     process_probe_batch_fn_(NULL) {
-  // TODO: log errors in runtime state
-  Status status = Init(pool, tnode);
-  DCHECK(status.ok())
-      << "HashJoinNode c'tor: Init() failed:\n"
-      << status.GetErrorMsg();
-
   match_all_probe_ =
     (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
@@ -54,19 +48,20 @@ HashJoinNode::HashJoinNode(
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
 }
 
-Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
+Status HashJoinNode::Init(const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode));
   DCHECK(tnode.__isset.hash_join_node);
   const vector<TEqJoinCondition>& eq_join_conjuncts =
       tnode.hash_join_node.eq_join_conjuncts;
   for (int i = 0; i < eq_join_conjuncts.size(); ++i) {
     Expr* expr;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].left, &expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, eq_join_conjuncts[i].left, &expr));
     probe_exprs_.push_back(expr);
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].right, &expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, eq_join_conjuncts[i].right, &expr));
     build_exprs_.push_back(expr);
   }
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool, tnode.hash_join_node.other_join_conjuncts,
+      Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjuncts_));
   return Status::OK;
 }

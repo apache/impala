@@ -49,6 +49,11 @@ class ExecNode {
 
   virtual ~ExecNode();
 
+  // Initializes this object from the thrift tnode desc. The subclass should
+  // do any initialization that can fail in Init() rather than the ctor.
+  // If overridden in subclass, must first call superclass's Init().
+  virtual Status Init(const TPlanNode& tnode);
+
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
   // node's lifetime.

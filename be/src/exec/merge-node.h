@@ -35,6 +35,7 @@ class MergeNode : public ExecNode {
  public:
   MergeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
+  virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -70,9 +71,6 @@ class MergeNode : public ExecNode {
 
   // Index of current row in child_row_batch_.
   int child_row_idx_;
-
-  // Create const exprs, child exprs and conjuncts from corresponding thrift exprs.
-  Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
   // Evaluates exprs on all rows in child_row_batch_ starting from child_row_idx_,
   // and materializes their results into *tuple.

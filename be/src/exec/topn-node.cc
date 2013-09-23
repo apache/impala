@@ -35,16 +35,14 @@ using namespace std;
 
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs) {
-  // TODO: log errors in runtime state
-  Status status = Init(pool, tnode);
-  DCHECK(status.ok()) << "TopNNode c'tor:Init failed: \n" << status.GetErrorMsg();
 }
 
-Status TopNNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
+Status TopNNode::Init(const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode));
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool, tnode.sort_node.ordering_exprs, &lhs_ordering_exprs_));
+      Expr::CreateExprTrees(pool_, tnode.sort_node.ordering_exprs, &lhs_ordering_exprs_));
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool, tnode.sort_node.ordering_exprs, &rhs_ordering_exprs_));
+      Expr::CreateExprTrees(pool_, tnode.sort_node.ordering_exprs, &rhs_ordering_exprs_));
   is_asc_order_.insert(
       is_asc_order_.begin(), tnode.sort_node.is_asc_order.begin(),
       tnode.sort_node.is_asc_order.end());

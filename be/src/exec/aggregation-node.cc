@@ -95,9 +95,15 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     build_timer_(NULL),
     get_results_timer_(NULL),
     hash_table_buckets_counter_(NULL) {
-  // ignore return status for now
-  Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &probe_exprs_);
-  Expr::CreateExprTrees(pool, tnode.agg_node.aggregate_exprs, &aggregate_exprs_);
+}
+
+Status AggregationNode::Init(const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode));
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_exprs_));
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(pool_, tnode.agg_node.aggregate_exprs, &aggregate_exprs_));
+  return Status::OK;
 }
 
 Status AggregationNode::Prepare(RuntimeState* state) {

@@ -54,6 +54,7 @@ namespace impala {
 PlanFragmentExecutor::PlanFragmentExecutor(
     ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
   : exec_env_(exec_env),
+    plan_(NULL),
     report_status_cb_(report_status_cb),
     report_thread_active_(false),
     done_(false),
@@ -467,10 +468,8 @@ void PlanFragmentExecutor::Close() {
   row_batch_.reset();
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
-    plan_->Close(runtime_state_.get());
-    if (sink_.get() != NULL) {
-      sink_->Close(runtime_state());
-    }
+    if (plan_ != NULL) plan_->Close(runtime_state_.get());
+    if (sink_.get() != NULL) sink_->Close(runtime_state());
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
   }
   if (mem_usage_sampled_counter_ != NULL) {

@@ -256,115 +256,96 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
 
 Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr) {
   switch (texpr_node.node_type) {
-    case TExprNodeType::AGG_EXPR: {
+    case TExprNodeType::AGG_EXPR:
       if (!texpr_node.__isset.agg_expr) {
         return Status("Aggregation expression not set in thrift node");
       }
       *expr = pool->Add(new AggregateExpr(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::ARITHMETIC_EXPR: {
+    case TExprNodeType::ARITHMETIC_EXPR:
       *expr = pool->Add(new ArithmeticExpr(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::BINARY_PRED: {
+    case TExprNodeType::BINARY_PRED:
       *expr = pool->Add(new BinaryPredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::BOOL_LITERAL: {
+    case TExprNodeType::BOOL_LITERAL:
       if (!texpr_node.__isset.bool_literal) {
         return Status("Boolean literal not set in thrift node");
       }
       *expr = pool->Add(new BoolLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::CASE_EXPR: {
+    case TExprNodeType::CASE_EXPR:
       if (!texpr_node.__isset.case_expr) {
         return Status("Case expression not set in thrift node");
       }
       *expr = pool->Add(new CaseExpr(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::CAST_EXPR: {
+    case TExprNodeType::CAST_EXPR:
       *expr = pool->Add(new CastExpr(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::COMPOUND_PRED: {
+    case TExprNodeType::COMPOUND_PRED:
       *expr = pool->Add(new CompoundPredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::DATE_LITERAL: {
+    case TExprNodeType::DATE_LITERAL:
       if (!texpr_node.__isset.date_literal) {
         return Status("Date literal not set in thrift node");
       }
       *expr = pool->Add(new DateLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::FLOAT_LITERAL: {
+    case TExprNodeType::FLOAT_LITERAL:
       if (!texpr_node.__isset.float_literal) {
         return Status("Float literal not set in thrift node");
       }
       *expr = pool->Add(new FloatLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::FUNCTION_CALL: {
+    case TExprNodeType::FUNCTION_CALL:
       *expr = pool->Add(new FunctionCall(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::INT_LITERAL: {
+    case TExprNodeType::INT_LITERAL:
       if (!texpr_node.__isset.int_literal) {
         return Status("Int literal not set in thrift node");
       }
       *expr = pool->Add(new IntLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::IN_PRED: {
+    case TExprNodeType::IN_PRED:
       if (!texpr_node.__isset.in_predicate) {
         return Status("In predicate not set in thrift node");
       }
       *expr = pool->Add(new InPredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::IS_NULL_PRED: {
+    case TExprNodeType::IS_NULL_PRED:
       if (!texpr_node.__isset.is_null_pred) {
         return Status("Is null predicate not set in thrift node");
       }
       *expr = pool->Add(new IsNullPredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::LIKE_PRED: {
+    case TExprNodeType::LIKE_PRED:
       *expr = pool->Add(new LikePredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::NULL_LITERAL: {
+    case TExprNodeType::NULL_LITERAL:
       *expr = pool->Add(new NullLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::SLOT_REF: {
+    case TExprNodeType::SLOT_REF:
       if (!texpr_node.__isset.slot_ref) {
         return Status("Slot reference not set in thrift node");
       }
       *expr = pool->Add(new SlotRef(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::STRING_LITERAL: {
+    case TExprNodeType::STRING_LITERAL:
       if (!texpr_node.__isset.string_literal) {
         return Status("String literal not set in thrift node");
       }
       *expr = pool->Add(new StringLiteral(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::TUPLE_IS_NULL_PRED: {
+    case TExprNodeType::TUPLE_IS_NULL_PRED:
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
-    }
-    case TExprNodeType::UDF_CALL: {
+    case TExprNodeType::UDF_CALL:
       if (texpr_node.udf_call_expr.udf_type == TUdfType::HIVE) {
         return Status("Hive UDFs are not yet implemented.");
       }
       *expr = pool->Add(new NativeUdfExpr(texpr_node));
       return Status::OK;
-    }
     default:
       stringstream os;
       os << "Unknown expr node type: " << texpr_node.node_type;

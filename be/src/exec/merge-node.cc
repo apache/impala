@@ -32,27 +32,23 @@ MergeNode::MergeNode(ObjectPool* pool, const TPlanNode& tnode,
       child_row_batch_(NULL),
       child_eos_(false),
       child_row_idx_(0) {
-  // TODO: log errors in runtime state
-  Status status = Init(pool, tnode);
-  DCHECK(status.ok())
-      << "MergeNode c'tor: Init() failed:\n"
-      << status.GetErrorMsg();
 }
 
-Status MergeNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
+Status MergeNode::Init(const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode));
   DCHECK(tnode.__isset.merge_node);
   // Create const_expr_lists_ from thrift exprs.
   const vector<vector<TExpr> >& const_texpr_lists = tnode.merge_node.const_expr_lists;
   for (int i = 0; i < const_texpr_lists.size(); ++i) {
     vector<Expr*> exprs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool, const_texpr_lists[i], &exprs));
+    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, const_texpr_lists[i], &exprs));
     const_result_expr_lists_.push_back(exprs);
   }
   // Create result_expr_lists_ from thrift exprs.
   const vector<vector<TExpr> >& result_texpr_lists = tnode.merge_node.result_expr_lists;
   for (int i = 0; i < result_texpr_lists.size(); ++i) {
     vector<Expr*> exprs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool, result_texpr_lists[i], &exprs));
+    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, result_texpr_lists[i], &exprs));
     result_expr_lists_.push_back(exprs);
   }
   return Status::OK;
