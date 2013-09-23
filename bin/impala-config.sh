@@ -56,6 +56,9 @@ export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
 
+# Directory where local cluster logs will go when running tests or loading data
+export IMPALA_TEST_CLUSTER_LOG_DIR=${IMPALA_HOME}/cluster_logs
+
 export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GPERFTOOLS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2

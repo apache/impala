@@ -29,9 +29,12 @@ else
 fi
 set -u
 
+IMPALAD_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
+mkdir -p ${IMPALAD_LOG_DIR}
+
 # Load the data set
 pushd ${IMPALA_HOME}/bin
-./start-impala-cluster.py -s 3 --wait_for_cluster
+./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}
 # Use unbuffered logging by executing these data loading steps with 'python -u'
 python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 echo "Loading data into hbasealltypeserror and hbasealltypeserrononulls"

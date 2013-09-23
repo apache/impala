@@ -21,7 +21,6 @@ set -u
 set -e
 . $IMPALA_HOME/bin/set-pythonpath.sh
 EXPLORATION_STRATEGY=core
-
 NUM_ITERATIONS=1
 
 # parse command line options
@@ -43,8 +42,8 @@ do
   esac
 done
 
-LOG_DIR=${IMPALA_HOME}/tests/results
-FE_LOG_DIR=${IMPALA_HOME}/tests/results/fe
+LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
+FE_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/fe_tests
 mkdir -p ${LOG_DIR}
 mkdir -p ${FE_LOG_DIR}
 

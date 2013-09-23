@@ -22,7 +22,6 @@ ROOT=`cd "$ROOT"; pwd`
 export IMPALA_HOME=$ROOT
 . "$ROOT"/bin/impala-config.sh
 
-CLUSTER_LOG_DIR=$IMPALA_HOME/cluster_logs
 CLEAN_ACTION=1
 TESTDATA_ACTION=1
 TESTS_ACTION=1
@@ -141,7 +140,7 @@ then
   rm -rf target
   rm -f src/test/resources/{core,hbase,hive}-site.xml
   rm -rf generated-sources/*
-  rm -rf ${CLUSTER_LOG_DIR}/*
+  rm -rf ${IMPALA_TEST_CLUSTER_LOG_DIR}/*
 
   # clean be
   cd $IMPALA_HOME/be
@@ -207,11 +206,16 @@ mvn package -DskipTests=true
 echo "Creating shell tarball"
 ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
-mkdir -p ${CLUSTER_LOG_DIR}
+# Create subdirectories for the test and data loading impalad logs.
+mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
+mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/fe_tests
+mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
+
 if [ $FORMAT_CLUSTER -eq 1 ]; then
-  $IMPALA_HOME/testdata/bin/run-all.sh -format 1>${CLUSTER_LOG_DIR}/run-all.log 2>&1
+  $IMPALA_HOME/testdata/bin/run-all.sh \
+      -format 1>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-all.log 2>&1
 elif [ $TESTDATA_ACTION -eq 1 ] || [ $TESTS_ACTION -eq 1 ]; then
-  $IMPALA_HOME/testdata/bin/run-all.sh 1>${CLUSTER_LOG_DIR}/run-all.log 2>&1
+  $IMPALA_HOME/testdata/bin/run-all.sh 1>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-all.log 2>&1
 fi
 
 if [ $TESTDATA_ACTION -eq 1 ]
