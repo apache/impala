@@ -675,32 +675,42 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
 
 void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  (*output) << "<h2>Queries</h2>";
-  lock_guard<mutex> l(query_exec_state_map_lock_);
-  (*output) << "This page lists all registered queries, i.e., those that are not closed "
-    " nor cancelled.<br/>" << endl;
-  (*output) << query_exec_state_map_.size() << " queries in flight" << endl;
-  (*output) << "<table class='table table-hover table-border'><tr>"
-            << "<th>User</th>" << endl
-            << "<th>Default Db</th>" << endl
-            << "<th>Statement</th>" << endl
-            << "<th>Query Type</th>" << endl
-            << "<th>Start Time</th>" << endl
-            << "<th>Backend Progress</th>" << endl
-            << "<th>State</th>" << endl
-            << "<th># rows fetched</th>" << endl
-            << "<th>Profile</th>" << endl
-            << "<th>Action</th>" << endl
-            << "</tr>";
-  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
-    QueryStateRecord record(*exec_state.second);
+  set<QueryStateRecord, QueryStateRecord> sorted_query_records;
+  {
+    lock_guard<mutex> l(query_exec_state_map_lock_);
+    (*output) << "<h2>Queries</h2>";
+    (*output) << "This page lists all running queries, plus any completed queries that "
+"are archived in memory. The size of that archive is controlled with the "
+"--query_log_size command line parameter.";
+    (*output) << "<h3>" << query_exec_state_map_.size() << " queries in flight</h3>"
+              << endl;
+    (*output) << "<table class='table table-hover table-border'><tr>"
+              << "<th>User</th>" << endl
+              << "<th>Default Db</th>" << endl
+              << "<th>Statement</th>" << endl
+              << "<th>Query Type</th>" << endl
+              << "<th>Start Time</th>" << endl
+              << "<th>Backend Progress</th>" << endl
+              << "<th>State</th>" << endl
+              << "<th># rows fetched</th>" << endl
+              << "<th>Profile</th>" << endl
+              << "<th>Action</th>" << endl
+              << "</tr>";
+    BOOST_FOREACH(
+        const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+      // TODO: Do this in the browser so that sorts on other keys are possible.
+      sorted_query_records.insert(QueryStateRecord(*exec_state.second));
+    }
+  }
+
+  BOOST_FOREACH(const QueryStateRecord& record, sorted_query_records) {
     RenderSingleQueryTableRow(record, false, true, output);
   }
 
   (*output) << "</table>";
 
   // Print the query location counts.
-  (*output) << "<h2>Query Locations</h2>";
+  (*output) << "<h3>Query Locations</h3>";
   (*output) << "<table class='table table-hover table-bordered'>";
   (*output) << "<tr><th>Location</th><th>Number of Fragments</th></tr>" << endl;
   {
@@ -713,7 +723,16 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   (*output) << "</table>";
 
   // Print the query log
-  (*output) << "<h2>Finished Queries</h2>";
+  if (FLAGS_query_log_size == 0) {
+    (*output) << "<h3>No queries archived in memory (--query_log_size is 0)</h3>";
+    return;
+  }
+
+  if (FLAGS_query_log_size > 0) {
+    (*output) << "<h3>Last " << FLAGS_query_log_size << " Completed Queries</h3>";
+  } else {
+    (*output) << "<h3>All Completed Queries</h3>";
+  }
   (*output) << "<table class='table table-hover table-border'><tr>"
             << "<th>User</th>" << endl
             << "<th>Default Db</th>" << endl
@@ -1637,6 +1656,12 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
       encoded_profile_str = encoded_profile;
     }
   }
+}
+
+bool ImpalaServer::QueryStateRecord::operator() (
+    const QueryStateRecord& lhs, const QueryStateRecord& rhs) const {
+  if (lhs.start_time == rhs.start_time) return lhs.id < rhs.id;
+  return lhs.start_time < rhs.start_time;
 }
 
 void ImpalaServer::ConnectionStart(

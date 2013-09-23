@@ -361,8 +361,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);
 
-  // Webserver callback. Prints a table of current queries, including their
-  // states, types and IDs.
+  // Webserver callback. Prints a sorted table of current queries, including their states,
+  // types and IDs.
   void QueryStatePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
@@ -478,6 +478,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // exec_state->profile.
     QueryStateRecord(const QueryExecState& exec_state, bool copy_profile = false,
         const std::string& encoded_str = "");
+
+    // Default constructor used only when participating in collections
+    QueryStateRecord() { }
+
+    // Comparator that sorts by start time.
+    bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };
 
   // Helper method to render a single QueryStateRecord as an HTML table
