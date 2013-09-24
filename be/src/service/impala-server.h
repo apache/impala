@@ -28,7 +28,7 @@
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "common/status.h"
 #include "service/frontend.h"
 #include "exec/ddl-executor.h"

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_UTIL_THRIFT_UTIL_H
-#define IMPALA_UTIL_THRIFT_UTIL_H
+#ifndef IMPALA_RPC_THRIFT_UTIL_H
+#define IMPALA_RPC_THRIFT_UTIL_H
 
 #include <boost/shared_ptr.hpp>
 #include <thrift/protocol/TBinaryProtocol.h>

@@ -28,7 +28,7 @@
 #include "gen-cpp/StateStoreService.h"
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
-#include "util/thrift-client.h"
+#include "rpc/thrift-client.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 #include "runtime/client-cache.h"

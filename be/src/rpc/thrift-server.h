@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_UTIL_THRIFT_SERVER_H
-#define IMPALA_UTIL_THRIFT_SERVER_H
+#ifndef IMPALA_RPC_THRIFT_SERVER_H
+#define IMPALA_RPC_THRIFT_SERVER_H
 
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>

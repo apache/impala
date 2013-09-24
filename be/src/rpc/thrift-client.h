@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_UTIL_THRIFT_CLIENT_H
-#define IMPALA_UTIL_THRIFT_CLIENT_H
+#ifndef IMPALA_RPC_THRIFT_CLIENT_H
+#define IMPALA_RPC_THRIFT_CLIENT_H
 
 #include <ostream>
 #include <sstream>
@@ -29,7 +29,7 @@
 
 #include "transport/TSaslClientTransport.h"
 #include "transport/TSasl.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "util/authorization.h"
 #include "gen-cpp/Types_types.h"
 

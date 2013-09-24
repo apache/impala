@@ -26,7 +26,7 @@
 #include "common/status.h"
 #include "statestore/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 using namespace std;
 using namespace boost;

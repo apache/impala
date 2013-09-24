@@ -18,7 +18,7 @@
 
 #include <gtest/gtest.h>
 #include "util/network-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
 

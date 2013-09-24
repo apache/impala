@@ -29,7 +29,7 @@
 #include "util/dict-encoding.h"
 #include "util/hdfs-util.h"
 #include "util/rle-encoding.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 #include <sstream>
 

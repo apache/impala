@@ -56,10 +56,6 @@ add_library(Util
   runtime-profile.cc
   simple-logger.cc
   static-asserts.cc
-  thrift-util.cc
-  thrift-client.cc
-  thrift-server.cc
-  thrift-thread.cc
   url-parser.cc
   url-coding.cc
 )
@@ -84,7 +80,6 @@ ADD_BE_TEST(decompress-test)
 ADD_BE_TEST(metrics-test)
 ADD_BE_TEST(debug-util-test)
 ADD_BE_TEST(url-coding-test)
-ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(bit-util-test)
 ADD_BE_TEST(rle-test)
 ADD_BE_TEST(blocking-queue-test)

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "util/hash-util.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Data_types.h"
 

@@ -19,7 +19,7 @@
 #include "util/logging.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 #include "util/thread.h"
 
 DECLARE_string(hostname);

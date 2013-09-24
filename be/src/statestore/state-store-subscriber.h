@@ -25,8 +25,8 @@
 
 #include "statestore/state-store.h"
 #include "util/stopwatch.h"
-#include "util/thrift-util.h"
-#include "util/thrift-client.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-client.h"
 #include "util/thread.h"
 #include "util/metrics.h"
 #include "gen-cpp/StateStoreService.h"

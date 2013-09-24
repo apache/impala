@@ -19,7 +19,7 @@
 
 #include "util/jni-util.h"
 #include "common/logging.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 using namespace std;
 using namespace impala;

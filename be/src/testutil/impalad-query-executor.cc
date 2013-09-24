@@ -18,8 +18,8 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
-#include "util/thrift-client.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-client.h"
+#include "rpc/thrift-util.h"
 
 DEFINE_string(impalad, "localhost:21000", "host:port of impalad process");
 DECLARE_int32(num_nodes);

@@ -22,7 +22,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "util/thrift-client.h"
+#include "rpc/thrift-client.h"
 #include "common/status.h"
 #include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"

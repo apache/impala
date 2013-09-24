@@ -18,7 +18,7 @@
 #include "util/compress.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 #include "util/url-coding.h"
 #include "util/container-util.h"
 #include "util/periodic-counter-updater.h"

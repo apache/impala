@@ -10,7 +10,7 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -23,7 +23,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 

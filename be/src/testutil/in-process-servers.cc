@@ -15,8 +15,8 @@
 #include "testutil/in-process-servers.h"
 
 #include "statestore/state-store.h"
-#include "util/thrift-util.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-server.h"
 #include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"

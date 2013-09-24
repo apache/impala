@@ -35,7 +35,7 @@
 #include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
 #include "util/runtime-profile.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 using namespace std;
 using namespace boost;

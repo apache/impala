@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <util/thrift-client.h>
+#include "rpc/thrift-client.h"
 #include <boost/assign.hpp>
 #include <ostream>
 

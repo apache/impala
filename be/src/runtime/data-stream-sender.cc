@@ -29,8 +29,8 @@
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
-#include "util/thrift-client.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-client.h"
+#include "rpc/thrift-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService.h"

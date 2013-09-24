@@ -24,7 +24,7 @@
 #include <boost/bind.hpp>
 
 #include "util/metrics.h"
-#include "util/thrift-client.h"
+#include "rpc/thrift-client.h"
 
 #include "common/status.h"
 

@@ -26,7 +26,7 @@
 #include "common/logging.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;

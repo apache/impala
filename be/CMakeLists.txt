@@ -181,6 +181,7 @@ set (IMPALA_LINK_LIBS
   GlobalFlags
   ImpalaThrift
   Opcode
+  Rpc
   Runtime
   Service
   Statestore
@@ -260,6 +261,7 @@ add_subdirectory(src/runtime)
 add_subdirectory(src/statestore)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
+add_subdirectory(src/rpc)
 add_subdirectory(src/udf)
 add_subdirectory(src/udf_samples)
 add_subdirectory(src/util)
@@ -280,11 +282,11 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/rpc
   ${CMAKE_CURRENT_SOURCE_DIR}/build/runtime
   ${CMAKE_CURRENT_SOURCE_DIR}/build/statestore
   ${CMAKE_CURRENT_SOURCE_DIR}/build/service
   ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
-  ${CMAKE_CURRENT_SOURCE_DIR}/build/thrift
   ${CMAKE_CURRENT_SOURCE_DIR}/build/util
   ${CMAKE_CURRENT_SOURCE_DIR}/build/transport
 )

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_UTIL_THRIFT_THREAD_H
-#define IMPALA_UTIL_THRIFT_THREAD_H
+#ifndef IMPALA_RPC_THRIFT_THREAD_H
+#define IMPALA_RPC_THRIFT_THREAD_H
 
 // This is required for thrift's Thread.h to compile. Thrift also includes an experimental
 // Boost-based thread implementation that is enabled by #define USE_BOOST_THREAD. It is

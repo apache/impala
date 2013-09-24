@@ -29,12 +29,12 @@
 #include <gflags/gflags.h>
 
 #include "gen-cpp/Types_types.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "util/authorization.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/uid-util.h"
-#include "util/thrift-thread.h"
+#include "rpc/thrift-thread.h"
 
 #include <sstream>
 

@@ -32,7 +32,7 @@
 #include "util/url-coding.h"
 #include "util/logging.h"
 #include "util/debug-util.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 
 using namespace std;
 using namespace boost;

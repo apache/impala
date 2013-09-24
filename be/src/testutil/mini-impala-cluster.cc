@@ -30,8 +30,8 @@
 #include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
-#include "util/thrift-util.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-server.h"
 #include "testutil/in-process-servers.h"
 
 DEFINE_int32(num_backends, 3, "The number of backends to start");

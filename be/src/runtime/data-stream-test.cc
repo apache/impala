@@ -31,7 +31,7 @@
 #include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/thread.h"
-#include "util/thrift-server.h"
+#include "rpc/thrift-server.h"
 #include "util/mem-info.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"

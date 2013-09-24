@@ -19,7 +19,7 @@
 #include "gen-cpp/StateStoreService_types.h"
 #include "statestore/failure-detector.h"
 #include "util/stopwatch.h"
-#include "util/thrift-util.h"
+#include "rpc/thrift-util.h"
 #include "util/webserver.h"
 
 #include <boost/thread.hpp>

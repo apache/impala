@@ -25,9 +25,9 @@
 #include "common/logging.h"
 #include "util/cpu-info.h"
 #include "util/stopwatch.h"
-#include "util/thrift-client.h"
-#include "util/thrift-server.h"
-#include "util/thrift-thread.h"
+#include "rpc/thrift-client.h"
+#include "rpc/thrift-server.h"
+#include "rpc/thrift-thread.h"
 
 #include <iostream>
 
