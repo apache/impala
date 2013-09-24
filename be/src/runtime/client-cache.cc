@@ -94,7 +94,7 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
   auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, client_key));
   VLOG_CONNECTION << "CreateClient(): adding new client for "
                   << client_impl->ipaddress() << ":" << client_impl->port();
-  Status status = client_impl->Open();
+  Status status = client_impl->OpenWithRetry(num_tries_, wait_ms_);
   if (!status.ok()) {
     *client_key = NULL;
     return status;

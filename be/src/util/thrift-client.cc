@@ -36,25 +36,25 @@ Status ThriftClientImpl::Open() {
   return Status::OK;
 }
 
-Status ThriftClientImpl::OpenWithRetry(
-    int num_tries, int wait_ms) {
-  DCHECK_GE(wait_ms, 0);
-  Status status;
-  int try_count = 0L;
-  while (num_tries <= 0 || try_count < num_tries) {
+Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
+  uint32_t try_count = 0L;
+  while (true) {
     ++try_count;
-    status = Open();
+    Status status = Open();
     if (status.ok()) return status;
+
     LOG(INFO) << "Unable to connect to " << ipaddress_ << ":" << port_;
-    if (num_tries < 0) {
+    if (num_tries == 0) {
       LOG(INFO) << "(Attempt " << try_count << ", will retry indefinitely)";
     } else {
-      LOG(INFO) << "(Attempt " << try_count << " of " << num_tries << ")";
+      if (num_tries != 1) {
+        // No point logging 'attempt 1 of 1'
+        LOG(INFO) << "(Attempt " << try_count << " of " << num_tries << ")";
+      }
+      if (try_count == num_tries) return status;
     }
     usleep(wait_ms * 1000L);
   }
-
-  return status;
 }
 
 void ThriftClientImpl::Close() {

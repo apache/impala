@@ -87,7 +87,8 @@ class ClientCacheHelper {
  private:
   template <class T> friend class ClientCache;
   // Private constructor so that only ClientCache can instantiate this class.
-  ClientCacheHelper() : metrics_enabled_(false) { }
+  ClientCacheHelper(uint32_t num_tries, uint64_t wait_ms)
+      : num_tries_(num_tries), wait_ms_(wait_ms), metrics_enabled_(false) { }
 
   // Protects all member variables
   // TODO: have more fine-grained locks or use lock-free data structures,
@@ -102,6 +103,12 @@ class ClientCacheHelper {
   // Map from client key back to its associated ThriftClientImpl transport
   typedef boost::unordered_map<void*, ThriftClientImpl*> ClientMap;
   ClientMap client_map_;
+
+  // Number of attempts to make to open a connection. 0 means retry indefinitely.
+  uint32_t num_tries_;
+
+  // Time to wait between failed connection attempts.
+  uint64_t wait_ms_;
 
   // Metrics
   bool metrics_enabled_;
@@ -170,7 +177,17 @@ class ClientCache {
  public:
   typedef ThriftClient<T> Client;
 
-  ClientCache() : client_cache_helper_() {
+  ClientCache() : client_cache_helper_(1, 0) {
+    client_factory_ =
+        boost::bind<ThriftClientImpl*>(
+            boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);
+  }
+
+  // Create a ClientCache where connections are tried num_tries times, with a pause of
+  // wait_ms between attempts.
+  // If num_tries == 0, retry connections indefinitely.
+  ClientCache(uint32_t num_tries, uint32_t wait_ms)
+      : client_cache_helper_(num_tries, wait_ms) {
     client_factory_ =
         boost::bind<ThriftClientImpl*>(
             boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);

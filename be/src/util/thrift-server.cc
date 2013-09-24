@@ -47,11 +47,8 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 
-DEFINE_int32(rpc_cnxn_attempts, 10,
-    "Advanced: The number of times to retry connecting to an RPC server. If zero or less,"
-    "connections will be retried until successful");
-DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000,
-    "Advanced: The interval, in ms, between retrying connections to an RPC server");
+DEFINE_int32(rpc_cnxn_attempts, 10, "Deprecated");
+DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 

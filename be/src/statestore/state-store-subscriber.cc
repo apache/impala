@@ -36,6 +36,10 @@ using namespace ::apache::thrift::transport;
 
 DEFINE_int32(statestore_subscriber_timeout_seconds, 10, "The amount of time (in seconds)"
      " that may elapse before the connection with the state-store is considered lost.");
+DEFINE_int32(statestore_subscriber_cnxn_attempts, 10, "The number of times to retry an "
+    "RPC connection to the statestore. A setting of 0 means retry indefinitely");
+DEFINE_int32(statestore_subscriber_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
+    "to wait between attempts to make an RPC connection to the state-store.");
 
 namespace impala {
 
@@ -74,7 +78,8 @@ StateStoreSubscriber::StateStoreSubscriber(const std::string& subscriber_id,
           seconds(FLAGS_statestore_subscriber_timeout_seconds),
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
       is_registered_(false),
-      client_cache_(new StateStoreClientCache()) {
+      client_cache_(new StateStoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
+          FLAGS_statestore_subscriber_cnxn_retry_interval_ms)) {
   connected_to_statestore_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric("statestore-subscriber.connected", false);
   last_recovery_time_metric_ =

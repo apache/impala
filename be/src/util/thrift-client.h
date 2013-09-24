@@ -46,15 +46,15 @@ class ThriftClientImpl {
   const std::string& ipaddress() { return ipaddress_; }
   int port() { return port_; }
 
-  // Open the connection to the remote server. May be called
-  // repeatedly, is idempotent unless there is a failure to connect.
+  // Open the connection to the remote server. May be called repeatedly, is idempotent
+  // unless there is a failure to connect.
   Status Open();
 
   // Retry the Open num_retries time waiting wait_ms milliseconds between retries.
-  Status OpenWithRetry(int num_retries, int wait_ms);
+  // If num_retries == 0, the connection is retried indefinitely.
+  Status OpenWithRetry(uint32_t num_retries, uint64_t wait_ms);
 
-  // Close the connection with the remote server. May be called
-  // repeatedly.
+  // Close the connection with the remote server. May be called repeatedly.
   void Close();
 
  protected:
@@ -77,8 +77,8 @@ class ThriftClientImpl {
 };
 
 
-// Utility client to a Thrift server. The parameter type is the
-// Thrift interface type that the server implements.
+// Utility client to a Thrift server. The parameter type is the Thrift interface type that
+// the server implements.
 template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl{
  public:
