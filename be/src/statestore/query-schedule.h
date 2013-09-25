@@ -57,13 +57,12 @@ struct FragmentExecParams {
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options);
+      const TQueryOptions& query_options, bool is_mini_llama);
 
   // Creates a reservation request for the given pool in reservation_request.
   // The request contains one resource per entry in unique_hosts_. The per-host resources
   // are based on planner estimates in the exec request or on manual overrides given
   // set in the query options.
-  // TODO: Remove the second argument. It's for debugging.
   void CreateReservationRequest(const std::string& pool,
       const std::vector<std::string>& llama_nodes,
       TResourceBrokerReservationRequest* reservation_request);
@@ -83,6 +82,13 @@ class QuerySchedule {
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
   bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
+  bool is_mini_llama() const { return is_mini_llama_; }
+  const TNetworkAddress& impalad_to_dn(const TNetworkAddress& impalad_hostport) {
+    return impalad_to_dn_[impalad_hostport];
+  }
+  const TNetworkAddress& dn_to_impalad(const TNetworkAddress& dn_hostport) {
+    return dn_to_impalad_[dn_hostport];
+  }
 
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -95,14 +101,23 @@ class QuerySchedule {
   TResourceBrokerReservationResponse* reservation() { return &reservation_; }
 
  private:
+  // Populates the bi-directional hostport mapping for the Mini Llama based on
+  // the given llama_nodes and the unique_hosts_ of this schedule.
+  void CreateMiniLlamaMapping(const std::vector<std::string>& llama_nodes);
+
   // These references are valid for the lifetime of this query schedule because they
   // are all owned by the enclosing QueryExecState.
   const TUniqueId& query_id_;
   const TQueryExecRequest& request_;
   const TQueryOptions& query_options_;
+  bool is_mini_llama_;
 
-  // Hostname of this machine.
-  std::string local_hostname_;
+  // Impala mini clusters using the Mini Llama require translating the impalad hostports
+  // to Hadoop DN hostports registered with the Llama during resource requests
+  // (and then in reverse for translating granted resources to impalads).
+  // These maps form a bi-directional hostport mapping Hadoop DN <-> impalad.
+  boost::unordered_map<TNetworkAddress, TNetworkAddress> impalad_to_dn_;
+  boost::unordered_map<TNetworkAddress, TNetworkAddress> dn_to_impalad_;
 
   // Maps from plan node id to its fragment index. Filled in c'tor.
   std::vector<int32_t> plan_node_to_fragment_idx_;

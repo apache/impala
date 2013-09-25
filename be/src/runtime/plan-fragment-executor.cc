@@ -91,7 +91,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   has_thread_token_ = true;
 
   if (request.__isset.reserved_resource) {
-    VLOG_QUERY << request.reserved_resource;
+    VLOG_QUERY << "Executing fragment in reserved resource:\n"
+               << request.reserved_resource;
   }
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",

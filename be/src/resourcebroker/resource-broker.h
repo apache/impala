@@ -70,6 +70,7 @@ class ResourceBroker {
   void NMNotification(const llama::TLlamaNMNotificationRequest& request,
       llama::TLlamaNMNotificationResponse& response);
 
+  bool is_mini_llama() const { return is_mini_llama_; }
   const std::vector<std::string>& llama_nodes() { return llama_nodes_; }
 
   // Retrieves the nodes known to Llama and stores them in llama_nodes_.
@@ -139,6 +140,9 @@ class ResourceBroker {
 
   // Cache of Llama client connections.
   boost::scoped_ptr<ClientCache<llama::LlamaAMServiceClient> > llama_client_cache_;
+
+  // True if this resource broker is using a Mini LLama. Set in RefreshLlamaNodes().
+  bool is_mini_llama_;
 
   // List of nodes registered with Llama. Set in Init() after registering with Llama.
   // Mostly for debugging now.

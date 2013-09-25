@@ -248,7 +248,8 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   }
 
   schedule_.reset(
-      new QuerySchedule(query_id_, query_exec_request,  exec_request_.query_options));
+      new QuerySchedule(query_id_, query_exec_request,  exec_request_.query_options,
+          exec_env_->resource_broker()->is_mini_llama()));
   coord_.reset(new Coordinator(exec_env_));
   RETURN_IF_ERROR(exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get()));
   Status status = coord_->Exec(*schedule_,  &output_exprs_);

@@ -673,10 +673,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
         resource_broker_->Reserve(reservation_request, schedule->reservation()));
     LOG(INFO) << "IRB fullfilled reservation: "
               << schedule->reservation()->allocated_resources.size();
-    // TODO: Temporarily disabled because we force a single resource to be requested.
-    // The main reason is that the MiniLlama always formats the DFS, so it's difficult to
-    // have data to play with.
-    //RETURN_IF_ERROR(schedule.ValidateReservation());
+    RETURN_IF_ERROR(schedule->ValidateReservation());
     AddToActiveResourceMaps(*schedule->reservation(), coord);
   }
   return Status::OK;

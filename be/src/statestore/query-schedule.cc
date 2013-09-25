@@ -34,10 +34,12 @@ using namespace impala;
 namespace impala {
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,
-    const TQueryExecRequest& request, const TQueryOptions& query_options)
+    const TQueryExecRequest& request, const TQueryOptions& query_options,
+    bool is_mini_llama)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
+    is_mini_llama_(is_mini_llama),
     num_backends_(0),
     num_scan_ranges_(0) {
   fragment_exec_params_.resize(request.fragments.size());
@@ -51,7 +53,6 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
       plan_node_to_fragment_idx_[node.node_id] = i;
     }
   }
-  GetHostname(&local_hostname_);
 }
 
 void QuerySchedule::GetIpAddress(const TNetworkAddress& src, TNetworkAddress* dest) {
@@ -65,6 +66,22 @@ void QuerySchedule::GetIpAddress(const TNetworkAddress& src, TNetworkAddress* de
   }
   if (!FindFirstNonLocalhost(ips, &dest->hostname)) dest->hostname = "127.0.0.1";
   dest->port = src.port;
+}
+
+void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
+  DCHECK(is_mini_llama_);
+  DCHECK(!llama_nodes.empty());
+  int llama_node_ix = 0;
+  BOOST_FOREACH(const TNetworkAddress& host, unique_hosts_) {
+    TNetworkAddress impalad_hostport;
+    GetIpAddress(host, &impalad_hostport);
+    TNetworkAddress dn_hostport = MakeNetworkAddress(llama_nodes[llama_node_ix]);
+    impalad_to_dn_[impalad_hostport] = dn_hostport;
+    dn_to_impalad_[dn_hostport] = impalad_hostport;
+    // Round robin the registered Llama nodes.
+    ++llama_node_ix;
+    llama_node_ix = llama_node_ix % llama_nodes.size();
+  }
 }
 
 void QuerySchedule::CreateReservationRequest(const string& pool,
@@ -91,20 +108,20 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
   if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
     memory_mb = max(1L, query_options_.mem_limit / (1024 * 1024));
   } else if (request_.__isset.per_host_mem_req) {
-    memory_mb = request_.per_host_mem_req;
+    memory_mb = request_.per_host_mem_req / (1024 * 1024);
   }
-  int16_t v_vpu_cores = 2;
-  if (query_options_.__isset.v_cpu_cores) {
-    v_vpu_cores = query_options_.v_cpu_cores;
+  int16_t v_cpu_cores = 2;
+  if (query_options_.__isset.v_cpu_cores && query_options_.v_cpu_cores > 0) {
+    v_cpu_cores = query_options_.v_cpu_cores;
   } else if (request_.__isset.per_host_vcores) {
-    v_vpu_cores = request_.per_host_vcores;
+    v_cpu_cores = request_.per_host_vcores;
   }
 
-  // TODO: Temporary hack to always request at least one resource for testing/debugging.
-  if (unique_hosts_.empty()) {
-    TNetworkAddress dummy_dn_port = MakeNetworkAddress(llama_nodes[0]);
-    unique_hosts_.insert(dummy_dn_port);
-  }
+  // The memory_mb and v_cpu_cores estimates may legitimately be zero,
+  // e.g., for constant selects. Do not reserve any resources in those cases.
+  if (memory_mb == 0 && v_cpu_cores == 0) return;
+
+  if (is_mini_llama_) CreateMiniLlamaMapping(llama_nodes);
 
   random_generator uuid_generator;
   BOOST_FOREACH(const TNetworkAddress& host, unique_hosts_) {
@@ -118,10 +135,11 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
     stringstream ss;
     TNetworkAddress ip_host;
     GetIpAddress(host, &ip_host);
+    if (is_mini_llama_) ip_host = impalad_to_dn_[ip_host];
     ss << ip_host;
     resource.askedLocation = ss.str();
     resource.memory_mb = memory_mb;
-    resource.v_cpu_cores = v_vpu_cores;
+    resource.v_cpu_cores = v_cpu_cores;
   }
 }
 
@@ -132,6 +150,7 @@ Status QuerySchedule::ValidateReservation() {
     BOOST_FOREACH(const TNetworkAddress& host, params.hosts) {
       TNetworkAddress ip_host;
       GetIpAddress(host, &ip_host);
+      if (is_mini_llama_) ip_host = impalad_to_dn_[ip_host];
       if (reservation_.allocated_resources.find(ip_host) ==
           reservation_.allocated_resources.end()) {
         hosts_missing_resources.push_back(host);

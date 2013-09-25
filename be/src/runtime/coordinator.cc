@@ -1293,6 +1293,7 @@ void Coordinator::SetExecPlanFragmentParams(
     // The reservation has already have been validated at this point.
     TNetworkAddress ip_exec_host;
     schedule.GetIpAddress(exec_host, &ip_exec_host);
+    if (schedule.is_mini_llama()) ip_exec_host = schedule.impalad_to_dn(ip_exec_host);
     rpc_params->__set_reserved_resource(
         schedule.reservation()->allocated_resources[ip_exec_host]);
   }

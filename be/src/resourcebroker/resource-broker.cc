@@ -343,6 +343,17 @@ Status ResourceBroker::RefreshLlamaNodes() {
   llama_client->GetNodes(response, request);
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(response.status));
   llama_nodes_ = response.nodes;
+
+  // The Llama is a Mini Llama if all nodes know to it are on 127.0.0.1.
+  is_mini_llama_ = true;
+  for (int i = 0; i < llama_nodes_.size(); ++i) {
+    TNetworkAddress hostport = MakeNetworkAddress(llama_nodes_[i]);
+    if (hostport.hostname != "127.0.0.1") {
+      is_mini_llama_ = false;
+      break;
+    }
+  }
+  LOG(INFO) << "Resource broker is using Mini LLama: " << is_mini_llama_;
   return Status::OK;
 }
 
