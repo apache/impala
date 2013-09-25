@@ -261,6 +261,9 @@ public class HBaseTable extends Table {
         colsByName.put(col.getName(), col);
       }
 
+      // Set table stats.
+      numRows = getRowCount(msTbl.getParameters());
+
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
       numClusteringCols = 1;

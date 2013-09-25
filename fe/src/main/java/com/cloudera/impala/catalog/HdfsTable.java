@@ -41,7 +41,6 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.slf4j.Logger;
@@ -507,26 +506,6 @@ public class HdfsTable extends Table {
       }
     }
     return uniqueHostPorts.size();
-  }
-
-  /**
-   * Returns the value of the ROW_COUNT constant, or -1 if not found.
-   */
-  private static long getRowCount(Map<String, String> parameters) {
-    if (parameters == null) {
-      return -1;
-    }
-    for (Map.Entry<String, String> e: parameters.entrySet()) {
-      if (e.getKey().equals(StatsSetupConst.ROW_COUNT)) {
-        try {
-          long numRows = Long.valueOf(e.getValue());
-          return numRows;
-        } catch (NumberFormatException exc) {
-          // ignore
-        }
-      }
-    }
-    return -1;
   }
 
   /**

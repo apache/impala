@@ -220,7 +220,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 3 
   |  
   0:MERGE
@@ -242,7 +242,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 3 
   |  
   5:EXCHANGE
@@ -384,7 +384,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   0:MERGE
@@ -403,7 +403,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   4:EXCHANGE
@@ -468,12 +468,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 54> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 4 
   |  
   5:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -499,12 +499,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
-  |  order by: <slot 54> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 4 
   |  
   5:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   7:EXCHANGE
@@ -589,7 +589,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 54> ASC, <slot 55> ASC
+  |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 3
   |  tuple ids: 4 
   |  
@@ -605,7 +605,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   3:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -623,7 +623,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 54> ASC, <slot 55> ASC
+  |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 3
   |  tuple ids: 4 
   |  
@@ -669,7 +669,7 @@ PLAN FRAGMENT 3
   |  tuple ids: 4 
   |  
   3:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -726,7 +726,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 54> ASC, <slot 55> ASC
+  |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 4
   |  tuple ids: 4 
   |  
@@ -738,7 +738,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -760,7 +760,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 54> ASC, <slot 55> ASC
+  |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 4
   |  tuple ids: 4 
   |  
@@ -792,7 +792,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -1020,7 +1020,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -1042,7 +1042,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   5:EXCHANGE
@@ -1108,7 +1108,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -1130,7 +1130,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   5:EXCHANGE
@@ -1204,7 +1204,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   4:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   1:MERGE
@@ -1249,7 +1249,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   4:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   6:EXCHANGE
@@ -1305,7 +1305,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 4 
   |  
   |----5:AGGREGATE
-  |    |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |  tuple ids: 3 
   |    |  
   |    2:MERGE
@@ -1340,7 +1340,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 4 
   |  
   5:AGGREGATE
-  |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 3 
   |  
   6:EXCHANGE
@@ -1420,7 +1420,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 4 
   |    
   4:AGGREGATE
-  |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 3 
   |  
   1:MERGE
@@ -1479,7 +1479,7 @@ PLAN FRAGMENT 3
   |  tuple ids: 5 
   |  
   4:AGGREGATE
-  |  group by: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 3 
   |  
   8:EXCHANGE
@@ -1539,7 +1539,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 5 
   |  
   |----5:AGGREGATE
-  |    |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |  tuple ids: 4 
   |    |  
   |    2:MERGE
@@ -1592,7 +1592,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 5 
   |  
   5:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -1675,7 +1675,7 @@ PLAN FRAGMENT 0
   |    |       tuple ids: 3 
   |    |    
   |    5:AGGREGATE
-  |    |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |  tuple ids: 4 
   |    |  
   |    2:MERGE
@@ -1740,7 +1740,7 @@ PLAN FRAGMENT 3
   |  tuple ids: 4 
   |  
   5:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -1817,7 +1817,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   4:TOP-N
-  |  order by: <slot 28> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 2 
   |  
@@ -1863,7 +1863,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   4:TOP-N
-  |  order by: <slot 28> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 2 
   |  
@@ -1921,7 +1921,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 4 
   |  
   |----5:TOP-N
-  |    |  order by: <slot 41> ASC
+  |    |  order by: tinyint_col ASC
   |    |  limit: 3
   |    |  tuple ids: 3 
   |    |  
@@ -1957,7 +1957,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 4 
   |  
   5:TOP-N
-  |  order by: <slot 41> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 3 
   |  
@@ -2025,7 +2025,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -2047,7 +2047,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   5:EXCHANGE
@@ -2114,7 +2114,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -2136,7 +2136,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   5:EXCHANGE
@@ -2205,7 +2205,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   0:MERGE
@@ -2231,7 +2231,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   6:EXCHANGE
@@ -2316,7 +2316,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   0:MERGE
@@ -2342,7 +2342,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   6:EXCHANGE
@@ -2426,7 +2426,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -2437,7 +2437,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   4:TOP-N
-  |  order by: <slot 28> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 2 
   |  
@@ -2456,7 +2456,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   10:EXCHANGE
@@ -2487,7 +2487,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   4:TOP-N
-  |  order by: <slot 28> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 2 
   |  
@@ -2542,14 +2542,14 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   0:MERGE
   |  tuple ids: 4 
   |  
   |----5:TOP-N
-  |    |  order by: <slot 41> ASC
+  |    |  order by: tinyint_col ASC
   |    |  limit: 3
   |    |  tuple ids: 3 
   |    |  
@@ -2572,7 +2572,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 4 
   |  
   10:EXCHANGE
@@ -2589,7 +2589,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 4 
   |  
   5:TOP-N
-  |  order by: <slot 41> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 3 
   |  
@@ -2784,7 +2784,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 8 
   |  
   0:MERGE
@@ -2814,7 +2814,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE
-  |  group by: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 8 
   |  
   7:EXCHANGE
@@ -2920,7 +2920,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 8 
   |  
   |----10:AGGREGATE
-  |    |  group by: <slot 91>, <slot 92>, <slot 93>, <slot 94>, <slot 95>, <slot 96>, <slot 97>, <slot 98>, <slot 99>, <slot 100>, <slot 101>, <slot 102>, <slot 103>
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |  tuple ids: 7 
   |    |  
   |    2:MERGE
@@ -2931,12 +2931,12 @@ PLAN FRAGMENT 0
   |    |       tuple ids: 2 
   |    |    
   |    |----9:TOP-N
-  |    |    |  order by: <slot 67> ASC
+  |    |    |  order by: tinyint_col ASC
   |    |    |  limit: 3
   |    |    |  tuple ids: 5 
   |    |    |  
   |    |    8:AGGREGATE
-  |    |    |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |    |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |    |  tuple ids: 5 
   |    |    |  
   |    |    5:MERGE
@@ -2975,7 +2975,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 8 
   |  
   10:AGGREGATE
-  |  group by: <slot 91>, <slot 92>, <slot 93>, <slot 94>, <slot 95>, <slot 96>, <slot 97>, <slot 98>, <slot 99>, <slot 100>, <slot 101>, <slot 102>, <slot 103>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 7 
   |  
   14:EXCHANGE
@@ -2992,12 +2992,12 @@ PLAN FRAGMENT 2
   |  tuple ids: 7 
   |  
   9:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 5 
   |  
   8:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   11:EXCHANGE
@@ -3100,7 +3100,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:AGGREGATE
-  |  group by: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 8 
   |  
   0:MERGE
@@ -3115,12 +3115,12 @@ PLAN FRAGMENT 0
   |       tuple ids: 2 
   |    
   |----8:TOP-N
-  |    |  order by: <slot 67> ASC
+  |    |  order by: tinyint_col ASC
   |    |  limit: 3
   |    |  tuple ids: 5 
   |    |  
   |    7:AGGREGATE
-  |    |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |    |  tuple ids: 5 
   |    |  
   |    4:MERGE
@@ -3142,7 +3142,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:AGGREGATE
-  |  group by: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 8 
   |  
   13:EXCHANGE
@@ -3159,12 +3159,12 @@ PLAN FRAGMENT 1
   |  tuple ids: 8 
   |  
   8:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 5 
   |  
   7:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   10:EXCHANGE
@@ -3287,7 +3287,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 8 
   |    
   |----15:TOP-N
-  |    |  order by: <slot 158> ASC
+  |    |  order by: tinyint_col ASC
   |    |  limit: 3
   |    |  tuple ids: 12 
   |    |  
@@ -3303,7 +3303,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 10 
   |    
   8:AGGREGATE
-  |  group by: <slot 169>, <slot 170>, <slot 171>, <slot 172>, <slot 173>, <slot 174>, <slot 175>, <slot 176>, <slot 177>, <slot 178>, <slot 179>, <slot 180>, <slot 181>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 13 
   |  
   0:MERGE
@@ -3318,7 +3318,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 2 
   |    
   |----7:TOP-N
-  |    |  order by: <slot 80> ASC
+  |    |  order by: tinyint_col ASC
   |    |  limit: 3
   |    |  tuple ids: 6 
   |    |  
@@ -3354,7 +3354,7 @@ PLAN FRAGMENT 1
   |  tuple ids: 13 
   |  
   15:TOP-N
-  |  order by: <slot 158> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 12 
   |  
@@ -3428,7 +3428,7 @@ PLAN FRAGMENT 6
   |  tuple ids: 13 
   |  
   8:AGGREGATE
-  |  group by: <slot 169>, <slot 170>, <slot 171>, <slot 172>, <slot 173>, <slot 174>, <slot 175>, <slot 176>, <slot 177>, <slot 178>, <slot 179>, <slot 180>, <slot 181>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 13 
   |  
   19:EXCHANGE
@@ -3445,7 +3445,7 @@ PLAN FRAGMENT 7
   |  tuple ids: 13 
   |  
   7:TOP-N
-  |  order by: <slot 80> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 6 
   |  
@@ -3553,7 +3553,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 5
   |  tuple ids: 5 
   |  
@@ -3579,7 +3579,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 5
   |  tuple ids: 5 
   |  
@@ -3661,12 +3661,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 5 
   |  
   6:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   0:MERGE
@@ -3677,7 +3677,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 4 
   |    
   4:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   1:MERGE
@@ -3695,12 +3695,12 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
-  |  order by: <slot 67> ASC
+  |  order by: tinyint_col ASC
   |  limit: 3
   |  tuple ids: 5 
   |  
   6:AGGREGATE
-  |  group by: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 5 
   |  
   11:EXCHANGE
@@ -3731,7 +3731,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 5 
   |  
   4:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   8:EXCHANGE
@@ -3783,7 +3783,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   |----2:SCAN HDFS
@@ -3808,7 +3808,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   5:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   2:SCAN HDFS
@@ -3823,7 +3823,7 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   4:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   1:SCAN HDFS
@@ -3846,11 +3846,11 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   0:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   |----2:SCAN HDFS
@@ -3865,7 +3865,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE
-  |  group by: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
   |  tuple ids: 2 
   |  
   4:EXCHANGE
@@ -3879,7 +3879,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   6:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   2:SCAN HDFS
@@ -3894,7 +3894,7 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   5:MERGE
-  |  predicates: <slot 30> < 5, <slot 27> = FALSE
+  |  predicates: int_col < 5, bool_col = FALSE
   |  tuple ids: 2 
   |  
   1:SCAN HDFS
@@ -3938,7 +3938,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE
-  |  group by: <slot 0>, <slot 1>, <slot 2>, <slot 3>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 0 
   |  
   0:MERGE
@@ -3949,7 +3949,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE
-  |  group by: <slot 0>, <slot 1>, <slot 2>, <slot 3>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 0 
   |  
   0:MERGE
@@ -3976,7 +3976,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 1 
   |    
   2:AGGREGATE
-  |  group by: <slot 8>, <slot 9>, <slot 10>, <slot 11>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 2 
   |  
   0:MERGE
@@ -4018,7 +4018,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 2 
   |  
   2:AGGREGATE
-  |  group by: <slot 8>, <slot 9>, <slot 10>, <slot 11>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 2 
   |  
   5:EXCHANGE
@@ -4070,7 +4070,7 @@ PLAN FRAGMENT 0
   |  tuple ids: 4 
   |  
   4:AGGREGATE
-  |  group by: <slot 8>
+  |  group by: 500
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -4118,7 +4118,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   4:AGGREGATE
-  |  group by: <slot 8>
+  |  group by: 500
   |  tuple ids: 4 
   |  
   8:EXCHANGE
@@ -4215,7 +4215,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE
-  |  group by: <slot 12>, <slot 13>, <slot 14>, <slot 15>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 3 
   |  
   0:MERGE
@@ -4226,7 +4226,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE
-  |  group by: <slot 12>, <slot 13>, <slot 14>, <slot 15>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 3 
   |  
   0:MERGE
@@ -4253,7 +4253,7 @@ PLAN FRAGMENT 0
   |       tuple ids: 3 
   |    
   2:AGGREGATE
-  |  group by: <slot 16>, <slot 17>, <slot 18>, <slot 19>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 4 
   |  
   0:MERGE
@@ -4295,7 +4295,7 @@ PLAN FRAGMENT 2
   |  tuple ids: 4 
   |  
   2:AGGREGATE
-  |  group by: <slot 16>, <slot 17>, <slot 18>, <slot 19>
+  |  group by: 1, 'a', null, f
   |  tuple ids: 4 
   |  
   5:EXCHANGE

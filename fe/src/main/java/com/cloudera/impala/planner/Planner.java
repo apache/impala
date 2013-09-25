@@ -49,6 +49,7 @@ import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.ValuesStmt;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
@@ -214,6 +215,7 @@ public class Planner {
     return str.toString();
   }
 
+
   /**
    * Return plan fragment that produces result of 'root'; recursively creates
    * all input fragments to the returned fragment.
@@ -331,8 +333,8 @@ public class Planner {
       return inputFragment;
     }
 
-    PlanNode exchNode = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot(), false);
+    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    exchNode.addChild(inputFragment.getPlanRoot(), false);
     exchNode.computeStats(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition =
@@ -352,10 +354,8 @@ public class Planner {
   private PlanFragment createMergeFragment(
       PlanFragment inputFragment, Analyzer analyzer) {
     Preconditions.checkState(inputFragment.isPartitioned());
-
-    // exchange node clones the behavior of its input, aside from the conjuncts
-    PlanNode mergePlan = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot(), false);
+    ExchangeNode mergePlan = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    mergePlan.addChild(inputFragment.getPlanRoot(), false);
     mergePlan.computeStats(analyzer);
     Preconditions.checkState(mergePlan.hasValidStats());
     PlanNodeId exchId = mergePlan.getId();
@@ -481,12 +481,14 @@ public class Planner {
       DataPartition lhsJoinPartition =
           new DataPartition(TPartitionType.HASH_PARTITIONED,
                             Expr.cloneList(lhsJoinExprs, null));
-      PlanNode lhsExchange = new ExchangeNode(
-          new PlanNodeId(nodeIdGenerator), leftChildFragment.getPlanRoot(), false);
+      ExchangeNode lhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+      lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
+      lhsExchange.computeStats(null);
       DataPartition rhsJoinPartition =
           new DataPartition(TPartitionType.HASH_PARTITIONED, rhsJoinExprs);
-      PlanNode rhsExchange = new ExchangeNode(
-          new PlanNodeId(nodeIdGenerator), rightChildFragment.getPlanRoot(), false);
+      ExchangeNode rhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+      rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
+      rhsExchange.computeStats(null);
       node.setChild(0, lhsExchange);
       node.setChild(1, rhsExchange);
       PlanFragment joinFragment = new PlanFragment(node, lhsJoinPartition);
@@ -529,8 +531,7 @@ public class Planner {
 
     // create an ExchangeNode to perform the merge operation of mergeNode;
     // the ExchangeNode retains the generic PlanNode parameters of mergeNode
-    ExchangeNode exchNode =
-        new ExchangeNode(new PlanNodeId(nodeIdGenerator), mergeNode, true);
+    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
     PlanFragment parentFragment =
         new PlanFragment(exchNode, DataPartition.UNPARTITIONED);
 
@@ -548,6 +549,7 @@ public class Planner {
       childMergeNode.addChild(childFragment.getPlanRoot(), resultExprs);
       childFragment.setPlanRoot(childMergeNode);
       childFragment.setDestination(parentFragment, exchNode.getId());
+      exchNode.addChild(childMergeNode, true);
     }
 
     // Add an unpartitioned child fragment with a MergeNode for the constant exprs.
@@ -563,7 +565,10 @@ public class Planner {
       childFragment.setDestination(parentFragment, exchNode.getId());
       childFragments.add(childFragment);
       fragments.add(childFragment);
+      exchNode.addChild(childMergeNode, true);
     }
+    exchNode.computeStats(analyzer);
+
     return parentFragment;
   }
 
@@ -588,8 +593,9 @@ public class Planner {
    */
   private void connectChildFragment(PlanNode node, int childIdx,
       PlanFragment parentFragment, PlanFragment childFragment) {
-    PlanNode exchangeNode = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), childFragment.getPlanRoot(), false);
+    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.computeStats(null);
     node.setChild(childIdx, exchangeNode);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
   }
@@ -601,8 +607,9 @@ public class Planner {
    */
   private PlanFragment createParentAggFragment(
       PlanFragment childFragment, DataPartition parentPartition) {
-    PlanNode exchangeNode = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), childFragment.getPlanRoot(), false);
+    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.computeStats(null);
     PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
     childFragment.setOutputPartition(parentPartition);
@@ -674,11 +681,15 @@ public class Planner {
             new PlanNodeId(nodeIdGenerator), mergeFragment.getPlanRoot(),
             node.getAggInfo().getMergeAggInfo());
       mergeAggNode.setLimit(limit);
-      mergeAggNode.computeStats(analyzer);
-      mergeFragment.addPlanRoot(mergeAggNode);
 
       // HAVING predicates can only be evaluated after the merge agg step
       node.transferConjuncts(mergeAggNode);
+      // Recompute stats after transferring the conjuncts (order is important).
+      node.computeStats(analyzer);
+      mergeFragment.getPlanRoot().computeStats(analyzer);
+      mergeAggNode.computeStats(analyzer);
+      // Set new plan root after updating stats.
+      mergeFragment.addPlanRoot(mergeAggNode);
 
       return mergeFragment;
     }
@@ -917,6 +928,7 @@ public class Planner {
  private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer) {
    Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
+   ArrayList<String> colLabels = selectStmt.getColLabels();
    // Create tuple descriptor for materialized tuple.
    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
    tupleDesc.setIsMaterialized(true);
@@ -928,8 +940,10 @@ public class Planner {
    // Replace the select stmt's resultExprs with SlotRefs into tupleDesc.
    for (int i = 0; i < resultExprs.size(); ++i) {
      SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(tupleDesc);
-     slotDesc.setIsMaterialized(true);
+     slotDesc.setLabel(colLabels.get(i));
      slotDesc.setType(resultExprs.get(i).getType());
+     slotDesc.setStats(ColumnStats.fromExpr(resultExprs.get(i)));
+     slotDesc.setIsMaterialized(true);
      SlotRef slotRef = new SlotRef(slotDesc);
      resultExprs.set(i, slotRef);
    }

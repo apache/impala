@@ -660,7 +660,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: 'c' ASC
   |  limit: 1
   |  tuple ids: 4
   |
@@ -679,7 +679,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: 'c' ASC
   |  limit: 1
   |  tuple ids: 4
   |
@@ -724,7 +724,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: 'c' ASC
   |  limit: 1
   |  tuple ids: 4
   |
@@ -743,7 +743,7 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
-  |  order by: <slot 8> ASC
+  |  order by: 'c' ASC
   |  limit: 1
   |  tuple ids: 4
   |
@@ -827,7 +827,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypesinsert
     overwrite=false
-    partitions: <slot 63>,<slot 64>
+    partitions: year,month
 
   0:MERGE
   |  tuple ids: 4
@@ -845,7 +845,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypesinsert
     overwrite=false
-    partitions: <slot 63>,<slot 64>
+    partitions: year,month
 
   3:EXCHANGE
      tuple ids: 4

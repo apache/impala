@@ -22,6 +22,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -146,6 +147,21 @@ public abstract class Table {
       throw new TableLoadingException(
           "Failed to load metadata for table: " + tblName, e);
     }
+  }
+
+  /**
+   * Returns the value of the ROW_COUNT constant, or -1 if not found.
+   */
+  protected static long getRowCount(Map<String, String> parameters) {
+    if (parameters == null) return -1;
+    String numRowsStr = parameters.get(StatsSetupConst.ROW_COUNT);
+    if (numRowsStr == null) return -1;
+    try {
+      return Long.valueOf(numRowsStr);
+    } catch (NumberFormatException exc) {
+      // ignore
+    }
+    return -1;
   }
 
   /**

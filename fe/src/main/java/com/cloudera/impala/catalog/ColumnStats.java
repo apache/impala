@@ -25,6 +25,8 @@ import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SlotRef;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -63,6 +65,42 @@ public class ColumnStats {
       avgSerializedSize = colType.getSlotSize();
       maxSize = colType.getSlotSize();
     }
+  }
+
+  /**
+   * Creates ColumnStats from the given expr. Sets numDistinctValues and if the expr
+   * is a SlotRef also numNulls.
+   */
+  public static ColumnStats fromExpr(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkState(expr.getType().isValid());
+    ColumnStats stats = new ColumnStats(expr.getType());
+    stats.setNumDistinctValues(expr.getNumDistinctValues());
+    SlotRef slotRef = expr.unwrapSlotRef();
+    if (slotRef == null) return stats;
+    stats.numNulls = slotRef.getDesc().getStats().getNumNulls();
+    return stats;
+  }
+
+  /**
+   * Adds other's numDistinctValues and numNulls to this ColumnStats.
+   * If this or other's stats are invalid, sets the corresponding stat to invalid,
+   * Returns this with the updated stats.
+   * This method is used to aggregate stats for slots that originate from multiple
+   * source slots, e.g., those produced by union queries.
+   */
+  public ColumnStats add(ColumnStats other) {
+    if (numDistinctValues != -1 || other.numDistinctValues == -1) {
+      numDistinctValues = -1;
+    } else {
+      numDistinctValues += other.numDistinctValues;
+    }
+    if (numNulls != -1 || other.numNulls != -1) {
+      numNulls = -1;
+    } else {
+      numNulls += other.numNulls;
+    }
+    return this;
   }
 
   public void setAvgSerializedSize(float avgSize) { this.avgSerializedSize = avgSize; }

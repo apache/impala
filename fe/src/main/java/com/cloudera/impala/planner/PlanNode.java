@@ -281,7 +281,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   private void treeToThriftHelper(TPlan container) {
     TPlanNode msg = new TPlanNode();
     msg.node_id = id.asInt();
-    msg.num_children = children.size();
     msg.limit = limit;
     for (TupleId tid: rowTupleIds) {
       msg.addToRow_tuples(tid.asInt());
@@ -293,8 +292,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.compact_data = compactData;
     toThrift(msg);
     container.addToNodes(msg);
-    for (PlanNode child: children) {
-      child.treeToThriftHelper(container);
+    // For the purpose of the BE consider ExchangeNodes to have no children.
+    if (this instanceof ExchangeNode) {
+      msg.num_children = 0;
+      return;
+    } else {
+      msg.num_children = children.size();
+      for (PlanNode child: children) {
+        child.treeToThriftHelper(container);
+      }
     }
   }
 

@@ -20,7 +20,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.DataPartition;
@@ -530,8 +530,9 @@ public class AggregateInfo {
       Expr expr = exprs.get(i);
       SlotDescriptor slotD = descTbl.addSlotDescriptor(result);
       slotD.setLabel(expr.toSql());
-      Preconditions.checkArgument(expr.getType() != PrimitiveType.INVALID_TYPE);
+      Preconditions.checkState(expr.getType().isValid());
       slotD.setType(expr.getType());
+      slotD.setStats(ColumnStats.fromExpr(expr));
       // count(*) is non-nullable.
       if (i >= aggregateExprStartIndex) {
         Preconditions.checkArgument(expr instanceof AggregateExpr);

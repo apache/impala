@@ -57,10 +57,11 @@ public class SlotRef extends Expr {
     super();
     this.tblName = null;
     this.col = null;
+    this.isAnalyzed = true;
     this.desc = desc;
     this.type = desc.getType();
-    this.isAnalyzed = true;
     this.label = desc.getLabel();
+    this.numDistinctValues = desc.getStats().getNumDistinctValues();
   }
 
   @Override

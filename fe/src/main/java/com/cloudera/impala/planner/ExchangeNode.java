@@ -17,65 +17,97 @@ package com.cloudera.impala.planner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
- * Receiver side of a 1:n data stream.
+ * Receiver side of a 1:n data stream. Logically, an ExchangeNode consumes the data
+ * produced by its children. For each of the sending child nodes the actual data
+ * transmission is performed by the DataStreamSink of the PlanFragment housing
+ * that child node. Typically, an ExchangeNode only has a single sender child but,
+ * e.g., for distributed union queries an ExchangeNode may have one sender child per
+ * union operand.
  *
  * TODO: merging of sorted inputs.
  */
 public class ExchangeNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(ExchangeNode.class);
 
-  // TODO: remove after transitioning to new planner
-  private int numSenders;
-
-  public void setNumSenders(int numSenders) {
-    this.numSenders = numSenders;
+  public ExchangeNode(PlanNodeId id) {
+    super(id, "EXCHANGE");
   }
 
-  /**
-   * Create ExchangeNode that consumes output of inputNode.
-   * An ExchangeNode doesn't have an input node as a child, which is why we
-   * need to compute the cardinality here.
-   *
-   * TODO: The cardinality estimation is not correct for ExchangeNodes being fed by
-   * multiple PlanNodes/Fragments, e.g., for distributed union queries. This means
-   * that ExchangeNodes can have multiple 'child' PlanNodes.
-   */
-  public ExchangeNode(PlanNodeId id, PlanNode inputNode, boolean copyConjuncts) {
-    super(id, inputNode, "EXCHANGE");
-    if (!copyConjuncts) {
-      this.conjuncts = Lists.newArrayList();
-    }
-    if (hasLimit()) {
-      cardinality = Math.min(limit, inputNode.cardinality);
+  public void addChild(PlanNode node, boolean copyConjuncts) {
+    // This ExchangeNode 'inherits' several parameters from its children.
+    // Ensure that all children agree on them.
+    if (!children.isEmpty()) {
+      Preconditions.checkState(limit == node.limit);
+      Preconditions.checkState(tupleIds.equals(node.tupleIds));
+      Preconditions.checkState(rowTupleIds.equals(node.rowTupleIds));
+      Preconditions.checkState(nullableTupleIds.equals(node.nullableTupleIds));
+      Preconditions.checkState(compactData == node.compactData);
     } else {
-      cardinality = inputNode.cardinality;
+      limit = node.limit;
+      tupleIds = Lists.newArrayList(node.tupleIds);
+      rowTupleIds = Lists.newArrayList(node.rowTupleIds);
+      nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
+      compactData = node.compactData;
     }
-    numNodes = inputNode.numNodes;
-    avgRowSize = inputNode.avgRowSize;
+    if (copyConjuncts) conjuncts.addAll(Expr.cloneList(node.conjuncts, null));
+    children.add(node);
+  }
+
+  @Override
+  public void addChild(PlanNode node) { addChild(node, false); }
+
+  @Override
+  public void setCompactData(boolean on) { this.compactData = on; }
+
+  @Override
+  public void computeStats(Analyzer analyzer) {
+    Preconditions.checkState(!children.isEmpty(),
+        "ExchangeNode must have at least one child");
+    cardinality = 0;
+    for (PlanNode child: children) {
+      if (child.getCardinality() == -1) {
+        cardinality = -1;
+        break;
+      }
+      cardinality += child.getCardinality();
+    }
+
+    if (hasLimit()) {
+      if (cardinality == -1) {
+        cardinality = limit;
+      } else {
+        cardinality = Math.min(limit, cardinality);
+      }
+    }
+
+    // Pick the max numNodes and avgRowSize of all children.
+    numNodes = Integer.MIN_VALUE;
+    avgRowSize = Integer.MIN_VALUE;
+    for (PlanNode child: children) {
+      numNodes = Math.max(child.numNodes, numNodes);
+      avgRowSize =  Math.max(child.numNodes, numNodes);
+    }
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(!children.isEmpty(),
+        "ExchangeNode must have at least one child");
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();
     for (TupleId tid: tupleIds) {
       msg.exchange_node.addToInput_row_tuples(tid.asInt());
     }
-  }
-
-  @Override
-  protected String debugString() {
-    return Objects.toStringHelper(this)
-        .add("numSenders", numSenders)
-        .addValue(super.debugString())
-        .toString();
   }
 }

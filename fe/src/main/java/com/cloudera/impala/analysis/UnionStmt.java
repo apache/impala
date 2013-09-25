@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.ListIterator;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -188,20 +189,37 @@ public class UnionStmt extends QueryStmt {
    * Set resultExprs to be slot refs into that tuple.
    * Also fills the substitution map, such that "order by" can properly resolve
    * column references from the result of the union.
-   *
-   * @param analyzer
-   * @throws AnalysisException
    */
   private void createTupleAndResultExprs(Analyzer analyzer) throws AnalysisException {
     // Create tuple descriptor for materialized tuple created by the union.
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
     tupleDesc.setIsMaterialized(true);
     tupleId = tupleDesc.getId();
+
     // One slot per expr in the select blocks. Use first select block as representative.
     List<Expr> firstSelectExprs = operands.get(0).getQueryStmt().getResultExprs();
+
+    // Compute column stats for the materialized slots from the source exprs.
+    List<ColumnStats> columnStats = Lists.newArrayList();
+    for (int i = 0; i < operands.size(); ++i) {
+      List<Expr> selectExprs = operands.get(i).getQueryStmt().getResultExprs();
+      for (int j = 0; j < selectExprs.size(); ++j) {
+        ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
+        if (i == 0) {
+          columnStats.add(statsToAdd);
+        } else {
+          columnStats.get(j).add(statsToAdd);
+        }
+      }
+    }
+
+    // Create tuple descriptor and slots.
     for (int i = 0; i < firstSelectExprs.size(); ++i) {
+      Expr expr = firstSelectExprs.get(i);
       SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(tupleDesc);
-      slotDesc.setType(firstSelectExprs.get(i).getType());
+      slotDesc.setLabel(getColLabels().get(i));
+      slotDesc.setType(expr.getType());
+      slotDesc.setStats(columnStats.get(i));
       SlotRef slotRef = new SlotRef(slotDesc);
       resultExprs.add(slotRef);
       // Add to the substitution map so that column refs in "order by" can be resolved.

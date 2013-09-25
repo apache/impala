@@ -517,7 +517,7 @@ PLAN FRAGMENT 0
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    a.int_col = <slot 0>
+  |    a.int_col = int_col
   |  tuple ids: 0 1
   |
   |----1:MERGE
@@ -544,7 +544,7 @@ PLAN FRAGMENT 1
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    a.int_col = <slot 0>
+  |    a.int_col = int_col
   |  tuple ids: 0 1
   |
   |----3:EXCHANGE

@@ -520,7 +520,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: <slot 11>,<slot 12>
+    partitions: 2010,4
 
   0:MERGE
      merging 3 SELECT CONSTANT
@@ -531,7 +531,7 @@ PLAN FRAGMENT 0
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: <slot 11>,<slot 12>
+    partitions: 2010,4
 
   0:MERGE
      merging 3 SELECT CONSTANT

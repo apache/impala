@@ -355,6 +355,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     Expr result = (Expr) this.clone();
     result.children = Lists.newArrayList();
+    result.selectivity = selectivity;
+    result.isAnalyzed = isAnalyzed;
+    result.numDistinctValues = numDistinctValues;
     for (Expr child: children) {
       result.children.add(((Expr) child).clone(sMap));
     }

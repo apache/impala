@@ -79,6 +79,7 @@ public class SlotDescriptor {
   public void setSlotIdx(int slotIdx) { this.slotIdx = slotIdx; }
   public String getLabel() { return label; }
   public void setLabel(String label) { this.label = label; }
+  public void setStats(ColumnStats stats) { this.stats = stats; }
 
   public ColumnStats getStats() {
     if (stats == null) {

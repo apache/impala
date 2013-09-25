@@ -934,7 +934,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "2009, 10)",
         "Target table 'functional.alltypes' is incompatible with SELECT / PARTITION " +
         "expressions.\n" +
-        "Expression '<slot 2>' (type: STRING) is not compatible with column " +
+        "Expression ''a'' (type: STRING) is not compatible with column " +
         "'tinyint_col' (type: TINYINT)");
   }
 
