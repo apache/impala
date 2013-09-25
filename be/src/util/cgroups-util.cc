@@ -23,6 +23,10 @@ using namespace std;
 using namespace boost::filesystem;
 using namespace boost;
 
+DEFINE_string(cgroup_hierarchy_path, "", "If Resource Management is enabled, this must "
+    "be set to the Impala-writeable root of the cgroups hierarchy into which execution "
+    "threads are assigned.");
+
 Status impala::AssignThreadToCgroup(const Thread& thread, const string& prefix,
     const string& cgroup) {
   stringstream cgroup_path_ss;

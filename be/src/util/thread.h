@@ -152,11 +152,18 @@ class Thread {
 // boost::thread_group.
 class ThreadGroup {
  public:
+  ThreadGroup() {}
+
+  ThreadGroup(const std::string& prefix, const std::string& cgroup)
+      : cgroup_prefix_(prefix), cgroup_path_(cgroup) { }
+
   // Adds a new Thread to this group. The ThreadGroup takes ownership of the Thread, and
   // will destroy it when the ThreadGroup is destroyed.  Threads will linger until that
   // point (even if terminated), however, so callers should be mindful of the cost of
   // placing very many threads in this set.
-  void AddThread(Thread* thread);
+  // If cgroup_path_ / cgroup_prefix_ are set, the thread will be added to the specified
+  // cgroup and an error will be returned if that operation fails.
+  Status AddThread(Thread* thread);
 
   // Waits for all threads to finish. DO NOT call this from a thread inside this set;
   // deadlock will predictably ensue.
@@ -164,11 +171,17 @@ class ThreadGroup {
 
   // Assigns all threads to the cgroup at <prefix>/<path>. Returns an error if any
   // assignment was not possible, but does not undo previously succesful assignments.
-  Status AssignToCgroup(const std::string& prefix, const std::string& cgroup) const;
+  // All future threads added to this group will be assigned to the same cgroup.
+  Status SetCgroup(const std::string& prefix, const std::string& cgroup);
 
  private:
   // All the threads grouped by this set.
   boost::ptr_vector<Thread> threads_;
+
+  // If not empty, every thread added to this group will also be placed in the cgroup
+  // located at cgroup_prefix_/cgroup_path_.
+  std::string cgroup_prefix_;
+  std::string cgroup_path_;
 };
 
 // Initialises the threading subsystem. Must be called before a Thread is created.

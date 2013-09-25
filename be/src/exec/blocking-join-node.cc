@@ -107,6 +107,10 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");
     Thread build_thread(node_name_, "build thread",
         bind(&BlockingJoinNode::BuildSideThread, this, state, &build_side_status));
+    if (!state->rm_resource_id().empty()) {
+      RETURN_IF_ERROR(AssignThreadToCgroup(build_thread,
+          FLAGS_cgroup_hierarchy_path, state->rm_resource_id()));
+    }
   } else {
     build_side_status.Set(ConstructBuildSide(state));
   }

@@ -51,6 +51,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
+DECLARE_string(cgroup_hierarchy_path);
 
 using namespace boost;
 using namespace impala;
@@ -309,6 +310,10 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
+
+  if (!state->rm_resource_id().empty()) {
+    scanner_threads_.SetCgroup(FLAGS_cgroup_hierarchy_path, state->rm_resource_id());
+  }
 
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);

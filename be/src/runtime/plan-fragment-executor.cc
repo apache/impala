@@ -82,8 +82,11 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
              << " instance_id=" << PrintId(params.fragment_instance_id);
   VLOG(2) << "params:\n" << ThriftDebugString(params);
 
+  const string& resource_id =
+      request.__isset.reserved_resource ? request.reserved_resource.rm_resource_id : "";
+
   runtime_state_.reset(new RuntimeState(query_id_, params.fragment_instance_id,
-      request.query_ctxt, exec_env_));
+      request.query_ctxt, resource_id, exec_env_));
   RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_));
 
   // Reserve one main thread from the pool

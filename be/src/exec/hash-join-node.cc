@@ -21,10 +21,13 @@
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/cgroups-util.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
+
+DECLARE_string(cgroup_hierarchy_path);
 
 using namespace boost;
 using namespace impala;

@@ -47,7 +47,7 @@ namespace impala {
 
 RuntimeState::RuntimeState(const TUniqueId& query_id,
     const TUniqueId& fragment_instance_id, const TQueryContext& query_ctxt,
-    ExecEnv* exec_env)
+    const string& rm_resource_id, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
@@ -55,6 +55,7 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
     now_(new TimestampValue(query_ctxt.now_string.c_str(),
         query_ctxt.now_string.size())),
     query_id_(query_id),
+    rm_resource_id_(rm_resource_id),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     is_cancelled_(false) {
   Status status = Init(fragment_instance_id, exec_env);

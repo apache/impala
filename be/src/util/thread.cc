@@ -264,8 +264,14 @@ void Thread::SuperviseThread(const string& name, const string& category,
   thread_mgr_ref->RemoveThread(this_thread::get_id(), category_copy);
 }
 
-void ThreadGroup::AddThread(Thread* thread) {
+Status ThreadGroup::AddThread(Thread* thread) {
   threads_.push_back(thread);
+  if (!cgroup_path_.empty()) {
+    RETURN_IF_ERROR(
+        AssignThreadToCgroup(*thread, cgroup_prefix_, cgroup_path_));
+  }
+
+  return Status::OK;
 }
 
 void ThreadGroup::JoinAll() {
@@ -274,7 +280,9 @@ void ThreadGroup::JoinAll() {
   }
 }
 
-Status ThreadGroup::AssignToCgroup(const string& prefix, const string& cgroup) const {
+Status ThreadGroup::SetCgroup(const string& prefix, const string& cgroup) {
+  cgroup_prefix_ = prefix;
+  cgroup_path_ = cgroup;
   // BOOST_FOREACH + ptr_vector + const are not compatible
   for (ptr_vector<Thread>::const_iterator it = threads_.begin();
        it != threads_.end(); ++it) {

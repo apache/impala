@@ -112,7 +112,7 @@ class ThreadPool {
   }
 
   Status AssignToCgroup(const std::string& prefix, const std::string& cgroup) const {
-    return threads_.AssignToCgroup(prefix, cgroup);
+    return threads_.SetCgroup(prefix, cgroup);
   }
 
  private:
