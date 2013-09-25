@@ -347,20 +347,20 @@ class ImpalaShell(cmd.Cmd):
 
   def do_connect(self, args):
     """Connect to an Impalad instance:
-    Usage: connect <hostname:port>
+    Usage: connect, defaults to the fqdn of the localhost and port 21000
+           connect <hostname:port>
            connect <hostname>, defaults to port 21000
 
     """
+    # Assume the user wants to connect to the local impalad if no connection string is
+    # specified. Conneting to a kerberized impalad requires an fqdn as the host name.
+    if not args: args = socket.getfqdn()
     tokens = args.split(" ")
-    if len(tokens) != 1:
-      print ("CONNECT takes exactly one argument: <hostname:port> or"
-             " <hostname> of the impalad to connect to")
-      return False
-
     # validate the connection string.
     host_port = [val for val in tokens[0].split(':') if val.strip()]
-    if (':' in tokens[0] and len(host_port) != 2) or (not host_port):
-      print "Connect string must be of form <hostname:port> or <hostname>"
+    if (':' in tokens[0] and len(host_port) != 2):
+      print_to_stderr("Connection string must either be empty, or of the form "
+                      "<hostname[:port]>")
       return False
     elif len(host_port) == 1:
       host_port.append(21000)
@@ -411,7 +411,7 @@ class ImpalaShell(cmd.Cmd):
         self.transport.close()
         raise
     except Exception, e:
-      print_to_stderr("Error connecting: %s, %s" % (type(e),e))
+      print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
       # If a connection to another impalad failed while already connected
       # reset the prompt to disconnected.
       self.prompt = self.DISCONNECTED_PROMPT
