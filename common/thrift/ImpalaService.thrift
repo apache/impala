@@ -114,6 +114,9 @@ enum TImpalaQueryOptions {
 
   // Target file size for inserts into parquet tables. 0 uses the default.
   PARQUET_FILE_SIZE,
+
+  // Level of detail for explain output (NORMAL, VERBOSE).
+  EXPLAIN_LEVEL
 }
 
 // The summary of an insert.

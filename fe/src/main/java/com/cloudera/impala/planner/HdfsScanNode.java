@@ -27,6 +27,8 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.PrintUtils;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileSplit;
@@ -214,9 +216,12 @@ public class HdfsScanNode extends ScanNode {
   @Override
   protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "table=" + desc.getTable().getFullName());
-    output.append(" #partitions=" + partitions.size());
-    output.append(" size=" + printBytes(totalBytes));
+    HdfsTable table = (HdfsTable) desc.getTable();
+    output.append(prefix + "table=" + table.getFullName());
+    // Exclude the dummy default partition from the total partition count.
+    output.append(String.format(" #partitions=%s/%s", partitions.size(),
+        table.getPartitions().size() - 1));
+    output.append(" size=" + PrintUtils.printBytes(totalBytes));
     if (compactData) {
       output.append(" compact\n");
     } else {
@@ -225,35 +230,10 @@ public class HdfsScanNode extends ScanNode {
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
+    // Add table and column stats.
+    output.append(getStatsExplainString(prefix, detailLevel));
+    output.append("\n");
     return output.toString();
-  }
-
-  /**
-   * Return the number in TB, GB, MB, KB with 2 decimal points. For example 5000 will be
-   * returned as 4.88KB.
-   * @param num
-   * @return
-   */
-  static private String printBytes(long value) {
-    long kb = 1024;
-    long mb = kb * 1024;
-    long gb = mb * 1024;
-    long tb = gb * 1024;
-
-    double result = value;
-    if (value > tb) {
-      return String.format("%.2f", result / tb) + "TB";
-    }
-    if (value > gb) {
-      return String.format("%.2f", result / gb) + "GB";
-    }
-    if (value > mb) {
-      return String.format("%.2f", result / mb) + "MB";
-    }
-    if (value > kb) {
-      return String.format("%.2f", result / kb) + "KB";
-    }
-    return value + "B";
   }
 
   /**
@@ -273,7 +253,7 @@ public class HdfsScanNode extends ScanNode {
     // to return an estimate.
     // TODO: The calculation below is a worst-case estimate that is temporarily
     // acceptable for testing resource management with hard memory limit enforcement.
-    long numCores = Runtime.getRuntime().availableProcessors();
+    long numCores = RuntimeEnv.INSTANCE.getNumCores();
     // Impala starts up 3 scan ranges per core each using a default of 5 * 8MB buffers.
     perHostMemCost = numCores * 3L * 5L * 8L * 1024L * 1024L;
   }

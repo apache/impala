@@ -1,88 +1,124 @@
----- QUERY
 values(1+1, 2, 5.0, 'a')
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 1
+     per-host memory: unavailable
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 1
+     per-host memory: unavailable
+     tuple ids: 0
 ====
----- QUERY
 values(1+1, 2, 5.0, 'a') order by 1 limit 10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: 1 + 1 ASC
   |  limit: 10
-  |  tuple ids: 0 
-  |  
+  |  cardinality: 1
+  |  per-host memory: unavailable
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 1
+     per-host memory: unavailable
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: 1 + 1 ASC
   |  limit: 10
-  |  tuple ids: 0 
-  |  
+  |  cardinality: 1
+  |  per-host memory: unavailable
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 1
+     per-host memory: unavailable
+     tuple ids: 0
 ====
----- QUERY
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c'))
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 3
+     per-host memory: unavailable
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 3
+     per-host memory: unavailable
+     tuple ids: 0
 ====
----- QUERY
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 limit 10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: 1 + 1 ASC
   |  limit: 10
-  |  tuple ids: 0 
-  |  
+  |  cardinality: 3
+  |  per-host memory: unavailable
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 3
+     per-host memory: unavailable
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: 1 + 1 ASC
   |  limit: 10
-  |  tuple ids: 0 
-  |  
+  |  cardinality: 3
+  |  per-host memory: unavailable
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     cardinality: 3
+     per-host memory: unavailable
+     tuple ids: 0
 ====

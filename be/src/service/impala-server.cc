@@ -1352,6 +1352,17 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::PARQUET_FILE_SIZE:
         query_options->__set_parquet_file_size(atoi(value.c_str()));
         break;
+      case TImpalaQueryOptions::EXPLAIN_LEVEL:
+        if (iequals(value, "verbose") || iequals(value, "1")) {
+          query_options->__set_explain_level(TExplainLevel::VERBOSE);
+        } else if (iequals(value, "normal") || iequals(value, "0")) {
+          query_options->__set_explain_level(TExplainLevel::NORMAL);
+        } else {
+          stringstream ss;
+          ss << "Invalid explain level: " << value;
+          return Status(ss.str());
+        }
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1600,6 +1611,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::PARQUET_FILE_SIZE:
         val << query_option.parquet_file_size;
+        break;
+      case TImpalaQueryOptions::EXPLAIN_LEVEL:
+        val << query_option.explain_level;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

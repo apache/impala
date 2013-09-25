@@ -20,6 +20,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -56,6 +57,8 @@ public class HdfsTableSink extends TableSink {
     HdfsFileFormat format = table.getMajorityFormat();
     PlanNode inputNode = fragment.getPlanRoot();
     int numNodes = fragment.getNumNodes();
+    // Compute the per-host number of partitions, taking the number of nodes
+    // and the data partition of the fragment executing this sink into account.
     long numPartitions = fragment.getNumDistinctValues(partitionKeyExprs);
     if (numPartitions == -1) numPartitions = DEFAULT_NUM_PARTITIONS;
     long perPartitionMemReq = getPerPartitionMemReq(format);
@@ -99,13 +102,26 @@ public class HdfsTableSink extends TableSink {
         + "\n");
     output.append(prefix + "  overwrite=" + (overwrite ? "true" : "false") + "\n");
     if (!partitionKeyExprs.isEmpty()) {
-      output.append(prefix + "  partitions: ");
+      output.append(prefix + "  partition keys: ");
       for (Expr expr : partitionKeyExprs) {
         output.append(expr.toSql() + ",");
       }
     }
     output.deleteCharAt(output.length() - 1);
+
+    // Report the total number of partitions, independent of the number of nodes
+    // and the data partition of the fragment executing this sink.
+    long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs);
+    if (totalNumPartitions == -1) {
+      output.append("  #partitions: unavailable");
+    } else {
+      output.append("  #partitions: " + totalNumPartitions);
+    }
+
     output.append("\n");
+    if (explainLevel == TExplainLevel.VERBOSE) {
+      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost) + "\n");
+    }
     return output.toString();
   }
 

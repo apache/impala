@@ -53,6 +53,7 @@ import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -199,10 +200,17 @@ public class Planner {
 
   /**
    * Return combined explain string for all plan fragments.
+   * Includes the estimated resource requirements from the request if set.
    */
-  public String getExplainString(
-      ArrayList<PlanFragment> fragments, TExplainLevel explainLevel) {
+  public String getExplainString(ArrayList<PlanFragment> fragments,
+      TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
+    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()) {
+      str.append(
+          String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n\n",
+          PrintUtils.printBytes(request.getPer_host_mem_req()),
+          request.per_host_vcores));
+    }
     for (int i = 0; i < fragments.size(); ++i) {
       PlanFragment fragment = fragments.get(i);
       if (i > 0) {
@@ -532,6 +540,7 @@ public class Planner {
     // create an ExchangeNode to perform the merge operation of mergeNode;
     // the ExchangeNode retains the generic PlanNode parameters of mergeNode
     ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    exchNode.addChild(mergeNode, true);
     PlanFragment parentFragment =
         new PlanFragment(exchNode, DataPartition.UNPARTITIONED);
 
@@ -611,6 +620,7 @@ public class Planner {
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.computeStats(null);
     PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
+    exchangeNode.addChild(childFragment.getPlanRoot(), false);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
     childFragment.setOutputPartition(parentPartition);
     return parentFragment;

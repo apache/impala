@@ -83,28 +83,17 @@ public class AggregationNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
-    cardinality = 1;
+    // This is prone to overflow, because we keep multiplying cardinalities,
+    // even if the grouping exprs are functionally dependent (example:
+    // group by the primary key of a table plus a number of other columns from that
+    // same table)
+    // TODO: try to recognize functional dependencies
+    // TODO: as a shortcut, instead of recognizing functional dependencies,
+    // limit the contribution of a single table to the number of rows
+    // of that table (so that when we're grouping by the primary key col plus
+    // some others, the estimate doesn't overshoot dramatically)
     // cardinality: product of # of distinct values produced by grouping exprs
-    for (Expr groupingExpr: groupingExprs) {
-      long numDistinct = groupingExpr.getNumDistinctValues();
-      LOG.debug("grouping expr: " + groupingExpr.toSql() + " #distinct="
-          + Long.toString(numDistinct));
-      if (numDistinct == -1) {
-        cardinality = -1;
-        break;
-      }
-      // This is prone to overflow, because we keep multiplying cardinalities,
-      // even if the grouping exprs are functionally dependent (example:
-      // group by the primary key of a table plus a number of other columns from that
-      // same table)
-      // TODO: try to recognize functional dependencies
-      // TODO: as a shortcut, instead of recognizing functional dependencies,
-      // limit the contribution of a single table to the number of rows
-      // of that table (so that when we're grouping by the primary key col plus
-      // some others, the estimate doesn't overshoot dramatically)
-      cardinality *= numDistinct;
-    }
+    cardinality = Expr.getNumDistinctValues(aggInfo.getGroupingExprs());
     // take HAVING predicate into account
     LOG.debug("Agg: cardinality=" + Long.toString(cardinality));
     if (cardinality > 0) {

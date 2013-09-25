@@ -1,17 +1,27 @@
 # Basic test with a view.
 select int_col, string_col from functional.alltypes_view
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -22,50 +32,76 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # Basic test with a complex view.
 select * from functional.complex_view
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
+  |  cardinality: 0
+  |  per-host memory: unavailable
   |  tuple ids: 2
   |
   3:AGGREGATE (finalize)
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1
+  |  cardinality: 0
+  |  per-host memory: unavailable
   |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    a.id = b.id
+  |  cardinality: 1333
+  |  per-host memory: unavailable
   |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
+  |       table stats: 8 rows total
+  |       column stats: all
+  |       cardinality: 8
+  |       per-host memory: unavailable
   |       tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10 size=743.67KB
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
      predicates: a.bigint_col < 50
+     table stats: 10000 rows total
+     column stats: all
+     cardinality: 1000
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
+  |  cardinality: 0
+  |  per-host memory: unavailable
   |  tuple ids: 2
   |
   8:EXCHANGE
+     cardinality: 0
+     per-host memory: unavailable
      tuple ids: 2
 
 PLAN FRAGMENT 1
@@ -78,15 +114,21 @@ PLAN FRAGMENT 1
   4:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
+  |  cardinality: 0
+  |  per-host memory: 0B
   |  tuple ids: 2
   |
   7:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.bigint_col))
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1
+  |  cardinality: 0
+  |  per-host memory: 10.00MB
   |  tuple ids: 2
   |
   6:EXCHANGE
+     cardinality: 4
+     per-host memory: 0B
      tuple ids: 2
 
 PLAN FRAGMENT 2
@@ -99,20 +141,30 @@ PLAN FRAGMENT 2
   3:AGGREGATE
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
+  |  cardinality: 2
+  |  per-host memory: 10.00MB
   |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    a.id = b.id
+  |  cardinality: 1333
+  |  per-host memory: 27B
   |  tuple ids: 0 1
   |
   |----5:EXCHANGE
+  |       cardinality: 8
+  |       per-host memory: 0B
   |       tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10 size=743.67KB
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
      predicates: a.bigint_col < 50
+     table stats: 10000 rows total
+     column stats: all
+     cardinality: 1000
+     per-host memory: 960.00MB
      tuple ids: 0
 
 PLAN FRAGMENT 3
@@ -123,23 +175,37 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B
+     table=functional.alltypestiny #partitions=4/4 size=460B
+     table stats: 8 rows total
+     column stats: all
+     cardinality: 8
+     per-host memory: 960.00MB
      tuple ids: 1
 ====
 # Basic test with a view on a view
 select int_col, string_col from functional.view_view
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -150,32 +216,52 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # view used in a union.
 select * from functional.alltypes_view union all
 select * from functional.alltypes_view where id < 10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
+  |  cardinality: 8030
+  |  per-host memory: unavailable
   |  tuple ids: 4
   |
   |----2:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB
   |       predicates: functional.alltypes.id < 10
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 730
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=1.88GB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:EXCHANGE
+     cardinality: unavailable
+     per-host memory: unavailable
      tuple ids: 4
 
 PLAN FRAGMENT 1
@@ -186,11 +272,17 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   5:MERGE
+  |  cardinality: unavailable
+  |  per-host memory: 0B
   |  tuple ids: 4
   |
   2:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
      predicates: functional.alltypes.id < 10
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 730
+     per-host memory: 960.00MB
      tuple ids: 2
 
 PLAN FRAGMENT 2
@@ -201,28 +293,44 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   4:MERGE
+  |  cardinality: unavailable
+  |  per-host memory: 0B
   |  tuple ids: 4
   |
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # view used in an inline view.
 select * from (select * from functional.alltypes_view) t
 where t.id < 10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
      predicates: functional.alltypes.id < 10
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 730
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
+     cardinality: 730
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -233,14 +341,20 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
      predicates: functional.alltypes.id < 10
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 730
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # Multiple views used in a join.
 select * from functional.alltypes_view t1, functional.alltypes_view_sub t2,
 functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -248,52 +362,82 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    int_col = COUNT(a.bigint_col)
+  |  cardinality: 0
+  |  per-host memory: unavailable
   |  tuple ids: 0 2 7
   |
   |----7:TOP-N
   |    |  order by: b.string_col ASC
   |    |  limit: 100
+  |    |  cardinality: 0
+  |    |  per-host memory: unavailable
   |    |  tuple ids: 7
   |    |
   |    6:AGGREGATE (finalize)
   |    |  output: COUNT(a.bigint_col)
   |    |  group by: b.string_col
   |    |  having: COUNT(a.bigint_col) > 1
+  |    |  cardinality: 0
+  |    |  per-host memory: unavailable
   |    |  tuple ids: 7
   |    |
   |    5:HASH JOIN
   |    |  join op: INNER JOIN
   |    |  hash predicates:
   |    |    a.id = b.id
+  |    |  cardinality: 1333
+  |    |  per-host memory: unavailable
   |    |  tuple ids: 5 6
   |    |
   |    |----4:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=4 size=460B compact
+  |    |       table=functional.alltypestiny #partitions=4/4 size=460B compact
+  |    |       table stats: 8 rows total
+  |    |       column stats: all
+  |    |       cardinality: 8
+  |    |       per-host memory: unavailable
   |    |       tuple ids: 6
   |    |
   |    3:SCAN HDFS
-  |       table=functional.alltypesagg #partitions=10 size=743.67KB
+  |       table=functional.alltypesagg #partitions=10/10 size=743.67KB
   |       predicates: a.bigint_col < 50
+  |       table stats: 10000 rows total
+  |       column stats: all
+  |       cardinality: 1000
+  |       per-host memory: unavailable
   |       tuple ids: 5
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = int_col
+  |  cardinality: 4844545
+  |  per-host memory: unavailable
   |  tuple ids: 0 2
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:EXCHANGE
+     cardinality: 0
+     per-host memory: unavailable
      tuple ids: 0 2 7
 
 PLAN FRAGMENT 1
@@ -307,23 +451,35 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    int_col = COUNT(a.bigint_col)
+  |  cardinality: 0
+  |  per-host memory: 0B
   |  tuple ids: 0 2 7
   |
   |----15:EXCHANGE
   |       limit: 100
+  |       cardinality: 0
+  |       per-host memory: 0B
   |       tuple ids: 7
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = int_col
+  |  cardinality: 4844545
+  |  per-host memory: 23.53KB
   |  tuple ids: 0 2
   |
   |----9:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 
 PLAN FRAGMENT 2
@@ -336,9 +492,13 @@ PLAN FRAGMENT 2
   14:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
+  |  cardinality: 0
+  |  per-host memory: unavailable
   |  tuple ids: 7
   |
   13:EXCHANGE
+     cardinality: 0
+     per-host memory: unavailable
      tuple ids: 7
 
 PLAN FRAGMENT 3
@@ -351,15 +511,21 @@ PLAN FRAGMENT 3
   7:TOP-N
   |  order by: b.string_col ASC
   |  limit: 100
+  |  cardinality: 0
+  |  per-host memory: 0B
   |  tuple ids: 7
   |
   12:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.bigint_col))
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1
+  |  cardinality: 0
+  |  per-host memory: 10.00MB
   |  tuple ids: 7
   |
   11:EXCHANGE
+     cardinality: 4
+     per-host memory: 0B
      tuple ids: 7
 
 PLAN FRAGMENT 4
@@ -372,20 +538,30 @@ PLAN FRAGMENT 4
   6:AGGREGATE
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
+  |  cardinality: 2
+  |  per-host memory: 10.00MB
   |  tuple ids: 7
   |
   5:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    a.id = b.id
+  |  cardinality: 1333
+  |  per-host memory: 27B
   |  tuple ids: 5 6
   |
   |----10:EXCHANGE
+  |       cardinality: 8
+  |       per-host memory: 0B
   |       tuple ids: 6
   |
   3:SCAN HDFS
-     table=functional.alltypesagg #partitions=10 size=743.67KB
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
      predicates: a.bigint_col < 50
+     table stats: 10000 rows total
+     column stats: all
+     cardinality: 1000
+     per-host memory: 960.00MB
      tuple ids: 5
 
 PLAN FRAGMENT 5
@@ -396,7 +572,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   4:SCAN HDFS
-     table=functional.alltypestiny #partitions=4 size=460B
+     table=functional.alltypestiny #partitions=4/4 size=460B
+     table stats: 8 rows total
+     column stats: all
+     cardinality: 8
+     per-host memory: 960.00MB
      tuple ids: 6
 
 PLAN FRAGMENT 6
@@ -407,7 +587,11 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 2
 ====
 # Self-join of view to make sure the on clause is properly set
@@ -416,6 +600,8 @@ select * from functional.alltypes_view t1
 inner join functional.alltypes_view t2 on (t1.id = t2.id)
 inner join functional.alltypes_view t3 on (t2.id = t3.id)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -423,30 +609,50 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2 4
   |
   |----3:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=1.88GB VCores=3
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
@@ -460,21 +666,31 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 23.53KB
   |  tuple ids: 0 2 4
   |
   |----7:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 7.84KB
   |  tuple ids: 0 2
   |
   |----6:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 2
   |
   5:EXCHANGE
+     cardinality: 7300
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 2
@@ -485,7 +701,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 4
 
 PLAN FRAGMENT 3
@@ -496,7 +716,11 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: functional.alltypes.id
 
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 2
 
 PLAN FRAGMENT 4
@@ -507,7 +731,11 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: functional.alltypes.id
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # Self-join views to make sure the using clause is properly set
@@ -516,6 +744,8 @@ select * from functional.alltypes_view t1
 inner join functional.alltypes_view t2 using(id)
 inner join functional.alltypes_view t3 using(id)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -523,30 +753,50 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2 4
   |
   |----3:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=1.88GB VCores=3
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
@@ -560,21 +810,31 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 23.53KB
   |  tuple ids: 0 2 4
   |
   |----7:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 7.84KB
   |  tuple ids: 0 2
   |
   |----6:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 2
   |
   5:EXCHANGE
+     cardinality: 7300
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 2
@@ -585,7 +845,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   3:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 4
 
 PLAN FRAGMENT 3
@@ -596,7 +860,11 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: functional.alltypes.id
 
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 2
 
 PLAN FRAGMENT 4
@@ -607,7 +875,11 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: functional.alltypes.id
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # Self-join of view to make sure the join op is properly set
@@ -616,6 +888,8 @@ select * from functional.alltypes_view t1
 left outer join functional.alltypes_view t2 using(id)
 full outer join functional.alltypes_view t3 using(id)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -623,30 +897,50 @@ PLAN FRAGMENT 0
   |  join op: FULL OUTER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0N 2N 4N
   |
   |----3:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2N
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.02MB VCores=3
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0N 2N 4N
 
 PLAN FRAGMENT 1
@@ -660,12 +954,18 @@ PLAN FRAGMENT 1
   |  join op: FULL OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 7.84KB
   |  tuple ids: 0N 2N 4N
   |
   |----8:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 4
   |
   7:EXCHANGE
+     cardinality: 7300
+     per-host memory: 0B
      tuple ids: 0 2N
 
 PLAN FRAGMENT 2
@@ -676,7 +976,11 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: functional.alltypes.id
 
   3:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 4
 
 PLAN FRAGMENT 3
@@ -690,12 +994,18 @@ PLAN FRAGMENT 3
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 7.84KB
   |  tuple ids: 0 2N
   |
   |----6:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 2
   |
   5:EXCHANGE
+     cardinality: 7300
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 4
@@ -706,7 +1016,11 @@ PLAN FRAGMENT 4
     HASH_PARTITIONED: functional.alltypes.id
 
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 2
 
 PLAN FRAGMENT 5
@@ -717,7 +1031,11 @@ PLAN FRAGMENT 5
     HASH_PARTITIONED: functional.alltypes.id
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # Self-join of view to make sure join hints are properly set
@@ -728,6 +1046,8 @@ select * from functional.alltypes_view t1
 inner join [broadcast] functional.alltypes_view t2 using(id)
 inner join [shuffle] functional.alltypes_view t3 using(id)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -735,30 +1055,50 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2 4
   |
   |----3:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: unavailable
   |  tuple ids: 0 2
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24 size=478.45KB compact
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       table stats: 7300 rows total
+  |       columns missing stats: timestamp_col
+  |       cardinality: 7300
+  |       per-host memory: unavailable
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.03MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0 2 4
 
 PLAN FRAGMENT 1
@@ -772,12 +1112,18 @@ PLAN FRAGMENT 1
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 7.84KB
   |  tuple ids: 0 2 4
   |
   |----7:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 4
   |
   6:EXCHANGE
+     cardinality: 7300
+     per-host memory: 0B
      tuple ids: 0 2
 
 PLAN FRAGMENT 2
@@ -788,7 +1134,11 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: functional.alltypes.id
 
   3:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 4
 
 PLAN FRAGMENT 3
@@ -802,13 +1152,21 @@ PLAN FRAGMENT 3
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    functional.alltypes.id = functional.alltypes.id
+  |  cardinality: 7300
+  |  per-host memory: 23.53KB
   |  tuple ids: 0 2
   |
   |----5:EXCHANGE
+  |       cardinality: 7300
+  |       per-host memory: 0B
   |       tuple ids: 2
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 
 PLAN FRAGMENT 4
@@ -819,25 +1177,39 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   1:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 2
 ====
 # Tests that parentheses are preserved when creating a view
 # enabling proper partition pruning for this particular view.
 select * from functional.alltypes_parens
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.95KB
+     table=functional.alltypes #partitions=1/24 size=19.95KB
      predicates: (int_col < 100 OR bool_col = FALSE)
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 59
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
+     cardinality: 59
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -848,7 +1220,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.95KB
+     table=functional.alltypes #partitions=1/24 size=19.95KB
      predicates: (int_col < 100 OR bool_col = FALSE)
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 59
+     per-host memory: 960.00MB
      tuple ids: 0
 ====

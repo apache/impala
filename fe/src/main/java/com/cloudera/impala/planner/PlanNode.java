@@ -27,6 +27,7 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlan;
@@ -236,8 +237,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     expBuilder.append(rootPrefix + id.asInt() + ":" + displayName + "\n");
     expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
     if (limit != -1) expBuilder.append(detailPrefix + "limit: " + limit + "\n");
-    // Output Tuple Ids only when explain plan level is set to verbose
+    // Output cardinality, cost estimates and tuple Ids only when explain plan level
+    // is set to verbose
     if (detailLevel.equals(TExplainLevel.VERBOSE)) {
+      // Print estimated output cardinality and memory cost.
+      expBuilder.append(PrintUtils.printCardinality(detailPrefix, cardinality) + "\n");
+      expBuilder.append(PrintUtils.printMemCost(detailPrefix, perHostMemCost) + "\n");
+
+      // Print tuple ids.
       expBuilder.append(detailPrefix + "tuple ids: ");
       for (TupleId tupleId: tupleIds) {
         String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";

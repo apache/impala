@@ -14,11 +14,12 @@ string
 ''
 '  WRITE TO HDFS table=functional.alltypessmall'
 '    overwrite=false'
-'    partitions: year,4'
+'    partition keys: year,4  #partitions: 2
 ''
 '  0:SCAN HDFS'
-'     table=functional.alltypes #partitions=1 size=19.71KB'
-'     tuple ids: 0 '
+'     table=functional.alltypes #partitions=1/24 size=19.71KB'
+'     table stats: 7300 rows total'
+'     columns missing stats: timestamp_col'
 ====
 ---- QUERY
 # Tests explain query
@@ -26,11 +27,12 @@ explain select * from functional.alltypes
 ---- TYPES
 string
 ---- RESULTS
+'Estimated Per-Host Requirements: Memory=960.00MB VCores=1'
+''
 'PLAN FRAGMENT 0'
 '  PARTITION: UNPARTITIONED'
 ''
 '  1:EXCHANGE'
-'     tuple ids: 0 '
 ''
 'PLAN FRAGMENT 1'
 '  PARTITION: RANDOM'
@@ -40,7 +42,8 @@ string
 '    UNPARTITIONED'
 ''
 '  0:SCAN HDFS'
-'     table=functional.alltypes #partitions=24 size=478.45KB'
-'     tuple ids: 0 '
+'     table=functional.alltypes #partitions=24/24 size=478.45KB'
+'     table stats: 7300 rows total'
+'     columns missing stats: timestamp_col'
 ====
 

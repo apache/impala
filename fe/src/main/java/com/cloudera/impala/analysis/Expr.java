@@ -152,6 +152,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // msg.op as well as the expr-specific field.
   protected abstract void toThrift(TExprNode msg);
 
+  /**
+   * Returns the product of the given exprs' number of distinct values or -1 if any of
+   * the exprs have an invalid number of distinct values.
+   */
+  public static long getNumDistinctValues(List<Expr> exprs) {
+    long numDistinctValues = 1;
+    for (Expr expr: exprs) {
+      if (expr.getNumDistinctValues() == -1) {
+        numDistinctValues = -1;
+        break;
+      }
+      numDistinctValues *= expr.getNumDistinctValues();
+    }
+    return numDistinctValues;
+  }
+
   public static List<TExpr> treesToThrift(List<? extends Expr> exprs) {
     List<TExpr> result = Lists.newArrayList();
     for (Expr expr: exprs) {

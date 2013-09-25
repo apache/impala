@@ -5,24 +5,38 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
+    overwrite=false  #partitions: 1
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.01MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
+    overwrite=false  #partitions: 1
+    per-host memory: 9.76KB
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -36,26 +50,40 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,4
+    partition keys: 2009,4  #partitions: 1
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.01MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,4
+    partition keys: 2009,4  #partitions: 1
+    per-host memory: 9.76KB
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -69,26 +97,40 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=true
-    partitions: 2009,4
+    partition keys: 2009,4  #partitions: 1
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.01MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=true
-    partitions: 2009,4
+    partition keys: 2009,4  #partitions: 1
+    per-host memory: 9.76KB
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=20.36KB
+     table=functional.alltypes #partitions=1/24 size=20.36KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 310
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -102,25 +144,37 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypes
 where year=2009 and month>10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: year, month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: 609B
 
   1:EXCHANGE
+     cardinality: 610
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -131,7 +185,11 @@ PLAN FRAGMENT 1
     HASH_PARTITIONED: year, month
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -147,25 +205,37 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional_seq_snap.alltypes
 where year=2009 and month>10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional_seq_snap.alltypes #partitions=2 size=11.34KB
+     table=functional_seq_snap.alltypes #partitions=2/24 size=11.34KB
+     table stats: unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+     cardinality: unavailable
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.39MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: year, month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: 400.00KB
 
   1:EXCHANGE
+     cardinality: unavailable
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -176,9 +246,12 @@ PLAN FRAGMENT 1
     HASH_PARTITIONED: year, month
 
   0:SCAN HDFS
-     table=functional_seq_snap.alltypes #partitions=2 size=11.34KB
+     table=functional_seq_snap.alltypes #partitions=2/24 size=11.34KB
+     table stats: unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+     cardinality: unavailable
+     per-host memory: 960.00MB
      tuple ids: 0
----- SCANRANGELOCATIONS
 ====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
@@ -191,35 +264,51 @@ from functional.alltypes
 where year=2009 and month>10
 group by year, month
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: unavailable
 
   1:AGGREGATE (finalize)
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
   |  group by: year, month
+  |  cardinality: 24
+  |  per-host memory: unavailable
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: year, month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,month
+    partition keys: year,month  #partitions: 24
+    per-host memory: 704B
 
   3:AGGREGATE (merge finalize)
   |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
   |  group by: year, month
+  |  cardinality: 24
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   2:EXCHANGE
+     cardinality: 48
+     per-host memory: 0B
      tuple ids: 1
 
 PLAN FRAGMENT 1
@@ -232,10 +321,16 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
   |  group by: year, month
+  |  cardinality: 24
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -250,25 +345,37 @@ float_col, double_col, date_string_col, string_col, timestamp_col, month
 from functional.alltypes
 where year=2009 and month>10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,month
+    partition keys: 2009,month  #partitions: 12
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,month
+    partition keys: 2009,month  #partitions: 12
+    per-host memory: 609B
 
   1:EXCHANGE
+     cardinality: 610
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -279,7 +386,11 @@ PLAN FRAGMENT 1
     HASH_PARTITIONED: month
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -297,35 +408,51 @@ from functional.alltypes
 where year=2009 and month>10
 group by month
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,month
+    partition keys: 2009,month  #partitions: 12
+    per-host memory: unavailable
 
   1:AGGREGATE (finalize)
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
   |  group by: month
+  |  cardinality: 12
+  |  per-host memory: unavailable
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: month
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2009,month
+    partition keys: 2009,month  #partitions: 12
+    per-host memory: 336B
 
   3:AGGREGATE (merge finalize)
   |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
   |  group by: month
+  |  cardinality: 12
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   2:EXCHANGE
+     cardinality: 24
+     per-host memory: 0B
      tuple ids: 1
 
 PLAN FRAGMENT 1
@@ -338,10 +465,16 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
   |  group by: month
+  |  cardinality: 12
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=2 size=40.07KB
+     table=functional.alltypes #partitions=2/24 size=40.07KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 610
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -356,26 +489,40 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
 where year>2009 and month=4
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,4
+    partition keys: year,4  #partitions: 2
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.71KB
+     table=functional.alltypes #partitions=1/24 size=19.71KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.01MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: year,4
+    partition keys: year,4  #partitions: 2
+    per-host memory: 9.47KB
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.71KB
+     table=functional.alltypes #partitions=1/24 size=19.71KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
+     cardinality: 300
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -387,25 +534,37 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes where year=2009 and month=1 limit 10
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
+    overwrite=false  #partitions: 1
+    per-host memory: unavailable
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.95KB
+     table=functional.alltypes #partitions=1/24 size=19.95KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
      limit: 10
+     cardinality: 310
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
+    overwrite=false  #partitions: 1
+    per-host memory: unavailable
 
   1:EXCHANGE
      limit: 10
+     cardinality: 10
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -416,8 +575,12 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   0:SCAN HDFS
-     table=functional.alltypes #partitions=1 size=19.95KB
+     table=functional.alltypes #partitions=1/24 size=19.95KB
+     table stats: 7300 rows total
+     columns missing stats: timestamp_col
      limit: 10
+     cardinality: 310
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -429,26 +592,36 @@ partition (year=2010, month=4)
 select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 1 SELECT CONSTANT
+     cardinality: 1
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 1 SELECT CONSTANT
+     cardinality: 1
+     per-host memory: unavailable
      tuple ids: 0
 ====
 # dynamic partition insert from a constant select
@@ -457,26 +630,36 @@ partition (year, month)
 select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp), 2010, 4
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 1 SELECT CONSTANT
+     cardinality: 1
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 1 SELECT CONSTANT
+     cardinality: 1
+     per-host memory: unavailable
      tuple ids: 0
 ====
 # static partition insert from values statement
@@ -486,26 +669,36 @@ partition (year=2010, month=4) values
 (200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp)),
 (300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp))
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 3 SELECT CONSTANT
+     cardinality: 3
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 1
+    per-host memory: unavailable
 
   0:MERGE
      merging 3 SELECT CONSTANT
+     cardinality: 3
+     per-host memory: unavailable
      tuple ids: 0
 ====
 # dynamic partition insert from values statement
@@ -515,26 +708,36 @@ partition (year, month) values
 (200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp), 2010, 5),
 (300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp), 2010, 6)
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 0
+    per-host memory: unavailable
 
   0:MERGE
      merging 3 SELECT CONSTANT
+     cardinality: 3
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypessmall
     overwrite=false
-    partitions: 2010,4
+    partition keys: 2010,4  #partitions: 0
+    per-host memory: unavailable
 
   0:MERGE
      merging 3 SELECT CONSTANT
+     cardinality: 3
+     per-host memory: unavailable
      tuple ids: 0
 ====
 # test static partition insert from a query with grouped aggregation
@@ -544,35 +747,51 @@ insert into functional.alltypes(bigint_col, string_col) partition (year=2010, mo
 select count(int_col), string_col from functional.alltypes
 group by string_col
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypes
     overwrite=false
-    partitions: 2010,10
+    partition keys: 2010,10  #partitions: 1
+    per-host memory: unavailable
 
   1:AGGREGATE (finalize)
   |  output: COUNT(int_col)
   |  group by: string_col
+  |  cardinality: 9
+  |  per-host memory: unavailable
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     column stats: all
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: string_col
 
   WRITE TO HDFS table=functional.alltypes
     overwrite=false
-    partitions: 2010,10
+    partition keys: 2010,10  #partitions: 1
+    per-host memory: 72B
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(int_col))
   |  group by: string_col
+  |  cardinality: 9
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   2:EXCHANGE
+     cardinality: 18
+     per-host memory: 0B
      tuple ids: 1
 
 PLAN FRAGMENT 1
@@ -585,10 +804,16 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: COUNT(int_col)
   |  group by: string_col
+  |  cardinality: 9
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     column stats: all
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====
 # test static partition insert from a query with distinct grouped aggregation
@@ -598,43 +823,63 @@ insert into functional.alltypes(bigint_col, string_col) partition (year=2010, mo
 select count(distinct int_col), string_col from functional.alltypes
 group by string_col
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=functional.alltypes
     overwrite=false
-    partitions: 2010,10
+    partition keys: 2010,10  #partitions: 1
+    per-host memory: unavailable
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col)
   |  group by: string_col
+  |  cardinality: 9
+  |  per-host memory: unavailable
   |  tuple ids: 2
   |
   1:AGGREGATE
   |  group by: string_col, int_col
+  |  cardinality: 99
+  |  per-host memory: unavailable
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     column stats: all
+     cardinality: 7300
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=970.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: string_col
 
   WRITE TO HDFS table=functional.alltypes
     overwrite=false
-    partitions: 2010,10
+    partition keys: 2010,10  #partitions: 1
+    per-host memory: 72B
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col)
   |  group by: string_col
+  |  cardinality: 9
+  |  per-host memory: 10.00MB
   |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  group by: string_col, int_col
+  |  cardinality: 99
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   3:EXCHANGE
+     cardinality: 99
+     per-host memory: 0B
      tuple ids: 1
 
 PLAN FRAGMENT 1
@@ -646,9 +891,15 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  group by: string_col, int_col
+  |  cardinality: 99
+  |  per-host memory: 10.00MB
   |  tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypes #partitions=24 size=478.45KB
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     table stats: 7300 rows total
+     column stats: all
+     cardinality: 7300
+     per-host memory: 960.00MB
      tuple ids: 0
 ====

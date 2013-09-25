@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestFileParser.Section;
@@ -31,6 +32,7 @@ import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -51,12 +53,15 @@ public class PlannerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
+    // Use 8 cores for resource estimation.
+    RuntimeEnv.INSTANCE.setNumCores(8);
     frontend = new Frontend(Catalog.CatalogInitStrategy.LAZY,
         AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
   public static void cleanUp() {
+    RuntimeEnv.INSTANCE.reset();
   }
 
   private StringBuilder PrintScanRangeLocations(TQueryExecRequest execRequest) {
@@ -161,6 +166,7 @@ public class PlannerTest {
     TSessionState sessionState = new TSessionState(null, null, "default",
         System.getProperty("user.name"), null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
+    request.queryOptions.setExplain_level(TExplainLevel.VERBOSE);
     StringBuilder explainBuilder = new StringBuilder();
 
     TExecRequest execRequest = null;

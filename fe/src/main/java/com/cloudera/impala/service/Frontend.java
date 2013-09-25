@@ -371,14 +371,12 @@ public class Frontend {
   }
 
   /**
-   * new planner interface:
-   * Create a populated TExecRequest corresponding to the supplied
-   * TClientRequest.
+   * Create a populated TExecRequest corresponding to the supplied TClientRequest.
    */
   public TExecRequest createExecRequest(
-      TClientRequest request, StringBuilder explainString) throws
-      AnalysisException, NotImplementedException,
-      InternalException, AuthorizationException {
+      TClientRequest request, StringBuilder explainString)
+      throws AnalysisException, AuthorizationException, NotImplementedException,
+      InternalException {
     AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_,
         request.sessionState.database,
         new User(request.sessionState.user));
@@ -428,7 +426,17 @@ public class Frontend {
       fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
-    explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
+
+    // The explain level query option only applies to explain stmts.
+    // For other queries, always get the verbose explain plan for logging
+    // and reporting through the query profile.
+    TExplainLevel explainLevel = TExplainLevel.VERBOSE;
+    if (analysisResult.isExplainStmt()) {
+      explainLevel = request.queryOptions.getExplain_level();
+    }
+
+    explainString.append(planner.getExplainString(fragments, queryExecRequest,
+        explainLevel));
     queryExecRequest.setQuery_plan(explainString.toString());
     queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
 

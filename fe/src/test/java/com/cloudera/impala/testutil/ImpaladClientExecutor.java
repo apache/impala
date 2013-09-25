@@ -200,6 +200,9 @@ public class ImpaladClientExecutor {
         case PARQUET_FILE_SIZE:
           optionValue = String.valueOf(queryOptions.getParquet_file_size());
           break;
+        case EXPLAIN_LEVEL:
+          optionValue = String.valueOf(queryOptions.getExplain_level());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

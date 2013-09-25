@@ -36,38 +36,58 @@ where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 2
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: t1.int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0 1
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    t1.id = t2.id
+  |  cardinality: 159
+  |  per-host memory: unavailable
   |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4 size=6.32KB compact
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
   |       predicates: t2.int_col IS NOT NULL
+  |       table stats: 100 rows total
+  |       column stats: all
+  |       cardinality: 100
+  |       per-host memory: unavailable
   |       tuple ids: 1
   |
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=2
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
   |  order by: t1.int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0 1
   |
   6:EXCHANGE
+     cardinality: 2
+     per-host memory: unavailable
      tuple ids: 0 1
 
 PLAN FRAGMENT 1
@@ -80,18 +100,26 @@ PLAN FRAGMENT 1
   3:TOP-N
   |  order by: t1.int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: 32B
   |  tuple ids: 0 1
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    t1.id = t2.id
+  |  cardinality: 159
+  |  per-host memory: 110B
   |  tuple ids: 0 1
   |
   |----5:EXCHANGE
+  |       cardinality: 100
+  |       per-host memory: 0B
   |       tuple ids: 1
   |
   4:EXCHANGE
+     cardinality: 100
+     per-host memory: 0B
      tuple ids: 0
 
 PLAN FRAGMENT 2
@@ -102,8 +130,12 @@ PLAN FRAGMENT 2
     HASH_PARTITIONED: t2.id
 
   1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
      predicates: t2.int_col IS NOT NULL
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: 960.00MB
      tuple ids: 1
 
 PLAN FRAGMENT 3
@@ -114,7 +146,11 @@ PLAN FRAGMENT 3
     HASH_PARTITIONED: t1.id
 
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -131,27 +167,41 @@ NODE 1:
 # Test that the sort is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0
   |
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0
   |
   2:EXCHANGE
+     cardinality: 2
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -164,10 +214,16 @@ PLAN FRAGMENT 1
   1:TOP-N
   |  order by: int_col ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: 8B
   |  tuple ids: 0
   |
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -179,27 +235,41 @@ NODE 0:
 # Test that the sort is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id limit 2
 ---- PLAN
+Estimated Per-Host Requirements: Memory=0B VCores=0
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: functional.alltypessmall.id ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0
   |
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: unavailable
      tuple ids: 0
 ---- DISTRIBUTEDPLAN
+Estimated Per-Host Requirements: Memory=960.00MB VCores=1
+
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: functional.alltypessmall.id ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: unavailable
   |  tuple ids: 0
   |
   2:EXCHANGE
+     cardinality: 2
+     per-host memory: unavailable
      tuple ids: 0
 
 PLAN FRAGMENT 1
@@ -212,10 +282,16 @@ PLAN FRAGMENT 1
   1:TOP-N
   |  order by: functional.alltypessmall.id ASC
   |  limit: 2
+  |  cardinality: 2
+  |  per-host memory: 16B
   |  tuple ids: 0
   |
   0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4 size=6.32KB
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     table stats: 100 rows total
+     column stats: all
+     cardinality: 100
+     per-host memory: 960.00MB
      tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:

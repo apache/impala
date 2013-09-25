@@ -120,6 +120,7 @@ public class ColumnStats {
   public boolean hasAvgSerializedSize() { return avgSerializedSize >= 0; }
   public boolean hasMaxSize() { return maxSize >= 0; }
   public boolean hasNumDistinctValues() { return numDistinctValues >= 0; }
+  public boolean hasStats() { return numNulls != -1 || numDistinctValues != -1; }
 
   /**
    * Updates the stats with the given ColumnStatisticsData. If the ColumnStatisticsData

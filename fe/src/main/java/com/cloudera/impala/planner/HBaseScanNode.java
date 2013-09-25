@@ -365,6 +365,9 @@ public class HBaseScanNode extends ScanNode {
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
+    // Add table and column stats.
+    output.append(getStatsExplainString(prefix, detailLevel));
+    output.append("\n");
     return output.toString();
   }
 
