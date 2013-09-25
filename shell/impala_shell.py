@@ -124,7 +124,7 @@ class ImpalaShell(cmd.Cmd):
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
     except ImportError:
-      self.readline = None
+      self.__disable_readline()
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -134,6 +134,13 @@ class ImpalaShell(cmd.Cmd):
     # the underlying socket unusable.
     self.is_interrupted = threading.Event()
     signal.signal(signal.SIGINT, self.__signal_handler)
+
+  def __disable_readline(self):
+    """Disables the readline module.
+
+    The readline module is responsible for keeping track of command history.
+    """
+    self.readline = None
 
   def __print_options(self, options):
     if not options:
@@ -880,16 +887,24 @@ class ImpalaShell(cmd.Cmd):
         cmd = self.readline.get_history_item(index)
         print_to_stderr('[%d]: %s' % (index, cmd))
     else:
-      print_to_stderr('readline module not found, history is not supported.')
+      print_to_stderr("The readline module was either not found or disabled. Command "
+                      "history will not be collected.")
     return True
 
   def preloop(self):
     """Load the history file if it exists"""
     if self.readline:
+      # The history file is created when the Impala shell is invoked and commands are
+      # issued. In the first invocation of the shell, the history file will not exist.
+      # Clearly, this is not an error, return.
+      if not os.path.exists(self.history_file): return
       try:
         self.readline.read_history_file(self.history_file)
       except IOError, i:
-        print_to_stderr('Unable to load history: %s' % i)
+        msg = "Unable to load command history (disabling history collection): %s" % i
+        print_to_stderr(msg)
+        # This history file exists but is not readable, disable readline.
+        self.__disable_readline()
 
   def postloop(self):
     """Save session commands in history."""
@@ -897,7 +912,10 @@ class ImpalaShell(cmd.Cmd):
       try:
         self.readline.write_history_file(self.history_file)
       except IOError, i:
-        print_to_stderr('Unable to save history: %s' % i)
+        msg = "Unable to save command history (disabling history collection): %s" % i
+        print_to_stderr(msg)
+        # The history file is not writable, disable readline.
+        self.__disable_readline()
 
   def default(self, args):
     query = self.__create_beeswax_query_handle()
