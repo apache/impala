@@ -30,7 +30,9 @@ import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.opcode.FunctionRegistry;
 import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * The OpcodeRegistry provides a mapping between function signatures and opcodes. The
@@ -155,17 +157,25 @@ public class OpcodeRegistry {
   public BuiltinFunction getFunctionInfo(FunctionOperator op, boolean allowImplicitCasts,
       PrimitiveType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
-    // Take the last argument's type as the vararg type.
-    Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
+    List<Pair<FunctionOperator, PrimitiveType>> varArgMatchTypes = null;
     if (argTypes.length > 0) {
-      PrimitiveType varArgMatchType = getRightMostNonNullTypeOrNull(argTypes);
-      varArgsLookup = Pair.create(op, varArgMatchType.getMaxResolutionType());
+      Set<PrimitiveType> maxResolutionTypes = getMaxResolutionTypes(argTypes);
+      Preconditions.checkNotNull(maxResolutionTypes);
+      varArgMatchTypes = Lists.newArrayList();
+      for (PrimitiveType maxResolutionType : maxResolutionTypes) {
+        varArgMatchTypes.add(Pair.create(op, maxResolutionType));
+      }
     }
     List<BuiltinFunction> functions = null;
     if (operations.containsKey(lookup)) {
       functions = operations.get(lookup);
-    } else if(varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
-      functions = varArgOperations.get(varArgsLookup);
+    } else if(varArgMatchTypes != null) {
+      functions = Lists.newArrayList();
+      List<BuiltinFunction> matchedFunctions = null;
+      for (Pair<FunctionOperator, PrimitiveType> varArgsMatchType : varArgMatchTypes) {
+        matchedFunctions = varArgOperations.get(varArgsMatchType);
+        if (matchedFunctions != null) functions.addAll(matchedFunctions);
+      }
     }
     if (functions == null) return null;
     BuiltinFunction compatibleMatch = null;
@@ -182,15 +192,18 @@ public class OpcodeRegistry {
   }
 
   /**
-   * Returns right-most argType that is not NULL_TYPE, otherwise NULL_TYPE.
+   * Returns the max resolution type for each argType that is not a NULL_TYPE. If all
+   * argument types are NULL_TYPE then a set will be returned containing NULL_TYPE.
    */
-  private PrimitiveType getRightMostNonNullTypeOrNull(PrimitiveType[] argTypes) {
-    for (int i = argTypes.length - 1; i >= 0; --i) {
+  private Set<PrimitiveType> getMaxResolutionTypes(PrimitiveType[] argTypes) {
+    Set<PrimitiveType> maxResolutionTypes = Sets.newHashSet();
+    for (int i = 0; i < argTypes.length; ++i) {
       if (!argTypes[i].isNull()) {
-        return argTypes[i];
+        maxResolutionTypes.add(argTypes[i].getMaxResolutionType());
       }
     }
-    return PrimitiveType.NULL_TYPE;
+    if (maxResolutionTypes.isEmpty()) maxResolutionTypes.add(PrimitiveType.NULL_TYPE);
+    return maxResolutionTypes;
   }
 
   /**

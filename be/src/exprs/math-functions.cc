@@ -564,5 +564,98 @@ void* MathFunctions::QuotientBigInt(Expr* e, TupleRow* row) {
   return ComputeFunctions::Int_Divide_long_long(e, row);
 }
 
+void* MathFunctions::LeastInt(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  int32_t* val = reinterpret_cast<int32_t*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  int32_t smallest_val = *val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<int32_t*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (*val < smallest_val) smallest_val = *val;
+  }
+  e->result_.int_val = smallest_val;
+  return &e->result_.int_val;
+}
+
+void* MathFunctions::LeastBigInt(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  int64_t* val = reinterpret_cast<int64_t*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  int64_t smallest_val = *val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<int64_t*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (*val < smallest_val) smallest_val = *val;
+  }
+  e->result_.bigint_val = smallest_val;
+  return &e->result_.bigint_val;
+}
+
+void* MathFunctions::LeastFloat(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  float* val = reinterpret_cast<float*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  float smallest_val = *val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<float*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (*val < smallest_val) smallest_val = *val;
+  }
+  e->result_.float_val = smallest_val;
+  return &e->result_.float_val;
+}
+
+void* MathFunctions::LeastDouble(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  double* val = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  double smallest_val = *val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<double*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (*val < smallest_val) smallest_val = *val;
+  }
+  e->result_.double_val = smallest_val;
+  return &e->result_.double_val;
+}
+
+void* MathFunctions::LeastString(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  StringValue* val =
+      reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  StringValue* smallest_val = val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (val->Compare(*smallest_val) < 0) smallest_val = val;
+  }
+  e->result_.string_val.ptr = smallest_val->ptr;
+  e->result_.string_val.len = smallest_val->len;
+  return &e->result_.string_val;
+}
+
+void* MathFunctions::LeastTimestamp(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  TimestampValue* val =
+      reinterpret_cast<TimestampValue*>(e->children()[0]->GetValue(row));
+  if (val == NULL) return NULL;
+  TimestampValue* smallest_val = val;
+  int num_children = e->GetNumChildren();
+  for (int i = 1; i < num_children; ++i) {
+    val = reinterpret_cast<TimestampValue*>(e->children()[i]->GetValue(row));
+    if (val == NULL) return NULL;
+    if (*val < *smallest_val) smallest_val = val;
+  }
+  e->result_.timestamp_val = *smallest_val;
+  return &e->result_.timestamp_val;
+}
+
 }
 

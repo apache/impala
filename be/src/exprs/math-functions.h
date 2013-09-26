@@ -69,6 +69,14 @@ class MathFunctions {
   static void* NegativeDouble(Expr* e, TupleRow* row);
   static void* QuotientDouble(Expr* e, TupleRow* row);
   static void* QuotientBigInt(Expr* e, TupleRow* row);
+  // TODO: Collapse the numeric implementations in to a template once the new
+  // expression logic is in place.
+  static void* LeastInt(Expr* e, TupleRow* row);
+  static void* LeastBigInt(Expr* e, TupleRow* row);
+  static void* LeastFloat(Expr* e, TupleRow* row);
+  static void* LeastDouble(Expr* e, TupleRow* row);
+  static void* LeastString(Expr* e, TupleRow* row);
+  static void* LeastTimestamp(Expr* e, TupleRow* row);
 
  private:
   static const int32_t MIN_BASE = 2;

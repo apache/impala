@@ -87,6 +87,13 @@ functions = [
         'MathFunctions::QuotientBigInt', ['quotient']],
   ['Math_Quotient', 'BIGINT', ['DOUBLE', 'DOUBLE'],\
         'MathFunctions::QuotientDouble', ['quotient']],
+  ['Math_Least', 'INT', ['INT', '...'], 'MathFunctions::LeastInt', ['least']],
+  ['Math_Least', 'BIGINT', ['BIGINT', '...'], 'MathFunctions::LeastBigInt', ['least']],
+  ['Math_Least', 'FLOAT', ['FLOAT', '...'], 'MathFunctions::LeastFloat', ['least']],
+  ['Math_Least', 'DOUBLE', ['DOUBLE', '...'], 'MathFunctions::LeastDouble', ['least']],
+  ['Math_Least', 'STRING', ['STRING', '...'], 'MathFunctions::LeastString', ['least']],
+  ['Math_Least', 'TIMESTAMP', ['TIMESTAMP', '...'], \
+        'MathFunctions::LeastTimestamp', ['least']],
 
   ['String_Substring', 'STRING', ['STRING', 'INT'], \
         'StringFunctions::Substring<int32_t>', ['substr', 'substring']],

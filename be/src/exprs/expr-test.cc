@@ -1934,6 +1934,128 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("quotient(-30.5, 2.5)", TYPE_BIGINT, -15);
   TestIsNull("quotient(-30.5, 0.000999)", TYPE_BIGINT);
 
+  // Test int param
+  const int32_t int_val = 123456789;
+  const string int_val_str = lexical_cast<string>(int_val);
+  TestValue<int32_t>("least(500, 300)", TYPE_INT, 300);
+  // Test ordering
+  TestValue<int32_t>("least(300, 500)", TYPE_INT, 300);
+  // Test to make sure least value is found in a mixed order set
+  TestValue<int32_t>("least(1, 3, 4, 0, 6)", TYPE_INT, 0);
+  // Test to make sure the least value is found from a list of duplicates
+  TestValue<int32_t>("least(1, 1, 1, 1)", TYPE_INT, 1);
+  // Test repeating groups and ordering
+  TestValue<int32_t>("least(2, 2, 1, 1)", TYPE_INT, 1);
+  TestValue<int32_t>("least(0, -2, 1)", TYPE_INT, -2);
+  // Test small single value is returned correctly
+  TestValue<int32_t>("least(1)", TYPE_INT, 1);
+  // Test large single value is returned correctly
+  TestValue<int32_t>("least(" + int_val_str + ")", TYPE_INT, int_val);
+  // Test to make sure mixed integer types are handled correctly
+  TestValue<int32_t>("least(" + int_val_str + ", 10)", TYPE_INT, 10);
+  // Test to make sure large integer types are handled correctly
+  TestValue<int32_t>("least(" + int_val_str + "," + int_val_str + ")", TYPE_INT,
+      int_val);
+  // Test explicit cast
+  TestValue<int32_t>("least(cast(1 as int))", TYPE_INT, 1);
+  TestIsNull("least(1, NULL)", TYPE_INT);
+  // Test bigint param
+  const int64_t bigint_val = 12345678900;
+  const string bigint_val_str = lexical_cast<string>(bigint_val);
+  TestValue<int64_t>("least(" + bigint_val_str + ", 300)", TYPE_BIGINT, 300);
+  // Test ordering
+  TestValue<int64_t>("least(300, " + bigint_val_str + ")", TYPE_BIGINT, 300);
+  // Test to make sure least value is found in a mixed order set
+  TestValue<int64_t>("least(1, 3, " + bigint_val_str + ", 0, 6)", TYPE_BIGINT, 0);
+  // Test to make sure the least value is found from a list of duplicates
+  TestValue<int64_t>("least(" + bigint_val_str + ", " + bigint_val_str + ", " +
+      bigint_val_str + ", " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
+  // Test repeating groups and ordering
+  TestValue<int64_t>("least(1, 1, " + bigint_val_str + ", " + bigint_val_str + ")",
+      TYPE_BIGINT, 1);
+  TestValue<int64_t>("least(0, -3147483648, 1)", TYPE_BIGINT, -3147483648);
+  TestValue<int64_t>("least(" + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
+  TestIsNull("least(1, " + bigint_val_str + ", NULL)", TYPE_BIGINT);
+  // Test float param
+  TestValue<float>("least(500.25, 300.25)", TYPE_FLOAT, 300.25f);
+  // Test ordering
+  TestValue<float>("least(300.25, 500.25)", TYPE_FLOAT, 300.25f);
+  // Test to make sure least value is found in a mixed order set
+  TestValue<float>("least(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 0.25f);
+  // Test to make sure the least value is found from a list of duplicates
+  TestValue<float>("least(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  // Test repeating groups and ordering
+  TestValue<float>("least(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("least(0.0, -2.0, 1.0)", TYPE_FLOAT, -2.0f);
+  TestValue<float>("least(1.25)", TYPE_FLOAT, 1.25f);
+  TestIsNull("least(1.0, NULL)", TYPE_FLOAT);
+  // Test double param
+  const double double_val = 12345678900.25;
+  const string double_val_str = lexical_cast<string>(double_val);
+  TestValue<double>("least(" + double_val_str + ", 300.25)", TYPE_DOUBLE, 300.25);
+  // Test the ordering of the arguments
+  TestValue<double>("least(300.25, " + double_val_str + ")", TYPE_DOUBLE, 300.25);
+  // Test to make sure least value is found in a mixed order set
+  TestValue<double>("least(1.25, 3.25, " + double_val_str + ", 0.25, 6.25)", TYPE_DOUBLE,
+      0.25);
+  TestValue<double>("least(" + double_val_str + ", " + double_val_str + ", " +
+      double_val_str + ", " + double_val_str + ")", TYPE_DOUBLE, double_val);
+  // Test repeating groups and ordering
+  TestValue<double>("least(" + double_val_str + ", " + double_val_str + ", 1.0, 1.0)",
+      TYPE_DOUBLE, 1.0);
+  TestValue<double>("least(0.0, -" + double_val_str + ", 1.0)", TYPE_DOUBLE,
+      (double_val * -1));
+  TestValue<double>("least(" + double_val_str + ")", TYPE_DOUBLE, double_val);
+  TestIsNull("least(1.0, " + double_val_str + ", NULL)", TYPE_DOUBLE);
+  // Test mixed numeric params
+  TestValue<float>("least(500.25, 1.25, 10)", TYPE_FLOAT, 1.25f);
+  TestValue<float>("least(1.0, 55, 300.25, 100)", TYPE_FLOAT, 1.0f);
+  TestValue<double>("least(500.25, " + double_val_str + ", 10, 1.0)", TYPE_DOUBLE, 1.0);
+  TestValue<double>("least(1.0, 55, " + double_val_str + ", 100)", TYPE_DOUBLE, 1.0);
+  TestIsNull("least(1.0, NULL, 10)", TYPE_FLOAT);
+  TestIsNull("least(1.0, " + double_val_str + ", NULL, 10)", TYPE_DOUBLE);
+  // Test string param
+  TestStringValue("least('2', '5', '12', '3')", "12");
+  TestStringValue("least('apples', 'oranges', 'bananas')", "apples");
+  TestStringValue("least('apples', 'applis', 'applas')", "applas");
+  TestStringValue("least('apples', '!applis', 'applas')", "!applis");
+  TestStringValue("least('apples', 'apples', 'apples')", "apples");
+  TestStringValue("least('apples')", "apples");
+  TestStringValue("least('A')", "A");
+  TestStringValue("least('A', 'a')", "A");
+  // Test ordering
+  TestStringValue("least('a', 'A')", "A");
+  TestStringValue("least('APPLES', 'APPLES')", "APPLES");
+  TestStringValue("least('apples', 'APPLES')", "APPLES");
+  TestStringValue("least('apples', 'app\nles')", "app\nles");
+  TestStringValue("least('apples', 'app les')", "app les");
+  TestStringValue("least('apples', 'app\nles')", "app\nles");
+  TestStringValue("least('apples', 'app\tles')", "app\tles");
+  TestStringValue("least('apples', 'app\fles')", "app\fles");
+  TestStringValue("least('apples', 'app\vles')", "app\vles");
+  TestStringValue("least('apples', 'app\rles')", "app\rles");
+  TestIsNull("least('apples', 'oranges', 'bananas', NULL)", TYPE_STRING);
+  // Test timestamp param
+  TestStringValue("cast(least(cast('2014-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-08-26 12:00:00' as timestamp)) as string)", "2013-08-26 12:00:00");
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-25 12:00:00' as timestamp)) as string)", "2013-09-25 12:00:00");
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 11:59:59' as timestamp)) as string)", "2013-09-26 11:59:59");
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:00");
+  TestStringValue("cast(least(cast('2013-09-26 12:01:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:01");
+  TestStringValue("cast(least(cast('12:01:00' as timestamp), "
+      "cast('12:00:01' as timestamp)) as string)", "12:00:01");
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp)) " "as string)",
+      "2013-09-26 12:00:00");
+  TestStringValue("cast(least(cast('12:00:00' as timestamp)) as string)", "12:00:00");
+  TestIsNull("least(cast('2013-09-26 12:01:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp), NULL)", TYPE_TIMESTAMP);
+
   // NULL arguments.
   TestIsNull("abs(NULL)", TYPE_DOUBLE);
   TestIsNull("sign(NULL)", TYPE_FLOAT);
@@ -1970,6 +2092,12 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);
   TestIsNull("quotient(1.0, NULL)", TYPE_BIGINT);
   TestIsNull("quotient(NULL, NULL)", TYPE_BIGINT);
+  TestIsNull("least(NULL)", TYPE_STRING);
+  TestIsNull("least(cast(NULL as int))", TYPE_INT);
+  TestIsNull("least(cast(NULL as bigint))", TYPE_BIGINT);
+  TestIsNull("least(cast(NULL as float))", TYPE_FLOAT);
+  TestIsNull("least(cast(NULL as double))", TYPE_DOUBLE);
+  TestIsNull("least(cast(NULL as timestamp))", TYPE_TIMESTAMP);
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {
