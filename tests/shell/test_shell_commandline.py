@@ -85,9 +85,8 @@ class TestImpalaShell(object):
 
   @pytest.mark.execute_serially
   def test_unsecure_message(self):
-    args = '-q "%s"' % DEFAULT_QUERY
-    results = run_impala_shell_cmd(args)
-    assert "Starting Impala Shell in unsecure mode" in results.stderr
+    results = run_impala_shell_cmd("")
+    assert "Starting Impala Shell without Kerberos authentication" in results.stderr
 
   @pytest.mark.execute_serially
   def test_print_header(self):
@@ -109,7 +108,7 @@ class TestImpalaShell(object):
     results = run_impala_shell_cmd(args, expect_success=False)
     # Check that impala is using the right service name.
     assert "Using service name 'impala'" in results.stderr
-    assert "Starting Impala Shell in secure mode (using Kerberos)" in results.stderr
+    assert "Starting Impala Shell using Kerberos authentication" in results.stderr
     # Change the service name
     args += " -s foobar"
     results = run_impala_shell_cmd(args, expect_success=False)
