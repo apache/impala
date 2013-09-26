@@ -103,12 +103,23 @@ class TestImpalaShell(object):
 
   @pytest.mark.execute_serially
   def test_kerberos_option(self):
-    args = "-k -q '%s'" % DEFAULT_QUERY
-    # The command with fail because we're trying to connect to a kerberized impalad.
+    args = "-k"
+    # The command will fail because we're trying to connect to a kerberized impalad.
     results = run_impala_shell_cmd(args, expect_success=False)
     # Check that impala is using the right service name.
     assert "Using service name 'impala'" in results.stderr
     assert "Starting Impala Shell using Kerberos authentication" in results.stderr
+    # Check that Impala warns the user if klist does not exist on the system, or if
+    # no kerberos tickets are initialized.
+    try:
+      call(["klist"])
+      expected_error_msg = ("-k requires a valid kerberos ticket but no valid kerberos "
+          "ticket found.")
+      assert expected_error_msg in results.stderr
+    except OSError:
+      assert 'klist not found on the system' in results.stderr
+    # Make sure we don't try to re-connect
+    assert "retrying the connection with a secure transport" not in results.stderr
     # Change the service name
     args += " -s foobar"
     results = run_impala_shell_cmd(args, expect_success=False)

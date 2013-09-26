@@ -19,6 +19,7 @@ import cmd
 import getpass
 import prettytable
 import os
+import sasl
 import shlex
 import signal
 import socket
@@ -30,6 +31,7 @@ import re
 from optparse import OptionParser
 from Queue import Queue, Empty
 from shell_output import OutputStream, DelimitedOutputFormatter, PrettyOutputFormatter
+from subprocess import call
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
@@ -37,6 +39,7 @@ from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from ImpalaService.ImpalaService import TPingImpalaServiceResp
 from Status.ttypes import TStatus, TStatusCode
+from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport import TSSLSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
@@ -368,8 +371,21 @@ class ImpalaShell(cmd.Cmd):
     elif len(host_port) == 1:
       host_port.append(21000)
     self.impalad = tuple(host_port)
+    self.__connect()
+    # If the connection fails and the Kerberos has not been enabled,
+    # check for a valid kerberos ticket and retry the connection
+    # with kerberos enabled.
+    if not self.connected and not self.use_kerberos:
+      try:
+        if call(["klist", "-s"]) == 0:
+          print_to_stderr(("Kerberos ticket found in the credentials cache, retrying "
+                           "the connection with a secure transport."))
+          self.use_kerberos = True
+          self.__connect()
+      except OSError, e:
+        pass
 
-    if self.__connect():
+    if self.connected:
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
       self.__print_if_verbose('Server version: %s' % self.server_version)
       self.prompt = "[%s:%s] > " % self.impalad
@@ -408,7 +424,9 @@ class ImpalaShell(cmd.Cmd):
         result = self.imp_service.PingImpalaService()
         self.server_version = result.version
         self.connected = True
-      except Exception, e:
+      # We get a TApplicationException if the transport is valid, but the RPC does not
+      # exist.
+      except TApplicationException:
         print_to_stderr("Error: Unable to communicate with impalad service. This "
                "service may not be an impalad instance. Check host:port and try again.")
         self.transport.close()
@@ -419,8 +437,6 @@ class ImpalaShell(cmd.Cmd):
       # reset the prompt to disconnected.
       self.prompt = self.DISCONNECTED_PROMPT
 
-    return self.connected
-
   def __get_transport(self):
     """Create a Transport.
 
@@ -430,7 +446,8 @@ class ImpalaShell(cmd.Cmd):
        If SSL is enabled, a TSSLSocket underlies the transport stack; otherwise a TSocket
        is used.
     """
-    host, port = self.impalad[0], int(self.impalad[1])
+    # sasl does not accept unicode strings, explicitly encode the string into ascii.
+    host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])
     if self.ssl_enabled:
       if self.ca_cert is None:
         # No CA cert means don't try to verify the certificate
@@ -444,7 +461,7 @@ class ImpalaShell(cmd.Cmd):
     # Initializes a sasl client
     def sasl_factory():
       sasl_client = sasl.Client()
-      sasl_client.setAttr("host", self.impalad[0])
+      sasl_client.setAttr("host", host)
       sasl_client.setAttr("service", self.kerberos_service_name)
       sasl_client.init()
       return sasl_client
@@ -969,7 +986,7 @@ if __name__ == "__main__":
   parser.add_option("--output_delimiter", dest="output_delimiter", default='\t',
                     help="Field delimiter to use for output in delimited mode")
   parser.add_option("-s", "--kerberos_service_name",
-                    dest="kerberos_service_name", default=None,
+                    dest="kerberos_service_name", default='impala',
                     help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=True, action="store_true",
                     help="Enable verbose output")
@@ -1008,19 +1025,17 @@ if __name__ == "__main__":
     sys.exit(0)
 
   if options.use_kerberos:
-    # The sasl module is bundled with the shell.
     print_to_stderr("Starting Impala Shell using Kerberos authentication")
-    try:
-      import sasl
-    except ImportError:
-      print_to_stderr('sasl not found.')
-      sys.exit(1)
-    from thrift_sasl import TSaslClientTransport
-
-    # The service name defaults to 'impala' if not specified by the user.
-    if not options.kerberos_service_name:
-      options.kerberos_service_name = 'impala'
     print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
+    # Check if the user has a ticket in the credentials cache
+    try:
+      if call(['klist', '-s']) != 0:
+        print_to_stderr(("-k requires a valid kerberos ticket but no valid kerberos "
+                         "ticket found."))
+        sys.exit(1)
+    except OSError, e:
+      print_to_stderr('klist not found on the system, install kerberos clients')
+      sys.exit(1)
   else:
      print_to_stderr("Starting Impala Shell without Kerberos authentication")
 
