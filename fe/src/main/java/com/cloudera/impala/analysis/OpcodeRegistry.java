@@ -57,19 +57,24 @@ public class OpcodeRegistry {
   public static class BuiltinFunction extends Function {
     public TExprOpcode opcode;
     public FunctionOperator operator;
+    // If true, this builtin is implemented against the Udf interface.
+    public final boolean udfInterface;
 
     // Constructor for searching, specifying the op and arguments
     public BuiltinFunction(FunctionOperator operator, PrimitiveType[] args) {
       super(new FunctionName(operator.toString()),
           args, PrimitiveType.INVALID_TYPE, false);
       this.operator = operator;
+      this.udfInterface = false;
     }
 
-    private BuiltinFunction(TExprOpcode opcode, FunctionOperator operator,
-        boolean varArgs, PrimitiveType ret, PrimitiveType[] args) {
+    private BuiltinFunction(boolean udfInterface, TExprOpcode opcode,
+        FunctionOperator operator, boolean varArgs, PrimitiveType ret,
+        PrimitiveType[] args) {
       super(new FunctionName(opcode.toString()), args, ret, varArgs);
       this.operator = operator;
       this.opcode = opcode;
+      this.udfInterface = udfInterface;
     }
   }
 
@@ -191,8 +196,8 @@ public class OpcodeRegistry {
   /**
    * Add a function with the specified opcode/signature to the registry.
    */
-  public boolean add(FunctionOperator op, TExprOpcode opcode, boolean varArgs,
-      PrimitiveType retType, PrimitiveType ... args) {
+  public boolean add(boolean udfInterface, FunctionOperator op, TExprOpcode opcode,
+      boolean varArgs, PrimitiveType retType, PrimitiveType ... args) {
     List<BuiltinFunction> functions;
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
     // Take the last argument's type as the vararg type.
@@ -218,7 +223,8 @@ public class OpcodeRegistry {
       }
     }
 
-    BuiltinFunction function = new BuiltinFunction(opcode, op, varArgs, retType, args);
+    BuiltinFunction function =
+        new BuiltinFunction(udfInterface, opcode, op, varArgs, retType, args);
     if (functions.contains(function)) {
       LOG.error("OpcodeRegistry: Function already exists: " + opcode);
       return false;

@@ -84,6 +84,10 @@ enum TFunctionType {
 }
 
 enum TFunctionBinaryType {
+  // Impala builtin. We can either run this interpreted or via codegen
+  // depending on the query option.
+  BUILTIN,
+
   // Hive UDFs, loaded from *.jar
   HIVE,
 

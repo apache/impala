@@ -30,9 +30,8 @@ class TupleRow;
 
 class OpcodeRegistry {
  public:
-  // Returns the function for this opcode.  If the opcdoe is not valid,
-  // this function returns NULL
-   Expr::ComputeFn GetFunction(TExprOpcode::type opcode) {
+  // Returns the function ptr for this opcode.
+  void* GetFunctionPtr(TExprOpcode::type opcode) {
     int index = static_cast<int>(opcode);
     DCHECK_GE(index, 0);
     DCHECK_LT(index, functions_.size());
@@ -61,20 +60,19 @@ class OpcodeRegistry {
   }
 
   // Populates all of the registered functions. Implemented in
-  // opcode-registry-init.cc which is an auto-generated file 
+  // opcode-registry-init.cc which is an auto-generated file
   void Init();
 
-  // Add a function to the registry.
-  void Add(TExprOpcode::type opcode, const Expr::ComputeFn& function) {
+  void Add(TExprOpcode::type opcode, void* fn) {
     int index = static_cast<int>(opcode);
     DCHECK_LT(index, functions_.size());
     DCHECK_GE(index, 0);
-    functions_[index] = function;
+    functions_[index] = fn;
   }
 
   static OpcodeRegistry* instance_;
   static boost::mutex instance_lock_;
-  std::vector<Expr::ComputeFn> functions_;
+  std::vector<void*> functions_;
 };
 
 }

@@ -308,6 +308,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new FloatLiteral(texpr_node));
       return Status::OK;
     case TExprNodeType::FUNCTION_CALL:
+      DCHECK(texpr_node.__isset.opcode);
       *expr = pool->Add(new FunctionCall(texpr_node));
       return Status::OK;
     case TExprNodeType::INT_LITERAL:
@@ -520,12 +521,14 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   PrepareChildren(state, row_desc);
   // Not all exprs have opcodes (i.e. literals, agg-exprs)
   DCHECK(opcode_ != TExprOpcode::INVALID_OPCODE);
-  compute_fn_ = OpcodeRegistry::Instance()->GetFunction(opcode_);
-  if (compute_fn_ == NULL) {
+  void* compute_fn_ptr =
+      OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);
+  if (compute_fn_ptr == NULL) {
     stringstream out;
     out << "Expr::Prepare(): Opcode: " << opcode_ << " does not have a registry entry. ";
     return Status(out.str());
   }
+  compute_fn_ = reinterpret_cast<ComputeFn>(compute_fn_ptr);
   return Status::OK;
 }
 

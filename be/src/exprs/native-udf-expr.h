@@ -63,7 +63,7 @@ class NativeUdfExpr: public Expr {
   // TODO: Get this from the to-be-implemented ExprContext instead
   boost::scoped_ptr<impala_udf::FunctionContext> udf_context_;
 
-  // Native (.so) or IR (.ll)
+  // Native (.so), IR (.ll) or builtin
   TFunctionBinaryType::type udf_type_;
 
   // HDFS/local path and name of the compiled UDF binary

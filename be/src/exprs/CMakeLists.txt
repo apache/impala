@@ -48,6 +48,7 @@ add_library(Exprs
   timezone_db.cc
   tuple-is-null-predicate.cc
   native-udf-expr.cc
+  udf-builtins.cc
   udf-util.cc
   utility-functions.cc
 )

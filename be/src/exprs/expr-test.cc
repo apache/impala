@@ -225,20 +225,18 @@ class ExprTest : public testing::Test {
       case TYPE_BIGINT:
         EXPECT_EQ(*reinterpret_cast<int64_t*>(result), expected_result) << expr;
         break;
-      case TYPE_FLOAT: {
+      case TYPE_FLOAT:
         // Converting the float back from a string is inaccurate so convert
         // the expected result to a string.
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
                              TYPE_FLOAT, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
-      }
-      case TYPE_DOUBLE: {
+      case TYPE_DOUBLE:
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
                              TYPE_DOUBLE, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
-      }
       default:
         ASSERT_TRUE(false) << "invalid TestValue() type: " << TypeToString(expr_type);
     }
@@ -2658,11 +2656,19 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   }
 }
 
+TEST_F(ExprTest, UdfBuiltins) {
+  // These currently don't run with codegen disabled
+  if (disable_codegen_) return;
+  TestValue("udf_pi()", TYPE_DOUBLE, M_PI);
+  TestValue("udf_abs(-1)", TYPE_DOUBLE, 1.0);
+  TestStringValue("udf_lower('Hello_WORLD')", "hello_world");
+}
+
 }
 
 int main(int argc, char **argv) {
-  InitCommonRuntime(argc, argv, true);
   ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, true);
   InitFeSupport();
   impala::LlvmCodeGen::InitializeLlvm();
 

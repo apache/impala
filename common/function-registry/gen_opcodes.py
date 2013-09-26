@@ -106,6 +106,7 @@ cc_registry_preamble = '\
 #include "exprs/string-functions.h"\n\
 #include "exprs/timestamp-functions.h"\n\
 #include "exprs/conditional-functions.h"\n\
+#include "exprs/udf-builtins.h"\n\
 #include "exprs/utility-functions.h"\n\
 #include "opcode/functions.h"\n\
 \n\
@@ -217,18 +218,16 @@ operators = []
 meta_data_entries = {}
 
 # Read in the function and add it to the meta_data_entries map
-def add_function(fn_meta_data):
+def add_function(fn_meta_data, udf_interface):
   fn_name = fn_meta_data[0]
-  ret_type = fn_meta_data[1]
-  args = fn_meta_data[2]
-  be_fn = fn_meta_data[3]
 
   entry = {}
-  entry["fn_name"] = fn_meta_data[0]
+  entry["fn_name"] = fn_name
   entry["ret_type"] = fn_meta_data[1]
   entry["args"] = fn_meta_data[2]
   entry["be_fn"] = fn_meta_data[3]
   entry["sql_names"] = fn_meta_data[4]
+  entry["udf_interface"] = udf_interface
 
   if fn_name in meta_data_entries:
     meta_data_entries[fn_name].append(entry)
@@ -273,7 +272,8 @@ def generate_be_registry_init(filename):
     for entry in entries:
       opcode = entry["opcode"]
       be_fn = entry["be_fn"]
-      cc_registry_file.write("  this->Add(TExprOpcode::%s, %s);\n" % (opcode, be_fn))
+      cc_output = "TExprOpcode::%s, (void*)%s" % (opcode, be_fn)
+      cc_registry_file.write("  this->Add(%s);\n" % (cc_output))
 
   cc_registry_file.write(cc_registry_epilogue)
   cc_registry_file.close()
@@ -288,7 +288,12 @@ def generate_fe_registry_init(filename):
   for fn in meta_data_entries:
     entries = meta_data_entries[fn]
     for entry in entries:
-      java_output = "FunctionOperator." + fn.upper()
+      java_output = ""
+      if entry["udf_interface"]:
+        java_output += "true"
+      else:
+        java_output += "false"
+      java_output += ", FunctionOperator." + fn.upper()
       java_output += ", TExprOpcode." + entry["opcode"]
       # Check the last entry for varargs indicator.
       if entry["args"] and entry["args"][-1] == "...":
@@ -327,12 +332,17 @@ for function in impala_functions.functions:
   if len(function) != 5:
     print "Invalid function entry in impala_functions.py:\n\t" + repr(function)
     sys.exit(1)
-  add_function(function)
+  add_function(function, False)
+for function in impala_functions.udf_functions:
+  if len(function) != 5:
+    print "Invalid function entry in impala_functions.py:\n\t" + repr(function)
+    sys.exit(1)
+  add_function(function, True)
 for function in generated_functions.functions:
   if len(function) != 5:
     print "Invalid function entry in generated_functions.py:\n\t" + repr(function)
     sys.exit(1)
-  add_function(function)
+  add_function(function, False)
 
 generate_opcodes()
 

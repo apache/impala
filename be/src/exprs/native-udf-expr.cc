@@ -17,7 +17,9 @@
 #include <vector>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include "codegen/llvm-codegen.h"
+#include "exprs/opcode-registry.h"
 #include "exprs/udf-util.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
@@ -204,10 +206,16 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
 Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
   LlvmCodeGen* codegen = state->llvm_codegen();
 
-  if (udf_type_ == TFunctionBinaryType::NATIVE) {
+  if (udf_type_ == TFunctionBinaryType::NATIVE ||
+      udf_type_ == TFunctionBinaryType::BUILTIN) {
     void* udf_ptr;
-    RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
-        state, hdfs_location_, symbol_name_, &udf_ptr));
+    if (udf_type_ == TFunctionBinaryType::NATIVE) {
+      RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
+          state, hdfs_location_, symbol_name_, &udf_ptr));
+    } else {
+      udf_ptr = OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);
+    }
+    DCHECK(udf_ptr != NULL);
 
     // Convert UDF function pointer to llvm::Function*
     // First generate the llvm::FunctionType* corresponding to the UDF.

@@ -212,6 +212,17 @@ struct ExprValue {
 };
 
 // This is the superclass of all expr evaluation nodes.
+//
+// If codegen is enabled for the query, we will codegen as much of the expr evaluation
+// as possible. This means all builtins will run through the codegen path and nothing
+// (e.g. Exec nodes) will call GetValue(). Instead, they will call GetIrComputeFn().
+//
+// In order to call UDFs (external ones in a different binary/IR module), we need
+// to use codegen to generate the wrapper to call the function, regardless of
+// whether or not codegen is enabled for the query. If codegen is enabled for the
+// query, the UDF will be wrapped and returned as an IR function in GetIrComputeFn().
+// If codegen is disabled for the query, the UDF will be wrapped and jit compiled to
+// a function that is called in GetValue().
 class Expr {
  public:
   // typedef for compute functions.

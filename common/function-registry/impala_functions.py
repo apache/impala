@@ -89,7 +89,7 @@ functions = [
         'MathFunctions::QuotientDouble', ['quotient']],
 
   ['String_Substring', 'STRING', ['STRING', 'INT'], \
-        'StringFunctions::Substring<int32_t>', ['substr', 'substring']], 
+        'StringFunctions::Substring<int32_t>', ['substr', 'substring']],
   ['String_Substring', 'STRING', ['STRING', 'BIGINT'], \
         'StringFunctions::Substring<int64_t>', ['substr', 'substring']],
   ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'], \
@@ -124,12 +124,12 @@ functions = [
   ['String_Upper', 'STRING', ['STRING'], 'StringFunctions::Upper', ['upper', 'ucase']],
   ['String_InitCap', 'STRING', ['STRING'], 'StringFunctions::InitCap', ['initcap']],
   ['String_Reverse', 'STRING', ['STRING'], 'StringFunctions::Reverse', ['reverse']],
-  ['String_Translate', 'STRING', ['STRING', 'STRING', 'STRING'], 
+  ['String_Translate', 'STRING', ['STRING', 'STRING', 'STRING'],
         'StringFunctions::Translate', ['translate']],
   ['String_Trim', 'STRING', ['STRING'], 'StringFunctions::Trim', ['trim']],
   ['String_Ltrim', 'STRING', ['STRING'], 'StringFunctions::Ltrim', ['ltrim']],
   ['String_Rtrim', 'STRING', ['STRING'], 'StringFunctions::Rtrim', ['rtrim']],
-  ['String_Ascii', 'INT', ['STRING'], 'StringFunctions::Ascii', ['ascii']], 
+  ['String_Ascii', 'INT', ['STRING'], 'StringFunctions::Ascii', ['ascii']],
   ['String_Instr', 'INT', ['STRING', 'STRING'], 'StringFunctions::Instr', ['instr']],
   ['String_Locate', 'INT', ['STRING', 'STRING'], 'StringFunctions::Locate', ['locate']],
   ['String_Locate', 'INT', ['STRING', 'STRING', 'INT'], \
@@ -326,7 +326,7 @@ functions = [
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
   ['Conditional_IsNull', 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], \
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
-  
+
   ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], \
         'ConditionalFunctions::CoalesceBool', ['coalesce']],
   ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], \
@@ -337,4 +337,12 @@ functions = [
         'ConditionalFunctions::CoalesceString', ['coalesce']],
   ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'], \
         'ConditionalFunctions::CoalesceTimestamp', ['coalesce']],
+]
+
+# These functions are implemented against the UDF interface.
+# TODO: this list should subsume the one above when all builtins are migrated.
+udf_functions = [
+  ['Udf_Math_Pi', 'DOUBLE', [], 'UdfBuiltins::Pi', ['udf_pi']],
+  ['Udf_Math_Abs', 'DOUBLE', ['DOUBLE'], 'UdfBuiltins::Abs', ['udf_abs']],
+  ['Udf_String_Lower', 'STRING', ['STRING'], 'UdfBuiltins::Lower', ['udf_lower']],
 ]
