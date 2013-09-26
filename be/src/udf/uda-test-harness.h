@@ -38,15 +38,15 @@ enum UdaExecutionMode {
 template<typename RESULT, typename INTERMEDIATE>
 class UdaTestHarnessBase {
  public:
-  typedef void (*InitFn)(UdfContext* context, INTERMEDIATE* result);
+  typedef void (*InitFn)(FunctionContext* context, INTERMEDIATE* result);
 
-  typedef void (*MergeFn)(UdfContext* context, const INTERMEDIATE& src,
+  typedef void (*MergeFn)(FunctionContext* context, const INTERMEDIATE& src,
       INTERMEDIATE* dst);
 
-  typedef const INTERMEDIATE (*SerializeFn)(UdfContext* context,
+  typedef const INTERMEDIATE (*SerializeFn)(FunctionContext* context,
       const INTERMEDIATE& type);
 
-  typedef RESULT (*FinalizeFn)(UdfContext* context, const INTERMEDIATE& value);
+  typedef RESULT (*FinalizeFn)(FunctionContext* context, const INTERMEDIATE& value);
 
   // UDA test harness allows for custom comparator to validate results. UDAs
   // can specify a custom comparator to, for example, tolerate numerical imprecision.
@@ -80,7 +80,7 @@ class UdaTestHarnessBase {
   bool Execute(const RESULT& expected, UdaExecutionMode mode);
 
   // Returns false if there is an error set in the context.
-  bool CheckContext(UdfContext* context);
+  bool CheckContext(FunctionContext* context);
 
   // Verifies x == y, using the custom comparator if set.
   bool CheckResult(const RESULT& x, const RESULT& y);
@@ -98,7 +98,7 @@ class UdaTestHarnessBase {
   // num2 in the second. The values are processed in num1 + num2 contexts.
   RESULT ExecuteTwoLevel(int num1, int num2);
 
-  virtual void Update(int idx, UdfContext* context, INTERMEDIATE* dst) = 0;
+  virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst) = 0;
 
   // UDA functions
   InitFn init_fn_;
@@ -122,7 +122,7 @@ class UdaTestHarnessBase {
 template<typename RESULT, typename INTERMEDIATE, typename INPUT>
 class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
-  typedef void (*UpdateFn)(UdfContext* context, const INPUT& input,
+  typedef void (*UpdateFn)(FunctionContext* context, const INPUT& input,
       INTERMEDIATE* result);
 
   typedef UdaTestHarnessBase<RESULT, INTERMEDIATE> BaseClass;
@@ -155,7 +155,7 @@ class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
   }
 
  protected:
-  virtual void Update(int idx, UdfContext* context, INTERMEDIATE* dst);
+  virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst);
 
  private:
   UpdateFn update_fn_;
@@ -166,7 +166,7 @@ class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
 template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT2>
 class UdaTestHarness2 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
-  typedef void (*UpdateFn)(UdfContext* context, const INPUT1& input1,
+  typedef void (*UpdateFn)(FunctionContext* context, const INPUT1& input1,
       const INPUT2& input2, INTERMEDIATE* result);
 
   typedef UdaTestHarnessBase<RESULT, INTERMEDIATE> BaseClass;
@@ -186,7 +186,7 @@ class UdaTestHarness2 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       const RESULT& expected, UdaExecutionMode mode = ALL);
 
  protected:
-  virtual void Update(int idx, UdfContext* context, INTERMEDIATE* dst);
+  virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst);
 
  private:
   UpdateFn update_fn_;
@@ -198,7 +198,7 @@ template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT
     typename INPUT3>
 class UdaTestHarness3 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
-  typedef void (*UpdateFn)(UdfContext* context, const INPUT1& input1,
+  typedef void (*UpdateFn)(FunctionContext* context, const INPUT1& input1,
       const INPUT2& input2, const INPUT3& input3, INTERMEDIATE* result);
 
   typedef UdaTestHarnessBase<RESULT, INTERMEDIATE> BaseClass;
@@ -219,7 +219,7 @@ class UdaTestHarness3 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       const RESULT& expected, UdaExecutionMode mode = ALL);
 
  protected:
-  virtual void Update(int idx, UdfContext* context, INTERMEDIATE* dst);
+  virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst);
 
  private:
   UpdateFn update_fn_;
@@ -232,7 +232,7 @@ template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT
     typename INPUT3, typename INPUT4>
 class UdaTestHarness4 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
-  typedef void (*UpdateFn)(UdfContext* context, const INPUT1& input1,
+  typedef void (*UpdateFn)(FunctionContext* context, const INPUT1& input1,
       const INPUT2& input2, const INPUT3& input3, const INPUT4& input4,
       INTERMEDIATE* result);
 
@@ -254,7 +254,7 @@ class UdaTestHarness4 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       const RESULT& expected, UdaExecutionMode mode = ALL);
 
  protected:
-  virtual void Update(int idx, UdfContext* context, INTERMEDIATE* dst);
+  virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst);
 
  private:
   UpdateFn update_fn_;

@@ -20,21 +20,21 @@ using namespace impala_udf;
 // ---------------------------------------------------------------------------
 // This is a sample of implementing a COUNT aggregate function.
 // ---------------------------------------------------------------------------
-void CountInit(UdfContext* context, BigIntVal* val) {
+void CountInit(FunctionContext* context, BigIntVal* val) {
   val->is_null = false;
   val->val = 0;
 }
 
-void CountUpdate(UdfContext* context, const AnyVal& input, BigIntVal* val) {
+void CountUpdate(FunctionContext* context, const AnyVal& input, BigIntVal* val) {
   if (input.is_null) return;
   ++val->val;
 }
 
-void CountMerge(UdfContext* context, const BigIntVal& src, BigIntVal* dst) {
+void CountMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
   dst->val += src.val;
 }
 
-BigIntVal CountFinalize(UdfContext* context, const BigIntVal& val) {
+BigIntVal CountFinalize(FunctionContext* context, const BigIntVal& val) {
   return val;
 }
 
@@ -46,19 +46,19 @@ struct AvgStruct {
   int64_t count;
 };
 
-void AvgInit(UdfContext* context, BufferVal* val) {
+void AvgInit(FunctionContext* context, BufferVal* val) {
   assert(sizeof(AvgStruct) == 16);
   memset(*val, 0, sizeof(AvgStruct));
 }
 
-void AvgUpdate(UdfContext* context, const DoubleVal& input, BufferVal* val) {
+void AvgUpdate(FunctionContext* context, const DoubleVal& input, BufferVal* val) {
   if (input.is_null) return;
   AvgStruct* avg = reinterpret_cast<AvgStruct*>(*val);
   avg->sum += input.val;
   ++avg->count;
 }
 
-void AvgMerge(UdfContext* context, const BufferVal& src, BufferVal* dst) {
+void AvgMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst) {
   if (src == NULL) return;
   const AvgStruct* src_struct = reinterpret_cast<const AvgStruct*>(src);
   AvgStruct* dst_struct = reinterpret_cast<AvgStruct*>(*dst);
@@ -66,7 +66,7 @@ void AvgMerge(UdfContext* context, const BufferVal& src, BufferVal* dst) {
   dst_struct->count += src_struct->count;
 }
 
-DoubleVal AvgFinalize(UdfContext* context, const BufferVal& val) {
+DoubleVal AvgFinalize(FunctionContext* context, const BufferVal& val) {
   if (val == NULL) return DoubleVal::null();
   AvgStruct* val_struct = reinterpret_cast<AvgStruct*>(val);
   return DoubleVal(val_struct->sum / val_struct->count);
@@ -76,12 +76,12 @@ DoubleVal AvgFinalize(UdfContext* context, const BufferVal& val) {
 // This is a sample of implementing the STRING_CONCAT aggregate function.
 // Example: select string_concat(string_col, ",") from table
 // ---------------------------------------------------------------------------
-void StringConcatInit(UdfContext* context, StringVal* val) {
+void StringConcatInit(FunctionContext* context, StringVal* val) {
   val->is_null = true;
 }
 
-void StringConcatUpdate(UdfContext* context, const StringVal& arg1, const StringVal& arg2,
-    StringVal* val) {
+void StringConcatUpdate(FunctionContext* context, const StringVal& arg1,
+    const StringVal& arg2, StringVal* val) {
   if (val->is_null) {
     val->is_null = false;
     *val = StringVal(context, arg1.len);
@@ -96,11 +96,11 @@ void StringConcatUpdate(UdfContext* context, const StringVal& arg1, const String
   }
 }
 
-void StringConcatMerge(UdfContext* context, const StringVal& src, StringVal* dst) {
+void StringConcatMerge(FunctionContext* context, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;
   StringConcatUpdate(context, src, ",", dst);
 }
 
-StringVal StringConcatFinalize(UdfContext* context, const StringVal& val) {
+StringVal StringConcatFinalize(FunctionContext* context, const StringVal& val) {
   return val;
 }

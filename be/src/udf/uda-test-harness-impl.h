@@ -33,12 +33,12 @@ namespace impala_udf {
 class UdaTestHarnessUtil {
  public:
   template<typename T>
-  static T CreateIntermediate(UdfContext* context, int byte_size) {
+  static T CreateIntermediate(FunctionContext* context, int byte_size) {
     return T();
   }
 
   template<typename T>
-  static void FreeIntermediate(UdfContext* context, const T& v) {
+  static void FreeIntermediate(FunctionContext* context, const T& v) {
     // No-op
     return;
   }
@@ -46,26 +46,26 @@ class UdaTestHarnessUtil {
   // Copy src value into context, returning the new copy. This simulates
   // copying the bytes between nodes.
   template<typename T>
-  static T CopyIntermediate(UdfContext* context, int byte_size, const T& src) {
+  static T CopyIntermediate(FunctionContext* context, int byte_size, const T& src) {
     return src;
   }
 };
 
 template<>
 BufferVal UdaTestHarnessUtil::CreateIntermediate(
-    UdfContext* context, int byte_size) {
+    FunctionContext* context, int byte_size) {
   return reinterpret_cast<BufferVal>(context->Allocate(byte_size));
 }
 
 template<>
 void UdaTestHarnessUtil::FreeIntermediate(
-    UdfContext* context, const BufferVal& v) {
+    FunctionContext* context, const BufferVal& v) {
   context->Free(v);
 }
 
 template<>
 BufferVal UdaTestHarnessUtil::CopyIntermediate(
-    UdfContext* context, int byte_size, const BufferVal& src) {
+    FunctionContext* context, int byte_size, const BufferVal& src) {
   BufferVal v = reinterpret_cast<BufferVal>(context->Allocate(byte_size));
   memcpy(v, src, byte_size);
   return v;
@@ -73,7 +73,7 @@ BufferVal UdaTestHarnessUtil::CopyIntermediate(
 
 // Returns false if there is an error set in the context.
 template<typename RESULT, typename INTERMEDIATE>
-bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::CheckContext(UdfContext* context) {
+bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::CheckContext(FunctionContext* context) {
   if (context->has_error()) {
     std::stringstream ss;
     ss << "UDA set error to: " << context->error_msg();
@@ -149,7 +149,7 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
 
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteSingleNode() {
-  boost::scoped_ptr<UdfContext> context(UdfContext::CreateTestContext());
+  boost::scoped_ptr<FunctionContext> context(FunctionContext::CreateTestContext());
   INTERMEDIATE intermediate =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           context.get(), fixed_buffer_byte_size_);
@@ -171,12 +171,12 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteSingleNode() {
 
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes) {
-  std::vector<boost::shared_ptr<UdfContext> > contexts;
+  std::vector<boost::shared_ptr<FunctionContext> > contexts;
   std::vector<INTERMEDIATE> intermediates;
   contexts.resize(num_nodes);
 
   for (int i = 0; i < num_nodes; ++i) {
-    UdfContext* cxt = UdfContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext();
     contexts[i].reset(cxt);
     intermediates.push_back(UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           cxt, fixed_buffer_byte_size_));
@@ -184,7 +184,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes) 
     if (!CheckContext(cxt)) return RESULT::null();
   }
 
-  boost::scoped_ptr<UdfContext> merge_context(UdfContext::CreateTestContext());
+  boost::scoped_ptr<FunctionContext> merge_context(FunctionContext::CreateTestContext());
   INTERMEDIATE merged =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           merge_context.get(), fixed_buffer_byte_size_);
@@ -227,14 +227,14 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes) 
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     int num1, int num2) {
-  std::vector<boost::shared_ptr<UdfContext> > level1_contexts, level2_contexts;
+  std::vector<boost::shared_ptr<FunctionContext> > level1_contexts, level2_contexts;
   std::vector<INTERMEDIATE> level1_intermediates, level2_intermediates;
   level1_contexts.resize(num1);
   level2_contexts.resize(num2);
 
   // Initialize the intermediate contexts and intermediate result buffers
   for (int i = 0; i < num1; ++i) {
-    UdfContext* cxt = UdfContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext();
     level1_contexts[i].reset(cxt);
     level1_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
@@ -243,7 +243,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     if (!CheckContext(cxt)) return RESULT::null();
   }
   for (int i = 0; i < num2; ++i) {
-    UdfContext* cxt = UdfContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext();
     level2_contexts[i].reset(cxt);
     level2_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
@@ -253,7 +253,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
   }
 
   // Initialize the final context and final intermediate buffer
-  boost::scoped_ptr<UdfContext> final_context(UdfContext::CreateTestContext());
+  boost::scoped_ptr<FunctionContext> final_context(FunctionContext::CreateTestContext());
   INTERMEDIATE final_intermediate =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           final_context.get(), fixed_buffer_byte_size_);
@@ -333,7 +333,7 @@ bool UdaTestHarness<RESULT, INTERMEDIATE, INPUT>::Execute(
 
 template<typename RESULT, typename INTERMEDIATE, typename INPUT>
 void UdaTestHarness<RESULT, INTERMEDIATE, INPUT>::Update(
-    int idx, UdfContext* context, INTERMEDIATE* dst) {
+    int idx, FunctionContext* context, INTERMEDIATE* dst) {
   update_fn_(context, *input_[idx], dst);
 }
 
@@ -356,7 +356,7 @@ bool UdaTestHarness2<RESULT, INTERMEDIATE, INPUT1, INPUT2>::Execute(
 
 template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT2>
 void UdaTestHarness2<RESULT, INTERMEDIATE, INPUT1, INPUT2>::Update(
-    int idx, UdfContext* context, INTERMEDIATE* dst) {
+    int idx, FunctionContext* context, INTERMEDIATE* dst) {
   update_fn_(context, (*input1_)[idx], (*input2_)[idx], dst);
 }
 
@@ -380,7 +380,7 @@ bool UdaTestHarness3<RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3>::Execute(
 template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT2,
     typename INPUT3>
 void UdaTestHarness3<RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3>::Update(
-    int idx, UdfContext* context, INTERMEDIATE* dst) {
+    int idx, FunctionContext* context, INTERMEDIATE* dst) {
   update_fn_(context, (*input1_)[idx], (*input2_)[idx], (*input3_)[idx], dst);
 }
 
@@ -407,7 +407,7 @@ bool UdaTestHarness4<RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3, INPUT4>::Exec
 template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT2,
     typename INPUT3, typename INPUT4>
 void UdaTestHarness4<RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3, INPUT4>::Update(
-    int idx, UdfContext* context, INTERMEDIATE* dst) {
+    int idx, FunctionContext* context, INTERMEDIATE* dst) {
   update_fn_(context, (*input1_)[idx], (*input2_)[idx], (*input3_)[idx], (*input4_)[idx],
       dst);
 }

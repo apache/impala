@@ -21,26 +21,26 @@
 using namespace impala_udf;
 
 // This is an example of the COUNT aggregate function.
-void CountInit(UdfContext* context, BigIntVal* val);
-void CountUpdate(UdfContext* context, const AnyVal& input, BigIntVal* val);
-void CountMerge(UdfContext* context, const BigIntVal& src, BigIntVal* dst);
-BigIntVal CountFinalize(UdfContext* context, const BigIntVal& val);
+void CountInit(FunctionContext* context, BigIntVal* val);
+void CountUpdate(FunctionContext* context, const AnyVal& input, BigIntVal* val);
+void CountMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst);
+BigIntVal CountFinalize(FunctionContext* context, const BigIntVal& val);
 
 // This is an example of the AVG(double) aggregate function. This function needs to
 // maintain two pieces of state, the current sum and the count. We do this using
 // the BufferVal intermediate type. When this UDA is registered, it would specify
 // 16 bytes (8 byte sum + 8 byte count) as the size for this buffer.
-void AvgInit(UdfContext* context, BufferVal* val);
-void AvgUpdate(UdfContext* context, const DoubleVal& input, BufferVal* val);
-void AvgMerge(UdfContext* context, const BufferVal& src, BufferVal* dst);
-DoubleVal AvgFinalize(UdfContext* context, const BufferVal& val);
+void AvgInit(FunctionContext* context, BufferVal* val);
+void AvgUpdate(FunctionContext* context, const DoubleVal& input, BufferVal* val);
+void AvgMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst);
+DoubleVal AvgFinalize(FunctionContext* context, const BufferVal& val);
 
 // This is a sample of implementing the STRING_CONCAT aggregate function.
 // Example: select string_concat(string_col, ",") from table
-void StringConcatInit(UdfContext* context, StringVal* val);
-void StringConcatUpdate(UdfContext* context, const StringVal& arg1, const StringVal& arg2,
-    StringVal* val);
-void StringConcatMerge(UdfContext* context, const StringVal& src, StringVal* dst);
-StringVal StringConcatFinalize(UdfContext* context, const StringVal& val);
+void StringConcatInit(FunctionContext* context, StringVal* val);
+void StringConcatUpdate(FunctionContext* context, const StringVal& arg1,
+    const StringVal& arg2, StringVal* val);
+void StringConcatMerge(FunctionContext* context, const StringVal& src, StringVal* dst);
+StringVal StringConcatFinalize(FunctionContext* context, const StringVal& val);
 
 #endif

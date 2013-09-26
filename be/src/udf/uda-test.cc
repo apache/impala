@@ -26,22 +26,22 @@ using namespace std;
 // The input type is: int
 // The intermediate type is bigint
 // the return type is bigint
-void CountInit(UdfContext* context, BigIntVal* val) {
+void CountInit(FunctionContext* context, BigIntVal* val) {
   val->is_null = false;
   val->val = 0;
 }
 
-void CountUpdate(UdfContext* context, const IntVal& input, BigIntVal* val) {
+void CountUpdate(FunctionContext* context, const IntVal& input, BigIntVal* val) {
   // BigIntVal is the same ptr as what was passed to CountInit
   if (input.is_null) return;
   ++val->val;
 }
 
-void CountMerge(UdfContext* context, const BigIntVal& src, BigIntVal* dst) {
+void CountMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
   dst->val += src.val;
 }
 
-BigIntVal CountFinalize(UdfContext* context, const BigIntVal& val) {
+BigIntVal CountFinalize(FunctionContext* context, const BigIntVal& val) {
   return val;
 }
 
@@ -50,15 +50,15 @@ BigIntVal CountFinalize(UdfContext* context, const BigIntVal& val) {
 // The input type is: multiple ints
 // The intermediate type is bigint
 // the return type is bigint
-void Count2Update(UdfContext* context, const IntVal& input1, const IntVal& input2,
+void Count2Update(FunctionContext* context, const IntVal& input1, const IntVal& input2,
     BigIntVal* val) {
   val->val += (!input1.is_null + !input2.is_null);
 }
-void Count3Update(UdfContext* context, const IntVal& input1, const IntVal& input2,
+void Count3Update(FunctionContext* context, const IntVal& input1, const IntVal& input2,
     const IntVal& input3, BigIntVal* val) {
   val->val += (!input1.is_null + !input2.is_null + !input3.is_null);
 }
-void Count4Update(UdfContext* context, const IntVal& input1, const IntVal& input2,
+void Count4Update(FunctionContext* context, const IntVal& input1, const IntVal& input2,
     const IntVal& input3, const IntVal& input4, BigIntVal* val) {
   val->val += (!input1.is_null + !input2.is_null + !input3.is_null + !input4.is_null);
 }
@@ -75,7 +75,7 @@ struct MinState {
   int len;
   int buffer_len;
 
-  void Set(UdfContext* context, const StringVal& val) {
+  void Set(FunctionContext* context, const StringVal& val) {
     if (buffer_len < val.len) {
       context->Free(value);
       value = context->Allocate(val.len);
@@ -87,14 +87,14 @@ struct MinState {
 };
 
 // Initialize the MinState scratch space
-void MinInit(UdfContext* context, BufferVal* val) {
+void MinInit(FunctionContext* context, BufferVal* val) {
   MinState* state = reinterpret_cast<MinState*>(*val);
   state->value = NULL;
   state->buffer_len = 0;
 }
 
 // Update the min value, comparing with the current value in MinState
-void MinUpdate(UdfContext* context, const StringVal& input, BufferVal* val) {
+void MinUpdate(FunctionContext* context, const StringVal& input, BufferVal* val) {
   if (input.is_null) return;
   MinState* state = reinterpret_cast<MinState*>(*val);
   if (state->value == NULL) {
@@ -108,19 +108,19 @@ void MinUpdate(UdfContext* context, const StringVal& input, BufferVal* val) {
 }
 
 // Serialize the state into the min string
-const BufferVal MinSerialize(UdfContext* context, const BufferVal& intermediate) {
+const BufferVal MinSerialize(FunctionContext* context, const BufferVal& intermediate) {
   return intermediate;
 }
 
 // Merge is the same as Update since the serialized format is the raw input format
-void MinMerge(UdfContext* context, const BufferVal& src, BufferVal* dst) {
+void MinMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst) {
   const MinState* src_state = reinterpret_cast<const MinState*>(src);
   if (src_state->value == NULL) return;
   MinUpdate(context, StringVal(src_state->value, src_state->len), dst);
 }
 
 // Finalize also just returns the string so is the same as MinSerialize.
-StringVal MinFinalize(UdfContext* context, const BufferVal& val) {
+StringVal MinFinalize(FunctionContext* context, const BufferVal& val) {
   const MinState* state = reinterpret_cast<const MinState*>(val);
   if (state->value == NULL) return StringVal::null();
   StringVal result = StringVal(context, state->len);
@@ -135,22 +135,22 @@ StringVal MinFinalize(UdfContext* context, const BufferVal& val) {
 // The input type is: double
 // The intermediate type is bigint
 // the return type is bigint
-void XorInit(UdfContext* context, BigIntVal* val) {
+void XorInit(FunctionContext* context, BigIntVal* val) {
   val->is_null = false;
   val->val = 0;
 }
 
-void XorUpdate(UdfContext* context, const double* input, BigIntVal* val) {
+void XorUpdate(FunctionContext* context, const double* input, BigIntVal* val) {
   // BigIntVal is the same ptr as what was passed to CountInit
   if (input == NULL) return;
   val->val |= *reinterpret_cast<const int64_t*>(input);
 }
 
-void XorMerge(UdfContext* context, const BigIntVal& src, BigIntVal* dst) {
+void XorMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
   dst->val |= src.val;
 }
 
-BigIntVal XorFinalize(UdfContext* context, const BigIntVal& val) {
+BigIntVal XorFinalize(FunctionContext* context, const BigIntVal& val) {
   int64_t set_bits = 0;
   // Do popcnt on val
   // set_bits = popcnt(val.val);
@@ -165,13 +165,14 @@ BigIntVal XorFinalize(UdfContext* context, const BigIntVal& val) {
 // The input type is: bigint
 // The intermediate type is string (fixed at 256 bytes)
 // the return type is bigint
-void DistinctEstimateInit(UdfContext* context, StringVal* val) {
+void DistinctEstimateInit(FunctionContext* context, StringVal* val) {
   // Since this is known, this will be allocated to 256 bytes.
   assert(val->len == 256);
   memset(val->ptr, 0, 256);
 }
 
-void DistinctEstimatUpdate(UdfContext* context, const int64_t* input, StringVal* val) {
+void DistinctEstimatUpdate(FunctionContext* context,
+    const int64_t* input, StringVal* val) {
   if (input == NULL) return;
   for (int i = 0; i < 256; ++i) {
     int hash = 0;
@@ -181,20 +182,21 @@ void DistinctEstimatUpdate(UdfContext* context, const int64_t* input, StringVal*
   }
 }
 
-StringVal DistinctEstimatSerialize(UdfContext* context, const StringVal& intermediate) {
+StringVal DistinctEstimatSerialize(FunctionContext* context,
+    const StringVal& intermediate) {
   int compressed_size = 0;
   uint8_t* result = NULL; // SnappyCompress(intermediate.ptr, intermediate.len);
   return StringVal(result, compressed_size);
 }
 
-void DistinctEstimateMerge(UdfContext* context, const StringVal& src, StringVal* dst) {
+void DistinctEstimateMerge(FunctionContext* context, const StringVal& src, StringVal* dst) {
   uint8_t* src_uncompressed = NULL; // SnappyUncompress(src.ptr, src.len);
   for (int i = 0; i < 256; ++i) {
     dst->ptr[i] ^= src_uncompressed[i];
   }
 }
 
-BigIntVal DistinctEstimateFinalize(UdfContext* context, const StringVal& val) {
+BigIntVal DistinctEstimateFinalize(FunctionContext* context, const StringVal& val) {
   int64_t set_bits = 0;
   // Do popcnt on val
   // set_bits = popcnt(val.val);

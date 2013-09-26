@@ -20,10 +20,10 @@
 #include <string.h>
 
 // This is the only Impala header required to develop UDFs and UDAs. This header
-// contains the types that need to be used and the UdfContext object. The context
+// contains the types that need to be used and the FunctionContext object. The context
 // object serves as the interface object between the UDF/UDA and the impala process.
 namespace impala {
-  class UdfContextImpl;
+  class FunctionContextImpl;
 }
 
 namespace impala_udf {
@@ -40,10 +40,10 @@ struct BigIntVal;
 struct StringVal;
 struct TimestampVal;
 
-// The UdfContext is passed to every UDF/UDA and is the interface for the UDF to the
+// The FunctionContext is passed to every UDF/UDA and is the interface for the UDF to the
 // rest of the system. It contains APIs to examine the system state, report errors
 // and manage memory.
-class UdfContext {
+class FunctionContext {
  public:
   enum ImpalaVersion {
     v1_2,
@@ -113,23 +113,23 @@ class UdfContext {
 
   // Returns the underlying opaque implementation object. The UDF/UDA should not
   // use this. This is used internally.
-  impala::UdfContextImpl* impl() { return impl_; }
+  impala::FunctionContextImpl* impl() { return impl_; }
 
-  // Create a test UdfContext object. The caller is responsible for calling delete
+  // Create a test FunctionContext object. The caller is responsible for calling delete
   // on it. This context has additional debugging validation enabled.
-  static UdfContext* CreateTestContext();
+  static FunctionContext* CreateTestContext();
 
-  ~UdfContext();
+  ~FunctionContext();
 
  private:
-  friend class impala::UdfContextImpl;
-  UdfContext();
+  friend class impala::FunctionContextImpl;
+  FunctionContext();
 
   // Disable copy ctor and assignment operator
-  UdfContext(const UdfContext& other);
-  UdfContext& operator=(const UdfContext& other);
+  FunctionContext(const FunctionContext& other);
+  FunctionContext& operator=(const FunctionContext& other);
 
-  impala::UdfContextImpl* impl_; // Owned by this object.
+  impala::FunctionContextImpl* impl_; // Owned by this object.
 };
 
 //----------------------------------------------------------------------------
@@ -137,18 +137,18 @@ class UdfContext {
 //----------------------------------------------------------------------------
 // The UDF function must implement this function prototype. This is not
 // a typedef as the actual UDF's signature varies from UDF to UDF.
-//    typedef <*Val> Evaluate(UdfContext* context, <const Val& arg>);
+//    typedef <*Val> Evaluate(FunctionContext* context, <const Val& arg>);
 //
 // The UDF must return one of the *Val structs. The UDF must accept a pointer
-// to a UdfContext object and then a const reference for each of the input arguments.
+// to a FunctionContext object and then a const reference for each of the input arguments.
 // NULL input arguments will have NULL passed in.
 // Examples of valid Udf signatures are:
-//  1) DoubleVal Example1(UdfContext* context);
-//  2) IntVal Example2(UdfContext* context, const IntVal& arg1, const DoubleVal& arg2);
+//  1) DoubleVal Example1(FunctionContext* context);
+//  2) IntVal Example2(FunctionContext* context, const IntVal& a1, const DoubleVal& a2);
 //
 // UDFs can be variadic. The variable arguments must all come at the end and must be
 // the same type. A example signature is:
-//  StringVal Concat(UdfContext* context, const StringVal& separator,
+//  StringVal Concat(FunctionContext* context, const StringVal& separator,
 //    int num_var_args, const StringVal* args);
 // In this case args[0] is the first variable argument and args[num_var_args - 1] is
 // the last.
@@ -156,20 +156,20 @@ class UdfContext {
 // The UDF should not maintain any state across calls since there is no guarantee
 // on how the execution is multithreaded or distributed. Conceptually, the UDF
 // should only read the input arguments and return the result, using only the
-// UdfContext as an external object.
+// FunctionContext as an external object.
 //
 // Memory Managment: the UDF can assume that memory from input arguments will have
 // the same lifetime as results for the UDF. In other words, the UDF can return
 // memory from input arguments without making copies. For example, a function like
 // substring will not need to allocate and copy the smaller string. For cases where
-// the UDF needs a buffer, it should use the StringValue(UdfContext, len) c'tor.
+// the UDF needs a buffer, it should use the StringValue(FunctionContext, len) c'tor.
 //
 // The UDF can optionally specify a Prepare function. The prepare function is called
 // once before any calls to the Udf to evaluate values. This is the appropriate time for
 // the Udf to validate versions and things like that.
-// If there is an error, this function should call UdfContext::SetError()/
-// UdfContext::AddWarning().
-typedef void (*UdfPrepareFn)(UdfContext* context);
+// If there is an error, this function should call FunctionContext::SetError()/
+// FunctionContext::AddWarning().
+typedef void (*UdfPrepareFn)(FunctionContext* context);
 
 //----------------------------------------------------------------------------
 //------------------------------- UDAs ---------------------------------------
@@ -184,16 +184,16 @@ typedef void (*UdfPrepareFn)(UdfContext* context);
 //
 // If the UDA needs a fixed byte width intermediate buffer, the type should be
 // TYPE_FIXED_BUFFER and Impala will allocate the buffer. If the UDA needs an unknown
-// sized buffer, it should use TYPE_STRING and allocate it from the UdfContext
+// sized buffer, it should use TYPE_STRING and allocate it from the FunctionContext
 // manually.
 // For UDAs that need a complex data structure as the intermediate state, the
 // intermediate type should be string and the UDA can cast the ptr to the structure
 // it is using.
 //
 // Memory Management: For allocations that are not returned to Impala, the UDA
-// should use the UdfContext::Allocate()/Free() methods. For StringVal allocations
+// should use the FunctionContext::Allocate()/Free() methods. For StringVal allocations
 // returned to Impala (e.g. UdaSerialize()), the UDA should allocate the result
-// via StringVal(UdfContext*, int) ctor and Impala will automatically handle
+// via StringVal(FunctionContext*, int) ctor and Impala will automatically handle
 // freeing it.
 //
 // For clarity in documenting the UDA interface, the various types will be typedefed
@@ -206,31 +206,31 @@ typedef AnyVal IntermediateType;
 
 // UdaInit is called once for each aggregate group before calls to any of the
 // other functions below.
-typedef void (*UdaInit)(UdfContext* context, IntermediateType* result);
+typedef void (*UdaInit)(FunctionContext* context, IntermediateType* result);
 
 // This is called for each input value. The UDA should update result based on the
 // input value. The update function can take any number of input arguments. Here
 // are some examples:
-typedef void (*UdaUpdate)(UdfContext* context, const InputType& input,
+typedef void (*UdaUpdate)(FunctionContext* context, const InputType& input,
     IntermediateType* result);
-typedef void (*UdaUpdate2)(UdfContext* context, const InputType& input,
+typedef void (*UdaUpdate2)(FunctionContext* context, const InputType& input,
     const InputType2& input2, IntermediateType* result);
 
 // Merge an intermediate result 'src' into 'dst'.
-typedef void (*UdaMerge)(UdfContext* context, const IntermediateType& src,
+typedef void (*UdaMerge)(FunctionContext* context, const IntermediateType& src,
     IntermediateType* dst);
 
 // Serialize the intermediate type. The serialized data is then sent across the
 // wire. This is not called unless the intermediate type is String.
-// No additional functions will be called with this UdfContext object and the
+// No additional functions will be called with this FunctionContext object and the
 // UDA should do final clean (e.g. Free()) here.
-typedef const IntermediateType (*UdaSerialize)(UdfContext* context,
+typedef const IntermediateType (*UdaSerialize)(FunctionContext* context,
     const IntermediateType& type);
 
 // Called once at the end to return the final value for this UDA.
-// No additional functions will be called with this UdfContext object and the
+// No additional functions will be called with this FunctionContext object and the
 // UDA should do final clean (e.g. Free()) here.
-typedef ResultType (*UdaFinalize)(UdfContext* context, const IntermediateType& value);
+typedef ResultType (*UdaFinalize)(FunctionContext* context, const IntermediateType& v);
 
 //----------------------------------------------------------------------------
 //-------------Implementation of the *Val structs ----------------------------
@@ -419,7 +419,7 @@ struct StringVal : public AnyVal {
   // Creates a StringVal, allocating a new buffer with 'len'. This should
   // be used to return StringVal objects in UDF/UDAs that need to allocate new
   // string memory.
-  StringVal(UdfContext* context, int len);
+  StringVal(FunctionContext* context, int len);
 
   bool operator==(const StringVal& other) const {
     if (is_null != other.is_null) return false;

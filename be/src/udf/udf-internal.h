@@ -25,14 +25,16 @@
 
 namespace impala {
 
-// This class actually implements the interface of UdfContext. This is split to
+// This class actually implements the interface of FunctionContext. This is split to
 // hide the details from the external header.
-class UdfContextImpl {
+class FunctionContextImpl {
  public:
-  // Create a UdfContext. The caller is responsible for calling delete on it.
-  static impala_udf::UdfContext* CreateContext() { return new impala_udf::UdfContext(); }
+  // Create a FunctionContext. The caller is responsible for calling delete on it.
+  static impala_udf::FunctionContext* CreateContext() {
+    return new impala_udf::FunctionContext();
+  }
 
-  UdfContextImpl(impala_udf::UdfContext* parent);
+  FunctionContextImpl(impala_udf::FunctionContext* parent);
 
   // Allocates a buffer of 'byte_size' with "local" memory management. These
   // allocations are not freed one by one but freed as a pool by FreeLocalAllocations()
@@ -51,15 +53,15 @@ class UdfContextImpl {
   bool CheckLocalAlloctionsEmpty();
 
  private:
-  friend class impala_udf::UdfContext;
+  friend class impala_udf::FunctionContext;
 
   // Parent context object. Not owned
-  impala_udf::UdfContext* context_;
+  impala_udf::FunctionContext* context_;
 
   // If true, indicates this is a debug context which will do additional validation.
   bool debug_;
 
-  impala_udf::UdfContext::ImpalaVersion version_;
+  impala_udf::FunctionContext::ImpalaVersion version_;
 
   // Empty if there's no error
   std::string error_msg_;

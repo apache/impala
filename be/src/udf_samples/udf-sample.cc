@@ -15,7 +15,7 @@
 #include "udf-sample.h"
 
 // In this sample we are declaring a UDF that adds two ints and returns an int.
-IntVal AddUdf(UdfContext* context, const IntVal& arg1, const IntVal& arg2) {
+IntVal AddUdf(FunctionContext* context, const IntVal& arg1, const IntVal& arg2) {
   if (arg1.is_null || arg2.is_null) return IntVal::null();
   return IntVal(arg1.val + arg2.val);
 }

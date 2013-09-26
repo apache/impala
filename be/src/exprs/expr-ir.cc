@@ -24,8 +24,8 @@ void* IrExprGetValue(Expr* expr, TupleRow* row) {
   return expr->GetValue(row);
 }
 
-// Dummy function to force compilation of UdfContext type
-void dummy(impala_udf::UdfContext) { }
+// Dummy function to force compilation of FunctionContext type
+void dummy(impala_udf::FunctionContext) { }
 
 #else
 #error "This file should only be compiled by clang."

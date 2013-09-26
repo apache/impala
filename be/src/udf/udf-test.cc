@@ -25,16 +25,16 @@ using namespace impala;
 using namespace impala_udf;
 using namespace std;
 
-DoubleVal ZeroUdf(UdfContext* context) {
+DoubleVal ZeroUdf(FunctionContext* context) {
   return DoubleVal(0);
 }
 
-StringVal LogUdf(UdfContext* context, const StringVal& arg1) {
+StringVal LogUdf(FunctionContext* context, const StringVal& arg1) {
   cerr << (arg1.is_null ? "NULL" : string((char*)arg1.ptr, arg1.len)) << endl;
   return arg1;
 }
 
-StringVal UpperUdf(UdfContext* context, const StringVal& input) {
+StringVal UpperUdf(FunctionContext* context, const StringVal& input) {
   if (input.is_null) return StringVal::null();
   // Create a new StringVal object that's the same length as the input
   StringVal result = StringVal(context, input.len);
@@ -44,7 +44,7 @@ StringVal UpperUdf(UdfContext* context, const StringVal& input) {
   return result;
 }
 
-FloatVal Min3(UdfContext* context, const FloatVal& f1,
+FloatVal Min3(FunctionContext* context, const FloatVal& f1,
     const FloatVal& f2, const FloatVal& f3) {
   bool is_null = true;
   float v;
@@ -75,7 +75,7 @@ FloatVal Min3(UdfContext* context, const FloatVal& f1,
   return is_null ? FloatVal::null() : FloatVal(v);
 }
 
-StringVal Concat(UdfContext* context, int n, const StringVal* args) {
+StringVal Concat(FunctionContext* context, int n, const StringVal* args) {
   int size = 0;
   bool all_null = true;
   for (int i = 0; i < n; ++i) {
@@ -95,18 +95,18 @@ StringVal Concat(UdfContext* context, int n, const StringVal* args) {
   return result;
 }
 
-IntVal NumVarArgs(UdfContext*, const BigIntVal& dummy, int n, const IntVal* args) {
+IntVal NumVarArgs(FunctionContext*, const BigIntVal& dummy, int n, const IntVal* args) {
   return IntVal(n);
 }
 
-IntVal ValidateUdf(UdfContext* context) {
-  EXPECT_EQ(context->version(), UdfContext::v1_2);
+IntVal ValidateUdf(FunctionContext* context) {
+  EXPECT_EQ(context->version(), FunctionContext::v1_2);
   EXPECT_FALSE(context->has_error());
   EXPECT_TRUE(context->error_msg() == NULL);
   return IntVal::null();
 }
 
-IntVal ValidateFail(UdfContext* context) {
+IntVal ValidateFail(FunctionContext* context) {
   EXPECT_FALSE(context->has_error());
   EXPECT_TRUE(context->error_msg() == NULL);
   context->SetError("Fail");
@@ -115,7 +115,7 @@ IntVal ValidateFail(UdfContext* context) {
   return IntVal::null();
 }
 
-IntVal ValidateMem(UdfContext* context) {
+IntVal ValidateMem(FunctionContext* context) {
   EXPECT_TRUE(context->Allocate(0) == NULL);
   uint8_t* buffer = context->Allocate(10);
   EXPECT_TRUE(buffer != NULL);
@@ -124,7 +124,7 @@ IntVal ValidateMem(UdfContext* context) {
   return IntVal::null();
 }
 
-StringVal TimeToString(UdfContext* context, const TimestampVal& time) {
+StringVal TimeToString(FunctionContext* context, const TimestampVal& time) {
   ptime t(*(date*)&time.date);
   t += nanoseconds(time.time_of_day);
   stringstream ss;
@@ -135,7 +135,7 @@ StringVal TimeToString(UdfContext* context, const TimestampVal& time) {
   return result;
 }
 
-TEST(UdfTest, TestUdfContext) {
+TEST(UdfTest, TestFunctionContext) {
   EXPECT_TRUE(UdfTestHarness::ValidateUdf<IntVal>(ValidateUdf, IntVal::null()));
   EXPECT_FALSE(UdfTestHarness::ValidateUdf<IntVal>(ValidateFail, IntVal::null()));
   EXPECT_TRUE(UdfTestHarness::ValidateUdf<IntVal>(ValidateMem, IntVal::null()));

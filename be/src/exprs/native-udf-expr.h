@@ -20,7 +20,7 @@
 #include "exprs/expr.h"
 
 namespace impala_udf {
-class UdfContext;
+  class FunctionContext;
 }
 
 namespace impala {
@@ -63,9 +63,9 @@ class NativeUdfExpr: public Expr {
   // compute_fn_ is set to this in Prepare().
   static void* ComputeFn(Expr* e, TupleRow* row);
 
-  // UdfContext* that is passed to the UDF
+  // FunctionContext* that is passed to the UDF
   // TODO: Get this from the to-be-implemented ExprContext instead
-  boost::scoped_ptr<impala_udf::UdfContext> udf_context_;
+  boost::scoped_ptr<impala_udf::FunctionContext> udf_context_;
 
   // HDFS/local path and name of the compiled UDF binary
   std::string hdfs_location_;

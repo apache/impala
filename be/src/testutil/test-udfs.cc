@@ -19,24 +19,24 @@ using namespace impala_udf;
 // These functions are intended to test the "glue" that runs UDFs. Thus, the UDFs
 // themselves are kept very simple.
 
-BooleanVal Identity(UdfContext* context, const BooleanVal& arg) { return arg; }
+BooleanVal Identity(FunctionContext* context, const BooleanVal& arg) { return arg; }
 
-TinyIntVal Identity(UdfContext* context, const TinyIntVal& arg) { return arg; }
+TinyIntVal Identity(FunctionContext* context, const TinyIntVal& arg) { return arg; }
 
-SmallIntVal Identity(UdfContext* context, const SmallIntVal& arg) { return arg; }
+SmallIntVal Identity(FunctionContext* context, const SmallIntVal& arg) { return arg; }
 
-IntVal Identity(UdfContext* context, const IntVal& arg) { return arg; }
+IntVal Identity(FunctionContext* context, const IntVal& arg) { return arg; }
 
-BigIntVal Identity(UdfContext* context, const BigIntVal& arg) { return arg; }
+BigIntVal Identity(FunctionContext* context, const BigIntVal& arg) { return arg; }
 
-FloatVal Identity(UdfContext* context, const FloatVal& arg) { return arg; }
+FloatVal Identity(FunctionContext* context, const FloatVal& arg) { return arg; }
 
-DoubleVal Identity(UdfContext* context, const DoubleVal& arg) { return arg; }
+DoubleVal Identity(FunctionContext* context, const DoubleVal& arg) { return arg; }
 
-StringVal Identity(UdfContext* context, const StringVal& arg) { return arg; }
+StringVal Identity(FunctionContext* context, const StringVal& arg) { return arg; }
 
 IntVal AllTypes(
-    UdfContext* context, const StringVal& string, const BooleanVal& boolean,
+    FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
     const BigIntVal& big_int, const FloatVal& float_val, const DoubleVal& double_val) {
   int result = string.len + boolean.val + tiny_int.val + small_int.val + int_val.val
@@ -45,6 +45,6 @@ IntVal AllTypes(
   return IntVal(result);
 }
 
-StringVal NoArgs(UdfContext* context) {
+StringVal NoArgs(FunctionContext* context) {
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>("string")), 6);
 }

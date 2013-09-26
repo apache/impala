@@ -33,7 +33,7 @@ DEFINE_string(local_library_dir, "/tmp",
 
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
-    udf_context_(UdfContextImpl::CreateContext()),
+    udf_context_(FunctionContextImpl::CreateContext()),
     hdfs_location_(node.udf_call_expr.binary_location),
     symbol_name_(node.udf_call_expr.symbol_name),
     dl_handle_(NULL),
@@ -156,9 +156,10 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
 //       i8* %context, %"class.impala::TupleRow"* %row)
 //   %arg2 = alloca %BigIntVal
 //   store %BigIntVal %arg_val1, %BigIntVal* %arg2
-//   %result = call %BigIntVal @_Z6AddUdfPN10impala_udf10UdfContextERKNS_9BigIntValES4_(
-//       %"class.impala_udf::UdfContext"* inttoptr
-//           (i64 58189624 to %"class.impala_udf::UdfContext"*),
+//   %result = call
+//       %BigIntVal @_Z6AddUdfPN10impala_udf10FunctionContextERKNS_9BigIntValES4_(
+//       %"class.impala_udf::FunctionContext"* inttoptr
+//           (i64 58189624 to %"class.impala_udf::FunctionContext"*),
 //       %BigIntVal* %arg, %BigIntVal* %arg2)
 //   ret %BigIntVal %result
 // }
@@ -173,7 +174,7 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   // Convert UDF function pointer to llvm::Function*
   Type* return_type = GetUdfValType(codegen, type_);
   vector<Type*> arg_types;
-  arg_types.push_back(codegen->GetPtrType("class.impala_udf::UdfContext"));
+  arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
   for (int i = 0; i < children_.size(); ++i) {
     Type* child_return_type = GetUdfValType(codegen, children_[i]->type());
     arg_types.push_back(PointerType::get(child_return_type, 0));
@@ -189,10 +190,10 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmCodeGen::LlvmBuilder builder(block);
 
-  // First argument is always UdfContext*
+  // First argument is always FunctionContext*
   vector<Value*> udf_args;
   udf_args.push_back(codegen->CastPtrToLlvmPtr(
-      codegen->GetPtrType("class.impala_udf::UdfContext"), udf_context_.get()));
+      codegen->GetPtrType("class.impala_udf::FunctionContext"), udf_context_.get()));
 
   // Call children to populate remaining arguments
   for (int i = 0; i < children_.size(); ++i) {
