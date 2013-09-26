@@ -20,7 +20,7 @@ PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py
 # Note: this could go wrong if we have used two different versions of
 # Python to build Thrift on this machine, and the first version is not
 # compatible with the second.
-for PYTHON_DIR in ${THRIFT_HOME}/python/lib/python*/site-packages; do
+for PYTHON_DIR in ${THRIFT_HOME}/python/lib{64,}/python*/site-packages; do
     PYTHONPATH=$PYTHONPATH:${PYTHON_DIR}/
 done
 
