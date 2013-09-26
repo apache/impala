@@ -21,7 +21,6 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -706,6 +705,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.SO' SYMBOL='a'");
     AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
 
+    // Varargs
+    AnalyzesOk("create function foo(INT...) RETURNS int" + udfSuffix);
+
     // Try to create a function with the same name as a builtin
     AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
         "Function cannot have the same name as a builtin: sin");
@@ -745,17 +747,42 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function if exists a.foo()");
     AnalysisError("drop function a.foo()", "Database does not exist: a");
     AnalyzesOk("drop function if exists foo()");
+    AnalyzesOk("drop function if exists foo(int...)");
+    AnalyzesOk("drop function if exists foo(double, int...)");
 
-    // Add a udf default.TestFn() and default.TestFn(double)
-    catalog.addFunction(new Udf(new FunctionName("default", "TestFn"),
-        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
-    catalog.addFunction(new Udf(new FunctionName("default", "TestFn"),
-        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null));
+    // Add functions default.TestFn(), default.TestFn(double), default.TestFn(String...),
+    addTestFunction("TestFn", new ArrayList<PrimitiveType>(), false);
+    addTestFunction("TestFn", Lists.newArrayList(PrimitiveType.DOUBLE), false);
+    addTestFunction("TestFn", Lists.newArrayList(PrimitiveType.STRING), true);
 
     AnalysisError("create function TestFn() RETURNS INT " + udfSuffix,
         "Function already exists: testfn()");
     AnalysisError("create function TestFn(double) RETURNS INT " + udfSuffix,
         "Function already exists: testfn(DOUBLE)");
+
+    // Fn(Double) and Fn(Double...) should be a conflict.
+    AnalysisError("create function TestFn(double...) RETURNS INT" + udfSuffix,
+        "Function already exists: testfn(DOUBLE)");
+    AnalysisError("create function TestFn(double) RETURNS INT" + udfSuffix,
+        "Function already exists: testfn(DOUBLE)");
+
+    // Add default.TestFn(int, int)
+    addTestFunction("TestFn",
+        Lists.newArrayList(PrimitiveType.INT, PrimitiveType.INT), false);
+    AnalyzesOk("drop function TestFn(int, int)");
+    AnalysisError("drop function TestFn(int, int, int)",
+        "Function does not exist: testfn(INT, INT, INT)");
+
+    // Fn(String...) was already added.
+    AnalysisError("create function TestFn(String) RETURNS INT" + udfSuffix,
+        "Function already exists: testfn(STRING...)");
+    AnalysisError("create function TestFn(String...) RETURNS INT" + udfSuffix,
+        "Function already exists: testfn(STRING...)");
+    AnalysisError("create function TestFn(String, String) RETURNS INT" + udfSuffix,
+        "Function already exists: testfn(STRING...)");
+    AnalyzesOk("create function TestFn(String, String, Int) RETURNS INT" + udfSuffix);
+
+    // Check function overloading.
     AnalyzesOk("create function TestFn(int) RETURNS INT " + udfSuffix);
 
     // Create a function with the same signature in a different db
@@ -763,16 +790,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     AnalyzesOk("drop function TestFn()");
     AnalyzesOk("drop function TestFn(double)");
+    AnalyzesOk("drop function TestFn(string...)");
+    AnalysisError("drop function TestFn(double...)",
+        "Function does not exist: testfn(DOUBLE...)");
     AnalysisError("drop function TestFn(int)", "Function does not exist: testfn(INT)");
     AnalysisError(
         "drop function functional.TestFn()", "Function does not exist: testfn()");
 
-    Udf udf = new Udf(new FunctionName("functional", "TestFn"),
-        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, null, null);
-    catalog.addFunction(udf);
+    addTestFunction("udf_test", "TestFn", new ArrayList<PrimitiveType>(), false);
     AnalysisError(
-        "drop database functional", "Cannot drop non-empty database: functional");
-    catalog.removeFunction(udf);
+        "drop database udf_test", "Cannot drop non-empty database: udf_test");
 
     AnalysisError("create function f() returns int " + udfSuffix +
         "init_fn='a'", "Optional argument 'INIT_FN' should not be set");
@@ -805,9 +832,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE CHAR(0) LOCATION '/foo.so' UPDATE_FN='b'",
         "Array size must be > 0. Size was set to: 0.");
-
     AnalysisError("create aggregate function foo() RETURNS int" + loc,
-        "UDA must take at least 1 argument.");
+        "UDAs must take at least one argument.");
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
         "'/foo.jar' UPDATE_FN='b'", "Java UDAs are not supported.");
 

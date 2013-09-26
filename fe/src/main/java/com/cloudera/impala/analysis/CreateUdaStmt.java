@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -24,7 +23,6 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateUdaParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE AGGREGATE FUNCTION statement.
@@ -45,11 +43,11 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
    * @param additionalArgs - Key/Value pairs for additional arguments. The keys are
    *        validated in analyze()
    */
-  public CreateUdaStmt(FunctionName fnName, ArrayList<PrimitiveType> fnArgs,
+  public CreateUdaStmt(FunctionName fnName, FunctionArgs args,
       PrimitiveType retType, ColumnType intermediateType,
       HdfsURI location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
-    super(new Uda(fnName, fnArgs, retType), location, ifNotExists, optArgs);
+    super(new Uda(fnName, args, retType), location, ifNotExists, optArgs);
     uda_ = (Uda)super.fn_;
     intermediateType_ = intermediateType;
   }
@@ -101,7 +99,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     }
 
     if (uda_.getNumArgs() == 0) {
-      throw new AnalysisException("UDA must take at least 1 argument.");
+      throw new AnalysisException("UDAs must take at least one argument.");
     }
 
     if (intermediateType_ == null) {

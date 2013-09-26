@@ -2,30 +2,18 @@
 ---- QUERY
 create database if not exists function_ddl_test
 ====
+---- QUERY
 # Drop the dummy udfs this test uses.
----- QUERY
-drop function if exists function_ddl_test.fn()
-====
----- QUERY
-drop function if exists function_ddl_test.fn(int)
-====
----- QUERY
-drop function if exists function_ddl_test.fn(int, string)
-====
----- QUERY
-drop function if exists function_ddl_test.fn(string, int)
-====
----- QUERY
-drop function if exists function_ddl_test.fn2(int)
-====
----- QUERY
-drop function if exists function_ddl_test.fn2(int, string)
-====
----- QUERY
-drop function if exists function_ddl_test.agg_fn(int)
-====
----- QUERY
-drop function if exists function_ddl_test.agg_fn(int, string)
+drop function if exists function_ddl_test.fn();
+drop function if exists function_ddl_test.fn(int);
+drop function if exists function_ddl_test.fn(int, string);
+drop function if exists function_ddl_test.fn(string, int);
+drop function if exists function_ddl_test.fn2(int);
+drop function if exists function_ddl_test.fn2(int, string);
+drop function if exists function_ddl_test.fn_var_arg(int...);
+drop function if exists function_ddl_test.agg_fn(int);
+drop function if exists function_ddl_test.agg_fn(int, string);
+drop function if exists function_ddl_test.agg_fn_var_arg(double, string...);
 ====
 ---- QUERY
 # Verify all the test functions are removed
@@ -65,11 +53,19 @@ create function function_ddl_test.fn2(int, string)
 RETURNS int LOCATION '/test.so' SYMBOL='foo'
 ====
 ---- QUERY
+create function function_ddl_test.fn_var_arg(int...)
+RETURNS int LOCATION '/test.so' SYMBOL='foo'
+====
+---- QUERY
 create aggregate function function_ddl_test.agg_fn(int)
 RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
 ====
 ---- QUERY
 create aggregate function function_ddl_test.agg_fn(int, string)
+RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
+====
+---- QUERY
+create aggregate function function_ddl_test.agg_fn_var_arg(double, string...)
 RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
 ====
 ---- QUERY
@@ -81,6 +77,7 @@ show functions in function_ddl_test
 'fn(STRING, INT)'
 'fn2(INT)'
 'fn2(INT, STRING)'
+'fn_var_arg(INT...)'
 ---- TYPES
 STRING
 ====
@@ -89,6 +86,7 @@ show aggregate functions in function_ddl_test
 ---- RESULTS
 'agg_fn(INT)'
 'agg_fn(INT, STRING)'
+'agg_fn_var_arg(DOUBLE, STRING...)'
 ---- TYPES
 STRING
 ====
@@ -103,6 +101,7 @@ show functions in function_ddl_test
 'fn(INT, STRING)'
 'fn(STRING, INT)'
 'fn2(INT)'
+'fn_var_arg(INT...)'
 ---- TYPES
 STRING
 ====
@@ -117,6 +116,7 @@ show functions in function_ddl_test
 'fn(INT, STRING)'
 'fn(STRING, INT)'
 'fn2(INT)'
+'fn_var_arg(INT...)'
 ---- TYPES
 STRING
 ====
@@ -131,6 +131,7 @@ show functions;
 'fn(INT, STRING)'
 'fn(STRING, INT)'
 'fn2(INT)'
+'fn_var_arg(INT...)'
 ---- TYPES
 STRING
 ====
@@ -144,11 +145,36 @@ show functions;
 'fn(INT, STRING)'
 'fn(STRING, INT)'
 'fn2(INT)'
+'fn_var_arg(INT...)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function fn_var_arg(INT...)
+====
+---- QUERY
+show functions;
+---- RESULTS
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
 ---- TYPES
 STRING
 ====
 ---- QUERY
 drop function agg_fn(int)
+====
+---- QUERY
+show aggregate functions;
+---- RESULTS
+'agg_fn(INT, STRING)'
+'agg_fn_var_arg(DOUBLE, STRING...)'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function agg_fn_var_arg(double, string...)
 ====
 ---- QUERY
 show aggregate functions;

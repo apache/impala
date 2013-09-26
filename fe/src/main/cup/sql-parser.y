@@ -218,7 +218,8 @@ terminal
   KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES,
   KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
-terminal COMMA, DOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
+terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
+  DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
@@ -342,9 +343,10 @@ nonterminal String optional_kw_table;
 nonterminal Boolean overwrite_val;
 
 // For Create/Drop/Show function ddl
-nonterminal ArrayList<PrimitiveType> function_def_args;
-nonterminal ArrayList<PrimitiveType> function_def_arg_list;
+nonterminal FunctionArgs function_def_args;
+nonterminal FunctionArgs function_def_arg_list;
 nonterminal Boolean opt_is_aggregate_fn;
+nonterminal Boolean opt_is_varargs;
 nonterminal ColumnType opt_aggregate_fn_intermediate_type;
 nonterminal CreateUdfStmt create_udf_stmt;
 nonterminal CreateUdaStmt create_uda_stmt;
@@ -825,7 +827,7 @@ drop_function_stmt ::=
   KW_DROP opt_is_aggregate_fn:is_aggregate KW_FUNCTION
       if_exists_val:if_exists function_name:fn_name
   function_def_args:fn_args
-  {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists, is_aggregate); :}
+  {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
   ;
 
 db_or_schema_kw ::=
@@ -906,27 +908,37 @@ static_partition_key_value ::=
 
 function_def_args ::=
   LPAREN RPAREN
-  {: RESULT = new ArrayList<PrimitiveType>(); :}
-  | LPAREN function_def_arg_list:args RPAREN
-  {: RESULT = args; :}
+  {: RESULT = new FunctionArgs(); :}
+  | LPAREN function_def_arg_list:args opt_is_varargs:var_args RPAREN
+  {:
+    args.setHasVarArgs(var_args);
+    RESULT = args;
+  :}
   ;
 
 function_def_arg_list ::=
   primitive_type:type
   {:
-    ArrayList<PrimitiveType> list = new ArrayList<PrimitiveType>();
-    list.add(type);
-    RESULT = list;
+    FunctionArgs args = new FunctionArgs();
+    args.argTypes.add(type);
+    RESULT = args;
   :}
-  | function_def_arg_list:list COMMA primitive_type:type
+  | function_def_arg_list:args COMMA primitive_type:type
   {:
-    list.add(type);
-    RESULT = list;
+    args.argTypes.add(type);
+    RESULT = args;
   :}
   ;
 
 opt_is_aggregate_fn ::=
   KW_AGGREGATE
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
+opt_is_varargs ::=
+  DOTDOTDOT
   {: RESULT = true; :}
   |
   {: RESULT = false; :}

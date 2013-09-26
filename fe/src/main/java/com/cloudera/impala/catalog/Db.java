@@ -254,18 +254,26 @@ public class Db {
   /*
    * See comment in Catalog.
    */
-  public Function getFunction(Function desc, boolean exactMatch) {
+  public Function getFunction(Function desc, Function.CompareMode mode) {
     synchronized (functions) {
       List<Function> fns = functions.get(desc.functionName());
       if (fns == null) return null;
 
+      // First check for identical
       for (Function f: fns) {
-        if (desc.equals(f)) return f;
+        if (f.compare(desc, Function.CompareMode.IS_IDENTICAL)) return f;
       }
-      if (exactMatch) return null;
+      if (mode == Function.CompareMode.IS_IDENTICAL) return null;
 
+      // Next check for indistinguishable
       for (Function f: fns) {
-        if (f.isSupertype(desc)) return f;
+        if (f.compare(desc, Function.CompareMode.IS_INDISTINGUISHABLE)) return f;
+      }
+      if (mode == Function.CompareMode.IS_INDISTINGUISHABLE) return null;
+
+      // Finally check for is_subtype
+      for (Function f: fns) {
+        if (f.compare(desc, Function.CompareMode.IS_SUBTYPE)) return f;
       }
     }
     return null;
@@ -277,7 +285,9 @@ public class Db {
   public boolean addFunction(Function fn) {
     // TODO: add this to persistent store
     synchronized (functions) {
-      if (getFunction(fn, true) != null) return false;
+      if (getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
+        return false;
+      }
       List<Function> fns = functions.get(fn.functionName());
       if (fns == null) {
         fns = Lists.newArrayList();
@@ -294,7 +304,7 @@ public class Db {
   public boolean removeFunction(Function desc) {
     // TODO: remove this from persistent store.
     synchronized (functions) {
-      Function fn = getFunction(desc, true);
+      Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
       if (fn == null) return false;
       List<Function> fns = functions.get(desc.functionName());
       Preconditions.checkNotNull(fns);

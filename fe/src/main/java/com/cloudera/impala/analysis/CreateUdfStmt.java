@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -23,7 +22,6 @@ import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateUdfParams;
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE FUNCTION statement.
@@ -42,10 +40,10 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
    * @param additionalArgs - Key/Value pairs for additional arguments. The keys are
    *        validated in analyze()
    */
-  public CreateUdfStmt(FunctionName fnName, ArrayList<PrimitiveType> fnArgs,
+  public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
       PrimitiveType retType, HdfsURI location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
-    super(new Udf(fnName, fnArgs, retType), location, ifNotExists, optArgs);
+    super(new Udf(fnName, args, retType), location, ifNotExists, optArgs);
     udf_ = (Udf)fn_;
   }
 

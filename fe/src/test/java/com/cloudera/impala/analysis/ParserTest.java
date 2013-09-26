@@ -1230,9 +1230,22 @@ public class ParserTest {
     ParserError("CREATE FUNCTION Foo(NULL, INT) RETURNS INT LOCATION 'f.jar'");
     ParserError("CREATE FUNCTION Foo(INT, NULL) RETURNS INT LOCATION 'f.jar'");
     ParserError("CREATE FUNCTION Foo() RETURNS NULL LOCATION 'f.jar'");
+  }
 
-    // Variadic args not yet supported
-    ParserError("CREATE FUNCTION Foo(...) RETURNS INT LOCATION 'f.jar'");
+  @Test
+  public void TestVariadicCreateFunctions() {
+    String fnCreates[] = {"CREATE FUNCTION ", "CREATE AGGREGATE FUNCTION " };
+    for (String fnCreate: fnCreates) {
+      ParsesOk(fnCreate + "Foo(int...) RETURNS INT LOCATION 'f.jar'");
+      ParsesOk(fnCreate + "Foo(int ...) RETURNS INT LOCATION 'f.jar'");
+      ParsesOk(fnCreate + "Foo(int, double ...) RETURNS INT LOCATION 'f.jar'");
+
+      ParserError(fnCreate + "Foo(...) RETURNS INT LOCATION 'f.jar'");
+      ParserError(fnCreate + "Foo(int..., double) RETURNS INT LOCATION 'f.jar'");
+      ParserError(fnCreate + "Foo(int) RETURNS INT... LOCATION 'f.jar'");
+      ParserError(fnCreate + "Foo(int. . .) RETURNS INT... LOCATION 'f.jar'");
+      ParserError(fnCreate + "Foo(int, ...) RETURNS INT... LOCATION 'f.jar'");
+    }
   }
 
   @Test
@@ -1272,6 +1285,9 @@ public class ParserTest {
     ParserError("CREATE UNKNOWN FUNCTION " + "Foo() RETURNS INT" + loc);
     ParserError("CREATE AGGREGATE FUNCTION Foo() init_fn='1' RETURNS INT" + loc);
     ParserError(c + "init_fn='1'" + loc);
+
+    // Variadic args
+    ParsesOk("CREATE AGGREGATE FUNCTION Foo(INT...) RETURNS INT LOCATION 'f.jar'");
   }
 
   @Test
@@ -1716,6 +1732,7 @@ public class ParserTest {
     ParsesOk("DROP FUNCTION Foo.Foo(INT)");
     ParsesOk("DROP AGGREGATE FUNCTION IF EXISTS Foo()");
     ParsesOk("DROP FUNCTION IF EXISTS Foo(INT)");
+    ParsesOk("DROP FUNCTION IF EXISTS Foo(INT...)");
 
     ParserError("DROP");
     ParserError("DROP Foo");
@@ -1744,6 +1761,7 @@ public class ParserTest {
     ParserError("DROP FUNCTION Foo(INT) RETURNS NULL");
     ParserError("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
     ParserError("DROP BLAH FUNCTION IF EXISTS Foo.A.Foo(INT)");
+    ParserError("DROP FUNCTION IF EXISTS Foo(...)");
   }
 
   @Test

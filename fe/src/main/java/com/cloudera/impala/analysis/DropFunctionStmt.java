@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -36,18 +35,14 @@ public class DropFunctionStmt extends StatementBase {
   private final Function desc_;
   private final boolean ifExists_;
 
-  // If true, drop UDA, otherwise, drop UDF
-  private final boolean isAggregate_;
-
   /**
    * Constructor for building the drop statement. If ifExists is true, an error will not
    * be thrown if the function does not exist.
    */
-  public DropFunctionStmt(FunctionName fnName, ArrayList<PrimitiveType> fnArgs,
-      boolean ifExists, boolean isAggregate) {
-    desc_ = new Function(fnName, fnArgs, PrimitiveType.INVALID_TYPE, false);
+  public DropFunctionStmt(FunctionName fnName, FunctionArgs fnArgs, boolean ifExists) {
+    desc_ = new Function(
+        fnName, fnArgs.argTypes, PrimitiveType.INVALID_TYPE, fnArgs.hasVarArgs);
     ifExists_ = ifExists;
-    isAggregate_ = isAggregate;
   }
 
   public FunctionName getFunction() { return desc_.getName(); }
@@ -88,7 +83,8 @@ public class DropFunctionStmt extends StatementBase {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
 
-    if (analyzer.getCatalog().getFunction(desc_, true) == null && !ifExists_) {
+    if (analyzer.getCatalog().getFunction(
+        desc_, Function.CompareMode.IS_IDENTICAL) == null && !ifExists_) {
       throw new AnalysisException(
           Analyzer.FN_DOES_NOT_EXIST_ERROR_MSG + desc_.signatureString());
     }

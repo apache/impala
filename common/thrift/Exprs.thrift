@@ -118,6 +118,8 @@ struct TUdfCallExpr {
   2: required string symbol_name
 
   3: required Types.TFunctionBinaryType binary_type
+
+  4: required bool has_var_args;
 }
 
 // This is essentially a union over the subclasses of Expr.

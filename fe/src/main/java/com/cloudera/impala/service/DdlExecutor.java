@@ -336,6 +336,7 @@ public class DdlExecutor {
       LOG.info(String.format("Adding UDA %s", uda.signatureString()));
       fn = uda;
     }
+    fn.setHasVarArgs(params.has_var_args);
     fn.setBinaryType(params.fn_binary_type);
 
     boolean added = catalog.addFunction(fn);

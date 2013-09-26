@@ -63,6 +63,7 @@ public class FunctionCallExpr extends Expr {
       msg.udf_call_expr.setBinary_location(udf_.getLocation().toString());
       msg.udf_call_expr.setSymbol_name(udf_.getSymbolName());
       msg.udf_call_expr.setBinary_type(udf_.getBinaryType());
+      msg.udf_call_expr.setHas_var_args(udf_.getHasVarArgs());
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
       msg.setOpcode(opcode);
@@ -101,7 +102,8 @@ public class FunctionCallExpr extends Expr {
       Function searchDesc = new Function(functionName_,
           argTypes, PrimitiveType.INVALID_TYPE, false);
 
-      Function fn = analyzer.getCatalog().getFunction(searchDesc, false);
+      Function fn = analyzer.getCatalog().getFunction(
+          searchDesc, Function.CompareMode.IS_SUBTYPE);
       if (fn != null) {
         if (fn instanceof Udf) {
           udf_ = (Udf)fn;
@@ -124,7 +126,7 @@ public class FunctionCallExpr extends Expr {
       }
       this.type = fnDesc.getReturnType();
     } else {
-      String error = String.format("No matching function with those arguments: %s(%s)",
+      String error = String.format("No matching function with signature: %s(%s).",
           functionName_, Joiner.on(", ").join(argTypes));
       throw new AnalysisException(error);
     }

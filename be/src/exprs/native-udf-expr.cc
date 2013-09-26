@@ -33,6 +33,7 @@ NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
     udf_type_(node.udf_call_expr.binary_type),
     hdfs_location_(node.udf_call_expr.binary_location),
     symbol_name_(node.udf_call_expr.symbol_name),
+    has_var_args_(node.udf_call_expr.has_var_args),
     udf_wrapper_(NULL),
     codegen_(NULL),
     ir_udf_wrapper_(NULL) {
@@ -129,6 +130,7 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
 }
 
 Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
+  if (has_var_args_) return Status("Vararg UDFs not yet implemented.");
   if (state->llvm_codegen() == NULL) {
     return Status("UDFs cannot be evaluated with codegen disabled");
   }

@@ -20,19 +20,43 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 
 /**
  * Utility class to describe a function.
  */
 public class Function {
+  // Enum for how to compare function signatures.
+  public enum CompareMode {
+    // Two signatures are identical if the number of arguments and their types match
+    // exactly and either both signatures are varargs or neither.
+    IS_IDENTICAL,
+
+    // Two signatures are indistinguishable if there is no way to tell them apart
+    // when matching a particular instantiation. That is, their fixed arguments
+    // match exactly and the remaining varargs have the same type.
+    // e.g. fn(int, int, int) and fn(int...)
+    IS_INDISTINGUISHABLE,
+
+    // X is a subtype of Y if Y.arg[i] can be implicitly cast to
+    // X.arg[i]. If X has vargs, the remaining arguments of Y must
+    // be implicitly castable to the var arg type.
+    // e.g.
+    // fn(int, double, string...) is a subtype of fn(tinyint, float, string, string)
+    IS_SUBTYPE,
+  }
+
   // User specified function name e.g. "Add"
   private FunctionName name_;
 
   private final PrimitiveType retType_;
   // Array of parameter types.  empty array if this function does not have parameters.
   private PrimitiveType[] argTypes_;
-  private final boolean varArgs_;
+
+  // If true, this function has variable arguments.
+  // TODO: we don't currently support varargs with no fixed types. i.e. fn(...)
+  private boolean hasVarArgs_;
 
   // Absolute path in HDFS for the binary that contains this function.
   // e.g. /udfs/udfs.jar
@@ -43,7 +67,7 @@ public class Function {
   public Function(FunctionName name, PrimitiveType[] argTypes,
       PrimitiveType retType, boolean varArgs) {
     this.name_ = name;
-    this.varArgs_ = varArgs;
+    this.hasVarArgs_ = varArgs;
     if (argTypes == null) {
       argTypes_ = new PrimitiveType[0];
     } else {
@@ -71,10 +95,17 @@ public class Function {
   public int getNumArgs() { return argTypes_.length; }
   public HdfsURI getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
+  public boolean getHasVarArgs() { return hasVarArgs_; }
+  public PrimitiveType getVarArgsType() {
+    if (!hasVarArgs_) return PrimitiveType.INVALID_TYPE;
+    Preconditions.checkState(argTypes_.length > 0);
+    return argTypes_[argTypes_.length - 1];
+  }
 
   public void setName(FunctionName name) { name_ = name; }
   public void setLocation(HdfsURI loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
+  public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
 
   // Returns a string with the signature in human readable format:
   // FnName(argtype1, argtyp2).  e.g. Add(int, int)
@@ -82,30 +113,44 @@ public class Function {
     StringBuilder sb = new StringBuilder();
     sb.append(name_.getFunction())
       .append("(")
-      .append(Joiner.on(", ").join(argTypes_))
-      .append(")");
+      .append(Joiner.on(", ").join(argTypes_));
+    if (hasVarArgs_) sb.append("...");
+    sb.append(")");
     return sb.toString();
   }
 
+  // Compares this to 'other' for mode.
+  public boolean compare(Function other, CompareMode mode) {
+    switch (mode) {
+      case IS_IDENTICAL: return isIdentical(other);
+      case IS_INDISTINGUISHABLE: return isIndistinguishable(other);
+      case IS_SUBTYPE: return isSubtype(other);
+      default:
+        Preconditions.checkState(false);
+        return false;
+    }
+  }
   /**
    * Returns true if 'this' is a supertype of 'other'. Each argument in other must
    * be implicitly castable to the matching argument in this.
    * TODO: look into how we resolve implicitly castable functions. Is there a rule
-    * for "most" compatible or maybe return an error if it is ambiguous?
+   * for "most" compatible or maybe return an error if it is ambiguous?
    */
-  public boolean isSupertype(Function other) {
-    if (!varArgs_ && other.argTypes_.length != this.argTypes_.length) return false;
-    if (varArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
+  private boolean isSubtype(Function other) {
+    if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
+      return false;
+    }
+    if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
       if (!PrimitiveType.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
         return false;
       }
     }
     // Check trailing varargs.
-    if (varArgs_) {
+    if (this.hasVarArgs_) {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
         if (!PrimitiveType.isImplicitlyCastable(other.argTypes_[i],
-            this.argTypes_[this.argTypes_.length - 1])) {
+            this.getVarArgsType())) {
           return false;
         }
       }
@@ -113,21 +158,52 @@ public class Function {
     return true;
   }
 
-  @Override
-  /**
-    * Signatures are equal with C++/Java function-signature semantics.  They are
-    * equal if the operation and all the arguments are the same. The return
-    * type is ignored.
-    */
-  public boolean equals(Object o) {
-    if (o == null || !(o instanceof Function)) return false;
-
-    Function s = (Function) o;
-    if (s.argTypes_.length != this.argTypes_.length) return false;
-
+  private boolean isIdentical(Function o) {
+    if (o.argTypes_.length != this.argTypes_.length) return false;
+    if (o.hasVarArgs_ != this.hasVarArgs_) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (s.argTypes_[i] != this.argTypes_[i]) return false;
+      if (o.argTypes_[i] != this.argTypes_[i]) return false;
     }
     return true;
+  }
+
+  private boolean isIndistinguishable(Function o) {
+    int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
+    // The first fully specified args must be identical.
+    for (int i = 0; i < minArgs; ++i) {
+      if (o.argTypes_[i] != this.argTypes_[i]) return false;
+    }
+    if (o.argTypes_.length == this.argTypes_.length) return true;
+
+    if (o.hasVarArgs_ && this.hasVarArgs_) {
+      if (o.getVarArgsType() != this.getVarArgsType()) return false;
+      if (this.getNumArgs() > o.getNumArgs()) {
+        for (int i = minArgs; i < this.getNumArgs(); ++i) {
+          if (this.argTypes_[i] != o.getVarArgsType()) return false;
+        }
+      } else {
+        for (int i = minArgs; i < o.getNumArgs(); ++i) {
+          if (o.argTypes_[i] != this.getVarArgsType()) return false;
+        }
+      }
+      return true;
+    } else if (o.hasVarArgs_) {
+      // o has var args so check the remaining arguments from this
+      if (o.getNumArgs() > minArgs) return false;
+      for (int i = minArgs; i < this.getNumArgs(); ++i) {
+        if (this.argTypes_[i] != o.getVarArgsType()) return false;
+      }
+      return true;
+    } else if (this.hasVarArgs_) {
+      // this has var args so check the remaining arguments from s
+      if (this.getNumArgs() > minArgs) return false;
+      for (int i = minArgs; i < o.getNumArgs(); ++i) {
+        if (o.argTypes_[i] != this.getVarArgsType()) return false;
+      }
+      return true;
+    } else {
+      // Neither has var args and the lengths don't match
+      return false;
+    }
   }
 }

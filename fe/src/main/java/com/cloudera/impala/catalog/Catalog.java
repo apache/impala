@@ -207,14 +207,13 @@ public class Catalog {
 
   /**
    * Returns the function that best matches 'desc' that is registered with the
-   * catalog. If exactMatch is true, only function signatures that are identical
-   * will be returned. If exactMatch is false, an arbitrary compatible
-   * (i.e. implicitly castable) function will be returned.
+   * catalog using 'mode' to check for matching. If desc matches multiple functions
+   * in the catalog, it will return the function with the strictest matching mode.
    */
-  public Function getFunction(Function desc, boolean exactMatch) {
+  public Function getFunction(Function desc, Function.CompareMode mode) {
     Db db = getDbInternal(desc.dbName());
     if (db == null) return null;
-    return db.getFunction(desc, exactMatch);
+    return db.getFunction(desc, mode);
   }
 
   /**

@@ -70,6 +70,9 @@ class NativeUdfExpr: public Expr {
   std::string hdfs_location_;
   std::string symbol_name_;
 
+  // If true, this function has var args.
+  bool has_var_args_;
+
   // Function pointer to the JIT'd function produced by GetIrComputeFn(). Initialized and
   // called by ComputeFn().
   void* udf_wrapper_;

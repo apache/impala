@@ -78,6 +78,7 @@ public class CreateFunctionStmtBase extends StatementBase {
     params.setArg_types(types);
 
     params.setRet_type(fn_.getReturnType().toThrift());
+    params.setHas_var_args(fn_.getHasVarArgs());
     params.setComment(getComment());
     params.setIf_not_exists(getIfNotExists());
     return params;
@@ -146,9 +147,11 @@ public class CreateFunctionStmtBase extends StatementBase {
         dbName, analyzer.getUser(), Privilege.CREATE) == null) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
-    if (analyzer.getCatalog().getFunction(fn_, true) != null && !ifNotExists_) {
+    Function existingFn = analyzer.getCatalog().getFunction(
+        fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
+    if (existingFn != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
-          fn_.signatureString());
+          existingFn.signatureString());
     }
 
     fn_.getLocation().analyze(analyzer, Privilege.CREATE);

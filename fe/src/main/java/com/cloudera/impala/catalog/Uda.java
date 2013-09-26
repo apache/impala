@@ -17,6 +17,7 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 
 import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 
@@ -33,9 +34,8 @@ public class Uda extends Function {
   private String mergeFnName_;
   private String finalizeFnName_;
 
-  public Uda(FunctionName fnName, ArrayList<PrimitiveType> argTypes,
-      PrimitiveType retType) {
-    super(fnName, argTypes, retType, false);
+  public Uda(FunctionName fnName, FunctionArgs args, PrimitiveType retType) {
+    super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
   public Uda(FunctionName fnName, ArrayList<PrimitiveType> argTypes,

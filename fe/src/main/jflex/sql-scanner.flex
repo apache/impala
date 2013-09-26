@@ -218,6 +218,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.STAR), "*");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITOR), "|");
     tokenIdMap.put(new Integer(SqlParserSymbols.DOT), ".");
+    tokenIdMap.put(new Integer(SqlParserSymbols.DOTDOTDOT), "...");
     tokenIdMap.put(new Integer(SqlParserSymbols.STRING_LITERAL), "STRING LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.EOF), "EOF");
     tokenIdMap.put(new Integer(SqlParserSymbols.SUBTRACT), "-");
@@ -263,6 +264,8 @@ TraditionalComment = "/*" [^*] ~"*/" | "/*" "*"+ "/"
 EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 
 %%
+// Put '...' before '.'
+"..." { return newToken(SqlParserSymbols.DOTDOTDOT, null); }
 
 // single-character tokens
 "," { return newToken(SqlParserSymbols.COMMA, null); }

@@ -161,13 +161,13 @@ struct TCreateUdfParams {
 }
 
 struct TCreateUdaParams {
-  1: required string update_fn_name;
-  2: required string init_fn_name;
+  1: required string update_fn_name
+  2: required string init_fn_name
   // This function does not need to be specified by the UDA.
-  3: optional string serialize_fn_name;
-  4: required string merge_fn_name;
-  5: required string finalize_fn_name;
-  6: required Types.TColumnType intermediate_type;
+  3: optional string serialize_fn_name
+  4: required string merge_fn_name
+  5: required string finalize_fn_name
+  6: required Types.TColumnType intermediate_type
 }
 
 // Parameters of CREATE FUNCTION commands
@@ -176,27 +176,30 @@ struct TCreateFunctionParams {
   1: required TFunctionName fn_name
 
   // Type of the udf. e.g. hive, native, ir
-  2: required Types.TFunctionBinaryType fn_binary_type;
+  2: required Types.TFunctionBinaryType fn_binary_type
 
   // HDFS path for the function binary. This binary must exist at the time the
   // function is created.
   3: required string location
 
   // The types of the arguments to the function
-  4: required list<Types.TPrimitiveType> arg_types;
+  4: required list<Types.TPrimitiveType> arg_types
 
   // Return type for the function.
-  5: required Types.TPrimitiveType ret_type;
+  5: required Types.TPrimitiveType ret_type
+
+  // If true, this function takes var args.
+  6: required bool has_var_args
 
   // Optional comment to attach to the function
-  6: optional string comment
+  7: optional string comment
 
   // Do not throw an error if a function of the same signature already exists.
-  7: optional bool if_not_exists
+  8: optional bool if_not_exists
 
   // Only one of the below is set.
-  8: optional TCreateUdfParams udf_params
-  9: optional TCreateUdaParams uda_params
+  9: optional TCreateUdfParams udf_params
+  10: optional TCreateUdaParams uda_params
 }
 
 // Valid table file formats
@@ -491,7 +494,7 @@ struct TDropFunctionParams {
   1: required TFunctionName fn_name
 
   // The types of the arguments to the function
-  2: required list<Types.TPrimitiveType> arg_types;
+  2: required list<Types.TPrimitiveType> arg_types
 
   // If true, no error is raised if the target fn does not exist
   3: required bool if_exists
@@ -516,7 +519,7 @@ struct TClientRequest {
   2: required ImpalaInternalService.TQueryOptions queryOptions
 
   // session state
-  3: required TSessionState sessionState;
+  3: required TSessionState sessionState
 }
 
 // Parameters for SHOW DATABASES commands
@@ -587,30 +590,30 @@ struct TResultSetMetadata {
 // Describes a set of changes to make to the metastore
 struct TCatalogUpdate {
   // Unqualified name of the table to change
-  1: required string target_table;
+  1: required string target_table
 
   // Database that the table belongs to
-  2: required string db_name;
+  2: required string db_name
 
   // List of partitions that are new and need to be created. May
   // include the root partition (represented by the empty string).
-  3: required set<string> created_partitions;
+  3: required set<string> created_partitions
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.
 // Only relevant for INSERT queries.
 struct TFinalizeParams {
   // True if the INSERT query was OVERWRITE, rather than INTO
-  1: required bool is_overwrite;
+  1: required bool is_overwrite
 
   // The base directory in hdfs of the table targeted by this INSERT
-  2: required string hdfs_base_dir;
+  2: required string hdfs_base_dir
 
   // The target table name
-  3: required string table_name;
+  3: required string table_name
 
   // The target table database
-  4: required string table_db;
+  4: required string table_db
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.
@@ -711,14 +714,14 @@ struct TDdlExecResponse {
   // determine if a CREATE TABLE IF NOT EXISTS AS SELECT ... actually creates a new
   // table or whether creation was skipped because the table already existed, in which
   // case this flag would be false
-  1: optional bool new_table_created;
+  1: optional bool new_table_created
 }
 
 struct TDdlExecRequest {
   1: required TDdlType ddl_type
 
   // Parameters for USE commands
-  2: optional TUseDbParams use_db_params;
+  2: optional TUseDbParams use_db_params
 
   // Parameters for DESCRIBE table commands
   3: optional TDescribeTableParams describe_table_params
@@ -833,10 +836,10 @@ struct TAccessEvent {
 
 // Result of call to createExecRequest()
 struct TExecRequest {
-  1: required Types.TStmtType stmt_type;
+  1: required Types.TStmtType stmt_type
 
   // Copied from the corresponding TClientRequest
-  2: required ImpalaInternalService.TQueryOptions query_options;
+  2: required ImpalaInternalService.TQueryOptions query_options
 
   // TQueryExecRequest for the backend
   // Set iff stmt_type is QUERY or DML

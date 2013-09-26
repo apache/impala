@@ -166,10 +166,10 @@ public class OpcodeRegistry {
     BuiltinFunction compatibleMatch = null;
     BuiltinFunction search = new BuiltinFunction(op, argTypes);
     for (BuiltinFunction function : functions) {
-      if (search.equals(function)) {
+      if (function.compare(search, Function.CompareMode.IS_INDISTINGUISHABLE)) {
         return function;
       } else if (allowImplicitCasts && compatibleMatch == null
-          && function.isSupertype(search)) {
+          && function.compare(search, Function.CompareMode.IS_SUBTYPE)) {
         compatibleMatch = function;
       }
     }

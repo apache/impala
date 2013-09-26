@@ -18,6 +18,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,9 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
@@ -80,6 +83,23 @@ public class AnalyzerTest {
   @AfterClass
   public static void cleanUp() {
     catalog.close();
+  }
+
+  // Adds a Udf: default.name(args) to the catalog.
+  // TODO: we could consider having this be the sql to run instead but that requires
+  // connecting to the BE.
+  protected Function addTestFunction(String name,
+      ArrayList<PrimitiveType> args, boolean varArgs) {
+    return addTestFunction("default", name, args, varArgs);
+  }
+
+  protected Function addTestFunction(String db, String fnName,
+      ArrayList<PrimitiveType> args, boolean varArgs) {
+    Function fn = new Udf(
+        new FunctionName(db, fnName), args, PrimitiveType.INT, null, null);
+    fn.setHasVarArgs(varArgs);
+    catalog.addFunction(fn);
+    return fn;
   }
 
   /**
@@ -408,5 +428,116 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
         "float_col, float_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+  }
+
+  private Function createFunction(boolean hasVarArgs, PrimitiveType... args) {
+    return new Function(
+        new FunctionName("test"), args, PrimitiveType.INVALID_TYPE, hasVarArgs);
+  }
+
+  @Test
+  // Test matching function signatures.
+  public void TestFunctionMatching() {
+    Function[] fns = new Function[14];
+    // test()
+    fns[0] = createFunction(false);
+
+    // test(int)
+    fns[1] = createFunction(false, PrimitiveType.INT);
+
+    // test(int...)
+    fns[2] = createFunction(true, PrimitiveType.INT);
+
+    // test(tinyint)
+    fns[3] = createFunction(false, PrimitiveType.TINYINT);
+
+    // test(tinyint...)
+    fns[4] = createFunction(true, PrimitiveType.TINYINT);
+
+    // test(double)
+    fns[5] = createFunction(false, PrimitiveType.DOUBLE);
+
+    // test(double...)
+    fns[6] = createFunction(true, PrimitiveType.DOUBLE);
+
+    // test(double, double)
+    fns[7] = createFunction(false, PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+
+    // test(double, double...)
+    fns[8] = createFunction(true, PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+
+    // test(smallint, tinyint)
+    fns[9] = createFunction(false, PrimitiveType.SMALLINT, PrimitiveType.TINYINT);
+
+    // test(int, double, double, double)
+    fns[10] = createFunction(false, PrimitiveType.INT, PrimitiveType.DOUBLE,
+        PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+
+    // test(int, string, int...)
+    fns[11] = createFunction(
+        true, PrimitiveType.INT, PrimitiveType.STRING, PrimitiveType.INT);
+
+    // test(tinying, string, tinyint, int, tinyint)
+    fns[12] = createFunction(false, PrimitiveType.TINYINT, PrimitiveType.STRING,
+        PrimitiveType.TINYINT, PrimitiveType.INT, PrimitiveType.TINYINT);
+
+    // test(tinying, string, bigint, int, tinyint)
+    fns[13] = createFunction(false, PrimitiveType.TINYINT, PrimitiveType.STRING,
+        PrimitiveType.BIGINT, PrimitiveType.INT, PrimitiveType.TINYINT);
+
+    Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[1].compare(fns[3], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[1].compare(fns[4], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[1].compare(fns[5], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[1].compare(fns[6], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[1].compare(fns[7], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[1].compare(fns[8], Function.CompareMode.IS_SUBTYPE));
+
+    Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertTrue(fns[3].compare(fns[4], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertTrue(fns[5].compare(fns[6], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertFalse(fns[5].compare(fns[7], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertFalse(fns[5].compare(fns[8], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertTrue(fns[6].compare(fns[7], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertTrue(fns[6].compare(fns[8], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertTrue(fns[7].compare(fns[8], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertFalse(fns[1].compare(fns[3], Function.CompareMode.IS_INDISTINGUISHABLE));
+    Assert.assertFalse(fns[1].compare(fns[4], Function.CompareMode.IS_INDISTINGUISHABLE));
+
+    Assert.assertFalse(fns[9].compare(fns[4], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[2].compare(fns[9], Function.CompareMode.IS_SUBTYPE));
+
+    Assert.assertTrue(fns[8].compare(fns[10], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[10].compare(fns[8], Function.CompareMode.IS_SUBTYPE));
+
+    Assert.assertTrue(fns[11].compare(fns[12], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[11].compare(fns[13], Function.CompareMode.IS_SUBTYPE));
+
+    for (int i = 0; i < fns.length; ++i) {
+      for (int j = 0; j < fns.length; ++j) {
+        if (i == j) {
+          Assert.assertTrue(
+              fns[i].compare(fns[i], Function.CompareMode.IS_IDENTICAL));
+          Assert.assertTrue(
+              fns[i].compare(fns[i], Function.CompareMode.IS_INDISTINGUISHABLE));
+          Assert.assertTrue(
+              fns[i].compare(fns[i], Function.CompareMode.IS_SUBTYPE));
+        } else {
+          Assert.assertFalse(fns[i].compare(fns[j], Function.CompareMode.IS_IDENTICAL));
+          if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
+            // If it's a indistinguishable, at least one of them must be a super type
+            // of the other
+            Assert.assertTrue(
+                fns[i].compare(fns[j], Function.CompareMode.IS_SUBTYPE) ||
+                fns[j].compare(fns[i], Function.CompareMode.IS_SUBTYPE));
+          } else if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
+            // This is reflexive
+            Assert.assertTrue(
+                fns[j].compare(fns[i], Function.CompareMode.IS_INDISTINGUISHABLE));
+          }
+        }
+      }
+    }
   }
 }
