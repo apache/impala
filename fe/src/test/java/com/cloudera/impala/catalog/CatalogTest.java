@@ -84,53 +84,53 @@ public class CatalogTest {
 
   @Test
   public void TestColSchema() throws TableLoadingException {
-    Db defaultDb = catalog.getDb("functional");
-    Db hbaseDb = catalog.getDb("functional_hbase");
-    Db testDb = catalog.getDb("functional_seq");
+    Db functionalDb = catalog.getDb("functional");
+    assertNotNull(functionalDb);
+    assertEquals(functionalDb.getName(), "functional");
+    assertNotNull(functionalDb.getTable("alltypes"));
+    assertNotNull(functionalDb.getTable("alltypes_view"));
+    assertNotNull(functionalDb.getTable("alltypes_view_sub"));
+    assertNotNull(functionalDb.getTable("alltypessmall"));
+    assertNotNull(functionalDb.getTable("alltypeserror"));
+    assertNotNull(functionalDb.getTable("alltypeserrornonulls"));
+    assertNotNull(functionalDb.getTable("alltypesagg"));
+    assertNotNull(functionalDb.getTable("alltypesaggnonulls"));
+    assertNotNull(functionalDb.getTable("alltypesnopart"));
+    assertNotNull(functionalDb.getTable("alltypesinsert"));
+    assertNotNull(functionalDb.getTable("complex_view"));
+    assertNotNull(functionalDb.getTable("testtbl"));
+    assertNotNull(functionalDb.getTable("dimtbl"));
+    assertNotNull(functionalDb.getTable("jointbl"));
+    assertNotNull(functionalDb.getTable("liketbl"));
+    assertNotNull(functionalDb.getTable("greptiny"));
+    assertNotNull(functionalDb.getTable("rankingssmall"));
+    assertNotNull(functionalDb.getTable("uservisitssmall"));
+    assertNotNull(functionalDb.getTable("view_view"));
+    // IMP-163 - table with string partition column does not load if there are partitions
+    assertNotNull(functionalDb.getTable("StringPartitionKey"));
+    // Test non-existent table
+    assertNull(functionalDb.getTable("nonexistenttable"));
 
-    assertNotNull(defaultDb);
-    assertEquals(defaultDb.getName(), "functional");
+    // functional_seq contains the same tables as functional
+    Db testDb = catalog.getDb("functional_seq");
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "functional_seq");
+    assertNotNull(testDb.getTable("alltypes"));
+    assertNotNull(testDb.getTable("testtbl"));
+
+    Db hbaseDb = catalog.getDb("functional_hbase");
     assertNotNull(hbaseDb);
     assertEquals(hbaseDb.getName(), "functional_hbase");
-
-    assertNotNull(defaultDb.getTable("alltypes"));
-    assertNotNull(defaultDb.getTable("alltypes_view"));
-    assertNotNull(defaultDb.getTable("alltypes_view_sub"));
-    assertNotNull(defaultDb.getTable("alltypessmall"));
-    assertNotNull(defaultDb.getTable("alltypeserror"));
-    assertNotNull(defaultDb.getTable("alltypeserrornonulls"));
-    assertNotNull(defaultDb.getTable("alltypesagg"));
-    assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
-    assertNotNull(defaultDb.getTable("alltypesnopart"));
-    assertNotNull(defaultDb.getTable("alltypesinsert"));
-    assertNotNull(defaultDb.getTable("complex_view"));
-    assertNotNull(defaultDb.getTable("testtbl"));
-    assertNotNull(defaultDb.getTable("dimtbl"));
-    assertNotNull(defaultDb.getTable("jointbl"));
-    assertNotNull(defaultDb.getTable("liketbl"));
-    assertNotNull(defaultDb.getTable("greptiny"));
-    assertNotNull(defaultDb.getTable("rankingssmall"));
-    assertNotNull(defaultDb.getTable("uservisitssmall"));
-    assertNotNull(defaultDb.getTable("view_view"));
+    // Loading succeeds for an HBase table that has binary columns and an implicit key
+    // column mapping
+    assertNotNull(hbaseDb.getTable("alltypessmallbinary"));
     assertNotNull(hbaseDb.getTable("alltypessmall"));
     assertNotNull(hbaseDb.getTable("hbasealltypeserror"));
     assertNotNull(hbaseDb.getTable("hbasealltypeserrornonulls"));
     assertNotNull(hbaseDb.getTable("alltypesagg"));
     assertNotNull(hbaseDb.getTable("stringids"));
 
-    // IMP-163 - table with string partition column does not load if there are partitions
-    assertNotNull(defaultDb.getTable("StringPartitionKey"));
-
-    // functional_seq contains the same tables as functional
-    assertNotNull(testDb.getTable("alltypes"));
-    assertNotNull(testDb.getTable("testtbl"));
-
-    // Test non-existant table
-    assertNull(defaultDb.getTable("nonexistenttable"));
-
-    checkTableCols(defaultDb, "alltypes", 2,
+    checkTableCols(functionalDb, "alltypes", 2,
         new String[]
           {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
@@ -141,7 +141,7 @@ public class CatalogTest {
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
            PrimitiveType.TIMESTAMP});
-    checkTableCols(defaultDb, "testtbl", 0,
+    checkTableCols(functionalDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
@@ -149,18 +149,18 @@ public class CatalogTest {
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
-    checkTableCols(defaultDb, "liketbl", 0,
+    checkTableCols(functionalDb, "liketbl", 0,
         new String[] {
             "str_col", "match_like_col", "no_match_like_col", "match_regex_col",
             "no_match_regex_col"},
         new PrimitiveType[]
           {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
            PrimitiveType.STRING, PrimitiveType.STRING});
-    checkTableCols(defaultDb, "dimtbl", 0,
+    checkTableCols(functionalDb, "dimtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
-    checkTableCols(defaultDb, "jointbl", 0,
+    checkTableCols(functionalDb, "jointbl", 0,
         new String[] {"test_id", "test_name", "test_zip", "alltypes_id"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT,
@@ -252,19 +252,19 @@ public class CatalogTest {
            PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
            PrimitiveType.TINYINT, PrimitiveType.INT});
 
-    checkTableCols(defaultDb, "greptiny", 0,
+    checkTableCols(functionalDb, "greptiny", 0,
         new String[]
           {"field"},
         new PrimitiveType[]
           {PrimitiveType.STRING});
 
-    checkTableCols(defaultDb, "rankingssmall", 0,
+    checkTableCols(functionalDb, "rankingssmall", 0,
         new String[]
           {"pagerank", "pageurl", "avgduration"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.STRING, PrimitiveType.INT});
 
-    checkTableCols(defaultDb, "uservisitssmall", 0,
+    checkTableCols(functionalDb, "uservisitssmall", 0,
         new String[]
           {"sourceip", "desturl", "visitdate",  "adrevenue", "useragent",
            "ccode", "lcode", "skeyword", "avgtimeonsite"},
@@ -274,7 +274,7 @@ public class CatalogTest {
            PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.INT});
 
     // case-insensitive lookup
-    assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));
+    assertEquals(functionalDb.getTable("alltypes"), functionalDb.getTable("AllTypes"));
   }
 
   @Test public void TestPartitions() throws TableLoadingException {

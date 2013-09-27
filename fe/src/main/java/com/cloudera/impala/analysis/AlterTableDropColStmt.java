@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableDropColParams;
@@ -56,6 +57,12 @@ public class AlterTableDropColStmt extends AlterTableStmt {
       AuthorizationException {
     super.analyze(analyzer);
     Table t = getTargetTable();
+    // TODO: Support column-level DDL on HBase tables. Requires updating the column
+    // mappings along with the table columns.
+    if (t instanceof HBaseTable) {
+      throw new AnalysisException("ALTER TABLE DROP COLUMN not currently supported " +
+          "on HBase tables.");
+    }
     String tableName = getDb() + "." + getTbl();
 
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {

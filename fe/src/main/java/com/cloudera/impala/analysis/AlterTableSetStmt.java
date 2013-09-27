@@ -16,6 +16,8 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 
 /**
@@ -36,6 +38,14 @@ public class AlterTableSetStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
+    Table t = getTargetTable();
+    // TODO: Support ALTER TABLE SET on HBase tables. Requires validating changes
+    // to the SERDEPROPERTIES and TBLPROPERTIES to ensure the table metadata does not
+    // become invalid.
+    if (t instanceof HBaseTable) {
+      throw new AnalysisException("ALTER TABLE SET not currently supported on " +
+          "HBase tables.");
+    }
 
     // Altering the table rather than the partition.
     if (partitionSpec_ == null) return;

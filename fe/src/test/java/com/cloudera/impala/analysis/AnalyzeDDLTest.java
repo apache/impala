@@ -168,6 +168,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes_view " +
         "add columns (c1 string comment 'hi')",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+
+    // Cannot ALTER TABLE ADD/REPLACE COLUMNS on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes add columns (i int)",
+        "ALTER TABLE ADD|REPLACE COLUMNS not currently supported on HBase tables.");
   }
 
   @Test
@@ -194,6 +198,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view drop column int_col",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+
+    // Cannot ALTER TABLE DROP COLUMN on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes drop column int_col",
+        "ALTER TABLE DROP COLUMN not currently supported on HBase tables.");
   }
 
   @Test
@@ -230,6 +238,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes_view " +
         "change column int_col int_col2 int",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+
+    // Cannot ALTER TABLE CHANGE COLUMN on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes CHANGE COLUMN int_col i int",
+        "ALTER TABLE CHANGE COLUMN not currently supported on HBase tables.");
   }
 
   @Test
@@ -321,6 +333,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view set fileformat sequencefile",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+
+    // Cannot ALTER TABLE SET on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
+        "ALTER TABLE SET not currently supported on HBase tables.");
   }
 
   @Test
@@ -349,6 +365,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view rename to new_alltypes",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+
+    // It should be okay to rename an HBase table.
+    AnalyzesOk("alter table functional_hbase.alltypes rename to new_alltypes");
   }
 
   @Test

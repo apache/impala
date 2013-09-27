@@ -551,6 +551,8 @@ functional
 ---- BASE_TABLE_NAME
 alltypessmallbinary
 ---- CREATE_HIVE
+-- This table does not define a ':key' column spec. If one is not specified, the
+-- first column is implied.
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   id int,
   bool_col boolean,
@@ -568,8 +570,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key#-,
-   d:bool_col#-,
+  "d:bool_col#-,
    d:tinyint_col#-,
    d:smallint_col#-,
    d:int_col#-,
@@ -1153,5 +1154,6 @@ functional
 bad_serde
 ---- CREATE_HIVE
 -- For incompatible SerDe testing
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col int) ROW FORMAT serde "org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe";
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col int)
+ROW FORMAT serde "org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe";
 ====
