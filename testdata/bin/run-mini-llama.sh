@@ -12,9 +12,8 @@ $IMPALA_HOME/testdata/bin/kill-mini-llama.sh
 # - Multiple Yarn NodeManagers, exactly one per HDFS DN
 # - Single Llama service
 CLASSPATH=`hadoop classpath`
-export MINI_LLAMA_OPTS="-Dtest.build.data=$MINI_DFS_BASE_DATA_DIR -Djava.library.path=$HADOOP_HOME/lib/native"
-#export JETTY_ARGS=OPTIONS=Server,jsp
+export MINI_LLAMA_OPTS="-Dtest.build.data=$MINI_DFS_BASE_DATA_DIR -Djava.library.path=${HADOOP_HOME}/lib/native"
 pushd ${LLAMA_HOME}
-bin/minillama --hadoop-conf=$IMPALA_HOME/fe/src/test/resources/ --hadoop-nodes=3 $@
+bin/minillama --hadoop-conf=$IMPALA_HOME/fe/src/test/resources/ --hadoop-nodes=3 $@ &
 sleep 10
 popd

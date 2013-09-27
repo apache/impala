@@ -114,26 +114,22 @@ Status RuntimeState::Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_e
   return Status::OK;
 }
 
-Status RuntimeState::InitMemTrackers(const TUniqueId& query_id) {
-  bool has_query_mem_limit = query_options().__isset.mem_limit &&
-      query_options().mem_limit > 0;
-  int64_t bytes_limit = has_query_mem_limit ? query_options().mem_limit : -1;
+Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
+    int64_t query_bytes_limit) {
   query_mem_tracker_ =
       MemTracker::GetQueryMemTracker(
-        query_id, bytes_limit, exec_env_->process_mem_tracker());
+        query_id, query_bytes_limit, exec_env_->process_mem_tracker());
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
-  if (has_query_mem_limit) {
-    if (bytes_limit > MemInfo::physical_mem()) {
-      stringstream ss;
-      ss << "Memory limit "
-         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
-         << " exceeds physical memory of "
-         << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
-      LogError(ss.str());
+  if (query_bytes_limit != -1) {
+    if (query_bytes_limit > MemInfo::physical_mem()) {
+      LOG(WARNING) << "Memory limit "
+                   << PrettyPrinter::Print(query_bytes_limit, TCounterType::BYTES)
+                   << " exceeds physical memory of "
+                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
     }
     VLOG_QUERY << "Using query memory limit: "
-               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+               << PrettyPrinter::Print(query_bytes_limit, TCounterType::BYTES);
   }
 
   // TODO: this is a stopgap until we implement ExprContext

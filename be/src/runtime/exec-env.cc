@@ -65,7 +65,7 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
 
-DEFINE_bool(enable_rm, true, "Whether to enable resource management");
+DEFINE_bool(enable_rm, false, "Whether to enable resource management");
 DEFINE_int32(llama_callback_port, 28000,
              "Port where Llama notification callback should be started");
 DEFINE_string(llama_host, "127.0.0.1",
@@ -125,7 +125,7 @@ ExecEnv::ExecEnv()
         resource_broker_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
-  resource_broker_->set_scheduler(scheduler_.get());
+  if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());
 }
 
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
@@ -175,7 +175,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         resource_broker_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
-  resource_broker_->set_scheduler(scheduler_.get());
+  if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());
 }
 
 ExecEnv::~ExecEnv() {

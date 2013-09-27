@@ -29,15 +29,15 @@ ostream& operator<<(ostream& os, const TUniqueId& id) {
 }
 
 ostream& operator<<(ostream& os, const TNetworkAddress& address) {
-  os << address.hostname << ":" << address.port;
+  os << address.hostname << ":" << dec << address.port;
   return os;
 }
 
 ostream& operator<<(ostream& os, const TResource& resource) {
   os << "Resource("
      << "client_resource_id=" << resource.client_resource_id << " "
-     << "v_cpu_cores=" << resource.v_cpu_cores << " "
-     << "memory_mb=" << resource.memory_mb << " "
+     << "v_cpu_cores=" << dec << resource.v_cpu_cores << " "
+     << "memory_mb=" << dec << resource.memory_mb << " "
      << "asked_location=" << resource.askedLocation << " "
      << "enforcement=" << resource.enforcement << ")";
   return os;
@@ -48,8 +48,8 @@ ostream& operator<<(ostream& os, const TAllocatedResource& resource) {
      << "reservation_id=" << resource.reservation_id << " "
      << "client_resource_id=" << resource.client_resource_id << " "
      << "rm_resource_id=" << resource.rm_resource_id << " "
-     << "v_cpu_cores=" << resource.v_cpu_cores << " "
-     << "memory_mb=" << resource.memory_mb << " "
+     << "v_cpu_cores=" << dec << resource.v_cpu_cores << " "
+     << "memory_mb=" << dec << resource.memory_mb << " "
      << "location=" << resource.location << ")";
   return os;
 }

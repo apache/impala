@@ -22,10 +22,10 @@
 #include <boost/lexical_cast.hpp>
 
 #include "common/status.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-server.h"
 #include "statestore/scheduler.h"
 #include "util/debug-util.h"
-#include "util/thrift-util.h"
-#include "util/thrift-server.h"
 #include "util/stopwatch.h"
 #include "util/uid-util.h"
 #include "util/network-util.h"

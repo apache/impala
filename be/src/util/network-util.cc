@@ -124,7 +124,7 @@ string TNetworkAddressToString(const TNetworkAddress& address) {
 }
 
 ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {
-  out << hostport.hostname << ":" << hostport.port;
+  out << hostport.hostname << ":" << dec << hostport.port;
   return out;
 }
 

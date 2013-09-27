@@ -81,7 +81,7 @@ class RuntimeState {
   // Specific parts of the fragment (i.e. exec nodes, sinks, data stream senders, etc)
   // will add a fourth level when they are initialized.
   // This function also initializes a user function mem tracker (in the fourth level).
-  Status InitMemTrackers(const TUniqueId& query_id);
+  Status InitMemTrackers(const TUniqueId& query_id, int64_t query_bytes_limit);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }

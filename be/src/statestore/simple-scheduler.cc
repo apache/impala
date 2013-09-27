@@ -43,6 +43,7 @@ using namespace apache::thrift;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
+DECLARE_bool(enable_rm);
 
 namespace impala {
 
@@ -661,6 +662,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
+  if (!FLAGS_enable_rm) return Status::OK;
 
   DCHECK(schedule->request().__isset.user);
   string pool = GetYarnPool(schedule->request().user, schedule->query_options());
@@ -680,7 +682,8 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
 }
 
 Status SimpleScheduler::Release(QuerySchedule* schedule) {
-  if (resource_broker_ != NULL && schedule->HasReservation()) {
+  if (FLAGS_enable_rm && schedule->HasReservation()) {
+    DCHECK(resource_broker_ != NULL);
     TResourceBrokerReleaseRequest request;
     TResourceBrokerReleaseResponse response;
     request.reservation_id = schedule->reservation()->reservation_id;
