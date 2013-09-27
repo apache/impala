@@ -28,6 +28,9 @@ src/test/resources/core-site.xml
 # Generated authorization policy file
 src/test/resources/authz-policy.ini
 
+# Generated minicluster config
+src/test/resources/minicluster-conf.xml
+
 # Generated thrift files
 generated-sources
 

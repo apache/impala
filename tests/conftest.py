@@ -33,8 +33,7 @@ def pytest_addoption(parser):
                    "Hive's HiveServer2 host:port to connect to.")
 
 
-  default_xml_path = os.path.join(os.environ['IMPALA_HOME'],
-                                  "fe/target/test-classes/minicluster-conf.xml")
+  default_xml_path = os.path.join(os.environ['HADOOP_CONF_DIR'], "minicluster-conf.xml")
   parser.addoption("--minicluster_xml_conf", default=default_xml_path, help=\
                    "The full path to the HDFS xml configuration file")
 
