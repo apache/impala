@@ -63,6 +63,14 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/mapreduce/hadoop-mapreduce-client-core-${hadoop.version}.jar</systemPath>
+      <version>${hadoop.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core</artifactId>
       <version>${sentry.version}</version>
@@ -131,6 +139,12 @@
     </dependency>
 
     <dependency>
+      <groupId>commons-lang</groupId>
+      <artifactId>commons-lang</artifactId>
+      <version>2.6</version>
+    </dependency>
+
+    <dependency>
       <groupId>net.sf.squirrel-sql.thirdparty-non-maven</groupId>
       <artifactId>java-cup</artifactId>
       <version>0.11a</version>
@@ -152,23 +166,21 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derby</artifactId>
+      <version>10.4.2.0</version>
+    </dependency>
+
+    <!-- Until there are stable versions of Hive 0.11-CDH5 make sure to
+         use systemPath for all Hive dependencies to avoid pulling incompatible
+         Hive jars from the Maven repo. -->
+    <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-hbase-handler</artifactId>
       <scope>system</scope>
       <version>${hive.version}</version>
       <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-hbase-handler-${hive.version}.jar</systemPath>
     </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-mapreduce-client-core</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <!-- Until there are stable versions of Hive 0.11-CDH5 make sure to
-         use systemPath for the following dependencies to have them in sync.
-         Not doing so can lead to extremely hard to diagnose problems with 
-         JDBC connectivity to Impala. -->
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-service</artifactId>
@@ -183,26 +195,33 @@
       <version>${hive.version}</version>
       <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-jdbc-${hive.version}.jar</systemPath>
     </dependency>
-
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-metastore</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-metastore-${hive.version}.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-common</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-common-${hive.version}.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-serde-${hive.version}.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-shims</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-shims-${hive.version}.jar</systemPath>
     </dependency>
 <<<<<<< HEAD
 
@@ -210,13 +229,50 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-exec-${hive.version}.jar</systemPath>
+    </dependency>
+
+    <!-- Hive stable dependencies. These dependencies can safely be managed by Maven
+         because they are fixed versions whose contents do not change. -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.derby</groupId>
-      <artifactId>derby</artifactId>
-      <version>10.4.2.0</version>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>1.6</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>1.7.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro-compiler</artifactId>
+      <version>1.7.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro-ipc</artifactId>
+      <version>1.7.4</version>
+    </dependency>
+
+    <!-- Hive SNAPSHOT dependencies. These dependencies may change at any time in Cloudera's
+         Maven repo. Rely on the jars supplied in thirdparty to ensure the dependency
+         snapshots are compatible with the particular Hive snapshot. -->
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <scope>system</scope>
+      <version>3.4.5-cdh5.0.0-SNAPSHOT</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/zookeeper-3.4.5-cdh5.0.0-SNAPSHOT.jar</systemPath>
+   </dependency>
+
    <!-- The datanucleus dependencies are copied directly from Hive's pom.xml
         to make our FE build work -->
    <dependency>
