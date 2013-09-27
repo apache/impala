@@ -156,13 +156,17 @@ class TestProcessFailures(ImpalaTestSuite):
     # non-deterministic which of those paths will initiate cancellation, but in either
     # case the query status should include the failed (or unreachable) worker.
     assert client.get_state(handle) == client.query_states['EXCEPTION']
-    query_status = impalad.service.get_query_status(handle.id)
-    if query_status is None:
-      assert False, "Could not find 'Query Status' section in profile of "\
-                  "query with id %s:\n%s" % (handle.id)
+    
+    # Wait for the query status on the query profile web page to contain the
+    # expected failed hostport.
     failed_hostport = "%s:%s" % (worker_impalad.service.hostname,\
                                  worker_impalad.service.be_port)
-    assert failed_hostport in query_status
+    query_status_match =\
+      impalad.service.wait_for_query_status(client, handle.id, failed_hostport)
+    if not query_status_match:
+      query_profile_page = impalad.service.read_query_profile_page(handle.id)
+      assert False, "Query status did not contain expected hostport %s\n\n%s"\
+        % (failed_hostport, query_profile_page)
 
     # Should work fine even if a worker is down.
     self.execute_query_using_client(client, QUERY, vector)

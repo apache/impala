@@ -33,6 +33,7 @@ LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
 
 # Base class for Impalad and Statestore services
+# TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
   def __init__(self, hostname, webserver_port):
     self.hostname = hostname
@@ -75,7 +76,6 @@ class BaseImpalaService(object):
       sleep(interval)
     assert 0, 'Metric value %s did not reach value %s in %ss' %\
         (metric_name, expected_value, timeout)
-
 
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
@@ -123,7 +123,7 @@ class ImpaladService(BaseImpalaService):
     return status_line.split('Query Status:')[1].strip()
 
   def wait_for_query_state(self, client, query_handle, target_state,
-                           timeout=10, interval=1):
+                              timeout=10, interval=1):
     """Keeps polling for the query's state using client in the given interval until
     the query's state reaches the target state or the given timeout has been reached."""
     start_time = time()
@@ -136,6 +136,26 @@ class ImpaladService(BaseImpalaService):
         return
       sleep(interval)
     return
+
+  def wait_for_query_status(self, client, query_id, expected_content,
+                               timeout=30, interval=1):
+    """Polls for the query's status in the query profile web page to contain the
+    specified content. Returns False if the timeout was reached before a successful
+    match, True otherwise."""
+    start_time = time()
+    query_status = ""
+    while (time() - start_time < timeout):
+      try:
+        query_status = self.get_query_status(query_id)
+        if query_status is None:
+          assert False, "Could not find 'Query Status' section in profile of "\
+                    "query with id %s:\n%s" % (query_id)
+      except Exception as e:
+        pass
+      if expected_content in query_status:
+        return True
+      sleep(interval)
+    return False
 
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad"""
