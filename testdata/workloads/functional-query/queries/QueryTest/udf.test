@@ -1,123 +1,70 @@
 ====
----- QUERY
-create database if not exists udf_test;
-====
 # Test identity functions
 ---- QUERY
-drop function if exists udf_test.boolean_identity(boolean);
-
-create function udf_test.boolean_identity(boolean) returns boolean
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE';
-
-select udf_test.boolean_identity(true);
+select udf_test.identity(true);
 ---- TYPES
 boolean
 ---- RESULTS
 true
 ====
 ---- QUERY
-drop function if exists udf_test.tinyint_identity(tinyint);
-
-create function udf_test.tinyint_identity(tinyint) returns tinyint
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE';
-
-select udf_test.tinyint_identity(10);
+select udf_test.identity(cast(10 as tinyint));
 ---- TYPES
 tinyint
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.smallint_identity(smallint);
-
-create function udf_test.smallint_identity(smallint) returns smallint
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_11SmallIntValE';
-
-select udf_test.smallint_identity(10);
+select udf_test.identity(cast(10 as smallint));
 ---- TYPES
 smallint
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.int_identity(int);
-
-create function udf_test.int_identity(int) returns int
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_6IntValE';
-
-select udf_test.int_identity(10);
+select udf_test.identity(cast(10 as int));
 ---- TYPES
 int
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.bigint_identity(bigint);
-
-create function udf_test.bigint_identity(bigint) returns bigint
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9BigIntValE';
-
-select udf_test.bigint_identity(10);
+select udf_test.identity(cast(10 as bigint));
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.float_identity(float);
-
-create function udf_test.float_identity(float) returns float
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_8FloatValE';
-
-select udf_test.float_identity(10.0);
+select udf_test.identity(cast(10.0 as float));
 ---- TYPES
 float
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.double_identity(double);
-
-create function udf_test.double_identity(double) returns double
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9DoubleValE';
-
-select udf_test.double_identity(10.0);
+select udf_test.identity(cast(10.0 as double));
 ---- TYPES
 double
 ---- RESULTS
 10
 ====
 ---- QUERY
-drop function if exists udf_test.string_identity(string);
-
-create function udf_test.string_identity(string) returns string
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
-
-select udf_test.string_identity("why hello there");
+select udf_test.identity("why hello there");
 ---- TYPES
 string
 ---- RESULTS
 'why hello there'
 ====
+---- QUERY
+select udf_test.identity(NULL);
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
 # Test UDFs with different arguments
 ---- QUERY
-drop function if exists
-udf_test.all_types_fn(string, boolean, tinyint, smallint, int, bigint, float, double);
-
-create function udf_test.all_types_fn(
-    string, boolean, tinyint, smallint, int, bigint, float, double)
-returns int
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValERKNS_8FloatValERKNS_9DoubleValE';
-
 select udf_test.all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
 ---- TYPES
 int
@@ -125,12 +72,6 @@ int
 29
 ====
 ---- QUERY
-drop function if exists udf_test.no_args();
-
-create function udf_test.no_args() returns string
-location '/test-warehouse/libTestUdfs.so'
-SYMBOL='_Z6NoArgsPN10impala_udf15FunctionContextE';
-
 select udf_test.no_args();
 ---- TYPES
 string
@@ -139,14 +80,14 @@ string
 ====
 # Test UDFs over tables
 ---- QUERY
-select sum(udf_test.bigint_identity(bigint_col)) from functional.alltypes
+select sum(udf_test.identity(bigint_col)) from functional.alltypes
 ---- TYPES
 bigint
 ---- RESULTS
 328500
 ====
 ---- QUERY
-select udf_test.string_identity(a) from functional.tinytable;
+select udf_test.identity(a) from functional.tinytable;
 ---- TYPES
 string
 ---- RESULTS
@@ -174,4 +115,72 @@ select udf_test.no_args() from alltypes limit 1;
 string
 ---- RESULTS
 'string'
+====
+# Chain UDFs/exprs together to test glue
+---- QUERY
+select udf_test.identity(udf_test.no_args());
+---- TYPES
+string
+---- RESULTS
+'string'
+====
+---- QUERY
+select udf_test.identity(cast(udf_test.identity(3.0) as bigint));
+---- TYPES
+bigint
+---- RESULTS
+3
+====
+---- QUERY
+select count(*) from alltypessmall having udf_test.identity(count(*)) > 1
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+select count(udf_test.identity(id)) from functional.alltypessmall
+having udf_test.identity(count(*)) > 1
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+select count(udf_test.identity(id)) from functional.alltypessmall
+group by udf_test.identity(int_col)
+having udf_test.identity(count(*)) > 10
+---- TYPES
+bigint
+---- RESULTS
+12
+12
+12
+12
+12
+====
+---- QUERY
+select udf_test.identity(a.tinyint_col),
+       udf_test.identity(b.id),
+       udf_test.identity(a.string_col)
+from alltypesagg a join alltypessmall b on
+  (udf_test.identity(a.tinyint_col) = udf_test.identity(b.id))
+and udf_test.identity(a.tinyint_col + b.tinyint_col) < 5
+order by udf_test.identity(a.string_col)
+limit 5
+---- TYPES
+tinyint, int, string
+---- RESULTS
+1,1,'1'
+1,1,'1'
+1,1,'1'
+1,1,'1'
+1,1,'1'
+====
+---- QUERY
+select min(udf_test.identity(int_col)) from alltypesagg where int_col is null;
+---- TYPES
+int
+---- RESULT
+NULL
 ====

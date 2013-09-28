@@ -38,6 +38,7 @@
 #include "exprs/timestamp-literal.h"
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/native-udf-expr.h"
+#include "exprs/udf-util.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Data_types.h"
 #include "runtime/runtime-state.h"
@@ -852,32 +853,40 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
 }
 
 // Codegens a function that calls GetValue(this, row) and wraps the returned void* value
-// in the appropriate AnyVal type. Example generated IR:
+// in the appropriate AnyVal type. Note that the AnyVal types are lowered.
+// Example generated function IR for a TYPE_SMALLINT expr returning a lowered SmallIntVal
+// ({i8, i16} => i32):
 //
-// define %"struct.impala_udf::BigIntVal" @ExprWrapper1(
-//     i8* %context, %"class.impala::TupleRow"* %row) {
+// define i32 @ExprWrapper(i8* %context, %"class.impala::TupleRow"* %row) {
 // entry:
 //   %raw = call i8* @IrExprGetValue(
-//       %"class.impala::Expr"* inttoptr (i64 65575328 to %"class.impala::Expr"*),
-//       %"class.impala::TupleRow"* %row)
-//   %val = alloca %"struct.impala_udf::BigIntVal"
+//      %"class.impala::Expr"* inttoptr (i64 82763584 to %"class.impala::Expr"*),
+//      %"class.impala::TupleRow"* %row)
+//   %0 = alloca i32
+//   %result = load i32* %0
 //   %is_null = icmp eq i8* %raw, null
-//   %is_null_dst = getelementptr inbounds
-//       %"struct.impala_udf::BigIntVal"* %val, i32 0, i32 0
-//   %is_null_dst_i1 = bitcast %"struct.impala_udf::AnyVal"* %is_null_dst to i1*
-//   store i1 %is_null, i1* %is_null_dst_i1
-//   %val_ptr = bitcast i8* %raw to i64*
-//   %val1 = load i64* %val_ptr
-//   %val_dst = getelementptr inbounds %"struct.impala_udf::BigIntVal"* %val, i32 0, i32 1
-//   store i64 %val1, i64* %val_dst
-//   %result = load %"struct.impala_udf::BigIntVal"* %val
-//   ret %"struct.impala_udf::BigIntVal" %result
+//   %masked = and i32 %result, -256
+//   %is_null_ext = zext i1 %is_null to i32
+//   %result1 = or i32 %masked, %is_null_ext
+//   br i1 %is_null, label %null, label %non_null
+//
+// null:                                             ; preds = %entry
+//   ret i32 %result1
+//
+// non_null:                                         ; preds = %entry
+//   %val_ptr = bitcast i8* %raw to i16*
+//   %val = load i16* %val_ptr
+//   %1 = zext i16 %val to i32
+//   %2 = shl i32 %1, 16
+//   %3 = and i32 %result1, 65535
+//   %result2 = or i32 %3, %2
+//   ret i32 %result2
 // }
-Status Expr::GetIRComputeFn(RuntimeState* state, Function** fn) {
+Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
   LlvmCodeGen* codegen = state->llvm_codegen();
 
   Value* args[2];
-  *fn = CreateIRFunctionPrototype(codegen, "ExprWrapper", &args);
+  *fn = CreateIrFunctionPrototype(codegen, "ExprWrapper", &args);
   BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmCodeGen::LlvmBuilder builder(block);
 
@@ -889,44 +898,45 @@ Status Expr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   Value* row_arg = args[1];
   Value* raw_result = builder.CreateCall2(interpreted_fn, this_arg, row_arg, "raw");
 
-  // Convert void* value to appropriate AnyVal
-  Value* result_ptr = builder.CreateAlloca((*fn)->getReturnType(), 0, "val");
+  // Convert void* 'raw_result' to *Val 'result'
+  CodegenAnyVal result(codegen, &builder, type(), NULL, "result");
 
   Value* is_null = builder.CreateIsNull(raw_result, "is_null");
-  Value* is_null_dst = builder.CreateStructGEP(result_ptr, 0, "is_null_dst");
-  Value* is_null_dst_i1 = builder.CreateBitCast(
-      is_null_dst, codegen->GetPtrType(TYPE_BOOLEAN), "is_null_dst_i1");
-  builder.CreateStore(is_null, is_null_dst_i1);
+  result.SetIsNull(is_null);
+  BasicBlock* null_block;
+  BasicBlock* non_null_block;
+  codegen->CreateIfElseBlocks(*fn, "null", "non_null", &null_block, &non_null_block);
+  builder.CreateCondBr(is_null, null_block, non_null_block);
 
+  // If expr returns NULL, return *Val 'result' immediately
+  builder.SetInsertPoint(null_block);
+  builder.CreateRet(result.value());
+
+  // else set result.val
+  builder.SetInsertPoint(non_null_block);
   Value* val_ptr =
       builder.CreateBitCast(raw_result, codegen->GetPtrType(type()), "val_ptr");
   if (type() == TYPE_STRING) {
     Value* ptr_ptr = builder.CreateStructGEP(val_ptr, 0, "ptr_ptr");
     Value* ptr = builder.CreateLoad(ptr_ptr, "ptr");
-    Value* ptr_dst = builder.CreateStructGEP(result_ptr, 2, "ptr_dst");
-    builder.CreateStore(ptr, ptr_dst);
-
+    result.SetPtr(ptr);
     Value* len_ptr = builder.CreateStructGEP(val_ptr, 1, "len_ptr");
     Value* len = builder.CreateLoad(len_ptr, "len");
-    Value* len_dst = builder.CreateStructGEP(result_ptr, 1, "len_dst");
-    builder.CreateStore(len, len_dst);
+    result.SetLen(len);
   } else {
     Value* val = builder.CreateLoad(val_ptr, "val");
-    Value* val_dst = builder.CreateStructGEP(result_ptr, 1, "val_dst");
-    builder.CreateStore(val, val_dst);
+    result.SetVal(val);
   }
-
-  Value* result = builder.CreateLoad(result_ptr, "result");
-  builder.CreateRet(result);
+  builder.CreateRet(result.value());
 
   *fn = codegen->FinalizeFunction(*fn);
   DCHECK(*fn != NULL);
   return Status::OK;
 }
 
-Function* Expr::CreateIRFunctionPrototype(LlvmCodeGen* codegen, const string& name,
+Function* Expr::CreateIrFunctionPrototype(LlvmCodeGen* codegen, const string& name,
                                           Value* (*args)[2]) {
-  Type* return_type = GetUdfValType(codegen, type_);
+  Type* return_type = CodegenAnyVal::GetType(codegen, type_);
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
   // TODO: Placeholder for ExprContext argument
   prototype.AddArgument(LlvmCodeGen::NamedVariable("context", codegen->ptr_type()));
@@ -935,35 +945,4 @@ Function* Expr::CreateIRFunctionPrototype(LlvmCodeGen* codegen, const string& na
   Function* function = prototype.GeneratePrototype(NULL, args[0]);
   DCHECK(function != NULL);
   return function;
-}
-
-// Indexed by PrimitveType. UDFs cannot return TYPE_NULL or TYPE_TIMESTAMP.
-const char* VAL_TYPE_NAMES[] = {
-  NULL, NULL, "BooleanVal", "TinyIntVal", "SmallIntVal", "IntVal",
-  "BigIntVal", "FloatVal", "DoubleVal", NULL, "StringVal" };
-
-// Clang compiles out most of the UDF AnyVal types (e.g. IntVal={bool, i32} is coerced to
-// i64), so we must manually generate them rather than using the cross-compiled types
-// directly. We cache the generated types in udf_val_types_ so we always return the same
-// Type* for a given 'type' (binary-compatible struct types are not accepted by the llvm
-// verifier).
-Type* Expr::GetUdfValType(LlvmCodeGen* codegen, PrimitiveType type) {
-  DCHECK(type != TYPE_NULL);
-  DCHECK(type != TYPE_TIMESTAMP) << "TODO";
-  DCHECK_LT(type, sizeof(VAL_TYPE_NAMES));
-  DCHECK(VAL_TYPE_NAMES[type] != NULL) << type;
-
-  // We may have already generated this type
-  StructType* val_type = codegen->module()->getTypeByName(VAL_TYPE_NAMES[type]);
-  if (val_type != NULL) return val_type;
-
-  if (type == TYPE_STRING) {
-    Type* elements[3] = { codegen->boolean_type(), // is_null
-                          codegen->int_type(),     // len
-                          codegen->ptr_type() };   // ptr
-    return StructType::create(elements, VAL_TYPE_NAMES[type]);
-  }
-  Type* elements[2] = { codegen->boolean_type(),  // is_null
-                        codegen->GetType(type) }; // val
-  return StructType::create(elements, VAL_TYPE_NAMES[type]);
 }

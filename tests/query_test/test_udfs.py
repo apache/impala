@@ -20,9 +20,16 @@ class TestUdfs(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
-  # This must run serially because other tests executing 'invalidate metadata' will nuke
-  # all loaded functions.
-  # TODO: This can be run in parallel once functions are persisted correctly.
+  # These tests must run serially because other tests executing 'invalidate metadata' will
+  # nuke all loaded functions.
+  # TODO: They can be run in parallel once functions are persisted correctly.
+
   @pytest.mark.execute_serially
-  def test_udfs(self, vector):
+  def test_native_udfs(self, vector):
+    self.run_test_case('QueryTest/load-native-udfs', vector)
+    self.run_test_case('QueryTest/udf', vector)
+
+  @pytest.mark.execute_serially
+  def test_ir_udfs(self, vector):
+    self.run_test_case('QueryTest/load-ir-udfs', vector)
     self.run_test_case('QueryTest/udf', vector)

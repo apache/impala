@@ -70,6 +70,7 @@ namespace impala {
 
 THRIFT_ENUM_OUTPUT_FN(TExprOpcode);
 THRIFT_ENUM_OUTPUT_FN(TAggregationOp);
+THRIFT_ENUM_OUTPUT_FN(TFunctionBinaryType);
 THRIFT_ENUM_OUTPUT_FN(TCatalogObjectType);
 THRIFT_ENUM_OUTPUT_FN(TDdlType);
 THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);

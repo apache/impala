@@ -28,6 +28,7 @@ add_library(TestUtil STATIC
 )
 
 add_library(TestUdfs SHARED test-udfs.cc)
+COMPILE_TO_IR(test-udfs.cc)
 
 add_executable(mini-impala-cluster
   mini-impala-cluster.cc

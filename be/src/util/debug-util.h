@@ -39,6 +39,7 @@ class RowBatch;
 
 std::ostream& operator<<(std::ostream& os, const TExprOpcode::type& op);
 std::ostream& operator<<(std::ostream& os, const TAggregationOp::type& op);
+std::ostream& operator<<(std::ostream& os, const TFunctionBinaryType::type& op);
 std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
 std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);

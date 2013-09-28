@@ -25,6 +25,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "statestore/simple-scheduler.h"
@@ -63,6 +64,7 @@ ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
     client_cache_(new ImpalaInternalServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
+    lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
@@ -103,6 +105,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
   : stream_mgr_(new DataStreamMgr()),
     client_cache_(new ImpalaInternalServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
+    lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),

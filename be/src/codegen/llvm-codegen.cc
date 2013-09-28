@@ -25,6 +25,7 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/Linker.h>
 #include <llvm/PassManager.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -40,7 +41,9 @@
 #include "common/logging.h"
 #include "codegen/subexpr-elimination.h"
 #include "impala-ir/impala-ir-names.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "util/cpu-info.h"
+#include "util/hdfs-util.h"
 #include "util/path-builder.h"
 
 using namespace boost;
@@ -49,6 +52,7 @@ using namespace std;
 
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
 DEFINE_string(module_output, "", "if set, saves the generated IR to the output file.");
+DECLARE_string(local_library_dir);
 
 namespace impala {
 
@@ -102,7 +106,18 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(pool, ""));
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
-  SCOPED_TIMER((*codegen)->load_module_timer_);
+
+  Module* loaded_module;
+  RETURN_IF_ERROR(LoadModule(codegen->get(), file, &loaded_module));
+  (*codegen)->module_ = loaded_module;
+
+  return (*codegen)->Init();
+}
+
+Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
+                               Module** module) {
+  SCOPED_TIMER(codegen->load_module_timer_);
+
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
   if (err.value() != 0) {
@@ -110,20 +125,44 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     ss << "Could not load module " << file << ": " << err.message();
     return Status(ss.str());
   }
+  COUNTER_UPDATE(codegen->module_file_size_, file_buffer->getBufferSize());
 
-  COUNTER_UPDATE((*codegen)->module_file_size_, file_buffer->getBufferSize());
   string error;
-  Module* loaded_module = ParseBitcodeFile(file_buffer.get(),
-      (*codegen)->context(), &error);
-
-  if (loaded_module == NULL) {
+  *module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);
+  if (*module == NULL) {
     stringstream ss;
     ss << "Could not parse module " << file << ": " << error;
     return Status(ss.str());
   }
-  (*codegen)->module_ = loaded_module;
+  return Status::OK;
+}
 
-  return (*codegen)->Init();
+// TODO: Create separate counters/timers (file size, load time) for each module linked
+Status LlvmCodeGen::LinkModule(const string& file, HdfsFsCache* fs_cache) {
+  if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK;
+
+  SCOPED_TIMER(profile_.total_time_counter());
+
+  // TODO: This should go in LibCache
+  DCHECK(fs_cache != NULL);
+  hdfsFS hdfs_conn = fs_cache->GetDefaultConnection();
+  hdfsFS local_conn = fs_cache->GetLocalConnection();
+  string local_file;
+  RETURN_IF_ERROR(CopyHdfsFile(hdfs_conn, file.c_str(), local_conn,
+                               FLAGS_local_library_dir.c_str(), &local_file));
+
+  Module* new_module;
+  RETURN_IF_ERROR(LoadModule(this, local_file, &new_module));
+  string error_msg;
+  bool error =
+      Linker::LinkModules(module_, new_module, Linker::DestroySource, &error_msg);
+  if (error) {
+    stringstream ss;
+    ss << "Problem linking " << file << " to main module: " << error_msg;
+    return Status(ss.str());
+  }
+  linked_modules_.insert(file);
+  return Status::OK;
 }
 
 Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* codegen_ret) {
@@ -294,7 +333,9 @@ Type* LlvmCodeGen::GetType(const string& name) {
 }
 
 PointerType* LlvmCodeGen::GetPtrType(const string& name) {
-  return PointerType::get(GetType(name), 0);
+  Type* type = GetType(name);
+  DCHECK(type != NULL) << name;
+  return PointerType::get(type, 0);
 }
 
 // Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead

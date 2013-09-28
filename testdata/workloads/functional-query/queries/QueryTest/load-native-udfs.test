@@ -1,0 +1,59 @@
+====
+---- QUERY
+drop function if exists udf_test.identity(boolean);
+drop function if exists udf_test.identity(tinyint);
+drop function if exists udf_test.identity(smallint);
+drop function if exists udf_test.identity(int);
+drop function if exists udf_test.identity(bigint);
+drop function if exists udf_test.identity(float);
+drop function if exists udf_test.identity(double);
+drop function if exists udf_test.identity(string);
+drop function if exists udf_test.all_types_fn(
+    string, boolean, tinyint, smallint, int, bigint, float, double);
+drop function if exists udf_test.no_args();
+
+drop database if exists udf_test;
+create database if not exists udf_test;
+
+create function udf_test.identity(boolean) returns boolean
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE';
+
+create function udf_test.identity(tinyint) returns tinyint
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE';
+
+create function udf_test.identity(smallint) returns smallint
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_11SmallIntValE';
+
+create function udf_test.identity(int) returns int
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_6IntValE';
+
+create function udf_test.identity(bigint) returns bigint
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9BigIntValE';
+
+create function udf_test.identity(float) returns float
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_8FloatValE';
+
+create function udf_test.identity(double) returns double
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9DoubleValE';
+
+create function udf_test.identity(string) returns string
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
+
+create function udf_test.all_types_fn(
+    string, boolean, tinyint, smallint, int, bigint, float, double)
+returns int
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValERKNS_8FloatValERKNS_9DoubleValE';
+
+create function udf_test.no_args() returns string
+location '/test-warehouse/libTestUdfs.so'
+symbol='_Z6NoArgsPN10impala_udf15FunctionContextE';
+====

@@ -63,6 +63,7 @@ namespace llvm {
 
 namespace impala {
 
+class HdfsFsCache;
 class SubExprElimination;
 
 // LLVM code generator.  This is the top level object to generate jitted code.  
@@ -347,6 +348,8 @@ class LlvmCodeGen {
   // Simple wrappers to reduce code verbosity
   llvm::Type* boolean_type() { return GetType(TYPE_BOOLEAN); }
   llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
+  llvm::Type* tinyint_type() { return GetType(TYPE_TINYINT); }
+  llvm::Type* smallint_type() { return GetType(TYPE_SMALLINT); }
   llvm::Type* int_type() { return GetType(TYPE_INT); }
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
   llvm::Type* string_val_type() { return string_val_type_; }
@@ -371,6 +374,17 @@ class LlvmCodeGen {
   // Codegen for do *dst = src.  For native types, this is just a store, for structs
   // we need to assign the fields one by one
   void CodegenAssign(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, PrimitiveType);
+
+  // Loads an LLVM module. 'file' should be the local path to the LLVM bitcode (.ll)
+  // file. If 'file_size' is not NULL, it will be set to the size of 'file'.
+  // The caller is responsible for cleaning up module.
+  static Status LoadModule(LlvmCodeGen* codegen, const std::string& file,
+                           llvm::Module** module);
+
+  // Loads a module from a local or HDFS file and links it to the module associated with
+  // this LlvmCodeGen object.  If 'hfds_file' is true, 'file' is the HDFS path to the
+  // module and 'fs_cache' cannot be null.
+  Status LinkModule(const std::string& file, HdfsFsCache* fs_cache);
 
  private:
   friend class LlvmCodeGenTest;
@@ -471,6 +485,10 @@ class LlvmCodeGen {
   // for the caller to know the number of bytes to hash (e.g. tuple width) and
   // we can codegen a loop unrolled hash function.
   std::map<int, llvm::Function*> hash_fns_;
+
+  // The locations of modules that have been linked. Used to avoid linking the same module
+  // twice, which causes symbol collision errors.
+  std::set<std::string> linked_modules_;
 
   // Debug utility that will insert a printf-like function into the generated
   // IR.  Useful for debugging the IR.  This is lazily created.

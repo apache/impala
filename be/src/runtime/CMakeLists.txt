@@ -33,6 +33,7 @@ add_library(Runtime STATIC
   hbase-table.cc
   hbase-table-factory.cc
   hdfs-fs-cache.cc
+  lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
   parallel-executor.cc

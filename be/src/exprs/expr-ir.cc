@@ -24,8 +24,12 @@ void* IrExprGetValue(Expr* expr, TupleRow* row) {
   return expr->GetValue(row);
 }
 
-// Dummy function to force compilation of FunctionContext type
-void dummy(impala_udf::FunctionContext) { }
+// Dummy function to force compilation of UDF types.
+// The arguments are pointers to prevent Clang from lowering the struct types
+// (e.g. IntVal={bool, i32} can be coerced to i64).
+void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::TinyIntVal*,
+           impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
+           impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*) { }
 
 #else
 #error "This file should only be compiled by clang."

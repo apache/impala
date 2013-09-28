@@ -252,6 +252,22 @@ FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
   TARGET_LINK_LIBRARIES(${BENCHMARK_NAME} ${IMPALA_LINK_LIBS})
 ENDFUNCTION()
 
+# Function to generate rule to cross compile a source file to an IR module.
+# This should be called with the .cc src file and it will generate a
+# src-file-ir target that can be built.
+# e.g. COMPILE_TO_IR(test.cc) generates the "test-ir" make target.
+# Note: this is duplicated in udf_samples/CMakeLists.txt
+set(IR_COMPILE_FLAGS "-emit-llvm" "-O3" "-c" "-I../")
+function(COMPILE_TO_IR SRC_FILE)
+  get_filename_component(BASE_NAME ${SRC_FILE} NAME_WE)
+  set(OUTPUT_FILE "${LIBRARY_OUTPUT_PATH}/${BASE_NAME}.ll")
+  add_custom_command(
+    OUTPUT ${OUTPUT_FILE}
+    COMMAND ${LLVM_CLANG_EXECUTABLE} ${IR_COMPILE_FLAGS} ${SRC_FILE} -o ${OUTPUT_FILE}
+    DEPENDS ${SRC_FILE})
+  add_custom_target(${BASE_NAME}-ir ALL DEPENDS ${OUTPUT_FILE})
+endfunction(COMPILE_TO_IR)
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)

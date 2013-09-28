@@ -14,35 +14,30 @@
 
 #include "exprs/native-udf-expr.h"
 
-#include <dlfcn.h>
 #include <vector>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include "codegen/llvm-codegen.h"
-#include "runtime/hdfs-fs-cache.h"
+#include "exprs/udf-util.h"
+#include "runtime/lib-cache.h"
 #include "udf/udf-internal.h"
+#include "util/debug-util.h"
 #include "util/dynamic-util.h"
-#include "util/hdfs-util.h"
 
-using namespace llvm;
 using namespace impala;
 using namespace impala_udf;
 using namespace std;
 
-DEFINE_string(local_library_dir, "/tmp",
-              "Local directory to copy UDF libraries from HDFS into");
-
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
     udf_context_(FunctionContextImpl::CreateContext()),
+    udf_type_(node.udf_call_expr.binary_type),
     hdfs_location_(node.udf_call_expr.binary_location),
     symbol_name_(node.udf_call_expr.symbol_name),
-    dl_handle_(NULL),
-    udf_wrapper_(NULL) {
+    udf_wrapper_(NULL),
+    codegen_(NULL),
+    ir_udf_wrapper_(NULL) {
   DCHECK(node.node_type == TExprNodeType::UDF_CALL);
-}
-
-NativeUdfExpr::~NativeUdfExpr() {
-  if (dl_handle_ != NULL) dlclose(dl_handle_);
+  DCHECK(udf_type_ != TFunctionBinaryType::HIVE);
 }
 
 typedef BooleanVal (*BooleanUdfWrapper)(int8_t*, TupleRow*);
@@ -56,16 +51,29 @@ typedef StringVal (*StringUdfWrapper)(int8_t*, TupleRow*);
 
 void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
   NativeUdfExpr* udf_expr = reinterpret_cast<NativeUdfExpr*>(e);
+
+  // TODO: This isn't threadsafe. UDF exprs should create their own IR module which they
+  // optimize and compile in Prepare() so this won't be necessary.
+  if (UNLIKELY(udf_expr->udf_wrapper_ == NULL)) {
+    udf_expr->udf_wrapper_ = udf_expr->codegen_->JitFunction(udf_expr->ir_udf_wrapper_);
+    if (UNLIKELY(udf_expr->udf_wrapper_ == NULL)) {
+      LOG(ERROR) << "Unable to JIT compile UDF wrapper function";
+      return NULL;
+    }
+  }
+
   switch (e->type()) {
     case TYPE_BOOLEAN: {
       BooleanUdfWrapper fn = reinterpret_cast<BooleanUdfWrapper>(udf_expr->udf_wrapper_);
       BooleanVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.bool_val = v.val;
       return &e->result_.bool_val;
     }
     case TYPE_TINYINT: {
       TinyIntUdfWrapper fn = reinterpret_cast<TinyIntUdfWrapper>(udf_expr->udf_wrapper_);
       TinyIntVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.tinyint_val = v.val;
       return &e->result_.tinyint_val;
     }
@@ -73,36 +81,42 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
       SmallIntUdfWrapper fn =
           reinterpret_cast<SmallIntUdfWrapper>(udf_expr->udf_wrapper_);
       SmallIntVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.smallint_val = v.val;
       return &e->result_.smallint_val;
     }
     case TYPE_INT: {
       IntUdfWrapper fn = reinterpret_cast<IntUdfWrapper>(udf_expr->udf_wrapper_);
       IntVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.int_val = v.val;
       return &e->result_.int_val;
     }
     case TYPE_BIGINT: {
       BigIntUdfWrapper fn = reinterpret_cast<BigIntUdfWrapper>(udf_expr->udf_wrapper_);
       BigIntVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.bigint_val = v.val;
       return &e->result_.bigint_val;
     }
     case TYPE_FLOAT: {
       FloatUdfWrapper fn = reinterpret_cast<FloatUdfWrapper>(udf_expr->udf_wrapper_);
       FloatVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.float_val = v.val;
       return &e->result_.float_val;
     }
     case TYPE_DOUBLE: {
       DoubleUdfWrapper fn = reinterpret_cast<DoubleUdfWrapper>(udf_expr->udf_wrapper_);
       DoubleVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.double_val = v.val;
       return &e->result_.double_val;
     }
     case TYPE_STRING: {
       StringUdfWrapper fn = reinterpret_cast<StringUdfWrapper>(udf_expr->udf_wrapper_);
       StringVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
       e->result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
       e->result_.string_val.len = v.len;
       return &e->result_.string_val;
@@ -118,100 +132,66 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
   if (state->llvm_codegen() == NULL) {
     return Status("UDFs cannot be evaluated with codegen disabled");
   }
-
+  codegen_ = state->llvm_codegen();
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
-
-  // Copy the library file from HDFS to the local filesystem
-  // TODO: This needs to be moved to a cache so we don't copy the library from HDFS every
-  // time the UDF is used.
-  hdfsFS hdfs_conn = state->fs_cache()->GetDefaultConnection();
-  hdfsFS local_conn = state->fs_cache()->GetLocalConnection();
-  RETURN_IF_ERROR(CopyHdfsFile(hdfs_conn, hdfs_location_.c_str(), local_conn,
-                               FLAGS_local_library_dir.c_str(), &local_location_));
-
-  LlvmCodeGen* codegen = state->llvm_codegen();
-  Function* fn;
-  RETURN_IF_ERROR(GetIRComputeFn(state, &fn));
-  udf_wrapper_ = codegen->JitFunction(fn);
-  if (udf_wrapper_ == NULL) {
-    stringstream ss;
-    ss << "NativeUdfExpr::Prepare: unable to JIT compile UDF wrapper function\n" << fn;
-    return Status(ss.str());
-  }
+  RETURN_IF_ERROR(GetIrComputeFn(state, &ir_udf_wrapper_));
   compute_fn_ = NativeUdfExpr::ComputeFn;
   return Status::OK;
 }
 
 // Dynamically loads the pre-compiled UDF and codegens a function that calls each child's
 // codegen'd function, then passes those values to the UDF and returns the result.
-// Example generated IR:
+// Example generated IR for a UDF with signature
+// SmallIntVal Identity(FunctionContext*, SmallIntVal*):
 //
-// define %BigIntVal @UdfWrapper(i8* %context, %"class.impala::TupleRow"* %row) {
+// define i32 @UdfWrapper(i8* %context, %"class.impala::TupleRow"* %row) {
 // entry:
-//   %arg_val = call %BigIntVal @ExprWrapper(
-//       i8* %context, %"class.impala::TupleRow"* %row)
-//   %arg = alloca %BigIntVal
-//   store %BigIntVal %arg_val, %BigIntVal* %arg
-//   %arg_val1 = call %BigIntVal @ExprWrapper1(
-//       i8* %context, %"class.impala::TupleRow"* %row)
-//   %arg2 = alloca %BigIntVal
-//   store %BigIntVal %arg_val1, %BigIntVal* %arg2
-//   %result = call
-//       %BigIntVal @_Z6AddUdfPN10impala_udf10FunctionContextERKNS_9BigIntValES4_(
-//       %"class.impala_udf::FunctionContext"* inttoptr
-//           (i64 58189624 to %"class.impala_udf::FunctionContext"*),
-//       %BigIntVal* %arg, %BigIntVal* %arg2)
-//   ret %BigIntVal %result
+//   %arg_val = call i32 @ExprWrapper(i8* %context, %"class.impala::TupleRow"* %row)
+//   %arg_ptr = alloca i32
+//   store i32 %arg_val, i32* %arg_ptr
+//   %result = call i32 @_Z8IdentityPN10impala_udf15FunctionContextERKNS_11SmallIntValE(
+//      %"class.impala_udf::FunctionContext"* inttoptr
+//         (i64 51760208 to %"class.impala_udf::FunctionContext"*),
+//      i32* %arg_ptr)
+//   ret i32 %result
 // }
-Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
+Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   LlvmCodeGen* codegen = state->llvm_codegen();
-
-  // Dynamically load the UDF
-  RETURN_IF_ERROR(DynamicOpen(state, local_location_, RTLD_NOW, &dl_handle_));
-  void* udf_ptr;
-  RETURN_IF_ERROR(DynamicLookup(state, dl_handle_, symbol_name_.c_str(), &udf_ptr));
-
-  // Convert UDF function pointer to llvm::Function*
-  Type* return_type = GetUdfValType(codegen, type_);
-  vector<Type*> arg_types;
-  arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
-  for (int i = 0; i < children_.size(); ++i) {
-    Type* child_return_type = GetUdfValType(codegen, children_[i]->type());
-    arg_types.push_back(PointerType::get(child_return_type, 0));
-  }
-  FunctionType* udf_type = FunctionType::get(return_type, arg_types, false);
-  Function* udf = Function::Create(
-      udf_type, GlobalValue::ExternalLinkage, symbol_name_, codegen->module());
-  codegen->execution_engine()->addGlobalMapping(udf, udf_ptr);
+  llvm::Function* udf;
+  RETURN_IF_ERROR(GetUdf(state, &udf));
 
   // Create wrapper that computes args and calls UDF
-  Value* args[2];
-  *fn = CreateIRFunctionPrototype(codegen, "UdfWrapper", &args);
-  BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
+  llvm::Value* args[2];
+  *fn = CreateIrFunctionPrototype(codegen, "UdfWrapper", &args);
+  llvm::BasicBlock* block = llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmCodeGen::LlvmBuilder builder(block);
 
   // First argument is always FunctionContext*
-  vector<Value*> udf_args;
+  vector<llvm::Value*> udf_args;
   udf_args.push_back(codegen->CastPtrToLlvmPtr(
       codegen->GetPtrType("class.impala_udf::FunctionContext"), udf_context_.get()));
 
   // Call children to populate remaining arguments
-  for (int i = 0; i < children_.size(); ++i) {
-    Function* child_fn;
-    RETURN_IF_ERROR(children_[i]->GetIRComputeFn(state, &child_fn));
+  llvm::Function::arg_iterator arg = udf->arg_begin();
+  ++arg; // Skip FunctionContext* arg
+  for (int i = 0; i < children_.size(); ++i, ++arg) {
+    llvm::Function* child_fn;
+    RETURN_IF_ERROR(children_[i]->GetIrComputeFn(state, &child_fn));
     DCHECK(child_fn != NULL);
-    Value* val = builder.CreateCall(child_fn, args, "arg_val");
-    udf_args.push_back(builder.CreateAlloca(child_fn->getReturnType(), 0, "arg"));
-    builder.CreateStore(val, udf_args.back());
+
+    llvm::Value* arg_val = builder.CreateCall(child_fn, args, "arg_val");
+    llvm::Value* arg_ptr = builder.CreateAlloca(child_fn->getReturnType(), 0, "arg_ptr");
+    builder.CreateStore(arg_val, arg_ptr);
+
+    // The *Val type returned by child_fn will be likely be lowered to a simpler type, so
+    // we must cast arg_ptr to the actual *Val struct pointer type expected by the UDF.
+    llvm::Value* cast_arg_ptr =
+        builder.CreateBitCast(arg_ptr, arg->getType(), "cast_arg_ptr");
+    udf_args.push_back(cast_arg_ptr);
   }
 
   // Call UDF
-  // Note: I ran into an issue where the calling convention used by the llvm-generated
-  // call to this function didn't match the expected cc (the function itself was compiled
-  // with gcc). It involved how a StringVal is returned, and was fixed by reducing the
-  // memory footprint of StringVal (putting 'len' before 'ptr'). This might come up again
-  // when we upgrade llvm or if a *Val's memory layout is changed.
-  Value* result_val = builder.CreateCall(udf, udf_args, "result");
+  llvm::Value* result_val = builder.CreateCall(udf, udf_args, "result");
   builder.CreateRet(result_val);
 
   *fn = codegen->FinalizeFunction(*fn);
@@ -219,9 +199,57 @@ Status NativeUdfExpr::GetIRComputeFn(RuntimeState* state, Function** fn) {
   return Status::OK;
 }
 
+Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
+  LlvmCodeGen* codegen = state->llvm_codegen();
+
+  if (udf_type_ == TFunctionBinaryType::NATIVE) {
+    void* udf_ptr;
+    RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
+        state, hdfs_location_, symbol_name_, &udf_ptr));
+
+    // Convert UDF function pointer to llvm::Function*
+    // First generate the llvm::FunctionType* corresponding to the UDF.
+    llvm::Type* return_type = CodegenAnyVal::GetType(codegen, type_);
+    vector<llvm::Type*> arg_types;
+    arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
+    for (int i = 0; i < children_.size(); ++i) {
+      llvm::Type* child_return_type =
+          CodegenAnyVal::GetType(codegen, children_[i]->type());
+      arg_types.push_back(llvm::PointerType::get(child_return_type, 0));
+    }
+    llvm::FunctionType* udf_type = llvm::FunctionType::get(return_type, arg_types, false);
+
+    // Create a llvm::Function* with the generated type. This is only a function
+    // declaration, not a definition, since we do not create any basic blocks or
+    // instructions in it.
+    *udf = llvm::Function::Create(
+        udf_type, llvm::GlobalValue::ExternalLinkage, symbol_name_, codegen->module());
+
+    // Associate the dynamically loaded function pointer with the Function* we
+    // defined. This tells LLVM where the compiled function definition is located in
+    // memory.
+    codegen->execution_engine()->addGlobalMapping(*udf, udf_ptr);
+  } else {
+    DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
+
+    // Link the UDF module into this query's main module (essentially copy the UDF module
+    // into the main module) so the UDF function is available for inlining in the main
+    // module.
+    RETURN_IF_ERROR(codegen->LinkModule(hdfs_location_, state->fs_cache()));
+    *udf = codegen->module()->getFunction(symbol_name_);
+    if (*udf == NULL) {
+      stringstream ss;
+      ss << "Unable to locate function " << symbol_name_
+         << " from LLVM module " << hdfs_location_;
+      return Status(ss.str());
+    }
+  }
+  return Status::OK;
+}
+
 string NativeUdfExpr::DebugString() const {
   stringstream out;
-  out << "NativeUdfExpr(location= " << hdfs_location_ << " symbol_name= "
-      << symbol_name_ << " " << Expr::DebugString() << ")";
+  out << "NativeUdfExpr(udf_type=" << udf_type_ << " location=" << hdfs_location_
+      << " symbol_name=" << symbol_name_ << Expr::DebugString() << ")";
   return out.str();
 }

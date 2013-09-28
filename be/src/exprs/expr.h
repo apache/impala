@@ -439,17 +439,13 @@ class Expr {
   // replaced by an ExprContext* argument.
   //
   // The default implementation produces a wrapper around GetValue().
-  virtual Status GetIRComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetIrComputeFn(RuntimeState* state, llvm::Function** fn);
 
   // Helper function to create an empty Function* with the appropriate signature to be
-  // returned by GetIRComputeFn(). 'name' is the name of the returned Function*. The
+  // returned by GetIrComputeFn(). 'name' is the name of the returned Function*. The
   // arguments to the function are returned in 'args'.
-  llvm::Function* CreateIRFunctionPrototype(LlvmCodeGen* codegen, const std::string& name,
+  llvm::Function* CreateIrFunctionPrototype(LlvmCodeGen* codegen, const std::string& name,
                                             llvm::Value* (*args)[2]);
-
-  // Returns the type of the AnyVal subclass corresponding to 'type'.
-  // For example, 'type' = TYPE_INT => the llvm type of IntVal ({i1, i32})
-  llvm::Type* GetUdfValType(LlvmCodeGen* codegen, PrimitiveType type);
 
   // Create a compute function prototype.
   // The signature is:
