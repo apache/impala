@@ -22,7 +22,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "common/logging.h"
-#include "common/daemon.h"
+#include "common/init.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
 #include "runtime/hbase-table-factory.h"
@@ -35,7 +35,6 @@
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
-#include "util/authorization.h"
 #include "service/impala-server.h"
 #include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
@@ -59,21 +58,19 @@ DECLARE_int32(be_port);
 DECLARE_string(principal);
 
 int main(int argc, char** argv) {
-  InitDaemon(argc, argv);
+  InitCommonRuntime(argc, argv, true);
 
   LlvmCodeGen::InitializeLlvm();
+  JniUtil::InitLibhdfs();
+  EXIT_IF_ERROR(HBaseTableScanner::Init());
+  EXIT_IF_ERROR(HBaseTableFactory::Init());
+  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
+  InitFeSupport();
 
   // Enable Kerberos security if requested.
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("Impalad"));
   }
-
-  JniUtil::InitLibhdfs();
-  EXIT_IF_ERROR(JniUtil::Init());
-  EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTableFactory::Init());
-  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
-  InitFeSupport();
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;

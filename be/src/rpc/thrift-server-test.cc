@@ -17,7 +17,7 @@
 #include "service/impala-server.h"
 #include <string>
 #include <gtest/gtest.h>
-#include "common/daemon.h"
+#include "common/init.h"
 #include "service/fe-support.h"
 
 using namespace impala;
@@ -61,8 +61,7 @@ TEST(SslTest, Connectivity) {
 }
 
 int main(int argc, char** argv) {
-  InitDaemon(argc, argv);
-  EXIT_IF_ERROR(JniUtil::Init());
+  InitCommonRuntime(argc, argv, true);
   InitFeSupport();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

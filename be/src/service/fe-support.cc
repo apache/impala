@@ -76,50 +76,6 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   return result_bytes;
 }
 
-// Called by the frontend to log messages to Glog
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeLogger(
-    JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
-    int line_number) {
-
-  // Mimic the behaviour of VLOG(N) by ignoring verbose log messages when appropriate.
-  if (severity == TLogLevel::VLOG && !VLOG_IS_ON(1)) return;
-  if (severity == TLogLevel::VLOG_2 && !VLOG_IS_ON(2)) return;
-  if (severity == TLogLevel::VLOG_3 && !VLOG_IS_ON(3)) return;
-
-  // Unused required argument to GetStringUTFChars
-  jboolean dummy;
-  const char* filename = env->GetStringUTFChars(file, &dummy);
-  const char* str = env->GetStringUTFChars(msg, &dummy);
-  int log_level = google::INFO;
-  switch (severity) {
-    case TLogLevel::VLOG:
-    case TLogLevel::VLOG_2:
-    case TLogLevel::VLOG_3:
-      log_level = google::INFO;
-      break;
-    case TLogLevel::INFO:
-      log_level = google::INFO;
-      break;
-    case TLogLevel::WARN:
-      log_level = google::WARNING;
-      break;
-    case TLogLevel::ERROR:
-      log_level = google::ERROR;
-      break;
-    case TLogLevel::FATAL:
-      log_level = google::FATAL;
-      break;
-    default:
-      DCHECK(false) << "Unrecognised TLogLevel: " << log_level;
-  }
-  google::LogMessage(filename, line_number, log_level).stream() << string(str);
-
-  env->ReleaseStringUTFChars(msg, str);
-  env->ReleaseStringUTFChars(file, filename);
-}
-
 namespace impala {
 
 void InitFeSupport() {
@@ -130,13 +86,6 @@ void InitFeSupport() {
   nm.signature = const_cast<char*>("([B[B)[B");
   nm.fnPtr = reinterpret_cast<void*>(
       ::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr);
-  env->RegisterNatives(native_backend_cl, &nm, 1);
-  EXIT_IF_EXC(env);
-
-  nm.name = const_cast<char*>("NativeLogger");
-  nm.signature = const_cast<char*>("(ILjava/lang/String;Ljava/lang/String;I)V");
-  nm.fnPtr = reinterpret_cast<void*>(
-      ::Java_com_cloudera_impala_service_FeSupport_NativeLogger);
   env->RegisterNatives(native_backend_cl, &nm, 1);
   EXIT_IF_EXC(env);
 }

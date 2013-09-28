@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_COMMON_DAEMON_H
-#define IMPALA_COMMON_DAEMON_H
+#ifndef IMPALA_UTIL_LOGGING_SUPPORT_H
+#define IMPALA_UTIL_LOGGING_SUPPORT_H
+
+#include "util/jni-util.h"
 
 namespace impala {
 
-// Initialises logging, flags etc. Callers that want to override default gflags
-// variables should do so before calling this method; no logging should be
-// performed until after this method returns.
-void InitDaemon(int argc, char** argv);
+// InitLoggingSupport registers the native logging functions with JNI. This allows
+// the Java log4j log messages to be forwarded to Glog.
+void InitJvmLoggingSupport();
 
 }
-
 #endif

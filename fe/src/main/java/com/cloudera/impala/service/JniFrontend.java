@@ -74,6 +74,7 @@ import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TResetMetadataParams;
+import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 
 /**

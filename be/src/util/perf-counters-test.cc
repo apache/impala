@@ -16,21 +16,19 @@
 #include <stdio.h>
 #include <iostream>
 #include <gtest/gtest.h>
-#include "util/cpu-info.h"
+#include "common/init.h"
 #include "util/disk-info.h"
-#include "util/mem-info.h"
 #include "util/perf-counters.h"
 
 using namespace std;
 
 namespace impala {
 
-TEST(PerfCounterTest, Basic) { 
+TEST(PerfCounterTest, Basic) {
   PerfCounters counters;
   EXPECT_TRUE(counters.AddDefaultCounters());
 
   counters.Snapshot("Before");
-
   double result = 0;
   for (int i = 0; i < 1000000; i++) {
     double d1 = rand() / (double) RAND_MAX;
@@ -63,10 +61,8 @@ TEST(DiskInfoTest, Basic) {
 }
 
 int main(int argc, char **argv) {
+  InitCommonRuntime(argc, argv, false);
   ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
   return RUN_ALL_TESTS();
 }
 

@@ -15,6 +15,7 @@
 #include <boost/thread/thread.hpp>
 #include <gtest/gtest.h>
 
+#include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
 #include "codegen/llvm-codegen.h"
@@ -498,17 +499,11 @@ TEST_F(DataStreamTest, BasicTest) {
 }
 
 int main(int argc, char **argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
+  InitCommonRuntime(argc, argv, true);
   impala::LlvmCodeGen::InitializeLlvm();
-  impala::InitThreading();
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("data-stream-test"));
   }
-
+  ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -20,6 +20,7 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/unordered_map.hpp>
 
+#include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
@@ -35,15 +36,10 @@
 #include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
 #include "util/debug-util.h"
-#include "util/jni-util.h"
-#include "util/mem-info.h"
 #include "util/string-parser.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-client.h"
-#include "rpc/thrift-util.h"
 #include "testutil/in-process-servers.h"
 #include "testutil/impalad-query-executor.h"
 #include "service/impala-server.h"
@@ -2665,17 +2661,10 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 }
 
 int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
+  InitCommonRuntime(argc, argv, true);
   ::testing::InitGoogleTest(&argc, argv);
-  InitThriftLogging();
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
-  impala::LlvmCodeGen::InitializeLlvm();
-  impala::InitThreading();
-
-  EXIT_IF_ERROR(JniUtil::Init());
   InitFeSupport();
+  impala::LlvmCodeGen::InitializeLlvm();
 
   // Create an in-process Impala server and in-process backends for test environment
   // without any startup validation check

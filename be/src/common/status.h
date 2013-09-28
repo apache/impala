@@ -170,7 +170,7 @@ class Status {
   do { \
     Status __status__ = (stmt); \
     if (UNLIKELY(!__status__.ok())) { \
-      string msg; \
+      std::string msg; \
       __status__.GetErrorMsg(&msg); \
       LOG(ERROR) << msg;            \
       exit(1); \

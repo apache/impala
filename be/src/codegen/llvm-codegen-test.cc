@@ -17,11 +17,10 @@
 #include <boost/thread/thread.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "common/init.h"
 #include "runtime/raw-value.h"
 #include "util/cpu-info.h"
-#include "util/disk-info.h"
 #include "util/hash-util.h"
-#include "util/mem-info.h"
 #include "util/path-builder.h"
 
 using namespace std;
@@ -434,9 +433,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 }
 
 int main(int argc, char **argv) {
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
+  impala::InitCommonRuntime(argc, argv, false);
   ::testing::InitGoogleTest(&argc, argv);
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();

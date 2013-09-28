@@ -217,12 +217,13 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
 endif ()
 
-# The above link list does not include tcmalloc.  This is because libfesupport
-# cannot use tcmalloc in all cases.  When it is started up by the FE (for tests)
-# the jvm has already made allocations before tcmalloc can be loaded.  In all
-# other binaries, we can use tcmalloc except the address sanitizer build.  Address sanitizer
-# is incompatible with tcmalloc (they both intercept malloc/free)
-set (IMPALA_FE_SUPPORT_LINK_LIBS ${IMPALA_LINK_LIBS})
+# The above link list does not include tcmalloc. This is because the Impala JVM support
+# libraries (libfesupport, libloggingsupport) cannot use tcmalloc in all cases. When they
+# are started up by the FE (for tests) the jvm has already made allocations before
+# tcmalloc can be loaded. In all other binaries, we can use tcmalloc except the address
+# sanitizer build. Address sanitizer is incompatible with tcmalloc (they both intercept
+# malloc/free)
+set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS})
 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()

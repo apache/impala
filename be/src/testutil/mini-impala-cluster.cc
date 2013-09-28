@@ -20,14 +20,12 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "common/daemon.h"
+#include "common/init.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "util/authorization.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "rpc/thrift-util.h"
@@ -46,24 +44,23 @@ using namespace std;
 using namespace boost;
 
 int main(int argc, char** argv) {
-  InitDaemon(argc, argv);
+  InitCommonRuntime(argc, argv, true);
   if (FLAGS_num_backends <= 0) {
     LOG(ERROR) << "-num_backends arg must be > 0";
     exit(1);
   }
 
   LlvmCodeGen::InitializeLlvm();
-  // Enable Kerberos security, if requested.
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("Impalad"));
-  }
   JniUtil::InitLibhdfs();
-
-  EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTableFactory::Init());
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
+
+  // Enable Kerberos security, if requested.
+  if (!FLAGS_principal.empty()) {
+    EXIT_IF_ERROR(InitKerberos("Impalad"));
+  }
 
   int base_be_port = FLAGS_be_port;
   int base_subscriber_port = 21500;

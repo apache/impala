@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.service;
 
-import java.io.File;
-
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -29,6 +27,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.util.NativeLibUtil;
 import com.google.common.base.Preconditions;
 
 /**
@@ -41,25 +40,11 @@ import com.google.common.base.Preconditions;
  */
 public class FeSupport {
   private final static Logger LOG = LoggerFactory.getLogger(FeSupport.class);
-
   private static boolean loaded = false;
 
   // Returns a serialized TColumnValue.
   public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
       byte[] thriftQueryGlobals);
-
-  // Writes a log message to glog
-  public native static void NativeLogger(
-      int severity, String msg, String filename, int line);
-
-  public static void LogToGlog(int severity, String msg, String filename, int line) {
-    try {
-      NativeLogger(severity, msg, filename, line);
-    } catch (UnsatisfiedLinkError e) {
-      loadLibrary();
-      NativeLogger(severity, msg, filename, line);
-    }
-  }
 
   public static TColumnValue EvalConstExpr(Expr expr, TQueryGlobals queryGlobals)
       throws InternalException {
@@ -103,27 +88,8 @@ public class FeSupport {
    * native functions are loaded.
    */
   private static synchronized void loadLibrary() {
-    if (loaded) {
-      return;
-    }
+    if (loaded) return;
+    NativeLibUtil.loadLibrary("libfesupport.so");
     loaded = true;
-
-    // Search for libfesupport.so in all library paths.
-    String libPath = System.getProperty("java.library.path");
-    String[] paths = libPath.split(":");
-    boolean found = false;
-    for (String path : paths) {
-      String filePath = path + File.separator + "libfesupport.so";
-      File libFile = new File(filePath);
-      if (libFile.exists()) {
-        System.load(filePath);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      System.out.println("Failed to load libfesupport.so from given java.library.paths ("
-          + libPath + ").");
-    }
   }
 }

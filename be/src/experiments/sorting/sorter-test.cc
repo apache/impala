@@ -22,6 +22,7 @@
 #include "sort-util.h"
 #include "sorted-merger.h"
 #include "codegen/llvm-codegen.h"
+#include "common/init.h"
 #include "common/object-pool.h"
 #include "exprs/expr.h"
 #include "runtime/mem-pool.h"
@@ -33,9 +34,6 @@
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tuple-row.h"
 #include "testutil/desc-tbl-builder.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
-#include "util/mem-info.h"
 
 using namespace std;
 using namespace boost;
@@ -1054,17 +1052,9 @@ TEST_F(SorterTest, NoData) {
 }
 
 int main(int argc, char **argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-
-//  ::testing::GTEST_FLAG(filter) = "*ExternalSort*";
-
+  impala::InitCommonRuntime(argc, argv, false);
+  //  ::testing::GTEST_FLAG(filter) = "*ExternalSort*";
   ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
-  impala::InitThreading();
   impala::LlvmCodeGen::InitializeLlvm();
-
   return RUN_ALL_TESTS();
 }

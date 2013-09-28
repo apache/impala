@@ -18,15 +18,13 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/unordered_map.hpp>
 
+#include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
 #include "testutil/in-process-query-executor.h"
 #include "gen-cpp/Exprs_types.h"
 #include "codegen/llvm-codegen.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
-#include "util/mem-info.h"
 
 using namespace llvm;
 using namespace std;
@@ -89,12 +87,8 @@ TEST_F(SequenceTest, SyncTest) {
 }
 
 int main(int argc, char** argv) {
-  google::InitGoogleLogging(argv[0]);
+  impala::InitCommonRuntime(argc, argv, false);
   ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::MemInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
-
   return RUN_ALL_TESTS();
 }

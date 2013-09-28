@@ -19,7 +19,7 @@
 #include <iostream>
 #include <string>
 
-#include "common/daemon.h"
+#include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
 #include "runtime/mem-tracker.h"
@@ -44,7 +44,7 @@ using namespace ::apache::thrift::transport;
 int main(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 25010;
-  InitDaemon(argc, argv);
+  InitCommonRuntime(argc, argv, false);
 
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("StateStore"));

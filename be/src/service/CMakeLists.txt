@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# where to put generated libraries
+# where to put generated libraries.
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 
-# where to put generated binaries
+# where to put generated binaries.
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 
 add_library(Service
@@ -28,12 +27,12 @@ add_library(Service
   query-exec-state.cc
 )
 
-# this shared library provides Impala executor functionality to FE test
+# this shared library provides Impala executor functionality to FE test.
 add_library(fesupport SHARED
   fe-support.cc
 )
 
-target_link_libraries(fesupport ${IMPALA_FE_SUPPORT_LINK_LIBS})
+target_link_libraries(fesupport ${IMPALA_LINK_LIBS_NO_TCMALLOC})
 
 add_executable(impalad
   impalad-main.cc

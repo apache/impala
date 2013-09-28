@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/daemon.h"
+#include "common/init.h"
+#include "common/status.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/logging.h"
+#include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
@@ -24,7 +26,7 @@
 
 DECLARE_string(hostname);
 
-void impala::InitDaemon(int argc, char** argv) {
+void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   // Set the default hostname. The user can override this with the hostname flag.
   GetHostname(&FLAGS_hostname);
 
@@ -45,4 +47,9 @@ void impala::InitDaemon(int argc, char** argv) {
   LOG(INFO) << CpuInfo::DebugString();
   LOG(INFO) << DiskInfo::DebugString();
   LOG(INFO) << MemInfo::DebugString();
+
+  if (init_jvm) {
+    EXIT_IF_ERROR(JniUtil::Init());
+    InitJvmLoggingSupport();
+  }
 }

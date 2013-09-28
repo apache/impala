@@ -41,6 +41,7 @@ add_library(Util
   impalad-metrics.cc
   jni-util.cc
   logging.cc
+  logging-support.cc
   mem-info.cc
   metrics.cc
   network-util.cc
@@ -65,6 +66,11 @@ add_library(Webserver STATIC
   webserver.cc
 )
 
+# shared library which provides native logging support to JVMs over JNI.
+add_library(loggingsupport SHARED
+  logging-support.cc
+)
+
 target_link_libraries(Webserver pthread dl Util ssl)
 
 add_executable(network-perf-benchmark network-perf-benchmark.cc)
@@ -72,6 +78,7 @@ add_executable(parquet-reader parquet-reader.cc)
 
 target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
+target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_NO_TCMALLOC})
 
 ADD_BE_TEST(authorization-test)
 ADD_BE_TEST(runtime-profile-test)

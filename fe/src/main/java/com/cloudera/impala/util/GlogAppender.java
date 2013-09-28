@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.cloudera.impala.service;
+package com.cloudera.impala.util;
+
+import java.util.Properties;
 
 import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.Level;
-import org.apache.log4j.Appender;
 import org.apache.log4j.PropertyConfigurator;
-
-import java.util.Map;
-import java.util.Properties;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Maps;
-import com.google.common.base.Preconditions;
+import org.apache.log4j.spi.LoggingEvent;
 
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TLogLevel;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 /**
  * log4j appender which calls into C++ code to log messages at their correct severities
@@ -59,6 +55,7 @@ public class GlogAppender extends AppenderSkeleton {
     throw new IllegalStateException("Unknown log level: " + level.toString());
   }
 
+  @Override
   public void append(LoggingEvent event) {
     Level level = event.getLevel();
     if (level.equals(Level.OFF)) return;
@@ -70,13 +67,15 @@ public class GlogAppender extends AppenderSkeleton {
     }
     int lineNumber = Integer.parseInt(event.getLocationInformation().getLineNumber());
     String fileName = event.getLocationInformation().getFileName();
-    FeSupport.LogToGlog(levelToSeverity(level).getValue(), msg, fileName, lineNumber);
+    NativeLogger.LogToGlog(
+        levelToSeverity(level).getValue(), msg, fileName, lineNumber);
   }
 
   /**
    * Returns a log4j level string corresponding to the Glog log level
    */
-  private static String log4jLevelForTLogLevel(TLogLevel logLevel) throws InternalException {
+  private static String log4jLevelForTLogLevel(TLogLevel logLevel)
+      throws InternalException {
     switch (logLevel) {
       case INFO:
         return "INFO";
@@ -97,14 +96,13 @@ public class GlogAppender extends AppenderSkeleton {
   }
 
   /**
-   * Manually override Log4j root logger configuration. Any values in log4j.properties not
-   * overridden (that is, anything but the root logger and its default level) will
+   * Manually override Log4j root logger configuration. Any values in log4j.properties
+   * not overridden (that is, anything but the root logger and its default level) will
    * continue to have effect.
-   *
    *  - impalaLogLevel - the maximum log level for com.cloudera.impala.* classes
    *  - otherLogLevel - the maximum log level for all other classes
    */
-  static void Install(TLogLevel impalaLogLevel, TLogLevel otherLogLevel)
+  public static void Install(TLogLevel impalaLogLevel, TLogLevel otherLogLevel)
       throws InternalException {
     Properties properties = new Properties();
     properties.setProperty("log4j.appender.glog", GlogAppender.class.getName());
