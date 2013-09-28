@@ -120,6 +120,7 @@ class ImpalaShell(cmd.Cmd):
     self.output_delimiter = options.output_delimiter
     self.write_delimited = options.write_delimited
     self.print_header = options.print_header
+    self.__populate_command_list()
     try:
       self.readline = __import__('readline')
       self.readline.set_history_length(HISTORY_LENGTH)
@@ -134,6 +135,15 @@ class ImpalaShell(cmd.Cmd):
     # the underlying socket unusable.
     self.is_interrupted = threading.Event()
     signal.signal(signal.SIGINT, self.__signal_handler)
+
+  def __populate_command_list(self):
+    """Populate a list of commands in the shell.
+
+    Each command has its own method of the form do_<command>, and can be extracted by
+    introspecting the class directory.
+    """
+    # Slice the command method name to get the name of the command.
+    self.commands = [cmd[3:] for cmd in dir(self.__class__) if cmd.startswith('do_')]
 
   def __disable_readline(self):
     """Disables the readline module.
@@ -932,6 +942,19 @@ class ImpalaShell(cmd.Cmd):
     print_to_stderr("Shell version: %s" % VERSION_STRING)
     print_to_stderr("Server version: %s" % self.server_version)
     return True
+
+  def completenames(self, text, *ignored):
+    """Make tab completion of commands case agnostic
+
+    Override the superclass's completenames() method to support tab completion for
+    upper case and mixed case commands.
+    """
+    cmd_names = [cmd for cmd in self.commands if cmd.startswith(text.lower())]
+    # If the user input is upper case, return commands in upper case.
+    if text.isupper(): return [cmd_names.upper() for cmd_names in cmd_names]
+    # If the user input is lower case or mixed case, return lower case commands.
+    return cmd_names
+
 
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
 available commands.
