@@ -269,8 +269,8 @@ public class HdfsScanNode extends ScanNode {
     // to return an estimate.
     // TODO: The calculation below is a worst-case estimate that is temporarily
     // acceptable for testing resource management with hard memory limit enforcement.
-    int numCores = Runtime.getRuntime().availableProcessors();
+    long numCores = Runtime.getRuntime().availableProcessors();
     // Impala starts up 3 scan ranges per core each using a default of 5 * 8MB buffers.
-    perHostMemCost = numCores * 3 * 5 * 8 * 1024 * 1024;
+    perHostMemCost = numCores * 3L * 5L * 8L * 1024L * 1024L;
   }
 }

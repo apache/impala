@@ -1546,7 +1546,11 @@ public class Planner {
        if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
        node.computeCosts();
        uniqueFragments.add(fragment);
-       Preconditions.checkState(node.getPerHostMemCost() >= 0);
+       if (node.getPerHostMemCost() < 0) {
+         LOG.warn(String.format("Invalid per-host memory requirement %s of node %s.\n" +
+             "PlanNode stats are: numNodes=%s ", node.getPerHostMemCost(),
+             node.getClass().getSimpleName(), node.getNumNodes()));
+       }
        perHostMem += node.getPerHostMemCost();
       }
 
@@ -1557,7 +1561,10 @@ public class Planner {
         // Sanity check that this plan-node set has at least one PlanNode of fragment.
         Preconditions.checkState(uniqueFragments.contains(fragment));
         sink.computeCosts();
-        Preconditions.checkState(sink.getPerHostMemCost() >= 0);
+        if (sink.getPerHostMemCost() < 0) {
+          LOG.warn(String.format("Invalid per-host memory requirement %s of sink %s.\n" +
+              sink.getPerHostMemCost(), sink.getClass().getSimpleName()));
+        }
         perHostMem += sink.getPerHostMemCost();
       }
 
@@ -1582,6 +1589,8 @@ public class Planner {
    * Estimates the per-host memory and CPU requirements for the given plan fragments,
    * and sets the results in request.
    * Optionally excludes the requirements for unpartitioned fragments.
+   * TODO: The LOG.warn() messages should eventually become Preconditions checks
+   * once resource estimation is more robust.
    */
   public void computeResourceReqs(List<PlanFragment> fragments,
       boolean excludeUnpartitionedFragments, TQueryExecRequest request) {
@@ -1633,9 +1642,12 @@ public class Planner {
       }
     }
 
-    Preconditions.checkState(maxPerHostMem >= 0 && maxPerHostMem != Long.MIN_VALUE);
-    Preconditions.checkState(maxPerHostVcores >= 0 &&
-        maxPerHostVcores != Integer.MIN_VALUE);
+    if (maxPerHostMem < 0 || maxPerHostMem == Long.MIN_VALUE) {
+      LOG.warn("Invalid per-host memory requirement: " + maxPerHostMem);
+    }
+    if (maxPerHostVcores < 0 || maxPerHostVcores == Integer.MIN_VALUE) {
+      LOG.warn("Invalid per-host virtual cores requirement: " + maxPerHostVcores);
+    }
     request.setPer_host_mem_req(maxPerHostMem);
     request.setPer_host_vcores((short) maxPerHostVcores);
 
