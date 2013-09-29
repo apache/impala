@@ -209,7 +209,7 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
 
     // Convert UDF function pointer to llvm::Function*
     // First generate the llvm::FunctionType* corresponding to the UDF.
-    llvm::Type* return_type = CodegenAnyVal::GetType(codegen, type_);
+    llvm::Type* return_type = CodegenAnyVal::GetType(codegen, type());
     vector<llvm::Type*> arg_types;
     arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
     for (int i = 0; i < children_.size(); ++i) {

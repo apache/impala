@@ -24,10 +24,10 @@ using namespace std;
 
 namespace impala {
 
-FloatLiteral::FloatLiteral(PrimitiveType type, void* value)
+FloatLiteral::FloatLiteral(const ColumnType& type, void* value)
   : Expr(type) {
   DCHECK(value != NULL);
-  switch (type_) {
+  switch (type_.type) {
     case TYPE_FLOAT:
       result_.float_val = *reinterpret_cast<float*>(value);
       break;
@@ -35,13 +35,13 @@ FloatLiteral::FloatLiteral(PrimitiveType type, void* value)
       result_.double_val = *reinterpret_cast<double*>(value);
       break;
     default:
-      DCHECK(false) << "FloatLiteral ctor: bad type: " << TypeToString(type_);
+      DCHECK(false) << "FloatLiteral ctor: bad type: " << type_.DebugString();
   }
 }
 
 FloatLiteral::FloatLiteral(const TExprNode& node)
   : Expr(node) {
-  switch (type_) {
+  switch (type_.type) {
     case TYPE_FLOAT:
       result_.float_val = node.float_literal.value;
       break;
@@ -49,7 +49,7 @@ FloatLiteral::FloatLiteral(const TExprNode& node)
       result_.double_val = node.float_literal.value;
       break;
     default:
-      DCHECK(false) << "FloatLiteral ctor: bad type: " << TypeToString(type_);
+      DCHECK(false) << "FloatLiteral ctor: bad type: " << type_.DebugString();
   }
 }
 
@@ -65,7 +65,7 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
 
 Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  switch (type_) {
+  switch (type()) {
     case TYPE_FLOAT:
       compute_fn_ = ReturnFloatValue;
       break;
@@ -73,7 +73,7 @@ Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
       compute_fn_ = ReturnDoubleValue;
       break;
     default:
-      DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
+      DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << type_.DebugString();
   }
   return Status::OK;
 }
@@ -81,7 +81,7 @@ Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
 string FloatLiteral::DebugString() const {
   stringstream out;
   out << "FloatLiteral(value=";
-  switch (type_) {
+  switch (type()) {
     case TYPE_FLOAT:
       out << result_.float_val;
       break;
@@ -89,7 +89,7 @@ string FloatLiteral::DebugString() const {
       out << result_.double_val;
       break;
     default:
-      DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
+      DCHECK(false) << "FloatLiteral::DebugString(): bad type: " << type_.DebugString();
   }
   out << ")";
   return out.str();
@@ -106,7 +106,7 @@ Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
-  
+
   Function* function = CreateComputeFnPrototype(codegen, "FloatLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
@@ -126,7 +126,7 @@ Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
   builder.SetInsertPoint(entry_block);
   CodegenSetIsNullArg(codegen, entry_block, false);
   builder.CreateRet(result);
-  
+
   return codegen->FinalizeFunction(function);
 }
 

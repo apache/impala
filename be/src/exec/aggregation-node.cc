@@ -286,7 +286,8 @@ AggregationTuple* AggregationNode::ConstructAggTuple() {
     //  - sum/count: 0
     //  - min: max_value
     //  - max: min_value
-    if (agg_expr->type() != TYPE_STRING && agg_expr->type() != TYPE_TIMESTAMP) {
+    if (agg_expr->type() != TYPE_STRING && agg_expr->type() != TYPE_TIMESTAMP &&
+        agg_expr->type() != TYPE_CHAR) {
       void* default_value_ptr = NULL;
       switch (agg_expr->agg_op()) {
         case TAggregationOp::MIN:
@@ -812,9 +813,10 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   // string and timestamp aggregation currently not supported
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
       expr != aggregate_exprs_.end(); ++expr) {
-    if ((*expr)->type() == TYPE_STRING || (*expr)->type() == TYPE_TIMESTAMP) {
+    if ((*expr)->type() == TYPE_STRING || (*expr)->type() == TYPE_TIMESTAMP ||
+        (*expr)->type() == TYPE_CHAR) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
-                 << "string and timestamp aggregation is not yet supported.";
+                 << "string, char and timestamp aggregation is not yet supported.";
       return NULL;
     }
   }

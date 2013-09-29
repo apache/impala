@@ -39,7 +39,12 @@ enum PrimitiveType {
   TYPE_DATE,        // Not implemented
   TYPE_DATETIME,    // Not implemented
   TYPE_BINARY,      // Not implemented
-  TYPE_DECIMAL     // Not implemented
+  TYPE_DECIMAL,     // Not implemented
+
+  // This is minimally supported currently. It can't be returned to the user or
+  // parsed from scan nodes. It can be returned from exprs and must be consumable
+  // by exprs.
+  TYPE_CHAR,
 };
 
 // Returns the byte size of 'type'  Returns 0 for variable length types.
@@ -65,7 +70,7 @@ inline int GetByteSize(PrimitiveType type) {
     case TYPE_DATE:
     case INVALID_TYPE:
     default:
-      DCHECK(false); 
+      DCHECK(false);
   }
   return 0;
 }
@@ -75,6 +80,33 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 std::string TypeToOdbcString(PrimitiveType t);
 apache::hive::service::cli::thrift::TTypeId::type TypeToHiveServer2Type(PrimitiveType t);
+
+// Wrapper struct to describe a type. Includes the enum and, optionally,
+// size information.
+// TODO: PrimitiveType should not be used directly in the BE.
+struct ColumnType {
+  PrimitiveType type;
+  /// Only set if type == TYPE_CHAR
+  int len;
+
+  ColumnType(PrimitiveType type = INVALID_TYPE, int len = -1)
+    : type(type), len(len) {
+  }
+
+  ColumnType(const TColumnType& t) {
+    type = ThriftToType(t.type);
+    if (t.__isset.len) {
+      len = t.len;
+      DCHECK_EQ(type, TYPE_CHAR);
+    } else {
+      DCHECK_NE(type, TYPE_CHAR);
+      len = -1;
+    }
+  }
+
+  std::string DebugString() const;
+};
+
 }
 
 #endif

@@ -26,13 +26,13 @@ namespace impala {
 
 const int RawValue::ASCII_PRECISION = 16; // print 16 digits for double/float
 
-void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
+void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
                                  stringstream* stream) {
   if (value == NULL) return;
 
   const char* chars = reinterpret_cast<const char*>(value);
   const StringValue* string_val = NULL;
-  switch (type) {
+  switch (type.type) {
     case TYPE_BOOLEAN:
       stream->write(chars, sizeof(bool));
       return;
@@ -57,16 +57,19 @@ void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
     case TYPE_STRING:
       string_val = reinterpret_cast<const StringValue*>(value);
       stream->write(static_cast<char*>(string_val->ptr), string_val->len);
-      return;
+      break;
     case TYPE_TIMESTAMP:
       stream->write(chars, TimestampValue::Size());
       break;
+    case TYPE_CHAR:
+      stream->write(chars, type.len);
+      break;
     default:
-      DCHECK(false) << "bad RawValue::PrintValue() type: " << TypeToString(type);
+      DCHECK(false) << "bad RawValue::PrintValue() type: " << type.DebugString();
   }
 }
 
-void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
+void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
                           string* str) {
   if (value == NULL) {
     *str = "NULL";
@@ -80,7 +83,7 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
   bool val;
 
   // Special case types that we can print more efficiently without using a stringstream
-  switch (type) {
+  switch (type.type) {
     case TYPE_BOOLEAN:
       val = *reinterpret_cast<const bool*>(value);
       *str = (val ? "true" : "false");
@@ -90,13 +93,16 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, int scale,
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
       str->swap(tmp);
       return;
+    case TYPE_CHAR:
+      *str = string(static_cast<const char*>(value), type.len);
+      return;
     default:
       PrintValue(value, type, scale, &out);
   }
   *str = out.str();
 }
 
-int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
+int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
   const StringValue* string_value1;
   const StringValue* string_value2;
   const TimestampValue* ts_value1;
@@ -105,7 +111,7 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   double d1, d2;
   int32_t i1, i2;
   int64_t b1, b2;
-  switch (type) {
+  switch (type.type) {
     case TYPE_NULL:
       return 0;
     case TYPE_BOOLEAN:
@@ -121,7 +127,7 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
       return i1 > i2 ? 1 : (i1 < i2 ? -1 : 0);
     case TYPE_BIGINT:
       b1 = *reinterpret_cast<const int64_t*>(v1);
-      b2 = *reinterpret_cast<const int64_t*>(v2); 
+      b2 = *reinterpret_cast<const int64_t*>(v2);
       return b1 > b2 ? 1 : (b1 < b2 ? -1 : 0);
     case TYPE_FLOAT:
       // TODO: can this be faster? (just returning the difference has underflow problems)
@@ -147,16 +153,20 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
       ts_value1 = reinterpret_cast<const TimestampValue*>(v1);
       ts_value2 = reinterpret_cast<const TimestampValue*>(v2);
       return *ts_value1 > *ts_value2 ? 1 : (*ts_value1 < *ts_value2 ? -1 : 0);
+    case TYPE_CHAR:
+      return StringCompare(reinterpret_cast<const char*>(v1), type.len,
+          reinterpret_cast<const char*>(v2), type.len, type.len);
     default:
-      DCHECK(false) << "invalid type: " << TypeToString(type);
+      DCHECK(false) << "invalid type: " << type.DebugString();
       return 0;
   };
 }
 
-void RawValue::Write(const void* value, void* dst, PrimitiveType type, MemPool* pool) {
+void RawValue::Write(const void* value, void* dst, const ColumnType& type,
+    MemPool* pool) {
   DCHECK(value != NULL);
-  
-  switch (type) {
+
+  switch (type.type) {
     case TYPE_BOOLEAN: {
       *reinterpret_cast<bool*>(dst) = *reinterpret_cast<const bool*>(value);
       break;
@@ -185,7 +195,7 @@ void RawValue::Write(const void* value, void* dst, PrimitiveType type, MemPool* 
       *reinterpret_cast<double*>(dst) = *reinterpret_cast<const double*>(value);
       break;
     }
-    case TYPE_TIMESTAMP: 
+    case TYPE_TIMESTAMP:
       *reinterpret_cast<TimestampValue*>(dst) =
           *reinterpret_cast<const TimestampValue*>(value);
       break;
@@ -201,8 +211,11 @@ void RawValue::Write(const void* value, void* dst, PrimitiveType type, MemPool* 
       }
       break;
     }
+    case TYPE_CHAR:
+      memcpy(dst, value, type.len);
+      break;
     default:
-      DCHECK(false) << "RawValue::Write(): bad type: " << TypeToString(type);
+      DCHECK(false) << "RawValue::Write(): bad type: " << type.DebugString();
   }
 }
 

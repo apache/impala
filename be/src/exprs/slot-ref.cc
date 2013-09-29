@@ -33,7 +33,7 @@ SlotRef::SlotRef(const TExprNode& node)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-SlotRef::SlotRef(const SlotDescriptor* desc) 
+SlotRef::SlotRef(const SlotDescriptor* desc)
   : Expr(desc->type(), true),
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
@@ -41,7 +41,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-SlotRef::SlotRef(PrimitiveType type, int offset) 
+SlotRef::SlotRef(PrimitiveType type, int offset)
   : Expr(type, true),
     tuple_idx_(0),
     slot_offset_(offset),
@@ -109,24 +109,24 @@ string SlotRef::DebugString() const {
 //   %tuple_ptr = load i8** %tuple_addr1
 //   %tuple_is_null = icmp eq i8* %tuple_ptr, null
 //   br i1 %tuple_is_null, label %null_ret, label %check_slot_null
-// 
+//
 // check_slot_null:                                   ; preds = %entry
 //   %null_ptr2 = bitcast i8* %tuple_ptr to i8*
 //   %null_byte = load i8* %null_ptr2
 //   %null_byte_set = and i8 %null_byte, 1
 //   %slot_is_null = icmp ne i8 %null_byte_set, 0
 //   br i1 %slot_is_null, label %null_ret, label %get_slot
-// 
+//
 // get_slot:                                         ; preds = %check_slot_null
 //   %slot_addr = getelementptr i8* %tuple_ptr, i32 1
 //   %slot_value = load i8* %slot_addr
 //   store i1 false, i1* %is_null
 //   br label %ret
-// 
+//
 // null_ret:                                         ; preds = %check_slot_null, %entry
 //   store i1 true, i1* %is_null
 //   br label %ret
-// 
+//
 // ret:                                              ; preds = %null_ret, %get_slot
 //   %tmp_phi = phi i8 [ 0, %null_ret ], [ %slot_value, %get_slot ]
 //   ret i8 %tmp_phi
@@ -145,7 +145,7 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
-  
+
   Type* return_type = GetLlvmReturnType(codegen);
   Function* function = CreateComputeFnPrototype(codegen, "SlotRef");
 
@@ -153,16 +153,16 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   Value* row_ptr = func_args;
 
   Type* int_type = codegen->GetType(TYPE_INT);
-  Value* tuple_offset[] = { 
+  Value* tuple_offset[] = {
     ConstantInt::get(int_type, tuple_idx_)
   };
-  Value* null_byte_offset[] = { 
+  Value* null_byte_offset[] = {
     ConstantInt::get(int_type, null_indicator_offset_.byte_offset)
   };
-  Value* slot_offset[] = { 
+  Value* slot_offset[] = {
     ConstantInt::get(int_type, slot_offset_)
   };
-  Value* null_mask = 
+  Value* null_mask =
       ConstantInt::get(context, APInt(8, null_indicator_offset_.bit_mask, true));
   Value* zero = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
   Type* result_type = codegen->GetType(type());
@@ -180,7 +180,7 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
 
   builder.SetInsertPoint(entry_block);
   // Get the tuple offset addr from the row
-  Value* tuple_addr = builder.CreateGEP(row_ptr, tuple_offset, "tuple_addr"); 
+  Value* tuple_addr = builder.CreateGEP(row_ptr, tuple_offset, "tuple_addr");
   // Load the tuple*
   Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
 
@@ -191,9 +191,9 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
     if (null_indicator_offset_.bit_mask == 0) {
       builder.CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
     } else {
-      builder.CreateCondBr(tuple_is_null, null_ret_block, 
+      builder.CreateCondBr(tuple_is_null, null_ret_block,
           check_slot_null_indicator_block);
-    } 
+    }
   } else {
     if (null_indicator_offset_.bit_mask == 0) {
       builder.CreateBr(get_slot_block);

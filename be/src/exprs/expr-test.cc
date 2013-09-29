@@ -26,6 +26,7 @@
 #include "runtime/string-value.h"
 #include "gen-cpp/Exprs_types.h"
 #include "exprs/bool-literal.h"
+#include "exprs/char-literal.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
 #include "exprs/int-literal.h"
@@ -94,7 +95,6 @@ class ExprTest : public testing::Test {
   ExprValue expr_value_;
 
   virtual void SetUp() {
-
     min_int_values_[TYPE_TINYINT] = 1;
     min_int_values_[TYPE_SMALLINT] =
         static_cast<int64_t>(numeric_limits<int8_t>::max()) + 1;
@@ -614,13 +614,13 @@ void ExprTest::TestCast(const string& stmt, const char* val) {
   }
 }
 
-void TestSingleLiteralConstruction(PrimitiveType type, void* value,
+void TestSingleLiteralConstruction(const ColumnType& type, const void* value,
     const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
   RuntimeState state(TUniqueId(), TQueryOptions(), "", "", NULL);
 
-  Expr* expr = Expr::CreateLiteral(&pool, type, value);
+  Expr* expr = Expr::CreateLiteral(&pool, type, const_cast<void*>(value));
   EXPECT_TRUE(expr != NULL);
   Expr::Prepare(expr, &state, desc, disable_codegen_);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
@@ -666,6 +666,8 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "+5.9e-3");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
   TestSingleLiteralConstruction(TYPE_NULL, NULL, "NULL");
+  TestSingleLiteralConstruction(ColumnType(TYPE_CHAR, 5), "HelloWorld", "Hello");
+  TestSingleLiteralConstruction(ColumnType(TYPE_CHAR, 1), "H", "H");
 
   // Min/Max Boundary value test for tiny/small/int/long
   c_val = 127;

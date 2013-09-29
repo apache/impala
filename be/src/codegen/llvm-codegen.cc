@@ -736,13 +736,8 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
 
 Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
     PrimitiveType type) {
-  if (type == TYPE_TIMESTAMP) {
-    DCHECK(false) << "Timestamp codegen NYI";
-    return NULL;
-  }
   switch (type) {
-    case TYPE_NULL:
-      return false_value();
+    case TYPE_NULL: return false_value();
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
@@ -757,7 +752,7 @@ Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
       return builder->CreateCall2(str_fn, v1, v2, "tmp_eq");
     }
     default:
-      DCHECK(false);
+      DCHECK(false) << "Type is not implemented for codegen.";
       return NULL;
   }
 }
@@ -832,8 +827,9 @@ void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
       CodegenMemcpy(builder, dst, src, sizeof(StringValue));
       break;
     }
+    case TYPE_CHAR:
     case TYPE_TIMESTAMP:
-      DCHECK(false) << "Timestamp NYI"; // TODO
+      DCHECK(false) << "NYI"; // TODO
       break;
     default:
       builder->CreateStore(src, dst);

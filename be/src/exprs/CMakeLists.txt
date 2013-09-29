@@ -26,6 +26,7 @@ add_library(Exprs
   bool-literal.cc
   case-expr.cc
   cast-expr.cc
+  char-literal.cc
   compound-predicate.cc
   conditional-functions.cc
   date-literal.cc

@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+#include <sstream>
 #include "runtime/raw-value.h"
 
 using namespace impala;
+using namespace std;
 
 namespace impala {
 
@@ -42,11 +44,39 @@ TEST_F(RawValueTest, Compare) {
   EXPECT_LT(RawValue::Compare(&s2, &s1, TYPE_SMALLINT), 0);
 }
 
+TEST_F(RawValueTest, TypeChar) {
+  const int N = 5;
+  const char* v1 = "aaaaa";
+  const char* v2 = "aaaaab";
+  const char* v3 = "aaaab";
+
+  EXPECT_EQ(RawValue::Compare(v1, v1, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_EQ(RawValue::Compare(v1, v2, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_LT(RawValue::Compare(v1, v3, ColumnType(TYPE_CHAR, N)), 0);
+
+  EXPECT_EQ(RawValue::Compare(v2, v1, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_EQ(RawValue::Compare(v2, v2, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_LT(RawValue::Compare(v2, v3, ColumnType(TYPE_CHAR, N)), 0);
+
+  EXPECT_GT(RawValue::Compare(v3, v1, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_GT(RawValue::Compare(v3, v2, ColumnType(TYPE_CHAR, N)), 0);
+  EXPECT_EQ(RawValue::Compare(v3, v3, ColumnType(TYPE_CHAR, N)), 0);
+
+  // Try putting non-string data (multiple nulls, non-ascii) and make
+  // sure we can output it.
+  stringstream ss;
+  int val = 123;
+  RawValue::PrintValue(&val, ColumnType(TYPE_CHAR, sizeof(int)), -1, &ss);
+  string s = ss.str();
+  EXPECT_EQ(s.size(), sizeof(int));
+  EXPECT_EQ(memcmp(&val, s.data(), sizeof(int)), 0);
+}
+
 }
 
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
-
+  impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }

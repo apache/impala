@@ -24,10 +24,10 @@ using namespace llvm;
 
 namespace impala {
 
-IntLiteral::IntLiteral(PrimitiveType type, void* value)
+IntLiteral::IntLiteral(const ColumnType& type, void* value)
   : Expr(type) {
   DCHECK(value != NULL);
-  switch (type_) {
+  switch (type_.type) {
     case TYPE_TINYINT:
       result_.tinyint_val = *reinterpret_cast<int8_t*>(value);
       break;
@@ -41,13 +41,13 @@ IntLiteral::IntLiteral(PrimitiveType type, void* value)
       result_.bigint_val = *reinterpret_cast<int64_t*>(value);
       break;
     default:
-      DCHECK(false) << "IntLiteral ctor: bad type: " << TypeToString(type_);
+      DCHECK(false) << "IntLiteral ctor: bad type: " << type_.DebugString();
   }
 }
 
 IntLiteral::IntLiteral(const TExprNode& node)
   : Expr(node) {
-  switch (type_) {
+  switch (type()) {
     case TYPE_TINYINT:
       result_.tinyint_val = node.int_literal.value;
       break;
@@ -61,7 +61,7 @@ IntLiteral::IntLiteral(const TExprNode& node)
       result_.bigint_val = node.int_literal.value;
       break;
     default:
-      DCHECK(false) << "IntLiteral ctor: bad type: " << TypeToString(type_);
+      DCHECK(false) << "IntLiteral ctor: bad type: " << type_.DebugString();
   }
 }
 
@@ -87,7 +87,7 @@ void* IntLiteral::ReturnBigintValue(Expr* e, TupleRow* row) {
 
 Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  switch (type_) {
+  switch (type()) {
     case TYPE_TINYINT:
       compute_fn_ = ReturnTinyintValue;
       break;
@@ -101,7 +101,7 @@ Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
       compute_fn_ = ReturnBigintValue;
       break;
     default:
-      DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
+      DCHECK(false) << "IntLiteral::Prepare(): bad type: " << type_.DebugString();
   }
   return Status::OK;
 }
@@ -109,7 +109,7 @@ Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 string IntLiteral::DebugString() const {
   stringstream out;
   out << "IntLiteral(value=";
-  switch (type_) {
+  switch (type()) {
     case TYPE_TINYINT:
       out << static_cast<int>(result_.tinyint_val); // don't print it out as a char
       break;
@@ -123,7 +123,7 @@ string IntLiteral::DebugString() const {
       out << result_.bigint_val;
       break;
     default:
-      DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
+      DCHECK(false) << "IntLiteral::DebugString(): bad type: " << type_.DebugString();
   }
   out << ")";
   return out.str();
@@ -143,7 +143,7 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
 
   Function* function = CreateComputeFnPrototype(codegen, "IntLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  
+
   builder.SetInsertPoint(entry_block);
   Value* result = NULL;
   switch (type()) {
@@ -163,7 +163,7 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
       DCHECK(false) << "Invalid type.";
       return NULL;
   }
-  
+
   CodegenSetIsNullArg(codegen, entry_block, false);
   builder.CreateRet(result);
 

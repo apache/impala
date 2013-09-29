@@ -31,8 +31,8 @@ class IntLiteral: public Expr {
   friend class Expr;
 
   // Construct a IntLiteral from value.  Type must be one of the integer types and
-  // value should be the corresponding binary type.  
-  IntLiteral(PrimitiveType type, void* value);
+  // value should be the corresponding binary type.
+  IntLiteral(const ColumnType& type, void* value);
   IntLiteral(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);

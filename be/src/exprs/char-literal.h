@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#ifndef IMPALA_EXPRS_FLOAT_LITERAL_H_
-#define IMPALA_EXPRS_FLOAT_LITERAL_H_
+#ifndef IMPALA_EXPRS_CHAR_LITERAL_H_
+#define IMPALA_EXPRS_CHAR_LITERAL_H_
 
 #include <string>
 #include "exprs/expr.h"
@@ -23,24 +22,20 @@ namespace impala {
 
 class TExprNode;
 
-class FloatLiteral: public Expr {
- public:
-  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
-
+// Literal class for CHAR(N) type.
+class CharLiteral: public Expr {
  protected:
   friend class Expr;
 
-  // Construct a FloatLiteral expr. type/value must be TYPE_FLOAT/float* or
-  // TYPE_DOUBLE/double*.
-  FloatLiteral(const ColumnType& type, void* value);
-  FloatLiteral(const TExprNode& node);
+  // Construct a CharLiteral expr from str. The size of the literal is str.size()
+  CharLiteral(const std::string& str);
+  CharLiteral(uint8_t* data, int len);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   virtual std::string DebugString() const;
 
  private:
-  static void* ReturnFloatValue(Expr* e, TupleRow* row);
-  static void* ReturnDoubleValue(Expr* e, TupleRow* row);
+  static void* ComputeFn(Expr* e, TupleRow* row);
 };
 
 }

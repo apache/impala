@@ -145,7 +145,7 @@ struct ExprValue {
         return NULL;
     }
   }
-  
+
   // Sets the value for type to min and returns a pointer to the data
   void* SetToMin(PrimitiveType type) {
     switch (type) {
@@ -177,7 +177,7 @@ struct ExprValue {
         return NULL;
     }
   }
-  
+
   // Sets the value for type to max and returns a pointer to the data
   void* SetToMax(PrimitiveType type) {
     switch (type) {
@@ -222,7 +222,7 @@ class Expr {
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
-  // TODO: stop having the result cached in this Expr object 
+  // TODO: stop having the result cached in this Expr object
   void* GetValue(TupleRow* row);
 
   // Convenience function: extract value into col_val and sets the
@@ -267,7 +267,7 @@ class Expr {
   Expr* GetChild(int i) const { return children_[i]; }
   int GetNumChildren() const { return children_.size(); }
 
-  PrimitiveType type() const { return type_; }
+  PrimitiveType type() const { return type_.type; }
   const std::vector<Expr*>& children() const { return children_; }
 
   TExprOpcode::type op() const { return opcode_; }
@@ -278,7 +278,7 @@ class Expr {
   virtual bool IsConstant() const;
 
   // Returns the slots that are referenced by this expr tree in 'slot_ids'.
-  // Returns the number of slots added to the vector 
+  // Returns the number of slots added to the vector
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
 
   // Create expression tree from the list of nodes contained in texpr
@@ -310,20 +310,21 @@ class Expr {
   // Create a new literal expr of 'type' with initial 'data'.
   // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)
   // The new Expr will be allocated from the pool.
-  static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data);
+  static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type, void* data);
 
   // Create a new literal expr of 'type' by parsing the string.
   // NULL will be returned if the string and type are not compatible.
   // The new Expr will be allocated from the pool.
-  static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, const std::string&);
+  static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type,
+      const std::string&);
 
   // Computes a memory efficient layout for storing the results of evaluating 'exprs'
-  // Returns the number of bytes necessary to store all the results and offsets 
+  // Returns the number of bytes necessary to store all the results and offsets
   // where the result for each expr should be stored.
   // Variable length types are guaranteed to be at the end and 'var_result_begin'
   // will be set the beginning byte offset where variable length results begin.
   // 'var_result_begin' will be set to -1 if there are no variable len types.
-  static int ComputeResultsLayout(const std::vector<Expr*>& exprs, 
+  static int ComputeResultsLayout(const std::vector<Expr*>& exprs,
       std::vector<int>* offsets, int* var_result_begin);
 
   // Returns if codegen on each of the exprs is available.
@@ -332,12 +333,12 @@ class Expr {
   // Codegen the expr tree rooted at this node.  This does a post order traversal
   // of the expr tree and codegen's each node.  Returns NULL if the subtree cannot
   // be codegen'd.
-  // Subclasses should override this function if it supports expr specific codegen, 
+  // Subclasses should override this function if it supports expr specific codegen,
   // otherwise it will just wrap the interpreted ComputeFn.  All exprs under this
   // one will also in turn be interpreted but codegen using this expr will be able
   // to continue.
   // All expr codegen'd functions have this signature:
-  // <expr ret type> ComputeFn(int8_t** tuple_row, int8_t* scratch_buffer, bool* is_null) 
+  // <expr ret type> ComputeFn(int8_t** tuple_row, int8_t* scratch_buffer, bool* is_null)
   virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
 
   // Returns whether the subtree at this node is jittable.  This is temporary
@@ -359,7 +360,7 @@ class Expr {
   // - args: args to call this compute function with
   // - null_block: block in caller function to jump to if the child is null
   // - not_null_block: block in caller function to jump to if the child is not null
-  // - result_var_name: name of the variable for child result.  This is the name 
+  // - result_var_name: name of the variable for child result.  This is the name
   //   generated in the IR so it's only useful for debugging.
   llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* caller,
       llvm::Value** args, llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block,
@@ -376,7 +377,7 @@ class Expr {
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
-  
+
   static const char* LLVM_CLASS_NAME;
 
  protected:
@@ -391,7 +392,7 @@ class Expr {
   friend class FunctionCall;
   friend class NativeUdfExpr;
 
-  Expr(PrimitiveType type, bool is_slotref = false);
+  Expr(const ColumnType& type, bool is_slotref = false);
   Expr(const TExprNode& node, bool is_slotref = false);
 
   // Prepare should be invoked recurisvely on the expr tree.
@@ -412,7 +413,7 @@ class Expr {
   // recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;
   // analysis is done, types are fixed at this point
-  const PrimitiveType type_;
+  const ColumnType type_;
   std::vector<Expr*> children_;
   ExprValue result_;
   int output_scale_;
@@ -552,7 +553,7 @@ inline void* SlotRef::ComputeFn(Expr* expr, TupleRow* row) {
 }
 
 inline void* Expr::GetValue(TupleRow* row) {
-  DCHECK(type_ != INVALID_TYPE);
+  DCHECK(type_.type != INVALID_TYPE);
   if (is_slotref_) {
     return SlotRef::ComputeFn(this, row);
   } else {

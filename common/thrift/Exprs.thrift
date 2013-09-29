@@ -127,6 +127,10 @@ struct TExprNode {
   3: optional Opcodes.TExprOpcode opcode
   4: required i32 num_children
 
+  // If set, col_type.type == type
+  // TODO: we've done this to support rolling upgrades but it is painful.
+  19: optional Types.TColumnType col_type
+
   5: optional TAggregateExpr agg_expr
   6: optional TBoolLiteral bool_literal
   7: optional TCaseExpr case_expr

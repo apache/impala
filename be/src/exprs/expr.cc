@@ -24,6 +24,7 @@
 #include "exprs/bool-literal.h"
 #include "exprs/case-expr.h"
 #include "exprs/cast-expr.h"
+#include "exprs/char-literal.h"
 #include "exprs/compound-predicate.h"
 #include "exprs/date-literal.h"
 #include "exprs/float-literal.h"
@@ -94,7 +95,7 @@ void* ExprValue::TryParse(const string& str, PrimitiveType type) {
   return NULL;
 }
 
-Expr::Expr(PrimitiveType type, bool is_slotref)
+Expr::Expr(const ColumnType& type, bool is_slotref)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(type),
@@ -108,7 +109,8 @@ Expr::Expr(PrimitiveType type, bool is_slotref)
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
-      type_(ThriftToType(node.type)),
+      type_(node.__isset.col_type ?
+          ColumnType(node.col_type) :ColumnType(ThriftToType(node.type))),
       output_scale_(-1),
       codegen_fn_(NULL),
       adapter_fn_used_(false),
@@ -132,11 +134,11 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_ex
   return Status::OK;
 }
 
-Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data) {
-  DCHECK(type == TYPE_NULL || data != NULL);
+Expr* Expr::CreateLiteral(ObjectPool* pool, const ColumnType& type, void* data) {
+  DCHECK(type.type == TYPE_NULL || data != NULL);
   Expr* result = NULL;
 
-  switch (type) {
+  switch (type.type) {
     case TYPE_NULL:
       result = new NullLiteral(TYPE_NULL);
       break;
@@ -156,6 +158,9 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data) {
     case TYPE_STRING:
       result = new StringLiteral(*reinterpret_cast<StringValue*>(data));
       break;
+    case TYPE_CHAR:
+      result = new CharLiteral(reinterpret_cast<uint8_t*>(data), type.len);
+      break;
     default:
       DCHECK(false) << "Invalid type.";
   }
@@ -164,11 +169,11 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data) {
   return result;
 }
 
-Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& str) {
+Expr* Expr::CreateLiteral(ObjectPool* pool, const ColumnType& type, const string& str) {
   ExprValue val;
   Expr* result = NULL;
 
-  switch (type) {
+  switch (type.type) {
     case TYPE_NULL:
       result = new NullLiteral(TYPE_NULL);
       break;
@@ -206,6 +211,9 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
       break;
     case TYPE_STRING:
       result = new StringLiteral(str);
+      break;
+    case TYPE_CHAR:
+      result = new CharLiteral(str);
       break;
     default:
       DCHECK(false) << "Unrecognized type.";
@@ -431,7 +439,7 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
 
   StringValue* string_val = NULL;
   string tmp;
-  switch (type_) {
+  switch (type_.type) {
     case TYPE_BOOLEAN:
       col_val->boolVal = *reinterpret_cast<bool*>(value);
       col_val->__isset.boolVal = true;
@@ -471,12 +479,12 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       col_val->__isset.stringVal = true;
       break;
     default:
-      DCHECK(false) << "bad GetValue() type: " << TypeToString(type_);
+      DCHECK(false) << "bad GetValue() type: " << type_.DebugString();
   }
 }
 
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
-  DCHECK(type_ != INVALID_TYPE);
+  DCHECK(type_.type != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state, row_desc));
   }
@@ -540,7 +548,7 @@ bool Expr::IsCodegenAvailable(const vector<Expr*>& exprs) {
 string Expr::DebugString() const {
   // TODO: implement partial debug string for member vars
   stringstream out;
-  out << " type=" << TypeToString(type_);
+  out << " type=" << type_.DebugString();
   if (opcode_ != TExprOpcode::INVALID_OPCODE) {
     out << " opcode=" << opcode_;
   }
@@ -743,7 +751,7 @@ void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
-  if (type() == TYPE_TIMESTAMP) return false;
+  if (type() == TYPE_TIMESTAMP || type() == TYPE_CHAR) return false;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (!children()[i]->IsJittable(codegen)) return false;
   }
@@ -936,7 +944,7 @@ Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
 
 Function* Expr::CreateIrFunctionPrototype(LlvmCodeGen* codegen, const string& name,
                                           Value* (*args)[2]) {
-  Type* return_type = CodegenAnyVal::GetType(codegen, type_);
+  Type* return_type = CodegenAnyVal::GetType(codegen, type());
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
   // TODO: Placeholder for ExprContext argument
   prototype.AddArgument(LlvmCodeGen::NamedVariable("context", codegen->ptr_type()));
