@@ -60,7 +60,8 @@ const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS =
     "impala-server.num-open-hiveserver2-sessions";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS =
     "impala-server.num-open-beeswax-sessions";
-
+const char* ImpaladMetricKeys::NUM_SESSIONS_EXPIRED =
+    "impala-server.num-sessions-expired";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -82,6 +83,7 @@ Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
 Metrics::BooleanMetric* ImpaladMetrics::CATALOG_READY = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
+Metrics::IntMetric* ImpaladMetrics::NUM_SESSIONS_EXPIRED = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
@@ -133,6 +135,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
   CATALOG_READY = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::CATALOG_READY, false);
+  NUM_SESSIONS_EXPIRED = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0L);
 }
 
 }

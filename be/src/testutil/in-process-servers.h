@@ -20,11 +20,11 @@
 
 #include "common/status.h"
 #include "util/thread.h"
+#include "runtime/exec-env.h"
 
 namespace impala {
 
 class ImpalaServer;
-class ExecEnv;
 class ThriftServer;
 class Webserver;
 class Metrics;
@@ -58,6 +58,8 @@ class InProcessImpalaServer {
   Status Join();
 
   ImpalaServer* impala_server() { return impala_server_; }
+
+  Metrics* metrics() { return exec_env_->metrics(); }
 
  private:
   // Hostname for this server, usually FLAGS_hostname

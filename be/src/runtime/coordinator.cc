@@ -918,7 +918,7 @@ void Coordinator::Cancel(const Status* cause) {
   // if the query status indicates an error, cancellation has already been initiated
   if (!query_status_.ok()) return;
   // prevent others from cancelling a second time
-  query_status_ = (cause != NULL) ? *cause : Status::CANCELLED;
+  query_status_ = (cause != NULL && !cause->ok()) ? *cause : Status::CANCELLED;
   CancelInternal();
 }
 

@@ -45,3 +45,5 @@ target_link_libraries(impalad
   ${JAVA_JSIG_LIBRARY}
   ${IMPALA_LINK_LIBS}
 )
+
+ADD_BE_TEST(session-expiry-test session-expiry-test.cc)

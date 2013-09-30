@@ -336,9 +336,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const boost::shared_ptr<QueryExecState>& exec_state);
 
   // Cancel the query execution if the query is still running. Removes exec_state from
-  // query_exec_state_map_, and removes the query id from session state's open query list
+  // query_exec_state_map_, and removes the query id from session state's open query list.
+  // Updates the query's status to that provided, unless status is already not OK or
+  // provided status is NULL.
   // Returns true if it found a registered exec_state, otherwise false.
-  bool UnregisterQuery(const TUniqueId& query_id);
+  bool UnregisterQuery(const TUniqueId& query_id, const Status* status = NULL);
 
   // Initiates query cancellation reporting the given cause as the query status.
   // Assumes deliberate cancellation by the user if the cause is NULL.
@@ -585,6 +587,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // 2 additional statestore heartbeats after this impalad has received the metadata.
   void WaitForCatalogUpdate(const TCatalogUpdateResult& catalog_update_result);
 
+  // To be run in a thread. Every FLAGS_idle_session_timeout / 2 seconds, wakes up and
+  // checks all sessions for their last-idle time. Those that have been idle for longer
+  // than FLAGS_idle_session_timeout are 'expired': they will no longer accept queries and
+  // any running queries associated with those sessions are cancelled.
+  void ExpireSessions();
+
+  // Cancels all queries associated with a session
+  void CancelSessionQueries(SessionState* session_state);
+
+  // Cancels all queries associated with a session asynchronously, by placing them on the
+  // cancellation queue.
+  void CancelSessionQueriesAsync(SessionState* session_state, const std::string& cause);
+
   // Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -620,6 +635,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // avoid blocking the statestore callback.
   boost::scoped_ptr<ThreadPool<CancellationWork> > cancellation_thread_pool_;
 
+  // Thread that runs ExpireSessions if FLAGS_idle_session_timeout > 0
+  boost::scoped_ptr<Thread> session_timeout_thread_;
+
   // map from query id to exec state; QueryExecState is owned by us and referenced
   // as a shared_ptr to allow asynchronous deletion
   typedef boost::unordered_map<TUniqueId, boost::shared_ptr<QueryExecState> >
@@ -642,6 +660,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // is one ref count in the SessionStateMap for as long as the session is active.
   // All queries running from this session also have a reference.
   struct SessionState {
+    SessionState() : closed(false), expired(false), ref_count(0) { }
+
     TSessionType::type session_type;
 
     // Time the session was created
@@ -663,6 +683,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // If true, the session has been closed.
     bool closed;
 
+    // If true, the session was idle for too long and has been expired. Only set when
+    // ref_count == 0, after which point ref_count should never become non-zero (since
+    // clients will use ScopedSessionState to access the session, which will prevent use
+    // after expiration).
+    bool expired;
+
     // The default database (changed as a result of 'use' query execution)
     std::string database;
 
@@ -672,10 +698,56 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Inflight queries belonging to this session
     boost::unordered_set<TUniqueId> inflight_queries;
 
+    // Time the session was last accessed.
+    TimestampValue last_accessed;
+
+    // Number of RPCs concurrently accessing this session state. Used to detect when a
+    // session may be correctly expired after a timeout (when ref_count == 0). Typically
+    // at most one RPC will be issued against a session at a time, but clients may do
+    // something unexpected and, for example, poll in one thread and fetch in another.
+    uint32_t ref_count;
+
     // Builds a Thrift representation of this SessionState for serialisation to
     // the frontend.
     void ToThrift(const TUniqueId& session_id, TSessionState* session_state);
   };
+
+  // Class that allows users of SessionState to mark a session as in-use, and therefore
+  // immune to expiration. The marking is done in WithSession() and undone in the
+  // destructor, so this class can be used to 'check-out' a session for the duration of a
+  // scope.
+  class ScopedSessionState {
+   public:
+    ScopedSessionState(ImpalaServer* impala) : impala_(impala) { }
+
+    // Marks a session as in-use, and saves it so that it can be unmarked when this object
+    // goes out of scope. Returns OK unless there is an error in GetSessionState.
+    // Must only be called once per ScopedSessionState.
+    Status WithSession(const TUniqueId& session_id,
+        boost::shared_ptr<SessionState>* session = NULL) {
+      DCHECK(session_.get() == NULL);
+      RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
+      if (session != NULL) (*session) = session_;
+      return Status::OK;
+    }
+
+    // Decrements the reference count so the session can be expired correctly.
+    ~ScopedSessionState() {
+      if (session_.get() != NULL) {
+        impala_->MarkSessionInactive(session_);
+      }
+    }
+
+   private:
+    // Reference-counted pointer to the session state object.
+    boost::shared_ptr<SessionState> session_;
+
+    // Saved so that we can access ImpalaServer methods to get / return session state.
+    ImpalaServer* impala_;
+  };
+
+  // For access to GetSessionState() / MarkSessionInactive()
+  friend class ScopedSessionState;
 
   // Protects session_state_map_
   boost::mutex session_state_map_lock_;
@@ -696,19 +768,20 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     ConnectionToSessionMap;
   ConnectionToSessionMap connection_to_sessions_map_;
 
-  // Return session state for given session_id.
+  // Returns session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.
-  inline Status GetSessionState(const TUniqueId& session_id,
-      boost::shared_ptr<SessionState>* session_state) {
-    boost::lock_guard<boost::mutex> l(session_state_map_lock_);
-    SessionStateMap::iterator i = session_state_map_.find(session_id);
-    if (i == session_state_map_.end()) {
-      *session_state = boost::shared_ptr<SessionState>();
-      return Status("Invalid session id");
-    } else {
-      *session_state = i->second;
-      return Status::OK;
-    }
+  // If keep_alive is true, also checks if the session is expired or closed and increments
+  // the session's reference counter if it is still alive.
+  Status GetSessionState(const TUniqueId& session_id,
+      boost::shared_ptr<SessionState>* session_state, bool mark_active = false);
+
+  // Decrement the session's reference counter and mark the last_accessed time so that
+  // state expiration can proceed.
+  inline void MarkSessionInactive(boost::shared_ptr<SessionState> session) {
+    boost::lock_guard<boost::mutex> l(session->lock);
+    DCHECK_GT(session->ref_count, 0);
+    --session->ref_count;
+    session->last_accessed = TimestampValue::local_time();
   }
 
   // protects query_locations_. Must always be taken after

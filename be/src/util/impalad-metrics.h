@@ -85,6 +85,9 @@ class ImpaladMetricKeys {
 
   // Number of files open for insert
   static const char* NUM_FILES_OPEN_FOR_INSERT;
+
+  // Number of sessions expired due to inactivity
+  static const char* NUM_SESSIONS_EXPIRED;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -112,6 +115,7 @@ class ImpaladMetrics {
   static Metrics::IntMetric* CATALOG_NUM_TABLES;
   static Metrics::BooleanMetric* CATALOG_READY;
   static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
+  static Metrics::IntMetric* NUM_SESSIONS_EXPIRED;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(Metrics* m);

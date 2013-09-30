@@ -459,6 +459,7 @@ void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   // we don't want multiple concurrent cancel calls to end up executing
   // Coordinator::Cancel() multiple times
   if (query_state_ == QueryState::EXCEPTION) return;
+  if (cause != NULL) UpdateQueryStatus(*cause);
   query_state_ = QueryState::EXCEPTION;
   if (coord_.get() != NULL) coord_->Cancel(cause);
 }

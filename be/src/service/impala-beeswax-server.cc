@@ -74,6 +74,14 @@ using namespace apache::thrift::concurrency;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax;
 
+#define RAISE_IF_ERROR(stmt, ex_type)                           \
+  do {                                                          \
+    Status __status__ = (stmt);                                 \
+    if (UNLIKELY(!__status__.ok())) {                           \
+      RaiseBeeswaxException(__status__.GetErrorMsg(), ex_type); \
+    }                                                           \
+  } while (false)
+
 namespace impala {
 
 // Ascii result set for Beeswax.
@@ -130,16 +138,16 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   VLOG_QUERY << "query(): query=" << query.query;
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  RAISE_IF_ERROR(
+      session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
+      SQLSTATE_GENERAL_ERROR);
   TClientRequest query_request;
-  Status status = QueryToTClientRequest(query, &query_request);
-  if (!status.ok()) {
-    // raise general error for request conversion error;
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
-  }
+  // raise general error for request conversion error;
+  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
-  shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadConnectionId(), &session);
   DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
@@ -149,15 +157,10 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
     if (session->user.empty()) session->user = query.hadoop_user;
     query_request.sessionState.user = session->user;
   }
-  status = Execute(query_request, session, query_request.sessionState, &exec_state);
-
-  if (!status.ok()) {
-    // raise Syntax error or access violation;
-    // it's likely to be syntax/analysis error
-    // TODO: that may not be true; fix this
-    RaiseBeeswaxException(
-        status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
-  }
+  // raise Syntax error or access violation; it's likely to be syntax/analysis error
+  // TODO: that may not be true; fix this
+  RAISE_IF_ERROR(Execute(query_request, session, query_request.sessionState, &exec_state),
+      SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
@@ -171,16 +174,17 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     const LogContextId& client_ctx) {
   VLOG_QUERY << "executeAndWait(): query=" << query.query;
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  RAISE_IF_ERROR(
+      session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
+      SQLSTATE_GENERAL_ERROR);
   TClientRequest query_request;
-  Status status = QueryToTClientRequest(query, &query_request);
-  if (!status.ok()) {
-    // raise general error for request conversion error;
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
-  }
+  // raise general error for request conversion error;
+  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request),
+      SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
-  shared_ptr<SessionState> session;
-  GetSessionState(ThriftServer::GetThreadConnectionId(), &session);
   DCHECK(session != NULL);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
@@ -189,21 +193,17 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;
   }
-  status = Execute(query_request, session, query_request.sessionState, &exec_state);
 
-  if (!status.ok()) {
-    // raise Syntax error or access violation;
-    // it's likely to be syntax/analysis error
-    // TODO: that may not be true; fix this
-    RaiseBeeswaxException(
-        status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
-  }
+  // raise Syntax error or access violation; it's likely to be syntax/analysis error
+  // TODO: that may not be true; fix this
+  RAISE_IF_ERROR(Execute(query_request, session, query_request.sessionState, &exec_state),
+      SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
   // block until results are ready
-  status = exec_state->Wait();
+  Status status = exec_state->Wait();
   if (!status.ok()) {
-    UnregisterQuery(exec_state->query_id());
+    UnregisterQuery(exec_state->query_id(), &status);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 
@@ -219,19 +219,15 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   // Translate Beeswax Query to Impala's QueryRequest and then set the explain plan bool
   // before shipping to FE
   VLOG_QUERY << "explain(): query=" << query.query;
-  TClientRequest query_request;
-  Status status = QueryToTClientRequest(query, &query_request);
-  if (!status.ok()) {
-    // raise general error for request conversion error;
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
-  }
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
 
-  status = frontend_->GetExplainPlan(query_request, &query_explanation.textual);
-  if (!status.ok()) {
-    // raise Syntax error or access violation; this is the closest.
-    RaiseBeeswaxException(
-        status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
-  }
+  TClientRequest query_request;
+  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request), SQLSTATE_GENERAL_ERROR);
+
+  RAISE_IF_ERROR(frontend_->GetExplainPlan(query_request, &query_explanation.textual),
+      SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   query_explanation.__isset.textual = true;
   VLOG_QUERY << "explain():\nstmt=" << query_request.stmt
              << "\nplan: " << query_explanation.textual;
@@ -239,6 +235,10 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
 
 void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle,
     const bool start_over, const int32_t fetch_size) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
+
   if (start_over) {
     // We can't start over. Raise "Optional feature not implemented"
     RaiseBeeswaxException(
@@ -253,13 +253,17 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
   VLOG_ROW << "fetch result: #results=" << query_results.data.size()
            << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
-    UnregisterQuery(query_id);
+    UnregisterQuery(query_id, &status);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 }
 
 void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     const QueryHandle& handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
+
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
@@ -296,6 +300,9 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
 }
 
 void ImpalaServer::close(const QueryHandle& handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "close(): query_id=" << PrintId(query_id);
@@ -309,6 +316,9 @@ void ImpalaServer::close(const QueryHandle& handle) {
 }
 
 QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_ROW << "get_state(): query_id=" << PrintId(query_id);
@@ -326,6 +336,9 @@ QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
 }
 
 void ImpalaServer::echo(string& echo_string, const string& input_string) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   echo_string = input_string;
 }
 
@@ -333,6 +346,9 @@ void ImpalaServer::clean(const LogContextId& log_context) {
 }
 
 void ImpalaServer::get_log(string& log, const LogContextId& context) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   // LogContextId is the same as QueryHandle.id
   QueryHandle handle;
   handle.__set_id(context);
@@ -353,16 +369,25 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
 
 void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurations,
     const bool include_hadoop) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   configurations.insert(configurations.end(), default_configs_.begin(),
       default_configs_.end());
 }
 
 void ImpalaServer::dump_config(string& config) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   config = "";
 }
 
 void ImpalaServer::Cancel(impala::TStatus& tstatus,
     const beeswax::QueryHandle& query_handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
@@ -376,6 +401,9 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
 
 void ImpalaServer::CloseInsert(TInsertResult& insert_result,
     const QueryHandle& query_handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
   VLOG_QUERY << "CloseInsert(): query_id=" << PrintId(query_id);
@@ -390,6 +418,10 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
 // the profile_output parameter. Raises a BeeswaxException if there are any errors
 // getting the profile, such as no matching queries found.
 void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
+
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
@@ -403,6 +435,10 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
 }
 
 void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
+
   VLOG_RPC << "PingImpalaService()";
   return_val.version = GetVersionString(true);
   VLOG_RPC << "PingImpalaService(): return_val=" << ThriftDebugString(return_val);
