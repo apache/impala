@@ -42,7 +42,7 @@ COMPILE_TO_IR(uda-sample.cc )
 
 # This is an example of how to use the test harness to help develop UDF and UDAs.
 add_executable(udf-sample-test udf-sample-test.cc)
-target_link_libraries(udf-sample-test Udf udfsample)
+target_link_libraries(udf-sample-test ImpalaUdf udfsample)
 add_executable(uda-sample-test uda-sample-test.cc)
-target_link_libraries(uda-sample-test Udf udasample)
+target_link_libraries(uda-sample-test ImpalaUdf udasample)
 

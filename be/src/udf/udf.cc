@@ -14,11 +14,32 @@
 
 #include "udf/udf.h"
 #include <iostream>
+#include <assert.h>
 
 // Be careful what this includes since this needs to be linked into the UDF's
 // binary. For example, it would be unfortunate if they had a random dependency
 // on libhdfs.
 #include "udf/udf-internal.h"
+
+#if IMPALA_UDF_SDK_BUILD
+// For the SDK build, we are building the .lib that the developers would use to
+// write UDFs. They want to link against this to run their UDFs in a test environment.
+// Pulling in mem-pool is very undesirable since it pulls in many other libaries.
+// Instead, we'll implement a dummy version that is not used.
+// When they build their library to a .so, they'd use the version of FunctionContext
+// in the main binary, which does include MemPool.
+namespace impala {
+class MemPool {
+ public:
+  uint8_t* Allocate(int byte_size) {
+    assert(false);
+    return NULL;
+  }
+};
+}
+#else
+#include "runtime/mem-pool.h"
+#endif
 
 using namespace impala;
 using namespace impala_udf;
@@ -29,6 +50,7 @@ static const int MAX_WARNINGS = 1000;
 FunctionContext* FunctionContext::CreateTestContext() {
   FunctionContext* context = new FunctionContext;
   context->impl()->debug_ = true;
+  context->impl()->pool_ = NULL;
   return context;
 }
 
@@ -67,7 +89,12 @@ const char* FunctionContext::error_msg() const {
 
 uint8_t* FunctionContext::Allocate(int byte_size) {
   if (byte_size == 0) return NULL;
-  uint8_t* buffer = new uint8_t[byte_size];
+  uint8_t* buffer = NULL;
+  if (impl_->pool_ == NULL) {
+    buffer = new uint8_t[byte_size];
+  } else {
+    buffer = impl_->pool_->Allocate(byte_size);
+  }
   impl_->allocations_[buffer] = byte_size;
   if (impl_->debug_) memset(buffer, 0xff, byte_size);
   return buffer;
@@ -81,7 +108,7 @@ void FunctionContext::Free(uint8_t* buffer) {
       // fill in garbage value into the buffer to increase the chance of detecting misuse
       memset(buffer, 0xff, it->second);
       impl_->allocations_.erase(it);
-      delete[] buffer;
+      if (impl_->pool_ == NULL) delete[] buffer;
     } else {
       SetError(
           "FunctionContext::Free() on buffer that is not freed or was not allocated.");
@@ -114,7 +141,12 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
 
 uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
   if (byte_size == 0) return NULL;
-  uint8_t* buffer = new uint8_t[byte_size];
+  uint8_t* buffer = NULL;
+  if (pool_ == NULL) {
+    buffer = new uint8_t[byte_size];
+  } else {
+    buffer = pool_->Allocate(byte_size);
+  }
   local_allocations_.push_back(buffer);
   return buffer;
 }
@@ -123,7 +155,7 @@ void FunctionContextImpl::FreeLocalAllocations() {
   // TODO: these should be reused rather than freed.
   // TODO: Integrate with MemPool
   for (int i = 0; i < local_allocations_.size(); ++i) {
-    delete[] local_allocations_[i];
+    if (pool_ == NULL) delete[] local_allocations_[i];
   }
   local_allocations_.clear();
 }

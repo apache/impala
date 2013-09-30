@@ -19,9 +19,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf")
 
-add_library(Udf
-  udf.cc
-)
+# Build this library twice. Once to be linked into the main impalad. This version
+# can have dependencies on our other libs. The second version is shipped as part
+# of the UDF sdk, which can't use other libs.
+add_library(Udf udf.cc)
+add_library(ImpalaUdf udf.cc)
+set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
 ADD_BE_TEST(udf-test)
 ADD_BE_TEST(uda-test)

@@ -25,13 +25,18 @@
 
 namespace impala {
 
+class MemPool;
+
 // This class actually implements the interface of FunctionContext. This is split to
 // hide the details from the external header.
+// Note: The actual UDF code does not include this file.
 class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
-  static impala_udf::FunctionContext* CreateContext() {
-    return new impala_udf::FunctionContext();
+  static impala_udf::FunctionContext* CreateContext(MemPool* pool = NULL) {
+    impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
+    ctx->impl_->pool_ = pool;
+    return ctx;
   }
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
@@ -57,6 +62,9 @@ class FunctionContextImpl {
 
   // Parent context object. Not owned
   impala_udf::FunctionContext* context_;
+
+  // Pool to service allocations from.
+  MemPool* pool_;
 
   // If true, indicates this is a debug context which will do additional validation.
   bool debug_;
