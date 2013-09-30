@@ -274,6 +274,15 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   if (request.__isset.configuration) {
     map<string, string>::const_iterator conf_itr = request.configuration.begin();
     for (; conf_itr != request.configuration.end(); ++conf_itr) {
+      // If the current user is a valid proxy user, he/she can optionally perform
+      // authorization requests on behalf of another user. This is done by setting the
+      // 'impala.doas.user' Hive Server 2 configuration property.
+      if (conf_itr->first == "impala.doas.user") {
+        state->do_as_user = conf_itr->second;
+        Status status = AuthorizeProxyUser(state->user, state->do_as_user);
+        HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+        continue;
+      }
       Status status = SetQueryOptions(conf_itr->first, conf_itr->second,
           &state->default_query_options);
       HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);

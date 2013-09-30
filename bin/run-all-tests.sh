@@ -43,9 +43,10 @@ do
 done
 
 LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
-FE_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/fe_tests
+AUTHORIZATION_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/authorization_tests
 mkdir -p ${LOG_DIR}
-mkdir -p ${FE_LOG_DIR}
+mkdir -p ${AUTHORIZATION_LOG_DIR}
+
 
 # Enable core dumps
 ulimit -c unlimited
@@ -65,7 +66,19 @@ do
   # Run backend tests.
   ${IMPALA_HOME}/bin/run-backend-tests.sh
 
-  # Run the remaining tests against an external Impala test cluster.
+  # Start up a cluster with authorization enabled.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${AUTHORIZATION_LOG_DIR} \
+      --cluster_size=3 --impalad_args="\
+      --authorization_policy_file='/test-warehouse/authz-policy.ini'\
+      --server_name=server1\
+      --authorized_proxy_user_config=hue=$USER"
+
+  # Run authorization tests
+  pushd ${IMPALA_HOME}/tests
+  py.test authorization/test_authorization.py -k test_impersonation
+  popd
+
+  # Run the remaining tests against a cluster with authorization disabled.
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3
 
   # Run some queries using run-workload to verify run-workload has not been broken.
@@ -91,4 +104,6 @@ do
   # this requires adjusting the timeout values and making changes to the ImpalaService()
   # class. Disable them for now.
   #${IMPALA_HOME}/tests/run-process-failure-tests.sh
+
+
 done

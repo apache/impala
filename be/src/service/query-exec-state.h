@@ -103,6 +103,7 @@ class ImpalaServer::QueryExecState {
 
   ImpalaServer::SessionState* parent_session() const { return parent_session_.get(); }
   const std::string& user() const { return parent_session_->user; }
+  const std::string& do_as_user() const { return parent_session_->do_as_user; }
   TSessionType::type session_type() const { return query_session_state_.session_type; }
   const TUniqueId& session_id() const { return query_session_state_.session_id; }
   const std::string& default_db() const { return query_session_state_.database; }

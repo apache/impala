@@ -93,6 +93,7 @@ DECLARE_string(nn);
 DECLARE_int32(nn_port);
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 DECLARE_string(heap_profile_dir);
+DECLARE_string(authorized_proxy_user_config);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -402,6 +403,33 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     exit(1);
   }
 
+  if (!FLAGS_authorized_proxy_user_config.empty()) {
+    // Parse the proxy user configuration using the format:
+    // <proxy user>=<comma separated list of users they are allowed to impersonate>
+    // See FLAGS_authorized_proxy_user_config for more details.
+    vector<string> proxy_user_config;
+    split(proxy_user_config, FLAGS_authorized_proxy_user_config, is_any_of(";"),
+        token_compress_on);
+    if (proxy_user_config.size() > 0) {
+      BOOST_FOREACH(const string& config, proxy_user_config) {
+        size_t pos = config.find("=");
+        if (pos == string::npos) {
+          LOG(ERROR) << "Invalid proxy user configuration. No mapping value specified "
+                     << "for the proxy user. For more information review usage of the "
+                     << "--authorized_proxy_user_config flag: " << config;
+          exit(1);
+        }
+        string proxy_user = config.substr(0, pos);
+        string config_str = config.substr(pos + 1);
+        vector<string> parsed_allowed_users;
+        split(parsed_allowed_users, config_str, is_any_of(","), token_compress_on);
+        unordered_set<string> allowed_users(parsed_allowed_users.begin(),
+            parsed_allowed_users.end());
+        authorized_proxy_user_config_.insert(make_pair(proxy_user, allowed_users));
+      }
+    }
+  }
+
   Webserver::PathHandlerCallback varz_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/varz", varz_callback);
@@ -495,9 +523,12 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String(exec_state.query_status().GetErrorMsg().c_str());
   writer.String("user");
   writer.String(exec_state.user().c_str());
-  // Impala does not support impersonation so always mark this field as null.
   writer.String("impersonator");
-  writer.Null();
+  if (exec_state.do_as_user().empty()) {
+    writer.Null();
+  } else {
+    writer.String(exec_state.do_as_user().c_str());
+  }
   writer.String("statement_type");
   if (request.stmt_type == TStmtType::DDL) {
     if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
@@ -1261,7 +1292,6 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
          << ": bad format (expected key=value)";
       return Status(ss.str());
     }
-
     RETURN_IF_ERROR(SetQueryOptions(key_value[0], key_value[1], query_options));
   }
   return Status::OK;
@@ -1633,7 +1663,9 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   state->session_id = session_id;
   state->session_type = session_type;
   state->database = database;
-  state->user = user;
+  // The do_as_user will only be set if impersonation is enabled and the
+  // proxy user is authorized to impersonate as this user.
+  state->user = do_as_user.empty() ? user : do_as_user;
   state->network_address = network_address;
 }
 
@@ -1645,6 +1677,41 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
                << ") did not succeed: " << status.GetErrorMsg();
   }
+}
+
+Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_user) {
+  if (user.empty()) {
+    return Status("Unable to impersonate using empty proxy username.");
+  } else if (user.empty()) {
+    return Status("Unable to impersonate using empty doAs username.");
+  }
+
+  stringstream error_msg;
+  error_msg << "User '" << user << "' is not authorized to impersonate '"
+            << do_as_user << "'.";
+  if (authorized_proxy_user_config_.size() == 0) {
+    error_msg << " User impersonation is disabled.";
+    return Status(error_msg.str());
+  }
+
+  // Get the short version of the user name (the user name up to the first '/' or '@')
+  // from the full principal name.
+  size_t end_idx = min(user.find("/"), user.find("@"));
+  // If neither are found (or are found at the beginning of the user name),
+  // return the username. Otherwise, return the username up to the matching character.
+  string short_user(
+      end_idx == string::npos || end_idx == 0 ? user : user.substr(0, end_idx));
+
+  // Check if the proxy user exists. If he/she does, then check if they are allowed
+  // to impersonate the do_as_user.
+  ProxyUserMap::const_iterator proxy_user =
+      authorized_proxy_user_config_.find(short_user);
+  if (proxy_user != authorized_proxy_user_config_.end()) {
+    BOOST_FOREACH(const string& user, proxy_user->second) {
+      if (user == "*" || user == do_as_user) return Status::OK;
+    }
+  }
+  return Status(error_msg.str());
 }
 
 void ImpalaServer::CatalogUpdateCallback(

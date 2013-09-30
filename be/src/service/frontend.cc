@@ -32,12 +32,19 @@ DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at s
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
-              "server during authorization. If set, authorization will be enabled.");
+    "server during authorization. If set, authorization will be enabled.");
 DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
-              "file. If set, authorization will be enabled.");
+    "file. If set, authorization will be enabled.");
 DEFINE_string(authorization_policy_provider_class,
     "org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider",
     "Advanced: The authorization policy provider class name.");
+DEFINE_string(authorized_proxy_user_config, "",
+    "Specifies the set of authorized proxy users (users who can impersonate other "
+    "users during authorization) and whom they are allowed to impersonate. "
+    "Input is a semicolon-separated list of key=value pairs of authorized proxy "
+    "users to the user(s) they can impersonate. These users are specified as a comma "
+    "separated list of short usernames, or '*' to indicate all users. For example: "
+    "hue=user1,user2;admin=*");
 
 // Describes one method to look up in a Frontend object
 struct Frontend::MethodDescriptor {

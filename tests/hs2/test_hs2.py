@@ -15,9 +15,12 @@
 #
 # Client tests for Impala's HiveServer2 interface
 
-from cli_service import TCLIService
-
+import os
 import pytest
+import json
+from time import sleep
+from getpass import getuser
+from cli_service import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -30,6 +33,8 @@ def needs_session(fn):
   """
   def add_session(self):
     open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.username = getuser()
+    open_session_req.configuration = dict()
     resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(resp)
     self.session_handle = resp.sessionHandle

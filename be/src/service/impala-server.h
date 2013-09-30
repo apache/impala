@@ -439,6 +439,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Must be called with query_exec_state_map_lock_ held
   void ArchiveQuery(const QueryExecState& query);
 
+  // Checks whether the given user is allowed to impersonate as the specified do_as_user.
+  // Returns OK if the authorization suceeds, otherwise returns an status with details
+  // on why the failure occurred.
+  Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user);
+
   // Snapshot of a query's state, archived in the query log.
   struct QueryStateRecord {
     // Pretty-printed runtime profile. TODO: Copy actual profile object
@@ -640,6 +645,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // User for this session
     std::string user;
 
+    // The user to impersonate. Empty for no impersonation.
+    std::string do_as_user;
+
     // Client network address
     TNetworkAddress network_address;
 
@@ -735,6 +743,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // and the CatalogService ID that this version was from.
   int64_t current_catalog_version_;
   TUniqueId current_catalog_service_id_;
+
+  // Map of short usernames of authorized proxy users to the set of user(s) they are
+  // allowed to impersonate. Populated by parsing the --authorized_proxy_users_config
+  // flag.
+  typedef boost::unordered_map<std::string, boost::unordered_set<std::string> >
+      ProxyUserMap;
+  ProxyUserMap authorized_proxy_user_config_;
 };
 
 // Create an ImpalaServer and Thrift servers.
