@@ -1,0 +1,109 @@
+# Distinct estimate
+select distinctpc(l_orderkey) from tpch.lineitem
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:AGGREGATE (finalize)
+  |  output: DISTINCT_PC(l_orderkey)
+  |  group by:
+  |  tuple ids: 1
+  |
+  0:SCAN HDFS
+     table=tpch.lineitem #partitions=1 size=718.94MB
+     tuple ids: 0
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:AGGREGATE (merge finalize)
+  |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))
+  |  group by:
+  |  tuple ids: 1
+  |
+  2:EXCHANGE
+     tuple ids: 1
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
+  1:AGGREGATE
+  |  output: DISTINCT_PC(l_orderkey)
+  |  group by:
+  |  tuple ids: 1
+  |
+  0:SCAN HDFS
+     table=tpch.lineitem #partitions=1 size=718.94MB
+     tuple ids: 0
+====
+# Distinct estimate with distinct
+select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:AGGREGATE (merge finalize)
+  |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
+  |  group by:
+  |  tuple ids: 2
+  |
+  1:AGGREGATE
+  |  output: DISTINCT_PC(l_orderkey)
+  |  group by: l_orderkey
+  |  tuple ids: 1
+  |
+  0:SCAN HDFS
+     table=tpch.lineitem #partitions=1 size=718.94MB
+     tuple ids: 0
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  6:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(l_orderkey)), DISTINCT_PC(DISTINCT_PC(DISTINCT_PC(l_orderkey)))
+  |  group by:
+  |  tuple ids: 2
+  |
+  5:EXCHANGE
+     tuple ids: 2
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: l_orderkey
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  2:AGGREGATE (merge)
+  |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
+  |  group by:
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
+  |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))
+  |  group by: l_orderkey
+  |  tuple ids: 1
+  |
+  3:EXCHANGE
+     tuple ids: 1
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    HASH_PARTITIONED: l_orderkey
+
+  1:AGGREGATE
+  |  output: DISTINCT_PC(l_orderkey)
+  |  group by: l_orderkey
+  |  tuple ids: 1
+  |
+  0:SCAN HDFS
+     table=tpch.lineitem #partitions=1 size=718.94MB
+     tuple ids: 0
+====

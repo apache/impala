@@ -21,6 +21,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "udf/udf.h"
 #include "util/hash-util.h"
 
 namespace impala {
@@ -184,10 +185,23 @@ class  TimestampValue {
     return TimestampValue(boost::posix_time::microsec_clock::local_time());
   }
 
-  inline uint32_t Hash() const {
+  inline uint32_t Hash(int seed = 0) const {
     uint32_t hash = HashUtil::Hash(
-        &time_of_day_, sizeof(boost::posix_time::time_duration), 0);
+        &time_of_day_, sizeof(boost::posix_time::time_duration), seed);
     return HashUtil::Hash(&time_of_day_, sizeof(boost::gregorian::date), hash);
+  }
+
+  void ToTimestampVal(impala_udf::TimestampVal* tv) const {
+    memcpy(&tv->date, &date_, sizeof(date_));
+    memcpy(&tv->time_of_day, &time_of_day_, sizeof(time_of_day_));
+    tv->is_null = false;
+  }
+
+  static TimestampValue FromTimestampVal(const impala_udf::TimestampVal& tv) {
+    TimestampValue v;
+    memcpy(&v.date_, &tv.date, sizeof(v.date_));
+    memcpy(&v.time_of_day_, &tv.time_of_day, sizeof(v.time_of_day_));
+    return v;
   }
 
  private:

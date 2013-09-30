@@ -656,6 +656,7 @@ public class Planner {
       // node in the child fragment to the merge aggregation node in the parent
       long limit = node.getLimit();
       node.unsetLimit();
+      node.unsetNeedsFinalize();
 
       DataPartition parentPartition = null;
       if (hasGrouping) {
@@ -735,6 +736,7 @@ public class Planner {
     AggregationNode mergeAggNode =
         new AggregationNode(
           new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
+    mergeAggNode.unsetNeedsFinalize();
     mergeFragment.addPlanRoot(mergeAggNode);
     mergeAggNode.computeStats(analyzer);
     // the 2nd-phase aggregation consumes the output of the merge agg;
@@ -747,6 +749,7 @@ public class Planner {
       // add preceding merge fragment at end
       fragments.add(mergeFragment);
 
+      node.unsetNeedsFinalize();
       mergeFragment =
           createParentAggFragment(mergeFragment, DataPartition.UNPARTITIONED);
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();
@@ -885,6 +888,7 @@ public class Planner {
       // if we're computing DISTINCT agg fns, the analyzer already created the
       // 2nd phase agginfo
       if (aggInfo.isDistinctAgg()) {
+        ((AggregationNode)root).unsetNeedsFinalize();
         root = new AggregationNode(
             new PlanNodeId(nodeIdGenerator), root,
             aggInfo.getSecondPhaseDistinctAggInfo());

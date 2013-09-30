@@ -147,7 +147,7 @@ PLAN FRAGMENT 0
   |    |  limit: 5
   |    |  tuple ids: 2
   |    |
-  |    2:AGGREGATE
+  |    2:AGGREGATE (finalize)
   |    |  output: COUNT(*)
   |    |  group by: id
   |    |  tuple ids: 2
@@ -217,7 +217,7 @@ PLAN FRAGMENT 3
   |  limit: 5
   |  tuple ids: 2
   |
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: id
   |  tuple ids: 2

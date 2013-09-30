@@ -165,36 +165,30 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
 void RawValue::Write(const void* value, void* dst, const ColumnType& type,
     MemPool* pool) {
   DCHECK(value != NULL);
-
   switch (type.type) {
-    case TYPE_BOOLEAN: {
+    case TYPE_NULL:
+      break;
+    case TYPE_BOOLEAN:
       *reinterpret_cast<bool*>(dst) = *reinterpret_cast<const bool*>(value);
       break;
-    }
-    case TYPE_TINYINT: {
+    case TYPE_TINYINT:
       *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(value);
       break;
-    }
-    case TYPE_SMALLINT: {
+    case TYPE_SMALLINT:
       *reinterpret_cast<int16_t*>(dst) = *reinterpret_cast<const int16_t*>(value);
       break;
-    }
-    case TYPE_INT: {
+    case TYPE_INT:
       *reinterpret_cast<int32_t*>(dst) = *reinterpret_cast<const int32_t*>(value);
       break;
-    }
-    case TYPE_BIGINT: {
+    case TYPE_BIGINT:
       *reinterpret_cast<int64_t*>(dst) = *reinterpret_cast<const int64_t*>(value);
       break;
-    }
-    case TYPE_FLOAT: {
+    case TYPE_FLOAT:
       *reinterpret_cast<float*>(dst) = *reinterpret_cast<const float*>(value);
       break;
-    }
-    case TYPE_DOUBLE: {
+    case TYPE_DOUBLE:
       *reinterpret_cast<double*>(dst) = *reinterpret_cast<const double*>(value);
       break;
-    }
     case TYPE_TIMESTAMP:
       *reinterpret_cast<TimestampValue*>(dst) =
           *reinterpret_cast<const TimestampValue*>(value);

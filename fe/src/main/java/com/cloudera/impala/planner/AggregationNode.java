@@ -19,17 +19,19 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Aggregation computation.
@@ -47,39 +49,30 @@ public class AggregationNode extends PlanNode {
 
   private final AggregateInfo aggInfo;
 
-  // Set to true if this aggregation node contains aggregate functions that require
-  // finalization after all rows have been aggregated.
+  // Set to true if this aggregation node needs to run the Finalize step. This
+  // node is the root node of a distributed aggregation.
   private boolean needsFinalize;
 
   /**
-   * Create an agg node that is not an intermediate node.
-   * isIntermediate is true if it is a slave node in a 2-part agg plan.
+   * Create an agg node from aggInfo.
    */
-  public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo,
-      boolean isIntermediate) {
+  public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
     super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
     this.aggInfo = aggInfo;
     this.children.add(input);
-    needsFinalize = false;
-    if (!isIntermediate) {
-      for (AggregateExpr expr: aggInfo.getAggregateExprs()) {
-        if (expr.getOp().getNeedFinalize()) {
-          needsFinalize = true;
-          break;
-        }
-      }
-    }
-  }
-
-  /**
-   * Create an agg node that is not an intermediate agg node. It is either an agg node in
-   * a single node plan, or a coord agg node in a multi-node plan.
-   */
-  public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
-    this(id, input, aggInfo, false);
+    this.needsFinalize = true;
+    updateDisplayName();
   }
 
   public AggregateInfo getAggInfo() { return aggInfo; }
+
+  // Unsets this node as requiring finalize. Only valid to call this if it is
+  // currently marked as needing finalize.
+  public void unsetNeedsFinalize() {
+    Preconditions.checkState(needsFinalize);
+    needsFinalize = false;
+    updateDisplayName();
+  }
 
   @Override
   public void setCompactData(boolean on) { this.compactData = on; }
@@ -123,6 +116,23 @@ public class AggregationNode extends PlanNode {
     LOG.debug("stats Agg: cardinality=" + Long.toString(cardinality));
   }
 
+  private void updateDisplayName() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("AGGREGATE");
+    if (aggInfo.isMerge() || needsFinalize) {
+      sb.append(" (");
+      if (aggInfo.isMerge() && needsFinalize) {
+        sb.append("merge finalize");
+      } else if (aggInfo.isMerge()) {
+        sb.append("merge");
+      } else {
+        sb.append("finalize");
+      }
+      sb.append(")");
+    }
+    setDisplayName(sb.toString());
+  }
+
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
@@ -134,9 +144,15 @@ public class AggregationNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
+
+    List<TAggregateFunction> aggregateFunctions = Lists.newArrayList();
+    for (FunctionCallExpr e: aggInfo.getAggregateExprs()) {
+      aggregateFunctions.add(e.toTAggregateFunction());
+    }
     msg.agg_node = new TAggregationNode(
-        Expr.treesToThrift(aggInfo.getAggregateExprs()),
+        aggregateFunctions,
         aggInfo.getAggTupleId().asInt(), needsFinalize);
+    msg.agg_node.setIs_merge(aggInfo.isMerge());
     List<Expr> groupingExprs = aggInfo.getGroupingExprs();
     if (groupingExprs != null) {
       msg.agg_node.setGrouping_exprs(Expr.treesToThrift(groupingExprs));
@@ -151,6 +167,10 @@ public class AggregationNode extends PlanNode {
       output.append(detailPrefix + "output: ")
         .append(getExplainString(aggInfo.getAggregateExprs()) + "\n");
     }
+    // TODO: is this the best way to display this. It currently would
+    // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
+    // very obvious what that means if you don't already know.
+
     // TODO: group by can be very long. Break it into multiple lines
     output.append(detailPrefix + "group by: ")
       .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");

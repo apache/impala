@@ -24,7 +24,7 @@ namespace java com.cloudera.impala.thrift
 include "Exprs.thrift"
 include "Types.thrift"
 
-enum TPlanNodeType {  
+enum TPlanNodeType {
   HDFS_SCAN_NODE,
   HBASE_SCAN_NODE,
   HASH_JOIN_NODE,
@@ -71,7 +71,7 @@ struct THdfsFileSplit {
   // ID of partition in parent THdfsScanNode. Meaningful only
   // in the context of a single THdfsScanNode, may not be unique elsewhere.
   4: required i64 partition_id
-  
+
   // total size of the hdfs file
   5: required i64 file_length
 }
@@ -116,7 +116,7 @@ struct THBaseScanNode {
   2: required string table_name
 
   3: optional list<THBaseFilter> filters
-  
+
   // Suggested max value for "hbase.client.scan.setCaching"
   4: optional i32 suggested_max_caching
 }
@@ -147,14 +147,61 @@ struct THashJoinNode {
   3: optional list<Exprs.TExpr> other_join_conjuncts
 }
 
+enum TAggregationOp {
+  INVALID,
+  COUNT,
+  MAX,
+  DISTINCT_PC,
+  DISTINCT_PCSA,
+  MIN,
+  SUM,
+  GROUP_CONCAT,
+}
+
+struct TAggregateFunction {
+  // The return type of this function.
+  1: required Types.TColumnType return_type
+
+  // The intermediate type used for this function.
+  2: required Types.TColumnType intermediate_type
+
+  // The input exprs to this aggregate function
+  3: required list<Exprs.TExpr> input_exprs
+
+  // Type of UDA. e.g. .so
+  4: required Types.TFunctionBinaryType binary_type
+
+  // For builtins, the builtin to use.
+  5: optional TAggregationOp op
+
+  // If set, this udf has varargs and this is the index for the first variable
+  // argument.
+  // e.g. if the signature was fn(int, double, string...), the index would be 2.
+  6: optional i32 vararg_start_idx
+
+  // Path in hdfs where the binary is. Set if it is a UDA
+  7: optional string binary_location
+
+  // Name of the symbol in the binary for the functions for the UDA
+  8: optional string init_fn_name
+  9: optional string update_fn_name
+  10: optional string merge_fn_name
+  11: optional string serialize_fn_name
+  12: optional string finalize_fn_name
+}
+
 struct TAggregationNode {
   1: optional list<Exprs.TExpr> grouping_exprs
-  2: required list<Exprs.TExpr> aggregate_exprs
+  2: required list<TAggregateFunction> aggregate_functions
   3: required Types.TTupleId agg_tuple_id
-  
+
   // Set to true if this aggregation function requires finalization to complete after all
   // rows have been aggregated, and this node is not an intermediate node.
   4: required bool need_finalize
+
+  // If true, this node is doing the merge phase of the aggregation (as opposed to the
+  // update phase).
+  5: optional bool is_merge
 }
 
 struct TSortNode {

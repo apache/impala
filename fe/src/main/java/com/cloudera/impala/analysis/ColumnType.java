@@ -57,6 +57,7 @@ public class ColumnType {
   }
 
   public void analyze() throws AnalysisException {
+    Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
     if (type_ == PrimitiveType.CHAR) {
       if (len_ <= 0) {
         throw new AnalysisException("Array size must be > 0. Size was set to: " +

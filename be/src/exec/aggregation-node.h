@@ -32,8 +32,7 @@ namespace llvm {
 
 namespace impala {
 
-class AggregateExpr;
-class AggregationTuple;
+class AggFnEvaluator;
 class LlvmCodeGen;
 class RowBatch;
 class RuntimeState;
@@ -46,12 +45,9 @@ class TupleDescriptor;
 // contain slots for all grouping and aggregation exprs (the grouping
 // slots precede the aggregation expr slots in the output tuple descriptor).
 //
-// For string aggregation, we need to append additional data to the tuple object
-// to reduce the number of string allocations (since we cannot know the length of
-// the output string beforehand).  For each string slot in the output tuple, a int32
-// will be appended to the end of the normal tuple data that stores the size of buffer
-// for that string slot.  This also results in the correct alignment because StringValue
-// slots are 8-byte aligned and form the tail end of the tuple.
+// TODO: for codegen, instead of hand written agg expr implementations, this class
+// should simply get it from the agg-expr, which in turn just returns a cross compiled
+// implementation.
 class AggregationNode : public ExecNode {
  public:
   AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -71,7 +67,7 @@ class AggregationNode : public ExecNode {
   boost::scoped_ptr<HashTable> hash_tbl_;
   HashTable::Iterator output_iterator_;
 
-  std::vector<Expr*> aggregate_exprs_;
+  std::vector<AggFnEvaluator*> aggregate_evaluators_;
   // Exprs used to evaluate input rows
   std::vector<Expr*> probe_exprs_;
   // Exprs used to insert constructed aggregation tuple into the hash table.
@@ -79,10 +75,7 @@ class AggregationNode : public ExecNode {
   std::vector<Expr*> build_exprs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
-  AggregationTuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
-  FreeList string_buffer_free_list_;
-  int num_string_slots_; // number of string slots in the output tuple
-  StringValue default_group_concat_delimiter_;
+  Tuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 
@@ -92,6 +85,10 @@ class AggregationNode : public ExecNode {
   typedef void (*ProcessRowBatchFn)(AggregationNode*, RowBatch*);
   // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
   ProcessRowBatchFn process_row_batch_fn_;
+
+  // If true, this aggregation node should use the aggregate evaluator's Merge()
+  // instead of Update()
+  bool is_merge_;
 
   // Certain aggregates require a finalize step, which is the final step of the
   // aggregate after consuming all input rows. The finalize step converts the aggregate
@@ -111,41 +108,15 @@ class AggregationNode : public ExecNode {
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
-  AggregationTuple* ConstructAggTuple();
-
-  // Allocates a string buffer that is at least the new_size.  The actual size of
-  // the allocated buffer is returned in allocated_size.
-  // The function first tries to allocate from the free list.  If there is nothing
-  // there, it will allocate from the MemPool.
-  char* AllocateStringBuffer(int new_size, int* allocated_size);
-
-  // Helper to update string value from src into dst.  This does a deep copy
-  // and will allocate a buffer for dst as necessary.
-  //  AggregationTuple: Contains the tuple data and the string buffer lengths
-  //  string_slot_idx: The i-th string slot in the aggregation tuple
-  //  dst: the target location to update the string.  This is part of the
-  //          AggregationTuple that's also passed in.
-  //  src: the value to update dst to.
-  void UpdateStringSlot(AggregationTuple* agg_tuple, int string_slot_idx,
-                        StringValue* dst, const StringValue* src);
-
-  void ConcatStringSlot(AggregationTuple* agg_tuple,
-      const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
-      StringValue* dst, const StringValue* src, const StringValue* delimiter);
-
-  // Helpers to compute Aggregate.MIN/Aggregate.MAX
-  void UpdateMinStringSlot(AggregationTuple*, const NullIndicatorOffset&,
-                           int slot_id, void* slot, void* value);
-  void UpdateMaxStringSlot(AggregationTuple*, const NullIndicatorOffset&,
-                           int slot_id, void* slot, void* value);
+  Tuple* ConstructAggTuple();
 
   // Updates the aggregation output tuple 'tuple' with aggregation values
   // computed over 'row'.
-  void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
+  void UpdateAggTuple(Tuple* tuple, TupleRow* row);
 
   // Called when all rows have been aggregated for the aggregation tuple to compute final
   // aggregate values
-  void FinalizeAggTuple(AggregationTuple* tuple);
+  void FinalizeAggTuple(Tuple* tuple);
 
   // Do the aggregation for all tuple rows in the batch
   void ProcessRowBatchNoGrouping(RowBatch* batch);
@@ -164,42 +135,6 @@ class AggregationNode : public ExecNode {
 
   // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
   llvm::Function* CodegenUpdateAggTuple(LlvmCodeGen* codegen);
-
-  // Compute distinctpc and distinctpcsa using Flajolet and Martin's algorithm
-  // (Probabilistic Counting Algorithms for Data Base Applications)
-  // We have implemented two variants here: one with stochastic averaging (with PCSA
-  // postfix) and one without.
-  // There are 4 phases to compute the aggregate:
-  //   1. allocate a bitmap, stored in the aggregation tuple's output string slot
-  //   2. update the bitmap per row (UpdateDistinctEstimateSlot)
-  //   3. for distribtued plan, merge the bitmaps from all the nodes
-  //      (UpdateMergeEstimateSlot)
-  //   4. compute the estimate using the bitmaps when all the rows are processed
-  //      (FinalizeEstimateSlot)
-  const static int NUM_PC_BITMAPS; // number of bitmaps
-  const static int PC_BITMAP_LENGTH; // the length of each bit map
-  const static float PC_THETA; // the magic number to compute the final result
-
-  // Initialize the NUM_PC_BITMAPS * PC_BITMAP_LENGTH bitmaps. The bitmaps are allocated
-  // as a string value of the slot. Both algorithms share the same bitmap structure.
-  void ConstructDistinctEstimateSlot(AggregationTuple*, const NullIndicatorOffset&,
-                                     int slot_id, void* slot);
-
-  // Update the distinct estimate bitmaps for a single input row we consumed
-  void UpdateDistinctEstimatePCSASlot(void* slot, void* value, PrimitiveType type);
-  void UpdateDistinctEstimateSlot(void* slot, void* value, PrimitiveType type);
-
-  // Merge the distinct estimate bitmaps from all slave nodes (multi-node plan) by
-  // union-ing all the bits. Both algorithms share the same merging logic.
-  void UpdateMergeEstimateSlot(AggregationTuple*, int slot_id, void* slot, void* value);
-
-  // Convert the distinct estimate bitmaps into the final estimated number in string form
-  // The logic differs slightly between the two algorithm. agg_op indicates which
-  // algorithm we are executing.
-  void FinalizeEstimateSlot(int slot_id, void* slot, TAggregationOp::type agg_op);
-
-  // Helper function to print aggregation tuple's distinct estimate bitmap
-  static std::string DistinctEstimateBitMapToString(char* v);
 };
 
 }

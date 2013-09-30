@@ -182,8 +182,10 @@ public class AnalyzerTest {
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
+      e.printStackTrace();
       fail("Analysis error:\n" + e.toString());
     } catch (AuthorizationException e) {
+      e.printStackTrace();
       fail("Authorization error:\n" + e.toString());
     }
     if (node instanceof SelectStmt) {

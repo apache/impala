@@ -30,7 +30,7 @@ class TupleDescriptor;
 // of fixed-size slots. The slots are arranged in order of increasing byte length;
 // the tuple might contain padding between slots in order to align them according
 // to their type.
-// 
+//
 // The contents of a tuple:
 // 1) a number of bytes holding a bitvector of null indicators
 // 2) bool slots
@@ -62,7 +62,7 @@ class Tuple {
   Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool, bool convert_ptrs = false);
 
   // Create a copy of 'this', including all its referenced string data.  This
-  // version does not allocate a tuple, instead copying 'dst'.  dst must already 
+  // version does not allocate a tuple, instead copying 'dst'.  dst must already
   // be allocated to the correct size (desc.byte_size())
   // If 'convert_ptrs' is true, converts pointers that are part of the tuple
   // into offsets in 'pool'.
@@ -79,9 +79,9 @@ class Tuple {
   void DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
                 bool convert_ptrs = false);
 
-  // Turn null indicator bit on.
+  // Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
+  // this is a no-op (but we don't have to branch to check is slots are nulalble).
   void SetNull(const NullIndicatorOffset& offset) {
-    DCHECK(offset.bit_mask != 0);
     char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
     *null_indicator_byte |= offset.bit_mask;
   }
@@ -112,7 +112,7 @@ class Tuple {
     DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
-  
+
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 };

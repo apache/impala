@@ -67,8 +67,8 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   }
   // TODO(marcel): get from runtime state
   tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent());
-  tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
   DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
+  tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
   slot_offset_ = slot_desc->tuple_offset();
   null_indicator_offset_ = slot_desc->null_indicator_offset();
   return Status::OK;

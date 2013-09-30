@@ -30,6 +30,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/thread-resource-mgr.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
 #include "util/runtime-profile.h"

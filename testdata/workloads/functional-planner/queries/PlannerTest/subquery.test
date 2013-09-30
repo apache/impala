@@ -30,7 +30,7 @@ PLAN FRAGMENT 0
   |  limit: 5
   |  tuple ids: 1
   |
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: int_col
   |  having: COUNT(*) > 1
@@ -83,7 +83,7 @@ PLAN FRAGMENT 2
   |  limit: 5
   |  tuple ids: 1
   |
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: int_col
   |  having: COUNT(*) > 1
@@ -675,7 +675,7 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*), MIN(functional.alltypesagg.tinyint_col), MAX(functional.alltypesagg.tinyint_col), SUM(functional.alltypesagg.tinyint_col), COUNT(functional.alltypesagg.tinyint_col)
   |  group by: functional.alltypesagg.tinyint_col
   |  tuple ids: 2
@@ -697,7 +697,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
   |  group by: tinyint_col
   |  tuple ids: 2
@@ -744,7 +744,7 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   |  group by: tinyint_col
   |  tuple ids: 1
@@ -766,7 +766,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
   |  group by: tinyint_col
   |  tuple ids: 1
@@ -822,7 +822,7 @@ PLAN FRAGMENT 0
   |  limit: 5
   |  tuple ids: 1
   |
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(float_col), MIN(float_col)
   |  group by: int_col
   |  tuple ids: 1
@@ -854,7 +854,7 @@ PLAN FRAGMENT 1
   |  limit: 5
   |  tuple ids: 1
   |
-  4:AGGREGATE
+  4:AGGREGATE (merge finalize)
   |  output: SUM(SUM(float_col)), MIN(MIN(float_col))
   |  group by: int_col
   |  tuple ids: 1
@@ -909,7 +909,7 @@ PLAN FRAGMENT 0
   |  limit: 0
   |  tuple ids: 4
   |
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: MIN(tinyint_col)
   |  group by: int_col
   |  tuple ids: 4
@@ -919,7 +919,7 @@ PLAN FRAGMENT 0
   |  limit: 1
   |  tuple ids: 1
   |
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: MIN(float_col)
   |  group by: int_col, tinyint_col
   |  tuple ids: 1
@@ -936,7 +936,7 @@ PLAN FRAGMENT 0
   |  limit: 0
   |  tuple ids: 4
   |
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: MIN(tinyint_col)
   |  group by: int_col
   |  tuple ids: 4
@@ -961,7 +961,7 @@ PLAN FRAGMENT 1
   |  limit: 1
   |  tuple ids: 1
   |
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  output: MIN(MIN(float_col))
   |  group by: int_col, tinyint_col
   |  tuple ids: 1
@@ -997,11 +997,11 @@ from (select distinct * from functional.testtbl) x
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 3
   |
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1
   |
@@ -1022,7 +1022,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  group by: x.id, x.name, x.zip
   |  tuple ids: 3
   |
@@ -1040,7 +1040,7 @@ PLAN FRAGMENT 2
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 3
   |
-  4:AGGREGATE
+  4:AGGREGATE (merge finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1
   |
@@ -1071,11 +1071,11 @@ from (select distinct * from functional.testtbl) x
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.zip
   |  tuple ids: 3
   |
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1
   |
@@ -1096,7 +1096,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 7
     UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  group by: id, zip
   |  tuple ids: 3
   |
@@ -1114,7 +1114,7 @@ PLAN FRAGMENT 2
   |  group by: functional.testtbl.id, functional.testtbl.zip
   |  tuple ids: 3
   |
-  4:AGGREGATE
+  4:AGGREGATE (merge finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   |  tuple ids: 1
   |
@@ -1154,7 +1154,7 @@ and   c2 > 10
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*), SUM(functional.alltypesagg.int_col), COUNT(functional.alltypesagg.int_col)
   |  group by: functional.alltypesagg.int_col % 7
   |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
@@ -1177,7 +1177,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), SUM(SUM(int_col)), SUM(COUNT(int_col))
   |  group by: int_col % 7
   |  having: SUM(int_col) / COUNT(int_col) > 500.0 OR COUNT(*) = 10, int_col % 7 IS NOT NULL, COUNT(*) > 10
@@ -1321,7 +1321,7 @@ group by x.smallint_col
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  output: COUNT(b.id)
   |  group by: a.smallint_col
   |  tuple ids: 5
@@ -1363,7 +1363,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 11
     UNPARTITIONED
 
-  10:AGGREGATE
+  10:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(x.id))
   |  group by: x.smallint_col
   |  tuple ids: 5
@@ -1604,7 +1604,7 @@ group by x.smallint_col
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  output: SUM(COUNT(a.id))
   |  group by: b.smallint_col
   |  tuple ids: 6
@@ -1615,7 +1615,7 @@ PLAN FRAGMENT 0
   |    c.id = b.smallint_col
   |  tuple ids: 0 4
   |
-  |----4:AGGREGATE
+  |----4:AGGREGATE (finalize)
   |    |  output: COUNT(a.id)
   |    |  group by: b.smallint_col
   |    |  tuple ids: 4
@@ -1651,7 +1651,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 13
     UNPARTITIONED
 
-  12:AGGREGATE
+  12:AGGREGATE (merge finalize)
   |  output: SUM(SUM(x.cnt))
   |  group by: x.smallint_col
   |  tuple ids: 6
@@ -1691,7 +1691,7 @@ PLAN FRAGMENT 3
     EXCHANGE ID: 10
     UNPARTITIONED
 
-  9:AGGREGATE
+  9:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.id))
   |  group by: b.smallint_col
   |  tuple ids: 4

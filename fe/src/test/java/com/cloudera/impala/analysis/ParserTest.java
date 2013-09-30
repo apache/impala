@@ -177,7 +177,7 @@ public class ParserTest {
     ParserError("select *.id from tbl");
     ParserError("select * from tbl.*");
     ParserError("select * from tbl where * = 5");
-    ParserError("select * from tbl where f(*) = 5");
+    ParsesOk("select * from tbl where f(*) = 5");
     ParserError("select * from tbl where tbl.* = 5");
     ParserError("select * from tbl where f(tbl.*) = 5");
   }
@@ -712,6 +712,9 @@ public class ParserTest {
   public void TestFunctionCallExprs() {
     ParsesOk("select f1(5), f2('five'), f3(5.0, i + 5) from t");
     ParsesOk("select f1(true), f2(true and false), f3(null) from t");
+    ParsesOk("select f1(*)");
+    ParsesOk("select f1(distinct col)");
+    ParsesOk("select f1(distinct col, col2)");
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }
@@ -779,6 +782,10 @@ public class ParserTest {
       // pass without 'interval' because the time unit is recognized as an alias.
       ParserError("select date_add(a, b " + timeUnit.toString() + ")");
       ParserError("select date_sub(a, b " + timeUnit.toString() + ")");
+
+      ParserError("select date_sub(distinct NULL, interval NULL " +
+          timeUnit.toString() + ")");
+      ParserError("select date_sub(*, interval NULL " + timeUnit.toString() + ")");
     }
 
     // Test chained timestamp arithmetic exprs.

@@ -181,6 +181,7 @@ CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen,
 
 AnyVal* CreateAnyVal(ObjectPool* pool, PrimitiveType type) {
   switch(type) {
+    case TYPE_NULL: return pool->Add(new AnyVal);
     case TYPE_BOOLEAN: return pool->Add(new BooleanVal);
     case TYPE_TINYINT: return pool->Add(new TinyIntVal);
     case TYPE_SMALLINT: return pool->Add(new SmallIntVal);

@@ -157,9 +157,9 @@ public class SelectStmt extends QueryStmt {
 
     if (whereClause != null) {
       whereClause.analyze(analyzer);
-      if (whereClause.contains(AggregateExpr.class)) {
+      if (whereClause.containsAggregate()) {
         throw new AnalysisException(
-            "aggregation function not allowed in WHERE clause");
+            "aggregate function not allowed in WHERE clause");
       }
       whereClause.checkReturnsBool("WHERE clause", false);
       analyzer.registerConjuncts(whereClause, null, true);
@@ -308,7 +308,7 @@ public class SelectStmt extends QueryStmt {
   private void analyzeAggregation(Analyzer analyzer)
       throws AnalysisException {
     if (groupingExprs == null && !selectList.isDistinct()
-        && !Expr.contains(resultExprs, AggregateExpr.class)) {
+        && !Expr.containsAggregate(resultExprs)) {
       // we're not computing aggregates
       return;
     }
@@ -319,7 +319,7 @@ public class SelectStmt extends QueryStmt {
           "aggregation without a FROM clause is not allowed");
     }
 
-    if ((groupingExprs != null || Expr.contains(resultExprs, AggregateExpr.class))
+    if ((groupingExprs != null || Expr.containsAggregate(resultExprs))
         && selectList.isDistinct()) {
       throw new AnalysisException(
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
@@ -352,7 +352,7 @@ public class SelectStmt extends QueryStmt {
       Expr.substituteList(groupingExprsCopy, aliasSMap);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
-        if (groupingExprsCopy.get(i).contains(AggregateExpr.class)) {
+        if (groupingExprsCopy.get(i).containsAggregate()) {
           // reference the original expr in the error msg
           throw new AnalysisException(
               "GROUP BY expression must not contain aggregate functions: "
@@ -371,17 +371,15 @@ public class SelectStmt extends QueryStmt {
     }
 
     List<Expr> orderingExprs = null;
-    if (sortInfo != null) {
-      orderingExprs = sortInfo.getOrderingExprs();
-    }
+    if (sortInfo != null) orderingExprs = sortInfo.getOrderingExprs();
 
-    ArrayList<AggregateExpr> aggExprs = collectAggExprs();
+    ArrayList<FunctionCallExpr> aggExprs = collectAggExprs();
     Expr.SubstitutionMap avgSMap = createAvgSMap(aggExprs, analyzer);
 
     // substitute AVG before constructing AggregateInfo
     Expr.substituteList(aggExprs, avgSMap);
-    ArrayList<AggregateExpr> nonAvgAggExprs = Lists.newArrayList();
-    Expr.collectList(aggExprs, AggregateExpr.class, nonAvgAggExprs);
+    ArrayList<FunctionCallExpr> nonAvgAggExprs = Lists.newArrayList();
+    Expr.collectAggregateExprs(aggExprs, nonAvgAggExprs);
     aggExprs = nonAvgAggExprs;
     try {
       createAggInfo(groupingExprsCopy, aggExprs, analyzer);
@@ -437,14 +435,14 @@ public class SelectStmt extends QueryStmt {
     }
   }
 
-  private ArrayList<AggregateExpr> collectAggExprs() {
-    ArrayList<AggregateExpr> result = Lists.newArrayList();
-    Expr.collectList(resultExprs, AggregateExpr.class, result);
+  private ArrayList<FunctionCallExpr> collectAggExprs() {
+    ArrayList<FunctionCallExpr> result = Lists.newArrayList();
+    Expr.collectAggregateExprs(resultExprs, result);
     if (havingPred != null) {
-      havingPred.collect(AggregateExpr.class, result);
+      havingPred.collectAggregateExprs(result);
     }
     if (sortInfo != null) {
-      Expr.collectList(sortInfo.getOrderingExprs(), AggregateExpr.class, result);
+      Expr.collectAggregateExprs(sortInfo.getOrderingExprs(), result);
     }
     return result;
   }
@@ -454,10 +452,10 @@ public class SelectStmt extends QueryStmt {
    * assumes that select list and having clause have been analyzed.
    */
   private Expr.SubstitutionMap createAvgSMap(
-      ArrayList<AggregateExpr> aggExprs, Analyzer analyzer) throws AnalysisException {
+      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer) throws AnalysisException {
     Expr.SubstitutionMap result = new Expr.SubstitutionMap();
-    for (AggregateExpr aggExpr : aggExprs) {
-      if (aggExpr.getOp() != AggregateExpr.Operator.AVG) {
+    for (FunctionCallExpr aggExpr : aggExprs) {
+      if (aggExpr.getAggOp() != BuiltinAggregateFunction.Operator.AVG) {
         continue;
       }
       // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
@@ -467,13 +465,17 @@ public class SelectStmt extends QueryStmt {
             new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(null), false);
       }
 
-      AggregateExpr sumExpr =
-          new AggregateExpr(AggregateExpr.Operator.SUM, false, aggExpr.isDistinct(),
-                Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
-                  inCastExpr : aggExpr.getChild(0).clone(null)));
-      AggregateExpr countExpr =
-          new AggregateExpr(AggregateExpr.Operator.COUNT, false, aggExpr.isDistinct(),
-                            Lists.newArrayList(aggExpr.getChild(0).clone(null)));
+      List<Expr> sumInputExprs =
+          Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
+              inCastExpr : aggExpr.getChild(0).clone(null));
+      List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone(null));
+
+      FunctionCallExpr sumExpr =
+          new FunctionCallExpr(BuiltinAggregateFunction.Operator.SUM,
+              new FunctionParams(aggExpr.isDistinct(), sumInputExprs));
+      FunctionCallExpr countExpr =
+          new FunctionCallExpr(BuiltinAggregateFunction.Operator.COUNT,
+              new FunctionParams(aggExpr.isDistinct(), countInputExpr));
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
 
@@ -495,7 +497,7 @@ public class SelectStmt extends QueryStmt {
    * Create aggInfo for the given grouping and agg exprs.
    */
   private void createAggInfo(ArrayList<Expr> groupingExprs,
-      ArrayList<AggregateExpr> aggExprs, Analyzer analyzer)
+      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
       throws AnalysisException, InternalException {
     if (selectList.isDistinct()) {
        // Create aggInfo for SELECT DISTINCT ... stmt:

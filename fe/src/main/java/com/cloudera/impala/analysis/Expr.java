@@ -139,7 +139,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // Append a flattened version of this expr, including all children, to 'container'.
   protected void treeToThriftHelper(TExpr container) {
     TExprNode msg = new TExprNode();
-    msg.type = type.toThrift();
+    msg.type = ColumnType.createType(type).toThrift();
     msg.num_children = children.size();
     toThrift(msg);
     container.addToNodes(msg);
@@ -392,6 +392,25 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
+  public static <C extends Expr> void collectAggregateExprs(
+      List<? extends Expr> input, List<C> output) {
+    Preconditions.checkNotNull(input);
+    for (Expr e: input) {
+      e.collectAggregateExprs(output);
+    }
+  }
+
+  // Identical behavior to TreeNode.collect() except it matches expr that are aggregates
+  public <C extends Expr> void collectAggregateExprs(List<C> output) {
+    if (isAggregate() && !output.contains((C)this)) {
+      output.add((C)this);
+      return;
+    }
+    for (Expr child:children) {
+      child.collectAggregateExprs(output);
+    }
+  }
+
   /**
    * Return true if the list contains a node of type C in any of
    * its elements or their children, otherwise return false.
@@ -403,6 +422,21 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (e.contains(cl)) return true;
     }
     return false;
+  }
+
+  /**
+   * Returns true if the list contains an aggregate expr.
+   */
+  public static <C extends Expr> boolean containsAggregate(List<? extends Expr> input) {
+    for (Expr e: input) {
+      if (e.containsAggregate()) return true;
+    }
+    return false;
+  }
+
+  public boolean containsAggregate() {
+    if (isAggregate()) return true;
+    return containsAggregate(children);
   }
 
   /**
@@ -517,6 +551,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (Expr e: exprs) {
       e.getIds(tupleIds, slotIds);
     }
+  }
+
+  public boolean isAggregate() {
+    return this instanceof FunctionCallExpr &&
+        ((FunctionCallExpr)this).isAggregateFunction();
   }
 
   /**

@@ -7,13 +7,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -24,7 +24,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -37,21 +37,21 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
      predicates: name LIKE 'm%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: zip
@@ -60,13 +60,13 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -78,12 +78,12 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
      predicates: name LIKE 'm%'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -95,13 +95,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -112,7 +112,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24 size=478.45KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -148,13 +148,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -165,7 +165,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -189,13 +189,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -206,7 +206,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -229,13 +229,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -246,7 +246,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=238.68KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -270,13 +270,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=2 size=40.32KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -287,7 +287,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=2 size=40.32KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -301,13 +301,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=1 size=19.95KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -318,7 +318,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=1 size=19.95KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -331,13 +331,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=6 size=120.87KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -348,7 +348,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=6 size=120.87KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
@@ -365,13 +365,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5 size=98.11KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -382,7 +382,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5 size=98.11KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -398,13 +398,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -415,7 +415,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -431,13 +431,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -448,7 +448,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -464,13 +464,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -481,7 +481,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -492,13 +492,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -509,7 +509,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=80.74KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -525,13 +525,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5 size=98.11KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -542,7 +542,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5 size=98.11KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -559,13 +559,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=81.46KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -576,7 +576,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4 size=81.46KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
@@ -592,13 +592,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -609,7 +609,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -621,13 +621,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=9 size=180.49KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -638,7 +638,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=9 size=180.49KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -659,13 +659,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -676,7 +676,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -691,13 +691,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -708,7 +708,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -724,13 +724,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -741,7 +741,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3 size=60.43KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -756,13 +756,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=239.77KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -773,7 +773,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12 size=239.77KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
@@ -797,13 +797,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifilesnopart #partitions=1 size=734.18KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -814,7 +814,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifilesnopart #partitions=1 size=734.18KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0 0:186852
@@ -830,13 +830,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifiles #partitions=2 size=145.97KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -847,7 +847,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifiles #partitions=2 size=145.97KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435

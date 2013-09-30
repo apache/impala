@@ -763,10 +763,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestNestedFunctions() throws AnalysisException {
+  public void TestFunctions() throws AnalysisException {
+    AnalyzesOk("select pi()");
     AnalyzesOk("select sin(pi())");
     AnalyzesOk("select sin(cos(pi()))");
     AnalyzesOk("select sin(cos(tan(e())))");
+    AnalysisError("select pi(*)", "Cannot pass '*' to scalar function.");
+    AnalysisError("select sin(DISTINCT 1)",
+        "Cannot pass 'DISTINCT' to scalar function.");
+    AnalysisError("select * from functional.alltypes where pi(*) = 5",
+        "Cannot pass '*' to scalar function.");
   }
 
   @Test

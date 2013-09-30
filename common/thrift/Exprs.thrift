@@ -19,7 +19,6 @@ include "Types.thrift"
 include "Opcodes.thrift"
 
 enum TExprNodeType {
-  AGG_EXPR,
   ARITHMETIC_EXPR,
   BINARY_PRED,
   BOOL_LITERAL,
@@ -39,25 +38,6 @@ enum TExprNodeType {
   STRING_LITERAL,
   TUPLE_IS_NULL_PRED,
   UDF_CALL,
-}
-
-enum TAggregationOp {
-  INVALID,
-  COUNT,
-  MAX,
-  DISTINCT_PC,
-  MERGE_PC,
-  DISTINCT_PCSA,
-  MERGE_PCSA,
-  MIN,
-  SUM,
-  GROUP_CONCAT,
-}
-
-struct TAggregateExpr {
-  1: required bool is_star
-  2: required bool is_distinct
-  3: required TAggregationOp op
 }
 
 struct TBoolLiteral {
@@ -128,28 +108,23 @@ struct TUdfCallExpr {
 // This is essentially a union over the subclasses of Expr.
 struct TExprNode {
   1: required TExprNodeType node_type
-  2: required Types.TPrimitiveType type
+  2: required Types.TColumnType type
   3: optional Opcodes.TExprOpcode opcode
   4: required i32 num_children
 
-  // If set, col_type.type == type
-  // TODO: we've done this to support rolling upgrades but it is painful.
-  19: optional Types.TColumnType col_type
-
-  5: optional TAggregateExpr agg_expr
-  6: optional TBoolLiteral bool_literal
-  7: optional TCaseExpr case_expr
-  8: optional TDateLiteral date_literal
-  9: optional TFloatLiteral float_literal
-  10: optional TIntLiteral int_literal
-  11: optional TInPredicate in_predicate
-  12: optional TIsNullPredicate is_null_pred
-  13: optional TLikePredicate like_pred
-  14: optional TLiteralPredicate literal_pred
-  15: optional TSlotRef slot_ref
-  16: optional TStringLiteral string_literal
-  17: optional TTupleIsNullPredicate tuple_is_null_pred
-  18: optional TUdfCallExpr udf_call_expr
+  5: optional TBoolLiteral bool_literal
+  6: optional TCaseExpr case_expr
+  7: optional TDateLiteral date_literal
+  8: optional TFloatLiteral float_literal
+  9: optional TIntLiteral int_literal
+  10: optional TInPredicate in_predicate
+  11: optional TIsNullPredicate is_null_pred
+  12: optional TLikePredicate like_pred
+  13: optional TLiteralPredicate literal_pred
+  14: optional TSlotRef slot_ref
+  15: optional TStringLiteral string_literal
+  16: optional TTupleIsNullPredicate tuple_is_null_pred
+  17: optional TUdfCallExpr udf_call_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first
@@ -157,5 +132,4 @@ struct TExprNode {
 struct TExpr {
   1: required list<TExprNode> nodes
 }
-
 

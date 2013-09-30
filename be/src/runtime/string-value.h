@@ -19,6 +19,7 @@
 #include <string.h>
 #include <string>
 
+#include "udf/udf.h"
 #include "util/hash-util.h"
 
 namespace impala {
@@ -26,6 +27,7 @@ namespace impala {
 // The format of a string-typed slot.
 // The returned StringValue of all functions that return StringValue
 // shares its buffer the parent.
+// TODO: rename this to be less confusing with impala_udf::StringVal.
 struct StringValue {
   // TODO: change ptr to an offset relative to a contiguous memory block,
   // so that we can send row batches between nodes without having to swizzle
@@ -61,15 +63,19 @@ struct StringValue {
   bool operator==(const StringValue& other) const { return Eq(other); }
   // !=
   bool Ne(const StringValue& other) const { return !Eq(other); }
+  bool operator!=(const StringValue& other) const { return Ne(other); }
   // <=
   bool Le(const StringValue& other) const { return Compare(other) <= 0; }
+  bool operator<=(const StringValue& other) const { return Le(other); }
   // >=
   bool Ge(const StringValue& other) const { return Compare(other) >= 0; }
+  bool operator>=(const StringValue& other) const { return Ge(other); }
   // <
   bool Lt(const StringValue& other) const { return Compare(other) < 0; }
   bool operator<(const StringValue& other) const { return Lt(other); }
   // >
   bool Gt(const StringValue& other) const { return Compare(other) > 0; }
+  bool operator>(const StringValue& other) const { return Gt(other); }
 
   std::string DebugString() const;
 
@@ -86,10 +92,18 @@ struct StringValue {
   // Trims leading and trailing spaces.
   StringValue Trim() const;
 
+  void ToStringVal(impala_udf::StringVal* sv) const {
+    *sv = impala_udf::StringVal(reinterpret_cast<uint8_t*>(ptr), len);
+  }
+
+  static StringValue FromStringVal(const impala_udf::StringVal& sv) {
+    return StringValue(reinterpret_cast<char*>(sv.ptr), sv.len);
+  }
+
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 };
-  
+
 // This function must be called 'hash_value' to be picked up by boost.
 inline std::size_t hash_value(const StringValue& v) {
   return HashUtil::Hash(v.ptr, v.len, 0);

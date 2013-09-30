@@ -5,19 +5,19 @@ from functional.testtbl
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
@@ -26,12 +26,12 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -42,11 +42,11 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -57,19 +57,19 @@ from functional.testtbl
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: id, zip
@@ -78,12 +78,12 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -94,11 +94,11 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -109,29 +109,29 @@ from functional.testtbl
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(if(id IS NULL, NULL, zip))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(if(id IS NULL, NULL, zip)))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: id, zip
@@ -140,17 +140,17 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge)
   |  output: COUNT(if(id IS NULL, NULL, zip))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
-  4:AGGREGATE
+  |  group by:
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   3:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -161,11 +161,11 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: id, zip
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0 size=0B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -177,24 +177,24 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  group by: tinyint_col, int_col, bigint_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -203,17 +203,17 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
   |  group by: tinyint_col, int_col, bigint_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   3:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -224,11 +224,11 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tinyint_col, int_col, bigint_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -250,24 +250,24 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col)
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -276,17 +276,17 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col)
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   3:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -297,11 +297,11 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -324,25 +324,25 @@ from functional.alltypesagg group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  output: MIN(smallint_col), MAX(string_col)
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -351,18 +351,18 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
   |  output: MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   3:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -374,11 +374,11 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: MIN(smallint_col), MAX(string_col)
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -400,25 +400,25 @@ from functional.alltypesagg group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -427,18 +427,18 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col
-  |  tuple ids: 2 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 2
+  |
+  4:AGGREGATE (merge)
   |  output: SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   3:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -450,11 +450,11 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   |  group by: tinyint_col, int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10 size=743.67KB
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -482,33 +482,33 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    COUNT(int_col) = COUNT(bigint_col)
-  |  tuple ids: 2 6 
-  |  
-  |----5:AGGREGATE
+  |  tuple ids: 2 6
+  |
+  |----5:AGGREGATE (merge finalize)
   |    |  output: COUNT(bigint_col)
-  |    |  group by: 
-  |    |  tuple ids: 6 
-  |    |  
+  |    |  group by:
+  |    |  tuple ids: 6
+  |    |
   |    4:AGGREGATE
   |    |  group by: bigint_col
-  |    |  tuple ids: 5 
-  |    |  
+  |    |  tuple ids: 5
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B
-  |       tuple ids: 4 
-  |    
-  2:AGGREGATE
+  |       tuple ids: 4
+  |
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col)
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   1:AGGREGATE
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -517,18 +517,18 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    COUNT(int_col) = COUNT(bigint_col)
-  |  tuple ids: 2 6 
-  |  
+  |  tuple ids: 2 6
+  |
   |----15:EXCHANGE
-  |       tuple ids: 6 
-  |    
-  10:AGGREGATE
+  |       tuple ids: 6
+  |
+  10:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(int_col))
-  |  group by: 
-  |  tuple ids: 2 
-  |  
+  |  group by:
+  |  tuple ids: 2
+  |
   9:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -537,13 +537,13 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 15
     UNPARTITIONED
 
-  14:AGGREGATE
+  14:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(bigint_col))
-  |  group by: 
-  |  tuple ids: 6 
-  |  
+  |  group by:
+  |  tuple ids: 6
+  |
   13:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: bigint_col
@@ -552,17 +552,17 @@ PLAN FRAGMENT 2
     EXCHANGE ID: 13
     UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (merge)
   |  output: COUNT(bigint_col)
-  |  group by: 
-  |  tuple ids: 6 
-  |  
-  12:AGGREGATE
+  |  group by:
+  |  tuple ids: 6
+  |
+  12:AGGREGATE (merge)
   |  group by: bigint_col
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   11:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -573,11 +573,11 @@ PLAN FRAGMENT 3
 
   4:AGGREGATE
   |  group by: bigint_col
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: HASH_PARTITIONED: int_col
@@ -586,17 +586,17 @@ PLAN FRAGMENT 4
     EXCHANGE ID: 9
     UNPARTITIONED
 
-  2:AGGREGATE
+  2:AGGREGATE (merge)
   |  output: COUNT(int_col)
-  |  group by: 
-  |  tuple ids: 2 
-  |  
-  8:AGGREGATE
+  |  group by:
+  |  tuple ids: 2
+  |
+  8:AGGREGATE (merge)
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   7:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -607,11 +607,11 @@ PLAN FRAGMENT 5
 
   1:AGGREGATE
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115

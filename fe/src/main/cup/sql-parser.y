@@ -260,7 +260,6 @@ nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
-nonterminal ArrayList<Expr> func_arg_list;
 nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal ArrayList<String> optional_ident_list;
@@ -278,8 +277,8 @@ nonterminal Expr cast_expr, case_else_clause, aggregate_expr;
 nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
-nonterminal AggregateParamsList aggregate_param_list;
-nonterminal AggregateExpr.Operator aggregate_operator;
+nonterminal FunctionParams function_params;
+nonterminal BuiltinAggregateFunction.Operator aggregate_operator;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
 nonterminal ArrayList<ViewRef> with_table_ref_list;
@@ -1563,10 +1562,10 @@ non_pred_expr ::=
   {: RESULT = l; :}
   | function_name:fn_name LPAREN RPAREN
   {: RESULT = new FunctionCallExpr(fn_name, new ArrayList<Expr>()); :}
-  | function_name:fn_name LPAREN func_arg_list:exprs RPAREN
-  {: RESULT = new FunctionCallExpr(fn_name, exprs); :}
+  | function_name:fn_name LPAREN function_params:params RPAREN
+  {: RESULT = new FunctionCallExpr(fn_name, params); :}
   /* Since "IF" is a keyword, need to special case this function */
-  | KW_IF LPAREN func_arg_list:exprs RPAREN
+  | KW_IF LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
   | cast_expr:c
   {: RESULT = c; :}
@@ -1584,20 +1583,6 @@ non_pred_expr ::=
   {:
     e.setPrintSqlInParens(true);
     RESULT = e;
-  :}
-  ;
-
-func_arg_list ::=
-  expr:item
-  {:
-    ArrayList<Expr> list = new ArrayList<Expr>();
-    list.add(item);
-    RESULT = list;
-  :}
-  | func_arg_list:list COMMA expr:item
-  {:
-    list.add(item);
-    RESULT = list;
   :}
   ;
 
@@ -1648,7 +1633,7 @@ timestamp_arithmetic_expr ::=
   // func_arg_list on COMMA, and report an error if the list contains more than one expr.
   // Although we don't want to accept function names as the expr, we can't parse it
   // it as just an IDENT due to the precedence conflict with function_name.
-  | function_name:functionName LPAREN func_arg_list:l COMMA
+  | function_name:functionName LPAREN expr_list:l COMMA
     KW_INTERVAL expr:v IDENT:u RPAREN
   {:
     if (l.size() > 1) {
@@ -1696,43 +1681,42 @@ literal ::=
   ;
 
 aggregate_expr ::=
-  aggregate_operator:op LPAREN aggregate_param_list:params RPAREN
+  aggregate_operator:op LPAREN function_params:params RPAREN
   {:
-    RESULT = new AggregateExpr((AggregateExpr.Operator) op,
-        params.isStar(), params.isDistinct(), params.exprs());
+    RESULT = new FunctionCallExpr(op, params);
   :}
   ;
 
 aggregate_operator ::=
   KW_COUNT
-  {: RESULT = AggregateExpr.Operator.COUNT; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.COUNT; :}
   | KW_MIN
-  {: RESULT = AggregateExpr.Operator.MIN; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.MIN; :}
   | KW_MAX
-  {: RESULT = AggregateExpr.Operator.MAX; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.MAX; :}
   | KW_DISTINCTPC
-  {: RESULT = AggregateExpr.Operator.DISTINCT_PC; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.DISTINCT_PC; :}
   | KW_DISTINCTPCSA
-  {: RESULT = AggregateExpr.Operator.DISTINCT_PCSA; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.DISTINCT_PCSA; :}
   | KW_SUM
-  {: RESULT = AggregateExpr.Operator.SUM; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.SUM; :}
   | KW_AVG
-  {: RESULT = AggregateExpr.Operator.AVG; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.AVG; :}
   | KW_GROUP_CONCAT
-  {: RESULT = AggregateExpr.Operator.GROUP_CONCAT; :}
+  {: RESULT = BuiltinAggregateFunction.Operator.GROUP_CONCAT; :}
   ;
 
-aggregate_param_list ::=
+function_params ::=
   STAR
-  {: RESULT = AggregateParamsList.createStarParam(); :}
+  {: RESULT = FunctionParams.createStarParam(); :}
   | KW_ALL STAR
-  {: RESULT = AggregateParamsList.createStarParam(); :}
+  {: RESULT = FunctionParams.createStarParam(); :}
   | expr_list:exprs
-  {: RESULT = new AggregateParamsList(false, exprs); :}
+  {: RESULT = new FunctionParams(false, exprs); :}
   | KW_ALL expr_list:exprs
-  {: RESULT = new AggregateParamsList(false, exprs); :}
+  {: RESULT = new FunctionParams(false, exprs); :}
   | KW_DISTINCT:distinct expr_list:exprs
-  {: RESULT = new AggregateParamsList(true, exprs); :}
+  {: RESULT = new FunctionParams(true, exprs); :}
   ;
 
 predicate ::=
@@ -1806,9 +1790,9 @@ between_predicate ::=
   ;
 
 in_predicate ::=
-  expr:e KW_IN LPAREN func_arg_list:l RPAREN
+  expr:e KW_IN LPAREN expr_list:l RPAREN
   {: RESULT = new InPredicate(e, l, false); :}
-  | expr:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
+  | expr:e KW_NOT KW_IN LPAREN expr_list:l RPAREN
   {: RESULT = new InPredicate(e, l, true); :}
   ;
 

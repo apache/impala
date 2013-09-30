@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -428,7 +429,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "couldn't resolve column reference");
     AnalyzesOk("select * from functional.testtbl where true");
     AnalysisError("select * from functional.testtbl where count(*) > 0",
-        "aggregation function not allowed in WHERE clause");
+        "aggregate function not allowed in WHERE clause");
     // NULL and bool literal in binary predicate.
     for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
       AnalyzesOk("select id from functional.testtbl where id " +
@@ -450,13 +451,37 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestFunctions() throws AnalysisException {
+    // Test with partition columns and substitution
+    AnalyzesOk("select year(timestamp_col), count(*) " +
+        "from functional.alltypes group by 1");
+    AnalyzesOk("select year(timestamp_col), count(*) " +
+        "from functional.alltypes group by year(timestamp_col)");
+  }
+
+  @Test
   public void TestAggregates() throws AnalysisException {
-    AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) " +
+    // Add an uda: int aggfn(int)
+    Uda uda = new Uda(new FunctionName("default", "AggFn"),
+        new FunctionArgs(Lists.newArrayList(PrimitiveType.BIGINT), false),
+        PrimitiveType.BIGINT);
+    catalog.addFunction(uda);
+
+    AnalysisError("select default.aggfn(1)",
+        "aggregation without a FROM clause is not allowed");
+    AnalyzesOk("select default.aggfn(int_col) from functional.alltypes");
+    AnalyzesOk("select count(*) from functional.testtbl");
+    AnalyzesOk("select min(id), max(id), sum(id) from functional.testtbl");
+    AnalyzesOk("select avg(id) from functional.testtbl");
+
+    AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id), aggfn(id) " +
         "from functional.testtbl");
     AnalyzesOk("select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL), " +
         "group_concat(NULL), group_concat(name, NULL) from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",
-        "aggregation function not allowed in WHERE clause");
+        "aggregate function not allowed in WHERE clause");
+    AnalysisError("select 1 from functional.alltypes where aggfn(1)",
+        "aggregate function not allowed in WHERE clause");
 
     // only count() allows '*'
     AnalysisError("select avg(*) from functional.testtbl",
@@ -485,6 +510,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // nested aggregates
     AnalysisError("select sum(count(*)) from functional.testtbl",
         "aggregate function cannot contain aggregate parameters");
+    AnalysisError("select min(aggfn(int_col)) from functional.alltypes",
+        "aggregate function cannot contain aggregate parameters: " +
+        "MIN(default.aggfn(int_col))");
 
     // wrong type
     AnalysisError("select sum(timestamp_col) from functional.alltypes",
@@ -521,10 +549,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             "GROUP_CONCAT requires second parameter to be of type STRING");
       }
     }
+
+    // Test distinct estimate
+    for (PrimitiveType type: typeToLiteralValue.keySet()) {
+      AnalyzesOk(String.format(
+          "select distinctpc(%s) from functional.alltypes",
+          typeToLiteralValue.get(type)));
+    }
   }
 
   @Test
   public void TestDistinct() throws AnalysisException {
+    AnalyzesOk("select count(distinct id) as sum_id from functional.testtbl");
     // DISTINCT
     AnalyzesOk("select count(distinct id) as sum_id from " +
         "functional.testtbl order by sum_id");

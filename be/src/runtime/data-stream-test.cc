@@ -106,7 +106,7 @@ class DataStreamTest : public testing::Test {
     // there's only one column to partition on
     TExprNode expr_node;
     expr_node.node_type = TExprNodeType::SLOT_REF;
-    expr_node.type = TPrimitiveType::BIGINT;
+    expr_node.type.type = TPrimitiveType::BIGINT;
     expr_node.num_children = 0;
     TSlotRef slot_ref;
     slot_ref.slot_id = 0;

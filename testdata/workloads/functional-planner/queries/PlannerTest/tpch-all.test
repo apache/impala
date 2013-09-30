@@ -22,7 +22,7 @@ group by
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1
@@ -45,7 +45,7 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * (1.0 - l_discount))), SUM(SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax))), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
   |  group by: l_returnflag, l_linestatus
   |  tuple ids: 1
@@ -267,7 +267,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: MIN(ps_supplycost)
   |  group by: p_partkey
   |  tuple ids: 1
@@ -282,7 +282,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: MIN(MIN(ps_supplycost))
   |  group by: p_partkey
   |  tuple ids: 1
@@ -429,7 +429,7 @@ PLAN FRAGMENT 0
   |  limit: 10
   |  tuple ids: 3
   |
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3
@@ -484,7 +484,7 @@ PLAN FRAGMENT 1
   |  limit: 10
   |  tuple ids: 3
   |
-  10:AGGREGATE
+  10:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_orderkey, o_orderdate, o_shippriority
   |  tuple ids: 3
@@ -592,7 +592,7 @@ PLAN FRAGMENT 0
   |  limit: 10
   |  tuple ids: 3
   |
-  4:AGGREGATE
+  4:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
   |  tuple ids: 3
@@ -640,12 +640,12 @@ PLAN FRAGMENT 1
   |  limit: 10
   |  tuple ids: 3
   |
-  4:AGGREGATE
+  4:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
   |  tuple ids: 3
   |
-  8:AGGREGATE
+  8:AGGREGATE (merge)
   |  group by: o_orderpriority, l_orderkey
   |  tuple ids: 2
   |
@@ -735,7 +735,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 6
   |
-  11:AGGREGATE
+  11:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
   |  tuple ids: 6
@@ -820,7 +820,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 6
   |
-  19:AGGREGATE
+  19:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: n_name
   |  tuple ids: 6
@@ -979,7 +979,7 @@ where l_shipdate >= '1994-01-01' and
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * l_discount)
   |  group by:
   |  tuple ids: 1
@@ -992,7 +992,7 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * l_discount))
   |  group by:
   |  tuple ids: 1
@@ -1066,7 +1066,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 8
   |
-  15:AGGREGATE
+  15:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
   |  tuple ids: 8
@@ -1171,7 +1171,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 8
   |
-  27:AGGREGATE
+  27:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: year(o_orderdate)
   |  tuple ids: 8
@@ -1418,7 +1418,7 @@ PLAN FRAGMENT 0
   |  limit: 200
   |  tuple ids: 6
   |
-  11:AGGREGATE
+  11:AGGREGATE (finalize)
   |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6
@@ -1502,7 +1502,7 @@ PLAN FRAGMENT 1
   |  limit: 200
   |  tuple ids: 6
   |
-  20:AGGREGATE
+  20:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity))
   |  group by: n.n_name, year(o.o_orderdate)
   |  tuple ids: 6
@@ -1701,7 +1701,7 @@ PLAN FRAGMENT 0
   |  limit: 20
   |  tuple ids: 4
   |
-  7:AGGREGATE
+  7:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4
@@ -1765,7 +1765,7 @@ PLAN FRAGMENT 1
   |  limit: 20
   |  tuple ids: 4
   |
-  14:AGGREGATE
+  14:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
   |  tuple ids: 4
@@ -1893,7 +1893,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q11_part_tmp
     overwrite=true
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  output: SUM(ps_supplycost * ps_availqty)
   |  group by: ps_partkey
   |  tuple ids: 3
@@ -1929,7 +1929,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q11_part_tmp
     overwrite=true
 
-  11:AGGREGATE
+  11:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ps_supplycost * ps_availqty))
   |  group by: ps_partkey
   |  tuple ids: 3
@@ -2024,7 +2024,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q11_sum_tmp
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(part_value)
   |  group by:
   |  tuple ids: 1
@@ -2039,7 +2039,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q11_sum_tmp
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(part_value))
   |  group by:
   |  tuple ids: 1
@@ -2103,7 +2103,7 @@ PLAN FRAGMENT 0
   |  limit: 10
   |  tuple ids: 2
   |
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   |  group by: l_shipmode
   |  tuple ids: 2
@@ -2146,7 +2146,7 @@ PLAN FRAGMENT 1
   |  limit: 10
   |  tuple ids: 2
   |
-  8:AGGREGATE
+  8:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END)), SUM(SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END))
   |  group by: l_shipmode
   |  tuple ids: 2
@@ -2241,12 +2241,12 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 4
   |
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  output: COUNT(1)
   |  group by: COUNT(o_orderkey)
   |  tuple ids: 4
   |
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: COUNT(o_orderkey)
   |  group by: c_custkey
   |  tuple ids: 2
@@ -2289,7 +2289,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 4
   |
-  11:AGGREGATE
+  11:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(1))
   |  group by: c_count
   |  tuple ids: 4
@@ -2309,7 +2309,7 @@ PLAN FRAGMENT 2
   |  group by: COUNT(o_orderkey)
   |  tuple ids: 4
   |
-  9:AGGREGATE
+  9:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(o_orderkey))
   |  group by: c_custkey
   |  tuple ids: 2
@@ -2385,7 +2385,7 @@ join tpch.part p
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
   |  tuple ids: 2
@@ -2408,7 +2408,7 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  7:AGGREGATE
+  7:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by:
   |  tuple ids: 2
@@ -2488,7 +2488,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.revenue
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
   |  tuple ids: 1
@@ -2504,7 +2504,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.revenue
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_suppkey
   |  tuple ids: 1
@@ -2539,7 +2539,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.max_revenue
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: MAX(total_revenue)
   |  group by:
   |  tuple ids: 1
@@ -2554,7 +2554,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.max_revenue
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: MAX(MAX(total_revenue))
   |  group by:
   |  tuple ids: 1
@@ -2833,7 +2833,7 @@ PLAN FRAGMENT 0
   |  limit: 1000
   |  tuple ids: 3
   |
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
   |  tuple ids: 3
@@ -2870,12 +2870,12 @@ PLAN FRAGMENT 1
   |  limit: 1000
   |  tuple ids: 3
   |
-  2:AGGREGATE
+  2:AGGREGATE (merge finalize)
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
   |  tuple ids: 3
   |
-  5:AGGREGATE
+  5:AGGREGATE (merge)
   |  group by: p_brand, p_type, p_size, ps_suppkey
   |  tuple ids: 2
   |
@@ -2910,7 +2910,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.lineitem_tmp
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_quantity), COUNT(l_quantity)
   |  group by: l_partkey
   |  tuple ids: 1
@@ -2925,7 +2925,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.lineitem_tmp
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity)), SUM(COUNT(l_quantity))
   |  group by: l_partkey
   |  tuple ids: 1
@@ -2965,7 +2965,7 @@ where
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice)
   |  group by:
   |  tuple ids: 3
@@ -2999,7 +2999,7 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  9:AGGREGATE
+  9:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice))
   |  group by:
   |  tuple ids: 3
@@ -3077,7 +3077,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q18_tmp
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: l_orderkey
   |  tuple ids: 1
@@ -3092,7 +3092,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q18_tmp
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: l_orderkey
   |  tuple ids: 1
@@ -3151,7 +3151,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 4
   |
-  7:AGGREGATE
+  7:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
   |  tuple ids: 4
@@ -3214,7 +3214,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 4
   |
-  14:AGGREGATE
+  14:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
   |  tuple ids: 4
@@ -3346,7 +3346,7 @@ or
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
   |  tuple ids: 2
@@ -3369,7 +3369,7 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by:
   |  tuple ids: 2
@@ -3437,7 +3437,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp1
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: p_partkey
   |  tuple ids: 1
   |
@@ -3452,7 +3452,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp1
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  group by: p_partkey
   |  tuple ids: 1
   |
@@ -3495,7 +3495,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp2
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: l_partkey, l_suppkey
   |  tuple ids: 1
@@ -3511,7 +3511,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp2
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: l_partkey, l_suppkey
   |  tuple ids: 1
@@ -3644,7 +3644,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp4
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: ps_suppkey
   |  tuple ids: 1
   |
@@ -3659,7 +3659,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q20_tmp4
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  group by: ps_suppkey
   |  tuple ids: 1
   |
@@ -3839,7 +3839,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 6
   |
-  11:AGGREGATE
+  11:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: s_name
   |  tuple ids: 6
@@ -3927,7 +3927,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 6
   |
-  20:AGGREGATE
+  20:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: s_name
   |  tuple ids: 6
@@ -4096,7 +4096,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     overwrite=true
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
   |  group by: substr(c_name, 1, 1)
   |  tuple ids: 1
@@ -4112,7 +4112,7 @@ PLAN FRAGMENT 0
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     overwrite=true
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(c_acctbal)), SUM(COUNT(c_acctbal))
   |  group by: substr(c_name, 1, 1)
   |  tuple ids: 1
@@ -4175,7 +4175,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 3
   |
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  output: COUNT(*), SUM(c_acctbal)
   |  group by: substring(c_phone, 1, 2)
   |  tuple ids: 3
@@ -4230,7 +4230,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 3
   |
-  11:AGGREGATE
+  11:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), SUM(SUM(c_acctbal))
   |  group by: substring(c_phone, 1, 2)
   |  tuple ids: 3

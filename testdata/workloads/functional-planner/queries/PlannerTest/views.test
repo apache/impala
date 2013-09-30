@@ -36,7 +36,7 @@ PLAN FRAGMENT 0
   |  limit: 100
   |  tuple ids: 2
   |
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  output: COUNT(a.bigint_col)
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1
@@ -80,7 +80,7 @@ PLAN FRAGMENT 1
   |  limit: 100
   |  tuple ids: 2
   |
-  7:AGGREGATE
+  7:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.bigint_col))
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1
@@ -255,7 +255,7 @@ PLAN FRAGMENT 0
   |    |  limit: 100
   |    |  tuple ids: 7
   |    |
-  |    6:AGGREGATE
+  |    6:AGGREGATE (finalize)
   |    |  output: COUNT(a.bigint_col)
   |    |  group by: b.string_col
   |    |  having: COUNT(a.bigint_col) > 1
@@ -353,7 +353,7 @@ PLAN FRAGMENT 3
   |  limit: 100
   |  tuple ids: 7
   |
-  12:AGGREGATE
+  12:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(a.bigint_col))
   |  group by: b.string_col
   |  having: COUNT(a.bigint_col) > 1

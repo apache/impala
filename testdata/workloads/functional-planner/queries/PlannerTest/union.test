@@ -9,25 +9,25 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -37,11 +37,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -51,11 +51,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -65,11 +65,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -89,32 +89,32 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   |----3:TOP-N
   |    |  order by: int_col ASC
   |    |  limit: 1
-  |    |  tuple ids: 1 
-  |    |  
+  |    |  tuple ids: 1
+  |    |
   |    2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
   |       limit: 1
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
      limit: 1
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -124,11 +124,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   8:EXCHANGE
      limit: 1
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -140,7 +140,7 @@ PLAN FRAGMENT 2
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
      limit: 1
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -150,15 +150,15 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   7:TOP-N
   |  order by: int_col ASC
   |  limit: 1
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   6:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -170,11 +170,11 @@ PLAN FRAGMENT 4
   3:TOP-N
   |  order by: int_col ASC
   |  limit: 1
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: UNPARTITIONED
@@ -184,11 +184,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   5:EXCHANGE
      limit: 1
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -200,7 +200,7 @@ PLAN FRAGMENT 6
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
      limit: 1
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -219,34 +219,34 @@ select * from functional.alltypestiny where year=2009 and month=2
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   0:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   5:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -256,11 +256,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -270,11 +270,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -284,11 +284,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -311,21 +311,21 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -336,7 +336,7 @@ PLAN FRAGMENT 1
 
   6:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -346,11 +346,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -360,11 +360,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   4:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -383,31 +383,31 @@ select 1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as ti
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   4:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -418,7 +418,7 @@ PLAN FRAGMENT 1
 
   7:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -428,11 +428,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -442,11 +442,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -462,7 +462,7 @@ union all
 select * from functional.alltypestiny where year=2009 and month=2
 union distinct
 (select * from functional.alltypestiny where year=2009 and month=2)
-order by 3 limit 3 
+order by 3 limit 3
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -470,30 +470,30 @@ PLAN FRAGMENT 0
   6:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 4 
-  |  
-  5:AGGREGATE
+  |  tuple ids: 4
+  |
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -501,14 +501,14 @@ PLAN FRAGMENT 0
   6:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 4 
-  |  
-  5:AGGREGATE
+  |  tuple ids: 4
+  |
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   7:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -518,11 +518,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -532,11 +532,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -546,11 +546,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -560,11 +560,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -591,33 +591,33 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 3
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----6:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
-  3:AGGREGATE
+  |       tuple ids: 3
+  |
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -625,10 +625,10 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 3
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   11:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -638,11 +638,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   14:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -652,11 +652,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -666,14 +666,14 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 4 
-  |  
-  3:AGGREGATE
+  |  tuple ids: 4
+  |
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -683,11 +683,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -697,11 +697,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -728,33 +728,33 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 4
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----6:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
-  4:AGGREGATE
+  |       tuple ids: 3
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -762,10 +762,10 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC, smallint_col ASC
   |  limit: 4
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   12:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -775,11 +775,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   14:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -789,14 +789,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 4 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -806,11 +806,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -820,11 +820,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -834,11 +834,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -860,25 +860,25 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -888,11 +888,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -902,11 +902,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -916,11 +916,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -940,25 +940,25 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -968,11 +968,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -982,11 +982,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -996,11 +996,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   5:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1019,34 +1019,34 @@ select * from functional.alltypestiny where year=2009 and month=1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1056,11 +1056,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1070,11 +1070,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1084,11 +1084,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1107,34 +1107,34 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1144,11 +1144,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1158,11 +1158,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1172,11 +1172,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1185,44 +1185,44 @@ NODE 2:
 NODE 3:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ====
-// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
+// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
 // first operand is nested
 (select * from functional.alltypestiny where year=2009 and month=1
  union distinct
  select * from functional.alltypestiny where year=2009 and month=2)
 union all
-select * from functional.alltypestiny where year=2009 and month=1  
+select * from functional.alltypestiny where year=2009 and month=1
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
-  4:AGGREGATE
+  |       tuple ids: 3
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1232,11 +1232,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -1246,14 +1246,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   6:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1263,11 +1263,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1277,11 +1277,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1302,32 +1302,32 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
-  |----5:AGGREGATE
+  |  tuple ids: 4
+  |
+  |----5:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -1337,14 +1337,14 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
-  5:AGGREGATE
+  |  tuple ids: 4
+  |
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   6:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1354,11 +1354,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1368,11 +1368,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1382,11 +1382,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1395,7 +1395,7 @@ NODE 3:
 NODE 4:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ====
-// Union unnesting: UNION ALL absorbs the children but not directly the operands 
+// Union unnesting: UNION ALL absorbs the children but not directly the operands
 // of a nested union with mixed ALL/DISTINCT, first operand is nested
 (select * from functional.alltypestiny where year=2009 and month=1
  union distinct
@@ -1409,36 +1409,36 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----6:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----7:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
-  4:AGGREGATE
+  |       tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   1:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   11:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1448,11 +1448,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   14:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   7:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1462,11 +1462,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -1476,14 +1476,14 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 5 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 5
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   8:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1493,11 +1493,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1507,11 +1507,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1522,7 +1522,7 @@ NODE 6:
 NODE 7:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
 ====
-// Union unnesting: UNION ALL absorbs the children but not directly the operands 
+// Union unnesting: UNION ALL absorbs the children but not directly the operands
 // of a nested union with mixed ALL/DISTINCT, second operand is nested
 select * from functional.alltypestiny where year=2009 and month=1
 union all
@@ -1536,36 +1536,36 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 5 
-  |  
-  |----5:AGGREGATE
+  |  tuple ids: 5
+  |
+  |----5:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |  tuple ids: 4 
-  |    |  
+  |    |  tuple ids: 4
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 4 
-  |    |  
+  |    |  tuple ids: 4
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----7:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   11:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1575,11 +1575,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   14:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   7:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -1589,14 +1589,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 5 
-  |  
-  5:AGGREGATE
+  |  tuple ids: 5
+  |
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1606,11 +1606,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1620,11 +1620,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1634,11 +1634,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1649,7 +1649,7 @@ NODE 4:
 NODE 7:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ====
-// Union unnesting: UNION ALL doesn't absorb the children of a nested union  
+// Union unnesting: UNION ALL doesn't absorb the children of a nested union
 // with mixed ALL/DISTINCT and limit, second operand is nested
 select * from functional.alltypestiny where year=2009 and month=1
 union all
@@ -1664,40 +1664,40 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----6:MERGE
   |    |  limit: 10
-  |    |  tuple ids: 4 
-  |    |  
+  |    |  tuple ids: 4
+  |    |
   |    |----7:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 3 
-  |    |    
-  |    5:AGGREGATE
+  |    |       tuple ids: 3
+  |    |
+  |    5:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |  tuple ids: 4 
-  |    |  
+  |    |  tuple ids: 4
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 4 
-  |    |  
+  |    |  tuple ids: 4
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   14:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -1707,11 +1707,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   16:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   11:EXCHANGE
      limit: 10
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1722,11 +1722,11 @@ PLAN FRAGMENT 2
 
   13:MERGE
   |  limit: 10
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   7:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -1737,14 +1737,14 @@ PLAN FRAGMENT 3
 
   12:MERGE
   |  limit: 10
-  |  tuple ids: 4 
-  |  
-  5:AGGREGATE
+  |  tuple ids: 4
+  |
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1754,11 +1754,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1768,11 +1768,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1782,11 +1782,11 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   15:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1804,39 +1804,39 @@ NODE 7:
  (select * from functional.alltypestiny where year=2009 and month=2)
  order by 3 limit 3)
 union all
-select * from functional.alltypestiny where year=2009 and month=1  
+select * from functional.alltypestiny where year=2009 and month=1
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1846,11 +1846,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -1860,15 +1860,15 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   6:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1878,11 +1878,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1892,11 +1892,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -1918,33 +1918,33 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -1954,15 +1954,15 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   6:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1972,11 +1972,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1986,11 +1986,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2000,11 +2000,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2024,34 +2024,34 @@ select * from functional.alltypestiny where year=2009 and month=1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2061,11 +2061,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2075,11 +2075,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2089,11 +2089,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2113,34 +2113,34 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  4:AGGREGATE
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2150,11 +2150,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2164,11 +2164,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2178,11 +2178,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2204,38 +2204,38 @@ select * from functional.alltypestiny where year=2009 and month=1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2245,11 +2245,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2259,11 +2259,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2273,11 +2273,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2287,11 +2287,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2315,38 +2315,38 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  5:AGGREGATE
+  5:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2356,11 +2356,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2370,11 +2370,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2384,11 +2384,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2398,11 +2398,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2420,47 +2420,47 @@ NODE 4:
  (select * from functional.alltypestiny where year=2009 and month=2)
  order by 3 limit 3)
 union distinct
-select * from functional.alltypestiny where year=2009 and month=1  
+select * from functional.alltypestiny where year=2009 and month=1
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   4:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   10:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2470,11 +2470,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -2484,15 +2484,15 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   7:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2502,11 +2502,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2516,11 +2516,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2541,42 +2541,42 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----5:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 3 
-  |    |  
+  |    |  tuple ids: 3
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   10:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -2586,15 +2586,15 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   7:EXCHANGE
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2604,11 +2604,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2618,11 +2618,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2632,11 +2632,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2660,33 +2660,33 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2696,11 +2696,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2710,11 +2710,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2724,11 +2724,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2738,11 +2738,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2752,11 +2752,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2783,42 +2783,42 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   0:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  6:AGGREGATE
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   7:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2828,11 +2828,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2842,11 +2842,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2856,11 +2856,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2870,11 +2870,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2884,11 +2884,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -2917,52 +2917,52 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
-  |  tuple ids: 8 
-  |  
-  |----10:AGGREGATE
+  |  tuple ids: 8
+  |
+  |----10:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |  tuple ids: 7 
-  |    |  
+  |    |  tuple ids: 7
+  |    |
   |    2:MERGE
-  |    |  tuple ids: 7 
-  |    |  
+  |    |  tuple ids: 7
+  |    |
   |    |----4:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 2 
-  |    |    
+  |    |       tuple ids: 2
+  |    |
   |    |----9:TOP-N
   |    |    |  order by: tinyint_col ASC
   |    |    |  limit: 3
-  |    |    |  tuple ids: 5 
-  |    |    |  
-  |    |    8:AGGREGATE
+  |    |    |  tuple ids: 5
+  |    |    |
+  |    |    8:AGGREGATE (finalize)
   |    |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |    |  tuple ids: 5 
-  |    |    |  
+  |    |    |  tuple ids: 5
+  |    |    |
   |    |    5:MERGE
-  |    |    |  tuple ids: 5 
-  |    |    |  
+  |    |    |  tuple ids: 5
+  |    |    |
   |    |    |----7:SCAN HDFS
   |    |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |    |       tuple ids: 4 
-  |    |    |    
+  |    |    |       tuple ids: 4
+  |    |    |
   |    |    6:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 3 
-  |    |    
+  |    |       tuple ids: 3
+  |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   18:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -2972,14 +2972,14 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   20:MERGE
-  |  tuple ids: 8 
-  |  
-  10:AGGREGATE
+  |  tuple ids: 8
+  |
+  10:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 7 
-  |  
+  |  tuple ids: 7
+  |
   14:EXCHANGE
-     tuple ids: 7 
+     tuple ids: 7
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -2989,19 +2989,19 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   17:MERGE
-  |  tuple ids: 7 
-  |  
+  |  tuple ids: 7
+  |
   9:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 5 
-  |  
-  8:AGGREGATE
+  |  tuple ids: 5
+  |
+  8:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   11:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3011,11 +3011,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   7:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3025,11 +3025,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -3039,11 +3039,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   16:MERGE
-  |  tuple ids: 7 
-  |  
+  |  tuple ids: 7
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -3053,11 +3053,11 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   15:MERGE
-  |  tuple ids: 7 
-  |  
+  |  tuple ids: 7
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -3067,11 +3067,11 @@ PLAN FRAGMENT 7
     UNPARTITIONED
 
   19:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3099,54 +3099,54 @@ union distinct
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  9:AGGREGATE
+  9:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   0:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----8:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
-  |    |  tuple ids: 5 
-  |    |  
-  |    7:AGGREGATE
+  |    |  tuple ids: 5
+  |    |
+  |    7:AGGREGATE (finalize)
   |    |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |    |  tuple ids: 5 
-  |    |  
+  |    |  tuple ids: 5
+  |    |
   |    4:MERGE
-  |    |  tuple ids: 5 
-  |    |  
+  |    |  tuple ids: 5
+  |    |
   |    |----6:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 4 
-  |    |    
+  |    |       tuple ids: 4
+  |    |
   |    5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  9:AGGREGATE
+  9:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   13:EXCHANGE
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -3156,19 +3156,19 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   17:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   8:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 5 
-  |  
-  7:AGGREGATE
+  |  tuple ids: 5
+  |
+  7:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   10:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3178,11 +3178,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3192,11 +3192,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3206,11 +3206,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   16:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -3220,11 +3220,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   15:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -3234,11 +3234,11 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   14:MERGE
-  |  tuple ids: 8 
-  |  
+  |  tuple ids: 8
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3270,78 +3270,78 @@ union all
   (select * from functional.alltypestiny where year=2009 and month=4
    union all
    (select * from functional.alltypestiny where year=2009 and month=5)
-   order by 3 limit 3)        
+   order by 3 limit 3)
 ---- PLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   |----10:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 7 
-  |    
+  |       tuple ids: 7
+  |
   |----11:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 8 
-  |    
+  |       tuple ids: 8
+  |
   |----15:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
-  |    |  tuple ids: 12 
-  |    |  
+  |    |  tuple ids: 12
+  |    |
   |    12:MERGE
-  |    |  tuple ids: 12 
-  |    |  
+  |    |  tuple ids: 12
+  |    |
   |    |----14:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=0 size=0B
-  |    |       tuple ids: 11 
-  |    |    
+  |    |       tuple ids: 11
+  |    |
   |    13:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 10 
-  |    
-  8:AGGREGATE
+  |       tuple ids: 10
+  |
+  8:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   0:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 2 
-  |    
+  |       tuple ids: 2
+  |
   |----7:TOP-N
   |    |  order by: tinyint_col ASC
   |    |  limit: 3
-  |    |  tuple ids: 6 
-  |    |  
+  |    |  tuple ids: 6
+  |    |
   |    4:MERGE
-  |    |  tuple ids: 6 
-  |    |  
+  |    |  tuple ids: 6
+  |    |
   |    |----6:SCAN HDFS
   |    |       table=functional.alltypestiny #partitions=1 size=115B
-  |    |       tuple ids: 5 
-  |    |    
+  |    |       tuple ids: 5
+  |    |
   |    5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   27:EXCHANGE
-     tuple ids: 13 
+     tuple ids: 13
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -3351,15 +3351,15 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   31:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   15:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 12 
-  |  
+  |  tuple ids: 12
+  |
   24:EXCHANGE
-     tuple ids: 12 
+     tuple ids: 12
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3369,11 +3369,11 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   26:MERGE
-  |  tuple ids: 12 
-  |  
+  |  tuple ids: 12
+  |
   14:SCAN HDFS
      table=functional.alltypestiny #partitions=0 size=0B
-     tuple ids: 11 
+     tuple ids: 11
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3383,11 +3383,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   25:MERGE
-  |  tuple ids: 12 
-  |  
+  |  tuple ids: 12
+  |
   13:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 10 
+     tuple ids: 10
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3397,11 +3397,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   30:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   11:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 8 
+     tuple ids: 8
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -3411,11 +3411,11 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   29:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   10:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 7 
+     tuple ids: 7
 
 PLAN FRAGMENT 6
   PARTITION: UNPARTITIONED
@@ -3425,14 +3425,14 @@ PLAN FRAGMENT 6
     UNPARTITIONED
 
   28:MERGE
-  |  tuple ids: 13 
-  |  
-  8:AGGREGATE
+  |  tuple ids: 13
+  |
+  8:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   19:EXCHANGE
-     tuple ids: 13 
+     tuple ids: 13
 
 PLAN FRAGMENT 7
   PARTITION: UNPARTITIONED
@@ -3442,15 +3442,15 @@ PLAN FRAGMENT 7
     UNPARTITIONED
 
   23:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   7:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   16:EXCHANGE
-     tuple ids: 6 
+     tuple ids: 6
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -3460,11 +3460,11 @@ PLAN FRAGMENT 8
     UNPARTITIONED
 
   18:MERGE
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   6:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 9
   PARTITION: RANDOM
@@ -3474,11 +3474,11 @@ PLAN FRAGMENT 9
     UNPARTITIONED
 
   17:MERGE
-  |  tuple ids: 6 
-  |  
+  |  tuple ids: 6
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 10
   PARTITION: RANDOM
@@ -3488,11 +3488,11 @@ PLAN FRAGMENT 10
     UNPARTITIONED
 
   22:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 11
   PARTITION: RANDOM
@@ -3502,11 +3502,11 @@ PLAN FRAGMENT 11
     UNPARTITIONED
 
   21:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 12
   PARTITION: RANDOM
@@ -3516,11 +3516,11 @@ PLAN FRAGMENT 12
     UNPARTITIONED
 
   20:MERGE
-  |  tuple ids: 13 
-  |  
+  |  tuple ids: 13
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3555,25 +3555,25 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 5
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
+  |       tuple ids: 4
+  |
   1:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3581,10 +3581,10 @@ PLAN FRAGMENT 0
   5:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 5
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   9:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3594,11 +3594,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   11:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -3608,10 +3608,10 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   6:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3621,11 +3621,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   8:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3635,11 +3635,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   7:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3663,33 +3663,33 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 5 
-  |  
-  6:AGGREGATE
+  |  tuple ids: 5
+  |
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   0:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   |----5:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 4 
-  |    
-  4:AGGREGATE
+  |       tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
@@ -3697,14 +3697,14 @@ PLAN FRAGMENT 0
   7:TOP-N
   |  order by: tinyint_col ASC
   |  limit: 3
-  |  tuple ids: 5 
-  |  
-  6:AGGREGATE
+  |  tuple ids: 5
+  |
+  6:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   11:EXCHANGE
-     tuple ids: 5 
+     tuple ids: 5
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3714,11 +3714,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 5 
-  |  
+  |  tuple ids: 5
+  |
   5:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -3728,14 +3728,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   12:MERGE
-  |  tuple ids: 5 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 5
+  |
+  4:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   8:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3745,11 +3745,11 @@ PLAN FRAGMENT 3
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3759,11 +3759,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3784,21 +3784,21 @@ PLAN FRAGMENT 0
 
   0:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3809,11 +3809,11 @@ PLAN FRAGMENT 1
 
   5:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3824,11 +3824,11 @@ PLAN FRAGMENT 2
 
   4:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3845,31 +3845,31 @@ where x.int_col < 5 and x.bool_col = false
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   0:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----2:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 1 
-  |    
+  |       tuple ids: 1
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (finalize)
   |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   4:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3880,11 +3880,11 @@ PLAN FRAGMENT 1
 
   6:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3895,11 +3895,11 @@ PLAN FRAGMENT 2
 
   5:MERGE
   |  predicates: int_col < 5, bool_col = FALSE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
@@ -3918,14 +3918,14 @@ PLAN FRAGMENT 0
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ====
 // UNION DISTINCT with only constant selects
 select 1, 'a', NULL, 10.0f
@@ -3937,24 +3937,24 @@ select 3, 'c', NULL, 30.0f
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 0 
-  |  
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 0 
-  |  
+  |  tuple ids: 0
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 0 
+     tuple ids: 0
 ====
 // UNION ALL/DISTINCT with mixed constant selects and non-constant selects
 select 1, 'a', NULL, 10.f
@@ -3969,29 +3969,29 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4 size=460B
-  |       tuple ids: 1 
-  |    
-  2:AGGREGATE
+  |       tuple ids: 1
+  |
+  2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4001,11 +4001,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   4:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -4015,14 +4015,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 2 
-  |  
-  2:AGGREGATE
+  |  tuple ids: 2
+  |
+  2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   5:EXCHANGE
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -4033,7 +4033,7 @@ PLAN FRAGMENT 3
 
   7:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 2 
+     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -4043,11 +4043,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 2 
-  |  
+  |  tuple ids: 2
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 // UNION ALL/DISTINCT with mixed constant selects and non-constant selects and nested unions
 (select 500
@@ -4058,7 +4058,7 @@ PLAN FRAGMENT 4
   select 500)
 )
 union distinct
-select int_col from functional.alltypestiny where year=2009 and month=1  
+select int_col from functional.alltypestiny where year=2009 and month=1
 union all
 select 503
 ---- PLAN
@@ -4067,34 +4067,34 @@ PLAN FRAGMENT 0
 
   5:MERGE
   |  merging 1 SELECT CONSTANT
-  |  tuple ids: 4 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: 500
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=1 size=115B
-  |       tuple ids: 3 
-  |    
+  |       tuple ids: 3
+  |
   2:TOP-N
   |  order by: int_col ASC
   |  limit: 3
-  |  tuple ids: 0 
-  |  
+  |  tuple ids: 0
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -4105,7 +4105,7 @@ PLAN FRAGMENT 1
 
   14:MERGE
      merging 1 SELECT CONSTANT
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -4115,14 +4115,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   13:MERGE
-  |  tuple ids: 4 
-  |  
-  4:AGGREGATE
+  |  tuple ids: 4
+  |
+  4:AGGREGATE (finalize)
   |  group by: 500
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -4133,7 +4133,7 @@ PLAN FRAGMENT 3
 
   11:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -4143,11 +4143,11 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 5
   PARTITION: UNPARTITIONED
@@ -4157,15 +4157,15 @@ PLAN FRAGMENT 5
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   7:TOP-N
   |  order by: int_col ASC
   |  limit: 3
-  |  tuple ids: 0 
-  |  
+  |  tuple ids: 0
+  |
   6:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -4177,11 +4177,11 @@ PLAN FRAGMENT 6
   2:TOP-N
   |  order by: int_col ASC
   |  limit: 3
-  |  tuple ids: 0 
-  |  
+  |  tuple ids: 0
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=1 size=115B
-     tuple ids: 0 
+     tuple ids: 0
 ====
 // UNION ALL with only values statements
 values(1, 'a', NULL, 10.f)
@@ -4195,14 +4195,14 @@ PLAN FRAGMENT 0
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 3 
+     tuple ids: 3
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 3 
+     tuple ids: 3
 ====
 // UNION DISTINCT with only values statements
 values(1, 'a', NULL, 10.0f)
@@ -4214,24 +4214,24 @@ values(3, 'c', NULL, 30.0f)
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 3 
+     tuple ids: 3
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 3 
-  |  
+  |  tuple ids: 3
+  |
   0:MERGE
      merging 3 SELECT CONSTANT
-     tuple ids: 3 
+     tuple ids: 3
 ====
 // UNION ALL/DISTINCT with mixed values statements and non-constant selects
 values(1, 'a', NULL, 10.f)
@@ -4246,29 +4246,29 @@ PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   |----4:SCAN HDFS
   |       table=functional.alltypessmall #partitions=4 size=6.32KB
-  |       tuple ids: 3 
-  |    
-  2:AGGREGATE
+  |       tuple ids: 3
+  |
+  2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   0:MERGE
   |  merging 2 SELECT CONSTANT
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 1 
+     tuple ids: 1
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4278,11 +4278,11 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   10:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   4:SCAN HDFS
      table=functional.alltypessmall #partitions=4 size=6.32KB
-     tuple ids: 3 
+     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: UNPARTITIONED
@@ -4292,14 +4292,14 @@ PLAN FRAGMENT 2
     UNPARTITIONED
 
   9:MERGE
-  |  tuple ids: 4 
-  |  
-  2:AGGREGATE
+  |  tuple ids: 4
+  |
+  2:AGGREGATE (finalize)
   |  group by: 1, 'a', null, f
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   5:EXCHANGE
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
@@ -4310,7 +4310,7 @@ PLAN FRAGMENT 3
 
   7:MERGE
      merging 2 SELECT CONSTANT
-     tuple ids: 4 
+     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -4320,9 +4320,9 @@ PLAN FRAGMENT 4
     UNPARTITIONED
 
   6:MERGE
-  |  tuple ids: 4 
-  |  
+  |  tuple ids: 4
+  |
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4 size=460B
-     tuple ids: 1 
+     tuple ids: 1
 ====

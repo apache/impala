@@ -17,34 +17,39 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 /**
- * Return value of the grammar production that parses aggregate function
- * parameters.
- *
+ * Return value of the grammar production that parses function
+ * parameters. These parameters can be for scalar or aggregate functions.
  */
-class AggregateParamsList {
+class FunctionParams {
   private final boolean isStar;
-  private final boolean isDistinct;
-  private List<Expr> exprs;
+  private boolean isDistinct;
+  private final List<Expr> exprs;
 
   // c'tor for non-star params
-  public AggregateParamsList(boolean isDistinct, List<Expr> exprs) {
-    super();
+  public FunctionParams(boolean isDistinct, List<Expr> exprs) {
     isStar = false;
     this.isDistinct = isDistinct;
     this.exprs = exprs;
   }
 
-  static public AggregateParamsList createStarParam() {
-    return new AggregateParamsList();
+  // c'tor for non-star, non-distinct params
+  public FunctionParams(List<Expr> exprs) {
+    this(false, exprs);
+  }
+
+  static public FunctionParams createStarParam() {
+    return new FunctionParams();
   }
 
   public boolean isStar() { return isStar; }
   public boolean isDistinct() { return isDistinct; }
   public List<Expr> exprs() { return exprs; }
 
+  public void setIsDistinct(boolean v) { isDistinct = v; }
+
   // c'tor for <agg>(*)
-  private AggregateParamsList() {
-    super();
+  private FunctionParams() {
+    exprs = null;
     isStar = true;
     isDistinct = false;
   }

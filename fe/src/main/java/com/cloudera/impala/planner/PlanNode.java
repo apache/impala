@@ -57,7 +57,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected final static int DEFAULT_BATCH_SIZE = 1024;
 
   // String used for this node in getExplainString().
-  protected final String displayName;
+  protected String displayName;
 
   protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
   protected long limit; // max. # of rows to be returned; 0: no limit
@@ -199,6 +199,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public String getExplainString() {
     return getExplainString("", "", TExplainLevel.NORMAL);
   }
+
+  protected void setDisplayName(String s) { displayName = s; }
 
   /**
    * Generate the explain plan tree. The plan will be in the form of:

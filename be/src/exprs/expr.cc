@@ -18,7 +18,6 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
-#include "exprs/agg-expr.h"
 #include "exprs/arithmetic-expr.h"
 #include "exprs/binary-predicate.h"
 #include "exprs/bool-literal.h"
@@ -109,8 +108,7 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
-      type_(node.__isset.col_type ?
-          ColumnType(node.col_type) :ColumnType(ThriftToType(node.type))),
+      type_(ColumnType(node.type)),
       output_scale_(-1),
       codegen_fn_(NULL),
       adapter_fn_used_(false),
@@ -265,12 +263,6 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
 
 Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr) {
   switch (texpr_node.node_type) {
-    case TExprNodeType::AGG_EXPR:
-      if (!texpr_node.__isset.agg_expr) {
-        return Status("Aggregation expression not set in thrift node");
-      }
-      *expr = pool->Add(new AggregateExpr(texpr_node));
-      return Status::OK;
     case TExprNodeType::ARITHMETIC_EXPR:
       *expr = pool->Add(new ArithmeticExpr(texpr_node));
       return Status::OK;
@@ -519,7 +511,7 @@ bool Expr::codegend_fn_thread_safe() const {
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   PrepareChildren(state, row_desc);
-  // Not all exprs have opcodes (i.e. literals, agg-exprs)
+  // Not all exprs have opcodes (i.e. literals)
   DCHECK(opcode_ != TExprOpcode::INVALID_OPCODE);
   void* compute_fn_ptr =
       OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);

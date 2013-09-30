@@ -29,7 +29,8 @@ import com.cloudera.impala.thrift.TUda;
 public class Uda extends Function {
   private ColumnType intermediateType_;
 
-  // The name inside the binary at location_ that contains this particular
+  // The name inside the binary at location_ that contains this particular.
+  // They can be null if it is not required.
   private String updateFnName_;
   private String initFnName_;
   private String serializeFnName_;

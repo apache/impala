@@ -36,6 +36,14 @@ class TestQueries(ImpalaTestSuite):
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 
+  def test_distinct_estimate(self, vector):
+    # These results will vary slightly depending on how the values get split up
+    # so only run with 1 node and on text.
+    if vector.get_value('table_format').file_format != 'text':
+      pytest.skip()
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/distinct-estimate', vector)
+
   def test_scan_range(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
 
@@ -44,12 +52,12 @@ class TestQueries(ImpalaTestSuite):
 
   def test_limit(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail("IMPALA-283 - select count(*) produces inconsistant results")
+      pytest.xfail("IMPALA-283 - select count(*) produces inconsistent results")
     self.run_test_case('QueryTest/limit', vector)
 
   def test_top_n(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistant results")
+      pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     self.run_test_case('QueryTest/top-n', vector)
 
   def test_empty(self, vector):

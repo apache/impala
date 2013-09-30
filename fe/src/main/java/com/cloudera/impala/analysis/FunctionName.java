@@ -24,7 +24,7 @@ import com.cloudera.impala.thrift.TFunctionName;
  */
 public class FunctionName {
   private String db_;
-  private final String fn_;
+  private String fn_;
 
   public FunctionName(String db, String fn) {
     db_ = db;
@@ -35,6 +35,26 @@ public class FunctionName {
   public FunctionName(String fn) {
     db_ = null;
     fn_ = fn.toLowerCase();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj instanceof FunctionName)) return false;
+    FunctionName o = (FunctionName)obj;
+    if ((db_ == null || o.db_ == null) && (db_ != o.db_)) {
+      if (db_ == null && o.db_ != null) return false;
+      if (db_ != null && o.db_ == null) return false;
+      if (!db_.equalsIgnoreCase(o.db_)) return false;
+    }
+    return fn_.equalsIgnoreCase(o.fn_);
+  }
+
+  // Same as FunctionName but for builtins and we'll leave the case
+  // as is since we aren't matching by string.
+  public static FunctionName CreateBuiltinName(String fn) {
+    FunctionName name = new FunctionName(fn);
+    name.fn_ = fn;
+    return name;
   }
 
   public FunctionName(TFunctionName thriftName) {

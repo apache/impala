@@ -6,13 +6,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HBASE
      table:stringids
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -23,7 +23,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:stringids
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -38,13 +38,13 @@ PLAN FRAGMENT 0
 
   0:SCAN HBASE
      table:alltypessmall
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -55,7 +55,7 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:alltypessmall
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -73,13 +73,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -91,7 +91,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -111,13 +111,13 @@ PLAN FRAGMENT 0
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -131,7 +131,7 @@ PLAN FRAGMENT 1
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
@@ -147,13 +147,13 @@ PLAN FRAGMENT 0
      table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -166,7 +166,7 @@ PLAN FRAGMENT 1
      table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5\0:7
@@ -183,13 +183,13 @@ PLAN FRAGMENT 0
      table:stringids
      start key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -202,7 +202,7 @@ PLAN FRAGMENT 1
      table:stringids
      start key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:7
@@ -219,13 +219,13 @@ PLAN FRAGMENT 0
      table:stringids
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -238,7 +238,7 @@ PLAN FRAGMENT 1
      table:stringids
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -255,13 +255,13 @@ PLAN FRAGMENT 0
      table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -274,7 +274,7 @@ PLAN FRAGMENT 1
      table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -292,13 +292,13 @@ PLAN FRAGMENT 0
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -312,7 +312,7 @@ PLAN FRAGMENT 1
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5
@@ -329,13 +329,13 @@ PLAN FRAGMENT 0
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -349,7 +349,7 @@ PLAN FRAGMENT 1
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5
@@ -366,13 +366,13 @@ PLAN FRAGMENT 0
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -386,7 +386,7 @@ PLAN FRAGMENT 1
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5\0
@@ -403,13 +403,13 @@ PLAN FRAGMENT 0
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -423,13 +423,13 @@ PLAN FRAGMENT 1
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
 ====
 # with aggregation
-select int_col, count(*) 
+select int_col, count(*)
 from functional_hbase.alltypessmall
 where id < 5
 group by 1
@@ -437,21 +437,21 @@ group by 1
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  1:AGGREGATE
+  1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -460,13 +460,13 @@ PLAN FRAGMENT 1
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  3:AGGREGATE
+  3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   2:EXCHANGE
-     tuple ids: 1 
+     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -478,12 +478,12 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: int_col
-  |  tuple ids: 1 
-  |  
+  |  tuple ids: 1
+  |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -499,13 +499,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -517,7 +517,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -533,13 +533,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col NOT_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -551,7 +551,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col NOT_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -566,13 +566,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -584,7 +584,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -599,13 +599,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -617,7 +617,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -632,13 +632,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS_OR_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -650,7 +650,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS_OR_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -665,13 +665,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER_OR_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -683,7 +683,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER_OR_EQUAL '4'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -699,17 +699,17 @@ PLAN FRAGMENT 0
 
   0:SCAN HBASE
      table:alltypessmall
-     hbase filters: 
+     hbase filters:
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -720,11 +720,11 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:alltypessmall
-     hbase filters: 
+     hbase filters:
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -741,13 +741,13 @@ PLAN FRAGMENT 0
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -760,7 +760,7 @@ PLAN FRAGMENT 1
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -768,7 +768,7 @@ NODE 0:
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
 # mix of predicates, functional_hbase. filters and start/stop keys
-select * from functional_hbase.stringids 
+select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
 PLAN FRAGMENT 0
@@ -780,13 +780,13 @@ PLAN FRAGMENT 0
      stop key: 5\0
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -801,7 +801,7 @@ PLAN FRAGMENT 1
      stop key: 5\0
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
@@ -815,13 +815,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -833,7 +833,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -849,13 +849,13 @@ PLAN FRAGMENT 0
   0:SCAN HBASE
      table:alltypessmall
      predicates: string_col >= date_string_col
-     tuple ids: 0 
+     tuple ids: 0
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     tuple ids: 0 
+     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -867,7 +867,7 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: string_col >= date_string_col
-     tuple ids: 0 
+     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
