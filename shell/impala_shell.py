@@ -218,6 +218,27 @@ class ImpalaShell(cmd.Cmd):
     args = self.__check_for_command_completion(' '.join(tokens).strip())
     return args.rstrip(ImpalaShell.CMD_DELIM)
 
+  def __cmd_ends_with_delim(self, line):
+    """Check if the input command ends with a command delimiter.
+
+    A command ending with the delimiter and containing an open quotation character is
+    not considered terminated. If no open quotation is found, it's considered
+    terminated.
+    """
+    if line.endswith(ImpalaShell.CMD_DELIM):
+      try:
+        # Look for an open quotation in the entire command, and not just the
+        # current line.
+        if self.partial_cmd: line = '%s %s' % (self.partial_cmd, line)
+        shlex.split(line)
+        return True
+      # If the command ends with a delimiter, check if it has an open quotation.
+      # shlex.split() throws a ValueError iff an open quoation is found.
+      # A quotation can either be a single quote or a double quote.
+      except ValueError:
+        pass
+    return False
+
   def __check_for_command_completion(self, cmd):
     """Check for a delimiter at the end of user input.
 
@@ -237,7 +258,7 @@ class ImpalaShell(cmd.Cmd):
     if self.readline:
       current_history_len = self.readline.get_current_history_length()
     # Input is incomplete, store the contents and do nothing.
-    if not cmd.endswith(ImpalaShell.CMD_DELIM):
+    if not self.__cmd_ends_with_delim(cmd):
       # The user input is incomplete, change the prompt to reflect this.
       if not self.partial_cmd and cmd:
         self.cached_prompt = self.prompt
@@ -274,7 +295,10 @@ class ImpalaShell(cmd.Cmd):
       self.prompt = self.cached_prompt
     else: # Input has a delimiter and partial_cmd is empty
       completed_cmd = sqlparse.format(cmd, strip_comments=True)
-    return completed_cmd
+    # The comments have been parsed out, there is no need to retain the newlines.
+    # They can cause parse errors in sqlparse when unescaped quotes and delimiters
+    # come into play.
+    return completed_cmd.replace('\n', ' ')
 
   def __signal_handler(self, signal, frame):
     self.is_interrupted.set()
