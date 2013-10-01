@@ -55,29 +55,14 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
   }
 }
 
-void QuerySchedule::GetIpAddress(const TNetworkAddress& src, TNetworkAddress* dest) {
-  vector<string> ips;
-  Status s = HostnameToIpAddrs(src.hostname, &ips);
-  // TODO: This hostname to IP conversion will eventually go away.
-  // Ignore the error status for now.
-  if (!s.ok()) {
-    LOG(ERROR) << "Failed to resolve hostname to IP for " << src;
-    return;
-  }
-  if (!FindFirstNonLocalhost(ips, &dest->hostname)) dest->hostname = "127.0.0.1";
-  dest->port = src.port;
-}
-
 void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
   DCHECK(is_mini_llama_);
   DCHECK(!llama_nodes.empty());
   int llama_node_ix = 0;
   BOOST_FOREACH(const TNetworkAddress& host, unique_hosts_) {
-    TNetworkAddress impalad_hostport;
-    GetIpAddress(host, &impalad_hostport);
     TNetworkAddress dn_hostport = MakeNetworkAddress(llama_nodes[llama_node_ix]);
-    impalad_to_dn_[impalad_hostport] = dn_hostport;
-    dn_to_impalad_[dn_hostport] = impalad_hostport;
+    impalad_to_dn_[host] = dn_hostport;
+    dn_to_impalad_[dn_hostport] = host;
     // Round robin the registered Llama nodes.
     ++llama_node_ix;
     llama_node_ix = llama_node_ix % llama_nodes.size();
@@ -133,10 +118,12 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
     resource.enforcement = llama::TLocationEnforcement::MUST;
 
     stringstream ss;
-    TNetworkAddress ip_host;
-    GetIpAddress(host, &ip_host);
-    if (is_mini_llama_) ip_host = impalad_to_dn_[ip_host];
-    ss << ip_host;
+    if (is_mini_llama_) {
+      ss << impalad_to_dn_[host];
+    } else {
+      ss << host;
+    }
+
     resource.askedLocation = ss.str();
     resource.memory_mb = memory_mb;
     resource.v_cpu_cores = v_cpu_cores;
@@ -148,10 +135,9 @@ Status QuerySchedule::ValidateReservation() {
   vector<TNetworkAddress> hosts_missing_resources;
   BOOST_FOREACH(const FragmentExecParams& params, fragment_exec_params_) {
     BOOST_FOREACH(const TNetworkAddress& host, params.hosts) {
-      TNetworkAddress ip_host;
-      GetIpAddress(host, &ip_host);
-      if (is_mini_llama_) ip_host = impalad_to_dn_[ip_host];
-      if (reservation_.allocated_resources.find(ip_host) ==
+      TNetworkAddress hostport = host;
+      if (is_mini_llama_) hostport = impalad_to_dn_[host];
+      if (reservation_.allocated_resources.find(hostport) ==
           reservation_.allocated_resources.end()) {
         hosts_missing_resources.push_back(host);
       }

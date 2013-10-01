@@ -71,13 +71,6 @@ class QuerySchedule {
   // of the hosts in fragment_exec_params_. Returns an error otherwise.
   Status ValidateReservation();
 
-  // Sets dest.hostname to the IP address corresponding to src.hostname
-  // (if not already an IP address). Copies src.port to dest.port.
-  // This method is needed because Llama expects the locations of reservation requests
-  // to be IP addresses, but the Impala's scheduler assigns scan ranges to hostnames
-  // (i.e., unique_hosts_ contains hostnames).
-  void GetIpAddress(const TNetworkAddress& src, TNetworkAddress* dest);
-
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
@@ -103,6 +96,8 @@ class QuerySchedule {
  private:
   // Populates the bi-directional hostport mapping for the Mini Llama based on
   // the given llama_nodes and the unique_hosts_ of this schedule.
+  // The MiniLlama expects resources to be requested on IP addresses, whereas the
+  // regular Llama requires hostnames.
   void CreateMiniLlamaMapping(const std::vector<std::string>& llama_nodes);
 
   // These references are valid for the lifetime of this query schedule because they
