@@ -600,6 +600,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // cancellation queue.
   void CancelSessionQueriesAsync(SessionState* session_state, const std::string& cause);
 
+  // Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
+  // idle (i.e. no client input and no time spent processing locally) for
+  // FLAGS_idle_query_timeout seconds.
+  void ExpireQueries();
+
   // Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -828,6 +833,51 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<std::string, boost::unordered_set<std::string> >
       ProxyUserMap;
   ProxyUserMap authorized_proxy_user_config_;
+
+  // Guards queries_by_timestamp_
+  boost::mutex query_expiration_lock_;
+
+  // Describes a query expiration event (t, q) where t is the expiration deadline in
+  // seconds, and q is the query ID.
+  typedef std::pair<int64_t, TUniqueId> ExpirationEvent;
+
+  // Comparator that breaks ties when two queries have identical expiration deadlines.
+  struct ExpirationEventComparator {
+    bool operator()(const ExpirationEvent& t1, const ExpirationEvent& t2) {
+      if (t1.first < t2.first) return true;
+      if (t2.first < t1.first) return false;
+      return t1.second < t2.second;
+    }
+  };
+
+  // Ordered set of (expiration_time, query_id) pairs. This queue is updated either by
+  // RegisterQuery(), which adds a new query to the set, or by ExpireQueries(), which
+  // updates the entries as it iterates over the set. Therefore, it is not directly
+  // accessed during normal query execution and the benefit of that is there is no
+  // competition for locks when ExpireQueries() walks this list to find expired queries.
+  //
+  // In order to make the query expiration algorithm work, the following conditions always
+  // hold:
+  //
+  // * For any pair (t, q) in the set, t is always a lower bound on the true expiration
+  // time of the query q (in q->idle_time()). Therefore it is always correct to sleep
+  // until t and then check q for expiration.
+  //
+  // * Any new pair (t, q) added to a non-empty set whose first value is (t', q') has t' <
+  // t. This guarantees that it is always safe to sleep until t' without missing any new
+  // expirations.
+  //
+  // The reason that the expiration time saved in each entry here may not exactly match
+  // the true expiration time of a query is because we wish to avoid accessing (and
+  // therefore locking) this structure on every query activity. Instead, queries maintain
+  // an accurate expiration time, and this structure guarantees that we will always
+  // (modulo scheduling delays out of our control) read the expiration time before it has
+  // passed.
+  typedef std::set<ExpirationEvent, ExpirationEventComparator> ExpirationQueue;
+  ExpirationQueue queries_by_timestamp_;
+
+  // Container for a thread that runs ExpireQueries() if FLAGS_idle_query_timeout is set.
+  boost::scoped_ptr<Thread> query_expiration_thread_;
 };
 
 // Create an ImpalaServer and Thrift servers.

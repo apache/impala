@@ -30,7 +30,7 @@ time_t to_time_t(boost::posix_time::ptime t);
 
 
 // The format of a timestamp-typed slot.
-class  TimestampValue {
+class TimestampValue {
  public:
   TimestampValue(const boost::gregorian::date& d,
                  const boost::posix_time::time_duration& t)

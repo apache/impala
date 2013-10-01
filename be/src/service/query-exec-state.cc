@@ -13,13 +13,16 @@
 // limitations under the License.
 
 #include "service/query-exec-state.h"
-#include "service/impala-server.h"
-#include "service/frontend.h"
+
+#include <limits>
 
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "service/impala-server.h"
+#include "service/frontend.h"
 #include "util/debug-util.h"
+#include "util/time.h"
 
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
@@ -40,6 +43,8 @@ ImpalaServer::QueryExecState::QueryExecState(
     shared_ptr<SessionState> session,
     const TSessionState& query_session_state, const string& sql_stmt)
   : sql_stmt_(sql_stmt),
+    last_active_time_(numeric_limits<int64_t>::max()),
+    ref_count_(0L),
     exec_env_(exec_env),
     parent_session_(session),
     query_session_state_(query_session_state),
@@ -86,6 +91,7 @@ ImpalaServer::QueryExecState::QueryExecState(
 }
 
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
+  MarkActive();
   exec_request_ = *exec_request;
 
   profile_.AddChild(&server_profile_);
@@ -299,6 +305,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
 
 void ImpalaServer::QueryExecState::Done() {
   unique_lock<mutex> l(lock_);
+  MarkActive();
   end_time_ = TimestampValue::local_time_micros();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
@@ -332,27 +339,23 @@ Status ImpalaServer::QueryExecState::Wait() {
     if (ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
       SetCreateTableAsSelectResultSet();
     }
-    // Rows are available now, so start the 'wait' timer that tracks how
-    // long Impala waits for the client to fetch rows.
-    client_wait_sw_.Start();
   }
+  // Rows are available now (for SELECT statement), so start the 'wait' timer that tracks
+  // how long Impala waits for the client to fetch rows. For other statements, track the
+  // time until a Close() is received.
+  MarkInactive();
   return Status::OK;
 }
 
 Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
-  // Pause the wait timer, since the client has instructed us to do
-  // work on its behalf.
-  client_wait_sw_.Stop();
-  int64_t elapsed_time = client_wait_sw_.ElapsedTime();
-  client_wait_timer_->Set(elapsed_time);
+  // Pause the wait timer, since the client has instructed us to do work on its behalf.
+  MarkActive();
 
   // FetchInternal has already taken our lock_
   UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
 
-  // If all rows have been returned, no point in continuing the timer
-  // to wait for the next call to FetchRows, which should never come.
-  if (!eos_) client_wait_sw_.Start();
+  MarkInactive();
   return query_status_;
 }
 
@@ -460,6 +463,7 @@ void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   // Coordinator::Cancel() multiple times
   if (query_state_ == QueryState::EXCEPTION) return;
   if (cause != NULL) UpdateQueryStatus(*cause);
+  query_events_->MarkEvent("Cancelled");
   query_state_ = QueryState::EXCEPTION;
   if (coord_.get() != NULL) coord_->Cancel(cause);
 }
@@ -558,6 +562,23 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   VLOG_QUERY << ss.str();
   vector<string> results(1, ss.str());
   SetResultSet(results);
+}
+
+void ImpalaServer::QueryExecState::MarkInactive() {
+  client_wait_sw_.Start();
+  lock_guard<mutex> l(expiration_data_lock_);
+  last_active_time_ = ms_since_epoch();
+  DCHECK(ref_count_ > 0) << "Invalid MarkInactive()";
+  --ref_count_;
+}
+
+void ImpalaServer::QueryExecState::MarkActive() {
+  client_wait_sw_.Stop();
+  int64_t elapsed_time = client_wait_sw_.ElapsedTime();
+  client_wait_timer_->Set(elapsed_time);
+  lock_guard<mutex> l(expiration_data_lock_);
+  last_active_time_ = ms_since_epoch();
+  ++ref_count_;
 }
 
 }

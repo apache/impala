@@ -35,6 +35,7 @@ class RowBatch;
 class Expr;
 class TupleRow;
 class Frontend;
+class QueryExecStateCleaner;
 
 // Execution state of a query. This captures everything necessary
 // to convert row batches received by the coordinator into results
@@ -132,6 +133,17 @@ class ImpalaServer::QueryExecState {
   const TimestampValue& end_time() const { return end_time_; }
   const std::string& sql_stmt() const { return sql_stmt_; }
 
+  inline int64_t last_active() const {
+    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    return last_active_time_;
+  }
+
+  // Returns true if Impala is actively processing this query.
+  inline bool is_active() const {
+    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    return ref_count_ > 0;
+  }
+
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
  private:
@@ -143,6 +155,17 @@ class ImpalaServer::QueryExecState {
   // while acquiring this lock (since FetchRows() will release and re-acquire lock_ during
   // its execution).
   boost::mutex fetch_rows_lock_;
+
+  // Protects last_active_time_ and ref_count_.
+  // Must always be taken as the last lock, that is no other locks may be taken while
+  // holding this lock.
+  mutable boost::mutex expiration_data_lock_;
+  int64_t last_active_time_;
+
+  // ref_count_ > 0 if Impala is currently performing work on this query's behalf. Every
+  // time a client instructs Impala to do work on behalf of this query, the ref count is
+  // increased, and decreased once that work is completed.
+  uint32_t ref_count_;
 
   boost::mutex lock_;  // protects all following fields
   ExecEnv* exec_env_;
@@ -215,6 +238,14 @@ class ImpalaServer::QueryExecState {
   // Executes a local catalog operation (an operation that does not need to execute
   // against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op);
+
+  // Updates last_active_time_ and ref_count_ to reflect that query is currently not doing
+  // any work. Takes expiration_data_lock_.
+  void MarkInactive();
+
+  // Updates last_active_time_ and ref_count_ to reflect that query is currently being
+  // actively processed. Takes expiration_data_lock_.
+  void MarkActive();
 
   // Core logic of initiating a query or dml execution request.
   // Initiates execution of plan fragments, if there are any, and sets
