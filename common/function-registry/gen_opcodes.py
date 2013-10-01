@@ -272,7 +272,8 @@ def generate_be_registry_init(filename):
     for entry in entries:
       opcode = entry["opcode"]
       be_fn = entry["be_fn"]
-      cc_output = "TExprOpcode::%s, (void*)%s" % (opcode, be_fn)
+      # We generate two casts to work around GCC Bug 11407
+      cc_output = "TExprOpcode::%s, (void*)(Expr::ComputeFn)%s" % (opcode, be_fn)
       cc_registry_file.write("  this->Add(%s);\n" % (cc_output))
 
   cc_registry_file.write(cc_registry_epilogue)
