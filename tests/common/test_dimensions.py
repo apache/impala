@@ -146,11 +146,11 @@ def get_dataset_from_workload(workload):
   # extract it without reading the actual test vector file
   return load_table_info_dimension(workload, 'exhaustive')[0].value.dataset
 
-def load_table_info_dimension(workload, exploration_strategy, file_formats=None,
+def load_table_info_dimension(workload_name, exploration_strategy, file_formats=None,
                       compression_codecs=None):
   """Loads test vector corresponding to the given workload and exploration strategy"""
   test_vector_file = os.path.join(
-      WORKLOAD_DIR, workload, '%s_%s.csv' % (workload, exploration_strategy))
+      WORKLOAD_DIR, workload_name, '%s_%s.csv' % (workload_name, exploration_strategy))
 
   if not os.path.isfile(test_vector_file):
     raise RuntimeError, 'Vector file not found: ' + test_vector_file

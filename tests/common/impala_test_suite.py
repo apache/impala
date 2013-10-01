@@ -26,11 +26,11 @@ from tests.common.impala_connection import ImpalaConnection, create_connection
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
-from tests.common.workload_runner import Query
+from tests.common.query import Query
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
-from tests.common.query_executor import JdbcQueryExecOptions, execute_using_jdbc
+from tests.common.query_executor import JdbcQueryExecConfig, execute_using_jdbc
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 # Imports required for Hive Metastore Client
@@ -312,13 +312,11 @@ class ImpalaTestSuite(BaseTestSuite):
     query = Query()
     query.query_str = stmt
     # Run the statement targeting Hive
-    exec_opts = JdbcQueryExecOptions(\
-        iterations=1, impalad=HIVE_HS2_HOST_PORT, transport="SASL")
+    exec_opts = JdbcQueryExecConfig(impalad=HIVE_HS2_HOST_PORT)
     hive_results = execute_using_jdbc(query, exec_opts).data
 
     # Run the statement targeting Impala
-    exec_opts = JdbcQueryExecOptions(\
-        iterations=1, impalad=IMPALAD_HS2_HOST_PORT, transport="NOSASL")
+    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT)
     impala_results = execute_using_jdbc(query, exec_opts).data
 
     # Compare the results

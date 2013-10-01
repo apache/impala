@@ -36,29 +36,38 @@ class PluginRunner(object):
   '''
 
   def __init__(self, plugin_infos):
-    self.__available_modules = self.__get_plugin_modules()
-    self.__get_plugins_from_modules(plugin_infos)
-    self.plugins = self.__plugins
+    self._available_modules = self._get_plugin_modules()
+    self._get_plugins_from_modules(plugin_infos)
 
-  def __get_plugin_modules(self):
+  @property
+  def plugins(self):
+    return self._plugins
+
+  def __getstate__(self):
+    state = self.__dict__.copy()
+    del state['_available_modules']
+    return state
+
+  def _get_plugin_modules(self):
     ''' Gets all the modules in the directory and imports them'''
     modules = pkgutil.iter_modules(path=[PLUGIN_DIR])
+    available_modules = []
     for loader, mod_name, ispkg in modules:
-      yield __import__("tests.benchmark.plugins.%s" % mod_name, fromlist=[mod_name])
+      yield  __import__("tests.benchmark.plugins.%s" % mod_name, fromlist=[mod_name])
 
-  def __get_plugins_from_modules(self, plugin_infos):
+  def _get_plugins_from_modules(self, plugin_infos):
     '''Look for user specified plugins in the available modules.'''
-    self.__plugins = []
+    self._plugins = []
     plugin_names = []
-    for module in self.__available_modules:
+    for module in self._available_modules:
       for plugin_info in plugin_infos:
-        plugin_name, scope = self.__get_plugin_info(plugin_info)
+        plugin_name, scope = self._get_plugin_info(plugin_info)
         plugin_names.append(plugin_name)
         if hasattr(module, plugin_name):
-          self.__plugins.append(getattr(module, plugin_name)(scope=scope.lower()))
+          self._plugins.append(getattr(module, plugin_name)(scope=scope.lower()))
     # The plugin(s) that could not be loaded are captured in the set difference
     # between plugin_names and self.__plugins
-    plugins_found = [p.__name__ for p in self.__plugins]
+    plugins_found = [p.__name__ for p in self._plugins]
     LOG.debug("Plugins found: %s" % ', '.join(plugins_found))
     plugins_not_found = set(plugin_names).difference(plugins_found)
     # If the user's entered a plugin that does not exist, raise an error.
@@ -66,7 +75,7 @@ class PluginRunner(object):
       msg = "Plugin(s) not found: %s" % (','.join(list(plugins_not_found)))
       raise RuntimeError, msg
 
-  def __get_plugin_info(self, plugin_info):
+  def _get_plugin_info(self, plugin_info):
     info = plugin_info.split(':')
     if len(info) == 1:
       return info[0], 'query'
@@ -76,20 +85,20 @@ class PluginRunner(object):
       raise ValueError("Plugin names specified in the form <plugin_name>[:<scope>]")
 
   def print_plugin_names(self):
-    for p in self.__plugins:
+    for p in self._plugins:
       LOG.debug("Plugin: %s, Scope: %s" % (p.__name__, p.scope))
 
   def run_plugins_pre(self, context=None, scope=None):
-    if len(self.__plugins) == 0: return
+    if len(self._plugins) == 0: return
     if context: context['scope'] = scope
-    for p in self.__plugins:
+    for p in self._plugins:
       if not scope or p.scope == scope.lower():
         LOG.debug('Running pre-hook for %s at scope %s' % (p.__name__, scope))
         p.run_pre_hook(context=context)
 
   def run_plugins_post(self, context=None, scope=None):
-    if len(self.__plugins) == 0: return
-    for p in self.__plugins:
+    if len(self._plugins) == 0: return
+    for p in self._plugins:
       if not scope or p.scope == scope.lower():
         LOG.debug('Running post-hook for %s at scope %s' % (p.__name__, scope))
         p.run_post_hook(context=context)

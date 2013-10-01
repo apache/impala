@@ -13,34 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Module used for executing queries and gathering results and allowing for executing
-# multiple queries concurrently. The QueryExecutor is meant to be very generic and doesn't
-# have the knowledge of how to actually execute a query. It takes an executor
-# function and a query option object and returns the QueryExecResult. It's
-# responsible for parallelizing execution. If a query fails, it either raises an
-# exception to the caller, or swallows the exception and prints out an error message if
-# the caller's exit_on_error is set to False.
+# Module used for executing queries and gathering results.
+# The QueryExecutor is meant to be generic and doesn't
+# have the knowledge of how to actually execute a query. It takes a query and its config
+# and executes is against a executor function.
 # For example (in pseudo-code):
 #
-# def execute_using_impala_beeswax(query, query_option):
+# def exec_func(query, config):
 # ...
 #
-# exec_option = ImpalaBeeswaxQueryExecOptions()
-# qe = QueryExecutor(execute_using_impala_beeswax, exec_options query, num_clients,
-#                   exit_on_error)
-# qe.run()
-# exec_result = qe.get_results()
-#
+# config = ImpalaBeeswaxQueryExecConfig()
+# executor = QueryExecutor('beeswax', query, config, exec_func)
+# executor.run()
+# result = executor.result
+
 import logging
 import os
 import re
 import shlex
 
-from collections import defaultdict
+from collections import defaultdict, deque
+from datetime import datetime
 from random import randint
 from subprocess import Popen, PIPE
-from tests.beeswax.impala_beeswax import *
-from tests.util.calculation_util import calculate_avg, calculate_stddev
+from tests.common.query import Query, QueryResult
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
 from threading import Thread, Lock
 
 # Setup logging for this module.
@@ -51,77 +48,58 @@ LOG.setLevel(level=logging.INFO)
 # globals.
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 
-class QueryExecResult(object):
-  """Container for saving the results of a query execution.
-
-  A query contains the following fields:
-  avg_time - Average query execution time.
-  std_dev - The standard deviation of execution times (None if only run once)
-  success - False when a query failed, True otherwise.
-  data - Tab delimited rows returned by the query.
-  runtime_profile - The query's runtime profile.
-  query_error - Empty string if the query succeeded. Error returned by the client if
-                it failed.
-  """
-  def __init__(self, **kwargs):
-    self.query = kwargs.get('query')
-    self.avg_time = kwargs.get('avg_time')
-    self.std_dev = kwargs.get('avg_time')
-    self.__note = kwargs.get('note')
-    self.data = kwargs.get('data')
-    self.runtime_profile = kwargs.get('runtime_profile', str())
-    self.success = False
-    self.query_error = str()
-    self.executor_name = str()
-
-  def set_result_note(self, note):
-    self.__note = note
-
-  def __str__(self):
-    """Print human readable query execution details"""
-    message = str()
-    if self.__note: message = "%s, " % self.__note
-    message += 'Avg Time: %s, Std Dev: %s' % (self.avg_time, self.std_dev)
-    return message
+## TODO: Split executors into their own modules.
+class QueryExecConfig(object):
+  """Base Class for Execution Configs"""
+  def __init__(self, plugin_runner=None):
+    self.plugin_runner = plugin_runner
 
 
-class QueryExecOptions(object):
-  """Base class for Query execution options"""
-  def __init__(self, iterations, **kwargs):
-    self.iterations = iterations
-    self.db_name = kwargs.get('db_name', None)
+class ImpalaQueryExecConfig(QueryExecConfig):
+  """Base class for Impala query execution config"""
+  def __init__(self, plugin_runner=None, impalad='localhost:21000'):
+    super(ImpalaQueryExecConfig, self).__init__(plugin_runner=plugin_runner)
+    self._impalad = impalad
+
+  @property
+  def impalad(self):
+    return self._impalad
+
+  @impalad.setter
+  def impalad(self, value):
+    self._impalad = value
 
 
-class ImpalaQueryExecOptions(QueryExecOptions):
-  """Base class for Impala query options"""
-  def __init__(self, iterations, **kwargs):
-    QueryExecOptions.__init__(self, iterations, **kwargs)
-    self.impalad = kwargs.get('impalad', 'localhost:21000')
-    self.plugin_runner = kwargs.get('plugin_runner', None)
+class JdbcQueryExecConfig(ImpalaQueryExecConfig):
+  """Impala query execution config for jdbc"""
+  JDBC_CLIENT_PATH = os.path.join(os.environ['IMPALA_HOME'], 'bin/run-jdbc-client.sh')
+  def __init__(self, plugin_runner=None, impalad='localhost:21050', transport=None):
+    super(JdbcQueryExecConfig, self).__init__(plugin_runner=plugin_runner,
+        impalad=impalad)
+    self.transport = transport
+
+  @property
+  def jdbc_client_cmd(self):
+    """The args to run the jdbc client.
+
+    Constructed on the fly, since the impalad it points to can change.
+    """
+    return JdbcQueryExecConfig.JDBC_CLIENT_PATH + ' -i "%s" -t %s' % (self._impalad,
+                                                                      self.transport)
 
 
-class JdbcQueryExecOptions(QueryExecOptions):
-  """Class for Impala query options when running a jdbc client"""
-  def __init__(self, iterations, **kwargs):
-    QueryExecOptions.__init__(self, iterations, **kwargs)
-    self.impalad = kwargs.get('impalad', 'localhost:21050')
-    self.transport = kwargs.get('transport', None)
-    self.jdbc_client_cmd = \
-        os.path.join(os.environ['IMPALA_HOME'], 'bin/run-jdbc-client.sh')
-    self.jdbc_client_cmd += ' -i "%s" -t %s' % (self.impalad, self.transport)
-
-
-class ImpalaBeeswaxExecOptions(ImpalaQueryExecOptions):
-  """Class for Impala query options when running a beeswax client"""
-  def __init__(self, iterations, **kwargs):
-    ImpalaQueryExecOptions.__init__(self, iterations, **kwargs)
-    self.use_kerberos = kwargs.get('use_kerberos', False)
+class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
+  """Impala query execution config for beeswax"""
+  def __init__(self, use_kerberos=False, exec_options=None, impalad='localhost:21000',
+      plugin_runner=None):
+    super(BeeswaxQueryExecConfig, self).__init__(plugin_runner=plugin_runner,
+        impalad=impalad)
+    self.use_kerberos = use_kerberos
     self.exec_options = dict()
-    self.__build_options(kwargs)
+    self.__build_options(exec_options)
 
-  def __build_options(self, kwargs):
+  def __build_options(self, exec_options):
     """Read the exec_options into a dictionary"""
-    exec_options = kwargs.get('exec_options', None)
     if exec_options:
       # exec_options are seperated by ; on the command line
       options = exec_options.split(';')
@@ -131,12 +109,11 @@ class ImpalaBeeswaxExecOptions(ImpalaQueryExecOptions):
         self.exec_options[key.upper()] = value
 
 
-# Hive query exec options
-class HiveQueryExecOptions(QueryExecOptions):
-  """Class for hive query options"""
-  def __init__(self, iterations, **kwargs):
-    QueryExecOptions.__init__(self, iterations, **kwargs)
-    self.hive_cmd = kwargs.get('hive_cmd', 'hive -e ')
+class HiveQueryExecConfig(QueryExecConfig):
+  """Hive query execution config"""
+  def __init__(self, plugin_runner=None, hive_cmd='hive -e'):
+    super(HiveQueryExecConfig, self).__init__(plugin_runner=plugin_runner)
+    self.hive_cmd = hive_cmd
 
   def build_argument_string(self):
     """ Builds the actual argument string that is passed to hive """
@@ -144,184 +121,101 @@ class HiveQueryExecOptions(QueryExecOptions):
 
 
 class QueryExecutor(object):
-  def __init__(self, query_exec_func, executor_name, exec_options, query, num_clients,
-      exit_on_error):
+  def __init__(self, name, query, func, config, exit_on_error):
     """
-    Execute a query in parallel.
+    Executes a query.
 
     The query_exec_func needs to be a function that accepts a QueryExecOption parameter
-    and returns a QueryExecResult.
+    and returns a QueryResult.
     """
-    self.query_exec_func = query_exec_func
-    self.query_exec_options = exec_options
+    self.exec_func = func
+    self.exec_config = config
     self.query = query
-    self.num_clients = num_clients
     self.exit_on_error = exit_on_error
-    self.executor_name = executor_name
-    self.__results = list()
-    self.__result_list_lock = Lock()
-    self.__create_thread_name_template()
+    self.executor_name = name
+    self.__result = QueryResult(query, query_config=self.exec_config)
 
-  def __create_thread_name_template(self):
-    """Create the thread prefix
+  def prepare(self, impalad):
+    """Prepare the query to be run.
 
-    The thread prefix is a concatanation of the query name and the scale factor
-    (if present)
+    For now, this sets the impalad that the query connects to. If the executor is hive,
+    it's a no op.
     """
-    if self.query.scale_factor:
-      self.thread_name = '[%s:%s]'% (self.query.name, self.query.scale_factor)
-    else:
-      self.thread_name = '[%s]'% self.query.name
-    self.thread_name += ' Thread %d'
+    if self.executor_name != 'hive':
+      self.exec_config.impalad = impalad
 
-  def __get_thread_name(self, thread_num):
-    """Generate a thread name."""
-    return "%s Thread %d" % (self.__thread_prefix, thread_num)
+  def execute(self):
+    """Execute the query using the given execution function"""
+    self.__result = self.exec_func(self.query, self.exec_config)
+    if not self.__result.success:
+      if self.exit_on_error:
+        raise RuntimeError(self.__result.query_error)
+      else:
+        LOG.info("Continuing execution")
 
-  def __create_query_threads(self):
-    """Create a thread for each client."""
-    self.query_threads = []
-    for i in xrange(self.num_clients):
-      thread = Thread(target=self.__run_query, name=self.thread_name % i)
-      thread.daemon = True
-      self.query_threads.append(thread)
+  @property
+  def result(self):
+    """Getter for the result of the query execution.
 
-  def __update_results(self, result):
-    """Thread safe update for results.
-
-    Also responsible for handling query failures.
+    A result is a QueryResult object that contains the details of a single run of the
+    query.
     """
-    self.__result_list_lock.acquire()
-    try:
-      self.__results.append(result)
-      if not result.success:
-        error_msg = "Error executing query %s, Error: %s." % (self.query.name,
-            result.query_error)
-        if self.exit_on_error:
-          raise RuntimeError, error_msg + ' Aborting.'
-        else:
-          LOG.error(error_msg + ' Ignoring')
-    finally:
-      self.__result_list_lock.release()
+    return self.__result
 
-  def __run_query(self):
-    """Run method for a query thread.
-
-    Responsible for running the query and updating the results.
-    """
-    result = self.query_exec_func(self.query, self.query_exec_options,
-        exit_on_error=self.exit_on_error)
-    result.executor_name = self.executor_name
-    self.__update_results(result)
-
-  def run(self):
-    """Create query threads based on the number clients and execute them"""
-    # Create threads on the fly; This makes the run() method resusable.
-    self.__create_query_threads()
-    for thread_num, t in enumerate(self.query_threads):
-      LOG.info("Starting %s" % self.thread_name % thread_num)
-      t.start()
-    for thread_num, t in enumerate(self.query_threads):
-      # Wait for threads to complete.
-      t.join()
-      LOG.info("Finished %s" % self.thread_name % thread_num)
-
-  def get_results(self):
-    """Returns the result(s) of the query execution.
-
-    Results are returned as a list of QueryExecResult objects. get_results() should be
-    called after run(), otherwise the result list will be empty.
-    """
-    for result in self.__results:
-      if self.exit_on_error and not result.success:
-        error_msg = "Error executing query, Error: %s." % result.query_error
-        raise RuntimeError, error_msg + ' Aborting.'
-    return self.__results
-
-def establish_beeswax_connection(query, query_options):
+def establish_beeswax_connection(query, query_config):
   """Establish a connection to the user specified impalad"""
   # TODO: Make this generic, for hive etc.
-  use_kerberos = query_options.use_kerberos
-  client = ImpalaBeeswaxClient(query_options.impalad, use_kerberos=use_kerberos)
+  use_kerberos = query_config.use_kerberos
+  client = ImpalaBeeswaxClient(query_config.impalad, use_kerberos=use_kerberos)
   # Try connect
   client.connect()
-  LOG.info('Connected to %s' % query_options.impalad)
   # Set the exec options.
-  client.set_query_options(query_options.exec_options)
+  client.set_query_options(query_config.exec_options)
+  LOG.info("Connected to %s" % query_config.impalad)
   return (True, client)
 
-def execute_using_impala_beeswax(query, query_options, exit_on_error=True):
+def execute_using_impala_beeswax(query, query_config):
   """Executes a query using beeswax.
 
-  A new client is created per query, then destroyed. Returns QueryExecResult()
+  A new client is created per query, then destroyed. Returns QueryResult()
   """
   # Create a client object to talk to impalad
-  exec_result = QueryExecResult()
-  plugin_runner = query_options.plugin_runner
-  (success, client) = establish_beeswax_connection(query.query_str, query_options)
-  if not success:
-    return exec_result
-  # we need to issue a use database here.
+  exec_result = QueryResult(query, query_config=query_config)
+  plugin_runner = query_config.plugin_runner
+  (success, client) = establish_beeswax_connection(query.query_str, query_config)
+  if not success: return exec_result
+  # We need to issue a use database here.
   if query.db:
     use_query = 'use %s' % query.db
     client.execute(use_query)
-  # execute the query
-  results = []
   # create a map for query options and the query names to send to the plugin
-  context = build_context(query, query_options)
-  for i in xrange(query_options.iterations):
-    LOG.info("Running iteration %d" % (i+1))
-    context['iteration'] = i
-    result = QueryResult()
-    if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
-    try:
-      result = client.execute(query.query_str)
-      LOG.info("Iteration %d finished in %f(s)" % (i+1, result.time_taken))
-    except Exception, e:
-      LOG.error(e)
-      exec_result.query_error = str(e)
-      # Return early if exit_on_error is True.
-      if exit_on_error: return exec_result
+  context = build_context(query, query_config)
+  if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
+  result = ImpalaBeeswaxResult()
+  try:
+    result = client.execute(query.query_str)
+  except Exception, e:
+    LOG.error(e)
+    exec_result.query_error = str(e)
+  finally:
+    client.close_connection()
     if plugin_runner: plugin_runner.run_plugins_post(context=context, scope="Query")
-    results.append(result)
-  # We only need to print the results for a successfull run, not all.
-  LOG.debug('Result:\n%s\n' % results[0])
-  client.close_connection()
-  # get rid of the client object
-  del client
-  # construct the execution result.
-  return construct_exec_result(query_options.iterations, query, results)
+    return construct_exec_result(result, exec_result)
 
-def build_context(query, query_options):
-  context = vars(query_options)
-  context['query_name'] = query.query_str
-  context['table_format'] = query.table_format_str
-  context['short_query_name'] = query.name
+def build_context(query, query_config):
+  context = vars(query_config)
+  context['query'] = query
   return context
 
-def construct_exec_result(iterations, query, results):
+def construct_exec_result(result, exec_result):
   """
-  Calculate average running time and standard deviation.
-
-  The summary of the first result is used as the summary for the entire execution.
+  Transform an ImpalaBeeswaxResult object to a QueryResult object.
   """
-  # Use the output from the first result.
-  exec_result = QueryExecResult()
-  exec_result.query = query
-  exec_result.data = results[0].data
-  exec_result.beeswax_result = results[0]
-  exec_result.set_result_note(results[0].summary)
-  exec_result.runtime_profile = results[0].runtime_profile
-  # If running more than 2 iterations, throw the first result out. Don't throw away
-  # the first result if iterations = 2 to preserve the stddev calculation.
-  if iterations > 2:
-    results = results[1:]
-
-  runtimes = [r.time_taken for r in results]
+  # Return immedietely if the query failed.
+  if not result.success: return exec_result
   exec_result.success = True
-  exec_result.avg_time = calculate_avg(runtimes)
-  if iterations > 1:
-    exec_result.std_dev = calculate_stddev(runtimes)
+  for attr in ['data', 'runtime_profile', 'start_time', 'time_taken', 'summary']:
+    setattr(exec_result, attr, getattr(result, attr))
   return exec_result
 
 def execute_shell_cmd(cmd):
@@ -334,21 +228,20 @@ def execute_shell_cmd(cmd):
   rc = p.returncode
   return rc, stdout, stderr
 
-def execute_using_hive(query, query_options, exit_on_error=True):
+def execute_using_hive(query, query_config):
   """Executes a query via hive"""
-  query_string = (query.query_str + ';') * query_options.iterations
+  query_string = query.query_str + ';'
   if query.db:
-    query_string = 'use %s;' % query.db + query_string
-  cmd = query_options.hive_cmd + " \"%s\"" % query_string
-  return run_query_capture_results(cmd, query, parse_hive_query_results,
-                                   query_options.iterations, exit_on_error=False)
+    query_string = 'use %s;%s' % (query.db, query_string)
+  cmd = query_config.hive_cmd + " \"%s\"" % query_string
+  return run_query_capture_results(cmd, query, parse_hive_query_results)
 
 def parse_hive_query_results(stdout, stderr, iterations):
   """
   Parse query execution details for hive.
 
   Parses the query execution details (avg time, stddev) from the runquery output.
-  Returns a QueryExecResult object.
+  Returns a QueryResult object.
   """
   run_success = False
   execution_times = list()
@@ -357,62 +250,53 @@ def parse_hive_query_results(stdout, stderr, iterations):
     match = re.search(hive_result_regex, line)
     if match:
       execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
+      break
   # TODO: Get hive results
   return create_exec_result(execution_times, iterations, None)
 
-def execute_using_jdbc(query, query_options, exit_on_error=True):
+def execute_using_jdbc(query, query_config):
   """Executes a query using JDBC"""
-  query_string = (query.query_str + ';') * query_options.iterations
+  query_string = query.query_str + ';'
   if query.db:
     query_string = 'use %s; %s' % (query.db, query_string)
-  cmd = query_options.jdbc_client_cmd + " -q \"%s\"" % query_string
+  cmd = query_config.jdbc_client_cmd + " -q \"%s\"" % query_string
   return run_query_capture_results(cmd, query, parse_jdbc_query_results,
-      query_options.iterations, exit_on_error=False)
+    exit_on_error=False)
 
-def parse_jdbc_query_results(stdout, stderr, iterations):
+def parse_jdbc_query_results(stdout, stderr):
   """
   Parse query execution results for the Impala JDBC client
 
   Parses the query execution details (avg time, stddev) from the output of the Impala
   JDBC test client.
   """
-  run_success = False
-  execution_times = list()
-  std_dev = None
   jdbc_result_regex = 'row\(s\) in (\d*).(\d*)s'
+  time_taken = 0.0
   for line in stdout.split('\n'):
     match = re.search(jdbc_result_regex, line)
     if match:
-      execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
+      time_taken = float(('%s.%s') % (match.group(1), match.group(2)))
+      break
+  result_data = re.findall(r'\[START\]----\n(.*?)\n----\[END\]', stdout, re.DOTALL)[0]
+  return create_exec_result(time_taken, result_data)
 
-  result_data = re.findall(r'\[START\]----\n(.*?)\n----\[END\]', stdout, re.DOTALL)
-  return create_exec_result(execution_times, iterations, result_data)
-
-def create_exec_result(execution_times, iterations, result_data):
-  exec_result = QueryExecResult()
-  exec_result.success = False
-
+def create_exec_result(time_taken, result_data):
+  exec_result = QueryResult()
   if result_data:
-    # Just print the first result returned. There may be additional results if
-    # there were multiple iterations executed.
-    LOG.debug('Data:\n%s\n' % result_data[0])
-    exec_result.data = result_data[0].split('\n')
-
-  if len(execution_times) == iterations:
-    exec_result.avg_time = calculate_avg(execution_times)
-    if iterations > 1:
-      exec_result.std_dev = calculate_stddev(execution_times)
-    exec_result.success = True
+    LOG.debug('Data:\n%s\n' % result_data)
+    exec_result.data = result_data
+  exec_result.time_taken = time_taken
+  exec_result.success = True
   return exec_result
 
-def run_query_capture_results(cmd, query, query_result_parse_function, iterations,
-                              exit_on_error):
+def run_query_capture_results(cmd, query, query_result_parse_function, exit_on_error):
   """
   Runs the given query command and returns the execution result.
 
   Takes in a match function that is used to parse stderr/stdout to extract the results.
   """
-  exec_result = QueryExecResult()
+  exec_result = QueryResult(query)
+  start_time = datetime.now()
   try:
     rc, stdout, stderr = execute_shell_cmd(cmd)
   except Exception, e:
@@ -420,16 +304,16 @@ def run_query_capture_results(cmd, query, query_result_parse_function, iteration
     exec_result.query_error = str(e)
     return exec_result
   if rc != 0:
-    LOG.error(('Command returned with an error:\n'
-               'rc: %d\n'
-               'STDERR:\n%s'
-               'STDOUT:\n%s'
-                % (rc, stderr, stdout)))
+    msg = ('Command returned with an error:\n'
+           'rc: %d\n'
+           'STDERR:\n%s'
+           'STDOUT:\n%s'
+           % (rc, stderr, stdout))
+    LOG.error(msg)
+    exec_result.query_error = msg
     return exec_result
   # The command completed
-  exec_result = query_result_parse_function(stdout, stderr, iterations)
+  exec_result = query_result_parse_function(stdout, stderr)
   exec_result.query = query
-  if not exec_result.success:
-    LOG.error("Query did not run successfully")
-    LOG.error("STDERR:\n%s\nSTDOUT:\n%s" % (stderr, stdout))
+  exec_result.start_time = start_time
   return exec_result

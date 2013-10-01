@@ -10,7 +10,7 @@
 #   client = ImpalaBeeswaxClient(impalad)
 #   client.connect()
 #   result = client.execute(query_string)
-#   where result is an object of the class QueryResult.
+#   where result is an object of the class ImpalaBeeswaxResult.
 import time
 import sys
 import shlex
@@ -20,6 +20,7 @@ import re
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
+from datetime import datetime
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from tests.util.thrift_util import create_transport
@@ -41,23 +42,21 @@ class ImpalaBeeswaxException(Exception):
   def __str__(self):
     return "%s:\n %s" % (self.__name__, self.__message)
 
-# Encapsulates a typical query result.
-class QueryResult(object):
-  def __init__(self, query=None, success=False, data=None, schema=None,
-               time_taken=0, summary='', runtime_profile=str()):
-    self.query = query
-    self.success = success
+class ImpalaBeeswaxResult(object):
+  def __init__(self, **kwargs):
+    self.query = kwargs.get('query', None)
+    self.success = kwargs.get('success', False)
     # Insert returns an int, convert into list to have a uniform data type.
     # TODO: We should revisit this if we have more datatypes to deal with.
-    self.data = data
+    self.data = kwargs.get('data', None)
     if not isinstance(self.data, list):
       self.data = str(self.data)
       self.data = [self.data]
-    self.time_taken = time_taken
-    self.summary = summary
-    self.schema = schema
-    self.runtime_profile = runtime_profile
     self.log = None
+    self.time_taken = kwargs.get('time_taken', 0)
+    self.summary = kwargs.get('summary', str())
+    self.schema = kwargs.get('schema', None)
+    self.runtime_profile = kwargs.get('runtime_profile', str())
 
   def get_data(self):
     return self.__format_data()
@@ -149,13 +148,15 @@ class ImpalaBeeswaxClient(object):
                             password=self.password, use_ssl=self.use_ssl)
 
   def execute(self, query_string):
-    """Re-directs the query to its appropriate handler, returns QueryResult"""
+    """Re-directs the query to its appropriate handler, returns ImpalaBeeswaxResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
     start = time.time()
+    start_time = datetime.now()
     handle = self.__execute_query(query_string.strip())
     result = self.fetch_results(query_string,  handle)
     result.time_taken = time.time() - start
+    result.start_time = start_time
     # Don't include the time it takes to get the runtime profile in the execution time
     result.runtime_profile = self.get_runtime_profile(handle)
     result.log = self.get_log(handle.log_context)
@@ -229,7 +230,7 @@ class ImpalaBeeswaxClient(object):
     if query_type == 'use':
       # TODO: "use <database>" does not currently throw an error. Need to update this
       # to handle the error case once that behavior has been changed.
-      return QueryResult(query=query_string, success=True, data=[''])
+      return ImpalaBeeswaxResult(query=query_string, success=True, data=[''])
 
     # Result fetching for insert is different from other queries.
     exec_result = None
@@ -241,7 +242,7 @@ class ImpalaBeeswaxClient(object):
     return exec_result
 
   def __fetch_results(self, handle, max_rows = -1):
-    """Handles query results, returns a QueryResult object"""
+    """Handles query results, returns a ImpalaBeeswaxResult object"""
     schema = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle)).schema
     # The query has finished, we can fetch the results
     result_rows = []
@@ -253,7 +254,7 @@ class ImpalaBeeswaxClient(object):
         break
 
     # The query executed successfully and all the data was fetched.
-    exec_result = QueryResult(success=True, data=result_rows, schema=schema)
+    exec_result = ImpalaBeeswaxResult(success=True, data=result_rows, schema=schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 
@@ -263,7 +264,7 @@ class ImpalaBeeswaxClient(object):
     # The insert was successful
     num_rows = sum(map(int, result.rows_appended.values()))
     data = ["%s: %s" % row for row in result.rows_appended.iteritems()]
-    exec_result = QueryResult(success=True, data=data)
+    exec_result = ImpalaBeeswaxResult(success=True, data=data)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result
 
