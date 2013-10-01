@@ -48,3 +48,30 @@ IntVal AllTypes(
 StringVal NoArgs(FunctionContext* context) {
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>("string")), 6);
 }
+
+IntVal VarSum(FunctionContext* context, int n, const IntVal* args) {
+  int result = 0;
+  bool is_null = true;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) continue;
+    result += args[i].val;
+    is_null = false;
+  }
+  if (is_null) return IntVal::null();
+  return IntVal(result);
+}
+
+DoubleVal VarSumMultiply(FunctionContext* context,
+    const DoubleVal& d, int n, const IntVal* args) {
+  if (d.is_null) return DoubleVal::null();
+
+  int result = 0;
+  bool is_null = true;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) continue;
+    result += args[i].val;
+    is_null = false;
+  }
+  if (is_null) return DoubleVal::null();
+  return DoubleVal(result * d.val);
+}

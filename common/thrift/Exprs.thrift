@@ -119,7 +119,10 @@ struct TUdfCallExpr {
 
   3: required Types.TFunctionBinaryType binary_type
 
-  4: required bool has_var_args;
+  // If set, this udf has varargs and this is the index for the first variable
+  // argument.
+  // e.g. if the signature was fn(int, double, string...), the index would be 2.
+  4: optional i32 vararg_start_idx
 }
 
 // This is essentially a union over the subclasses of Expr.

@@ -20,6 +20,10 @@
 #include "exprs/expr.h"
 #include "udf/udf.h"
 
+namespace impala_udf {
+  class AnyVal;
+};
+
 namespace impala {
 
 class TExprNode;
@@ -70,8 +74,10 @@ class NativeUdfExpr: public Expr {
   std::string hdfs_location_;
   std::string symbol_name_;
 
-  // If true, this function has var args.
-  bool has_var_args_;
+  // If this function has var args, children()[vararg_start_idx_] is the
+  // first vararg argument.
+  // If this function does not have varargs, it is set to -1.
+  int vararg_start_idx_;
 
   // Function pointer to the JIT'd function produced by GetIrComputeFn(). Initialized and
   // called by ComputeFn().
@@ -81,6 +87,10 @@ class NativeUdfExpr: public Expr {
   // this class.
   LlvmCodeGen* codegen_;
   llvm::Function* ir_udf_wrapper_;
+
+  // Vector of preallocate input objects to pass to UDF if it has varargs.
+  // TODO: Move to to ExprContext
+  std::vector<impala_udf::AnyVal*> varargs_input_;
 
   // Loads the native or IR function from HDFS and puts the result in *udf.
   Status GetUdf(RuntimeState* state, llvm::Function** udf);

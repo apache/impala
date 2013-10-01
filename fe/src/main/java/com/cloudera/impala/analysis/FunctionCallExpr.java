@@ -66,7 +66,9 @@ public class FunctionCallExpr extends Expr {
       msg.udf_call_expr.setBinary_location(udf.getLocation().toString());
       msg.udf_call_expr.setSymbol_name(udf.getSymbolName());
       msg.udf_call_expr.setBinary_type(udf.getBinaryType());
-      msg.udf_call_expr.setHas_var_args(udf.getHasVarArgs());
+      if (udf.hasVarArgs()) {
+        msg.udf_call_expr.setVararg_start_idx(udf.getNumArgs() - 1);
+      }
     } else {
       Preconditions.checkState(fn_ instanceof OpcodeRegistry.BuiltinFunction);
       OpcodeRegistry.BuiltinFunction builtin = (OpcodeRegistry.BuiltinFunction)fn_;
@@ -75,8 +77,10 @@ public class FunctionCallExpr extends Expr {
         msg.setUdf_call_expr(new TUdfCallExpr());
         msg.udf_call_expr.setBinary_location("");
         msg.udf_call_expr.setSymbol_name(functionName_.getFunction());
-        msg.udf_call_expr.setHas_var_args(builtin.getHasVarArgs());
         msg.udf_call_expr.setBinary_type(TFunctionBinaryType.BUILTIN);
+        if (fn_.hasVarArgs()) {
+          msg.udf_call_expr.setVararg_start_idx(fn_.getNumArgs() - 1);
+        }
       } else {
         // TODO: remove. All builtins will go through UDF_CALL.
         msg.node_type = TExprNodeType.FUNCTION_CALL;

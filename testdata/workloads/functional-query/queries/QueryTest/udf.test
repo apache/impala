@@ -184,3 +184,68 @@ int
 ---- RESULT
 NULL
 ====
+---- QUERY
+select udf_test.var_sum(NULL, NULL, NULL)
+---- TYPES
+int
+---- RESULT
+NULL
+====
+---- QUERY
+select udf_test.var_sum(1, 2, 3, 4, 5, 6)
+---- TYPES
+int
+---- RESULT
+21
+====
+---- QUERY
+select tinyint_col, int_col, udf_test.var_sum(tinyint_col, int_col)
+from functional.alltypestiny
+---- TYPES
+tinyint, int, int
+---- RESULT
+0,0,0
+1,1,2
+0,0,0
+1,1,2
+0,0,0
+1,1,2
+0,0,0
+1,1,2
+====
+---- QUERY
+select udf_test.var_sum_multiply(NULL, 1, 2)
+---- TYPES
+double
+---- RESULT
+NULL
+====
+---- QUERY
+select udf_test.var_sum_multiply(1.0, 1, 2, NULL, 3)
+---- TYPES
+double
+---- RESULT
+NULL
+====
+---- QUERY
+select udf_test.var_sum_multiply(5.0, 1, 2, 3, 4, 5, 6)
+---- TYPES
+double
+---- RESULT
+105
+====
+---- QUERY
+select tinyint_col, int_col, udf_test.var_sum_multiply(2, tinyint_col, int_col)
+from functional.alltypestiny
+---- TYPES
+tinyint, int, double
+---- RESULT
+0,0,0
+1,1,4
+0,0,0
+1,1,4
+0,0,0
+1,1,4
+0,0,0
+1,1,4
+====

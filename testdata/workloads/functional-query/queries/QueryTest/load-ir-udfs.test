@@ -11,8 +11,9 @@ drop function if exists udf_test.identity(string);
 drop function if exists udf_test.all_types_fn(
     string, boolean, tinyint, smallint, int, bigint, float, double);
 drop function if exists udf_test.no_args();
+drop function if exists udf_test.var_sum(int...);
+drop function if exists udf_test.var_sum_multiply(double, int...);
 
-drop database if exists udf_test;
 create database if not exists udf_test;
 
 create function udf_test.identity(boolean) returns boolean
@@ -56,4 +57,12 @@ symbol='_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10Boolea
 create function udf_test.no_args() returns string
 location '/test-warehouse/test-udfs.ll'
 symbol='_Z6NoArgsPN10impala_udf15FunctionContextE';
+
+create function udf_test.var_sum(int...) returns int
+location '/test-warehouse/test-udfs.ll'
+symbol='_Z6VarSumPN10impala_udf15FunctionContextEiPKNS_6IntValE';
+
+create function udf_test.var_sum_multiply(double, int...) returns double
+location '/test-warehouse/test-udfs.ll'
+symbol='_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE';
 ====

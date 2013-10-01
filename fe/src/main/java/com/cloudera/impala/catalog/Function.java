@@ -95,7 +95,7 @@ public class Function {
   public int getNumArgs() { return argTypes_.length; }
   public HdfsURI getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
-  public boolean getHasVarArgs() { return hasVarArgs_; }
+  public boolean hasVarArgs() { return hasVarArgs_; }
   public PrimitiveType getVarArgsType() {
     if (!hasVarArgs_) return PrimitiveType.INVALID_TYPE;
     Preconditions.checkState(argTypes_.length > 0);

@@ -15,7 +15,9 @@
 #include "exprs/udf-util.h"
 
 using namespace llvm;
-using namespace impala;
+using namespace impala_udf;
+
+namespace impala {
 
 CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* builder,
                              PrimitiveType type, Value* value, const char* name)
@@ -175,4 +177,23 @@ CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen,
   // All zeros => 'is_null' = false
   Value* value = Constant::getNullValue(val_type);
   return CodegenAnyVal(codegen, builder, type, value, name);
+}
+
+AnyVal* CreateAnyVal(ObjectPool* pool, PrimitiveType type) {
+  switch(type) {
+    case TYPE_BOOLEAN: return pool->Add(new BooleanVal);
+    case TYPE_TINYINT: return pool->Add(new TinyIntVal);
+    case TYPE_SMALLINT: return pool->Add(new SmallIntVal);
+    case TYPE_INT: return pool->Add(new IntVal);
+    case TYPE_BIGINT: return pool->Add(new BigIntVal);
+    case TYPE_FLOAT: return pool->Add(new FloatVal);
+    case TYPE_DOUBLE: return pool->Add(new DoubleVal);
+    case TYPE_STRING: return pool->Add(new StringVal);
+    case TYPE_TIMESTAMP: return pool->Add(new TimestampVal);
+    default:
+      DCHECK(false) << "Unsupported type: " << type;
+      return NULL;
+  }
+}
+
 }

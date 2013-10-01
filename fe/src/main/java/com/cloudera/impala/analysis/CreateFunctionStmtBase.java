@@ -78,7 +78,7 @@ public class CreateFunctionStmtBase extends StatementBase {
     params.setArg_types(types);
 
     params.setRet_type(fn_.getReturnType().toThrift());
-    params.setHas_var_args(fn_.getHasVarArgs());
+    params.setHas_var_args(fn_.hasVarArgs());
     params.setComment(getComment());
     params.setIf_not_exists(getIfNotExists());
     return params;

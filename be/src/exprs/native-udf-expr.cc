@@ -36,7 +36,8 @@ NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
     udf_type_(node.udf_call_expr.binary_type),
     hdfs_location_(node.udf_call_expr.binary_location),
     symbol_name_(node.udf_call_expr.symbol_name),
-    has_var_args_(node.udf_call_expr.has_var_args),
+    vararg_start_idx_(node.udf_call_expr.__isset.vararg_start_idx ?
+        node.udf_call_expr.vararg_start_idx : -1),
     udf_wrapper_(NULL),
     codegen_(NULL),
     ir_udf_wrapper_(NULL) {
@@ -133,9 +134,17 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
 }
 
 Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
-  if (has_var_args_) return Status("Vararg UDFs not yet implemented.");
   if (state->llvm_codegen() == NULL) {
     return Status("UDFs cannot be evaluated with codegen disabled");
+  }
+  if (vararg_start_idx_ != -1) {
+    DCHECK_GT(GetNumChildren(), vararg_start_idx_);
+    // Allocate a scratch buffer for all the variable args.
+    varargs_input_.resize(GetNumChildren() - vararg_start_idx_);
+    for (int i = 0; i < varargs_input_.size(); ++i) {
+      varargs_input_[i] = CreateAnyVal(state->obj_pool(),
+          children_[vararg_start_idx_ + i]->type());
+    }
   }
   codegen_ = state->llvm_codegen();
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
@@ -147,19 +156,30 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
 // Dynamically loads the pre-compiled UDF and codegens a function that calls each child's
 // codegen'd function, then passes those values to the UDF and returns the result.
 // Example generated IR for a UDF with signature
-// SmallIntVal Identity(FunctionContext*, SmallIntVal*):
-//
-// define i32 @UdfWrapper(i8* %context, %"class.impala::TupleRow"* %row) {
+//    create function Udf(double, int...) returns double
+//    select Udf(1.0, 2, 3, 4, 5)
+// define { i8, double } @UdfWrapper(i8* %context, %"class.impala::TupleRow"* %row) {
 // entry:
-//   %arg_val = call i32 @ExprWrapper(i8* %context, %"class.impala::TupleRow"* %row)
-//   %arg_ptr = alloca i32
-//   store i32 %arg_val, i32* %arg_ptr
-//   %result = call i32 @_Z8IdentityPN10impala_udf15FunctionContextERKNS_11SmallIntValE(
-//      %"class.impala_udf::FunctionContext"* inttoptr
-//         (i64 51760208 to %"class.impala_udf::FunctionContext"*),
-//      i32* %arg_ptr)
-//   ret i32 %result
-// }
+//   %arg_val = call { i8, double }
+//      @ExprWrapper(i8* %context, %"class.impala::TupleRow"* %row)
+//   %arg_ptr = alloca { i8, double }
+//   store { i8, double } %arg_val, { i8, double }* %arg_ptr
+//   %arg_val1 = call i64 @ExprWrapper1(i8* %context, %"class.impala::TupleRow"* %row)
+//   store i64 %arg_val1, i64* inttoptr (i64 89111072 to i64*)
+//   %arg_val2 = call i64 @ExprWrapper2(i8* %context, %"class.impala::TupleRow"* %row)
+//   store i64 %arg_val2, i64* inttoptr (i64 89111080 to i64*)
+//   %arg_val3 = call i64 @ExprWrapper3(i8* %context, %"class.impala::TupleRow"* %row)
+//   store i64 %arg_val3, i64* inttoptr (i64 89111088 to i64*)
+//   %arg_val4 = call i64 @ExprWrapper4(i8* %context, %"class.impala::TupleRow"* %row)
+//   store i64 %arg_val4, i64* inttoptr (i64 89111096 to i64*)
+//   %result = call { i8, double }
+//      @_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE(
+//        %"class.impala_udf::FunctionContext"* inttoptr
+//            (i64 37522464 to %"class.impala_udf::FunctionContext"*),
+//        {i8, double }* %arg_ptr,
+//        i32 4,
+//        i64* inttoptr (i64 89111072 to i64*))
+//   ret { i8, double } %result
 Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   LlvmCodeGen* codegen = state->llvm_codegen();
   llvm::Function* udf;
@@ -179,20 +199,43 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   // Call children to populate remaining arguments
   llvm::Function::arg_iterator arg = udf->arg_begin();
   ++arg; // Skip FunctionContext* arg
-  for (int i = 0; i < children_.size(); ++i, ++arg) {
+  for (int i = 0; i < GetNumChildren(); ++i) {
+    if (vararg_start_idx_ == i) {
+      // This is the start of the varargs, first add the number of args.
+      udf_args.push_back(codegen->GetIntConstant(
+          TYPE_INT, GetNumChildren() - vararg_start_idx_));
+      ++arg;
+    }
+
     llvm::Function* child_fn;
     RETURN_IF_ERROR(children_[i]->GetIrComputeFn(state, &child_fn));
     DCHECK(child_fn != NULL);
-
     llvm::Value* arg_val = builder.CreateCall(child_fn, args, "arg_val");
-    llvm::Value* arg_ptr = builder.CreateAlloca(child_fn->getReturnType(), 0, "arg_ptr");
-    builder.CreateStore(arg_val, arg_ptr);
 
-    // The *Val type returned by child_fn will be likely be lowered to a simpler type, so
-    // we must cast arg_ptr to the actual *Val struct pointer type expected by the UDF.
-    llvm::Value* cast_arg_ptr =
-        builder.CreateBitCast(arg_ptr, arg->getType(), "cast_arg_ptr");
-    udf_args.push_back(cast_arg_ptr);
+    if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
+      // Either no varargs or arguments before varargs begin.
+      llvm::Value* arg_ptr = builder.CreateAlloca(child_fn->getReturnType(), 0, "arg_ptr");
+      builder.CreateStore(arg_val, arg_ptr);
+
+      // The *Val type returned by child_fn will be likely be lowered to a simpler type, so
+      // we must cast arg_ptr to the actual *Val struct pointer type expected by the UDF.
+      llvm::Value* cast_arg_ptr =
+          builder.CreateBitCast(arg_ptr, arg->getType(), "cast_arg_ptr");
+      udf_args.push_back(cast_arg_ptr);
+      ++arg;
+    } else {
+      // Store the result of child(i) in varargs_input_[i - vararg_start_idx_]
+      int varargs_input_idx = i - vararg_start_idx_;
+      llvm::Type* arg_ptr_type = llvm::PointerType::get(arg_val->getType(), 0);
+      llvm::Value* arg_ptr = codegen->CastPtrToLlvmPtr(
+          arg_ptr_type, &varargs_input_[varargs_input_idx]);
+      builder.CreateStore(arg_val, arg_ptr);
+    }
+  }
+
+  if (vararg_start_idx_ != -1) {
+    // Add all the accumulated vararg inputs as one input argument.
+    udf_args.push_back(codegen->CastPtrToLlvmPtr(arg->getType(), &varargs_input_[0]));
   }
 
   // Call UDF
@@ -224,10 +267,18 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     llvm::Type* return_type = CodegenAnyVal::GetType(codegen, type());
     vector<llvm::Type*> arg_types;
     arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
-    for (int i = 0; i < children_.size(); ++i) {
+    int num_fixed_args = vararg_start_idx_ >= 0 ? vararg_start_idx_ : children_.size();
+    for (int i = 0; i < num_fixed_args; ++i) {
       llvm::Type* child_return_type =
           CodegenAnyVal::GetType(codegen, children_[i]->type());
       arg_types.push_back(llvm::PointerType::get(child_return_type, 0));
+    }
+
+    if (vararg_start_idx_ >= 0) {
+      llvm::Type* vararg_return_type =
+          CodegenAnyVal::GetType(codegen, children_[vararg_start_idx_]->type());
+      arg_types.push_back(codegen->GetType(TYPE_INT));
+      arg_types.push_back(llvm::PointerType::get(vararg_return_type, 0));
     }
     llvm::FunctionType* udf_type = llvm::FunctionType::get(return_type, arg_types, false);
 

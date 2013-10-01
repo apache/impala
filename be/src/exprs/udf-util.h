@@ -17,6 +17,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "runtime/primitive-type.h"
+#include "udf/udf.h"
 
 namespace llvm {
   class Type;
@@ -99,6 +100,9 @@ class CodegenAnyVal {
   llvm::Value* SetHighBits(int num_bits, llvm::Value* src, llvm::Value* dst,
                            const char* name = "");
 };
+
+// Creates the corresponding AnyVal subclass for type. The object is added to the pool.
+impala_udf::AnyVal* CreateAnyVal(ObjectPool* pool, PrimitiveType type);
 
 }
 
