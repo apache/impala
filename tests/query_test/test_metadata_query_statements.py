@@ -8,7 +8,6 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.shell_util import exec_shell_cmd
 
-
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
 class TestMetadataQueryStatements(ImpalaTestSuite):
@@ -39,7 +38,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
-    self.exec_and_compare_hive_and_impala_hs2(\
+    self.exec_and_compare_hive_and_impala_hs2(
         "describe formatted functional_text_lzo.alltypes")
     # Describe an unpartitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")

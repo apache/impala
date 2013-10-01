@@ -44,7 +44,11 @@ class Query(object):
     self.test_vector = kwargs.get('test_vector')
     self.results = kwargs.get('results')
     self.workload = kwargs.get('workload')
-    self.__build_query()
+    self.db = kwargs.get('db', str())
+    self.table_format_str = kwargs.get('table_format_str', str())
+    # Only attempt to build the query if a query_str has been passed to the c'tor.
+    # If it's None, assume the user wants to set a qualified query_str
+    if self.query_str: self.__build_query()
 
   def __build_query(self):
     self.db = QueryTestSectionReader.get_db_name(self.test_vector, self.scale_factor)

@@ -25,6 +25,7 @@ from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
+from tests.common.workload_runner import Query
 from tests.util.shell_util import exec_shell_cmd
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
@@ -245,13 +246,17 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def exec_and_compare_hive_and_impala_hs2(self, stmt):
     """Compare Hive and Impala results when executing the same statment over HS2"""
+    # execute_using_jdbc expects a Query object. Convert the query string into a Query
+    # object
+    query = Query()
+    query.query_str = stmt
     # Run the statement targeting Hive
     exec_opts = JdbcQueryExecOptions(iterations=1, impalad=HIVE_HS2_HOST_PORT)
-    hive_results = execute_using_jdbc(stmt, exec_opts).data
+    hive_results = execute_using_jdbc(query, exec_opts).data
 
     # Run the statement targeting Impala
     exec_opts = JdbcQueryExecOptions(iterations=1, impalad=IMPALAD_HS2_HOST_PORT)
-    impala_results = execute_using_jdbc(stmt, exec_opts).data
+    impala_results = execute_using_jdbc(query, exec_opts).data
 
     # Compare the results
     assert (impala_results is not None) and (hive_results is not None)
