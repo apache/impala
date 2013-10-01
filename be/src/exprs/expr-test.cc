@@ -1935,8 +1935,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("quotient(-30.5, 0.000999)", TYPE_BIGINT);
 
   // Test int param
-  const int32_t int_val = 123456789;
-  const string int_val_str = lexical_cast<string>(int_val);
+  int32_t int_val = 123456789;
+  string int_val_str = lexical_cast<string>(int_val);
   TestValue<int32_t>("least(500, 300)", TYPE_INT, 300);
   // Test ordering
   TestValue<int32_t>("least(300, 500)", TYPE_INT, 300);
@@ -1960,8 +1960,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue<int32_t>("least(cast(1 as int))", TYPE_INT, 1);
   TestIsNull("least(1, NULL)", TYPE_INT);
   // Test bigint param
-  const int64_t bigint_val = 12345678900;
-  const string bigint_val_str = lexical_cast<string>(bigint_val);
+  int64_t bigint_val = 12345678900;
+  string bigint_val_str = lexical_cast<string>(bigint_val);
   TestValue<int64_t>("least(" + bigint_val_str + ", 300)", TYPE_BIGINT, 300);
   // Test ordering
   TestValue<int64_t>("least(300, " + bigint_val_str + ")", TYPE_BIGINT, 300);
@@ -1990,8 +1990,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue<float>("least(1.25)", TYPE_FLOAT, 1.25f);
   TestIsNull("least(1.0, NULL)", TYPE_FLOAT);
   // Test double param
-  const double double_val = 12345678900.25;
-  const string double_val_str = lexical_cast<string>(double_val);
+  double double_val = 12345678900.25;
+  string double_val_str = lexical_cast<string>(double_val);
   TestValue<double>("least(" + double_val_str + ", 300.25)", TYPE_DOUBLE, 300.25);
   // Test the ordering of the arguments
   TestValue<double>("least(300.25, " + double_val_str + ")", TYPE_DOUBLE, 300.25);
@@ -2050,10 +2050,134 @@ TEST_F(ExprTest, MathFunctions) {
       "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:01");
   TestStringValue("cast(least(cast('12:01:00' as timestamp), "
       "cast('12:00:01' as timestamp)) as string)", "12:00:01");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp)) " "as string)",
+  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp)) as string)",
       "2013-09-26 12:00:00");
   TestStringValue("cast(least(cast('12:00:00' as timestamp)) as string)", "12:00:00");
   TestIsNull("least(cast('2013-09-26 12:01:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp), NULL)", TYPE_TIMESTAMP);
+
+  // Test int param
+  int_val = 123456789;
+  int_val_str = lexical_cast<string>(int_val);
+  TestValue<int32_t>("greatest(500, 300)", TYPE_INT, 500);
+  // Test ordering
+  TestValue<int32_t>("greatest(300, 500)", TYPE_INT, 500);
+  // Test to make sure greatest value is found in a mixed order set
+  TestValue<int32_t>("greatest(1, 3, 4, 0, 6)", TYPE_INT, 6);
+  // Test to make sure the greatest value is found from a list of duplicates
+  TestValue<int32_t>("greatest(1, 1, 1, 1)", TYPE_INT, 1);
+  // Test repeating groups and ordering
+  TestValue<int32_t>("greatest(2, 2, 1, 1)", TYPE_INT, 2);
+  TestValue<int32_t>("greatest(0, -2, 1)", TYPE_INT, 1);
+  // Test small single value is returned correctly
+  TestValue<int32_t>("greatest(1)", TYPE_INT, 1);
+  // Test large single value is returned correctly
+  TestValue<int32_t>("greatest(" + int_val_str + ")", TYPE_INT, int_val);
+  // Test to make sure mixed integer types are handled correctly
+  TestValue<int32_t>("greatest(" + int_val_str + ", 10)", TYPE_INT, int_val);
+  // Test to make sure large integer types are handled correctly
+  TestValue<int32_t>("greatest(" + int_val_str + "," + int_val_str + ")", TYPE_INT,
+      int_val);
+  // Test explicit cast
+  TestValue<int32_t>("greatest(cast(1 as int))", TYPE_INT, 1);
+  TestIsNull("greatest(1, NULL)", TYPE_INT);
+  // Test bigint param
+  bigint_val = 12345678900;
+  bigint_val_str = lexical_cast<string>(bigint_val);
+  TestValue<int64_t>("greatest(" + bigint_val_str + ", 300)", TYPE_BIGINT, bigint_val);
+  // Test ordering
+  TestValue<int64_t>("greatest(300, " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
+  // Test to make sure greatest value is found in a mixed order set
+  TestValue<int64_t>("greatest(1, 3, " + bigint_val_str + ", 0, 6)", TYPE_BIGINT,
+      bigint_val);
+  // Test to make sure the greatest value is found from a list of duplicates
+  TestValue<int64_t>("greatest(" + bigint_val_str + ", " + bigint_val_str + ", " +
+      bigint_val_str + ", " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
+  // Test repeating groups and ordering
+  TestValue<int64_t>("greatest(1, 1, " + bigint_val_str + ", " + bigint_val_str + ")",
+      TYPE_BIGINT, bigint_val);
+  TestValue<int64_t>("greatest(0, -3147483648, 1)", TYPE_BIGINT, 1);
+  TestValue<int64_t>("greatest(" + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
+  TestIsNull("greatest(1, " + bigint_val_str + ", NULL)", TYPE_BIGINT);
+  // Test float param
+  TestValue<float>("greatest(500.25, 300.25)", TYPE_FLOAT, 500.25f);
+  // Test ordering
+  TestValue<float>("greatest(300.25, 500.25)", TYPE_FLOAT, 500.25f);
+  // Test to make sure greatest value is found in a mixed order set
+  TestValue<float>("greatest(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 6.25f);
+  // Test to make sure the greatest value is found from a list of duplicates
+  TestValue<float>("greatest(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  // Test repeating groups and ordering
+  TestValue<float>("greatest(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 2.0f);
+  TestValue<float>("greatest(0.0, -2.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("greatest(1.25)", TYPE_FLOAT, 1.25f);
+  TestIsNull("greatest(1.0, NULL)", TYPE_FLOAT);
+  // Test double param
+  double_val = 12345678900.25;
+  double_val_str = lexical_cast<string>(double_val);
+  TestValue<double>("greatest(" + double_val_str + ", 300.25)", TYPE_DOUBLE, double_val);
+  // Test the ordering of the arguments
+  TestValue<double>("greatest(300.25, " + double_val_str + ")", TYPE_DOUBLE, double_val);
+  // Test to make sure greatest value is found in a mixed order set
+  TestValue<double>("greatest(1.25, 3.25, " + double_val_str + ", 0.25, 6.25)",
+      TYPE_DOUBLE, double_val);
+  TestValue<double>("greatest(" + double_val_str + ", " + double_val_str + ", " +
+      double_val_str + ", " + double_val_str + ")", TYPE_DOUBLE, double_val);
+  // Test repeating groups and ordering
+  TestValue<double>("greatest(" + double_val_str + ", " + double_val_str + ", 1.0, 1.0)",
+      TYPE_DOUBLE, double_val);
+  TestValue<double>("greatest(0.0, -" + double_val_str + ", 1.0)", TYPE_DOUBLE, 1.0);
+  TestValue<double>("greatest(" + double_val_str + ")", TYPE_DOUBLE, double_val);
+  TestIsNull("greatest(1.0, " + double_val_str + ", NULL)", TYPE_DOUBLE);
+  // Test mixed numeric params
+  TestValue<float>("greatest(500.25, 1.25, 10)", TYPE_FLOAT, 500.25f);
+  TestValue<float>("greatest(1.0, 55, 300.25, 100)", TYPE_FLOAT, 300.25f);
+  TestValue<double>("greatest(500.25, " + double_val_str + ", 10, 1.0)", TYPE_DOUBLE,
+      double_val);
+  TestValue<double>("greatest(1.0, 55, " + double_val_str + ", 100)", TYPE_DOUBLE,
+      double_val);
+  TestIsNull("greatest(1.0, NULL, 10)", TYPE_FLOAT);
+  TestIsNull("greatest(1.0, " + double_val_str + ", NULL, 10)", TYPE_DOUBLE);
+  // Test string param
+  TestStringValue("greatest('2', '5', '12', '3')", "5");
+  TestStringValue("greatest('apples', 'oranges', 'bananas')", "oranges");
+  TestStringValue("greatest('apples', 'applis', 'applas')", "applis");
+  TestStringValue("greatest('apples', '!applis', 'applas')", "apples");
+  TestStringValue("greatest('apples', 'apples', 'apples')", "apples");
+  TestStringValue("greatest('apples')", "apples");
+  TestStringValue("greatest('A')", "A");
+  TestStringValue("greatest('A', 'a')", "a");
+  // Test ordering
+  TestStringValue("greatest('a', 'A')", "a");
+  TestStringValue("greatest('APPLES', 'APPLES')", "APPLES");
+  TestStringValue("greatest('apples', 'APPLES')", "apples");
+  TestStringValue("greatest('apples', 'app\nles')", "apples");
+  TestStringValue("greatest('apples', 'app les')", "apples");
+  TestStringValue("greatest('apples', 'app\nles')", "apples");
+  TestStringValue("greatest('apples', 'app\tles')", "apples");
+  TestStringValue("greatest('apples', 'app\fles')", "apples");
+  TestStringValue("greatest('apples', 'app\vles')", "apples");
+  TestStringValue("greatest('apples', 'app\rles')", "apples");
+  TestIsNull("greatest('apples', 'oranges', 'bananas', NULL)", TYPE_STRING);
+  // Test timestamp param
+  TestStringValue("cast(greatest(cast('2014-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2014-09-26 12:00:00");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2014-08-26 12:00:00' as timestamp)) as string)", "2014-08-26 12:00:00");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-25 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 11:59:59' as timestamp)) as string)", "2013-09-26 12:00:00");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:01");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:01:00' as timestamp), "
+      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:01:00");
+  TestStringValue("cast(greatest(cast('12:01:00' as timestamp), "
+      "cast('12:00:01' as timestamp)) as string)", "12:01:00");
+  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp)) as string)",
+      "2013-09-26 12:00:00");
+  TestStringValue("cast(greatest(cast('12:00:00' as timestamp)) as string)", "12:00:00");
+  TestIsNull("greatest(cast('2013-09-26 12:01:00' as timestamp), "
       "cast('2013-09-26 12:00:01' as timestamp), NULL)", TYPE_TIMESTAMP);
 
   // NULL arguments.
@@ -2098,6 +2222,12 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("least(cast(NULL as float))", TYPE_FLOAT);
   TestIsNull("least(cast(NULL as double))", TYPE_DOUBLE);
   TestIsNull("least(cast(NULL as timestamp))", TYPE_TIMESTAMP);
+  TestIsNull("greatest(NULL)", TYPE_STRING);
+  TestIsNull("greatest(cast(NULL as int))", TYPE_INT);
+  TestIsNull("greatest(cast(NULL as bigint))", TYPE_BIGINT);
+  TestIsNull("greatest(cast(NULL as float))", TYPE_FLOAT);
+  TestIsNull("greatest(cast(NULL as double))", TYPE_DOUBLE);
+  TestIsNull("greatest(cast(NULL as timestamp))", TYPE_TIMESTAMP);
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {

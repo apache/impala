@@ -87,13 +87,30 @@ functions = [
         'MathFunctions::QuotientBigInt', ['quotient']],
   ['Math_Quotient', 'BIGINT', ['DOUBLE', 'DOUBLE'],\
         'MathFunctions::QuotientDouble', ['quotient']],
-  ['Math_Least', 'INT', ['INT', '...'], 'MathFunctions::LeastInt', ['least']],
-  ['Math_Least', 'BIGINT', ['BIGINT', '...'], 'MathFunctions::LeastBigInt', ['least']],
-  ['Math_Least', 'FLOAT', ['FLOAT', '...'], 'MathFunctions::LeastFloat', ['least']],
-  ['Math_Least', 'DOUBLE', ['DOUBLE', '...'], 'MathFunctions::LeastDouble', ['least']],
-  ['Math_Least', 'STRING', ['STRING', '...'], 'MathFunctions::LeastString', ['least']],
+  ['Math_Least', 'INT', ['INT', '...'], \
+        'MathFunctions::LeastGreatestInt<true>', ['least']],
+  ['Math_Least', 'BIGINT', ['BIGINT', '...'], \
+        'MathFunctions::LeastGreatestBigInt<true>', ['least']],
+  ['Math_Least', 'FLOAT', ['FLOAT', '...'], \
+        'MathFunctions::LeastGreatestFloat<true>', ['least']],
+  ['Math_Least', 'DOUBLE', ['DOUBLE', '...'], \
+        'MathFunctions::LeastGreatestDouble<true>', ['least']],
+  ['Math_Least', 'STRING', ['STRING', '...'], \
+        'MathFunctions::LeastGreatestString<true>', ['least']],
   ['Math_Least', 'TIMESTAMP', ['TIMESTAMP', '...'], \
-        'MathFunctions::LeastTimestamp', ['least']],
+        'MathFunctions::LeastGreatestTimestamp<true>', ['least']],
+  ['Math_Greatest', 'INT', ['INT', '...'], \
+        'MathFunctions::LeastGreatestInt<false>', ['greatest']],
+  ['Math_Greatest', 'BIGINT', ['BIGINT', '...'], \
+        'MathFunctions::LeastGreatestBigInt<false>', ['greatest']],
+  ['Math_Greatest', 'FLOAT', ['FLOAT', '...'], \
+        'MathFunctions::LeastGreatestFloat<false>', ['greatest']],
+  ['Math_Greatest', 'DOUBLE', ['DOUBLE', '...'], \
+        'MathFunctions::LeastGreatestDouble<false>', ['greatest']],
+  ['Math_Greatest', 'STRING', ['STRING', '...'], \
+        'MathFunctions::LeastGreatestString<false>', ['greatest']],
+  ['Math_Greatest', 'TIMESTAMP', ['TIMESTAMP', '...'], \
+        'MathFunctions::LeastGreatestTimestamp<false>', ['greatest']],
 
   ['String_Substring', 'STRING', ['STRING', 'INT'], \
         'StringFunctions::Substring<int32_t>', ['substr', 'substring']],
