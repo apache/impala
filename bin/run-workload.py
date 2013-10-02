@@ -120,6 +120,8 @@ LOG = logging.getLogger('run-workload')
 def save_results(result_map, output_csv_file, is_impala_result=True):
   """
   Writes the results to an output CSV files
+  TODO: This should be changed to use JSON as the container format. This is especially
+  important as we add more fields to the results.
   """
   if result_map is None:
     LOG.error('Result map is None')
@@ -150,7 +152,7 @@ def append_row_to_csv_file(csv_writer, query, result):
   # Since the query is run only once when executing at a 'workload' scope, reset it to 1
   num_iters = options.iterations if options.execution_scope.lower() == 'query' else 1
   csv_writer.writerow([result.executor_name, query.workload, query.scale_factor,
-                       query.query_str, query.name, query.test_vector.file_format,
+                       query.name, query.query_str, query.test_vector.file_format,
                        compression_str, result.avg_time, result.std_dev,
                        options.num_clients, num_iters, result.runtime_profile])
 
