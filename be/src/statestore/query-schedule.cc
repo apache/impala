@@ -60,6 +60,7 @@ void QuerySchedule::GetResourceHostport(const TNetworkAddress& src,
   if (is_mini_llama_) {
     *dest = impalad_to_dn_[src];
   } else {
+    dest->hostname = src.hostname;
     dest->port = 0;
   }
 }
