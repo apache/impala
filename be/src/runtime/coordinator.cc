@@ -1291,9 +1291,10 @@ void Coordinator::SetExecPlanFragmentParams(
   PerNodeScanRanges& scan_ranges = params.scan_range_assignment[exec_host];
   if (schedule.HasReservation()) {
     // The reservation has already have been validated at this point.
-    if (schedule.is_mini_llama()) exec_host = schedule.impalad_to_dn(exec_host);
+    TNetworkAddress resource_hostport;
+    schedule.GetResourceHostport(exec_host, &resource_hostport);
     rpc_params->__set_reserved_resource(
-        schedule.reservation()->allocated_resources[exec_host]);
+        schedule.reservation()->allocated_resources[resource_hostport]);
   }
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);

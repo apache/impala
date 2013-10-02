@@ -171,10 +171,10 @@ void ResourceBroker::ReservationPromise::FillReservation(
   BOOST_FOREACH(const llama::TAllocatedResource& resource, allocated_resources) {
     // Ignore resources that don't belong to the given reservation id.
     if (resource.reservation_id != reservation_id) continue;
-    VLOG_QUERY << "Getting allocated resource for reservation id "
-               << reservation_id << " and location " << resource.location;
     TNetworkAddress host = MakeNetworkAddress(resource.location);
     reservation_->allocated_resources[host] = resource;
+    VLOG_QUERY << "Getting allocated resource for reservation id "
+               << reservation_id << " and location " << host;
   }
   reservation_->reservation_id << reservation_id;
 }

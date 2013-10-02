@@ -71,17 +71,19 @@ class QuerySchedule {
   // of the hosts in fragment_exec_params_. Returns an error otherwise.
   Status ValidateReservation();
 
+  // Translates src into a network address suitable for identifying resources across
+  // interactions with the Llama. The MiniLlama expects resources to be requested on
+  // IP:port addresses of Hadoop DNs, whereas the regular Llama only deals with the
+  // hostnames of Yarn NMs. For MiniLlama setups this translation uses the
+  // impalad_to_dn_ mapping to populate dest. When using the regular Llama, this
+  // translation sets a fixed port of 0 in dest because the Llama strips away the port
+  // of resource locations.
+  void GetResourceHostport(const TNetworkAddress& src, TNetworkAddress* dest);
+
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
   bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
-  bool is_mini_llama() const { return is_mini_llama_; }
-  const TNetworkAddress& impalad_to_dn(const TNetworkAddress& impalad_hostport) {
-    return impalad_to_dn_[impalad_hostport];
-  }
-  const TNetworkAddress& dn_to_impalad(const TNetworkAddress& dn_hostport) {
-    return dn_to_impalad_[dn_hostport];
-  }
 
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }

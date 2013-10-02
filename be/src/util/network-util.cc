@@ -103,6 +103,11 @@ TNetworkAddress MakeNetworkAddress(const string& address) {
   vector<string> tokens;
   split(tokens, address, is_any_of(":"));
   TNetworkAddress ret;
+  if (tokens.size() == 1) {
+    ret.__set_hostname(tokens[0]);
+    ret.port = 0;
+    return ret;
+  }
   if (tokens.size() != 2) return ret;
   ret.__set_hostname(tokens[0]);
   StringParser::ParseResult parse_result;

@@ -55,6 +55,15 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
   }
 }
 
+void QuerySchedule::GetResourceHostport(const TNetworkAddress& src,
+    TNetworkAddress* dest) {
+  if (is_mini_llama_) {
+    *dest = impalad_to_dn_[src];
+  } else {
+    dest->port = 0;
+  }
+}
+
 void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
   DCHECK(is_mini_llama_);
   DCHECK(!llama_nodes.empty());
@@ -118,12 +127,9 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
     resource.enforcement = llama::TLocationEnforcement::MUST;
 
     stringstream ss;
-    if (is_mini_llama_) {
-      ss << impalad_to_dn_[host];
-    } else {
-      ss << host;
-    }
-
+    TNetworkAddress resource_hostport;
+    GetResourceHostport(host, &resource_hostport);
+    ss << resource_hostport;
     resource.askedLocation = ss.str();
     resource.memory_mb = memory_mb;
     resource.v_cpu_cores = v_cpu_cores;
@@ -135,9 +141,9 @@ Status QuerySchedule::ValidateReservation() {
   vector<TNetworkAddress> hosts_missing_resources;
   BOOST_FOREACH(const FragmentExecParams& params, fragment_exec_params_) {
     BOOST_FOREACH(const TNetworkAddress& host, params.hosts) {
-      TNetworkAddress hostport = host;
-      if (is_mini_llama_) hostport = impalad_to_dn_[host];
-      if (reservation_.allocated_resources.find(hostport) ==
+      TNetworkAddress resource_hostport;
+      GetResourceHostport(host, &resource_hostport);
+      if (reservation_.allocated_resources.find(resource_hostport) ==
           reservation_.allocated_resources.end()) {
         hosts_missing_resources.push_back(host);
       }

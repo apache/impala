@@ -35,8 +35,9 @@ Status GetHostname(std::string* hostname);
 TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
 
 // Utility method to parse the given string into a network address.
-// Accepted format: "host:port". If the given string address is malformed, returns a
-// network address with an empty hostname and a port of 0.
+// Accepted format: "host:port" or "host". For the latter format the port is set to zero.
+// If the given string address is malformed, returns a network address with an empty
+// hostname and a port of 0.
 TNetworkAddress MakeNetworkAddress(const std::string& address);
 
 // Returns true if the ip address parameter is the wildcard interface (0.0.0.0)
