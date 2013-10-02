@@ -565,33 +565,19 @@ Status LlvmCodeGen::OptimizeModule() {
   // our own passes.  Our subexpression elimination optimization can be rolled into
   // a pass.
   PassManagerBuilder pass_builder ;
-  // 2 maps to -O2
-  // TODO: should we switch to 3? (3 may not produce different IR than 2 while taking
-  // longer, but we should check)
-  pass_builder.OptLevel = 2;
-  // Don't optimize for code size (this corresponds to -O2/-O3)
-  pass_builder.SizeLevel = 0;
+  pass_builder.OptLevel = 2;          // 2 maps to -O2
   pass_builder.Inliner = createFunctionInliningPass() ;
 
-  scoped_ptr<FunctionPassManager> function_passes(new FunctionPassManager(module_));
-  pass_builder.populateFunctionPassManager(*function_passes);
-  function_passes->doInitialization();
-  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++it) {
-    if (!it->isDeclaration()) function_passes->run(*it);
+  scoped_ptr<FunctionPassManager> function_pass(new FunctionPassManager(module_));
+  pass_builder.populateFunctionPassManager(*function_pass);
+  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++ it) {
+    if (!it->isDeclaration()) function_pass->run(*it);
   }
-  function_passes->doFinalization() ;
+  function_pass->doFinalization() ;
 
-  scoped_ptr<PassManager> module_passes(new PassManager());
-
-  // Specifying the data layout is necessary for some optimizations (e.g. removing many of
-  // the loads/stores produced by structs).
-  string data_layout_str = module_->getDataLayout();
-  DataLayout* data_layout = new DataLayout(data_layout_str);
-  // Tranfers ownership of data_layout to module_passes
-  module_passes->add(data_layout);
-
-  pass_builder.populateModulePassManager(*module_passes);
-  module_passes->run(*module_);
+  scoped_ptr<PassManager> module_pass(new PassManager());
+  pass_builder.populateModulePassManager(*module_pass);
+  module_pass->run(*module_);
 
   return Status::OK;
 }

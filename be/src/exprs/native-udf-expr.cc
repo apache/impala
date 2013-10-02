@@ -15,7 +15,6 @@
 #include "exprs/native-udf-expr.h"
 
 #include <vector>
-#include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include "codegen/llvm-codegen.h"
 #include "exprs/opcode-registry.h"
@@ -242,7 +241,6 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   llvm::Value* result_val = builder.CreateCall(udf, udf_args, "result");
   builder.CreateRet(result_val);
 
-  (*fn)->addFnAttr(llvm::Attribute::AlwaysInline);
   *fn = codegen->FinalizeFunction(*fn);
   DCHECK(*fn != NULL);
   return Status::OK;
