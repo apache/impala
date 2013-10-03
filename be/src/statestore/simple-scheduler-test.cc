@@ -23,6 +23,8 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
+DECLARE_string(pool_conf_file);
+
 namespace impala {
 
 class SimpleSchedulerTest : public testing::Test {
@@ -143,6 +145,36 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   EXPECT_EQ(backends.at(3).address.port, 1001);
   EXPECT_EQ(backends.at(4).address.hostname, "127.0.0.1");
   EXPECT_EQ(backends.at(4).address.port, 1000);
+}
+
+TEST_F(SimpleSchedulerTest, InitPoolWhiteList) {
+  // Check a non-existant configuration
+  FLAGS_pool_conf_file = "/I/do/not/exist";
+  vector<TNetworkAddress> backends;
+  backends.push_back(TNetworkAddress());
+  scoped_ptr<SimpleScheduler> sched(new SimpleScheduler(backends, NULL, NULL, NULL));
+  EXPECT_FALSE(sched->Init().ok());
+
+  // Check a valid configuration (although one with some malformed lines)
+  string impala_home(getenv("IMPALA_HOME"));
+  stringstream conf_file;
+  conf_file << impala_home << "/be/src/statestore/test-pool-conf";
+  FLAGS_pool_conf_file = conf_file.str();
+  sched.reset(new SimpleScheduler(backends, NULL, NULL, NULL));
+  EXPECT_TRUE(sched->Init().ok());
+  const SimpleScheduler::UserPoolMap& pool_map = sched->user_pool_map();
+  EXPECT_EQ(3, pool_map.size());
+  EXPECT_EQ(2, pool_map.find("admin")->second.size());
+  EXPECT_EQ(pool_map.end(), pool_map.find("root"));
+  EXPECT_EQ(1, pool_map.find("*")->second.size());
+  EXPECT_EQ("Staging", pool_map.find("*")->second[0]);
+
+  // Check the pool determination logic.
+  string pool;
+  EXPECT_TRUE(sched->GetYarnPool("admin", TQueryOptions(), &pool).ok());
+  EXPECT_EQ("prod", pool);
+  EXPECT_TRUE(sched->GetYarnPool("i-want-default", TQueryOptions(), &pool).ok());
+  EXPECT_EQ("Staging", pool);
 }
 
 }

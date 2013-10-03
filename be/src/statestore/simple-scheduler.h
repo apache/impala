@@ -89,6 +89,19 @@ class SimpleScheduler : public Scheduler {
   virtual void HandlePreemptedReservation(const TUniqueId& reservation_id);
   virtual void HandlePreemptedResource(const TUniqueId& client_resource_id);
 
+  // Map form a user ID to a list of pools they are allowed to submit work to
+  typedef boost::unordered_map<std::string, std::vector<std::string> > UserPoolMap;
+
+  // Used for testing, to confirm correct parsing of the configuration file
+  const UserPoolMap& user_pool_map() const { return user_pool_whitelist_; }
+
+  // Determines the pool for a user, given a set of query options and any configuration
+  // loaded from a file. Returns the first pool from all pools configured for a user. Does
+  // not confirm that a user has access to a pool, if query_options.yarn_pool is set.
+  // Public only for testing.
+  Status GetYarnPool(const std::string& user,
+      const TQueryOptions& query_options, std::string* pool) const;
+
  private:
   // Protects access to backend_map_ and backend_ip_map_, which might otherwise be updated
   // asynchronously with respect to reads. Also protects the locality
@@ -148,8 +161,8 @@ class SimpleScheduler : public Scheduler {
   // Protects active_reservations_ and active_client_resources_.
   boost::mutex active_resources_lock_;
 
-  // Maps from a Llama reservation id to the coordinator of the query using that reservation.
-  // The map is used to cancel queries whose reservation has been preempted.
+  // Maps from a Llama reservation id to the coordinator of the query using that
+  // reservation.  The map is used to cancel queries whose reservation has been preempted.
   // Entries are added in Schedule() calls that result in granted resource allocations.
   // Entries are removed in Release().
   typedef boost::unordered_map<TUniqueId, Coordinator*> ActiveReservationsMap;
@@ -165,6 +178,9 @@ class SimpleScheduler : public Scheduler {
   // Resource broker that mediates resource requests between Impala and the Llama.
   // Set to NULL if resource management is disabled.
   ResourceBroker* resource_broker_;
+
+  // Map from a user ID to a list of pools they are allowed to submit work to.
+  UserPoolMap user_pool_whitelist_;
 
   // Adds the granted reservation and resources to the active_reservations_ and
   // active_client_resources_ maps, respectively.
@@ -183,8 +199,9 @@ class SimpleScheduler : public Scheduler {
   // Webserver callback that prints a list of known backends
   void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
-  std::string GetYarnPool(const std::string& user,
-      const TQueryOptions& query_options) const;
+  // Loads the list of permissible pools from the provided configuration file, failing if
+  // there is an error or the file can't be found.
+  Status InitPoolWhitelist(const std::string& conf_path);
 
   // Computes the assignment of scan ranges to hosts for each scan node in schedule.
   // Unpartitioned fragments are assigned to the coord. Populates the schedule's

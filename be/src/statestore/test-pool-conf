@@ -1,0 +1,4 @@
+admin: prod, dev.
+root:
+user: dev.
+*: Staging
