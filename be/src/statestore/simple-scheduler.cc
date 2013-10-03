@@ -692,9 +692,19 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
 
   // Each line is user: pool1, pool2
   string line;
+  bool in_user_section = false;
   while (getline(whitelist, line)) {
     trim(line);
     if (line.empty()) continue;
+    if (line == "[users]") {
+      in_user_section = true;
+    } else if (line.size() > 2 && line[0] == '[' && line[line.size() - 1] == ']') {
+      // Headers are '[header name]'
+      in_user_section = false;
+    }
+
+    if (!in_user_section) continue;
+
     size_t colon_pos = line.find_first_of(":");
     if (colon_pos == string::npos) {
       LOG(WARNING) << "Could not read line: " << line << " in pool configuration "
