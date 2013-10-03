@@ -83,6 +83,7 @@ class QuerySchedule {
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
+  const std::string& yarn_pool() { return yarn_pool_; }
   bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
 
   // Helper methods used by scheduler to populate this QuerySchedule.
@@ -131,6 +132,10 @@ class QuerySchedule {
 
   // Total number of scan ranges of this query.
   int64_t num_scan_ranges_;
+
+  // Yarn pool from which resources were requested for this query schedule.
+  // Set in CreateReservationRequest().
+  std::string yarn_pool_;
 
   // Fulfilled reservation request. Populated by scheduler.
   TResourceBrokerReservationResponse reservation_;

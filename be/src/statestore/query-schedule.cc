@@ -82,6 +82,7 @@ void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
 void QuerySchedule::CreateReservationRequest(const string& pool,
     const vector<string>& llama_nodes,
     TResourceBrokerReservationRequest* reservation_request) {
+  yarn_pool_ = pool;
   reservation_request->resources.clear();
   reservation_request->version = TResourceBrokerServiceVersion::V1;
   reservation_request->queue = pool;

@@ -251,12 +251,17 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   bool is_mini_llama = false;
   if (FLAGS_enable_rm) {
     DCHECK(exec_env_->resource_broker() != NULL);
-    is_mini_llama =  exec_env_->resource_broker()->is_mini_llama();
+    is_mini_llama = exec_env_->resource_broker()->is_mini_llama();
   }
   schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
       exec_request_.query_options, is_mini_llama));
   coord_.reset(new Coordinator(exec_env_));
   RETURN_IF_ERROR(exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get()));
+  if (FLAGS_enable_rm) {
+    // Add the Yarn Pool and the reservation wait time to the query's runtime profile.
+    summary_profile_.AddInfoString("Yarn Pool", schedule_->yarn_pool());
+    query_events_->MarkEvent("Resources reserved");
+  }
   Status status = coord_->Exec(*schedule_,  &output_exprs_);
   {
     lock_guard<mutex> l(lock_);
