@@ -171,8 +171,9 @@ class ThreadGroup {
   void JoinAll();
 
   // Assigns all current and future threads to the given cgroup managed by cgroups_mgr_.
+  // Must be called after SetCgroupsMgr() if groups_mgr_ has not been set already.
   // Returns an error if any assignment was not possible, but does not undo previously
-  // succesful assignments.
+  // successful assignments.
   Status SetCgroup(const std::string& cgroup);
 
   void SetCgroupsMgr(CgroupsMgr* cgroups_mgr) { cgroups_mgr_ = cgroups_mgr; }

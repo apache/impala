@@ -83,19 +83,25 @@ class CgroupsMgr {
   // Sets the cgroups mgr's corresponding members and creates the staging cgroup
   // under <cgroups_hierarchy_path>/<staging_cgroup>. Returns a non-OK status if
   // creation of the staging cgroup failed, e.g., because of insufficient privileges.
-  Status Init(const std:: string cgroups_hierarchy_path,
-      const std::string staging_cgroup);
+  Status Init(const std::string& cgroups_hierarchy_path,
+      const std::string& staging_cgroup);
 
   // Returns the cgroup Impala should create and use for enforcing granted resources
   // identified by the given Yarn resource id. Returns an empty string if
   // rm_resource_id is empty.
   std::string ResourceIdToCgroup(const std::string& rm_resource_id) const;
 
+  // Returns the cgroup CPU shares corresponding to the given number of virtual cores.
+  // Returns -1 if v_cpu_cores is <= 0 (which is invalid).
+  int32_t VirtualCoresToCpuShares(int16_t v_cpu_cores);
+
   // Informs the cgroups mgr that a plan fragment intends to use the given cgroup.
   // If this is the first fragment requesting use of cgroup, then the cgroup will
-  // be created. In any case the reference count active_cgroups_[cgroup] is incremented.
-  // Returns a non-OK status there was an error creating the cgroup.
-  Status RegisterFragment(const std::string& cgroup);
+  // be created and *is_first will be set to true (otherwise to false). In any case the
+  // reference count active_cgroups_[cgroup] is incremented. Returns a non-OK status
+  // if there was an error creating the cgroup.
+  Status RegisterFragment(const TUniqueId& fragment_instance_id,
+      const std::string& cgroup, bool* is_first);
 
   // Informs the cgroups mgr that a plan fragment using the given cgroup is complete.
   // Decrements the corresponding reference count active_cgroups_[cgroup]. If the
@@ -103,7 +109,8 @@ class CgroupsMgr {
   // the cgroup to the staging_cgroup_ and drops cgroup (a cgroup with active thread ids
   // cannot be dropped, so we relocate the thread ids first).
   // Returns a non-OK status there was an error creating the cgroup.
-  Status UnregisterFragment(const std::string& cgroup);
+  Status UnregisterFragment(const TUniqueId& fragment_instance_id,
+      const std::string& cgroup);
 
   // Creates a cgroup at <cgroups_hierarchy_path_>/<cgroup>. Returns a non-OK status
   // if the cgroup creation failed, e.g., because of insufficient privileges.
@@ -114,6 +121,11 @@ class CgroupsMgr {
   // if the cgroup deletion failed, e.g., because of insufficient privileges.
   // If if_exists is true then no error is returned if the cgroup does not exist.
   Status DropCgroup(const std::string& cgroup, bool if_exists) const;
+
+  // Sets the number of CPU shares for the given cgroup by writing num_shares into the
+  // cgroup's cpu.shares file. Returns a non-OK status if there was an error writing
+  // to the file, e.g., because of insufficient privileges.
+  Status SetCpuShares(const std::string& cgroup, int32_t num_shares);
 
   // Assigns a given thread to a cgroup, by writing its thread id to
   // <cgroups_hierarchy_path_>/<cgroup>/tasks. If there is no file at that
@@ -136,9 +148,6 @@ class CgroupsMgr {
   Status GetCgroupPaths(const std::string& cgroup,
       std::string* cgroup_path, std::string* tasks_path) const;
 
-   // Suffix appended to Yarn resource ids to form an Impala-internal cgroups.
-   static const std::string IMPALA_CGROUP_SUFFIX;
-
    // Number of currently active Impala-managed cgroups.
    Metrics::PrimitiveMetric<int64_t>* active_cgroups_metric_;
 
@@ -150,11 +159,12 @@ class CgroupsMgr {
    std::string staging_cgroup_;
 
    // Protects active_cgroups_.
-   static boost::mutex active_cgroups_lock_;
+   boost::mutex active_cgroups_lock_;
 
    // Process-wide map from cgroup to number of fragments using the cgroup.
-   // A cgroup can be safely dropped once its reference count in this map reaches zero.
-   static boost::unordered_map<std::string, int32_t> active_cgroups_;
+   // A cgroup can be safely dropped once the number of fragments in the cgroup,
+   // according to this map, reaches zero.
+   boost::unordered_map<std::string, int32_t> active_cgroups_;
 };
 
 }

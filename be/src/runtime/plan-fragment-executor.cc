@@ -44,6 +44,7 @@
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
+DECLARE_bool(enable_rm);
 
 using namespace std;
 using namespace boost;
@@ -55,10 +56,10 @@ namespace impala {
 
 PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
     const ReportStatusCallback& report_status_cb) :
-    exec_env_(exec_env), plan_(NULL), report_status_cb_(report_status_cb), report_thread_active_(
-        false), done_(false), prepared_(false), closed_(false), has_thread_token_(
-        false), average_thread_tokens_(NULL), mem_usage_sampled_counter_(NULL), thread_usage_sampled_counter_(
-        NULL) {
+    exec_env_(exec_env), plan_(NULL), report_status_cb_(report_status_cb),
+    report_thread_active_(false), done_(false), prepared_(false), closed_(false),
+    has_thread_token_(false), average_thread_tokens_(NULL),
+    mem_usage_sampled_counter_(NULL), thread_usage_sampled_counter_(NULL) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
@@ -73,7 +74,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   query_id_ = params.query_id;
 
   VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_) << " instance_id="
-      << PrintId(params.fragment_instance_id);
+             << PrintId(params.fragment_instance_id);
   VLOG(2) << "params:\n" << ThriftDebugString(params);
 
   if (request.__isset.reserved_resource) {
@@ -82,13 +83,30 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   const string& resource_id =
-      request.__isset.reserved_resource ?
-          request.reserved_resource.rm_resource_id : "";
+      request.__isset.reserved_resource ? request.reserved_resource.rm_resource_id : "";
 
-  string cgroup = exec_env_->cgroups_mgr()->ResourceIdToCgroup(resource_id);
+  string cgroup = "";
+  if (FLAGS_enable_rm) {
+    cgroup = exec_env_->cgroups_mgr()->ResourceIdToCgroup(resource_id);
+  }
 
   runtime_state_.reset(new RuntimeState(query_id_, params.fragment_instance_id,
       request.query_ctxt, cgroup, exec_env_));
+
+  // Register after setting runtime_state_ to ensure proper cleanup.
+  if (FLAGS_enable_rm) {
+    bool is_first;
+    RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
+        params.fragment_instance_id, cgroup, &is_first));
+    // The first fragment using cgroup sets the cgroup's CPU shares based on the
+    // reserved resource.
+    if (is_first) {
+      DCHECK(request.__isset.reserved_resource);
+      int32_t cpu_shares = exec_env_->cgroups_mgr()->VirtualCoresToCpuShares(
+          request.reserved_resource.v_cpu_cores);
+      RETURN_IF_ERROR(exec_env_->cgroups_mgr()->SetCpuShares(cgroup, cpu_shares));
+    }
+  }
 
   // reservation or a query option.
   int64_t bytes_limit = -1;
@@ -104,9 +122,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
   RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, bytes_limit));
-
-  // Register after setting runtime_state_ to ensure proper cleanup.
-  RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(cgroup));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
@@ -148,7 +163,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
   plan_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
-  BOOST_FOREACH(ExecNode * exch_node, exch_nodes)
+  BOOST_FOREACH(ExecNode* exch_node, exch_nodes)
   {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
     int num_senders = FindWithDefault(params.per_exch_num_senders,
@@ -481,7 +496,10 @@ void PlanFragmentExecutor::Close() {
   row_batch_.reset();
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
-    exec_env_->cgroups_mgr()->UnregisterFragment(runtime_state_->cgroup());
+    if (FLAGS_enable_rm) {
+      exec_env_->cgroups_mgr()->UnregisterFragment(
+          runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
+    }
     if (plan_ != NULL)
       plan_->Close(runtime_state_.get());
     if (sink_.get() != NULL)

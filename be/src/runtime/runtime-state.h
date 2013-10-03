@@ -265,7 +265,7 @@ class RuntimeState {
   TUniqueId query_id_;
   TUniqueId fragment_instance_id_;
 
-  // The Impala-internal cgroup into which execution threads are assigned to.
+  // The Impala-internal cgroup into which execution threads are assigned.
   // If empty, no RM is enabled.
   std::string cgroup_;
   ExecEnv* exec_env_;

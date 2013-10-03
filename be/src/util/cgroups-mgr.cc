@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <boost/filesystem.hpp>
+#include "util/debug-util.h"
 
 using namespace impala;
 using namespace std;
@@ -25,18 +26,21 @@ using namespace boost;
 
 namespace impala {
 
-const string CgroupsMgr::IMPALA_CGROUP_SUFFIX = "_impala";
-mutex CgroupsMgr::active_cgroups_lock_;
-unordered_map<std::string, int32_t> CgroupsMgr::active_cgroups_;
+// Suffix appended to Yarn resource ids to form an Impala-internal cgroups.
+const std::string IMPALA_CGROUP_SUFFIX = "_impala";
+
+// Yarn's default multiplier for translating virtual CPU cores into cgroup CPU shares.
+// See Yarn's CgroupsLCEResourcesHandler.java for more details.
+const int32_t CPU_DEFAULT_WEIGHT = 1024;
 
 CgroupsMgr::CgroupsMgr(Metrics* metrics) {
   active_cgroups_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "cgroups-mgr-active-cgroups", 0);
+          "cgroups-mgr.active-cgroups", 0);
 }
 
-Status CgroupsMgr::Init(const std:: string cgroups_hierarchy_path,
-      const std::string staging_cgroup) {
+Status CgroupsMgr::Init(const string& cgroups_hierarchy_path,
+      const string& staging_cgroup) {
   cgroups_hierarchy_path_ = cgroups_hierarchy_path;
   staging_cgroup_ = staging_cgroup;
   // Set up the staging cgroup for Impala to retire execution threads into.
@@ -47,6 +51,11 @@ Status CgroupsMgr::Init(const std:: string cgroups_hierarchy_path,
 string CgroupsMgr::ResourceIdToCgroup(const string& rm_resource_id) const {
   if (rm_resource_id.empty()) return "";
   return rm_resource_id + IMPALA_CGROUP_SUFFIX;
+}
+
+int32_t CgroupsMgr::VirtualCoresToCpuShares(int16_t v_cpu_cores) {
+  if (v_cpu_cores <= 0) return -1;
+  return CPU_DEFAULT_WEIGHT * v_cpu_cores;
 }
 
 Status CgroupsMgr::CreateCgroup(const string& cgroup, bool if_not_exists) const {
@@ -88,6 +97,28 @@ Status CgroupsMgr::DropCgroup(const string& cgroup, bool if_exists) const {
     err_msg << "Failed to drop CGroup at path " << cgroup_path << ". " << e.what();
     return Status(err_msg.str());
   }
+  return Status::OK;
+}
+
+Status CgroupsMgr::SetCpuShares(const string& cgroup, int32_t num_shares) {
+  string cgroup_path;
+  string tasks_path;
+  RETURN_IF_ERROR(GetCgroupPaths(cgroup, &cgroup_path, &tasks_path));
+
+  stringstream cpu_shares_ss;
+  cpu_shares_ss << cgroup_path << "/" << "cpu.shares";
+  string cpu_shares_path = cpu_shares_ss.str();
+
+  ofstream cpu_shares(tasks_path.c_str(), ios::out | ios::trunc);
+  if (!cpu_shares.is_open()) {
+    stringstream err_msg;
+    err_msg << "CGroup CPU shares file: " << cpu_shares_path
+            << " is not writable by Impala";
+    return Status(err_msg.str());
+  }
+
+  LOG(INFO) << "Setting CPU shares of CGroup " << cgroup_path << " to " << num_shares;
+  cpu_shares << num_shares << endl;
   return Status::OK;
 }
 
@@ -169,36 +200,32 @@ Status CgroupsMgr::RelocateThreads(const string& src_cgroup,
   return Status::OK;
 }
 
-Status CgroupsMgr::RegisterFragment(const string& cgroup) {
+Status CgroupsMgr::RegisterFragment(const TUniqueId& fragment_instance_id,
+    const string& cgroup, bool* is_first) {
   if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK;
 
-  LOG(INFO) << "Registering fragment with CGroup "
-            << cgroups_hierarchy_path_ << "/" << cgroup;
+  LOG(INFO) << "Registering fragment " << PrintId(fragment_instance_id)
+            << " with CGroup " << cgroups_hierarchy_path_ << "/" << cgroup;
   lock_guard<mutex> l(active_cgroups_lock_);
-  unordered_map<string, int32_t>::iterator entry = active_cgroups_.find(cgroup);
-  if (entry == active_cgroups_.end()) {
-    active_cgroups_[cgroup] = 1;
+  if (++active_cgroups_[cgroup] == 1) {
+    *is_first = true;
     RETURN_IF_ERROR(CreateCgroup(cgroup, false));
     active_cgroups_metric_->Increment(1);
   } else {
-    int32_t* ref_count = &entry->second;
-    ++(*ref_count);
+    *is_first = false;
   }
   return Status::OK;
 }
 
-Status CgroupsMgr::UnregisterFragment(const string& cgroup) {
+Status CgroupsMgr::UnregisterFragment(const TUniqueId& fragment_instance_id,
+    const string& cgroup) {
   if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK;
 
-  LOG(INFO) << "Unregistering fragment from CGroup "
-            << cgroups_hierarchy_path_ << " " << cgroup;
+  LOG(INFO) << "Unregistering fragment " << PrintId(fragment_instance_id)
+            << " from CGroup " << cgroups_hierarchy_path_ << " " << cgroup;
   lock_guard<mutex> l(active_cgroups_lock_);
   unordered_map<string, int32_t>::iterator entry = active_cgroups_.find(cgroup);
-  if (entry == active_cgroups_.end()) {
-    stringstream err_msg;
-    err_msg << "No active fragments for CGroup " << cgroup;
-    return Status(err_msg.str());
-  }
+  DCHECK(entry != active_cgroups_.end());
 
   int32_t* ref_count = &entry->second;
   --(*ref_count);
