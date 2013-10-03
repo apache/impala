@@ -111,8 +111,8 @@ class ThreadPool {
     Join();
   }
 
-  Status AssignToCgroup(const std::string& prefix, const std::string& cgroup) const {
-    return threads_.SetCgroup(prefix, cgroup);
+  Status AssignToCgroup(const std::string& cgroup) const {
+    return threads_.SetCgroup(cgroup);
   }
 
  private:

@@ -23,6 +23,7 @@
 #include "common/status.h"
 #include "exprs/timestamp-functions.h"
 #include "runtime/client-cache.h"
+#include "util/cgroups-mgr.h"
 #include "util/hdfs-bulk-ops.h" // For declaration of HdfsOpThreadPool
 #include "resourcebroker/resource-broker.h"
 
@@ -40,6 +41,7 @@ class Webserver;
 class Metrics;
 class MemTracker;
 class ThreadResourceMgr;
+class CgroupsManager;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -80,6 +82,7 @@ class ExecEnv {
   Metrics* metrics() { return metrics_.get(); }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
+  CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
@@ -113,6 +116,7 @@ class ExecEnv {
   boost::scoped_ptr<Metrics> metrics_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
+  boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
 
   bool enable_webserver_;

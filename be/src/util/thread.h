@@ -28,6 +28,7 @@ namespace impala {
 
 class Metrics;
 class Webserver;
+class CgroupsMgr;
 
 // Thin wrapper around boost::thread that can register itself with the singleton ThreadMgr
 // (a private class implemented in thread.cc entirely, which tracks all live threads so
@@ -154,8 +155,8 @@ class ThreadGroup {
  public:
   ThreadGroup() {}
 
-  ThreadGroup(const std::string& prefix, const std::string& cgroup)
-      : cgroup_prefix_(prefix), cgroup_path_(cgroup) { }
+  ThreadGroup(CgroupsMgr* cgroups_mgr, const std::string& cgroup)
+        : cgroups_mgr_(cgroups_mgr), cgroup_path_(cgroup) { }
 
   // Adds a new Thread to this group. The ThreadGroup takes ownership of the Thread, and
   // will destroy it when the ThreadGroup is destroyed.  Threads will linger until that
@@ -169,18 +170,22 @@ class ThreadGroup {
   // deadlock will predictably ensue.
   void JoinAll();
 
-  // Assigns all threads to the cgroup at <prefix>/<path>. Returns an error if any
-  // assignment was not possible, but does not undo previously succesful assignments.
-  // All future threads added to this group will be assigned to the same cgroup.
-  Status SetCgroup(const std::string& prefix, const std::string& cgroup);
+  // Assigns all current and future threads to the given cgroup managed by cgroups_mgr_.
+  // Returns an error if any assignment was not possible, but does not undo previously
+  // succesful assignments.
+  Status SetCgroup(const std::string& cgroup);
+
+  void SetCgroupsMgr(CgroupsMgr* cgroups_mgr) { cgroups_mgr_ = cgroups_mgr; }
 
  private:
   // All the threads grouped by this set.
   boost::ptr_vector<Thread> threads_;
 
-  // If not empty, every thread added to this group will also be placed in the cgroup
-  // located at cgroup_prefix_/cgroup_path_.
-  std::string cgroup_prefix_;
+  // Cgroups manager for assigning threads in this group to cgroups. Not owned.
+  CgroupsMgr* cgroups_mgr_;
+
+  // If not empty, every thread added to this group will also be placed in the
+  // cgroup_path_ managed by the cgroups_mgr_.
   std::string cgroup_path_;
 };
 

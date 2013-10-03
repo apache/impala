@@ -1,0 +1,1 @@
+./start-impala-cluster.py --impalad_args="-cgroup_hierarchy_path=/sys/fs/cgroup/cpu -enable_rm=true"

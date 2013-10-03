@@ -311,8 +311,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
 
-  if (!state->rm_resource_id().empty()) {
-    scanner_threads_.SetCgroup(FLAGS_cgroup_hierarchy_path, state->rm_resource_id());
+  if (!state->cgroup().empty()) {
+    scanner_threads_.SetCgroupsMgr(state->exec_env()->cgroups_mgr());
+    scanner_threads_.SetCgroup(state->cgroup());
   }
 
   // One-time initialisation of state that is constant across scan ranges

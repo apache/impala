@@ -46,7 +46,7 @@
 #include "service/query-exec-state.h"
 #include "statestore/simple-scheduler.h"
 #include "util/bit-util.h"
-#include "util/cgroups-util.h"
+#include "util/cgroups-mgr.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
@@ -130,8 +130,6 @@ DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may 
 DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be idle for"
     " (i.e. no processing work is done and no updates are received from the client) "
     "before it is cancelled. If 0, idle queries are never expired.");
-
-DECLARE_string(cgroup_hierarchy_path);
 
 namespace impala {
 

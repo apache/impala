@@ -68,7 +68,7 @@ typedef std::map<std::string, std::string> FileMoveMap;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, const TUniqueId& fragment_instance_id,
-      const TQueryContext& query_ctxt, const std::string& rm_resource_id, ExecEnv* exec_env);
+      const TQueryContext& query_ctxt, const std::string& cgroup, ExecEnv* exec_env);
 
   // RuntimeState for executing expr in fe-support.
   RuntimeState(const TQueryContext& query_ctxt);
@@ -107,7 +107,7 @@ class RuntimeState {
   }
   const TUniqueId& query_id() const { return query_id_; }
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
-  const std::string& rm_resource_id() const { return rm_resource_id_; }
+  const std::string& cgroup() const { return cgroup_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
@@ -265,9 +265,9 @@ class RuntimeState {
   TUniqueId query_id_;
   TUniqueId fragment_instance_id_;
 
-  // The YARN-supplied container ID, which corresponds to a cgroup path. If empty, no RM
-  // is enabled.
-  std::string rm_resource_id_;
+  // The Impala-internal cgroup into which execution threads are assigned to.
+  // If empty, no RM is enabled.
+  std::string cgroup_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 

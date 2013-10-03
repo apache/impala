@@ -23,7 +23,7 @@
 
 #include "util/debug-util.h"
 #include "util/error-util.h"
-#include "util/cgroups-util.h"
+#include "util/cgroups-mgr.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/url-coding.h"
@@ -267,10 +267,9 @@ void Thread::SuperviseThread(const string& name, const string& category,
 Status ThreadGroup::AddThread(Thread* thread) {
   threads_.push_back(thread);
   if (!cgroup_path_.empty()) {
-    RETURN_IF_ERROR(
-        AssignThreadToCgroup(*thread, cgroup_prefix_, cgroup_path_));
+    DCHECK(cgroups_mgr_ != NULL);
+    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*thread, cgroup_path_));
   }
-
   return Status::OK;
 }
 
@@ -280,13 +279,13 @@ void ThreadGroup::JoinAll() {
   }
 }
 
-Status ThreadGroup::SetCgroup(const string& prefix, const string& cgroup) {
-  cgroup_prefix_ = prefix;
+Status ThreadGroup::SetCgroup(const string& cgroup) {
+  DCHECK(cgroups_mgr_ != NULL);
   cgroup_path_ = cgroup;
   // BOOST_FOREACH + ptr_vector + const are not compatible
   for (ptr_vector<Thread>::const_iterator it = threads_.begin();
        it != threads_.end(); ++it) {
-    RETURN_IF_ERROR(AssignThreadToCgroup(*it, prefix, cgroup));
+    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*it, cgroup));
   }
   return Status::OK;
 }

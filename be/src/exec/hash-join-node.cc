@@ -21,7 +21,6 @@
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "util/cgroups-util.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 

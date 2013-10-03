@@ -142,6 +142,8 @@ Status QuerySchedule::ValidateReservation() {
   vector<TNetworkAddress> hosts_missing_resources;
   BOOST_FOREACH(const FragmentExecParams& params, fragment_exec_params_) {
     BOOST_FOREACH(const TNetworkAddress& host, params.hosts) {
+      // Ignore the coordinator host which is not contained in unique_hosts_.
+      if (unique_hosts_.find(host) == unique_hosts_.end()) continue;
       TNetworkAddress resource_hostport;
       GetResourceHostport(host, &resource_hostport);
       if (reservation_.allocated_resources.find(resource_hostport) ==

@@ -40,6 +40,9 @@
 #include "util/parse-util.h"
 #include "util/memory-metrics.h"
 #include "util/webserver.h"
+#include "util/mem-info.h"
+#include "util/debug-util.h"
+#include "util/cgroups-mgr.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/CatalogService.h"
 
@@ -72,6 +75,11 @@ DEFINE_string(llama_host, "127.0.0.1",
               "Host of Llama service that the resource broker should connect to");
 DEFINE_int32(llama_port, 15000,
              "Port of Llama service that the resource broker should connect to");
+DEFINE_string(cgroup_hierarchy_path, "", "If Resource Management is enabled, this must "
+    "be set to the Impala-writeable root of the cgroups hierarchy into which execution "
+    "threads are assigned.");
+DEFINE_string(staging_cgroup, "impala_staging", "Name of the cgroup that a query's "
+    "execution threads are moved into once the query completes.");
 
 namespace impala {
 
@@ -89,6 +97,7 @@ ExecEnv::ExecEnv()
     metrics_(new Metrics()),
     mem_tracker_(NULL),
     thread_mgr_(new ThreadResourceMgr),
+    cgroups_mgr_(NULL),
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     enable_webserver_(FLAGS_enable_webserver),
@@ -101,6 +110,7 @@ ExecEnv::ExecEnv()
         MakeNetworkAddress(FLAGS_hostname, FLAGS_llama_callback_port);
     resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
         metrics_.get()));
+    cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
   }
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // a standalone single backend)
@@ -153,6 +163,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         MakeNetworkAddress(hostname, FLAGS_llama_callback_port);
     resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
         metrics_.get()));
+    cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
   }
   if (FLAGS_use_statestore && statestore_port > 0) {
     TNetworkAddress subscriber_address =
@@ -184,10 +195,12 @@ ExecEnv::~ExecEnv() {
 Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
 
-  // Initialize the resource broker to make sure the Llama is up and reachable.
   if (FLAGS_enable_rm) {
+    // Initialize the resource broker to make sure the Llama is up and reachable.
     DCHECK(resource_broker_.get() != NULL);
     RETURN_IF_ERROR(resource_broker_->Init());
+    DCHECK(cgroups_mgr_.get() != NULL);
+    cgroups_mgr_->Init(FLAGS_cgroup_hierarchy_path, FLAGS_staging_cgroup);
   }
 
   // Initialize global memory limit.
