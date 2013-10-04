@@ -27,6 +27,8 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.thrift.TSymbolLookupParams;
+import com.cloudera.impala.thrift.TSymbolLookupResult;
 import com.cloudera.impala.util.NativeLibUtil;
 import com.google.common.base.Preconditions;
 
@@ -42,9 +44,16 @@ public class FeSupport {
   private final static Logger LOG = LoggerFactory.getLogger(FeSupport.class);
   private static boolean loaded = false;
 
+  // Only called if this library is explicitly loaded. This only happens
+  // when running FE tests.
+  public native static void NativeFeTestInit();
+
   // Returns a serialized TColumnValue.
   public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
       byte[] thriftQueryGlobals);
+
+  // Returns a serialize TSymbolLookupResult
+  public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
 
   public static TColumnValue EvalConstExpr(Expr expr, TQueryGlobals queryGlobals)
       throws InternalException {
@@ -66,10 +75,36 @@ public class FeSupport {
     }
   }
 
+  private static byte[] LookupSymbol(byte[] thriftParams) {
+    try {
+      return NativeLookupSymbol(thriftParams);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeLookupSymbol(thriftParams);
+  }
+
+  public static TSymbolLookupResult LookupSymbol(TSymbolLookupParams params)
+      throws InternalException {
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    try {
+      byte[] resultBytes = LookupSymbol(serializer.serialize(params));
+      Preconditions.checkNotNull(resultBytes);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TSymbolLookupResult result = new TSymbolLookupResult();
+      deserializer.deserialize(result, resultBytes);
+      return result;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("couldn't perform symbol lookup.", e);
+    }
+  }
+
   private static byte[] EvalConstExpr(byte[] thriftExpr, byte[] thriftQueryGlobals) {
     try {
       return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
     } catch (UnsatisfiedLinkError e) {
+      // We should only get here in FE tests that dont run the BE.
       loadLibrary();
     }
     return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
@@ -89,7 +124,10 @@ public class FeSupport {
    */
   private static synchronized void loadLibrary() {
     if (loaded) return;
+    LOG.info("Loading libfesupport.so");
     NativeLibUtil.loadLibrary("libfesupport.so");
+    LOG.info("Loaded libfesupport.so");
     loaded = true;
+    NativeFeTestInit();
   }
 }

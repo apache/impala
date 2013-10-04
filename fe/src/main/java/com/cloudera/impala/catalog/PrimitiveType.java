@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.analysis.SqlParserSymbols;
 import com.cloudera.impala.thrift.TPrimitiveType;
@@ -82,6 +83,14 @@ public enum PrimitiveType {
 
   public TPrimitiveType toThrift() {
     return thriftType;
+  }
+
+  public static List<TPrimitiveType> toThrift(PrimitiveType[] types) {
+    List<TPrimitiveType> result = Lists.newArrayList();
+    for (PrimitiveType t: types) {
+      result.add(t.toThrift());
+    }
+    return result;
   }
 
   public int getSlotSize() {

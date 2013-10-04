@@ -26,10 +26,10 @@ class TestUdfs(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_native_udfs(self, vector):
-    self.run_test_case('QueryTest/load-native-udfs', vector)
+    self.run_test_case('QueryTest/load-native-functions', vector)
     self.run_test_case('QueryTest/udf', vector)
 
   @pytest.mark.execute_serially
   def test_ir_udfs(self, vector):
-    self.run_test_case('QueryTest/load-ir-udfs', vector)
+    self.run_test_case('QueryTest/load-ir-functions', vector)
     self.run_test_case('QueryTest/udf', vector)

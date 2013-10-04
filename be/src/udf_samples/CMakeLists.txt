@@ -34,7 +34,7 @@ endfunction(COMPILE_TO_IR)
 
 # Build the UDA/UDFs into a shared library.
 add_library(udfsample SHARED udf-sample.cc)
-add_library(udasample SHARED uda-sample.cc)
+add_library(udasample SHARED uda-sample.cc hyperloglog-uda.cc)
 
 # Custom targest to cross compile UDA/UDF to ir
 COMPILE_TO_IR(udf-sample.cc )

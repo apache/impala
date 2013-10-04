@@ -23,13 +23,13 @@ using namespace std;
 
 bool TestCount() {
   // Use the UDA test harness to validate the COUNT UDA.
-  UdaTestHarness<BigIntVal, BigIntVal, AnyVal> test(
+  UdaTestHarness<BigIntVal, BigIntVal, IntVal> test(
       CountInit, CountUpdate, CountMerge, NULL, CountFinalize);
 
   // Run the UDA over 10000 non-null values
   vector<IntVal> no_nulls;
   no_nulls.resize(10000);
-  if (!test.Execute<IntVal>(no_nulls, BigIntVal(no_nulls.size()))) {
+  if (!test.Execute(no_nulls, BigIntVal(no_nulls.size()))) {
     cerr << test.GetErrorMsg() << endl;
     return false;
   }

@@ -23,6 +23,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TUda;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE AGGREGATE FUNCTION statement.
@@ -66,27 +67,34 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     return params;
   }
 
-  // Matches *update* to *target* or *Update* to *Target*. After guessing the symbol
-  // name, verifies that symbol exists in the binary.
-  // returns null if no matching function was found.
-  private String inferName(String updateFn, String target) {
-    if (updateFn.contains("update")) {
-      String s = updateFn.replace("update", target);
-      if (symbolExists(s)) return s;
-    }
-    if (updateFn.contains("Update")) {
-      char[] array = target.toCharArray();
-      array[0] = Character.toUpperCase(array[0]);
-      String s = new String(array);
-      s = updateFn.replace("Update", s);
-      if (symbolExists(s)) return s;
-    }
-    return null;
-  }
-
   private void reportCouldNotInferSymbol(String function) throws AnalysisException {
     throw new AnalysisException("Could not infer symbol for "
         + function + "() function.");
+  }
+
+  // Gets the symbol for 'arg'. If the user set it from the dll, return that. Otherwise
+  // try to infer the name from the Update function. To infer the name, the update
+  // function must contain "update" or "Update" and we switch that out with 'defaultName'.
+  // Returns null if no symbol was found.
+  private String getSymbolName(OptArg arg, String defaultName) {
+    Preconditions.checkState(uda_.getUpdateFnName() != null);
+    // First lookup if the user explicitly set it.
+    if (optArgs_.get(arg) != null) return optArgs_.get(arg);
+    // Try to match it from Update
+    String updateFn = optArgs_.get(OptArg.UPDATE_FN);
+    // Mangled strings start with _Z. We can't get substitute names for mangled
+    // strings.
+    // TODO: this is doable in the BE with more symbol parsing.
+    if (updateFn.startsWith("_Z")) return null;
+
+    if (updateFn.contains("update")) return updateFn.replace("update", defaultName);
+    if (updateFn.contains("Update")) {
+      char[] array = defaultName.toCharArray();
+      array[0] = Character.toUpperCase(array[0]);
+      String s = new String(array);
+      return updateFn.replace("Update", s);
+    }
+    return null;
   }
 
   @Override
@@ -113,45 +121,57 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     checkOptArgNotSet(OptArg.SYMBOL);
 
     // The user must provide the symbol for Update.
-    uda_.setUpdateFnName(checkAndGetOptArg(OptArg.UPDATE_FN));
-    if (!symbolExists(uda_.getUpdateFnName())) {
-      reportSymbolNotFound(uda_.getUpdateFnName());
-    }
-
-    uda_.setInitFnName(optArgs_.get(OptArg.INIT_FN));
-    uda_.setSerializeFnName(optArgs_.get(OptArg.SERIALIZE_FN));
-    uda_.setMergeFnName(optArgs_.get(OptArg.MERGE_FN));
-    uda_.setFinalizeFnName(optArgs_.get(OptArg.FINALIZE_FN));
+    uda_.setUpdateFnName(lookupSymbol(
+        checkAndGetOptArg(OptArg.UPDATE_FN), intermediateType_, fn_.hasVarArgs(),
+        ColumnType.toColumnType(fn_.getArgs())));
 
     // If the ddl did not specify the init/serialize/merge/finalize function
-    // names, guess them based on the update fn name. Otherwise, validate what
-    // the ddl specified is a valid symbol.
-    if (uda_.getInitFnName() == null) {
-      uda_.setInitFnName(inferName(uda_.getUpdateFnName(), "init"));
-      if (uda_.getInitFnName() == null) reportCouldNotInferSymbol("init");
-    } else if (!symbolExists(uda_.getInitFnName())) {
-      reportSymbolNotFound(uda_.getInitFnName());
+    // names, guess them based on the update fn name.
+    uda_.setInitFnName(getSymbolName(OptArg.INIT_FN, "init"));
+    uda_.setSerializeFnName(getSymbolName(OptArg.SERIALIZE_FN, "serialize"));
+    uda_.setMergeFnName(getSymbolName(OptArg.MERGE_FN, "merge"));
+    uda_.setFinalizeFnName(getSymbolName(OptArg.FINALIZE_FN, "finalize"));
+
+    // Init and merge are required.
+    if (uda_.getInitFnName() == null) reportCouldNotInferSymbol("init");
+    if (uda_.getMergeFnName() == null) reportCouldNotInferSymbol("merge");
+
+    // Validate that all set symbols exist.
+    uda_.setInitFnName(lookupSymbol(uda_.getInitFnName(), intermediateType_, false));
+    uda_.setMergeFnName(lookupSymbol(uda_.getMergeFnName(), intermediateType_, false,
+        intermediateType_));
+    if (uda_.getSerializeFnName() != null) {
+      try {
+        uda_.setSerializeFnName(lookupSymbol(
+            uda_.getSerializeFnName(), null, false, intermediateType_));
+      } catch (AnalysisException e) {
+        if (optArgs_.get(OptArg.SERIALIZE_FN) != null) {
+          reportSymbolNotFound(uda_.getSerializeFnName());
+        } else {
+          // Ignore, these symbols are optional.
+          uda_.setSerializeFnName(null);
+        }
+      }
+    }
+    if (uda_.getFinalizeFnName() != null) {
+      try {
+        uda_.setFinalizeFnName(lookupSymbol(
+            uda_.getFinalizeFnName(), null, false, intermediateType_));
+      } catch (AnalysisException e) {
+        if (optArgs_.get(OptArg.FINALIZE_FN) != null) {
+          reportSymbolNotFound(uda_.getFinalizeFnName());
+        } else {
+          // Ignore, these symbols are optional.
+          uda_.setFinalizeFnName(null);
+        }
+      }
     }
 
-    if (uda_.getSerializeFnName() == null) {
-      uda_.setSerializeFnName(inferName(uda_.getUpdateFnName(), "serialize"));
-      // Serialize is optional.
-    } else if (!symbolExists(uda_.getSerializeFnName())) {
-      reportSymbolNotFound(uda_.getSerializeFnName());
-    }
-
-    if (uda_.getMergeFnName() == null) {
-      uda_.setMergeFnName(inferName(uda_.getUpdateFnName(), "merge"));
-      if (uda_.getMergeFnName() == null) reportCouldNotInferSymbol("merge");
-    } else if (!symbolExists(uda_.getMergeFnName())) {
-      reportSymbolNotFound(uda_.getMergeFnName());
-    }
-
-    if (uda_.getFinalizeFnName() == null) {
-      uda_.setFinalizeFnName(inferName(uda_.getUpdateFnName(), "finalize"));
-      if (uda_.getFinalizeFnName() == null) reportCouldNotInferSymbol("finalize");
-    } else if (!symbolExists(uda_.getFinalizeFnName())) {
-      reportSymbolNotFound(uda_.getFinalizeFnName());
+    // If the intermediate type is not the return type, then finalize is
+    // required.
+    if (intermediateType_.getType() != fn_.getReturnType() &&
+        uda_.getFinalizeFnName() == null) {
+      throw new AnalysisException("Finalize() is required for this UDA.");
     }
 
     StringBuilder sb = new StringBuilder("CREATE ");
@@ -167,8 +187,9 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     if (uda_.getSerializeFnName() != null) {
       sb.append(" SERIALIZE_FN=").append(uda_.getSerializeFnName());
     }
-    sb.append(" FINALIZE_FN=").append(uda_.getFinalizeFnName());
-
+    if (uda_.getFinalizeFnName() != null) {
+      sb.append(" FINALIZE_FN=").append(uda_.getFinalizeFnName());
+    }
     if (getComment() != null) sb.append(" COMMENT = '" + getComment() + "'");
     sqlString_ = sb.toString();
   }

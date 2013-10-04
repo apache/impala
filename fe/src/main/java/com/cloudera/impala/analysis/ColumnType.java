@@ -14,10 +14,15 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Class wrapping a type of a column. For most types, this will just be a wrapper
@@ -44,6 +49,13 @@ public class ColumnType {
     ColumnType type = new ColumnType(PrimitiveType.CHAR);
     type.len_ = len;
     return type;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof ColumnType)) return false;
+    ColumnType other = (ColumnType)o;
+    return type_ == other.type_ && len_ == other.len_;
   }
 
   public final PrimitiveType getType() { return type_; }
@@ -74,6 +86,34 @@ public class ColumnType {
     thrift.type = type_.toThrift();
     if (type_ == PrimitiveType.CHAR) thrift.setLen(len_);
     return thrift;
+  }
+
+  public static List<TColumnType> toThrift(ColumnType[] types) {
+    return toThrift(Lists.newArrayList(types));
+  }
+
+  public static List<TColumnType> toThrift(ArrayList<ColumnType> types) {
+    ArrayList<TColumnType> result = Lists.newArrayList();
+    for (ColumnType t: types) {
+      result.add(t.toThrift());
+    }
+    return result;
+  }
+
+  public static ArrayList<TPrimitiveType> toTPrimitiveTypes(ColumnType[] types) {
+    ArrayList<TPrimitiveType> result = Lists.newArrayList();
+    for (ColumnType t: types) {
+      result.add(t.getType().toThrift());
+    }
+    return result;
+  }
+
+  public static ColumnType[] toColumnType(PrimitiveType[] types) {
+    ColumnType result[] = new ColumnType[types.length];
+    for (int i = 0; i < types.length; ++i) {
+      result[i] = createType(types[i]);
+    }
+    return result;
   }
 
   public static ColumnType fromThrift(TColumnType thrift) {

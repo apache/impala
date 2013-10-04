@@ -15,19 +15,21 @@
 package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
-import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TFunctionName;
-import com.cloudera.impala.thrift.TPrimitiveType;
-import com.google.common.collect.Lists;
+import com.cloudera.impala.thrift.TSymbolLookupParams;
+import com.cloudera.impala.thrift.TSymbolLookupResult;
+import com.google.common.base.Preconditions;
 
 /**
  * Base class for CREATE [] FUNCTION.
@@ -69,13 +71,7 @@ public class CreateFunctionStmtBase extends StatementBase {
     fn.setFn_name(new TFunctionName(fn_.dbName(), fn_.functionName()));
     fn.setFn_binary_type(fn_.getBinaryType());
     fn.setLocation(fn_.getLocation().toString());
-    List<TPrimitiveType> types = Lists.newArrayList();
-    if (fn_.getNumArgs() > 0) {
-      for (PrimitiveType t: fn_.getArgs()) {
-        types.add(t.toThrift());
-      }
-    }
-    fn.setArg_types(types);
+    fn.setArg_types(PrimitiveType.toThrift(fn_.getArgs()));
     fn.setRet_type(fn_.getReturnType().toThrift());
     fn.setHas_var_args(fn_.hasVarArgs());
     fn.setComment(getComment());
@@ -85,10 +81,45 @@ public class CreateFunctionStmtBase extends StatementBase {
     return params;
   }
 
-  // Returns true if the symbol fnName exists in the function's binary.
-  protected boolean symbolExists(String symbol) {
-    // TODO: implement this
-    return true;
+  // Returns the resolved symbol in the binary. The BE will do a lookup of 'symbol'
+  // in the binary and try to resolve unmangled names.
+  // If this function is expecting a return argument, retArgType is that type. It should
+  // be null if this function isn't expecting a return argument.
+  protected String lookupSymbol(String symbol, ColumnType retArgType, boolean hasVarArgs,
+      ColumnType... argTypes) throws AnalysisException {
+    if (symbol.length() == 0) reportSymbolNotFound(symbol);
+    if (fn_.getBinaryType() == TFunctionBinaryType.HIVE) {
+      // TODO: add this when hive udfs go in.
+      return symbol;
+    }
+    Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.NATIVE ||
+        fn_.getBinaryType() == TFunctionBinaryType.IR);
+
+    TSymbolLookupParams lookup = new TSymbolLookupParams();
+    lookup.location =  fn_.getLocation().toString();
+    lookup.symbol = symbol;
+    lookup.fn_binary_type = fn_.getBinaryType();
+    lookup.arg_types = ColumnType.toThrift(argTypes);
+    lookup.has_var_args = hasVarArgs;
+    if (retArgType != null) lookup.setRet_arg_type(retArgType.toThrift());
+
+    try {
+      TSymbolLookupResult result = FeSupport.LookupSymbol(lookup);
+      switch (result.result_code) {
+        case SYMBOL_FOUND:
+          return result.symbol;
+        case BINARY_NOT_FOUND:
+          throw new AnalysisException(
+              "Could not load binary: " + fn_.getLocation().getLocation());
+        case SYMBOL_NOT_FOUND:
+          reportSymbolNotFound(symbol);
+        default:
+          // Should never get here.
+          throw new AnalysisException("Internal Error");
+      }
+    } catch (InternalException e) {
+      throw new AnalysisException("Could not find symbol.", e);
+    }
   }
 
   protected void reportSymbolNotFound(String symbol)

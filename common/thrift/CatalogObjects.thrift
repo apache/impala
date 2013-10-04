@@ -283,7 +283,7 @@ struct TUda {
   // This function does not need to be specified by the UDA.
   3: optional string serialize_fn_name
   4: required string merge_fn_name
-  5: required string finalize_fn_name
+  5: optional string finalize_fn_name
   6: required Types.TColumnType intermediate_type
 }
 

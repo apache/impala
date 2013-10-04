@@ -88,6 +88,9 @@ class LibCache {
     // The path on the local file system for this library.
     std::string local_path;
 
+    // Status returned from copying this file from HDFS.
+    Status copy_file_status;
+
     // Handle from dlopen.
     void* shared_object_handle;
 
@@ -115,9 +118,10 @@ class LibCache {
   // copied locally, it will copy it and add a new LibCacheEntry to 'lib_cache_'.
   // Result is returned in *entry.
   // No locks should be take before calling this. On return the entry's lock is
-  // taken.
+  // taken and returned in *entry_lock.
   Status GetCacheEntry(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      bool is_shared_object, LibCacheEntry** entry);
+      bool is_shared_object, boost::unique_lock<boost::mutex>* entry_lock,
+      LibCacheEntry** entry);
 };
 
 }

@@ -75,3 +75,12 @@ DoubleVal VarSumMultiply(FunctionContext* context,
   if (is_null) return DoubleVal::null();
   return DoubleVal(result * d.val);
 }
+
+// Dummy functions to test ddl.
+IntVal Fn(FunctionContext*) { return IntVal::null(); }
+IntVal Fn(FunctionContext*, const IntVal&) { return IntVal::null(); }
+IntVal Fn(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::null(); }
+IntVal Fn(FunctionContext*, const StringVal&, const IntVal&) { return IntVal::null(); }
+IntVal Fn2(FunctionContext*, const IntVal&) { return IntVal::null(); }
+IntVal Fn2(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::null(); }
+

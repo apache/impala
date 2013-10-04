@@ -714,7 +714,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestUdf() throws AnalysisException {
-    final String udfSuffix = " LOCATION '/foo.jar' SYMBOL='foo.class'";
+    final String symbol =
+        "'_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'";
+    final String udfSuffix = " LOCATION '/test-warehouse/libTestUdfs.so' " +
+        "SYMBOL=" + symbol;
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
@@ -728,9 +731,22 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function A_B() RETURNS int" + udfSuffix);
 
     // Locations for all the udfs types.
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.so' SYMBOL='a'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.ll' SYMBOL='a'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.SO' SYMBOL='a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION " +
+        "'/test-warehouse/libTestUdfs.so' " +
+        "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
+    AnalysisError("create function foo() RETURNS int LOCATION " +
+        "'/test-warehouse/libTestUdfs.ll' " +
+        "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'",
+        "Could not load binary: /test-warehouse/libTestUdfs.ll");
+    AnalyzesOk("create function foo() RETURNS int LOCATION " +
+        "'/test-warehouse/test-udfs.ll' " +
+        "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
+    AnalyzesOk("create function foo(int) RETURNS int LOCATION " +
+        "'/test-warehouse/test-udfs.ll' SYMBOL='Identity'");
+
+    AnalyzesOk("create function foo() RETURNS int LOCATION " +
+        "'/test-warehouse/libTestUdfs.SO' " +
+        "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
     AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
 
     // Varargs
@@ -755,9 +771,58 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Unknown binary type: '/binary.so.'. Binary must end in .jar, .so or .ll");
 
     // Try with missing symbol
-    // TODO: Add tests for checking the symbol exists
     AnalysisError("create function foo() RETURNS int LOCATION '/binary.so'",
         "Argument 'SYMBOL' must be set.");
+
+    // Try with symbols missing in binary and symbols
+    AnalysisError("create function foo() RETURNS int LOCATION '/blah.so' " +
+        "SYMBOL='ab'", "Could not load binary: /blah.so");
+    AnalysisError("create function foo() RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " +
+        "SYMBOL='b'", "Could not find symbol 'b' in: /test-warehouse/libTestUdfs.so");
+    AnalysisError("create function foo() RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " +
+        "SYMBOL=''", "Could not find symbol '' in: /test-warehouse/libTestUdfs.so");
+    AnalysisError("create function foo() RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " +
+        "SYMBOL='_ZAB'",
+        "Could not find symbol '_ZAB' in: /test-warehouse/libTestUdfs.so");
+
+    // Infer the fully mangled symbol from the signature
+    AnalyzesOk("create function foo() RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='NoArgs'");
+    // We can't get the return type so any of those will match
+    AnalyzesOk("create function foo() RETURNS double " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='NoArgs'");
+    // The part the user specifies is case sensitive
+    AnalysisError("create function foo() RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='noArgs'",
+        "Could not find symbol 'noArgs' in: /test-warehouse/libTestUdfs.so");
+    // Types no longer match
+    AnalysisError("create function foo(int) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='NoArgs'",
+        "Could not find symbol 'NoArgs' in: /test-warehouse/libTestUdfs.so");
+
+    // Check we can match identity for all types
+    AnalyzesOk("create function identity(boolean) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(tinyint) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(smallint) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(int) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(bigint) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(float) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(double) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function identity(string) RETURNS int " +
+        "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
+    AnalyzesOk("create function all_types_fn(string, boolean, tinyint, " +
+        "smallint, int, bigint, float, double) returns int " +
+        "location '/test-warehouse/libTestUdfs.so' symbol='AllTypes'");
 
     // Try creating functions with illegal function names.
     AnalysisError("create function 123A() RETURNS int" + udfSuffix,
@@ -841,16 +906,47 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestUda() throws AnalysisException {
-    final String loc = " LOCATION '/foo.so' update_fn='UpdateFn' ";
-    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc);
-    AnalyzesOk("create aggregate function foo(int) RETURNS int" +
-        " LOCATION '/foo.so' UPDATE_FN='updateFn'");
-    AnalyzesOk("create aggregate function foo(int, int) RETURNS int" + loc);
-    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc);
-    AnalyzesOk("create aggregate function foo(string, double) " +
-        "RETURNS string INTERMEDIATE STRING" + loc);
+    final String loc = " LOCATION '/test-warehouse/libTestUdas.so' ";
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='AggUpdate'");
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='AggUpdate' INIT_FN='AggInit'");
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='AggUpdate' INIT_FN='AggInit' MERGE_FN='AggMerge'");
+    AnalysisError("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='AggUpdate' INIT_FN='AGgInit'",
+        "Could not find symbol 'AGgInit' in: /test-warehouse/libTestUdas.so");
+    AnalyzesOk("create aggregate function foo(int, int) RETURNS int" + loc +
+        "UPDATE_FN='AggUpdate'");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate'");
+
+    // Specify the complete symbol. If the user does this, we can't guess the
+    // other function names.
+    // TODO: think about these error messages more. Perhaps they can be made
+    // more actionable.
+    AnalysisError("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='_Z9AggUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPS2_'",
+        "Could not infer symbol for init() function.");
+    AnalysisError("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='_Z9AggUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPS2_' " +
+        "INIT_FN='_Z7AggInitPN10impala_udf15FunctionContextEPNS_6IntValE'",
+        "Could not infer symbol for merge() function.");
+    AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
+        "UPDATE_FN='_Z9AggUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPS2_' " +
+        "INIT_FN='_Z7AggInitPN10impala_udf15FunctionContextEPNS_6IntValE' " +
+        "MERGE_FN='_Z8AggMergePN10impala_udf15FunctionContextERKNS_6IntValEPS2_'");
+
+    // Try with CHAR(N) intermediate
     AnalyzesOk("create aggregate function foo(int) RETURNS int " +
-        "INTERMEDIATE CHAR(10)" + loc);
+        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
+        "MERGE_FN='AggMerge'" ,
+        "Finalize() is required for this UDA.");
+    AnalyzesOk("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
+        "MERGE_FN='AggMerge' FINALIZE_FN='AggFinalize'");
 
     // Udf only arguments must not be set.
     AnalysisError("create aggregate function foo(int) RETURNS int" + loc + "SYMBOL='Bad'",
@@ -865,20 +961,65 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
         "'/foo.jar' UPDATE_FN='b'", "Java UDAs are not supported.");
 
-    // If the update fn name does not contain 'update', we can't guess the other
-    // symbol names.
+    // Test missing .ll file.
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='Fn'", "Could not infer symbol for init() function.");
+        "'/foo.ll' UPDATE_FN='Fn'", "Could not load binary: /foo.ll");
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='Fn' init_fn='init'",
-        "Could not infer symbol for merge() function.");
-    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='Fn' init_fn='init' merge_fn='merge'",
-        "Could not infer symbol for finalize() function.");
-    AnalyzesOk("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='Fn' init_fn='init' merge_fn='merge' finalize_fn='finalize'");
+        "'/foo.ll' UPDATE_FN='_ZABCD'", "Could not load binary: /foo.ll");
 
-    // TODO: Add tests for checking the symbol exists
+    // Test cases where the UPDATE_FN doesn't contain "Update" in which case the user has
+    // to explicitly specify the other functions.
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg'", "Could not infer symbol for init() function.");
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg' INIT_FN='AggInit'",
+        "Could not infer symbol for merge() function.");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg' INIT_FN='AggInit' MERGE_FN='AggMerge'");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg' INIT_FN='AggInit' MERGE_FN='AggMerge' " +
+        "SERIALIZE_FN='AggSerialize'");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg' INIT_FN='AggInit' MERGE_FN='AggMerge' " +
+        "SERIALIZE_FN='AggSerialize' FINALIZE_FN='AggFinalize'");
+
+    // Serialize and Finalize have the same signature, make sure that's possible.
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate' SERIALIZE_FN='AggSerialize' FINALIZE_FN='AggSerialize'");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate' SERIALIZE_FN='AggFinalize' FINALIZE_FN='AggFinalize'");
+
+    // If you don't specify the full symbol, we look for it in the binary. This should
+    // prevent mismatched names by accident.
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate' INIT_FN='AggSerialize'",
+        "Could not find symbol 'AggSerialize' in: /test-warehouse/libTestUdas.so");
+    // If you specify a mangled name, we just check it exists.
+    // TODO: we should be able to validate better. This is almost certainly going
+    // to crash everything.
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate' "+
+        "INIT_FN='_Z12AggSerializePN10impala_udf15FunctionContextERKNS_6IntValE'");
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='AggUpdate' INIT_FN='_ZAggSerialize'",
+        "Could not find symbol '_ZAggSerialize' in: /test-warehouse/libTestUdas.so");
+
+    // Tests for checking the symbol exists
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg2Update'",
+        "Could not find symbol 'Agg2Init' in: /test-warehouse/libTestUdas.so");
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg2Update' INIT_FN='AggInit'",
+        "Could not find symbol 'Agg2Merge' in: /test-warehouse/libTestUdas.so");
+    AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge'");
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='BadFn'",
+        "Could not find symbol 'BadFn' in: /test-warehouse/libTestUdas.so");
+    AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
+        "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge' "+
+            "FINALIZE_FN='not there'",
+        "Could not find symbol 'not there' in: /test-warehouse/libTestUdas.so");
   }
 
   @Test

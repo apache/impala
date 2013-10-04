@@ -60,8 +60,9 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     super.analyze(analyzer);
 
     // Check the user provided symbol exists
-    udf_.setSymbolName(checkAndGetOptArg(OptArg.SYMBOL));
-    if (!symbolExists(udf_.getSymbolName())) reportSymbolNotFound(udf_.getSymbolName());
+    udf_.setSymbolName(lookupSymbol(
+        checkAndGetOptArg(OptArg.SYMBOL), null, fn_.hasVarArgs(),
+        ColumnType.toColumnType(fn_.getArgs())));
 
     // Udfs should not set any of these
     checkOptArgNotSet(OptArg.UPDATE_FN);

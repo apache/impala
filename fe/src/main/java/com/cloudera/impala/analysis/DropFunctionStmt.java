@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
-
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Function;
@@ -23,8 +21,6 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TFunctionName;
-import com.cloudera.impala.thrift.TPrimitiveType;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a DROP [IF EXISTS] FUNCTION statement
@@ -61,13 +57,7 @@ public class DropFunctionStmt extends StatementBase {
     TDropFunctionParams params = new TDropFunctionParams();
     params.setFn_name(new TFunctionName(desc_.getFunctionName().getDb(),
         desc_.getFunctionName().getFunction()));
-    List<TPrimitiveType> types = Lists.newArrayList();
-    if (desc_.getNumArgs() > 0) {
-      for (PrimitiveType t: desc_.getArgs()) {
-        types.add(t.toThrift());
-      }
-    }
-    params.setArg_types(types);
+    params.setArg_types(PrimitiveType.toThrift(desc_.getArgs()));
     params.setIf_exists(getIfExists());
     return params;
   }

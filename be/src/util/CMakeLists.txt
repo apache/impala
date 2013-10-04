@@ -57,6 +57,7 @@ add_library(Util
   progress-updater.cc
   runtime-profile.cc
   simple-logger.cc
+  symbols-util.cc
   static-asserts.cc
   url-parser.cc
   url-coding.cc
@@ -96,4 +97,5 @@ ADD_BE_TEST(thread-pool-test)
 ADD_BE_TEST(internal-queue-test)
 ADD_BE_TEST(string-parser-test)
 ADD_BE_TEST(promise-test)
+ADD_BE_TEST(symbols-util-test)
 #ADD_BE_TEST(perf-counters-test)

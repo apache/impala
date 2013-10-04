@@ -128,6 +128,21 @@ popd
 
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
 
-# Copy the test UDF library into HDFS
+# Copy the test UDF/UDA libraries into HDFS
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdas.so /test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so /test-warehouse
+# Added again with different case for FE testing
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
+    /test-warehouse/libTestUdfs.SO
+
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/test-udfs.ll /test-warehouse
+
+# Add the sample UDF/UDAs to HDFS as well.
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/libudfsample.so\
+    /test-warehouse
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/udf-sample.ll\
+    /test-warehouse
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/libudasample.so\
+    /test-warehouse
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/uda-sample.ll\
+    /test-warehouse

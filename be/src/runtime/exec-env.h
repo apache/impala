@@ -51,6 +51,10 @@ class ExecEnv {
   ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
           int webserver_port, const std::string& statestore_host, int statestore_port);
 
+  // Returns the first created exec env instance. In a normal impalad, this is
+  // the only instance. In test setups with multiple ExecEnv's per process,
+  // we return the first instance.
+  static ExecEnv* GetInstance() { return exec_env_; }
 
   // Empty destructor because the compiler-generated one requires full
   // declarations for classes in scoped_ptrs.
@@ -99,6 +103,7 @@ class ExecEnv {
   bool enable_webserver_;
 
  private:
+  static ExecEnv* exec_env_;
   TimezoneDatabase tz_database_;
 };
 

@@ -405,6 +405,49 @@ struct TExecRequest {
   8: optional list<TAccessEvent> access_events
 }
 
+// Parameters to pass to validate that the binary contains the symbol. If the
+// symbols is fully specified (i.e. full mangled name), we validate that the
+// mangled name is correct. If only the function name is specified, we try
+// to find the fully mangled name in the binary.
+// The result is returned in TSymbolLookupResult.
+struct TSymbolLookupParams {
+  // HDFS path for the function binary. This binary must exist at the time the
+  // function is created.
+  1: required string location
+
+  // This can either be a mangled symbol or before mangling function name.
+  2: required string symbol
+
+  // Type of the udf. e.g. hive, native, ir
+  3: required Types.TFunctionBinaryType fn_binary_type
+
+  // The types of the arguments to the function
+  4: required list<Types.TColumnType> arg_types
+
+  // If true, this function takes var args.
+  5: required bool has_var_args
+
+  // If set this function needs to have an return out argument of this type.
+  6: optional Types.TColumnType ret_arg_type
+}
+
+enum TSymbolLookupResultCode {
+  SYMBOL_FOUND,
+  BINARY_NOT_FOUND,
+  SYMBOL_NOT_FOUND,
+}
+
+struct TSymbolLookupResult {
+  // The result of the symbol lookup.
+  1: required TSymbolLookupResultCode result_code
+
+  // The symbol that was found. set if result_code == SYMBOL_FOUND.
+  2: optional string symbol
+
+  // The error message if the symbol found not be found.
+  3: optional string error_msg
+}
+
 // Sent to an impalad FE during each CatalogUpdate heartbeat. Contains details on all
 // catalog objects that need to be updated.
 struct TInternalCatalogUpdateRequest {

@@ -25,7 +25,7 @@ void CountInit(FunctionContext* context, BigIntVal* val) {
   val->val = 0;
 }
 
-void CountUpdate(FunctionContext* context, const AnyVal& input, BigIntVal* val) {
+void CountUpdate(FunctionContext* context, const IntVal& input, BigIntVal* val) {
   if (input.is_null) return;
   ++val->val;
 }

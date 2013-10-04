@@ -14,55 +14,56 @@ drop function if exists udf_test.no_args();
 drop function if exists udf_test.var_sum(int...);
 drop function if exists udf_test.var_sum_multiply(double, int...);
 
+drop function if exists uda_test.test_count(int);
+drop function if exists uda_test.hll(int);
+
 create database if not exists udf_test;
+create database if not exists uda_test;
 
 create function udf_test.identity(boolean) returns boolean
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(tinyint) returns tinyint
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(smallint) returns smallint
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_11SmallIntValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(int) returns int
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_6IntValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(bigint) returns bigint
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9BigIntValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(float) returns float
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_8FloatValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(double) returns double
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9DoubleValE';
+location '/test-warehouse/libTestUdfs.so' symbol='Identity';
 
 create function udf_test.identity(string) returns string
-location '/test-warehouse/test-udfs.ll'
+location '/test-warehouse/libTestUdfs.so'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
 
 create function udf_test.all_types_fn(
     string, boolean, tinyint, smallint, int, bigint, float, double)
 returns int
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValERKNS_8FloatValERKNS_9DoubleValE';
+location '/test-warehouse/libTestUdfs.so' symbol='AllTypes';
 
 create function udf_test.no_args() returns string
-location '/test-warehouse/test-udfs.ll'
+location '/test-warehouse/libTestUdfs.so'
 symbol='_Z6NoArgsPN10impala_udf15FunctionContextE';
 
 create function udf_test.var_sum(int...) returns int
-location '/test-warehouse/test-udfs.ll'
-symbol='_Z6VarSumPN10impala_udf15FunctionContextEiPKNS_6IntValE';
+location '/test-warehouse/libTestUdfs.so' symbol='VarSum';
 
 create function udf_test.var_sum_multiply(double, int...) returns double
-location '/test-warehouse/test-udfs.ll'
+location '/test-warehouse/libTestUdfs.so'
 symbol='_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE';
+
+create aggregate function uda_test.test_count(int) returns bigint
+location '/test-warehouse/libudasample.so' update_fn='CountUpdate';
+
+create aggregate function uda_test.hll(int) returns string
+location '/test-warehouse/libudasample.so' update_fn='HllUpdate';
 ====

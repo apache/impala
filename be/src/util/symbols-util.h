@@ -1,0 +1,51 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef IMPALA_UTIL_SYMBOLS_UTIL_H
+#define IMPALA_UTIL_SYMBOLS_UTIL_H
+
+#include <string>
+#include "runtime/primitive-type.h"
+
+namespace impala {
+
+// Utility class to manipulate c++/IR symbols, mangling and demangling names.
+class SymbolsUtil {
+ public:
+  // Returns true if this symbol is mangled.
+  static bool IsMangled(const std::string& symbol);
+
+  // Returns the demangled string. The name is assumed to be a mangled string
+  // using the gcc/llvm convention.
+  // Returns the empty string if the name is not valid.
+  static std::string Demangle(const std::string& name);
+
+  // Mangles fn_name with 'arg_types' to the function signature for user functions.
+  // This maps types to AnyVal* and automatically adds the FunctionContext*
+  // as the first argument.
+  // The fn_name must be fully qualified. i.e namespace::class::fn.
+  // if 'has_var_args' is true, the last argument in arg_types can be variable.
+  // if 'ret_argument' is non-null, it is added as a last return argument.
+  // TODO: this is not a general mangling function and that is more difficult to
+  // do. Find a library to do this.
+  // There is no place we require this to be perfect, if we can't do this right,
+  // the user will need to specify the full mangled string.
+  static std::string MangleUserFunction(const std::string& fn_name,
+      const std::vector<ColumnType>& arg_types, bool has_var_args = false,
+      ColumnType* ret_argument = NULL);
+};
+
+}
+
+#endif

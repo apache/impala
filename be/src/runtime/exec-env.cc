@@ -62,6 +62,8 @@ DECLARE_string(mem_limit);
 
 namespace impala {
 
+ExecEnv* ExecEnv::exec_env_ = NULL;
+
 ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
     client_cache_(new ImpalaInternalServiceClientCache()),
@@ -100,6 +102,7 @@ ExecEnv::ExecEnv()
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
+  if (exec_env_ == NULL) exec_env_ = this;
 }
 
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
@@ -139,6 +142,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get()));
   }
+  if (exec_env_ == NULL) exec_env_ = this;
 }
 
 ExecEnv::~ExecEnv() {

@@ -31,42 +31,44 @@ STRING
 ====
 ---- QUERY
 # Add them and test function overloading.
-create function function_ddl_test.fn() RETURNS int LOCATION '/test.so' SYMBOL='foo'
+create function function_ddl_test.fn() RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int) RETURNS double LOCATION '/test.so' SYMBOL='foo'
+create function function_ddl_test.fn(int) RETURNS double
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int, string)
-RETURNS int LOCATION '/test.jar' SYMBOL='foo.class'
+create function function_ddl_test.fn(int, string) RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(string, int)
-RETURNS int LOCATION '/test.ll' SYMBOL='foo.class'
+create function function_ddl_test.fn(string, int) RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int)
-RETURNS int LOCATION '/test.so' SYMBOL='foo.class'
+create function function_ddl_test.fn2(int) RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int, string)
-RETURNS int LOCATION '/test.so' SYMBOL='foo'
+create function function_ddl_test.fn2(int, string) RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
-create function function_ddl_test.fn_var_arg(int...)
-RETURNS int LOCATION '/test.so' SYMBOL='foo'
+create function function_ddl_test.fn_var_arg(int...) RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='VarSum'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn(int)
-RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
+create aggregate function function_ddl_test.agg_fn(int) RETURNS bigint
+LOCATION '/test-warehouse/libudasample.so' UPDATE_FN='CountUpdate'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn(int, string)
-RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
+create aggregate function function_ddl_test.agg_fn(int, string) RETURNS int
+LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn_var_arg(double, string...)
-RETURNS int LOCATION '/test.so' UPDATE_FN='UpdateFn'
+create aggregate function function_ddl_test.agg_fn_var_arg(double, string...) RETURNS int
+LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='VarArgUpdate'
 ====
 ---- QUERY
 show functions in function_ddl_test
