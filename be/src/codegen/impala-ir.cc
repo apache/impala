@@ -23,6 +23,7 @@
 #include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exprs/expr-ir.cc"
+#include "exprs/udf-builtins.cc"
 #include "runtime/string-value-ir.cc"
 #include "util/hash-util-ir.cc"
 #else

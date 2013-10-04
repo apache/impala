@@ -21,7 +21,7 @@
 #include "udf/udf.h"
 
 namespace impala_udf {
-  class AnyVal;
+  struct AnyVal;
 };
 
 namespace impala {

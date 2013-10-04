@@ -38,6 +38,14 @@ class OpcodeRegistry {
     return functions_[index];
   }
 
+  // Returns the function symbol for this opcode (used for loading IR functions).
+  const std::string& GetFunctionSymbol(TExprOpcode::type opcode) {
+    int index = static_cast<int>(opcode);
+    DCHECK_GE(index, 0);
+    DCHECK_LT(index, symbols_.size());
+    return symbols_[index];
+  }
+
   // Registry is a singleton
   static OpcodeRegistry* Instance() {
     if (instance_ == NULL) {
@@ -56,6 +64,7 @@ class OpcodeRegistry {
   OpcodeRegistry() {
     int num_opcodes = static_cast<int>(TExprOpcode::LAST_OPCODE);
     functions_.resize(num_opcodes);
+    symbols_.resize(num_opcodes);
     Init();
   }
 
@@ -63,16 +72,18 @@ class OpcodeRegistry {
   // opcode-registry-init.cc which is an auto-generated file
   void Init();
 
-  void Add(TExprOpcode::type opcode, void* fn) {
+  void Add(TExprOpcode::type opcode, void* fn, const char* symbol) {
     int index = static_cast<int>(opcode);
     DCHECK_LT(index, functions_.size());
     DCHECK_GE(index, 0);
     functions_[index] = fn;
+    symbols_[index] = symbol;
   }
 
   static OpcodeRegistry* instance_;
   static boost::mutex instance_lock_;
   std::vector<void*> functions_;
+  std::vector<std::string> symbols_;
 };
 
 }

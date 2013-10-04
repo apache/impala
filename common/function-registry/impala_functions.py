@@ -366,7 +366,10 @@ functions = [
 # These functions are implemented against the UDF interface.
 # TODO: this list should subsume the one above when all builtins are migrated.
 udf_functions = [
-  ['Udf_Math_Pi', 'DOUBLE', [], 'UdfBuiltins::Pi', ['udf_pi']],
-  ['Udf_Math_Abs', 'DOUBLE', ['DOUBLE'], 'UdfBuiltins::Abs', ['udf_abs']],
-  ['Udf_String_Lower', 'STRING', ['STRING'], 'UdfBuiltins::Lower', ['udf_lower']],
+  ['Udf_Math_Pi', 'DOUBLE', [], 'UdfBuiltins::Pi', ['udf_pi'],
+   '_ZN6impala11UdfBuiltins2PiEPN10impala_udf15FunctionContextE'],
+  ['Udf_Math_Abs', 'DOUBLE', ['DOUBLE'], 'UdfBuiltins::Abs', ['udf_abs'],
+   '_ZN6impala11UdfBuiltins3AbsEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'],
+  ['Udf_String_Lower', 'STRING', ['STRING'], 'UdfBuiltins::Lower', ['udf_lower'],
+   '_ZN6impala11UdfBuiltins5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
 ]

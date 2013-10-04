@@ -248,9 +248,10 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
 
 Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
   LlvmCodeGen* codegen = state->llvm_codegen();
+  bool codegen_disabled = (codegen == NULL);
 
   if (udf_type_ == TFunctionBinaryType::NATIVE ||
-      udf_type_ == TFunctionBinaryType::BUILTIN) {
+      (udf_type_ == TFunctionBinaryType::BUILTIN && codegen_disabled)) {
     void* udf_ptr;
     if (udf_type_ == TFunctionBinaryType::NATIVE) {
       RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
@@ -290,6 +291,14 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // defined. This tells LLVM where the compiled function definition is located in
     // memory.
     codegen->execution_engine()->addGlobalMapping(*udf, udf_ptr);
+  } else if (udf_type_ == TFunctionBinaryType::BUILTIN && !codegen_disabled) {
+    const string& symbol = OpcodeRegistry::Instance()->GetFunctionSymbol(opcode_);
+    *udf = codegen->module()->getFunction(symbol);
+    if (*udf == NULL) {
+      stringstream ss;
+      ss << "Could not load builtin " << opcode_ << " with symbol: " << symbol;
+      return Status(ss.str());
+    }
   } else {
     DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
 

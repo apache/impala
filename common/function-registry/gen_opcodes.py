@@ -227,6 +227,7 @@ def add_function(fn_meta_data, udf_interface):
   entry["args"] = fn_meta_data[2]
   entry["be_fn"] = fn_meta_data[3]
   entry["sql_names"] = fn_meta_data[4]
+  entry["symbol"] = fn_meta_data[5] if udf_interface else "<no symbol specified>"
   entry["udf_interface"] = udf_interface
 
   if fn_name in meta_data_entries:
@@ -272,8 +273,10 @@ def generate_be_registry_init(filename):
     for entry in entries:
       opcode = entry["opcode"]
       be_fn = entry["be_fn"]
+      symbol = entry["symbol"]
       # We generate two casts to work around GCC Bug 11407
-      cc_output = "TExprOpcode::%s, (void*)(Expr::ComputeFn)%s" % (opcode, be_fn)
+      cc_output = 'TExprOpcode::%s, (void*)(Expr::ComputeFn)%s, "%s"' \
+                  % (opcode, be_fn, symbol)
       cc_registry_file.write("  this->Add(%s);\n" % (cc_output))
 
   cc_registry_file.write(cc_registry_epilogue)
@@ -334,11 +337,12 @@ for function in impala_functions.functions:
     print "Invalid function entry in impala_functions.py:\n\t" + repr(function)
     sys.exit(1)
   add_function(function, False)
+
 for function in impala_functions.udf_functions:
-  if len(function) != 5:
-    print "Invalid function entry in impala_functions.py:\n\t" + repr(function)
-    sys.exit(1)
+  assert len(function) == 6, \
+         "Invalid function entry in impala_functions.py:\n\t" + repr(function)
   add_function(function, True)
+
 for function in generated_functions.functions:
   if len(function) != 5:
     print "Invalid function entry in generated_functions.py:\n\t" + repr(function)
