@@ -84,7 +84,7 @@ string SlotRef::DebugString() const {
   out << "SlotRef(slot_id=" << slot_id_
       << " tuple_idx=" << tuple_idx_ << " slot_offset=" << slot_offset_
       << " null_indicator=" << null_indicator_offset_
-      << " " << Expr::DebugString() << ")";
+      << Expr::DebugString() << ")";
   return out.str();
 }
 

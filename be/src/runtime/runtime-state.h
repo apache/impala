@@ -116,8 +116,20 @@ class RuntimeState {
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
 
-  // Returns CodeGen object.  Returns NULL if codegen is disabled.
-  LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
+  // Returns true if codegen is enabled for this query.
+  bool codegen_enabled() const { return !query_options_.disable_codegen; }
+
+  // Returns CodeGen object.  Returns NULL if the codegen object has not been
+  // created. If codegen is enabled for the query, the codegen object will be
+  // created as part of the RuntimeState's initialization.
+  // Otherwise, it can be created by calling CreateCodegen().
+  LlvmCodeGen* codegen() { return codegen_.get(); }
+
+  // Create a codegen object in codegen_. No-op if it has already been called.
+  // If codegen is enabled for the query, this is created when the runtime
+  // state is created. If codegen is disabled for the query, this is created
+  // on first use.
+  Status CreateCodegen();
 
   // Create and return a stream receiver for fragment_instance_id_
   // from the data stream manager. The receiver is added to data_stream_recvrs_pool_.
@@ -254,9 +266,6 @@ class RuntimeState {
 
   // prohibit copies
   RuntimeState(const RuntimeState&);
-
-  // set codegen_
-  Status CreateCodegen();
 };
 
 #define RETURN_IF_CANCELLED(state) \

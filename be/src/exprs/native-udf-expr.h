@@ -79,14 +79,8 @@ class NativeUdfExpr: public Expr {
   // If this function does not have varargs, it is set to -1.
   int vararg_start_idx_;
 
-  // Function pointer to the JIT'd function produced by GetIrComputeFn(). Initialized and
-  // called by ComputeFn().
+  // Function pointer to the JIT'd function produced by GetIrComputeFn().
   void* udf_wrapper_;
-
-  // Used by ComputeFn() to create udf_wrapper_. Initialized in Prepare(). Not owned by
-  // this class.
-  LlvmCodeGen* codegen_;
-  llvm::Function* ir_udf_wrapper_;
 
   // Vector of preallocate input objects to pass to UDF if it has varargs.
   // TODO: Move to to ExprContext

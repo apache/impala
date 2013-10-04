@@ -34,7 +34,6 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Implementation of HdfsScanner interface.
   virtual Status Prepare(ScannerContext* context);
-  virtual Status GetNext(RowBatch* row_batch, bool* eosr);
   virtual Status ProcessSplit();
   virtual void Close();
 

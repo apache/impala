@@ -485,6 +485,13 @@ class Expr {
   // Returns if the codegen function rooted at this node is thread safe.
   bool codegend_fn_thread_safe() const;
 
+  // This is the default implementation of GetIrComputeFn and *always* returns
+  // the wrapper around GetValue(), regardless of whether or not the Expr can
+  // return a more optimal IR function. This forces as much of the execution as
+  // possible in the interpreted path and is used when codegen has been disabled
+  // for the query.
+  Status GetWrapperIrComputeFunction(LlvmCodeGen* codegen, llvm::Function** fn);
+
  private:
   friend class ExprTest;
 
@@ -568,6 +575,7 @@ inline void* Expr::GetValue(TupleRow* row) {
   if (is_slotref_) {
     return SlotRef::ComputeFn(this, row);
   } else {
+    DCHECK(compute_fn_ != NULL);
     return compute_fn_(this, row);
   }
 }

@@ -114,20 +114,32 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size(), mem_tracker()));
 
-  LlvmCodeGen* codegen = state->llvm_codegen();
-  if (codegen != NULL) {
+  if (state->codegen_enabled()) {
     // Codegen for hashing rows
-    Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(codegen);
+    Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(state->codegen());
     if (hash_fn == NULL) return Status::OK;
 
     // Codegen for build path
-    codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(codegen, hash_fn);
+    codegen_process_build_batch_fn_ =
+        CodegenProcessBuildBatch(state->codegen(), hash_fn);
+    if (codegen_process_build_batch_fn_ != NULL) {
+      state->codegen()->AddFunctionToJit(codegen_process_build_batch_fn_,
+          reinterpret_cast<void**>(&process_build_batch_fn_));
+      AddRuntimeExecOption("Build Side Codegen Enabled");
+    }
 
     // Codegen for probe path (only for left joins)
     if (!match_all_build_) {
-      codegen_process_probe_batch_fn_ = CodegenProcessProbeBatch(codegen, hash_fn);
+      codegen_process_probe_batch_fn_ =
+          CodegenProcessProbeBatch(state->codegen(), hash_fn);
+      if (codegen_process_probe_batch_fn_ != NULL) {
+        state->codegen()->AddFunctionToJit(codegen_process_probe_batch_fn_,
+            reinterpret_cast<void**>(&process_probe_batch_fn_));
+        AddRuntimeExecOption("Probe Side Codegen Enabled");
+      }
     }
   }
+
   return Status::OK;
 }
 
@@ -188,24 +200,6 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_CANCELLED(state);
-
-  if (codegen_process_build_batch_fn_ != NULL) {
-    void* jitted_process_build_batch =
-        state->llvm_codegen()->JitFunction(codegen_process_build_batch_fn_);
-    DCHECK(jitted_process_build_batch != NULL);
-    process_build_batch_fn_ =
-        reinterpret_cast<ProcessBuildBatchFn>(jitted_process_build_batch);
-    AddRuntimeExecOption("Build Side Codegen Enabled");
-  }
-
-  if (codegen_process_probe_batch_fn_ != NULL) {
-    void* jitted_process_probe_batch =
-        state->llvm_codegen()->JitFunction(codegen_process_probe_batch_fn_);
-    DCHECK(jitted_process_probe_batch != NULL);
-    process_probe_batch_fn_ =
-        reinterpret_cast<ProcessProbeBatchFn>(jitted_process_probe_batch);
-    AddRuntimeExecOption("Probe Side Codegen Enabled");
-  }
 
   eos_ = false;
 

@@ -338,7 +338,7 @@ Status Coordinator::Exec(
         runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
     for (int i = 0; i < output_exprs->size(); ++i) {
       RETURN_IF_ERROR(
-          Expr::Prepare((*output_exprs)[i], runtime_state(), row_desc(), false));
+          Expr::Prepare((*output_exprs)[i], runtime_state(), row_desc()));
     }
 
     // Run optimization only after preparing the executor and the output exprs.

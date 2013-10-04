@@ -37,7 +37,7 @@ const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state) 
+HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : BaseSequenceScanner(scan_node, state),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0) {
@@ -46,14 +46,11 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* 
 HdfsSequenceScanner::~HdfsSequenceScanner() {
 }
 
-// Codegen for materialized parsed data into tuples.  
-// TODO: sequence file scanner needs to be split into a cross compiled ir file,
-// probably just for the block compressed path.  WriteCompleteTuple should be 
-// injected into that function.
+// Codegen for materialized parsed data into tuples.
 Function* HdfsSequenceScanner::Codegen(HdfsScanNode* node,
     const vector<Expr*>& conjuncts) {
-  LlvmCodeGen* codegen = node->runtime_state()->llvm_codegen();
-  if (codegen == NULL) return NULL;
+  if (!node->runtime_state()->codegen_enabled()) return NULL;
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
   Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen, conjuncts);
   if (write_complete_tuple_fn == NULL) return NULL;
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
@@ -64,14 +61,14 @@ Status HdfsSequenceScanner::InitNewRange() {
   only_parsing_header_ = false;
 
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
-  
+
   text_converter_.reset(new TextConverter(hdfs_partition->escape_char(),
       scan_node_->hdfs_table()->null_column_value()));
-  
+
   delimited_text_parser_.reset(new DelimitedTextParser(scan_node_, '\0',
       hdfs_partition->field_delim(), hdfs_partition->collection_delim(),
       hdfs_partition->escape_char()));
-  
+
   num_buffered_records_in_compressed_block_ = 0;
 
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
@@ -80,7 +77,7 @@ Status HdfsSequenceScanner::InitNewRange() {
         data_buffer_pool_.get(), stream_->compact_data(),
         header_->codec, &decompressor_));
   }
-  
+
   // Initialize codegen fn
   RETURN_IF_ERROR(InitializeWriteTuplesFn(hdfs_partition,
       THdfsFileFormat::SEQUENCE_FILE, "HdfsSequenceScanner"));
@@ -101,7 +98,7 @@ Status HdfsSequenceScanner::Prepare(ScannerContext* context) {
 BaseSequenceScanner::FileHeader* HdfsSequenceScanner::AllocateFileHeader() {
   return new SeqFileHeader;
 }
-  
+
 inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
                                              int64_t* record_len) {
   // There are 2 cases:
@@ -264,11 +261,11 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   int tuples_returned;
   if (write_tuples_fn_ != NULL) {
     // last argument: seq always starts at record_location[0]
-    tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
+    tuples_returned = write_tuples_fn_(this, pool, tuple_row,
         batch_->row_byte_size(), &field_locations_[0], num_to_process,
-        max_added_tuples, scan_node_->materialized_slots().size(), 0); 
+        max_added_tuples, scan_node_->materialized_slots().size(), 0);
   } else {
-    tuples_returned = WriteAlignedTuples(pool, tuple_row, 
+    tuples_returned = WriteAlignedTuples(pool, tuple_row,
         batch_->row_byte_size(), &field_locations_[0], num_to_process,
         max_added_tuples, scan_node_->materialized_slots().size(), 0);
   }
@@ -287,11 +284,11 @@ Status HdfsSequenceScanner::ProcessRange() {
   if (seq_header->is_compressed && !seq_header->is_row_compressed) {
     return ProcessBlockCompressedScanRange();
   }
-  
+
   // We count the time here since there is too much overhead to do
   // this on each record.
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
-  
+
   while (!finished()) {
     DCHECK_GT(record_locations_.size(), 0);
     // Get the next compressed or uncompressed record.
@@ -302,7 +299,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     TupleRow* tuple_row_mem;
     int max_tuples = GetMemory(&pool, &tuple_, &tuple_row_mem);
     DCHECK_GT(max_tuples, 0);
-    
+
     // Parse the current record.
     bool add_row = false;
 
@@ -316,10 +313,10 @@ Status HdfsSequenceScanner::ProcessRange() {
       uint8_t error_in_row = false;
 
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
-          1, record_locations_[0].len, reinterpret_cast<char**>(&record_start), 
+          1, record_locations_[0].len, reinterpret_cast<char**>(&record_start),
           &row_end_loc, &field_locations_[0], &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
-      
+
       uint8_t errors[num_fields];
       memset(errors, 0, sizeof(errors));
 
@@ -386,7 +383,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_FALSE(
       stream_->ReadBoolean(&is_blk_compressed, &parse_status_));
   seq_header->is_row_compressed = !is_blk_compressed;
-  
+
   if (header_->is_compressed) {
     uint8_t* codec_ptr;
     RETURN_IF_FALSE(stream_->ReadText(&codec_ptr, &len, &parse_status_));
@@ -398,7 +395,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
     header_->compression_type = THdfsCompression::NONE;
   }
   VLOG_FILE << stream_->filename() << ": "
-            << (header_->is_compressed ? 
+            << (header_->is_compressed ?
                (seq_header->is_row_compressed ?  "row compressed" : "block compressed") :
                 "not compressed");
   if (header_->is_compressed) VLOG_FILE << header_->codec;
@@ -411,7 +408,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
     RETURN_IF_FALSE(stream_->SkipText(&parse_status_));
     RETURN_IF_FALSE(stream_->SkipText(&parse_status_));
   }
-  
+
   // Read file sync marker
   uint8_t* sync;
   RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
@@ -436,7 +433,7 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
     ss << "Bad block length: " << current_block_length_ << " at offset " << position;
     return Status(ss.str());
   }
-  
+
   RETURN_IF_FALSE(stream_->ReadInt(&current_key_length_, &parse_status_));
   if (current_key_length_ < 0) {
     stringstream ss;
@@ -450,7 +447,7 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
 }
 
 Status HdfsSequenceScanner::ReadCompressedBlock() {
-  // We are reading a new compressed block.  Pass the previous buffer pool 
+  // We are reading a new compressed block.  Pass the previous buffer pool
   // bytes to the batch.  We don't need them anymore.
   if (!stream_->compact_data()) {
     AttachPool(data_buffer_pool_.get());
@@ -485,7 +482,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
     if (state_->LogHasSpace()) state_->LogError(ss.str());
     return Status(ss.str());
   }
-  
+
   uint8_t* compressed_data = NULL;
   RETURN_IF_FALSE(stream_->ReadBytes(block_size, &compressed_data, &parse_status_));
 
@@ -502,7 +499,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
 
 void HdfsSequenceScanner::LogRowParseError(int row_idx, stringstream* ss) {
   DCHECK_LT(row_idx, record_locations_.size());
-  *ss << string(reinterpret_cast<const char*>(record_locations_[row_idx].record), 
+  *ss << string(reinterpret_cast<const char*>(record_locations_[row_idx].record),
                   record_locations_[row_idx].len);
 }
 

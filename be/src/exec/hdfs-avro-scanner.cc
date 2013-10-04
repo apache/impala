@@ -82,8 +82,8 @@ HdfsAvroScanner::~HdfsAvroScanner() {
 }
 
 Function* HdfsAvroScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conjuncts) {
-  LlvmCodeGen* codegen = node->runtime_state()->llvm_codegen();
-  if (codegen == NULL) return NULL;
+  if (!node->runtime_state()->codegen_enabled()) return NULL;
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
   Function* materialize_tuple_fn = CodegenMaterializeTuple(node, codegen);
   if (materialize_tuple_fn == NULL) return NULL;
   return CodegenDecodeAvroData(codegen, materialize_tuple_fn, conjuncts);
@@ -478,7 +478,7 @@ Status HdfsAvroScanner::InitNewRange() {
     codegen_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::AVRO);
     if (codegen_fn_ != NULL) {
       codegend_decode_avro_data_ = reinterpret_cast<DecodeAvroDataFn>(
-          state_->llvm_codegen()->JitFunction(codegen_fn_));
+          state_->codegen()->JitFunction(codegen_fn_));
     }
     VLOG(2) << "HdfsAvroScanner (node_id=" << scan_node_->id()
             << ") using llvm codegend functions.";

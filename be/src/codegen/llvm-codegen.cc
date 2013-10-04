@@ -587,7 +587,16 @@ Status LlvmCodeGen::OptimizeModule() {
   pass_builder.populateModulePassManager(*module_passes);
   module_passes->run(*module_);
 
+  // Now that the module is optimized, it is safe to call jit fn.
+  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+    *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
+  }
+
   return Status::OK;
+}
+
+void LlvmCodeGen::AddFunctionToJit(Function* fn, void** result) {
+  fns_to_jit_compile_.push_back(make_pair(fn, result));
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {

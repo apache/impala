@@ -210,8 +210,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 }
 
 void PlanFragmentExecutor::OptimizeLlvmModule() {
-  if (runtime_state_->llvm_codegen() == NULL) return;
-  Status status = runtime_state_->llvm_codegen()->OptimizeModule();
+  if (runtime_state_->codegen() == NULL) return;
+  Status status = runtime_state_->codegen()->OptimizeModule();
   if (!status.ok()) {
     LOG(ERROR) << "Error with codegen for this query: " << status.GetErrorMsg();
     // TODO: propagate this to the coordinator and user?  Not really actionable

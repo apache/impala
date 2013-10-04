@@ -323,8 +323,8 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
 // codegen'd using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
 Function* HdfsTextScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conjuncts) {
-  LlvmCodeGen* codegen = node->runtime_state()->llvm_codegen();
-  if (codegen == NULL) return NULL;
+  if (!node->runtime_state()->codegen_enabled()) return NULL;
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
   Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen, conjuncts);
   if (write_complete_tuple_fn == NULL) return NULL;
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
@@ -342,12 +342,6 @@ Status HdfsTextScanner::Prepare(ScannerContext* context) {
   field_locations_.resize(state_->batch_size() * scan_node_->materialized_slots().size());
   row_end_locations_.resize(state_->batch_size());
 
-  return Status::OK;
-}
-
-// TODO: remove when all scanners are updated
-Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
-  DCHECK(false);
   return Status::OK;
 }
 

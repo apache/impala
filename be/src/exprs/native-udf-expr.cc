@@ -39,9 +39,7 @@ NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
     symbol_name_(node.udf_call_expr.symbol_name),
     vararg_start_idx_(node.udf_call_expr.__isset.vararg_start_idx ?
         node.udf_call_expr.vararg_start_idx : -1),
-    udf_wrapper_(NULL),
-    codegen_(NULL),
-    ir_udf_wrapper_(NULL) {
+    udf_wrapper_(NULL) {
   DCHECK(node.node_type == TExprNodeType::UDF_CALL);
   DCHECK(udf_type_ != TFunctionBinaryType::HIVE);
 }
@@ -58,17 +56,6 @@ typedef TimestampVal (*TimestampUdfWrapper)(int8_t*, TupleRow*);
 
 void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
   NativeUdfExpr* udf_expr = reinterpret_cast<NativeUdfExpr*>(e);
-
-  // TODO: This isn't threadsafe. UDF exprs should create their own IR module which they
-  // optimize and compile in Prepare() so this won't be necessary.
-  if (UNLIKELY(udf_expr->udf_wrapper_ == NULL)) {
-    udf_expr->udf_wrapper_ = udf_expr->codegen_->JitFunction(udf_expr->ir_udf_wrapper_);
-    if (UNLIKELY(udf_expr->udf_wrapper_ == NULL)) {
-      LOG(ERROR) << "Unable to JIT compile UDF wrapper function";
-      return NULL;
-    }
-  }
-
   switch (e->type()) {
     case TYPE_BOOLEAN: {
       BooleanUdfWrapper fn = reinterpret_cast<BooleanUdfWrapper>(udf_expr->udf_wrapper_);
@@ -143,9 +130,8 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
 }
 
 Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
-  if (state->llvm_codegen() == NULL) {
-    return Status("UDFs cannot be evaluated with codegen disabled");
-  }
+  RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
+
   if (vararg_start_idx_ != -1) {
     DCHECK_GT(GetNumChildren(), vararg_start_idx_);
     // Allocate a scratch buffer for all the variable args.
@@ -156,10 +142,11 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
     }
   }
 
-  codegen_ = state->llvm_codegen();
-  RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
-  RETURN_IF_ERROR(GetIrComputeFn(state, &ir_udf_wrapper_));
-  compute_fn_ = NativeUdfExpr::ComputeFn;
+  llvm::Function* ir_udf_wrapper;
+  RETURN_IF_ERROR(GetIrComputeFn(state, &ir_udf_wrapper));
+  DCHECK(state->codegen() != NULL);
+  state->codegen()->AddFunctionToJit(ir_udf_wrapper, &udf_wrapper_);
+  compute_fn_ = ComputeFn;
   return Status::OK;
 }
 
@@ -191,7 +178,10 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
 //        i64* inttoptr (i64 89111072 to i64*))
 //   ret { i8, double } %result
 Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
-  LlvmCodeGen* codegen = state->llvm_codegen();
+  // Udfs always require some amount of codegen.
+  if (state->codegen() == NULL) state->CreateCodegen();
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
   llvm::Function* udf;
   RETURN_IF_ERROR(GetUdf(state, &udf));
 
@@ -218,7 +208,17 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
     }
 
     llvm::Function* child_fn;
-    RETURN_IF_ERROR(children_[i]->GetIrComputeFn(state, &child_fn));
+    if (state->codegen_enabled()) {
+      // We want to do as much codegen as possible, so get the child functions
+      // as IR.
+      RETURN_IF_ERROR(children_[i]->GetIrComputeFn(state, &child_fn));
+    } else {
+      // Codegen is disabled, so use the wrapper which just calls GetValue(),
+      // which goes back to the interpreted path.
+      RETURN_IF_ERROR(
+          children_[i]->GetWrapperIrComputeFunction(codegen, &child_fn));
+    }
+
     DCHECK(child_fn != NULL);
     llvm::Value* arg_val = builder.CreateCall(child_fn, args, "arg_val");
 
@@ -259,11 +259,13 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
 }
 
 Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
-  LlvmCodeGen* codegen = state->llvm_codegen();
-  bool codegen_disabled = (codegen == NULL);
-
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
   if (udf_type_ == TFunctionBinaryType::NATIVE ||
-      (udf_type_ == TFunctionBinaryType::BUILTIN && codegen_disabled)) {
+      (udf_type_ == TFunctionBinaryType::BUILTIN && !state->codegen_enabled())) {
+    // In this path, we are code that has been statically compiled to assembly.
+    // This can either be a UDF implemented in a .so or a builtin using the UDF
+    // interface with the code in impalad.
     void* udf_ptr;
     if (udf_type_ == TFunctionBinaryType::NATIVE) {
       RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
@@ -303,7 +305,10 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // defined. This tells LLVM where the compiled function definition is located in
     // memory.
     codegen->execution_engine()->addGlobalMapping(*udf, udf_ptr);
-  } else if (udf_type_ == TFunctionBinaryType::BUILTIN && !codegen_disabled) {
+  } else if (udf_type_ == TFunctionBinaryType::BUILTIN) {
+    // In this path, we're running a builtin with the UDF interface. The IR is
+    // in the llvm module.
+    DCHECK(state->codegen_enabled());
     const string& symbol = OpcodeRegistry::Instance()->GetFunctionSymbol(opcode_);
     *udf = codegen->module()->getFunction(symbol);
     if (*udf == NULL) {
@@ -312,6 +317,7 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
       return Status(ss.str());
     }
   } else {
+    // We're running a IR UDF.
     DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
     string local_path;
     RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(

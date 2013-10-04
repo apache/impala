@@ -119,11 +119,19 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     singleton_output_tuple_ = ConstructAggTuple();
   }
 
-  LlvmCodeGen* codegen = state->llvm_codegen();
-  if (codegen != NULL) {
-    Function* update_tuple_fn = CodegenUpdateAggTuple(codegen);
+  if (state->codegen_enabled()) {
+    DCHECK(state->codegen() != NULL);
+    Function* update_tuple_fn = CodegenUpdateAggTuple(state->codegen());
     if (update_tuple_fn != NULL) {
-      codegen_process_row_batch_fn_ = CodegenProcessRowBatch(codegen, update_tuple_fn);
+      codegen_process_row_batch_fn_ =
+          CodegenProcessRowBatch(state->codegen(), update_tuple_fn);
+      if (codegen_process_row_batch_fn_ != NULL) {
+        // Update to using codegen'd process row batch.
+        state->codegen()->AddFunctionToJit(
+            codegen_process_row_batch_fn_,
+            reinterpret_cast<void**>(&process_row_batch_fn_));
+        AddRuntimeExecOption("Codegen Enabled");
+      }
     }
   }
   return Status::OK;
@@ -132,15 +140,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-
-  // Update to using codegen'd process row batch.
-  if (codegen_process_row_batch_fn_ != NULL) {
-    void* jitted_process_row_batch =
-        state->llvm_codegen()->JitFunction(codegen_process_row_batch_fn_);
-    process_row_batch_fn_ =
-        reinterpret_cast<ProcessRowBatchFn>(jitted_process_row_batch);
-    AddRuntimeExecOption("Codegen Enabled");
-  }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
 

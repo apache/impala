@@ -289,6 +289,15 @@ class LlvmCodeGen {
   // This function is thread safe.
   void* JitFunction(llvm::Function* function, int* scratch_size = NULL);
 
+  // Adds the function to be automatically jit compiled after the module is
+  // optimized. That is, after OptimizeModule(), this will do
+  // *result_fn_ptr = JitFunction(fn);
+  // This is useful since it is not valid to call JitFunction() before every
+  // part of the query has finished adding their IR and it's convenient to
+  // not have to rewalk the objects. This provides the same behavior as walking
+  // each of those objects and calling JitFunction().
+  void AddFunctionToJit(llvm::Function* fn, void** result_fn_ptr);
+
   // Verfies the function if the verfier is enabled.  Returns false if function
   // is invalid.
   bool VerifyFunction(llvm::Function* function);
@@ -491,6 +500,9 @@ class LlvmCodeGen {
   // The locations of modules that have been linked. Used to avoid linking the same module
   // twice, which causes symbol collision errors.
   std::set<std::string> linked_modules_;
+
+  // The vector of functions to automatically JIT compile after OptimizeModule().
+  std::vector<std::pair<llvm::Function*, void**> > fns_to_jit_compile_;
 
   // Debug utility that will insert a printf-like function into the generated
   // IR.  Useful for debugging the IR.  This is lazily created.

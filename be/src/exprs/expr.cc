@@ -95,7 +95,8 @@ void* ExprValue::TryParse(const string& str, PrimitiveType type) {
 }
 
 Expr::Expr(const ColumnType& type, bool is_slotref)
-    : opcode_(TExprOpcode::INVALID_OPCODE),
+    : compute_fn_(NULL),
+      opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(type),
       output_scale_(-1),
@@ -106,7 +107,8 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
-    : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
+    : compute_fn_(NULL),
+      opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(ColumnType(node.type)),
       output_scale_(-1),
@@ -489,14 +491,14 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
   RETURN_IF_ERROR(root->Prepare(state, row_desc));
   LlvmCodeGen* codegen = NULL;
   // state might be NULL when called from tests
-  if (state != NULL) codegen = state->llvm_codegen();
+  if (state != NULL && state->codegen_enabled() && !disable_codegen) {
+    codegen = state->codegen();
+    DCHECK(codegen != NULL);
+  }
 
-  // codegen == NULL means jitting is disabled.
-  if (!disable_codegen && codegen != NULL && root->IsJittable(codegen)) {
+  if (codegen != NULL && root->IsJittable(codegen)) {
     root->CodegenExprTree(codegen);
-    if (thread_safe != NULL) {
-      *thread_safe = root->codegend_fn_thread_safe();
-    }
+    if (thread_safe != NULL) *thread_safe = root->codegend_fn_thread_safe();
   }
   return Status::OK;
 }
@@ -855,6 +857,11 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
   return codegen->FinalizeFunction(function);
 }
 
+Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
+  DCHECK(state->codegen() != NULL);
+  return GetWrapperIrComputeFunction(state->codegen(), fn);
+}
+
 // Codegens a function that calls GetValue(this, row) and wraps the returned void* value
 // in the appropriate AnyVal type. Note that the AnyVal types are lowered.
 // Example generated function IR for a TYPE_SMALLINT expr returning a lowered SmallIntVal
@@ -885,9 +892,7 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
 //   %result2 = or i32 %3, %2
 //   ret i32 %result2
 // }
-Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
-  LlvmCodeGen* codegen = state->llvm_codegen();
-
+Status Expr::GetWrapperIrComputeFunction(LlvmCodeGen* codegen, Function** fn) {
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "ExprWrapper", &args);
   BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);

@@ -390,7 +390,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   }
 
   // Codegen scanner specific functions
-  if (state->llvm_codegen() != NULL) {
+  if (state->codegen_enabled()) {
     // If the codegen'd conjuncts are not thread safe, we will need to make copies of
     // the exprs and codegen those as well.
     if (!codegend_conjuncts_thread_safe_) {

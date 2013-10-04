@@ -108,7 +108,7 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
   }
 
   write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
-      state_->llvm_codegen()->JitFunction(codegen_fn_));
+      state_->codegen()->JitFunction(codegen_fn_));
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id()
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();

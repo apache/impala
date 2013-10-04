@@ -124,6 +124,7 @@ void RuntimeState::set_now(const TimestampValue* now) {
 }
 
 Status RuntimeState::CreateCodegen() {
+  if (codegen_.get() != NULL) return Status::OK;
   RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());

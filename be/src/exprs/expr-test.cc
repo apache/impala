@@ -2914,9 +2914,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   }
 }
 
-TEST_F(ExprTest, UdfBuiltins) {
-  // These currently don't run with codegen disabled
-  if (disable_codegen_) return;
+TEST_F(ExprTest, UdfInterfaceBuiltins) {
   TestValue("udf_pi()", TYPE_DOUBLE, M_PI);
   TestValue("udf_abs(-1)", TYPE_DOUBLE, 1.0);
   TestStringValue("udf_lower('Hello_WORLD')", "hello_world");
