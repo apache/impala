@@ -81,6 +81,11 @@ class Scheduler {
   // are cancelled via their coordinator.
   virtual void HandlePreemptedResource(const TUniqueId& client_resource_id) = 0;
 
+  // Notifies this scheduler that a single resource with the given client resource id
+  // has been lost by the central scheduler (Yarn via Llama). All affected queries
+  // are cancelled via their coordinator.
+  virtual void HandleLostResource(const TUniqueId& client_resource_id) = 0;
+
   // Initialises the scheduler, acquiring all resources needed to make
   // scheduling decisions once this method returns.
   virtual Status Init() = 0;

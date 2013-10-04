@@ -88,6 +88,7 @@ class SimpleScheduler : public Scheduler {
   virtual Status Release(QuerySchedule* schedule);
   virtual void HandlePreemptedReservation(const TUniqueId& reservation_id);
   virtual void HandlePreemptedResource(const TUniqueId& client_resource_id);
+  virtual void HandleLostResource(const TUniqueId& client_resource_id);
 
   // Map form a user ID to a list of pools they are allowed to submit work to
   typedef boost::unordered_map<std::string, std::vector<std::string> > UserPoolMap;

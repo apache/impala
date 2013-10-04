@@ -324,6 +324,13 @@ void ResourceBroker::AMNotification(const llama::TLlamaAMNotificationRequest& re
     scheduler_->HandlePreemptedResource(impala_res_id);
   }
 
+  // Process lost client resources.
+  BOOST_FOREACH(const llama::TUniqueId& res_id, request.lost_client_resource_ids) {
+    TUniqueId impala_res_id;
+    impala_res_id << res_id;
+    scheduler_->HandlePreemptedResource(impala_res_id);
+  }
+
   response.status.__set_status_code(llama::TStatusCode::OK);
 }
 

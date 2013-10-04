@@ -831,7 +831,10 @@ void SimpleScheduler::HandlePreemptedReservation(const TUniqueId& reservation_id
     LOG(WARNING) << "Ignoring preempted reservation id " << reservation_id
                  << " because no active query using it was found.";
   } else {
-    coord->Cancel();
+    stringstream err_msg;
+    err_msg << "Reservation " << reservation_id << " was preempted";
+    Status status(err_msg.str());
+    coord->Cancel(&status);
   }
 }
 
@@ -847,6 +850,28 @@ void SimpleScheduler::HandlePreemptedResource(const TUniqueId& client_resource_i
     LOG(WARNING) << "Ignoring preempted client resource id " << client_resource_id
                  << " because no active query using it was found.";
   } else {
+    stringstream err_msg;
+    err_msg << "Resource " << client_resource_id << " was preempted";
+    Status status(err_msg.str());
+    coord->Cancel();
+  }
+}
+
+void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
+  Coordinator* coord = NULL;
+  {
+    lock_guard<mutex> l(active_resources_lock_);
+    ActiveClientResourcesMap::iterator it =
+        active_client_resources_.find(client_resource_id);
+    if (it != active_client_resources_.end()) coord = it->second;
+  }
+  if (coord == NULL) {
+    LOG(WARNING) << "Ignoring lost client resource id " << client_resource_id
+                 << " because no active query using it was found.";
+  } else {
+    stringstream err_msg;
+    err_msg << "Resource " << client_resource_id << " was lost";
+    Status status(err_msg.str());
     coord->Cancel();
   }
 }
