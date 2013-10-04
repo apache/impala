@@ -45,7 +45,14 @@
   <name>datanucleus.autoCreateSchema</name>
   <value>false</value>
 </property>
-
+<property>
+  <name>hive.support.concurrency</name>
+  <value>true</value>
+</property>
+<property>
+  <name>datanucleus.metadata.validate</name>
+  <value>false</value>
+</property>
 <property>
   <name>hive.stats.dbclass</name>
   <value>jdbc:postgresql</value>
@@ -54,12 +61,10 @@
   <name>hive.stats.jdbcdriver</name>
   <value>org.postgresql.Driver</value>
 </property>
-
 <property>
   <name>datanucleus.fixedDatastore</name>
   <value>false</value>
 </property>
-
 <property>
   <name>hive.metastore.local</name>
   <value>true</value>

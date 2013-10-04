@@ -66,8 +66,7 @@ do
   ${IMPALA_HOME}/bin/run-backend-tests.sh
 
   # Run the remaining tests against an external Impala test cluster.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR}\
-      --wait_for_cluster --cluster_size=3
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
@@ -79,20 +78,17 @@ do
   ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
       --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
-  # TODO: The process failure tests need to be updated to work with the CatalogService.
-  # this requires adjusting the timeout values and making changes to the ImpalaService()
-  # class. Disable them for now.
-  #${IMPALA_HOME}/tests/run-process-failure-tests.sh
-
   # Run JUnit frontend tests
   # Requires a running impalad cluster because some tests (such as DataErrorTest and
   # JdbcTest) queries against an impala cluster.
   # TODO: Currently planner tests require running the end-to-end tests first
   # so data is inserted into tables. This will go away once we move the planner
   # tests to the new python framework.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${FE_LOG_DIR}\
-      --wait_for_cluster --cluster_size=3
-
   cd $IMPALA_FE_DIR
   mvn test
+
+  # TODO: The process failure tests need to be updated to work with the CatalogService.
+  # this requires adjusting the timeout values and making changes to the ImpalaService()
+  # class. Disable them for now.
+  #${IMPALA_HOME}/tests/run-process-failure-tests.sh
 done

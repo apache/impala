@@ -81,6 +81,7 @@ public class MetaStoreClientPool {
           // reuse MetastoreClient connections. No reason to add this client back
           // to the pool. See HIVE-5181.
           // clientPool.add(this);
+          hiveClient.close();
         }
       }
     }

@@ -439,7 +439,10 @@ public abstract class Catalog {
       }
 
       if (initStrategy_ == CatalogInitStrategy.IMMEDIATE) {
-        ExecutorService executor = Executors.newFixedThreadPool(32);
+        // The number of parallel threads to use to load table metadata. This number
+        // was chosen based on experimentation of what provided good throughput while not
+        // putting too much stress on the metastore.
+        ExecutorService executor = Executors.newFixedThreadPool(16);
         try {
           for (String dbName: dbCache_.getAllNames()) {
             final Db db = dbCache_.get(dbName);

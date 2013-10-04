@@ -45,7 +45,14 @@
   <name>datanucleus.autoCreateSchema</name>
   <value>true</value>
 </property>
-
+<property>
+  <name>hive.support.concurrency</name>
+  <value>true</value>
+</property>
+<property>
+  <name>datanucleus.metadata.validate</name>
+  <value>false</value>
+</property>
 <property>
   <name>hive.stats.dbclass</name>
   <value>jdbc:mysql</value>

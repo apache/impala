@@ -25,7 +25,10 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.log4j.Logger;
 
+import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnDef;
@@ -46,13 +49,19 @@ import com.google.common.collect.Maps;
  * a key range into a fixed number of buckets).
  */
 public abstract class Table implements CatalogObject {
+  private static final Logger LOG = Logger.getLogger(Table.class);
+  // Lock used to serialize calls to the Hive MetaStore to work around MetaStore
+  // concurrency bugs. Currently used to serialize calls to "getTable()" due to HIVE-5457.
+  private static final Object metastoreAccessLock_ = new Object();
+  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
+  private final org.apache.hadoop.hive.metastore.api.Table msTable_;
+
   protected final TableId id;
   protected final Db db;
   protected final String name;
   protected final String owner;
   protected TTableDescriptor tableDesc;
   protected List<FieldSchema> fields;
-  protected TStatus loadStatus_;
 
   // Number of clustering columns.
   protected int numClusteringCols;
@@ -75,19 +84,16 @@ public abstract class Table implements CatalogObject {
       EnumSet.of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE,
       TableType.VIRTUAL_VIEW);
 
-  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
-  private final org.apache.hadoop.hive.metastore.api.Table msTable;
-
-  protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
+  protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable_, Db db,
       String name, String owner) {
     this.id = id;
-    this.msTable = msTable;
+    this.msTable_ = msTable_;
     this.db = db;
     this.name = name;
     this.owner = owner;
     this.colsByPos = Lists.newArrayList();
     this.colsByName = Maps.newHashMap();
-    this.lastDdlTime = (msTable != null) ? Catalog.getLastDdlTime(msTable) : -1;
+    this.lastDdlTime = (msTable_ != null) ? Catalog.getLastDdlTime(msTable_) : -1;
   }
 
   //number of nodes that contain data for this table; -1: unknown
@@ -118,7 +124,7 @@ public abstract class Table implements CatalogObject {
    * if the derived Table object was not created from a metastore Table (ex. InlineViews).
    */
   public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
-    return msTable;
+    return msTable_;
   }
 
   /**
@@ -138,9 +144,11 @@ public abstract class Table implements CatalogObject {
 
     // turn all exceptions into TableLoadingException
     try {
-      org.apache.hadoop.hive.metastore.api.Table msTbl =
-          client.getTable(db.getName(), tblName);
-
+      org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+      // All calls to getTable() need to be serialized due to HIVE-5457.
+      synchronized (metastoreAccessLock_) {
+        msTbl = client.getTable(db.getName(), tblName);
+      }
       // Check that the Hive TableType is supported
       TableType tableType = TableType.valueOf(msTbl.getTableType());
       if (!SUPPORTED_TABLE_TYPES.contains(tableType)) {
@@ -161,6 +169,8 @@ public abstract class Table implements CatalogObject {
     } catch (NoSuchObjectException e) {
       throw new TableNotFoundException("Table not found: " + tblName, e);
     } catch (Exception e) {
+      LOG.error(JniUtil.throwableToString(e) + "\n" +
+                JniUtil.throwableToStackTrace(e));
       throw new TableLoadingException(
           "Failed to load metadata for table: " + tblName, e);
     }

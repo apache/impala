@@ -67,7 +67,7 @@ IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d")
 BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
-DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
+CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 
 def exec_impala_process(cmd, args, stderr_log_file_path):
   redirect_output = str()
@@ -157,7 +157,7 @@ def wait_for_impala_process_count(impala_cluster, retries=3):
   if not impala_cluster.statestored:
     raise RuntimeError, "statestored failed to start."
 
-def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
 
   A cluster is deemed "ready" if:
@@ -171,18 +171,24 @@ def wait_for_cluster_web(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECO
   wait_for_impala_process_count(impala_cluster)
   for impalad in impala_cluster.impalads:
     impalad.service.wait_for_num_known_live_backends(options.cluster_size, interval=2)
-    start_time = time()
-    while (time() - start_time < 120):
-      try:
-        num_dbs = impalad.service.get_metric_value('catalog.num-databases')
-        sleep(2)
-        if num_dbs != None and int(num_dbs) > 0:
-          break
-        print 'Waiting for Catalog...'
-      except Exception:
-        pass
+    wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
 
-def wait_for_cluster_cmdline(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+def wait_for_catalog(impalad, timeout_in_seconds):
+  """Waits for the impalad catalog to become ready (contains at least 1 database)"""
+  start_time = time()
+  num_dbs = 0
+  while (time() - start_time < timeout_in_seconds and not num_dbs):
+    try:
+      num_dbs = impalad.service.get_metric_value('catalog.num-databases')
+      num_tbls = impalad.service.get_metric_value('catalog.num-tables')
+      print 'Waiting for Catalog... Status: %s DBs / %s tables' % (num_dbs, num_tbls)
+      sleep(2)
+    except Exception, e:
+      print e
+  if not num_dbs:
+    raise RuntimeError, 'Catalog was not initialized in expected time period.'
+
+def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready" by executing a simple query in a loop"""
   start_time = time()
   while os.system('%s -i localhost:21000 -q "%s"' %  (IMPALA_SHELL, 'select 1')) != 0:
@@ -216,7 +222,7 @@ if __name__ == "__main__":
     wait_for_cluster = wait_for_cluster_cmdline
 
   # If ImpalaCluster cannot be imported, fall back to the command-line to check
-  # whether impalads/statestre are up.
+  # whether impalads/statestore are up.
   try:
     from tests.common.impala_cluster import ImpalaCluster
     # Make sure the processes have been killed. We loop till we can't detect a single
@@ -243,4 +249,4 @@ if __name__ == "__main__":
       print 'Error starting cluster: %s' % e
       sys.exit(1)
 
-  print 'ImpalaD Cluster Running with %d nodes.' % options.cluster_size
+  print 'Impala Cluster Running with %d nodes.' % options.cluster_size
