@@ -76,28 +76,28 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
   DCHECK(metrics != NULL);
   request_rpc_time_metric_ =
       metrics->RegisterMetric(
-          new StatsMetric<double>("resource-broker-request-rpc-time"));
+          new StatsMetric<double>("resource-broker.request-rpc-time"));
   request_response_time_metric_ =
       metrics->RegisterMetric(
-          new StatsMetric<double>("resource-broker-request-response-time"));
+          new StatsMetric<double>("resource-broker.request-response-time"));
   requests_total_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-total", 0);
+          "resource-broker.requests-total", 0);
   requests_fulfilled_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-fulfilled", 0);
+          "resource-broker.requests-fulfilled", 0);
   requests_failed_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-failed", 0);
+          "resource-broker.requests-failed", 0);
   requests_rejected_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-rejected", 0);
+          "resource-broker.requests-rejected", 0);
   requests_timedout_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-timedout", 0);
+          "resource-broker.requests-timedout", 0);
   requests_released_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "resource-broker-requests-released", 0);
+          "resource-broker.requests-released", 0);
 }
 
 Status ResourceBroker::Init() {
