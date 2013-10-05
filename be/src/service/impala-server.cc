@@ -1692,10 +1692,12 @@ void ImpalaServer::CatalogUpdateCallback(
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
       update.__set_from_version(0L);
+      ImpaladMetrics::CATALOG_READY->Update(false);
     } else {
       unique_lock<mutex> unique_lock(catalog_version_lock_);
       current_catalog_version_ = new_catalog_version;
       current_catalog_service_id_ = resp.catalog_service_id;
+      ImpaladMetrics::CATALOG_READY->Update(current_catalog_version_ > 0);
       catalog_version_update_cv_.notify_all();
       UpdateCatalogMetrics();
     }

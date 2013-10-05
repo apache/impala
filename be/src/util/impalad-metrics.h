@@ -77,6 +77,12 @@ class ImpaladMetricKeys {
   // Number of tables in the catalog
   static const char* CATALOG_NUM_TABLES;
 
+  // True if the impalad catalog is ready (has received a valid catalog-update topic
+  // entry from the state store). Reset to false while recovering from an invalid
+  // catalog state, such as detecting a catalog-update topic entry originating from
+  // a catalog server with an unexpected ID.
+  static const char* CATALOG_READY;
+
   // Number of files open for insert
   static const char* NUM_FILES_OPEN_FOR_INSERT;
 };
@@ -104,6 +110,7 @@ class ImpaladMetrics {
   static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
   static Metrics::IntMetric* CATALOG_NUM_DBS;
   static Metrics::IntMetric* CATALOG_NUM_TABLES;
+  static Metrics::BooleanMetric* CATALOG_READY;
   static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
 
   // Creates and initializes all metrics above in 'm'.
