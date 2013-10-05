@@ -79,6 +79,13 @@ class ResourceBroker {
   void set_scheduler(Scheduler* scheduler) { scheduler_ = scheduler; };
 
  private:
+  // Registers this resource broker with the Llama. Returns a non-OK status is the
+  // registration failed.
+  Status RegisterWithLlama();
+
+  // Detects Llama restarts from the given return status of a Llama RPC.
+  bool LlamaHasRestarted(const llama::TStatus& status) const;
+
   // Creates a Llama reservation request from a resource broker reservation request.
   void CreateLlamaReservationRequest(const TResourceBrokerReservationRequest& src,
       llama::TLlamaAMReservationRequest& dest);
@@ -131,9 +138,6 @@ class ResourceBroker {
   // Client id used to register with Llama. Set in Init().
   std::string llama_client_id_;
 
-  // Handle received from Llama during registration. Set in Init().
-  llama::TUniqueId llama_handle_;
-
   // Thrift API implementation which proxies Llama notifications onto this ResourceBroker.
   boost::shared_ptr<llama::LlamaNotificationServiceIf> llama_callback_thrift_iface_;
   boost::scoped_ptr<ThriftServer> llama_callback_server_;
@@ -141,12 +145,18 @@ class ResourceBroker {
   // Cache of Llama client connections.
   boost::scoped_ptr<ClientCache<llama::LlamaAMServiceClient> > llama_client_cache_;
 
+  // Lock to ensure that only a single registration with Llama is sent, e.g.,
+  // when multiple concurrent requests realize that Llama has restarted.
+  boost::mutex llama_registration_lock_;
+
+  // Handle received from Llama during registration. Set in RegisterWithLlama().
+  llama::TUniqueId llama_handle_;
+
+  // List of nodes registered with Llama. Set in RefreshLlamaNodes().
+  std::vector<std::string> llama_nodes_;
+
   // True if this resource broker is using a Mini LLama. Set in RefreshLlamaNodes().
   bool is_mini_llama_;
-
-  // List of nodes registered with Llama. Set in Init() after registering with Llama.
-  // Mostly for debugging now.
-  std::vector<std::string> llama_nodes_;
 
   // Used to implement a blocking resource-reservation interface on top of Llama's
   // non-blocking request interface (the Llama asynchronously notifies the resource

@@ -105,7 +105,7 @@ class JdbcQueryExecOptions(QueryExecOptions):
   def __init__(self, iterations, **kwargs):
     QueryExecOptions.__init__(self, iterations, **kwargs)
     self.impalad = kwargs.get('impalad', 'localhost:21050')
-    self.transport = self.options.get('transport', None)
+    self.transport = kwargs.get('transport', None)
     self.jdbc_client_cmd = \
         os.path.join(os.environ['IMPALA_HOME'], 'bin/run-jdbc-client.sh')
     self.jdbc_client_cmd += ' -i "%s" -t %s' % (self.impalad, self.transport)

@@ -94,7 +94,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       request.query_ctxt, cgroup, exec_env_));
 
   // Register after setting runtime_state_ to ensure proper cleanup.
-  if (FLAGS_enable_rm) {
+  if (FLAGS_enable_rm && !cgroup.empty()) {
     bool is_first;
     RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
         params.fragment_instance_id, cgroup, &is_first));
