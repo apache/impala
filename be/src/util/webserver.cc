@@ -29,6 +29,7 @@
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/mem-info.h"
+#include "util/os-info.h"
 #include "util/url-coding.h"
 #include "util/logging.h"
 #include "util/debug-util.h"
@@ -107,6 +108,10 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* ou
   (*output) << CpuInfo::DebugString();
   (*output) << MemInfo::DebugString();
   (*output) << DiskInfo::DebugString();
+  (*output) << "</pre>";
+  (*output) << "<h2>OS Info</h2>";
+  (*output) << "<pre>";
+  (*output) << OsInfo::DebugString();
   (*output) << "</pre>";
 
   (*output) << "<h2>Status Pages</h2>";

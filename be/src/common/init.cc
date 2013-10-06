@@ -21,6 +21,7 @@
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
+#include "util/os-info.h"
 #include "rpc/thrift-util.h"
 #include "util/thread.h"
 
@@ -43,10 +44,12 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   CpuInfo::Init();
   DiskInfo::Init();
   MemInfo::Init();
+  OsInfo::Init();
 
   LOG(INFO) << CpuInfo::DebugString();
   LOG(INFO) << DiskInfo::DebugString();
   LOG(INFO) << MemInfo::DebugString();
+  LOG(INFO) << OsInfo::DebugString();
 
   if (init_jvm) {
     EXIT_IF_ERROR(JniUtil::Init());

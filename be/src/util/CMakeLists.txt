@@ -45,6 +45,7 @@ add_library(Util
   mem-info.cc
   metrics.cc
   network-util.cc
+  os-info.cc
   parse-util.cc
   path-builder.cc
   periodic-counter-updater
