@@ -406,6 +406,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter view functional.alltypes_view as " +
         "select * from functional.badtable",
         "Table does not exist: functional.badtable");
+    // Duplicate column name.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypessmall a inner join " +
+        "functional.alltypessmall b on a.id = b.id",
+        "Duplicate column name: id");
     // Invalid column name.
     AnalysisError("alter view functional.alltypes_view as select 'abc' as `???`",
         "Invalid column name: ???");
@@ -664,6 +669,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "from functional.alltypes",
         "Column-definition list has more columns (3) than the " +
         "view-definition query statement returns (1).");
+    // Duplicate columns in the view-definition statement.
+    AnalysisError("create view foo as select * from functional.alltypessmall a " +
+        "inner join functional.alltypessmall b on a.id = b.id",
+        "Duplicate column name: id");
     // Duplicate columns in the column definition.
     AnalysisError("create view foo (a, b, a) as select int_col, int_col, int_col " +
         "from functional.alltypes",

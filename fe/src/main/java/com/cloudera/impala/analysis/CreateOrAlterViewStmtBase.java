@@ -80,8 +80,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(owner);
 
-    // Check that all the column names are unique. Also, set the finalColDefs
-    // to reflect the given column definitions.
+    // Set the finalColDefs to reflect the given column definitions.
     if (columnDefs != null) {
       Preconditions.checkState(!columnDefs.isEmpty());
       if (columnDefs.size() != viewDefStmt.getColLabels().size()) {
@@ -94,14 +93,9 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
 
       finalColDefs = columnDefs;
       Preconditions.checkState(columnDefs.size() == viewDefStmt.getResultExprs().size());
-      Set<String> colNames = Sets.newHashSet();
       for (int i = 0; i < columnDefs.size(); ++i) {
-        ColumnDef colDef = columnDefs.get(i);
-        if (!colNames.add(colDef.getColName().toLowerCase())) {
-          throw new AnalysisException("Duplicate column name: " + colDef.getColName());
-        }
         // Set type in the column definition from the view-definition statement.
-        colDef.setColType(viewDefStmt.getResultExprs().get(i).getType());
+        columnDefs.get(i).setColType(viewDefStmt.getResultExprs().get(i).getType());
       }
     } else {
       // Create list of column definitions from the view-definition statement.
@@ -114,9 +108,14 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       }
     }
 
-    // Check that the column definitions have valid names.
+    // Check that the column definitions have valid names, and that there are no
+    // duplicate column names.
+    Set<String> distinctColNames = Sets.newHashSet();
     for (ColumnDef colDef: finalColDefs) {
       colDef.analyze();
+      if (!distinctColNames.add(colDef.getColName().toLowerCase())) {
+        throw new AnalysisException("Duplicate column name: " + colDef.getColName());
+      }
     }
 
     // Set original and expanded view-definition SQL strings.
