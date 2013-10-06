@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
 
-# Base class for Impalad and Statestore services
+# Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
   def __init__(self, hostname, webserver_port):
@@ -164,8 +164,8 @@ class ImpaladService(BaseImpalaService):
     client.connect()
     return client
 
-# Allows for interacting with an Impalad instance to perform operations such as creating
-# new connections or accessing the debug webpage.
+# Allows for interacting with the StateStore service to perform operations such as
+# accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
   def __init__(self, hostname, webserver_port):
     super(StateStoredService, self).__init__(hostname, webserver_port)
@@ -173,3 +173,10 @@ class StateStoredService(BaseImpalaService):
   def wait_for_live_backends(self, num_backends, timeout=15, interval=1):
     self.wait_for_metric_value('statestore.live-backends', num_backends,
                                timeout=timeout, interval=interval)
+
+
+# Allows for interacting with the Catalog service to perform operations such as
+# accessing the debug webpage.
+class CatalogdService(BaseImpalaService):
+  def __init__(self, hostname, webserver_port):
+    super(CatalogdService, self).__init__(hostname, webserver_port)

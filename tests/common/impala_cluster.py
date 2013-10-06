@@ -26,7 +26,7 @@ import urllib
 from collections import defaultdict
 from HTMLParser import HTMLParser
 from random import choice, shuffle
-from tests.common.impala_service import ImpaladService, StateStoredService
+from tests.common.impala_service import *
 from tests.util.shell_util import exec_shell_cmd
 from time import sleep, time
 
@@ -38,16 +38,18 @@ LOG.setLevel(level=logging.DEBUG)
 # a basic set of command line options (beeswax_port, webserver_port, etc)
 class ImpalaCluster(object):
   def __init__(self):
-    self.__impalads, self.__statestoreds = self.__build_impala_process_lists()
-    LOG.info("Found %d impalad processes and %d statestored processes" %\
-        (len(self.__impalads), len(self.__statestoreds)))
+    self.__impalads, self.__statestoreds, self.__catalogd =\
+        self.__build_impala_process_lists()
+    LOG.info("Found %d impalad/%d statestored/%d catalogd process(es)" %\
+        (len(self.__impalads), len(self.__statestoreds), 1 if self.__catalogd else 0))
 
   def refresh(self):
-    """ Re-loads the impalad/statestored processes if they exist.
+    """ Re-loads the impalad/statestored/catalogd processes if they exist.
 
     Helpful to confirm that processes have been killed.
     """
-    self.__impalads, self.__statestoreds = self.__build_impala_process_lists()
+    self.__impalads, self.__statestoreds, self.__catalogd =\
+        self.__build_impala_process_lists()
 
   @property
   def statestored(self):
@@ -64,6 +66,11 @@ class ImpalaCluster(object):
   def impalads(self):
     """Returns a list of the known impalad processes"""
     return self.__impalads
+
+  @property
+  def catalogd(self):
+    """Returns the catalogd process, or None if no catalogd process was found"""
+    return self.__catalogd
 
   def get_any_impalad(self):
     """Selects a random impalad from the list of known processes"""
@@ -87,6 +94,7 @@ class ImpalaCluster(object):
     """
     impalads = list()
     statestored = list()
+    catalogd = None
     # TODO: Consider using process_iter() here
     for pid in psutil.get_pid_list():
       try:
@@ -99,7 +107,9 @@ class ImpalaCluster(object):
         impalads.append(ImpaladProcess(process.cmdline))
       elif process.name == 'statestored' and len(process.cmdline) >= 1:
         statestored.append(StateStoreProcess(process.cmdline))
-    return impalads, statestored
+      elif process.name == 'catalogd' and len(process.cmdline) >=1:
+        catalogd = CatalogdProcess(process.cmdline)
+    return impalads, statestored, catalogd
 
 # Represents a process running on a machine and common actions that can be performed
 # on a process such as restarting or killing.
@@ -151,7 +161,7 @@ class Process(object):
     return "Command: %s PID: %s" % (self.cmd, self.get_pid())
 
 
-# Represents an Impala process (either a statestored or impalad)
+# Base class for all Impala processes
 class BaseImpalaProcess(Process):
   def __init__(self, cmd, hostname):
     super(BaseImpalaProcess, self).__init__(cmd)
@@ -197,3 +207,11 @@ class StateStoreProcess(BaseImpalaProcess):
     super(StateStoreProcess, self).__init__(cmd, socket.gethostname())
     self.service =\
         StateStoredService(self.hostname, self._get_webserver_port(default=25010))
+
+
+# Represents a catalogd process
+class CatalogdProcess(BaseImpalaProcess):
+  def __init__(self, cmd):
+    super(CatalogdProcess, self).__init__(cmd, socket.gethostname())
+    self.service =\
+        CatalogdService(self.hostname, self._get_webserver_port(default=25020))

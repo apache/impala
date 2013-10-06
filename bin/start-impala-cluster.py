@@ -147,15 +147,20 @@ def wait_for_impala_process_count(impala_cluster, retries=3):
   """
   for i in range(retries):
     if len(impala_cluster.impalads) < options.cluster_size or \
-        not impala_cluster.statestored:
+        not impala_cluster.statestored or not impala_cluster.catalogd:
           sleep(2)
           impala_cluster.refresh()
+  msg = str()
   if len(impala_cluster.impalads) < options.cluster_size:
     impalads_found = len(impala_cluster.impalads)
-    msg = "Expected %d impalad(s), only %d found" % (options.cluster_size, impalads_found)
-    raise RuntimeError, msg
+    msg += "Expected %d impalad(s), only %d found\n" %\
+        (options.cluster_size, impalads_found)
   if not impala_cluster.statestored:
-    raise RuntimeError, "statestored failed to start."
+    msg += "statestored failed to start.\n"
+  if not impala_cluster.catalogd:
+    msg += "catalogd failed to start.\n"
+  if msg:
+    raise RuntimeError, msg
 
 def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
@@ -228,7 +233,8 @@ if __name__ == "__main__":
     # Make sure the processes have been killed. We loop till we can't detect a single
     # impalad or a statestore process.
     impala_cluster = ImpalaCluster()
-    while len(impala_cluster.impalads) != 0 or impala_cluster.statestored:
+    while len(impala_cluster.impalads) != 0 or impala_cluster.statestored or\
+          impala_cluster.catalogd:
       impala_cluster.refresh()
   except ImportError:
     print 'ImpalaCluster module not found.'
