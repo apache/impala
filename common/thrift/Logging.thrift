@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_UTIL_LOGGING_SUPPORT_H
-#define IMPALA_UTIL_LOGGING_SUPPORT_H
+namespace cpp impala
+namespace java com.cloudera.impala.thrift
 
-#include "util/jni-util.h"
-#include "gen-cpp/Logging_types.h"
+// Types to support Impala log forwarding.
 
-namespace impala {
-
-// InitLoggingSupport registers the native logging functions with JNI. This allows
-// the Java log4j log messages to be forwarded to Glog.
-void InitJvmLoggingSupport();
-
-// Helper function to convert a command line logging flag value (input as an int) to the
-// matching TLogLevel enum value.
-TLogLevel::type FlagToTLogLevel(int flag);
+// Convenience type to map between log4j levels and glog severity
+enum TLogLevel {
+  VLOG_3,
+  VLOG_2
+  VLOG,
+  INFO,
+  WARN,
+  ERROR,
+  FATAL
 }
-#endif

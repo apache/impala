@@ -85,13 +85,8 @@ public class JniFrontend {
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
       String policyProviderClassName, int impalaLogLevel, int otherLogLevel)
       throws InternalException {
-    // This trick saves having to pass a TLogLevel enum, which is an object and more
-    // complex to pass through JNI.
-    TLogLevel impalaLevel = TLogLevel.values()[impalaLogLevel];
-    TLogLevel otherLevel = TLogLevel.values()[otherLogLevel];
-    GlogAppender.Install(impalaLevel, otherLevel);
-    LOG.info(String.format("Frontend logging initialised. Impala: %s, All other: %s",
-        impalaLevel, otherLevel));
+    GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
+        TLogLevel.values()[otherLogLevel]);
 
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.

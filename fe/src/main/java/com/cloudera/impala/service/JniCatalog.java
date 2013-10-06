@@ -36,12 +36,14 @@ import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResetMetadataResponse;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateMetastoreRequest;
+import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 
 /**
@@ -63,9 +65,13 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  public JniCatalog() {
+  public JniCatalog(int impalaLogLevel, int otherLogLevel) throws InternalException {
     catalog_ = new CatalogServiceCatalog(getServiceId());
     ddlExecutor_ = new DdlExecutor(catalog_);
+    // This trick saves having to pass a TLogLevel enum, which is an object and more
+    // complex to pass through JNI.
+    GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
+        TLogLevel.values()[otherLogLevel]);
   }
 
   public static TUniqueId getServiceId() { return catalogServiceId_; }

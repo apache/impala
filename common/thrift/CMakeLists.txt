@@ -117,6 +117,7 @@ set (SRC_FILES
   Exprs.thrift
   ImpalaInternalService.thrift
   ImpalaService.thrift
+  Logging.thrift
   NetworkTest.thrift
   PlanNodes.thrift
   Planner.thrift

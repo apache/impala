@@ -405,17 +405,6 @@ struct TExecRequest {
   8: optional list<TAccessEvent> access_events
 }
 
-// Convenience type to map between log4j levels and glog severity
-enum TLogLevel {
-  VLOG_3,
-  VLOG_2
-  VLOG,
-  INFO,
-  WARN,
-  ERROR,
-  FATAL
-}
-
 // Sent to an impalad FE during each CatalogUpdate heartbeat. Contains details on all
 // catalog objects that need to be updated.
 struct TInternalCatalogUpdateRequest {

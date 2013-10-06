@@ -15,10 +15,12 @@
 #include "util/logging-support.h"
 
 #include "common/logging.h"
-#include "gen-cpp/Frontend_types.h"
 
 using namespace impala;
 using namespace std;
+
+DEFINE_int32(non_impala_java_vlog, 0, "(Advanced) The log level (equivalent to --v) for "
+    "non-Impala Java classes (0: INFO, 1 and 2: DEBUG, 3: TRACE)");
 
 // Requires JniUtil::Init() to have been called. Called by the frontend and catalog
 // service to log messages to Glog.
@@ -75,6 +77,16 @@ void InitJvmLoggingSupport() {
   nm.fnPtr = reinterpret_cast<void*>(::Java_com_cloudera_impala_util_NativeLogger_Log);
   env->RegisterNatives(native_backend_cl, &nm, 1);
   EXIT_IF_EXC(env);
+}
+
+TLogLevel::type FlagToTLogLevel(int flag) {
+  switch (flag) {
+    case 0: return TLogLevel::INFO;
+    case 1: return TLogLevel::VLOG;
+    case 2: return TLogLevel::VLOG_2;
+    case 3:
+    default: return TLogLevel::VLOG_3;
+  }
 }
 
 }

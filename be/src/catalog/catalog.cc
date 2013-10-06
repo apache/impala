@@ -17,12 +17,15 @@
 #include <list>
 #include <string>
 
-#include "util/jni-util.h"
 #include "common/logging.h"
 #include "rpc/thrift-util.h"
+#include "util/jni-util.h"
+#include "util/logging-support.h"
 
 using namespace std;
 using namespace impala;
+
+DECLARE_int32(non_impala_java_vlog);
 
 // Describes one method to look up in a Catalog object
 struct Catalog::MethodDescriptor {
@@ -38,7 +41,7 @@ struct Catalog::MethodDescriptor {
 
 Catalog::Catalog() {
   MethodDescriptor methods[] = {
-    {"<init>", "()V", &catalog_ctor_},
+    {"<init>", "(II)V", &catalog_ctor_},
     {"updateMetastore", "([B)[B", &update_metastore_id_},
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
@@ -56,7 +59,8 @@ Catalog::Catalog() {
     LoadJniMethod(jni_env, &(methods[i]));
   }
 
-  jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_);
+  jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_,
+      FlagToTLogLevel(FLAGS_v), FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }

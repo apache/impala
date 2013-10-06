@@ -18,6 +18,7 @@ import java.util.Properties;
 
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.spi.LoggingEvent;
 
@@ -77,21 +78,14 @@ public class GlogAppender extends AppenderSkeleton {
   private static String log4jLevelForTLogLevel(TLogLevel logLevel)
       throws InternalException {
     switch (logLevel) {
-      case INFO:
-        return "INFO";
-      case WARN:
-        return "WARN";
-      case ERROR:
-        return "ERROR";
-      case FATAL:
-        return "FATAL";
+      case INFO: return "INFO";
+      case WARN: return "WARN";
+      case ERROR: return "ERROR";
+      case FATAL: return "FATAL";
       case VLOG:
-      case VLOG_2:
-        return "DEBUG";
-      case VLOG_3:
-        return "TRACE";
-      default:
-        throw new InternalException("Unknown log level:" + logLevel);
+      case VLOG_2: return "DEBUG";
+      case VLOG_3: return "TRACE";
+      default: throw new InternalException("Unknown log level:" + logLevel);
     }
   }
 
@@ -126,5 +120,7 @@ public class GlogAppender extends AppenderSkeleton {
     properties.setProperty("log4j.logger.com.cloudera.impala",
         log4jLevelForTLogLevel(impalaLogLevel));
     PropertyConfigurator.configure(properties);
+    Logger.getLogger(GlogAppender.class).info(String.format("Logging initialized. " +
+        "Impala: %s, All other: %s", impalaLogLevel, otherLogLevel));
   }
 };
