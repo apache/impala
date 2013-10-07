@@ -19,7 +19,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTablePropertyType;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -311,14 +311,14 @@ nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
-nonterminal ColumnDef column_def, view_column_def;
-nonterminal ArrayList<ColumnDef> column_def_list, view_column_def_list;
-nonterminal ArrayList<ColumnDef> partition_column_defs, view_column_defs;
+nonterminal ColumnDesc column_def, view_column_def;
+nonterminal ArrayList<ColumnDesc> column_def_list, view_column_def_list;
+nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal String comment_val;
 nonterminal Boolean external_val;
-nonterminal TFileFormat file_format_val;
-nonterminal TFileFormat file_format_create_table_val;
+nonterminal THdfsFileFormat file_format_val;
+nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
 nonterminal Boolean replace_existing_cols_val;
@@ -589,8 +589,8 @@ create_tbl_as_select_stmt ::=
   {:
     // Initialize with empty List of columns and partition columns. The
     // columns will be added from the query statement during analysis
-    CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
-        new ArrayList<ColumnDef>(), external, comment, row_format,
+    CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDesc>(),
+        new ArrayList<ColumnDesc>(), external, comment, row_format,
         file_format, location, if_not_exists, tbl_props, serde_props);
     RESULT = new CreateTableAsSelectStmt(create_stmt, query);
   :}
@@ -698,21 +698,21 @@ terminator_val ::=
 file_format_create_table_val ::=
   KW_STORED KW_AS file_format_val:file_format
   {: RESULT = file_format; :}
-  | /* empty - default to TEXTFILE */
-  {: RESULT = TFileFormat.TEXTFILE; :}
+  | /* empty - default to TEXT */
+  {: RESULT = THdfsFileFormat.TEXT; :}
   ;
 
 file_format_val ::=
   KW_PARQUETFILE
-  {: RESULT = TFileFormat.PARQUETFILE; :}
+  {: RESULT = THdfsFileFormat.PARQUET; :}
   | KW_TEXTFILE
-  {: RESULT = TFileFormat.TEXTFILE; :}
+  {: RESULT = THdfsFileFormat.TEXT; :}
   | KW_SEQUENCEFILE
-  {: RESULT = TFileFormat.SEQUENCEFILE; :}
+  {: RESULT = THdfsFileFormat.SEQUENCE_FILE; :}
   | KW_RCFILE
-  {: RESULT = TFileFormat.RCFILE; :}
+  {: RESULT = THdfsFileFormat.RC_FILE; :}
   | KW_AVROFILE
-  {: RESULT = TFileFormat.AVROFILE; :}
+  {: RESULT = THdfsFileFormat.AVRO; :}
   ;
 
 tbl_properties ::=
@@ -747,13 +747,13 @@ partition_column_defs ::=
   KW_PARTITIONED KW_BY LPAREN column_def_list:col_defs RPAREN
   {: RESULT = col_defs; :}
   | /* Empty - not a partitioned table */
-  {: RESULT = new ArrayList<ColumnDef>(); :}
+  {: RESULT = new ArrayList<ColumnDesc>(); :}
   ;
 
 column_def_list ::=
   column_def:col_def
   {:
-    ArrayList<ColumnDef> list = new ArrayList<ColumnDef>();
+    ArrayList<ColumnDesc> list = new ArrayList<ColumnDesc>();
     list.add(col_def);
     RESULT = list;
   :}
@@ -766,7 +766,7 @@ column_def_list ::=
 
 column_def ::=
   IDENT:col_name primitive_type:targetType comment_val:comment
-  {: RESULT = new ColumnDef(col_name, targetType, comment); :}
+  {: RESULT = new ColumnDesc(col_name, targetType, comment); :}
   ;
 
 create_view_stmt ::=
@@ -787,7 +787,7 @@ view_column_defs ::=
 view_column_def_list ::=
   view_column_def:col_def
   {:
-    ArrayList<ColumnDef> list = new ArrayList<ColumnDef>();
+    ArrayList<ColumnDesc> list = new ArrayList<ColumnDesc>();
     list.add(col_def);
     RESULT = list;
   :}
@@ -800,7 +800,7 @@ view_column_def_list ::=
 
 view_column_def ::=
   IDENT:col_name comment_val:comment
-  {: RESULT = new ColumnDef(col_name, null, comment); :}
+  {: RESULT = new ColumnDesc(col_name, null, comment); :}
   ;
 
 alter_view_stmt ::=

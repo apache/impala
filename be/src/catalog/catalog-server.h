@@ -61,12 +61,12 @@ class CatalogServer {
   // Returns OK unless some error occurred in which case the status is returned.
   Status Start();
 
+  void RegisterWebpages(Webserver* webserver);
+
   // Returns the Thrift API interface that proxies requests onto the local CatalogService.
   const boost::shared_ptr<CatalogServiceIf>& thrift_iface() const {
     return thrift_iface_;
   }
-
-  void RegisterWebpages(Webserver* webserver);
   Catalog* catalog() const { return catalog_.get(); }
 
  private:
@@ -80,6 +80,9 @@ class CatalogServer {
   boost::scoped_ptr<Thread> catalog_update_gathering_thread_;
 
   // Tracks the set of catalog objects that exist via their topic entry key.
+  // During each IMPALA_CATALOG_TOPIC heartbeat, stores the set of known catalog objects
+  // that exist by their topic entry key. Used to track objects that have been removed
+  // since the last heartbeat.
   std::set<std::string> catalog_object_topic_entry_keys_;
 
   // Protects catalog_update_cv_, catalog_objects_, catalog_objects_from_version_, and

@@ -20,6 +20,8 @@ include "Status.thrift"
 include "Types.thrift"
 include "hive_metastore.thrift"
 
+// Types used to represent catalog objects.
+
 // Type of Catalog object.
 enum TCatalogObjectType {
   // UNKNOWN is used to indicate an error condition when converting
@@ -34,18 +36,8 @@ enum TCatalogObjectType {
 
 enum TTableType {
   HDFS_TABLE,
-  HBASE_TABLE
-}
-
-// Valid table file formats
-// TODO: Combine this an THdfsFileFormat once we are able to create LZO_TEXT files
-// in Impala.
-enum TFileFormat {
-  PARQUETFILE,
-  RCFILE,
-  SEQUENCEFILE,
-  TEXTFILE,
-  AVROFILE,
+  HBASE_TABLE,
+  VIEW
 }
 
 enum THdfsFileFormat {
@@ -110,19 +102,6 @@ struct TTableName {
   2: required string table_name
 }
 
-struct TColumnDesc {
-  1: required string columnName
-  2: required Types.TPrimitiveType columnType
-}
-
-// A column definition; used by CREATE TABLE and DESCRIBE <table> statements. A column
-// definition has a different meaning (and additional fields) from a column descriptor,
-// so this is a separate struct from TColumnDesc.
-struct TColumnDef {
-  1: required TColumnDesc columnDesc
-  2: optional string comment
-}
-
 struct TTableStatsData {
   // Estimated number of rows in the table or -1 if unknown
   1: required i64 num_rows;
@@ -143,6 +122,14 @@ struct TColumnStatsData {
   4: required i64 num_nulls
 }
 
+struct TColumnDesc {
+  1: required string columnName
+  2: required Types.TPrimitiveType columnType
+  3: optional string comment
+  // Stats for this table, if any are available.
+  4: optional TColumnStatsData col_stats
+}
+
 // Represents a block in an HDFS file
 struct THdfsFileBlock {
   // Name of the file
@@ -157,8 +144,8 @@ struct THdfsFileBlock {
   // Total length of the block
   4: required i64 length
 
-  // List of datanodes that contain this block
-  5: required list<string> host_ports
+  // List of datanodes network addresses (IP address and port) that contain this block
+  5: required list<Types.TNetworkAddress> network_addresses
 
   // The list of disk ids for the file block. May not be set if disk ids are not supported
   6: optional list<i32> disk_ids
@@ -199,8 +186,7 @@ struct THdfsTable {
   // columns.  This includes non-materialized columns.
   2: required list<string> colNames;
 
-  // Partition keys are the same as clustering columns in
-  // TTableDescriptor, so there should be an equal number of each.
+  // The string used to represent NULL partition keys.
   3: required string nullPartitionKeyValue
 
   // String to indicate a NULL column value in text files
@@ -223,7 +209,7 @@ struct THBaseTable {
   4: optional list<bool> binary_encoded
 }
 
-// Represents a table, and the metadata assiciated with it, in the Catalog
+// Represents a table or view.
 struct TTable {
   // Name of the parent database
   1: required string db_name
@@ -231,44 +217,40 @@ struct TTable {
   // Unqualified table name
   2: required string tbl_name
 
-  // The following fields may not be set if there were problems loading the table
-  // metadata.
-  3: optional Types.TTableId id
+  // Set if there were any errors loading the Table metadata. The remaining fields in
+  // the struct may not be set if there were problems loading the table metadata.
+  3: optional Status.TStatus load_status
+
+  // Table identifier.
+  4: optional Types.TTableId id
 
   // The access level Impala has on this table (READ_WRITE, READ_ONLY, etc).
-  4: optional TAccessLevel access_level
+  5: optional TAccessLevel access_level
 
   // List of columns (excludes partition columns)
-  5: optional list<TColumnDef> columns
+  6: optional list<TColumnDesc> columns
 
   // List of partition columns (empty list if table is not partitioned)
-  6: optional list<TColumnDef> partition_columns
+  7: optional list<TColumnDesc> partition_columns
 
   // Table stats data for the table.
-  7: optional TTableStatsData table_stats
+  8: optional TTableStatsData table_stats
 
-  // Column stats for the table. May not be set if there were errors loading the
-  // table metadata or if the table did not contain any column stats data.
-  8: optional map<string, TColumnStatsData> column_stats
-
-  // Set if there were any errors loading the Table metadata.
-  9: optional Status.TStatus load_status
-
-  // Determines whether this is an HDFS or HBASE table.
-  10: optional TTableType table_type
+  // Determines the table type - either HDFS, HBASE, or VIEW.
+  9: optional TTableType table_type
 
   // Set iff this is an HDFS table
-  11: optional THdfsTable hdfs_table
+  10: optional THdfsTable hdfs_table
 
   // Set iff this is an Hbase table
-  12: optional THBaseTable hbase_table
+  11: optional THBaseTable hbase_table
 
   // The Hive Metastore representation of this table. May not be set if there were
   // errors loading the table metadata
-  13: optional hive_metastore.Table metastore_table
+  12: optional hive_metastore.Table metastore_table
 }
 
-// Represents a database, and the metadata associated with it, in the Catalog
+// Represents a database.
 struct TDatabase {
   // Name of the database
   1: required string db_name
@@ -277,6 +259,7 @@ struct TDatabase {
   2: optional string location
 }
 
+// Represents state associated with the overall catalog.
 struct TCatalog {
   // The CatalogService service ID.
   1: required Types.TUniqueId catalog_service_id

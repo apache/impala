@@ -36,11 +36,11 @@ class Frontend {
   // or if there is any further exception, the constructor will terminate the process.
   Frontend();
 
-  // Request to update the Impalad catalog. The TInternalCatalogUpdateRequest contains a
-  // list of objects that should be added/removed from the Catalog. Returns a response
+  // Request to update the Impalad catalog cache. The TUpdateCatalogCacheRequest contains
+  // a list of objects that should be added/removed from the Catalog. Returns a response
   // that contains details such as the new max catalog version.
-  Status UpdateCatalog(const TInternalCatalogUpdateRequest& req,
-      TInternalCatalogUpdateResponse *resp);
+  Status UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
+      TUpdateCatalogCacheResponse *resp);
 
   // Call FE to get explain plan
   Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
@@ -129,7 +129,7 @@ class Frontend {
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
-  jmethodID update_internal_catalog_id_; // JniFrontend.updateInternalCatalog()
+  jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames

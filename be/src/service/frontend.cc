@@ -66,7 +66,7 @@ Frontend::Frontend() {
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
-    {"updateInternalCatalog", "([B)[B", &update_internal_catalog_id_},
+    {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
@@ -105,9 +105,9 @@ void Frontend::LoadJniFrontendMethod(JNIEnv* jni_env, MethodDescriptor* descript
   EXIT_IF_EXC(jni_env);
 }
 
-Status Frontend::UpdateCatalog(const TInternalCatalogUpdateRequest& req,
-    TInternalCatalogUpdateResponse* resp) {
-  return JniUtil::CallJniMethod(fe_, update_internal_catalog_id_, req, resp);
+Status Frontend::UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
+    TUpdateCatalogCacheResponse* resp) {
+  return JniUtil::CallJniMethod(fe_, update_catalog_cache_id_, req, resp);
 }
 
 Status Frontend::DescribeTable(const TDescribeTableParams& params,

@@ -35,10 +35,10 @@ import com.google.common.collect.Sets;
  * Represents an ALTER TABLE ADD|REPLACE COLUMNS (colDef1, colDef2, ...) statement.
  */
 public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
-  private final List<ColumnDef> columnDefs;
+  private final List<ColumnDesc> columnDefs;
   private final boolean replaceExistingCols;
 
-  public AlterTableAddReplaceColsStmt(TableName tableName, List<ColumnDef> columnDefs,
+  public AlterTableAddReplaceColsStmt(TableName tableName, List<ColumnDesc> columnDefs,
       boolean replaceExistingCols) {
     super(tableName);
     Preconditions.checkState(columnDefs != null && columnDefs.size() > 0);
@@ -46,7 +46,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     this.replaceExistingCols = replaceExistingCols;
   }
 
-  public List<ColumnDef> getColumnDefs() {
+  public List<ColumnDesc> getColumnDescs() {
     return columnDefs;
   }
 
@@ -60,7 +60,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.ADD_REPLACE_COLUMNS);
     TAlterTableAddReplaceColsParams colParams = new TAlterTableAddReplaceColsParams();
-    for (ColumnDef col: getColumnDefs()) {
+    for (ColumnDesc col: getColumnDescs()) {
       colParams.addToColumns(col.toThrift());
     }
     colParams.setReplace_existing_cols(replaceExistingCols);
@@ -90,7 +90,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     // are all valid and unique, and that none of the columns conflict with
     // partition columns.
     Set<String> colNames = Sets.newHashSet();
-    for (ColumnDef c: columnDefs) {
+    for (ColumnDesc c: columnDefs) {
       c.analyze();
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {

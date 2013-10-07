@@ -42,8 +42,8 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TInternalCatalogUpdateRequest;
-import com.cloudera.impala.thrift.TInternalCatalogUpdateResponse;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -180,8 +180,8 @@ public class ImpaladCatalog extends Catalog {
    * Catalog updates are ordered by the object type with the dependent objects coming
    * first. That is, database "foo" will always come before table "foo.bar".
    */
-  public TInternalCatalogUpdateResponse updateCatalog(
-      TInternalCatalogUpdateRequest req) throws CatalogException {
+  public TUpdateCatalogCacheResponse updateCatalog(
+      TUpdateCatalogCacheRequest req) throws CatalogException {
     catalogLock_.writeLock().lock();
     try {
       // Check for changes in the catalog service ID.
@@ -238,7 +238,7 @@ public class ImpaladCatalog extends Catalog {
     } finally {
       catalogLock_.writeLock().unlock();
     }
-    return new TInternalCatalogUpdateResponse(catalogServiceId_);
+    return new TUpdateCatalogCacheResponse(catalogServiceId_);
   }
 
   /**

@@ -482,9 +482,9 @@ struct TSymbolLookupResult {
   3: optional string error_msg
 }
 
-// Sent to an impalad FE during each CatalogUpdate heartbeat. Contains details on all
-// catalog objects that need to be updated.
-struct TInternalCatalogUpdateRequest {
+// Sent from the impalad BE to FE with the results of each CatalogUpdate heartbeat.
+// Contains details on all catalog objects that need to be updated.
+struct TUpdateCatalogCacheRequest {
   // True if update only contains entries changed from the previous update. Otherwise,
   // contains the entire topic.
   1: required bool is_delta
@@ -495,13 +495,12 @@ struct TInternalCatalogUpdateRequest {
   // New or modified items. Empty list if no items were updated.
   3: required list<CatalogObjects.TCatalogObject> updated_objects
 
-  // Empty of no items were removed or is_delta is false.
+  // Empty if no items were removed or is_delta is false.
   4: required list<CatalogObjects.TCatalogObject> removed_objects
 }
 
-// Response from a TCatalogUpdateRequest. Returns the new max catalog version after
-// applying the update.
-struct TInternalCatalogUpdateResponse {
+// Response from a TUpdateCatalogCacheRequest.
+struct TUpdateCatalogCacheResponse {
   // The catalog service id this version is from.
   1: required Types.TUniqueId catalog_service_id;
 }

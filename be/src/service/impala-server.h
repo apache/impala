@@ -577,7 +577,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const CancellationWork& cancellation_work);
 
   // Waits until the Impalad Catalog has reached a version that includes the specified
-  // update result.
+  // update result. Called from QueryExecState after executing statements that modify
+  // the catalog (DDL operations and DML operations that add new partitions).
+  // TODO: This function will wait until the local impalad processed the catalog update,
+  // it would be useful to also have a way to wait until all impalad instances in the
+  // cluster have processed the metadata update. This could be done by waiting for
+  // 2 additional statestore heartbeats after this impalad has received the metadata.
   void WaitForCatalogUpdate(const TCatalogUpdateResult& catalog_update_result);
 
   // Guards query_log_ and query_log_index_

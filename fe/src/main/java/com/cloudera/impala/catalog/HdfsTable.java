@@ -64,6 +64,7 @@ import com.cloudera.impala.thrift.TColumnStatsData;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -527,7 +528,7 @@ public class HdfsTable extends Table {
     if (newFileDescs.size() > 0) {
       loadBlockMd(newFileDescs);
     }
-    uniqueHostPortsCount_ = countUniqueHostPorts(partitions_);
+    uniqueHostPortsCount_ = countUniqueDataNetworkLocations(partitions_);
   }
 
   /**
@@ -554,16 +555,16 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Count the number of unique data node for the given partitions
+   * Counts the number of unique data node network addresses for all file blocks in the
+   * given partition.
    */
-  private static int countUniqueHostPorts(List<HdfsPartition> partitions) {
-    Set<String> uniqueHostPorts = Sets.newHashSet();
+  private static int countUniqueDataNetworkLocations(List<HdfsPartition> partitions) {
+    Set<TNetworkAddress> uniqueHostPorts = Sets.newHashSet();
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (THdfsFileBlock blockMd: fileDesc.getFileBlocks()) {
-          List<String> hostports = blockMd.getHost_ports();
-          for (int i = 0; i < hostports.size(); ++i) {
-            uniqueHostPorts.add(hostports.get(i));
+          for (TNetworkAddress networkAddress: blockMd.getNetwork_addresses()) {
+            uniqueHostPorts.add(networkAddress);
           }
         }
       }
@@ -853,7 +854,7 @@ public class HdfsTable extends Table {
     for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
       partitions_.add(HdfsPartition.fromThrift(this, part.getKey(), part.getValue()));
     }
-    uniqueHostPortsCount_ = countUniqueHostPorts(partitions_);
+    uniqueHostPortsCount_ = countUniqueDataNetworkLocations(partitions_);
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
   }
 
@@ -878,7 +879,7 @@ public class HdfsTable extends Table {
       MetaStoreClient client = db.getParentCatalog().getMetaStoreClient();
       try {
         table.setColumns(
-            fieldSchemaToColumnDef(client.getHiveClient().getFields(db.getName(), name)));
+            fieldSchemaToColumnDesc(client.getHiveClient().getFields(db.getName(), name)));
       } catch (Exception e) {
         throw new TableLoadingException("Failed to load metadata for table: " + name, e);
       } finally {
@@ -887,11 +888,6 @@ public class HdfsTable extends Table {
     }
 
     table.setHdfs_table(getHdfsTable());
-    Map<String, TColumnStatsData> stats = Maps.newHashMap();
-    table.setColumn_stats(stats);
-    for (Column c: colsByPos) {
-      table.getColumn_stats().put(c.getName().toLowerCase(), c.getStats().toThrift());
-    }
     return table;
   }
 

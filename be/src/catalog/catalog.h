@@ -18,6 +18,7 @@
 #include <jni.h>
 
 #include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/CatalogInternalService_types.h"
 #include "gen-cpp/CatalogService_types.h"
 #include "common/status.h"
 
@@ -36,24 +37,23 @@ class Catalog {
   // otherwise a Status object with information on the error will be returned.
   Status ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp);
 
-  // Executes the given TUpdateMetastoreRequest and returns a response with details on
+  // Executes the given TUpdateCatalogRequest and returns a response with details on
   // the result of the operation. Returns OK if the operation was successful,
   // otherwise a Status object with information on the error will be returned.
-  Status UpdateMetastore(const TUpdateMetastoreRequest& req,
-      TUpdateMetastoreResponse* resp);
+  Status UpdateCatalog(const TUpdateCatalogRequest& req,
+      TUpdateCatalogResponse* resp);
 
   // Resets the metadata of a single table or the entire catalog, based on the
   // given TResetMetadataRequest. Returns OK if the operation was successful, otherwise
   // a Status object with information on the error will be returned.
   Status ResetMetadata(const TResetMetadataRequest& req, TResetMetadataResponse* resp);
 
-  // Gets all Catalog objects and the metadata that is applicable applicable for
-  // the given request. Always returns all object names that exist in the Catalog, but
-  // allows for extended metadata for objects that were modified after a specific version.
+  // Gets all Catalog objects and the metadata that is applicable for the given request.
+  // Always returns all object names that exist in the Catalog, but allows for extended
+  // metadata for objects that were modified after the specified version.
   // Returns OK if the operation was successful, otherwise a Status object with
   // information on the error will be returned.
-  Status GetAllCatalogObjects(const TGetAllCatalogObjectsRequest& req,
-      TGetAllCatalogObjectsResponse* resp);
+  Status GetAllCatalogObjects(long from_version, TGetAllCatalogObjectsResponse* resp);
 
   // Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
   // which has the desired TCatalogObjectType and name properly set.

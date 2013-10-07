@@ -28,6 +28,7 @@ import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.ViewRef;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.thrift.TTableDescriptor;
 
 /**
@@ -138,6 +139,13 @@ public class View extends Table {
 
   @Override
   public TTableDescriptor toThriftDescriptor() {
-    throw new IllegalStateException("Cannot call toThrift() on a view.");
+    throw new IllegalStateException("Cannot call toThriftDescriptor() on a view.");
+  }
+
+  @Override
+  public TTable toThrift() throws TableLoadingException {
+    TTable view = super.toThrift();
+    view.setTable_type(TTableType.VIEW);
+    return view;
   }
 }

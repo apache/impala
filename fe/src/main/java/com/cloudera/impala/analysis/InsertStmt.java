@@ -30,7 +30,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -42,8 +42,8 @@ import com.google.common.collect.Sets;
  */
 public class InsertStmt extends StatementBase {
   // Insert formats currently supported by Impala.
-  private final static EnumSet<TFileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(TFileFormat.PARQUETFILE, TFileFormat.TEXTFILE);
+  private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
+      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
   // List of inline views that may be referenced in queryStmt.
   private final WithClause withClause;
   // Target table name as seen by the parser

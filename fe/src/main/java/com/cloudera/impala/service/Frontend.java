@@ -73,8 +73,8 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TFunctionType;
-import com.cloudera.impala.thrift.TInternalCatalogUpdateRequest;
-import com.cloudera.impala.thrift.TInternalCatalogUpdateResponse;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -113,8 +113,8 @@ public class Frontend {
 
   public ImpaladCatalog getCatalog() { return impaladCatalog_; }
 
-  public TInternalCatalogUpdateResponse updateInternalCatalog(
-      TInternalCatalogUpdateRequest req) throws CatalogException {
+  public TUpdateCatalogCacheResponse updateCatalogCache(
+      TUpdateCatalogCacheRequest req) throws CatalogException {
     ImpaladCatalog catalog = impaladCatalog_;
 
     // If this is not a delta, this update should replace the current
@@ -123,7 +123,7 @@ public class Frontend {
       catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.EMPTY,
           authzConfig_);
     }
-    TInternalCatalogUpdateResponse response = catalog.updateCatalog(req);
+    TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
     if (!req.is_delta) impaladCatalog_ = catalog;
     return response;
   }

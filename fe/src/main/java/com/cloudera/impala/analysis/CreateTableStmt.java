@@ -28,7 +28,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -39,12 +39,12 @@ import com.google.common.collect.Sets;
  * Represents a CREATE TABLE statement.
  */
 public class CreateTableStmt extends StatementBase {
-  private final ArrayList<ColumnDef> columnDefs_;
+  private final ArrayList<ColumnDesc> columnDefs_;
   private final String comment_;
   private final boolean isExternal_;
   private final boolean ifNotExists_;
-  private final TFileFormat fileFormat_;
-  private final ArrayList<ColumnDef> partitionColumnDefs_;
+  private final THdfsFileFormat fileFormat_;
+  private final ArrayList<ColumnDesc> partitionColumnDescs_;
   private final RowFormat rowFormat_;
   private final TableName tableName_;
   private final Map<String, String> tblProperties_;
@@ -59,7 +59,7 @@ public class CreateTableStmt extends StatementBase {
    * Builds a CREATE TABLE statement
    * @param tableName - Name of the new table
    * @param columnDefs - List of column definitions for the table
-   * @param partitionColumnDefs - List of partition column definitions for the table
+   * @param partitionColumnDescs - List of partition column definitions for the table
    * @param isExternal - If true, the table's data will be preserved if dropped.
    * @param comment - Comment to attach to the table
    * @param rowFormat - Custom row format of the table. Use RowFormat.DEFAULT_ROW_FORMAT
@@ -71,13 +71,13 @@ public class CreateTableStmt extends StatementBase {
    * @param serdeProperties - Optional map of key/values to persist with table serde
    *                          metadata.
    */
-  public CreateTableStmt(TableName tableName, List<ColumnDef> columnDefs,
-      List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
-      RowFormat rowFormat, TFileFormat fileFormat, HdfsURI location,
+  public CreateTableStmt(TableName tableName, List<ColumnDesc> columnDefs,
+      List<ColumnDesc> partitionColumnDescs, boolean isExternal, String comment,
+      RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsURI location,
       boolean ifNotExists, Map<String, String> tblProperties,
       Map<String, String> serdeProperties) {
     Preconditions.checkNotNull(columnDefs);
-    Preconditions.checkNotNull(partitionColumnDefs);
+    Preconditions.checkNotNull(partitionColumnDescs);
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
     Preconditions.checkNotNull(tableName);
@@ -88,7 +88,7 @@ public class CreateTableStmt extends StatementBase {
     this.ifNotExists_ = ifNotExists;
     this.fileFormat_ = fileFormat;
     this.location_ = location;
-    this.partitionColumnDefs_ = Lists.newArrayList(partitionColumnDefs);
+    this.partitionColumnDescs_ = Lists.newArrayList(partitionColumnDescs);
     this.rowFormat_ = rowFormat;
     this.tableName_ = tableName;
     this.tblProperties_ = tblProperties;
@@ -97,14 +97,14 @@ public class CreateTableStmt extends StatementBase {
 
   public String getTbl() { return tableName_.getTbl(); }
   public TableName getTblName() { return tableName_; }
-  public List<ColumnDef> getColumnDefs() { return columnDefs_; }
-  public List<ColumnDef> getPartitionColumnDefs() { return partitionColumnDefs_; }
+  public List<ColumnDesc> getColumnDescs() { return columnDefs_; }
+  public List<ColumnDesc> getPartitionColumnDescs() { return partitionColumnDescs_; }
   public String getComment() { return comment_; }
   public boolean isExternal() { return isExternal_; }
   public boolean getIfNotExists() { return ifNotExists_; }
   public HdfsURI getLocation() { return location_; }
   public void setLocation(HdfsURI location) { this.location_ = location; }
-  public TFileFormat getFileFormat() { return fileFormat_; }
+  public THdfsFileFormat getFileFormat() { return fileFormat_; }
   public RowFormat getRowFormat() { return rowFormat_; }
 
   /**
@@ -137,9 +137,9 @@ public class CreateTableStmt extends StatementBase {
     sb.append(")");
     if (comment_ != null) sb.append(" COMMENT = '" + comment_ + "'");
 
-    if (partitionColumnDefs_.size() > 0) {
+    if (partitionColumnDescs_.size() > 0) {
       sb.append(String.format(" PARTITIONED BY (%s)",
-          Joiner.on(", ").join(partitionColumnDefs_)));
+          Joiner.on(", ").join(partitionColumnDescs_)));
     }
 
     if (rowFormat_ != RowFormat.DEFAULT_ROW_FORMAT) {
@@ -182,10 +182,10 @@ public class CreateTableStmt extends StatementBase {
   public TCreateTableParams toThrift() {
     TCreateTableParams params = new TCreateTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
-    for (ColumnDef col: getColumnDefs()) {
+    for (ColumnDesc col: getColumnDescs()) {
       params.addToColumns(col.toThrift());
     }
-    for (ColumnDef col: getPartitionColumnDefs()) {
+    for (ColumnDesc col: getPartitionColumnDescs()) {
       params.addToPartition_columns(col.toThrift());
     }
     params.setOwner(getOwner());
@@ -228,13 +228,13 @@ public class CreateTableStmt extends StatementBase {
 
     // Check that all the column names are valid and unique.
     Set<String> colNames = Sets.newHashSet();
-    for (ColumnDef colDef: columnDefs_) {
+    for (ColumnDesc colDef: columnDefs_) {
       colDef.analyze();
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
     }
-    for (ColumnDef colDef: partitionColumnDefs_) {
+    for (ColumnDesc colDef: partitionColumnDescs_) {
       colDef.analyze();
       if (!colDef.getColType().supportsTablePartitioning()) {
         throw new AnalysisException(
@@ -246,7 +246,7 @@ public class CreateTableStmt extends StatementBase {
       }
     }
 
-    if (fileFormat_ == TFileFormat.AVROFILE) {
+    if (fileFormat_ == THdfsFileFormat.AVRO) {
       // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
       // taking precedence.
       List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();

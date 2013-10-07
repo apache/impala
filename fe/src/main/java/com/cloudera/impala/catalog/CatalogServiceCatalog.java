@@ -162,28 +162,6 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
-  /**
-   * Updates the cached lastDdlTime for the given table. The lastDdlTime is used during
-   * the metadata refresh() operations to determine if there have been any external
-   * (outside of Impala) modifications to the table.
-   */
-  public void updateLastDdlTime(TTableName tblName, long ddlTime) {
-    catalogLock_.writeLock().lock();
-    try {
-      Db db = getDb(tblName.getDb_name());
-      if (db == null) return;
-      try {
-        Table tbl = db.getTable(tblName.getTable_name());
-        if (tbl == null) return;
-        tbl.updateLastDdlTime(ddlTime);
-      } catch (Exception e) {
-        // Swallow all exceptions.
-      }
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-  }
-
   @Override
   public long reset() {
     catalogLock_.writeLock().lock();

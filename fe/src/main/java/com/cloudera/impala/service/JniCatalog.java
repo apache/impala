@@ -31,7 +31,6 @@ import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
 import com.cloudera.impala.thrift.TDdlExecRequest;
-import com.cloudera.impala.thrift.TGetAllCatalogObjectsRequest;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
@@ -43,7 +42,7 @@ import com.cloudera.impala.thrift.TResetMetadataResponse;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TUniqueId;
-import com.cloudera.impala.thrift.TUpdateMetastoreRequest;
+import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 
@@ -80,13 +79,9 @@ public class JniCatalog {
   /**
    * Gets all catalog objects
    */
-  public byte[] getCatalogObjects(byte[] req) throws ImpalaException, TException {
-    TGetAllCatalogObjectsRequest request = new TGetAllCatalogObjectsRequest();
-    JniUtil.deserializeThrift(protocolFactory, request, req);
-
+  public byte[] getCatalogObjects(long from_version) throws ImpalaException, TException {
     TGetAllCatalogObjectsResponse resp =
-        catalog_.getCatalogObjects(request.getFrom_version());
-
+        catalog_.getCatalogObjects(from_version);
     TSerializer serializer = new TSerializer(protocolFactory);
     return serializer.serialize(resp);
   }
@@ -177,11 +172,11 @@ public class JniCatalog {
    * Process any updates to the metastore required after a query executes.
    * The argument is a serialized TCatalogUpdate.
    */
-  public byte[] updateMetastore(byte[] thriftUpdateCatalog) throws ImpalaException,
+  public byte[] updateCatalog(byte[] thriftUpdateCatalog) throws ImpalaException,
       TException  {
-    TUpdateMetastoreRequest request = new TUpdateMetastoreRequest();
+    TUpdateCatalogRequest request = new TUpdateCatalogRequest();
     JniUtil.deserializeThrift(protocolFactory, request, thriftUpdateCatalog);
     TSerializer serializer = new TSerializer(protocolFactory);
-    return serializer.serialize(ddlExecutor_.updateMetastore(request));
+    return serializer.serialize(ddlExecutor_.updateCatalog(request));
   }
 }

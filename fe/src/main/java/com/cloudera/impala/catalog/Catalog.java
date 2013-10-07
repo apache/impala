@@ -43,7 +43,7 @@ import com.google.common.collect.Lists;
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
  * This class caches db-, table- and column-related metadata. Each time one of these
- * catalog objects is updated/added/removed, the catalogVersion is incremented.
+ * catalog objects is updated/added/removed, the catalogVersion_ is incremented.
  * Although this class is thread safe, it does not guarantee consistency with the
  * MetaStore. It is important to keep in mind that there may be external (potentially
  * conflicting) concurrent metastore updates occurring at any time.
@@ -58,16 +58,18 @@ public abstract class Catalog {
 
   private static final Logger LOG = Logger.getLogger(Catalog.class);
 
-  // Last assigned catalog version. Atomic to ensure catalog versions are always
-  // sequentially increasing, even when updated from different threads.
-  // TODO: This probably doesn't need to be atomic and be updated while holding
+  // Last assigned catalog version. Starts at INITIAL_CATALOG_VERSION and incremented
+  // with each update to the Catalog. Persisted across the lifetime of the Catalog.
+  // Atomic to ensure versions are always sequentially increasing, even when updated
+  // from different threads.
+  // TODO: This probably doesn't need to be atomic and can be updated while holding
   // the catalogLock_.
-  private final static AtomicLong catalogVersion =
+  private final static AtomicLong catalogVersion_ =
       new AtomicLong(INITIAL_CATALOG_VERSION);
   private static final int META_STORE_CLIENT_POOL_SIZE = 5;
   private final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
   private final CatalogInitStrategy initStrategy_;
-  private final AtomicInteger nextTableId = new AtomicInteger(0);
+  private final AtomicInteger nextTableId_ = new AtomicInteger(0);
 
   // Cache of database metadata.
   protected final CatalogObjectCache<Db> dbCache_ = new CatalogObjectCache<Db>(
@@ -395,7 +397,7 @@ public abstract class Catalog {
   /**
    * Gets the next table ID and increments the table ID counter.
    */
-  public TableId getNextTableId() { return new TableId(nextTableId.getAndIncrement()); }
+  public TableId getNextTableId() { return new TableId(nextTableId_.getAndIncrement()); }
 
   /**
    * Returns a managed meta store client from the client connection pool.
@@ -405,13 +407,13 @@ public abstract class Catalog {
   /**
    * Returns the current Catalog version.
    */
-  public static long getCatalogVersion() { return catalogVersion.get(); }
+  public static long getCatalogVersion() { return catalogVersion_.get(); }
 
   /**
    * Increments the current Catalog version and returns the new value.
    */
   public static long incrementAndGetCatalogVersion() {
-    return catalogVersion.incrementAndGet();
+    return catalogVersion_.incrementAndGet();
   }
 
   /**
@@ -435,7 +437,7 @@ public abstract class Catalog {
    */
   protected long resetInternal() {
     try {
-      nextTableId.set(0);
+      nextTableId_.set(0);
       dbCache_.clear();
 
       if (initStrategy_ == CatalogInitStrategy.EMPTY) {
@@ -637,5 +639,27 @@ public abstract class Catalog {
       } catch (NumberFormatException e) {}
     }
     return -1;
+  }
+
+  /**
+   * Updates the cached lastDdlTime for the given table. The lastDdlTime is used during
+   * the metadata refresh() operations to determine if there have been any external
+   * (outside of Impala) modifications to the table.
+   */
+  public void updateLastDdlTime(TTableName tblName, long ddlTime) {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(tblName.getDb_name());
+      if (db == null) return;
+      try {
+        Table tbl = db.getTable(tblName.getTable_name());
+        if (tbl == null) return;
+        tbl.updateLastDdlTime(ddlTime);
+      } catch (Exception e) {
+        // Swallow all exceptions.
+      }
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
   }
 }

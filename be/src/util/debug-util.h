@@ -20,7 +20,7 @@
 #include <string>
 #include <boost/cstdint.hpp>
 
-#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/JniCatalog_types.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Frontend_types.h"

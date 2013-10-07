@@ -18,6 +18,7 @@
 #include "catalog/catalog-util.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/debug-util.h"
+#include "gen-cpp/CatalogInternalService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/CatalogService_types.h"
 
@@ -64,17 +65,17 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "ResetMetadata(): response=" << ThriftDebugString(resp);
   }
 
-  // Executes a TUpdateMetastoreRequest and returns details on the result of the
+  // Executes a TUpdateCatalogRequest and returns details on the result of the
   // operation.
-  virtual void UpdateMetastore(TUpdateMetastoreResponse& resp,
-      const TUpdateMetastoreRequest& req) {
-    VLOG_RPC << "UpdateMetastore(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->UpdateMetastore(req, &resp);
+  virtual void UpdateCatalog(TUpdateCatalogResponse& resp,
+      const TUpdateCatalogRequest& req) {
+    VLOG_RPC << "UpdateCatalog(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->UpdateCatalog(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
     resp.result.__set_status(thrift_status);
-    VLOG_RPC << "UpdateMetastore(): response=" << ThriftDebugString(resp);
+    VLOG_RPC << "UpdateCatalog(): response=" << ThriftDebugString(resp);
   }
 
  private:
@@ -174,12 +175,12 @@ void CatalogServer::UpdateCatalogTopicCallback(
     catalog_object_topic_entry_keys_.clear();
     catalog_objects_.reset(new TGetAllCatalogObjectsResponse());
   }
-
   LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_->max_catalog_version
                          << " Last Catalog Version: " << last_sent_catalog_version_;
-  set<string> current_entry_keys;
 
   // Add any new/updated catalog objects to the topic.
+  set<string> current_entry_keys;
+  ThriftSerializer thrift_serializer(false);
   BOOST_FOREACH(const TCatalogObject& catalog_object, catalog_objects_->objects) {
     const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
     if (entry_key.empty()) {
@@ -197,21 +198,21 @@ void CatalogServer::UpdateCatalogTopicCallback(
       catalog_object_topic_entry_keys_.erase(itr);
     }
 
-    // This isn't a new item, skip it.
+    // This isn't a new or an updated item, skip it.
     if (catalog_object.catalog_version <= last_sent_catalog_version_) continue;
 
-    VLOG(1) << "Adding Update: " << entry_key << "@"
+    VLOG(1) << "Adding update: " << entry_key << "@"
             << catalog_object.catalog_version;
 
-    subscriber_topic_updates->push_back(TTopicDelta());
+    if (subscriber_topic_updates->size() == 0) {
+      subscriber_topic_updates->push_back(TTopicDelta());
+      subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
+    }
     TTopicDelta& update = subscriber_topic_updates->back();
-    update.topic_name = IMPALA_CATALOG_TOPIC;
-
     update.topic_entries.push_back(TTopicItem());
     TTopicItem& item = update.topic_entries.back();
     item.key = entry_key;
 
-    ThriftSerializer thrift_serializer(false);
     Status status = thrift_serializer.Serialize(&catalog_object, &item.value);
     if (!status.ok()) {
       LOG(ERROR) << "Error serializing topic value: " << status.GetErrorMsg();
@@ -220,12 +221,14 @@ void CatalogServer::UpdateCatalogTopicCallback(
   }
 
   // Add all deleted items to the topic. Any remaining items in
-  // catalog_object_topic_entry_keys_ indicate that the object was dropped since the
-  // last update, so mark it as deleted.
+  // catalog_object_topic_entry_keys_ indicate a difference since the last update
+  // (the object was removed), so mark it as deleted.
   BOOST_FOREACH(const string& key, catalog_object_topic_entry_keys_) {
-    subscriber_topic_updates->push_back(TTopicDelta());
+    if (subscriber_topic_updates->size() == 0) {
+      subscriber_topic_updates->push_back(TTopicDelta());
+      subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
+    }
     TTopicDelta& update = subscriber_topic_updates->back();
-    update.topic_name = IMPALA_CATALOG_TOPIC;
     update.topic_entries.push_back(TTopicItem());
     TTopicItem& item = update.topic_entries.back();
     item.key = key;
@@ -253,19 +256,16 @@ void CatalogServer::GatherCatalogUpdatesThread() {
     // when this flag is false, otherwise we may be in the middle processing a heartbeat.
     if (catalog_objects_ready_) continue;
 
-    TGetAllCatalogObjectsRequest req;
-    req.__set_from_version(last_sent_catalog_version_);
-
     // Call into the Catalog to get all the catalog objects (as Thrift structs).
     TGetAllCatalogObjectsResponse* resp = new TGetAllCatalogObjectsResponse();
-    Status s = catalog_->GetAllCatalogObjects(req, resp);
+    Status s = catalog_->GetAllCatalogObjects(last_sent_catalog_version_, resp);
     if (!s.ok()) {
       LOG(ERROR) << s.GetErrorMsg();
       delete resp;
     } else {
       catalog_objects_.reset(resp);
     }
-    catalog_objects_from_version_ = req.from_version;
+    catalog_objects_from_version_ = last_sent_catalog_version_;
     catalog_objects_ready_ = true;
   }
 }

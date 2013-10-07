@@ -40,7 +40,6 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
@@ -68,7 +67,7 @@ import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
-import com.cloudera.impala.thrift.TColumnDef;
+import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
@@ -80,14 +79,14 @@ import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.thrift.TUpdateMetastoreRequest;
-import com.cloudera.impala.thrift.TUpdateMetastoreResponse;
+import com.cloudera.impala.thrift.TUpdateCatalogRequest;
+import com.cloudera.impala.thrift.TUpdateCatalogResponse;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -99,7 +98,7 @@ import com.google.common.util.concurrent.SettableFuture;
  * clause of these methods.
  */
 public class DdlExecutor {
-  private final CatalogServiceCatalog catalog;
+  private final Catalog catalog;
 
   // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
   private final Object metastoreDdlLock = new Object();
@@ -113,7 +112,7 @@ public class DdlExecutor {
   private final ExecutorService executor =
       Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
 
-  public DdlExecutor(CatalogServiceCatalog catalog) {
+  public DdlExecutor(Catalog catalog) {
     this.catalog = catalog;
   }
 
@@ -513,7 +512,7 @@ public class DdlExecutor {
       ImpalaException, TableLoadingException, TableNotFoundException {
     Preconditions.checkNotNull(params);
 
-    TFileFormat fileFormat = params.isSetFile_format() ? params.getFile_format() : null;
+    THdfsFileFormat fileFormat = params.isSetFile_format() ? params.getFile_format() : null;
     String comment = params.isSetComment() ? params.getComment() : null;
     TableName tblName = TableName.fromThrift(params.getTable_name());
     TableName srcTblName = TableName.fromThrift(params.getSrc_table_name());
@@ -614,7 +613,7 @@ public class DdlExecutor {
    * Appends one or more columns to the given table, optionally replacing all existing
    * columns.
    */
-  private void alterTableAddReplaceCols(TableName tableName, List<TColumnDef> columns,
+  private void alterTableAddReplaceCols(TableName tableName, List<TColumnDesc> columns,
       boolean replaceExistingCols) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
@@ -637,7 +636,7 @@ public class DdlExecutor {
    * column, add a comment to a column, or change the datatype of a column.
    */
   private void alterTableChangeCol(TableName tableName, String colName,
-      TColumnDef newColDef) throws MetaException, InvalidObjectException,
+      TColumnDesc newColDesc) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
        TableLoadingException, ColumnNotFoundException {
     synchronized (metastoreDdlLock) {
@@ -647,12 +646,11 @@ public class DdlExecutor {
       while (iterator.hasNext()) {
         FieldSchema fs = iterator.next();
         if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
-          TColumnDesc colDesc = newColDef.getColumnDesc();
-          fs.setName(colDesc.getColumnName());
-          fs.setType(colDesc.getColumnType().toString().toLowerCase());
+          fs.setName(newColDesc.getColumnName());
+          fs.setType(newColDesc.getColumnType().toString().toLowerCase());
           // Don't overwrite the existing comment unless a new comment is given
-          if (newColDef.getComment() != null) {
-            fs.setComment(newColDef.getComment());
+          if (newColDesc.getComment() != null) {
+            fs.setComment(newColDesc.getComment());
           }
           break;
         }
@@ -818,7 +816,7 @@ public class DdlExecutor {
    * reloaded on the next access.
    */
   private void alterTableSetFileFormat(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, TFileFormat fileFormat) throws MetaException,
+      List<TPartitionKeyValue> partitionSpec, THdfsFileFormat fileFormat) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
@@ -849,7 +847,7 @@ public class DdlExecutor {
    * Helper method for setting the file format on a given storage descriptor.
    */
   private static void setStorageDescriptorFileFormat(StorageDescriptor sd,
-      TFileFormat fileFormat) {
+      THdfsFileFormat fileFormat) {
     StorageDescriptor tempSd =
         HiveStorageDescriptorFactory.createSd(fileFormat, RowFormat.DEFAULT_ROW_FORMAT);
     sd.setInputFormat(tempSd.getInputFormat());
@@ -968,13 +966,12 @@ public class DdlExecutor {
         .getMetaStoreTable().deepCopy();
   }
 
-  public static List<FieldSchema> buildFieldSchemaList(List<TColumnDef> columnDefs) {
+  public static List<FieldSchema> buildFieldSchemaList(List<TColumnDesc> columnDescs) {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
-    for (TColumnDef c: columnDefs) {
-      TColumnDesc colDesc = c.getColumnDesc();
-      FieldSchema fs = new FieldSchema(colDesc.getColumnName(),
-          colDesc.getColumnType().toString().toLowerCase(), c.getComment());
+    for (TColumnDesc col: columnDescs) {
+      FieldSchema fs = new FieldSchema(col.getColumnName(),
+          col.getColumnType().toString().toLowerCase(), col.getComment());
       fsList.add(fs);
     }
     return fsList;
@@ -1138,9 +1135,9 @@ public class DdlExecutor {
    * Create any new partitions required as a result of an INSERT statement.
    * Updates the lastDdlTime of the table if new partitions were created.
    */
-  public TUpdateMetastoreResponse updateMetastore(TUpdateMetastoreRequest update)
+  public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update)
       throws ImpalaException {
-    TUpdateMetastoreResponse response = new TUpdateMetastoreResponse();
+    TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
     Table table = catalog.getTable(update.getDb_name(), update.getTarget_table());
     if (!(table instanceof HdfsTable)) {

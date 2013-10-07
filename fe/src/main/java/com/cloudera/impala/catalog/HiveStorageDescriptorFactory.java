@@ -22,7 +22,7 @@ import parquet.hive.DeprecatedParquetInputFormat;
 import parquet.hive.DeprecatedParquetOutputFormat;
 import parquet.hive.serde.ParquetHiveSerDe;
 
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 
 public class HiveStorageDescriptorFactory {
@@ -32,17 +32,17 @@ public class HiveStorageDescriptorFactory {
    * RC file.
    * TODO: Add support for Avro and HBase
    */
-  public static StorageDescriptor createSd(TFileFormat fileFormat, RowFormat rowFormat) {
+  public static StorageDescriptor createSd(THdfsFileFormat fileFormat, RowFormat rowFormat) {
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
 
     StorageDescriptor sd = null;
     switch(fileFormat) {
-      case PARQUETFILE: sd = createParquetFileSd(); break;
-      case RCFILE: sd = createRcFileSd(); break;
-      case SEQUENCEFILE: sd = createSequenceFileSd(); break;
-      case TEXTFILE: sd = createTextSd(); break;
-      case AVROFILE: sd = createAvroSd(); break;
+      case PARQUET: sd = createParquetFileSd(); break;
+      case RC_FILE: sd = createRcFileSd(); break;
+      case SEQUENCE_FILE: sd = createSequenceFileSd(); break;
+      case TEXT: sd = createTextSd(); break;
+      case AVRO: sd = createAvroSd(); break;
       default: throw new UnsupportedOperationException(
           "Unsupported file format: " + fileFormat);
     }

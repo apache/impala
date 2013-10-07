@@ -33,6 +33,7 @@ import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -108,8 +109,8 @@ public class HdfsPartition {
     }
 
     /**
-     * Construct a FileBlock from blockLocation and populate hostPorts from
-     * BlockLocation.getNames(). Does not fill diskIds.
+     * Construct a FileBlock from blockLocation and populate the network address
+     * locations of this block from BlockLocation.getNames(). Does not fill diskIds.
      */
     public FileBlock(String fileName, long fileSize, BlockLocation blockLocation) {
       Preconditions.checkNotNull(blockLocation);
@@ -130,13 +131,14 @@ public class HdfsPartition {
         throw new IllegalStateException(errorMsg);
       }
 
-      // hostPorts[i] stores this block on diskId[i]; the BE uses this information to
-      // schedule scan ranges
-
-      // use String.intern() to reuse string
-      fileBlock_.host_ports = Lists.newArrayList();
+      // network_addresses[i] stores this block on diskId[i]; the BE uses this information
+      // to schedule scan ranges.
+      fileBlock_.network_addresses = Lists.newArrayList();
       for (int i = 0; i < blockHostPorts.length; ++i) {
-        fileBlock_.host_ports.add(blockHostPorts[i].intern());
+        String[] ip_port = blockHostPorts[i].split(":");
+        Preconditions.checkState(ip_port.length == 2);
+        fileBlock_.network_addresses.add(new TNetworkAddress(ip_port[0],
+            Integer.parseInt(ip_port[1])));
       }
     }
 
@@ -144,15 +146,18 @@ public class HdfsPartition {
     public long getFileSize() { return fileBlock_.getFile_size(); }
     public long getOffset() { return fileBlock_.getOffset(); }
     public long getLength() { return fileBlock_.getLength(); }
-    public List<String> getHostPorts() { return fileBlock_.getHost_ports(); }
+    public List<TNetworkAddress> getNetworkAddresses() {
+      return fileBlock_.getNetwork_addresses();
+    }
 
     /**
      * Populates the given THdfsFileBlock's list of disk ids with the given disk id
-     * values. The number of disk ids must match the number of host ports
+     * values. The number of disk ids must match the number of network addresses
      * set in the file block.
      */
     public static void setDiskIds(int[] diskIds, THdfsFileBlock fileBlock) {
-      Preconditions.checkArgument(diskIds.length == fileBlock.getHost_ports().size());
+      Preconditions.checkArgument(
+          diskIds.length == fileBlock.getNetwork_addresses().size());
       fileBlock.setDisk_ids(Arrays.asList(ArrayUtils.toObject(diskIds)));
     }
 

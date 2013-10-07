@@ -19,21 +19,21 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.
  */
 public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
-  private final TFileFormat fileFormat_;
+  private final THdfsFileFormat fileFormat_;
 
   public AlterTableSetFileFormatStmt(TableName tableName,
-      PartitionSpec partitionSpec, TFileFormat fileFormat) {
+      PartitionSpec partitionSpec, THdfsFileFormat fileFormat) {
     super(tableName, partitionSpec);
     this.fileFormat_ = fileFormat;
   }
 
-  public TFileFormat getFileFormat() { return fileFormat_; }
+  public THdfsFileFormat getFileFormat() { return fileFormat_; }
 
   @Override
   public TAlterTableParams toThrift() {

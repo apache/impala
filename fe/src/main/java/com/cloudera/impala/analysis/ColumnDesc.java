@@ -18,7 +18,6 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
 
 /**
@@ -29,13 +28,13 @@ import com.cloudera.impala.thrift.TColumnDesc;
  * Since a column definition refers a column stored in the Metastore, the column name
  * must be valid according to the Metastore's rules (see @MetaStoreUtils).
  */
-public class ColumnDef {
+public class ColumnDesc {
   private final String colName;
   private final String comment;
   // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
   private PrimitiveType colType;
 
-  public ColumnDef(String colName, PrimitiveType colType, String comment) {
+  public ColumnDesc(String colName, PrimitiveType colType, String comment) {
     this.colName = colName;
     this.colType = colType;
     this.comment = comment;
@@ -61,10 +60,10 @@ public class ColumnDef {
     return sb.toString();
   }
 
-  public TColumnDef toThrift() {
-    TColumnDef colDef = new TColumnDef(
+  public TColumnDesc toThrift() {
+    TColumnDesc colDesc = new TColumnDesc(
         new TColumnDesc(getColName(), getColType().toThrift()));
-    colDef.setComment(getComment());
-    return colDef;
+    colDesc.setComment(getComment());
+    return colDesc;
   }
 }

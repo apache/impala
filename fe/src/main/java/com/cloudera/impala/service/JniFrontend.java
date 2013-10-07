@@ -61,7 +61,7 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
-import com.cloudera.impala.thrift.TInternalCatalogUpdateRequest;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TLogLevel;
@@ -119,12 +119,12 @@ public class JniFrontend {
     }
   }
 
-  public byte[] updateInternalCatalog(byte[] thriftCatalogUpdate) throws ImpalaException {
-    TInternalCatalogUpdateRequest req = new TInternalCatalogUpdateRequest();
+  public byte[] updateCatalogCache(byte[] thriftCatalogUpdate) throws ImpalaException {
+    TUpdateCatalogCacheRequest req = new TUpdateCatalogCacheRequest();
     JniUtil.deserializeThrift(protocolFactory, req, thriftCatalogUpdate);
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
-      return serializer.serialize(frontend.updateInternalCatalog(req));
+      return serializer.serialize(frontend.updateCatalogCache(req));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }

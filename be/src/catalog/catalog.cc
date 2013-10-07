@@ -42,13 +42,13 @@ struct Catalog::MethodDescriptor {
 Catalog::Catalog() {
   MethodDescriptor methods[] = {
     {"<init>", "(II)V", &catalog_ctor_},
-    {"updateMetastore", "([B)[B", &update_metastore_id_},
+    {"updateCatalog", "([B)[B", &update_metastore_id_},
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
-    {"getCatalogObjects", "([B)[B", &get_catalog_objects_id_}};
+    {"getCatalogObjects", "(J)[B", &get_catalog_objects_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
   // Create an instance of the java class JniCatalog
@@ -77,9 +77,19 @@ Status Catalog::GetCatalogObject(const TCatalogObject& req,
   return JniUtil::CallJniMethod(catalog_, get_catalog_object_id_, req, resp);
 }
 
-Status Catalog::GetAllCatalogObjects(const TGetAllCatalogObjectsRequest& req,
+Status Catalog::GetAllCatalogObjects(long from_version,
     TGetAllCatalogObjectsResponse* resp) {
-  return JniUtil::CallJniMethod(catalog_, get_catalog_objects_id_, req, resp);
+  JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  jvalue requested_from_version;
+  requested_from_version.j = from_version;
+  jbyteArray result_bytes = static_cast<jbyteArray>(
+      jni_env->CallObjectMethod(catalog_, get_catalog_objects_id_,
+      requested_from_version));
+  RETURN_ERROR_IF_EXC(jni_env);
+  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, resp));
+  return Status::OK;
 }
 
 Status Catalog::ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp) {
@@ -91,8 +101,8 @@ Status Catalog::ResetMetadata(const TResetMetadataRequest& req,
   return JniUtil::CallJniMethod(catalog_, reset_metadata_id_, req, resp);
 }
 
-Status Catalog::UpdateMetastore(const TUpdateMetastoreRequest& req,
-    TUpdateMetastoreResponse* resp) {
+Status Catalog::UpdateCatalog(const TUpdateCatalogRequest& req,
+    TUpdateCatalogResponse* resp) {
   return JniUtil::CallJniMethod(catalog_, update_metastore_id_, req, resp);
 }
 

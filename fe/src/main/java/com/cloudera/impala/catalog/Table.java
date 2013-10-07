@@ -31,7 +31,7 @@ import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumnDef;
+import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -236,29 +236,21 @@ public abstract class Table implements CatalogObject {
   }
 
   public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
-    List<FieldSchema> tblFields = DdlExecutor.buildFieldSchemaList(
-        thriftTable.getColumns());
-    List<FieldSchema> partKeys =
-        DdlExecutor.buildFieldSchemaList(thriftTable.getPartition_columns());
+    List<TColumnDesc> columns = new ArrayList<TColumnDesc>();
+    columns.addAll(thriftTable.getPartition_columns());
+    columns.addAll(thriftTable.getColumns());
 
-    fields = new ArrayList<FieldSchema>(partKeys.size() + tblFields.size());
-    fields.addAll(partKeys);
-    fields.addAll(tblFields);
-
-    for (int i = 0; i < fields.size(); ++i) {
-      FieldSchema fs = fields.get(i);
-      Column col = new Column(fs.getName(), getPrimitiveType(fs.getType()),
-          fs.getComment(), i);
+    fields = new ArrayList<FieldSchema>();
+    for (int i = 0; i < columns.size(); ++i) {
+      Column col = Column.fromThrift(columns.get(i), i);
       colsByPos.add(col);
       colsByName.put(col.getName().toLowerCase(), col);
-      if (thriftTable.isSetColumn_stats() &&
-          thriftTable.getColumn_stats().containsKey(fs.getName().toLowerCase())) {
-        col.updateStats(thriftTable.getColumn_stats().get(fs.getName().toLowerCase()));
-      }
+      fields.add(new FieldSchema(col.getName(),
+        col.getType().toString().toLowerCase(), col.getComment()));
     }
 
     // The number of clustering columns is the number of partition keys.
-    numClusteringCols = partKeys.size();
+    numClusteringCols = thriftTable.getPartition_columns().size();
 
     // Estimated number of rows
     numRows = thriftTable.isSetTable_stats() ?
@@ -273,10 +265,20 @@ public abstract class Table implements CatalogObject {
     TTable table = new TTable(db.getName(), name);
     table.setId(id.asInt());
     table.setAccess_level(accessLevel);
-    table.setColumns(fieldSchemaToColumnDef(getMetaStoreTable().getSd().getCols()));
-    // populate with both partition keys and regular columns
-    table.setPartition_columns(fieldSchemaToColumnDef(
+
+    // Populate with both regular columns and partition key columns.
+    table.setColumns(fieldSchemaToColumnDesc(getMetaStoreTable().getSd().getCols()));
+    for (TColumnDesc colDesc: table.getColumns()) {
+      Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
+      colDesc.setCol_stats(column.getStats().toThrift());
+    }
+
+    table.setPartition_columns(fieldSchemaToColumnDesc(
         getMetaStoreTable().getPartitionKeys()));
+    for (TColumnDesc colDesc: table.getPartition_columns()) {
+      Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
+      colDesc.setCol_stats(column.getStats().toThrift());
+    }
     table.setMetastore_table(getMetaStoreTable());
     if (numRows != -1) {
       table.setTable_stats(new TTableStatsData());
@@ -285,17 +287,15 @@ public abstract class Table implements CatalogObject {
     return table;
   }
 
-  protected static List<TColumnDef> fieldSchemaToColumnDef(List<FieldSchema> fields) {
-    List<TColumnDef> colDefs = Lists.newArrayList();
+  protected static List<TColumnDesc> fieldSchemaToColumnDesc(List<FieldSchema> fields) {
+    List<TColumnDesc> colDescs = Lists.newArrayList();
     for (FieldSchema fs: fields) {
-      TColumnDef colDef = new TColumnDef();
       TColumnDesc colDesc = new TColumnDesc(fs.getName(),
           getPrimitiveType(fs.getType()).toThrift());
-      colDef.setColumnDesc(colDesc);
-      colDef.setComment(fs.getComment());
-      colDefs.add(colDef);
+      if (fs.getComment() != null) colDesc.setComment(fs.getComment());
+      colDescs.add(colDesc);
     }
-    return colDefs;
+    return colDescs;
   }
 
   protected static PrimitiveType getPrimitiveType(String typeName) {

@@ -141,6 +141,10 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       } else {
         // CREATE TABLE AS SELECT waits for its catalog update once the DML
         // portion of the operation has completed.
+        // TODO: For CREATE and ALTER statements, the CatalogServer should return the
+        // resulting TCatalogObject in the update_catalog_result. This object could be
+        // applied to the local impalad catalog cache immediately, which would avoid the
+        // need to wait for the update to be come from the StateStore.
         parent_server_->WaitForCatalogUpdate(
             *catalog_op_executor_->update_catalog_result());
       }
@@ -301,7 +305,7 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
 Status ImpalaServer::QueryExecState::Wait() {
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
-    RETURN_IF_ERROR(UpdateMetastore());
+    RETURN_IF_ERROR(UpdateCatalog());
   }
 
   if (!returns_result_set()) {
@@ -443,7 +447,7 @@ void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   if (coord_.get() != NULL) coord_->Cancel(cause);
 }
 
-Status ImpalaServer::QueryExecState::UpdateMetastore() {
+Status ImpalaServer::QueryExecState::UpdateCatalog() {
   if (!exec_request().__isset.query_exec_request ||
       exec_request().query_exec_request.stmt_type != TStmtType::DML) {
     return Status::OK;
@@ -455,7 +459,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
-    TUpdateMetastoreRequest catalog_update;
+    TUpdateCatalogRequest catalog_update;
     if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << query_id() << ")";
@@ -475,8 +479,9 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
       RETURN_IF_ERROR(client.Open());
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
-      TUpdateMetastoreResponse resp;
-      client.iface()->UpdateMetastore(resp, catalog_update);
+      TUpdateCatalogResponse resp;
+      client.iface()->UpdateCatalog(resp, catalog_update);
+
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
       RETURN_IF_ERROR(status);

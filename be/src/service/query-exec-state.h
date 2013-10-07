@@ -202,7 +202,7 @@ class ImpalaServer::QueryExecState {
   int current_batch_row_; // number of rows fetched within the current batch
   int num_rows_fetched_; // number of rows fetched by client for the entire query
 
-  // To get access to UpdateMetastore, LOAD, and DDL methods. Not owned.
+  // To get access to UpdateCatalog, LOAD, and DDL methods. Not owned.
   Frontend* frontend_;
 
   // The parent ImpalaServer; called to wait until the the impalad has processed a
@@ -243,7 +243,7 @@ class ImpalaServer::QueryExecState {
   Status GetRowValue(TupleRow* row, std::vector<void*>* result, std::vector<int>* scales);
 
   // Gather and publish all required updates to the metastore
-  Status UpdateMetastore();
+  Status UpdateCatalog();
 
   // Copies results into request_result_set_
   void SetResultSet(const std::vector<std::string>& results);

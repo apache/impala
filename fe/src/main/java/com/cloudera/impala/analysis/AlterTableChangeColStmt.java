@@ -32,10 +32,10 @@ import com.google.common.base.Preconditions;
  */
 public class AlterTableChangeColStmt extends AlterTableStmt {
   private final String colName;
-  private final ColumnDef newColDef;
+  private final ColumnDesc newColDef;
 
   public AlterTableChangeColStmt(TableName tableName, String colName,
-      ColumnDef newColDef) {
+      ColumnDesc newColDef) {
     super(tableName);
     Preconditions.checkNotNull(newColDef);
     Preconditions.checkState(colName != null && !colName.isEmpty());
@@ -47,7 +47,7 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
     return colName;
   }
 
-  public ColumnDef getNewColDef() {
+  public ColumnDesc getNewColDef() {
     return newColDef;
   }
 

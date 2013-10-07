@@ -1725,7 +1725,7 @@ void ImpalaServer::CatalogUpdateCallback(
     // No updates or deletions, nothing to do.
     if (delta.topic_entries.size() == 0 && delta.topic_deletions.size() == 0) return;
 
-    TInternalCatalogUpdateRequest update_req;
+    TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(delta.is_delta);
     // Process all Catalog updates (new and modified objects) and determine what the
     // new catalog version will be.
@@ -1775,8 +1775,8 @@ void ImpalaServer::CatalogUpdateCallback(
     }
 
     // Call the FE to apply the changes to the Impalad Catalog.
-    TInternalCatalogUpdateResponse resp;
-    Status s = frontend_->UpdateCatalog(update_req, &resp);
+    TUpdateCatalogCacheResponse resp;
+    Status s = frontend_->UpdateCatalogCache(update_req, &resp);
     if (!s.ok()) {
       LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
                  << " a full topic update to recover: " << s.GetErrorMsg();

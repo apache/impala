@@ -18,6 +18,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnStatsData;
 import com.google.common.base.Objects;
 
@@ -85,5 +86,14 @@ public class Column {
                   .add("name", name)
                   .add("type", type)
                   .add("position", position).toString();
+  }
+
+  public static Column fromThrift(TColumnDesc columnDesc, int position) {
+    // TODO: Should 'position' be part of TColumnDesc?
+    String comment = columnDesc.isSetComment() ? columnDesc.getComment() : null;
+    Column col = new Column(columnDesc.getColumnName(),
+        PrimitiveType.fromThrift(columnDesc.getColumnType()), comment, position);
+    if (columnDesc.isSetCol_stats()) col.updateStats(columnDesc.getCol_stats());
+    return col;
   }
 }

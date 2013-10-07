@@ -27,7 +27,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.collect.Lists;
 
 public class ParserTest {
@@ -1414,7 +1414,9 @@ public class ParserTest {
   @Test
   public void TestAlterTableSet() {
     // Supported file formats
-    for (TFileFormat format: TFileFormat.values()) {
+    String [] supportedFileFormats =
+        {"TEXTFILE", "SEQUENCEFILE", "PARQUETFILE", "RCFILE", "AVROFILE"};
+    for (String format: supportedFileFormats) {
       ParsesOk("ALTER TABLE Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo PARTITION (a=1) SET FILEFORMAT " + format);
@@ -1519,7 +1521,9 @@ public class ParserTest {
     ParsesOk("CREATE TABLE T (i int COMMENT 'hi') PARTITIONED BY (j int COMMENT 'bye')");
 
     // Supported file formats
-    for (TFileFormat format: TFileFormat.values()) {
+    String [] supportedFileFormats =
+        {"TEXTFILE", "SEQUENCEFILE", "PARQUETFILE", "RCFILE", "AVROFILE"};
+    for (String format: supportedFileFormats) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk(String.format(

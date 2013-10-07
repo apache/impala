@@ -30,7 +30,7 @@ import com.google.common.base.Preconditions;
 public class CreateViewStmt extends CreateOrAlterViewStmtBase {
 
   public CreateViewStmt(boolean ifNotExists, TableName tableName,
-      ArrayList<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
+      ArrayList<ColumnDesc> columnDefs, String comment, QueryStmt viewDefStmt) {
     super(ifNotExists, tableName, columnDefs, comment, viewDefStmt);
   }
 

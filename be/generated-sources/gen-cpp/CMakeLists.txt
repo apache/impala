@@ -25,6 +25,8 @@ set(SRC_FILES
   CatalogService.cpp
   CatalogService_constants.cpp
   CatalogService_types.cpp
+  CatalogInternalService_constants.cpp
+  CatalogInternalService_types.cpp
   ImpalaInternalService.cpp
   ImpalaInternalService_constants.cpp
   ImpalaInternalService_types.cpp
@@ -50,6 +52,8 @@ set(SRC_FILES
   Frontend_constants.cpp
   hive_metastore_constants.cpp
   hive_metastore_types.cpp
+  JniCatalog_constants.cpp
+  JniCatalog_types.cpp
   Logging_types.cpp
   NetworkTest_constants.cpp
   NetworkTest_types.cpp

@@ -36,6 +36,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
@@ -192,20 +193,19 @@ public class HdfsScanNode extends ScanNode {
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
           HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
-          List<String> blockHostPorts = block.getHostPorts();
-          if (blockHostPorts.size() == 0) {
+          List<TNetworkAddress> blockNetworkAddresses = block.getNetworkAddresses();
+          if (blockNetworkAddresses.size() == 0) {
             // we didn't get locations for this block; for now, just ignore the block
             // TODO: do something meaningful with that
             continue;
           }
 
           // record host/ports and volume ids
-          Preconditions.checkState(blockHostPorts.size() > 0);
+          Preconditions.checkState(blockNetworkAddresses.size() > 0);
           List<TScanRangeLocation> locations = Lists.newArrayList();
-          for (int i = 0; i < blockHostPorts.size(); ++i) {
+          for (int i = 0; i < blockNetworkAddresses.size(); ++i) {
             TScanRangeLocation location = new TScanRangeLocation();
-            String hostPort = blockHostPorts.get(i);
-            location.setServer(addressToTNetworkAddress(hostPort));
+            location.setServer(blockNetworkAddresses.get(i));
             location.setVolume_id(block.getDiskId(i));
             locations.add(location);
           }

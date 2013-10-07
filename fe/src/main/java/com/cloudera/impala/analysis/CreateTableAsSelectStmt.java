@@ -26,7 +26,7 @@ import com.cloudera.impala.catalog.TableId;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.service.DdlExecutor;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -36,8 +36,8 @@ import com.google.common.base.Preconditions;
 public class CreateTableAsSelectStmt extends StatementBase {
   private final CreateTableStmt createStmt_;
   private final InsertStmt insertStmt_;
-  private final static EnumSet<TFileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(TFileFormat.PARQUETFILE, TFileFormat.TEXTFILE);
+  private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
+      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
 
   /**
    * Builds a CREATE TABLE AS SELECT statement
@@ -73,7 +73,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
     for (int i = 0; i < colCnt; ++i) {
-      createStmt_.getColumnDefs().add(new ColumnDef(
+      createStmt_.getColumnDescs().add(new ColumnDesc(
           tmpQueryStmt.getColLabels().get(i),
           tmpQueryStmt.getResultExprs().get(i).getType(), null));
     }
@@ -82,7 +82,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
     if (!SUPPORTED_INSERT_FORMATS.contains(createStmt_.getFileFormat())) {
       throw new AnalysisException(String.format("CREATE TABLE AS SELECT " +
           "does not support (%s) file format. Supported formats are: (%s)",
-          createStmt_.getFileFormat(), Joiner.on(", ").join(SUPPORTED_INSERT_FORMATS)));
+          createStmt_.getFileFormat().toString().replace("_", ""),
+          "PARQUETFILE, TEXTFILE"));
     }
 
     // The full privilege check for the database will be done as part of the INSERT

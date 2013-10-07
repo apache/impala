@@ -20,7 +20,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
-import com.cloudera.impala.thrift.TFileFormat;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
@@ -33,7 +33,7 @@ public class CreateTableLikeStmt extends StatementBase {
   private final TableName srcTableName;
   private final boolean isExternal;
   private final String comment;
-  private final TFileFormat fileFormat;
+  private final THdfsFileFormat fileFormat;
   private final HdfsURI location;
   private final boolean ifNotExists;
 
@@ -53,7 +53,7 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String comment, TFileFormat fileFormat, HdfsURI location,
+      boolean isExternal, String comment, THdfsFileFormat fileFormat, HdfsURI location,
       boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
@@ -71,7 +71,7 @@ public class CreateTableLikeStmt extends StatementBase {
   public boolean isExternal() { return isExternal; }
   public boolean getIfNotExists() { return ifNotExists; }
   public String getComment() { return comment; }
-  public TFileFormat getFileFormat() { return fileFormat; }
+  public THdfsFileFormat getFileFormat() { return fileFormat; }
   public HdfsURI getLocation() { return location; }
 
   /**

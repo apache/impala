@@ -31,7 +31,7 @@ import com.google.common.collect.Sets;
 public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   protected final boolean ifNotExists;
   protected final TableName tableName;
-  protected final ArrayList<ColumnDef> columnDefs;
+  protected final ArrayList<ColumnDesc> columnDefs;
   protected final String comment;
   protected final QueryStmt viewDefStmt;
 
@@ -49,7 +49,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   // If column definitions were given, then this "expanded" view definition
   // wraps the original view definition in a select stmt as follows.
   //
-  // SELECT viewName.origCol1 AS colDef1, viewName.origCol2 AS colDef2, ...
+  // SELECT viewName.origCol1 AS colDesc1, viewName.origCol2 AS colDesc2, ...
   // FROM (originalViewDef) AS viewName
   //
   // Corresponds to Hive's viewExpandedText, but is not identical to the SQL
@@ -58,10 +58,10 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
 
   // Columns to use in the select list of the expanded SQL string and when registering
   // this view in the metastore. Set in analysis.
-  protected ArrayList<ColumnDef> finalColDefs;
+  protected ArrayList<ColumnDesc> finalColDefs;
 
   public CreateOrAlterViewStmtBase(boolean ifNotExists, TableName tableName,
-      ArrayList<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
+      ArrayList<ColumnDesc> columnDefs, String comment, QueryStmt viewDefStmt) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(viewDefStmt);
     this.ifNotExists = ifNotExists;
@@ -104,17 +104,17 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       List<String> labels = viewDefStmt.getColLabels();
       Preconditions.checkState(exprs.size() == labels.size());
       for (int i = 0; i < viewDefStmt.getColLabels().size(); ++i) {
-        finalColDefs.add(new ColumnDef(labels.get(i), exprs.get(i).getType(), null));
+        finalColDefs.add(new ColumnDesc(labels.get(i), exprs.get(i).getType(), null));
       }
     }
 
     // Check that the column definitions have valid names, and that there are no
     // duplicate column names.
     Set<String> distinctColNames = Sets.newHashSet();
-    for (ColumnDef colDef: finalColDefs) {
-      colDef.analyze();
-      if (!distinctColNames.add(colDef.getColName().toLowerCase())) {
-        throw new AnalysisException("Duplicate column name: " + colDef.getColName());
+    for (ColumnDesc colDesc: finalColDefs) {
+      colDesc.analyze();
+      if (!distinctColNames.add(colDesc.getColName().toLowerCase())) {
+        throw new AnalysisException("Duplicate column name: " + colDesc.getColName());
       }
     }
 
@@ -146,7 +146,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   public TCreateOrAlterViewParams toThrift() {
     TCreateOrAlterViewParams params = new TCreateOrAlterViewParams();
     params.setView_name(new TTableName(getDb(), getTbl()));
-    for (ColumnDef col: finalColDefs) {
+    for (ColumnDesc col: finalColDefs) {
       params.addToColumns(col.toThrift());
     }
     params.setOwner(getOwner());
@@ -174,7 +174,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     return owner;
   }
 
-  public List<ColumnDef> getColumnDefs() {return columnDefs; }
+  public List<ColumnDesc> getColumnDescs() {return columnDefs; }
   public String getComment() { return comment; }
   public boolean getIfNotExists() { return ifNotExists; }
   public String getOriginalViewDef() { return originalViewDef; }

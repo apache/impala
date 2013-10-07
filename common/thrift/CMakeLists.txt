@@ -107,6 +107,7 @@ set (GENERATES_SRC_FILES
 
 set (SRC_FILES
   beeswax.thrift
+  CatalogInternalService.thrift
   CatalogObjects.thrift
   CatalogService.thrift
   cli_service.thrift
@@ -117,6 +118,7 @@ set (SRC_FILES
   Exprs.thrift
   ImpalaInternalService.thrift
   ImpalaService.thrift
+  JniCatalog.thrift
   Logging.thrift
   NetworkTest.thrift
   PlanNodes.thrift
