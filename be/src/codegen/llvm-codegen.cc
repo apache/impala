@@ -138,21 +138,12 @@ Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
 }
 
 // TODO: Create separate counters/timers (file size, load time) for each module linked
-Status LlvmCodeGen::LinkModule(const string& file, HdfsFsCache* fs_cache) {
+Status LlvmCodeGen::LinkModule(const string& file) {
   if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK;
 
   SCOPED_TIMER(profile_.total_time_counter());
-
-  // TODO: This should go in LibCache
-  DCHECK(fs_cache != NULL);
-  hdfsFS hdfs_conn = fs_cache->GetDefaultConnection();
-  hdfsFS local_conn = fs_cache->GetLocalConnection();
-  string local_file;
-  RETURN_IF_ERROR(CopyHdfsFile(hdfs_conn, file.c_str(), local_conn,
-                               FLAGS_local_library_dir.c_str(), &local_file));
-
   Module* new_module;
-  RETURN_IF_ERROR(LoadModule(this, local_file, &new_module));
+  RETURN_IF_ERROR(LoadModule(this, file, &new_module));
   string error_msg;
   bool error =
       Linker::LinkModules(module_, new_module, Linker::DestroySource, &error_msg);
@@ -666,9 +657,15 @@ void LlvmCodeGen::GetFunctions(vector<Function*>* functions) {
   Module::iterator fn_iter = module_->begin();
   while (fn_iter != module_->end()) {
     Function* fn = fn_iter++;
-    if (!fn->empty()) {
-      functions->push_back(fn);
-    }
+    if (!fn->empty()) functions->push_back(fn);
+  }
+}
+
+void LlvmCodeGen::GetSymbols(unordered_set<string>* symbols) {
+  Module::iterator fn_iter = module_->begin();
+  while (fn_iter != module_->end()) {
+    Function* fn = fn_iter++;
+    if (!fn->empty()) symbols->insert(fn->getName());
   }
 }
 

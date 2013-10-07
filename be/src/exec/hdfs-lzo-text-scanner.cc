@@ -1,10 +1,22 @@
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "exec/hdfs-lzo-text-scanner.h"
 
 #include <hdfs.h>
-#include <dlfcn.h>
 #include <boost/algorithm/string.hpp>
 #include "common/version.h"
-#include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/read-write-util.h"
 #include "runtime/runtime-state.h"
@@ -69,8 +81,8 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
 
 Status HdfsLzoTextScanner::LoadLzoLibrary(RuntimeState* state) {
   void* handle;
-  RETURN_IF_ERROR(DynamicOpen(state, LIB_IMPALA_LZO, RTLD_NOW, &handle));
-  RETURN_IF_ERROR(DynamicLookup(state, handle,
+  RETURN_IF_ERROR(DynamicOpen(LIB_IMPALA_LZO, &handle));
+  RETURN_IF_ERROR(DynamicLookup(handle,
       "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
 
   if (strcmp((*GetImpalaBuildVersion)(), IMPALA_BUILD_VERSION) != 0) {
@@ -81,9 +93,9 @@ Status HdfsLzoTextScanner::LoadLzoLibrary(RuntimeState* state) {
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(DynamicLookup(state, handle,
+  RETURN_IF_ERROR(DynamicLookup(handle,
       "CreateLzoTextScanner", reinterpret_cast<void**>(&CreateLzoTextScanner)));
-  RETURN_IF_ERROR(DynamicLookup(state, handle,
+  RETURN_IF_ERROR(DynamicLookup(handle,
       "IssueInitialRanges", reinterpret_cast<void**>(&LzoIssueInitialRanges)));
 
   DCHECK(CreateLzoTextScanner != NULL);

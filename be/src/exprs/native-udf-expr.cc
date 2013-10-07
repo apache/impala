@@ -22,6 +22,7 @@
 #include "exprs/udf-util.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
+#include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
 #include "util/dynamic-util.h"
@@ -146,6 +147,7 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
           children_[vararg_start_idx_ + i]->type());
     }
   }
+
   codegen_ = state->llvm_codegen();
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
   RETURN_IF_ERROR(GetIrComputeFn(state, &ir_udf_wrapper_));
@@ -257,7 +259,7 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     void* udf_ptr;
     if (udf_type_ == TFunctionBinaryType::NATIVE) {
       RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
-          state, hdfs_location_, symbol_name_, &udf_ptr));
+          state->fs_cache(), hdfs_location_, symbol_name_, &udf_ptr));
     } else {
       udf_ptr = OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);
     }
@@ -303,11 +305,14 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     }
   } else {
     DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
+    string local_path;
+    RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
+          state->fs_cache(), hdfs_location_, false, &local_path));
 
     // Link the UDF module into this query's main module (essentially copy the UDF module
     // into the main module) so the UDF function is available for inlining in the main
     // module.
-    RETURN_IF_ERROR(codegen->LinkModule(hdfs_location_, state->fs_cache()));
+    RETURN_IF_ERROR(codegen->LinkModule(local_path));
     *udf = codegen->module()->getFunction(symbol_name_);
     if (*udf == NULL) {
       stringstream ss;
