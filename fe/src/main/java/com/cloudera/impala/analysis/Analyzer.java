@@ -925,8 +925,12 @@ public class Analyzer {
     } catch (TableNotFoundException e) {
       throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tableName.toString());
     } catch (TableLoadingException e) {
-      throw new AnalysisException(String.format("Failed to load metadata for table: %s",
-          tableName), e);
+      String errorMsg =
+          String.format("Failed to load metadata for table %s: ", tableName.toString());
+      // We don't want to log all AnalysisExceptions as ERROR, only failures due to
+      // TableLoadingExceptions.
+      LOG.error(errorMsg + e.getMessage());
+      throw new AnalysisException(errorMsg, e);
     }
     Preconditions.checkNotNull(table);
     return table;
