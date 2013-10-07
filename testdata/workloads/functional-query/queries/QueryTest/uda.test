@@ -1,0 +1,22 @@
+====
+---- QUERY
+select uda_test.hll(int_col) from functional.alltypestiny;
+---- TYPES
+string
+---- RESULTS
+'2'
+====
+---- QUERY
+select uda_test.test_count(int_col) from functional.alltypestiny;
+---- TYPES
+bigint
+---- RESULTS
+8
+====
+---- QUERY
+select uda_test.test_count(int_col) from functional.alltypesagg;
+---- TYPES
+bigint
+---- RESULTS
+9990
+====

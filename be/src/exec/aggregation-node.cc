@@ -469,6 +469,9 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
       return NULL;
     }
 
+    // Don't codegen things that aren't builtins (for now)
+    if (!evaluator->is_builtin()) return NULL;
+
     // Don't code gen distinct estimate
     if (evaluator->agg_op() == TAggregationOp::DISTINCT_PC
         || evaluator->agg_op() == TAggregationOp::DISTINCT_PCSA) {

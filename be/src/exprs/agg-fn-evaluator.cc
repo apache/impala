@@ -21,6 +21,7 @@
 #include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
 #include "exprs/anyval-util.h"
+#include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
@@ -53,10 +54,24 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunction& desc,
 AggFnEvaluator::AggFnEvaluator(const TAggregateFunction& desc)
   : return_type_(desc.return_type),
     intermediate_type_(desc.intermediate_type),
+    function_type_(desc.binary_type),
     agg_op_(desc.op),
+    hdfs_location_(desc.binary_location),
+    init_fn_symbol_(desc.init_fn_name),
+    update_fn_symbol_(desc.update_fn_name),
+    merge_fn_symbol_(desc.merge_fn_name),
+    serialize_fn_symbol_(desc.serialize_fn_name),
+    finalize_fn_symbol_(desc.finalize_fn_name),
     output_slot_desc_(NULL) {
-  DCHECK_EQ(desc.binary_type, TFunctionBinaryType::BUILTIN) << "NYI";
-  DCHECK_NE(agg_op_, TAggregationOp::INVALID);
+  if (desc.binary_type == TFunctionBinaryType::BUILTIN) {
+    DCHECK_NE(agg_op_, TAggregationOp::INVALID);
+  } else {
+    DCHECK_EQ(desc.binary_type, TFunctionBinaryType::NATIVE);
+    DCHECK(!hdfs_location_.empty());
+    DCHECK(!init_fn_symbol_.empty());
+    DCHECK(!update_fn_symbol_.empty());
+    DCHECK(!merge_fn_symbol_.empty());
+  }
 }
 
 Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
@@ -75,19 +90,41 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   }
   staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type());
 
-  pair<TAggregationOp::type, PrimitiveType> key;
-  if (is_count_star()) {
-    key = make_pair(agg_op_, INVALID_TYPE);
+  // TODO: this should be made identical for the builtin and UDA case by
+  // putting all this logic in an improved opcode registry.
+  if (function_type_ == TFunctionBinaryType::BUILTIN) {
+    pair<TAggregationOp::type, PrimitiveType> key;
+    if (is_count_star()) {
+      key = make_pair(agg_op_, INVALID_TYPE);
+    } else {
+      DCHECK_GE(input_exprs().size(), 1);
+      key = make_pair(agg_op_, input_exprs()[0]->type());
+    }
+    const OpcodeRegistry::AggFnDescriptor* fn_desc =
+        OpcodeRegistry::Instance()->GetBuiltinAggFnDescriptor(key);
+    DCHECK(fn_desc != NULL);
+    fn_ptrs_ = *fn_desc;
   } else {
-    DCHECK_GE(input_exprs().size(), 1);
-    key = make_pair(agg_op_, input_exprs()[0]->type());
-  }
+    DCHECK_EQ(function_type_, TFunctionBinaryType::NATIVE);
+    // Load the function pointers.
+    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), hdfs_location_, init_fn_symbol_, &fn_ptrs_.init_fn));
+    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), hdfs_location_, update_fn_symbol_, &fn_ptrs_.update_fn));
+    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), hdfs_location_, merge_fn_symbol_, &fn_ptrs_.merge_fn));
 
-  // TODO: if this is not a builtin, load the .so/.ll here
-  const OpcodeRegistry::AggFnDescriptor* fn_desc =
-      OpcodeRegistry::Instance()->GetBuiltinAggFnDescriptor(key);
-  DCHECK(fn_desc != NULL);
-  fn_ptrs_ = *fn_desc;
+    // Serialize and Finalize are optional
+    if (!serialize_fn_symbol_.empty()) {
+      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+          state->fs_cache(), hdfs_location_, serialize_fn_symbol_,
+          &fn_ptrs_.serialize_fn));
+    }
+    if (!finalize_fn_symbol_.empty()) {
+      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+          state->fs_cache(), hdfs_location_, finalize_fn_symbol_, &fn_ptrs_.finalize_fn));
+    }
+  }
   return Status::OK;
 }
 

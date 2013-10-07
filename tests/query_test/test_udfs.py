@@ -25,11 +25,12 @@ class TestUdfs(ImpalaTestSuite):
   # TODO: They can be run in parallel once functions are persisted correctly.
 
   @pytest.mark.execute_serially
-  def test_native_udfs(self, vector):
+  def test_native_functions(self, vector):
     self.run_test_case('QueryTest/load-native-functions', vector)
     self.run_test_case('QueryTest/udf', vector)
+    self.run_test_case('QueryTest/uda', vector)
 
   @pytest.mark.execute_serially
-  def test_ir_udfs(self, vector):
+  def test_ir_functions(self, vector):
     self.run_test_case('QueryTest/load-ir-functions', vector)
     self.run_test_case('QueryTest/udf', vector)

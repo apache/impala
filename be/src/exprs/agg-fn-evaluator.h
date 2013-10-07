@@ -60,6 +60,7 @@ class AggFnEvaluator {
   bool is_count_star() const {
     return agg_op_ == TAggregationOp::COUNT && input_exprs_.empty();
   }
+  bool is_builtin() const { return function_type_ == TFunctionBinaryType::BUILTIN; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
@@ -84,7 +85,19 @@ class AggFnEvaluator {
   const ColumnType intermediate_type_;
   std::vector<Expr*> input_exprs_;
 
+  // Native (.so), IR (.ll) or builtin
+  TFunctionBinaryType::type function_type_;
+
+  // If it's a builtin, the opcode.
   const TAggregationOp::type agg_op_;
+
+  // HDFS path and function names for UDAs.
+  std::string hdfs_location_;
+  std::string init_fn_symbol_;
+  std::string update_fn_symbol_;
+  std::string merge_fn_symbol_;
+  std::string serialize_fn_symbol_;
+  std::string finalize_fn_symbol_;
 
   // Unowned
   const SlotDescriptor* output_slot_desc_;

@@ -459,15 +459,30 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes group by year(timestamp_col)");
   }
 
+  void addTestUda(String name, PrimitiveType retType, PrimitiveType... argTypes) {
+    FunctionName fnName = new FunctionName("default", name);
+    catalog.addFunction(new Uda(fnName, new FunctionArgs(Lists.newArrayList(argTypes),
+        false), retType));
+  }
+
   @Test
   public void TestAggregates() throws AnalysisException {
-    // Add an uda: int aggfn(int)
-    Uda uda = new Uda(new FunctionName("default", "AggFn"),
-        new FunctionArgs(Lists.newArrayList(PrimitiveType.BIGINT), false),
-        PrimitiveType.BIGINT);
-    catalog.addFunction(uda);
+    // Add udas:
+    //   bigint AggFn(int)
+    //   bigint AggFn(bigint)
+    //   bigint AggFn(double)
+    //   string AggFn(string, string)
+    // TODO: if we could persist these in the catalog, we'd just use those
+    // TODO: add cases where the intermediate type is not the return type when
+    // the planner supports that.
+    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.INT);
+    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.BIGINT);
+    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.DOUBLE);
+    addTestUda("AggFn", PrimitiveType.STRING,
+        PrimitiveType.STRING, PrimitiveType.STRING);
 
-    AnalysisError("select default.aggfn(1)",
+    AnalyzesOk("select aggfn(int_col) from functional.alltypesagg");
+    AnalysisError("select default.AggFn(1)",
         "aggregation without a FROM clause is not allowed");
     AnalyzesOk("select default.aggfn(int_col) from functional.alltypes");
     AnalyzesOk("select count(*) from functional.testtbl");
@@ -476,6 +491,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id), aggfn(id) " +
         "from functional.testtbl");
+    AnalyzesOk("select AggFn(tinyint_col), AggFn(int_col), AggFn(bigint_col), " +
+        "AggFn(double_col) from functional.alltypes");
+    AnalysisError("select AggFn(string_col) from functional.alltypes",
+        "No matching function with signature: default.aggfn(STRING)");
+    AnalyzesOk("select AggFn(string_col, string_col) from functional.alltypes");
+
     AnalyzesOk("select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL), " +
         "group_concat(NULL), group_concat(name, NULL) from functional.testtbl");
     AnalysisError("select id, zip from functional.testtbl where count(*) > 0",

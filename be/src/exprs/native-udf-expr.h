@@ -70,7 +70,7 @@ class NativeUdfExpr: public Expr {
   // Native (.so), IR (.ll) or builtin
   TFunctionBinaryType::type udf_type_;
 
-  // HDFS/local path and name of the compiled UDF binary
+  // HDFS path and name of the compiled UDF binary
   std::string hdfs_location_;
   std::string symbol_name_;
 

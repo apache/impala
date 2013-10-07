@@ -40,8 +40,14 @@ public class FunctionCallExpr extends Expr {
   private final FunctionParams params_;
 
   // The function to call. This can either be a builtin scalar, UDF or UDA.
-  // Set in analyze().
+  // Set in analyze() except if isDistributedAggregation_ is true.
   private Function fn_;
+
+  // If set, this a function call from distributing an aggregation.
+  // In that case, when constructing the single node plan, we analyze this
+  // FunctionCallExpr, but when distributing the plan, fn_ is just inherited
+  // by the other created FunctionCallExpr objects.
+  private boolean isMergeAggregation_;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     this(new FunctionName(functionName), new FunctionParams(false, params));
@@ -69,10 +75,14 @@ public class FunctionCallExpr extends Expr {
 
   // Constructs the same agg function with new params.
   public FunctionCallExpr(FunctionCallExpr e, FunctionParams params) {
+    Preconditions.checkState(e.isAnalyzed);
     Preconditions.checkState(e.isAggregateFunction());
     fnName_ = e.fnName_;
     agg_op_ = e.agg_op_;
     params_ = params;
+    // Just inherit the function object from 'e'.
+    fn_ = e.fn_;
+    isMergeAggregation_ = true;
     if (params.exprs() != null) children.addAll(params.exprs());
   }
 
@@ -164,7 +174,6 @@ public class FunctionCallExpr extends Expr {
 
   public TAggregateFunction toTAggregateFunction() {
     Preconditions.checkState(isAggregateFunction());
-    Preconditions.checkState(agg_op_ != null);
 
     List<TExpr> inputExprs = Lists.newArrayList();
     for (Expr e: children) {
@@ -354,6 +363,31 @@ public class FunctionCallExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+
+    if (isMergeAggregation_) {
+      Preconditions.checkState(fn_ != null);
+      Preconditions.checkState(isAggregate());
+      ColumnType intermediateType = null;
+      if (fn_ instanceof Uda) {
+        intermediateType = ((Uda)fn_).getIntermediateType();
+      } else {
+        Preconditions.checkState(fn_ instanceof BuiltinAggregateFunction);
+        intermediateType = ((BuiltinAggregateFunction)fn_).getIntermediateType();
+      }
+      type = fn_.getReturnType();
+      if (intermediateType == null) intermediateType = ColumnType.createType(type);
+      // TODO: this needs to change when the intermediate type != the return type
+      Preconditions.checkArgument(intermediateType.getType() == fn_.getReturnType());
+
+      if (agg_op_ == BuiltinAggregateFunction.Operator.GROUP_CONCAT &&
+          getChildren().size() == 1) {
+        Expr arg2 = new NullLiteral();
+        arg2.analyze(analyzer);
+        addChild(arg2);
+      }
+      return;
+    }
+
     PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
     for (int i = 0; i < this.children.size(); ++i) {
       this.children.get(i).analyze(analyzer);
