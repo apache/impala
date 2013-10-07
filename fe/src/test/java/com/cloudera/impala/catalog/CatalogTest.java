@@ -7,17 +7,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -517,27 +514,6 @@ public class CatalogTest {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
       assertEquals(desc.getEscapeChar(), HdfsStorageDescriptor.DEFAULT_ESCAPE_CHAR);
     }
-  }
-
-  @Test
-  public void TestHiveMetaStoreClientCreationRetry() throws MetaException {
-    HiveConf conf = new HiveConf(CatalogTest.class);
-    // Set the Metastore warehouse to an empty string to trigger a MetaException
-    conf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, "");
-    try {
-      MetaStoreClientPool pool = new MetaStoreClientPool(1, conf);
-      fail("Expected MetaException");
-    } catch (IllegalStateException e) {
-      assertTrue(e.getCause() instanceof MetaException);
-    }
-
-    conf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, "/some/valid/path");
-    MetaStoreClientPool pool = new MetaStoreClientPool(1, conf);
-
-    // TODO: This doesn't fully validate the retry logic. In the future we
-    // could throw an exception when the retry attempts maxed out. This exception
-    // would have details on the number of retries, etc. We also need coverage for the
-    // case where we we have a few failure/retries and then a success.
   }
 
   @Test

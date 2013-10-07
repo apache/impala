@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -29,8 +27,6 @@ import com.google.common.base.Preconditions;
  * a new client is created and added to the pool. There is no size limit.
  */
 public class MetaStoreClientPool {
-  private static final int MAX_METASTORE_CLIENT_INIT_RETRIES = 5;
-  private static final int MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS = 5;
   private static final Logger LOG = Logger.getLogger(MetaStoreClientPool.class);
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool =
       new ConcurrentLinkedQueue<MetaStoreClient>();
@@ -38,7 +34,7 @@ public class MetaStoreClientPool {
   private final HiveConf hiveConf;
 
   /**
-   * A wrapper around the HiveMetaStoreClient that manages interations with the
+   * A wrapper around the HiveMetaStoreClient that manages interactions with the
    * connection pool.
    */
   public class MetaStoreClient {
@@ -48,7 +44,7 @@ public class MetaStoreClientPool {
     private MetaStoreClient(HiveConf hiveConf) {
       try {
         LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool.size());
-        this.hiveClient = createHiveClient(hiveConf);
+        this.hiveClient = new HiveMetaStoreClient(hiveConf);
       } catch (Exception e) {
         // Turn in to an unchecked exception
         throw new IllegalStateException(e);
@@ -145,41 +141,5 @@ public class MetaStoreClientPool {
     while ((client = clientPool.poll()) != null) {
       client.getHiveClient().close();
     }
-  }
-
-  /**
-   * Creates a HiveMetaStoreClient, retrying the operation if MetaStore exceptions occur.
-   * A random sleep is injected between retries to help reduce the likelihood of flooding
-   * the Meta Store with many requests at once.
-   */
-  private static HiveMetaStoreClient createHiveClient(HiveConf conf)
-      throws Exception {
-    Preconditions.checkNotNull(conf);
-    // Ensure numbers are random across nodes.
-    Random randomGen = new Random(UUID.randomUUID().hashCode());
-    int maxRetries = MAX_METASTORE_CLIENT_INIT_RETRIES;
-    for (int retryAttempt = 0; retryAttempt <= maxRetries; ++retryAttempt) {
-      try {
-        return new HiveMetaStoreClient(conf);
-      } catch (Exception e) {
-        LOG.error("Error initializing Hive Meta Store client", e);
-        if (retryAttempt == maxRetries) {
-          throw e;
-        }
-      }
-
-      // Randomize the retry interval so the meta store isn't flooded with attempts.
-      int retryInterval = randomGen.nextInt(MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS) + 1;
-      LOG.info(String.format("On retry attempt %d of %d. Sleeping %d seconds.",
-          retryAttempt + 1, maxRetries, retryInterval));
-      try {
-        Thread.sleep(retryInterval * 1000);
-      } catch (InterruptedException ie) {
-        // Do nothing
-      }
-    }
-    // Should never make it to here.
-    throw new UnsupportedOperationException(
-        "Unexpected error creating Hive Meta Store client");
   }
 }

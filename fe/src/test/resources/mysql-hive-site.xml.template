@@ -24,7 +24,10 @@
 <!-- Aside from Hadoop setup variables - this file is provided as a convenience so that Hive    -->
 <!-- users do not have to edit hadoop configuration files (that may be managed as a centralized -->
 <!-- resource).                                                                                 -->
-
+<property>
+ <name>hive.metastore.uris</name>
+ <value>thrift://localhost:9083</value>
+</property>
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
  <value>jdbc:mysql://localhost:3306/hive_${METASTORE_DB}?createDatabaseIfNotExist=true</value>
@@ -65,18 +68,20 @@
   <name>hive.stats.jdbcdriver</name>
   <value>com.mysql.jdbc.Driver</value>
 </property>
-
 <property>
   <name>datanucleus.fixedDatastore</name>
   <value>false</value>
 </property>
-
 <property>
-  <name>hive.metastore.local</name>
-  <value>true</value>
-  <description>controls whether to connect to remove metastore server or open a new metastore server in Hive Client JVM</description>
+  <name>hive.metastore.client.connect.retry.delay</name>
+  <value>0</value>
+  <description>Number of seconds for the client to wait between consecutive connection attempts</description>
 </property>
-
+<property>
+  <name>hive.metastore.client.socket.timeout</name>
+  <value>120</value>
+  <description>MetaStore Client socket timeout in seconds</description>
+</property>
 <property>
   <!--  this should eventually be deprecated since the metastore should supply this -->
   <name>hive.metastore.warehouse.dir</name>
