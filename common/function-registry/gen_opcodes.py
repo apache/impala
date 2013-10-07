@@ -227,7 +227,10 @@ def add_function(fn_meta_data, udf_interface):
   entry["args"] = fn_meta_data[2]
   entry["be_fn"] = fn_meta_data[3]
   entry["sql_names"] = fn_meta_data[4]
-  entry["symbol"] = fn_meta_data[5] if udf_interface else "<no symbol specified>"
+  if udf_interface:
+    entry["symbol"] = fn_meta_data[5]
+  else:
+    entry["symbol"] = "<no symbol specified>"
   entry["udf_interface"] = udf_interface
 
   if fn_name in meta_data_entries:
