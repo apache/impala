@@ -164,7 +164,11 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
   }
 
-  RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
+  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "PrepareTime");
+  {
+    SCOPED_TIMER(prepare_timer);
+    RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
+  }
 
   // set scan ranges
   vector<ExecNode*> scan_nodes;
