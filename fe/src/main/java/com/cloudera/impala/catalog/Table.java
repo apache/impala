@@ -27,15 +27,14 @@ import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
+import com.cloudera.impala.thrift.TTableStatsData;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -258,11 +257,14 @@ public abstract class Table implements CatalogObject {
     TTable table = new TTable(db.getName(), name);
     table.setId(id.asInt());
     table.setColumns(fieldSchemaToColumnDef(getMetaStoreTable().getSd().getCols()));
-
     // populate with both partition keys and regular columns
     table.setPartition_columns(fieldSchemaToColumnDef(
         getMetaStoreTable().getPartitionKeys()));
     table.setMetastore_table(getMetaStoreTable());
+    if (numRows != -1) {
+      table.setTable_stats(new TTableStatsData());
+      table.getTable_stats().setNum_rows(numRows);
+    }
     return table;
   }
 

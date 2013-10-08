@@ -59,6 +59,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnStatsData;
+import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -230,7 +231,7 @@ public class HdfsTable extends Table {
     int locationsIdx = 0;
     int unknownDiskIdCount = 0;
     for (FileDescriptor fileDescriptor: fileDescriptors) {
-      for (FileBlock blockMd: fileDescriptor.getFileBlocks()) {
+      for (THdfsFileBlock blockMd: fileDescriptor.getFileBlocks()) {
         VolumeId[] volumeIds = locations[locationsIdx++].getVolumeIds();
         // Convert opaque VolumeId to 0 based ids.
         // TODO: the diskId should be eventually retrievable from Hdfs when
@@ -238,11 +239,9 @@ public class HdfsTable extends Table {
         int[] diskIds = new int[volumeIds.length];
         for (int i = 0; i < volumeIds.length; ++i) {
           diskIds[i] = getDiskId(volumeIds[i]);
-          if (diskIds[i] < 0) {
-            ++unknownDiskIdCount;
-          }
+          if (diskIds[i] < 0) ++unknownDiskIdCount;
         }
-        blockMd.setDiskIds(diskIds);
+        FileBlock.setDiskIds(diskIds, blockMd);
       }
     }
     LOG.info("loaded disk ids for table " + getFullName() + ". nodes: " + getNumNodes());
@@ -495,8 +494,8 @@ public class HdfsTable extends Table {
     Set<String> uniqueHostPorts = Sets.newHashSet();
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDesc: partition.getFileDescriptors()) {
-        for (FileBlock blockMd: fileDesc.getFileBlocks()) {
-          List<String> hostports = blockMd.getHostPorts();
+        for (THdfsFileBlock blockMd: fileDesc.getFileBlocks()) {
+          List<String> hostports = blockMd.getHost_ports();
           for (int i = 0; i < hostports.size(); ++i) {
             uniqueHostPorts.add(hostports.get(i));
           }

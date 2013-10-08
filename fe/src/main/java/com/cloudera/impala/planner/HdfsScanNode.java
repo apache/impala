@@ -23,10 +23,12 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.HdfsPartition;
+import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -163,7 +165,8 @@ public class HdfsScanNode extends ScanNode {
     for (HdfsPartition partition: partitions) {
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
-        for (HdfsPartition.FileBlock block: fileDesc.getFileBlocks()) {
+        for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
+          HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
           List<String> blockHostPorts = block.getHostPorts();
           if (blockHostPorts.size() == 0) {
             // we didn't get locations for this block; for now, just ignore the block

@@ -74,12 +74,29 @@ public class CatalogObjectToFromThriftTest {
         }
       }
 
+      // Now try to load the thrift struct.
       Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
           catalog.getDb(dbName), thriftTable.getMetastore_table());
       newTable.loadFromTTable(thriftTable);
       Assert.assertTrue(newTable instanceof HdfsTable);
       Assert.assertEquals(newTable.name, thriftTable.tbl_name);
       Assert.assertEquals(newTable.numClusteringCols, 2);
+      // Currently only have table stats on "functional.alltypes"
+      Assert.assertEquals(newTable.numRows, dbName.equals("functional") ? 7300 : -1);
+      HdfsTable newHdfsTable = (HdfsTable) newTable;
+      Assert.assertEquals(newHdfsTable.getPartitions().size(), 25);
+      boolean foundDefaultPartition = false;
+      for (HdfsPartition hdfsPart: newHdfsTable.getPartitions()) {
+        if (hdfsPart.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+          Assert.assertEquals(foundDefaultPartition, false);
+          foundDefaultPartition = true;
+        } else {
+          Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
+          Assert.assertTrue(
+              hdfsPart.getFileDescriptors().get(0).getFileBlocks().size() > 0);
+        }
+      }
+      Assert.assertEquals(foundDefaultPartition, true);
     }
   }
 

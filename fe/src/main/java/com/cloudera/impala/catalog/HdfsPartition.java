@@ -15,10 +15,12 @@
 package com.cloudera.impala.catalog;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +50,6 @@ public class HdfsPartition {
   static public class FileDescriptor {
     // TODO: split filePath into dir and file name and reuse the dir string to save
     // memory.
-    private final List<FileBlock> fileBlocks_;
     private final THdfsFileDesc fileDescriptor_;
 
     public String getFilePath() { return fileDescriptor_.getPath(); }
@@ -56,7 +57,10 @@ public class HdfsPartition {
     public long getModificationTime() {
       return fileDescriptor_.getLast_modification_time();
     }
-    public List<FileBlock> getFileBlocks() { return fileBlocks_; }
+    public List<THdfsFileBlock> getFileBlocks() {
+      return fileDescriptor_.getFile_blocks();
+    }
+
     public THdfsFileDesc toThrift() { return fileDescriptor_; }
 
     public FileDescriptor(String filePath, long fileLength, long modificationTime) {
@@ -70,29 +74,27 @@ public class HdfsPartition {
           HdfsCompression.fromFileName(filePath).toThrift());
       List<THdfsFileBlock> emptyFileBlockList = Lists.newArrayList();
       fileDescriptor_.setFile_blocks(emptyFileBlockList);
-      fileBlocks_ = Lists.newArrayList();
     }
 
     private FileDescriptor(THdfsFileDesc fileDesc) {
       this(fileDesc.path, fileDesc.length, fileDesc.last_modification_time);
       for (THdfsFileBlock block: fileDesc.getFile_blocks()) {
-        fileBlocks_.add(FileBlock.fromThrift(block));
+        fileDescriptor_.addToFile_blocks(block);
       }
+    }
+
+    public void addFileBlock(FileBlock blockMd) {
+      fileDescriptor_.addToFile_blocks(blockMd.toThrift());
+    }
+
+    public static FileDescriptor fromThrift(THdfsFileDesc desc) {
+      return new FileDescriptor(desc);
     }
 
     @Override
     public String toString() {
       return Objects.toStringHelper(this).add("Path", getFilePath())
           .add("Length", getFileLength()).toString();
-    }
-
-    public void addFileBlock(FileBlock blockMd) {
-      fileBlocks_.add(blockMd);
-      fileDescriptor_.addToFile_blocks(blockMd.toThrift());
-    }
-
-    public static FileDescriptor fromThrift(THdfsFileDesc desc) {
-      return new FileDescriptor(desc);
     }
   }
 
@@ -144,12 +146,15 @@ public class HdfsPartition {
     public long getOffset() { return fileBlock_.getOffset(); }
     public long getLength() { return fileBlock_.getLength(); }
     public List<String> getHostPorts() { return fileBlock_.getHost_ports(); }
-    public void setDiskIds(int[] diskIds) {
-      Preconditions.checkArgument(diskIds.length == fileBlock_.getHost_ports().size());
-      fileBlock_.setDisk_ids(Lists.newArrayList(diskIds.length));
-      for (int i = 0; i < diskIds.length; ++i) {
-        fileBlock_.disk_ids.add(diskIds[i]);
-      }
+
+    /**
+     * Populates the given THdfsFileBlock's list of disk ids with the given disk id
+     * values. The number of disk ids must match the number of host ports
+     * set in the file block.
+     */
+    public static void setDiskIds(int[] diskIds, THdfsFileBlock fileBlock) {
+      Preconditions.checkArgument(diskIds.length == fileBlock.getHost_ports().size());
+      fileBlock.setDisk_ids(Arrays.asList(ArrayUtils.toObject(diskIds)));
     }
 
     /**
