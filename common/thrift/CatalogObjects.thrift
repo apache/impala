@@ -22,6 +22,9 @@ include "hive_metastore.thrift"
 
 // Type of Catalog object.
 enum TCatalogObjectType {
+  // UNKNOWN is used to indicate an error condition when converting
+  // strings to their matching TCatalogObjectType.
+  UNKNOWN,
   CATALOG,
   DATABASE,
   TABLE,

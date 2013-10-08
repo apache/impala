@@ -16,8 +16,9 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/catalog")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/catalog")
 
 add_library(Catalog STATIC
-  catalog-server.cc
   catalog.cc
+  catalog-server.cc
+  catalog-util.cc
 )
 
 add_executable(catalogd catalogd-main.cc)

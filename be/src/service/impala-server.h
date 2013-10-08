@@ -393,6 +393,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback that prints a list of all known databases and tables
   void CatalogPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
+  // Webserver callback that allows for dumping information on objects in the catalog.
+  void CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
+      std::stringstream* output);
+
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   // Must not be called with exec_state->lock() already taken.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
@@ -566,15 +570,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // CancelInternal directly, but has a signature compatible with the thread pool.
   void CancelFromThreadPool(uint32_t thread_id,
       const CancellationWork& cancellation_work);
-
-  // Parses the given IMPALA_CATALOG_TOPIC topic entry key to determine the
-  // TCatalogObjectType and unique object name. Populates catalog_object with the result.
-  // This is used to reconstruct type information when an item is deleted from the
-  // topic. The only context available about the object being deleted is its key,
-  // only the minimal amount of metadata to remove the item from the catalog will be
-  // populated.
-  Status TCatalogObjectFromEntryKey(const std::string& key,
-      TCatalogObject* catalog_object);
 
   // Waits until the Impalad Catalog has reached a version that includes the specified
   // update result.

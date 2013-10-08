@@ -50,6 +50,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
+import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
@@ -232,6 +233,18 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Gets the thrift representation of a catalog object.
+   */
+  public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
+      TException {
+    TCatalogObject objectDescription = new TCatalogObject();
+    JniUtil.deserializeThrift(protocolFactory, objectDescription, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory);
+    return serializer.serialize(
+        frontend.getCatalog().getTCatalogObject(objectDescription));
   }
 
   /**

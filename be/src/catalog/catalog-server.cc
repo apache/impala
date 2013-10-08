@@ -15,6 +15,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "catalog/catalog-server.h"
+#include "catalog/catalog-util.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/debug-util.h"
 #include "gen-cpp/CatalogObjects_types.h"
@@ -118,6 +119,11 @@ void CatalogServer::RegisterWebpages(Webserver* webserver) {
   Webserver::PathHandlerCallback catalog_callback =
       bind<void>(mem_fn(&CatalogServer::CatalogPathHandler), this, _1, _2);
   webserver->RegisterPathHandler("/catalog", catalog_callback);
+
+  Webserver::PathHandlerCallback catalog_objects_callback =
+      bind<void>(mem_fn(&CatalogServer::CatalogObjectsPathHandler), this, _1, _2);
+  webserver->RegisterPathHandler("/catalog_objects",
+      catalog_objects_callback, false, false);
 }
 
 void CatalogServer::UpdateCatalogTopicCallback(
@@ -161,35 +167,18 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
   // Add any new/updated catalog objects to the topic.
   BOOST_FOREACH(const TCatalogObject& catalog_object, resp.objects) {
-    // The key format is: "TCatalogObjectType:<fully qualified object name>"
-    stringstream entry_key;
-    entry_key << PrintTCatalogObjectType(catalog_object.type) << ":";
-    switch (catalog_object.type) {
-      case TCatalogObjectType::DATABASE:
-        entry_key << catalog_object.db.db_name;
-        break;
-      case TCatalogObjectType::TABLE:
-      case TCatalogObjectType::VIEW:
-        entry_key << catalog_object.table.db_name << "." << catalog_object.table.tbl_name;
-        break;
-      case TCatalogObjectType::FUNCTION:
-        entry_key << catalog_object.fn.signature;
-        break;
-      case TCatalogObjectType::CATALOG:
-        entry_key << catalog_object.catalog.catalog_service_id;
-        break;
-      default:
-        LOG_EVERY_N(WARNING, 60) << "Unexpected TCatalogObjectType: "
-                                 << catalog_object.type;
-        continue;
+    const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
+    if (entry_key.empty()) {
+      LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
+                               << ThriftDebugString(catalog_object);
     }
-    current_entry_keys.insert(entry_key.str());
+    current_entry_keys.insert(entry_key);
 
     // Check if we knew about this topic entry key in the last update, and if so remove it
     // from the catalog_object_topic_entry_keys_. At the end of this loop, we will be left
     // with the set of keys that were in the last update, but not in this update,
     // indicating which objects have been removed/dropped.
-    set<string>::iterator itr = catalog_object_topic_entry_keys_.find(entry_key.str());
+    set<string>::iterator itr = catalog_object_topic_entry_keys_.find(entry_key);
     if (itr != catalog_object_topic_entry_keys_.end()) {
       catalog_object_topic_entry_keys_.erase(itr);
     }
@@ -197,7 +186,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
     // This isn't a new item, skip it.
     if (catalog_object.catalog_version <= last_catalog_version_) continue;
 
-    LOG(INFO) << "Adding Update: " << entry_key.str() << "@"
+    LOG(INFO) << "Adding Update: " << entry_key << "@"
               << catalog_object.catalog_version;
 
     subscriber_topic_updates->push_back(TTopicDelta());
@@ -206,7 +195,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
     update.topic_entries.push_back(TTopicItem());
     TTopicItem& item = update.topic_entries.back();
-    item.key = entry_key.str();
+    item.key = entry_key;
 
     ThriftSerializer thrift_serializer(false);
     Status status = thrift_serializer.Serialize(&catalog_object, &item.value);
@@ -297,5 +286,34 @@ void CatalogServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
       }
       (*output) << endl << endl;
     }
+  }
+}
+
+void CatalogServer::CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
+  Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
+  Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
+  if (object_type_arg != args.end() && object_name_arg != args.end()) {
+    TCatalogObjectType::type object_type =
+        TCatalogObjectTypeFromName(object_type_arg->second);
+
+    // Get the object type and name from the topic entry key
+    TCatalogObject request;
+    TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
+
+    // Get the object and dump its contents.
+    TCatalogObject result;
+    Status status = catalog_->GetCatalogObject(request, &result);
+    if (status.ok()) {
+      if (args.find("raw") == args.end()) {
+        (*output) << "<pre>" << ThriftDebugString(result) << "</pre>";
+      } else {
+        (*output) << ThriftDebugString(result);
+      }
+    } else {
+      (*output) << status.GetErrorMsg();
+    }
+  } else {
+    (*output) << "Please specify values for the object_type and object_name parameters.";
   }
 }

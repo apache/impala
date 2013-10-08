@@ -32,28 +32,34 @@ class Catalog {
   Catalog();
 
   // Executes the given TDdlExecRequest and returns a response with details on the
-  // result of the operation. Returns OK if the operation was successfull,
+  // result of the operation. Returns OK if the operation was successful,
   // otherwise a Status object with information on the error will be returned.
   Status ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp);
 
   // Executes the given TUpdateMetastoreRequest and returns a response with details on
-  // the result of the operation. Returns OK if the operation was successfull,
+  // the result of the operation. Returns OK if the operation was successful,
   // otherwise a Status object with information on the error will be returned.
   Status UpdateMetastore(const TUpdateMetastoreRequest& req,
       TUpdateMetastoreResponse* resp);
 
   // Resets the metadata of a single table or the entire catalog, based on the
-  // given TResetMetadataRequest. Returns OK if the operation was successfull, otherwise
+  // given TResetMetadataRequest. Returns OK if the operation was successful, otherwise
   // a Status object with information on the error will be returned.
   Status ResetMetadata(const TResetMetadataRequest& req, TResetMetadataResponse* resp);
 
   // Gets all Catalog objects and the metadata that is applicable applicable for
   // the given request. Always returns all object names that exist in the Catalog, but
   // allows for extended metadata for objects that were modified after a specific version.
-  // Returns OK if the operation was successfull, otherwise a Status object with
+  // Returns OK if the operation was successful, otherwise a Status object with
   // information on the error will be returned.
   Status GetAllCatalogObjects(const TGetAllCatalogObjectsRequest& req,
       TGetAllCatalogObjectsResponse* resp);
+
+  // Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
+  // which has the desired TCatalogObjectType and name properly set.
+  // Returns OK if the operation was successful, otherwise a Status object with
+  // information on the error will be returned.
+  Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
   // Return all databases matching the optional argument 'pattern'.
   // If pattern is NULL, match all databases otherwise match only those databases that
@@ -80,7 +86,8 @@ class Catalog {
   jmethodID update_metastore_id_;  // CatalogServiceFrontend.updateMetaastore()
   jmethodID exec_ddl_id_;  // CatalogServiceFrontend.execDdl()
   jmethodID reset_metadata_id_;  // CatalogServiceFrontend.resetMetdata()
-  jmethodID get_catalog_objects_id_;  // CatalogServiceFrontend.createExecRequest()
+  jmethodID get_catalog_object_id_;  // CatalogServiceFrontend.getCatalogObject()
+  jmethodID get_catalog_objects_id_;  // CatalogServiceFrontend.getCatalogObjects()
   jmethodID get_db_names_id_; // CatalogServiceFrontend.getDbNames()
   jmethodID get_table_names_id_; // CatalogServiceFrontend.getTableNames()
   jmethodID catalog_ctor_;

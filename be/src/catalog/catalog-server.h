@@ -96,7 +96,15 @@ class CatalogServer {
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   void CatalogPathHandler(const Webserver::ArgumentMap& args,
-    std::stringstream* output);
+      std::stringstream* output);
+
+  // Debug webpage handler that is used to dump the internal state of catalog objects.
+  // The caller specifies a "object_type" and "object_name" parameters and this function
+  // will get the matching TCatalogObject struct, if one exists.
+  // For example, to dump table "bar" in database "foo":
+  // <host>:25020/catalog_objects?object_type=TABLE&object_name=foo.bar
+  void CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
+      std::stringstream* output);
 };
 
 }

@@ -28,6 +28,7 @@ import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
+import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsRequest;
@@ -159,6 +160,17 @@ public class JniCatalog {
     result.setTables(tables);
     TSerializer serializer = new TSerializer(protocolFactory);
     return serializer.serialize(result);
+  }
+
+  /**
+   * Gets the thrift representation of a catalog object.
+   */
+  public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
+      TException {
+    TCatalogObject objectDescription = new TCatalogObject();
+    JniUtil.deserializeThrift(protocolFactory, objectDescription, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory);
+    return serializer.serialize(catalog_.getTCatalogObject(objectDescription));
   }
 
   /**

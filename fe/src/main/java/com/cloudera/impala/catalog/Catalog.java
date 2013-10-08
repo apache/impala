@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
@@ -558,6 +559,60 @@ public abstract class Catalog {
     } catch (PartitionNotFoundException e) {
       return false;
     }
+  }
+
+  /**
+   * Gets the thrift representation of a catalog object, given the "object
+   * description". The object description is just a TCatalogObject with only the
+   * catalog object type and object name set.
+   * If the object is not found, a CatalogException is thrown.
+   */
+  public TCatalogObject getTCatalogObject(TCatalogObject objectDesc)
+      throws CatalogException {
+    TCatalogObject result = new TCatalogObject();
+    switch (objectDesc.getType()) {
+      case DATABASE: {
+        Db db = getDb(objectDesc.getDb().getDb_name());
+        if (db == null) {
+          throw new CatalogException(
+              "Database not found: " + objectDesc.getDb().getDb_name());
+        }
+        result.setType(db.getCatalogObjectType());
+        result.setCatalog_version(db.getCatalogVersion());
+        result.setDb(db.toThrift());
+        break;
+      }
+      case TABLE:
+      case VIEW: {
+        Table table = getTable(objectDesc.getTable().getDb_name(),
+            objectDesc.getTable().getTbl_name());
+        if (table == null) {
+          throw new CatalogException("Table not found: " +
+              objectDesc.getTable().getTbl_name());
+        }
+        result.setType(table.getCatalogObjectType());
+        result.setCatalog_version(table.getCatalogVersion());
+        result.setTable(table.toThrift());
+        break;
+      }
+      case FUNCTION: {
+        for (String dbName: getDbNames(null)) {
+          Db db = getDb(dbName);
+          if (db == null) continue;
+          Function fn = db.getFunction(objectDesc.getFn().getSignature());
+          if (fn == null) continue;
+          result.setType(fn.getCatalogObjectType());
+          result.setCatalog_version(fn.getCatalogVersion());
+          result.setFn(fn.toThrift());
+          break;
+        }
+        if (!result.isSetFn()) throw new CatalogException("Function not found.");
+        break;
+      }
+      default: throw new IllegalStateException(
+          "Unexpected TCatalogObject type: " + objectDesc.getType());
+    }
+    return result;
   }
 
   /**

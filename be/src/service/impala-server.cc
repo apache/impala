@@ -33,6 +33,7 @@
 #include <rapidjson/writer.h>
 
 #include "catalog/catalog-server.h"
+#include "catalog/catalog-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/version.h"
@@ -414,6 +415,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   Webserver::PathHandlerCallback catalog_callback =
       bind<void>(mem_fn(&ImpalaServer::CatalogPathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/catalog", catalog_callback);
+
+  Webserver::PathHandlerCallback catalog_objects_callback =
+      bind<void>(mem_fn(&ImpalaServer::CatalogObjectsPathHandler), this, _1, _2);
+  exec_env->webserver()->RegisterPathHandler("/catalog_objects",
+      catalog_objects_callback, false, false);
 
   Webserver::PathHandlerCallback profile_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
@@ -893,6 +899,35 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
       }
       (*output) << endl << endl;
     }
+  }
+}
+
+void ImpalaServer::CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
+    stringstream* output) {
+  Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
+  Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
+  if (object_type_arg != args.end() && object_name_arg != args.end()) {
+    TCatalogObjectType::type object_type =
+        TCatalogObjectTypeFromName(object_type_arg->second);
+
+    // Get the object type and name from the topic entry key
+    TCatalogObject request;
+    TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
+
+    // Get the object and dump its contents.
+    TCatalogObject result;
+    Status status = frontend_->GetCatalogObject(request, &result);
+    if (status.ok()) {
+      if (args.find("raw") == args.end()) {
+        (*output) << "<pre>" << ThriftDebugString(result) << "</pre>";
+      } else {
+        (*output) << ThriftDebugString(result);
+      }
+    } else {
+      (*output) << status.GetErrorMsg();
+    }
+  } else {
+    (*output) << "Please specify values for the object_type and object_name parameters.";
   }
 }
 
@@ -1594,45 +1629,6 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
                << ") did not succeed: " << status.GetErrorMsg();
   }
-}
-
-Status ImpalaServer::TCatalogObjectFromEntryKey(const string& key,
-    TCatalogObject* catalog_object) {
-  // Here we must reconstruct the object type based only on the key.
-  size_t pos = key.find(":");
-  DCHECK(pos != string::npos);
-  string object_type = key.substr(0, pos);
-  string object_name = key.substr(pos + 1);
-
-  // The catalog versions for these items do not matter because they will be removed
-  // from the catalog. To simplify things, only the minimum required fields will be filled
-  // in.
-  catalog_object->__set_catalog_version(0L);
-  if (object_type == "DATABASE") {
-    catalog_object->__set_type(TCatalogObjectType::DATABASE);
-    catalog_object->__set_db(TDatabase());
-    catalog_object->db.__set_db_name(object_name);
-  } else if (object_type == "TABLE" || object_type == "VIEW") {
-    catalog_object->__set_type(TCatalogObjectType::TABLE);
-    catalog_object->__set_table(TTable());
-    // Parse the (fully qualified) table name
-    pos = object_name.find(".");
-    DCHECK(pos != string::npos);
-
-    catalog_object->table.__set_db_name(object_name.substr(0, pos));
-    catalog_object->table.__set_tbl_name(object_name.substr(pos + 1));
-  } else if (object_type == "FUNCTION") {
-    catalog_object->__set_type(TCatalogObjectType::FUNCTION);
-    catalog_object->__set_fn(TFunction());
-    // The key only contains the signature string, which is all that is needed to uniquely identify
-    // the function.
-    catalog_object->fn.__set_signature(object_name);
-  } else {
-    stringstream ss;
-    ss << "Unexpected object type: " << object_type;
-    return Status(ss.str());
-  }
-  return Status::OK;
 }
 
 void ImpalaServer::CatalogUpdateCallback(

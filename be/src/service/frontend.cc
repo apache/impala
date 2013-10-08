@@ -64,6 +64,7 @@ Frontend::Frontend() {
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
+    {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
 
@@ -132,6 +133,11 @@ Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_functions_id_, params, functions);
+}
+
+Status Frontend::GetCatalogObject(const TCatalogObject& req,
+    TCatalogObject* resp) {
+  return JniUtil::CallJniMethod(fe_, get_catalog_object_id_, req, resp);
 }
 
 Status Frontend::GetExecRequest(

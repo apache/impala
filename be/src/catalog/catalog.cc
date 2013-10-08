@@ -47,6 +47,7 @@ Catalog::Catalog() {
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getCatalogObjects", "([B)[B", &get_catalog_objects_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
@@ -69,6 +70,11 @@ void Catalog::LoadJniMethod(JNIEnv* jni_env, MethodDescriptor* descriptor) {
   (*descriptor->method_id) = jni_env->GetMethodID(catalog_class_,
       descriptor->name.c_str(), descriptor->signature.c_str());
   EXIT_IF_EXC(jni_env);
+}
+
+Status Catalog::GetCatalogObject(const TCatalogObject& req,
+    TCatalogObject* resp) {
+  return JniUtil::CallJniMethod(catalog_, get_catalog_object_id_, req, resp);
 }
 
 Status Catalog::GetAllCatalogObjects(const TGetAllCatalogObjectsRequest& req,

@@ -85,6 +85,12 @@ class Frontend {
       const std::string* pattern, const TSessionState* session,
       TGetFunctionsResult* functions);
 
+  // Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
+  // which has the desired TCatalogObjectType and name properly set.
+  // Returns OK if the operation was successful, otherwise a Status object with
+  // information on the error will be returned.
+  Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
+
   // Returns (in the output parameter) the result of a DESCRIBE table command. This
   // command retrieves table metadata, such as the column definitions. The metadata
   // that is returned is controlled by setting the 'output_style' field. If this
@@ -128,6 +134,7 @@ class Frontend {
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID get_functions_id_; // JniFrontend.getFunctions
+  jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;
