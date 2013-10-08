@@ -5,6 +5,7 @@ export HIVE_SERVER2_THRIFT_PORT=11050
 HIVE_METASTORE_PORT=9083
 set -u
 
+# TODO: We should have a retry loop for every service we start.
 # Kill for a clean start.
 $IMPALA_HOME/testdata/bin/kill-hive-server.sh
 
@@ -17,4 +18,4 @@ hive --service hiveserver2 &
 
 # Starts hive-server (1) on the specified port.
 hive --service hiveserver -p $HIVE_SERVER_PORT &
-sleep 5
+sleep 20
