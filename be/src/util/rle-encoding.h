@@ -49,7 +49,10 @@ namespace impala {
 // Given that we know it is a multiple of 8, we store the number of 8-groups rather than
 // the actual number of encoded ints. (This means that the total number of encoded values
 // can not be determined from the encoded data, since the number of values in the last
-// group may not be a multiple of 8).
+// group may not be a multiple of 8). For the last group of literal runs, we pad
+// the group to 8 with zeros. This allows for 8 at a time decoding on the read side
+// without the need for additional checks.
+//
 // There is a break-even point when it is more storage efficient to do run length
 // encoding.  For 1 bit-width values, that point is 8 values.  They require 2 bytes
 // for both the repeated encoding or the literal encoding.  This value can always
@@ -101,11 +104,11 @@ class RleDecoder {
 // The encoding has two modes: encoding repeated runs and literal runs.
 // If the run is sufficiently short, it is more efficient to encode as a literal run.
 // This class does so by buffering 8 values at a time.  If they are not all the same
-// they are added to the literal run.  If they are the same, they are added to the 
+// they are added to the literal run.  If they are the same, they are added to the
 // repeated run.  When we switch modes, the previous run is flushed out.
 class RleEncoder {
  public:
-  // buffer/buffer_len: preallocated output buffer.  
+  // buffer/buffer_len: preallocated output buffer.
   // bit_width: max number of bits for value.
   // TODO: consider adding a min_repeated_run_length so the caller can control
   // when values should be encoded as repeated runs.  Currently this is derived
@@ -133,9 +136,9 @@ class RleEncoder {
   // Returns pointer to underlying buffer
   uint8_t* buffer() { return bit_writer_.buffer(); }
   int32_t len() { return bit_writer_.bytes_written(); }
-  
+
  private:
-  // Flushes any buffered values.  If this is part of a repeated run, this is largely 
+  // Flushes any buffered values.  If this is part of a repeated run, this is largely
   // a no-op.
   // If it is part of a literal run, this will call FlushLiteralRun, which writes
   // out the buffered literal values.
@@ -171,7 +174,7 @@ class RleEncoder {
 
   // The current (also last) value that was written and the count of how
   // many times in a row that value has been seen.  This is maintained even
-  // if we are in a literal run.  If the repeat_count_ get high enough, we switch 
+  // if we are in a literal run.  If the repeat_count_ get high enough, we switch
   // to encoding repeated runs.
   int64_t current_value_;
   int repeat_count_;
@@ -186,7 +189,7 @@ class RleEncoder {
   // when the literal run is complete.
   uint8_t* literal_indicator_byte_;
 };
-   
+
 template<typename T>
 inline bool RleDecoder::Get(T* val) {
   if (UNLIKELY(literal_count_ == 0 && repeat_count_ == 0)) {
@@ -244,7 +247,7 @@ inline bool RleEncoder::Put(uint64_t value) {
     }
     repeat_count_ = 1;
     current_value_ = value;
-  } 
+  }
 
   buffered_values_[num_buffered_values_] = value;
   if (++num_buffered_values_ == 8) {
@@ -260,7 +263,7 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
     literal_indicator_byte_ = bit_writer_.GetNextBytePtr();
     DCHECK(literal_indicator_byte_ != NULL);
   }
-  
+
   // Write all the buffered values as bit packed literals
   bool result = true;
   for (int i = 0; i < num_buffered_values_; ++i) {
@@ -274,7 +277,8 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
     // We only reserve one byte, to allow for streaming writes of literal values.
     // The logic makes sure we flush literal runs often enough to not overrun
     // the 1 byte.
-    int num_groups = BitUtil::Ceil(literal_count_, 8);
+    DCHECK_EQ(literal_count_ % 8, 0);
+    int num_groups = literal_count_ / 8;
     int32_t indicator_value = (num_groups << 1) | 1;
     DCHECK_EQ(indicator_value & 0xFFFFFF00, 0);
     *literal_indicator_byte_ = indicator_value;
@@ -308,13 +312,14 @@ inline void RleEncoder::FlushBufferedValues(bool done) {
       DCHECK_EQ(literal_count_ % 8, 0);
       DCHECK_EQ(repeat_count_, 8);
       FlushLiteralRun(true);
-    } 
+    }
     DCHECK_EQ(literal_count_, 0);
     return;
   }
 
   literal_count_ += num_buffered_values_;
-  int num_groups = BitUtil::Ceil(literal_count_, 8);
+  DCHECK_EQ(literal_count_ % 8, 0);
+  int num_groups = literal_count_ / 8;
   if (num_groups + 1 >= (1 << 6)) {
     // We need to start a new literal run because the indicator byte we've reserved
     // cannot store more values.
@@ -322,7 +327,7 @@ inline void RleEncoder::FlushBufferedValues(bool done) {
     FlushLiteralRun(true);
   } else {
     FlushLiteralRun(done);
-  } 
+  }
   repeat_count_ = 0;
 }
 
@@ -334,6 +339,12 @@ inline int RleEncoder::Flush() {
     if (repeat_count_ > 0 && all_repeat) {
       FlushRepeatedRun();
     } else  {
+      DCHECK_EQ(literal_count_ % 8, 0);
+      // Buffer the last group of literals to 8 by padding with 0s.
+      for (; num_buffered_values_ != 0 && num_buffered_values_ < 8;
+          ++num_buffered_values_) {
+        buffered_values_[num_buffered_values_] = 0;
+      }
       literal_count_ += num_buffered_values_;
       FlushLiteralRun(true);
       repeat_count_ = 0;

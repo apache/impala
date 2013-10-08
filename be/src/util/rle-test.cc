@@ -73,7 +73,7 @@ TEST(BitArray, TestBool) {
     EXPECT_TRUE(result);
     EXPECT_EQ(val, i % 2);
   }
-  
+
   for (int i = 0; i < 8; ++i) {
     bool val;
     bool result = reader.GetValue(1, &val);
@@ -163,8 +163,8 @@ TEST(BitArray, TestMixed) {
   }
 }
 
-// Validates encoding of values by encoding and decoding them.  If 
-// expected_encoding != NULL, also validates that the encoded buffer is 
+// Validates encoding of values by encoding and decoding them.  If
+// expected_encoding != NULL, also validates that the encoded buffer is
 // exactly 'expected_encoding'.
 // if expected_len is not -1, it will validate the encoded size is correct.
 void ValidateRle(const vector<int>& values, int bit_width,
@@ -230,16 +230,17 @@ TEST(Rle, SpecificSequences) {
   }
   int num_groups = BitUtil::Ceil(100, 8);
   expected_buffer[0] = (num_groups << 1) | 1;
-  for (int i = 0; i < 100/8; ++i) {
-    expected_buffer[i + 1] = BOOST_BINARY(1 0 1 0 1 0 1 0);
+  for (int i = 1; i <= 100/8; ++i) {
+    expected_buffer[i] = BOOST_BINARY(1 0 1 0 1 0 1 0);
   }
-  // Values for the last 4 0 and 1's
-  expected_buffer[1 + 100/8] = BOOST_BINARY(0 0 0 0 1 0 1 0);
+  // Values for the last 4 0 and 1's. The upper 4 bits should be padded to 0.
+  expected_buffer[100/8 + 1] = BOOST_BINARY(0 0 0 0 1 0 1 0);
 
   // num_groups and expected_buffer only valid for bit width = 1
   ValidateRle(values, 1, expected_buffer, 1 + num_groups);
   for (int width = 2; width <= MAX_WIDTH; ++width) {
-    ValidateRle(values, width, NULL, 1 + BitUtil::Ceil(width * 100, 8));
+    int num_values = BitUtil::Ceil(100, 8) * 8;
+    ValidateRle(values, width, NULL, 1 + BitUtil::Ceil(width * num_values, 8));
   }
 }
 
@@ -341,7 +342,7 @@ TEST(BitRle, Overflow) {
     if (!result) break;
     ++num_added;
   }
-  
+
   int bytes_written = encoder.Flush();
   EXPECT_LE(bytes_written, len);
   EXPECT_GT(num_added, 0);

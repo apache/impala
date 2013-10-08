@@ -208,7 +208,7 @@ set fileformat textfile
 ---- QUERY
 select count(*) from alltypes_test
 ---- RESULTS
-129
+124
 ---- TYPES
 BIGINT
 ====
@@ -259,7 +259,7 @@ select * from testtbl limit 5
 ====
 ---- QUERY
 # Make sure we can read the data.
-select * from testtbl_like 
+select * from testtbl_like
 ---- RESULTS
 1,'Hi'
 1,'Hi'
