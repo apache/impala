@@ -41,7 +41,6 @@ from ImpalaService.ImpalaService import TPingImpalaServiceResp
 from Status.ttypes import TStatus, TStatusCode
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
-from thrift.transport import TSSLSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
@@ -1081,6 +1080,14 @@ if __name__ == "__main__":
      print_to_stderr("Starting Impala Shell without Kerberos authentication")
 
   if options.ssl:
+    try:
+      # TSSLSocket needs the ssl module, which may not be standard on all Operating
+      # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
+      from thrift.transport import TSSLSocket
+    except ImportError:
+      print_to_stderr(("Unable to import the python 'ssl' module. It is required for an "
+                       "SSL-secured connection."))
+      sys.exit(1)
     if options.ca_cert is None:
       print_to_stderr("SSL is enabled. Impala server certificates will NOT be verified"\
                       " (set --ca_cert to change)")
