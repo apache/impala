@@ -138,6 +138,9 @@ public class SelectStmt extends QueryStmt {
           expandStar(analyzer, tblName);
         }
       } else {
+        // Analyze the resultExpr before generating a label to ensure enforcement
+        // of expr child and depth limits (toColumn() label may call toSql()).
+        item.getExpr().analyze(analyzer);
         resultExprs.add(item.getExpr());
         String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
         SlotRef aliasRef = new SlotRef(null, label);
@@ -151,9 +154,6 @@ public class SelectStmt extends QueryStmt {
         colLabels.add(label);
       }
     }
-
-    // analyze selectListExprs
-    Expr.analyze(resultExprs, analyzer);
 
     if (whereClause != null) {
       whereClause.analyze(analyzer);

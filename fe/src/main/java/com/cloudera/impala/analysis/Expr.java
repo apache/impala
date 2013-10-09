@@ -39,6 +39,12 @@ import com.google.common.collect.Lists;
  *
  */
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
+  // Limits on the number of expr children and the depth of an expr tree. These maximum
+  // values guard against crashes due to stack overflows (IMPALA-432) and were
+  // experimentally determined to be safe.
+  public final static int EXPR_CHILDREN_LIMIT = 10000;
+  public final static int EXPR_DEPTH_LIMIT = 2000;
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs
@@ -80,12 +86,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public long getNumDistinctValues() { return numDistinctValues; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens = b; }
 
-  /* Perform semantic analysis of node and all of its children.
+  /** Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
    * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
    */
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
+    analyzer.incrementCallDepth();
+    checkExprLimits(analyzer);
     for (Expr child: children) {
       child.analyze(analyzer);
     }
@@ -105,12 +113,30 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         numDistinctValues = Math.max(numDistinctValues, slotRef.numDistinctValues);
       }
     }
+    analyzer.decrementCallDepth();
+  }
+
+  /**
+   * Checks that the given expr is within the expr child and expr depth limits.
+   * Throws an AnalysisException if any of those limits is exceeded.
+   */
+  private void checkExprLimits(Analyzer analyzer) throws AnalysisException {
+    if (children.size() > EXPR_CHILDREN_LIMIT) {
+      String sql = toSql();
+      String sqlSubstr = sql.substring(0, Math.min(80, sql.length()));
+      throw new AnalysisException(String.format("Exceeded the maximum number of child " +
+          "expressions (%s).\nExpression has %s children:\n%s...",
+          EXPR_CHILDREN_LIMIT, children.size(), sqlSubstr));
+    }
+    // Do not print the expr because the toSql() may also overflow the stack.
+    if (analyzer.getCallDepth() > EXPR_DEPTH_LIMIT) {
+      throw new AnalysisException(String.format("Exceeded the maximum depth of an " +
+          "expresison tree (%s).", EXPR_DEPTH_LIMIT));
+    }
   }
 
   /**
    * Helper function: analyze list of exprs
-   * @param exprs
-   * @param analyzer
    */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)
       throws AnalysisException, AuthorizationException {

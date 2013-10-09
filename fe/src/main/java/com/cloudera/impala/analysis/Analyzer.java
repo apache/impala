@@ -91,6 +91,11 @@ public class Analyzer {
   // null.
   private final Analyzer parentAnalyzer;
 
+  // Current depth of nested analyze() calls. Used for enforcing a
+  // maximum expr-tree depth. Needs be manually maintained by the user
+  // of this Analyzer with incrementCallDepth() and decrementCallDepth().
+  private int callDepth = 0;
+
   // map from lowercase table alias to a view definition of a WITH clause.
   private final Map<String, ViewRef> withClauseViews = Maps.newHashMap();
 
@@ -1002,4 +1007,8 @@ public class Analyzer {
     this.useHiveColLabels = useHiveColLabels;
   }
   public boolean useHiveColLabels() { return useHiveColLabels; }
+
+  public int incrementCallDepth() { return ++callDepth; }
+  public int decrementCallDepth() { return --callDepth; }
+  public int getCallDepth() { return callDepth; }
 }

@@ -989,4 +989,119 @@ public class AnalyzeExprsTest extends AnalyzerTest {
          "No matching function with signature: default.udf(TINYINT, TINYINT).");
     catalog.removeFunction(udf);
   }
+
+  @Test
+  public void TestExprChildLimit() {
+    // Test IN predicate.
+    StringBuilder inPredStr = new StringBuilder("select 1 IN(");
+    for (int i = 0; i < Expr.EXPR_CHILDREN_LIMIT - 1; ++i) {
+      inPredStr.append(i);
+      if (i + 1 != Expr.EXPR_CHILDREN_LIMIT - 1) inPredStr.append(", ");
+    }
+    AnalyzesOk(inPredStr.toString() + ")");
+    inPredStr.append(", " + 1234);
+    AnalysisError(inPredStr.toString() + ")",
+        String.format("Exceeded the maximum number of child expressions (%s).\n" +
+        "Expression has %s children",  Expr.EXPR_CHILDREN_LIMIT,
+        Expr.EXPR_CHILDREN_LIMIT + 1));
+
+    // Test CASE expr.
+    StringBuilder caseExprStr = new StringBuilder("select case");
+    for (int i = 0; i < Expr.EXPR_CHILDREN_LIMIT/2; ++i) {
+      caseExprStr.append(" when true then 1");
+    }
+    AnalyzesOk(caseExprStr.toString() + " end");
+    caseExprStr.append(" when true then 1");
+    AnalysisError(caseExprStr.toString() + " end",
+        String.format("Exceeded the maximum number of child expressions (%s).\n" +
+        "Expression has %s children", Expr.EXPR_CHILDREN_LIMIT,
+        Expr.EXPR_CHILDREN_LIMIT + 2));
+  }
+
+  @Test
+  public void TestExprDepthLimit() {
+    // Compound predicates.
+    testInfixExprDepthLimit("select true", " and false");
+    testInfixExprDepthLimit("select true", " or false");
+
+    // Arithmetic expr.
+    testInfixExprDepthLimit("select 1 ", " + 1");
+
+    // Function-call expr.
+    // TODO: Analysis of function-call exprs and UDFs is extremely slow (IMPALA-621).
+    // Re-enable these tests when feasible.
+    //testFuncExprDepthLimit("lower(", "'abc'", ")");
+    //
+    // UDF.
+    //catalog.addFunction(new Udf(new FunctionName("default", "udf"),
+    //    Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
+    //    new HdfsURI(""), null));
+    //testFuncExprDepthLimit("udf(", "1", ")");
+    //
+    // Timestamp arithmetic expr.
+    //testFuncExprDepthLimit("date_add(", "now()", ", interval 1 day)");
+
+    // Casts.
+    testFuncExprDepthLimit("cast(", "1", " as int)");
+  }
+
+  /**
+   * Test expr depth limit of operators in infix notation, e.g., 1 + 1.
+   * Generates test exprs using the pattern: prefix + repeatSuffix*
+   */
+  private void testInfixExprDepthLimit(String prefix, String repeatSuffix) {
+    StringBuilder exprStr = new StringBuilder(prefix);
+    for (int i = 0; i < Expr.EXPR_DEPTH_LIMIT - 1; ++i) {
+      exprStr.append(repeatSuffix);
+    }
+    AnalyzesOk(exprStr.toString());
+    exprStr.append(repeatSuffix);
+    AnalysisError(exprStr.toString(),
+        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        Expr.EXPR_DEPTH_LIMIT));
+
+    // Test 10x the safe depth (already at 1x, append 9x).
+    for (int i = 0; i < Expr.EXPR_DEPTH_LIMIT * 9; ++i) {
+      exprStr.append(repeatSuffix);
+    }
+    AnalysisError(exprStr.toString(),
+        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        Expr.EXPR_DEPTH_LIMIT));
+  }
+
+  /**
+   * Test expr depth limit of function-like operations, e.g., f(a).
+   * Generates test exprs using the pattern: openFunc* baseArg closeFunc*
+   */
+  private void testFuncExprDepthLimit(String openFunc, String baseArg,
+      String closeFunc) {
+    AnalyzesOk("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
+        Expr.EXPR_DEPTH_LIMIT - 1));
+    AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
+        Expr.EXPR_DEPTH_LIMIT),
+        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        Expr.EXPR_DEPTH_LIMIT));
+    // Test 10x the safe depth.
+    AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
+        Expr.EXPR_DEPTH_LIMIT * 10),
+        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        Expr.EXPR_DEPTH_LIMIT));
+  }
+
+  /**
+   * Generates a string: openFunc* baseArg closeFunc*,
+   * where * repetition of exactly numFuncs times.
+   */
+  private String getNestedFuncExpr(String openFunc, String baseArg,
+      String closeFunc, int numFuncs) {
+    StringBuilder exprStr = new StringBuilder();
+    for (int i = 0; i < numFuncs; ++i) {
+      exprStr.append(openFunc);
+    }
+    exprStr.append(baseArg);
+    for (int i = 0; i < numFuncs; ++i) {
+      exprStr.append(closeFunc);
+    }
+    return exprStr.toString();
+  }
 }
