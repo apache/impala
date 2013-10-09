@@ -186,7 +186,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
     // This isn't a new item, skip it.
     if (catalog_object.catalog_version <= last_catalog_version_) continue;
 
-    LOG(INFO) << "Adding Update: " << entry_key << "@"
+    VLOG(1) << "Adding Update: " << entry_key << "@"
               << catalog_object.catalog_version;
 
     subscriber_topic_updates->push_back(TTopicDelta());
@@ -215,7 +215,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
     update.topic_entries.push_back(TTopicItem());
     TTopicItem& item = update.topic_entries.back();
     item.key = key;
-    LOG(INFO) << "Adding deletion: " << key;
+    VLOG(1) << "Adding deletion: " << key;
     // Don't set a value to mark this item as deleted.
   }
 

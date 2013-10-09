@@ -151,14 +151,14 @@ public class HBaseScanNode extends ScanNode {
 
     cardinality *= computeSelectivity();
     cardinality = Math.max(0, cardinality);
-    LOG.info("finalize HbaseScan: cardinality=" + Long.toString(cardinality));
+    LOG.debug("finalize HbaseScan: cardinality=" + Long.toString(cardinality));
 
     // Convert predicates to HBase filters.
     createHBaseFilters(analyzer);
 
     // TODO: take actual regions into account
     numNodes = desc.getTable().getNumNodes();
-    LOG.info("finalize HbaseScan: #nodes=" + Integer.toString(numNodes));
+    LOG.debug("finalize HbaseScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override

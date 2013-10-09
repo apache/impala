@@ -91,7 +91,7 @@ public class MergeNode extends PlanNode {
         cardinality += child.cardinality;
       }
     }
-    LOG.info("stats Merge: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Merge: cardinality=" + Long.toString(cardinality));
   }
 
   public List<List<Expr>> getResultExprLists() {

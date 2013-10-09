@@ -48,7 +48,7 @@ public class FileSystemUtil {
     for (FileStatus fStatus: fs.listStatus(directory)) {
       // Only delete files that are not hidden.
       if (fStatus.isFile() && !isHiddenFile(fStatus.getPath().getName())) {
-        LOG.info("Removing: " + fStatus.getPath());
+        LOG.debug("Removing: " + fStatus.getPath());
         fs.delete(fStatus.getPath(), false);
         ++numFilesDeleted;
       }
@@ -92,7 +92,7 @@ public class FileSystemUtil {
     int numFilesMoved = 0;
     for (FileStatus fStatus: fs.listStatus(sourceDir)) {
       if (fStatus.isDirectory()) {
-        LOG.info("Skipping copy of directory: " + fStatus.getPath());
+        LOG.debug("Skipping copy of directory: " + fStatus.getPath());
         continue;
       } else if (isHiddenFile(fStatus.getPath().getName())) {
         continue;
@@ -129,7 +129,7 @@ public class FileSystemUtil {
       destFile = new Path(destDir,
           appendToBaseFileName(destFile.getName(), UUID.randomUUID().toString()));
     }
-    LOG.info(String.format(
+    LOG.debug(String.format(
         "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
     // Move (rename) the file.
     fs.rename(sourceFile, destFile);

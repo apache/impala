@@ -50,7 +50,7 @@ public class SelectNode extends PlanNode {
       cardinality = Math.round(((double) getChild(0).cardinality) * computeSelectivity());
       Preconditions.checkState(cardinality >= 0);
     }
-    LOG.info("stats Select: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Select: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

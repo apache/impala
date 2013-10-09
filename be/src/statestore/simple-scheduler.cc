@@ -288,7 +288,7 @@ void SimpleScheduler::UpdateMembership(
       item.key = backend_id_;
       Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
       if (!status.ok()) {
-        LOG(INFO) << "Failed to serialize Impala backend address for state-store topic: "
+        LOG(WARNING) << "Failed to serialize Impala backend address for state-store topic: "
                   << status.GetErrorMsg();
         subscriber_topic_updates->pop_back();
       }

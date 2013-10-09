@@ -145,7 +145,7 @@ public class AggregateInfo {
       Preconditions.checkState(tupleDesc == null);
       result.createDistinctAggInfo(groupingExprs, distinctAggExprs, analyzer);
     }
-    LOG.info("agg info:\n" + result.debugString());
+    LOG.debug("agg info:\n" + result.debugString());
     return result;
   }
 

@@ -290,10 +290,10 @@ public abstract class Catalog {
         // shouldn't hold the catalog write lock the entire time. Instead,
         // we could consider making refresh() happen in the background or something
         // similar.
-        LOG.info("Refreshing table metadata: " + db.getName() + "." + tableName);
+        LOG.debug("Refreshing table metadata: " + db.getName() + "." + tableName);
         return db.refreshTable(tableName.getTable_name());
       } else {
-        LOG.info("Invalidating table metadata: " + db.getName() + "." + tableName);
+        LOG.debug("Invalidating table metadata: " + db.getName() + "." + tableName);
         return db.invalidateTable(tableName.getTable_name());
       }
     } finally {
@@ -454,7 +454,7 @@ public abstract class Catalog {
                   try {
                     db.getTable(tableName);
                   } catch (ImpalaException e) {
-                    LOG.info("Error: " + e.getMessage());
+                    LOG.warn("Error: " + e.getMessage());
                   }
                 }
               });

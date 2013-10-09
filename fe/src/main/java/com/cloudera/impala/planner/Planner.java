@@ -99,9 +99,9 @@ public class Planner {
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
 
-    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.debug("desctbl: " + analyzer.getDescTbl().debugString());
     analyzer.computeEquivClasses();
-    LOG.info("create single-node plan");
+    LOG.debug("create single-node plan");
     PlanNode singleNodePlan =
         createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
     Preconditions.checkNotNull(singleNodePlan);
@@ -125,9 +125,9 @@ public class Planner {
       if (analysisResult.isInsertStmt() && !queryStmt.hasLimitClause()) {
         isPartitioned = true;
       }
-      LOG.info("create plan fragments");
+      LOG.debug("create plan fragments");
       long perNodeMemLimit = queryOptions.mem_limit;
-      LOG.info("memlimit=" + Long.toString(perNodeMemLimit));
+      LOG.debug("memlimit=" + Long.toString(perNodeMemLimit));
       createPlanFragments(
           singleNodePlan, analyzer, isPartitioned, perNodeMemLimit, fragments);
     }
@@ -147,7 +147,7 @@ public class Planner {
     }
     rootFragment.setOutputExprs(queryStmt.getResultExprs());
 
-    LOG.info("finalize plan fragments");
+    LOG.debug("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
       fragment.finalize(analyzer, !queryOptions.allow_unsupported_formats);
     }
@@ -401,8 +401,8 @@ public class Planner {
           (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
       broadcastCost = rhsDataSize * leftChildFragment.getNumNodes();
     }
-    LOG.info("broadcast: cost=" + Long.toString(broadcastCost));
-    LOG.info("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+    LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
+    LOG.debug("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
         + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
         + Integer.toString(leftChildFragment.getNumNodes()));
 
@@ -417,12 +417,12 @@ public class Planner {
           (double) lhsTree.getCardinality() * lhsTree.getAvgRowSize()
           + (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
     }
-    LOG.info("partition: cost=" + Long.toString(partitionCost));
-    LOG.info("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
+    LOG.debug("partition: cost=" + Long.toString(partitionCost));
+    LOG.debug("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
         + Float.toString(lhsTree.getAvgRowSize()));
-    LOG.info("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+    LOG.debug("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
         + Float.toString(rhsTree.getAvgRowSize()));
-    LOG.info(rhsTree.getExplainString());
+    LOG.debug(rhsTree.getExplainString());
 
     boolean doBroadcast;
     // we do a broadcast join if
@@ -784,7 +784,7 @@ public class Planner {
     PlanFragment mergeFragment = createMergeFragment(childFragment, analyzer);
     // insert sort node that repeats the child's sort
     SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
-    LOG.info("childsortnode limit: " + Long.toString(childSortNode.getLimit()));
+    LOG.debug("childsortnode limit: " + Long.toString(childSortNode.getLimit()));
     Preconditions.checkState(childSortNode.hasLimit());
     PlanNode exchNode = mergeFragment.getPlanRoot();
     // the merging exchange node must not apply the limit (that's done by the merging

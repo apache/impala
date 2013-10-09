@@ -154,12 +154,12 @@ public class HashJoinNode extends PlanNode {
       if (rhsTbl != null && rhsTbl.getNumRows() != -1) {
         // we can't have more distinct values than rows in the table, even though
         // the metastore stats may think so
-        LOG.info("#distinct=" + numDistinct + " #rows="
+        LOG.debug("#distinct=" + numDistinct + " #rows="
             + Long.toString(rhsTbl.getNumRows()));
         numDistinct = Math.min(numDistinct, rhsTbl.getNumRows());
       }
       maxNumDistinct = Math.max(maxNumDistinct, numDistinct);
-      LOG.info("min slotref=" + rhsSlotRef.toSql() + " #distinct="
+      LOG.debug("min slotref=" + rhsSlotRef.toSql() + " #distinct="
           + Long.toString(numDistinct));
     }
 
@@ -174,7 +174,7 @@ public class HashJoinNode extends PlanNode {
             * (double) getChild(1).cardinality / (double) maxNumDistinct);
     }
     Preconditions.checkState(hasValidStats());
-    LOG.info("stats HashJoin: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats HashJoin: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

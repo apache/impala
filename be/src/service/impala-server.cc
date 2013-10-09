@@ -1703,7 +1703,7 @@ void ImpalaServer::CatalogUpdateCallback(
 void ImpalaServer::WaitForCatalogUpdate(
     const TCatalogUpdateResult& catalog_update_result) {
   int64_t min_req_catalog_version = catalog_update_result.version;
-  LOG(INFO) << "Waiting for catalog version: " << min_req_catalog_version
+  VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
              << " current version: " << current_catalog_version_;
   unique_lock<mutex> unique_lock(catalog_version_lock_);
   // TODO: What about query cancellation?
@@ -1896,7 +1896,8 @@ void ImpalaServer::ConnectionEnd(
   BOOST_FOREACH(const TUniqueId& session_id, it->second) {
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
-      LOG(INFO) << "Error closing session " << session_id << ": " << status.GetErrorMsg();
+      LOG(WARNING) << "Error closing session " << session_id << ": "
+                   << status.GetErrorMsg();
     }
   }
   connection_to_sessions_map_.erase(it);

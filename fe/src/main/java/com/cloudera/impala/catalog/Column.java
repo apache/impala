@@ -71,7 +71,7 @@ public class Column {
 
   public boolean updateStats(ColumnStatisticsData statsData) {
     boolean statsDataCompatibleWithColType = stats.update(type, statsData);
-    LOG.info("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
+    LOG.debug("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
     return statsDataCompatibleWithColType;
   }
 

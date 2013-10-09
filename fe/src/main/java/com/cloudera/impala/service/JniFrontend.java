@@ -108,7 +108,7 @@ public class JniFrontend {
 
     StringBuilder explainString = new StringBuilder();
     TExecRequest result = frontend.createExecRequest(request, explainString);
-    LOG.info(explainString.toString());
+    LOG.debug(explainString.toString());
 
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
@@ -157,7 +157,7 @@ public class JniFrontend {
     TClientRequest request = new TClientRequest();
     JniUtil.deserializeThrift(protocolFactory, request, thriftQueryRequest);
     String plan = frontend.getExplainString(request);
-    LOG.info("Explain plan: " + plan);
+    LOG.debug("Explain plan: " + plan);
     return plan;
   }
 

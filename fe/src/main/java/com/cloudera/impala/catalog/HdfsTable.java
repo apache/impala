@@ -173,7 +173,7 @@ public class HdfsTable extends Table {
    */
   private void loadBlockMd(List<FileDescriptor> fileDescriptors)
       throws RuntimeException {
-    LOG.info("load block md for " + name);
+    LOG.debug("load block md for " + name);
     // Block locations for all the files
     List<BlockLocation> blockLocations = Lists.newArrayList();
 
@@ -244,7 +244,7 @@ public class HdfsTable extends Table {
         FileBlock.setDiskIds(diskIds, blockMd);
       }
     }
-    LOG.info("loaded disk ids for table " + getFullName() + ". nodes: " + getNumNodes());
+    LOG.debug("loaded disk ids for table " + getFullName() + ". nodes: " + getNumNodes());
     if (unknownDiskIdCount > 0) {
       LOG.warn("unknown disk id count " + unknownDiskIdCount);
     }
@@ -476,8 +476,7 @@ public class HdfsTable extends Table {
         ColumnStats stats = colsByPos.get(i).getStats();
         stats.setNumNulls(numNullKeys[i]);
         stats.setNumDistinctValues(uniquePartitionKeys[i].size());
-        // remove
-        LOG.info("#col=" + Integer.toString(i) + " stats=" + stats.toString());
+        LOG.debug("#col=" + Integer.toString(i) + " stats=" + stats.toString());
       }
     }
 
@@ -597,7 +596,7 @@ public class HdfsTable extends Table {
    */
   public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    LOG.info("load table: " + db.getName() + "." + name);
+    LOG.debug("load table: " + db.getName() + "." + name);
     // turn all exceptions into TableLoadingException
     try {
       // set nullPartitionKeyValue from the hive conf.
@@ -645,7 +644,7 @@ public class HdfsTable extends Table {
 
       // load table stats
       numRows = getRowCount(msTbl.getParameters());
-      LOG.info("table #rows=" + Long.toString(numRows));
+      LOG.debug("table #rows=" + Long.toString(numRows));
 
       // populate Avro schema if necessary
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {

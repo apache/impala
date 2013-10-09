@@ -47,7 +47,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   convert_row_batch_timer_ = ADD_TIMER(runtime_profile(), "ConvertRowBatchTime");
-  LOG(INFO) << "Exch id=" << id_ << "\ninput_desc=" << input_row_desc_.DebugString()
+  VLOG_QUERY << "Exch id=" << id_ << "\ninput_desc=" << input_row_desc_.DebugString()
             << "\noutput_desc=" << row_descriptor_.DebugString();
 
   // TODO: figure out appropriate buffer size

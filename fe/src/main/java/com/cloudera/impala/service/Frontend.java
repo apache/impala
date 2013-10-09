@@ -132,10 +132,10 @@ public class Frontend {
           "Table not found: " + dbName + "." + tableName);
     }
     if (isRefresh) {
-      LOG.info("Refreshing table metadata: " + dbName + "." + tableName);
+      LOG.debug("Refreshing table metadata: " + dbName + "." + tableName);
       db.refreshTable(tableName);
     } else {
-      LOG.info("Invalidating table metadata: " + dbName + "." + tableName);
+      LOG.debug("Invalidating table metadata: " + dbName + "." + tableName);
       db.invalidateTable(tableName);
     }
   }
@@ -411,7 +411,7 @@ public class Frontend {
         request.sessionState.database,
         new User(request.sessionState.user));
     AnalysisContext.AnalysisResult analysisResult = null;
-    LOG.info("analyze query " + request.stmt);
+    LOG.debug("analyze query " + request.stmt);
     analysisResult = analysisCtxt.analyze(request.stmt);
 
     Preconditions.checkNotNull(analysisResult.getStmt());
@@ -440,7 +440,7 @@ public class Frontend {
 
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     // create plan
-    LOG.info("create plan");
+    LOG.debug("create plan");
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
@@ -477,7 +477,7 @@ public class Frontend {
     }
 
     // set scan ranges/locations for scan nodes
-    LOG.info("get scan range locations");
+    LOG.debug("get scan range locations");
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
@@ -490,7 +490,7 @@ public class Frontend {
 
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata
-      LOG.info("create result set metadata");
+      LOG.debug("create result set metadata");
       result.stmt_type = TStmtType.QUERY;
       result.query_exec_request.stmt_type = result.stmt_type;
       TResultSetMetadata metadata = new TResultSetMetadata();
@@ -570,14 +570,14 @@ public class Frontend {
       case GET_TABLES:
       {
         TGetTablesReq req = request.getGet_tables_req();
-        return MetadataOp.getTables(impaladCatalog_, req.getCatalogName(), req.getSchemaName(),
-            req.getTableName(), req.getTableTypes(), user);
+        return MetadataOp.getTables(impaladCatalog_, req.getCatalogName(),
+            req.getSchemaName(), req.getTableName(), req.getTableTypes(), user);
       }
       case GET_COLUMNS:
       {
         TGetColumnsReq req = request.getGet_columns_req();
-        return MetadataOp.getColumns(impaladCatalog_, req.getCatalogName(), req.getSchemaName(),
-            req.getTableName(), req.getColumnName(), user);
+        return MetadataOp.getColumns(impaladCatalog_, req.getCatalogName(),
+            req.getSchemaName(), req.getTableName(), req.getColumnName(), user);
       }
       case GET_CATALOGS: return MetadataOp.getCatalogs();
       case GET_TABLE_TYPES: return MetadataOp.getTableTypes();

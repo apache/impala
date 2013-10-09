@@ -90,7 +90,7 @@ public class SortNode extends PlanNode {
         cardinality = Math.min(cardinality, limit);
       }
     }
-    LOG.info("stats Sort: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality));
   }
 
   @Override

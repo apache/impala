@@ -91,7 +91,7 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(keyFilters);
     super.finalize(analyzer);
 
-    LOG.info("collecting partitions for table " + tbl.getName());
+    LOG.debug("collecting partitions for table " + tbl.getName());
     if (tbl.getPartitions().isEmpty()) {
       cardinality = tbl.getNumRows();
     } else {
@@ -138,14 +138,15 @@ public class HdfsScanNode extends ScanNode {
 
     Preconditions.checkState(cardinality >= 0 || cardinality == -1);
     if (cardinality > 0) {
-      LOG.info("cardinality=" + Long.toString(cardinality) + " sel=" + Double.toString(computeSelectivity()));
+      LOG.debug("cardinality=" + Long.toString(cardinality) +
+                " sel=" + Double.toString(computeSelectivity()));
       cardinality = Math.round((double) cardinality * computeSelectivity());
     }
-    LOG.info("finalize HdfsScan: cardinality=" + Long.toString(cardinality));
+    LOG.debug("finalize HdfsScan: cardinality=" + Long.toString(cardinality));
 
     // TODO: take actual partitions into account
     numNodes = tbl.getNumNodes();
-    LOG.info("finalize HdfsScan: #nodes=" + Integer.toString(numNodes));
+    LOG.debug("finalize HdfsScan: #nodes=" + Integer.toString(numNodes));
   }
 
   @Override

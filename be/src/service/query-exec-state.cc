@@ -471,7 +471,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
           FLAGS_catalog_service_port, ThriftServer::ThreadPool);
       RETURN_IF_ERROR(client.Open());
 
-      LOG(INFO) << "Executing FinalizeDml() using CatalogService";
+      VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateMetastoreResponse resp;
       client.iface()->UpdateMetastore(resp, catalog_update);
       Status status(resp.result.status);
@@ -530,7 +530,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   }
   stringstream ss;
   ss << "Inserted " << total_num_rows_inserted << " row(s)";
-  LOG(INFO) << ss.str();
+  VLOG_QUERY << ss.str();
   vector<string> results(1, ss.str());
   SetResultSet(results);
 }

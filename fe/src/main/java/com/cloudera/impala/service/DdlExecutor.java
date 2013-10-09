@@ -266,7 +266,7 @@ public class DdlExecutor {
 
       // Set the altered view attributes and update the metastore.
       setViewAttributes(params, msTbl);
-      LOG.info(String.format("Altering view %s", tableName));
+      LOG.debug(String.format("Altering view %s", tableName));
       applyAlterTable(msTbl);
     }
     resp.result.setVersion(catalog.resetTable(tableName.toThrift(), true));
@@ -292,7 +292,7 @@ public class DdlExecutor {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
     if (params.if_not_exists && catalog.getDb(dbName) != null) {
-      LOG.info("Skipping database creation because " + dbName + " already exists and " +
+      LOG.debug("Skipping database creation because " + dbName + " already exists and " +
           "IF NOT EXISTS was specified.");
       resp.getResult().setVersion(Catalog.getCatalogVersion());
       return;
@@ -306,7 +306,7 @@ public class DdlExecutor {
     if (params.getLocation() != null) {
       db.setLocationUri(params.getLocation());
     }
-    LOG.info("Creating database " + dbName);
+    LOG.debug("Creating database " + dbName);
     synchronized (metastoreDdlLock) {
       MetaStoreClient msClient = catalog.getMetaStoreClient();
       try {
@@ -315,7 +315,7 @@ public class DdlExecutor {
         if (!params.if_not_exists) {
           throw e;
         }
-        LOG.info(String.format("Ignoring '%s' when creating database %s because " +
+        LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
             "IF NOT EXISTS was specified.", e, dbName));
       } finally {
         msClient.release();
@@ -327,7 +327,7 @@ public class DdlExecutor {
   private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException, MetaException, AlreadyExistsException {
     Function fn = Function.fromThrift(params.getFn());
-    LOG.info(String.format("Adding %s: %s",
+    LOG.debug(String.format("Adding %s: %s",
         fn.getClass().getSimpleName(), fn.signatureString()));
     boolean added = catalog.addFunction(fn);
     if (!added && !params.if_not_exists) {
@@ -352,7 +352,7 @@ public class DdlExecutor {
     Preconditions.checkState(params.getDb() != null && !params.getDb().isEmpty(),
         "Null or empty database name passed as argument to Catalog.dropDatabase");
 
-    LOG.info("Dropping database " + params.getDb());
+    LOG.debug("Dropping database " + params.getDb());
     Db db = catalog.getDb(params.db);
     if (db != null && db.numFunctions() > 0) {
       throw new InvalidObjectException("Database " + db.getName() + " is not empty");
@@ -377,7 +377,7 @@ public class DdlExecutor {
       org.apache.thrift.TException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    LOG.info(String.format("Dropping table/view %s", tableName));
+    LOG.debug(String.format("Dropping table/view %s", tableName));
     synchronized (metastoreDdlLock) {
       MetaStoreClient msClient = catalog.getMetaStoreClient();
       try {
@@ -398,7 +398,7 @@ public class DdlExecutor {
     }
     Function desc = new Function(new FunctionName(params.fn_name),
         argTypes, PrimitiveType.INVALID_TYPE, false);
-    LOG.info(String.format("Dropping UDF %s", desc.signatureString()));
+    LOG.debug(String.format("Dropping UDF %s", desc.signatureString()));
     long version = catalog.removeFunction(desc);
     if (version == Catalog.INITIAL_CATALOG_VERSION) {
       if (!params.if_exists) {
@@ -446,14 +446,14 @@ public class DdlExecutor {
 
     if (params.if_not_exists &&
         catalog.containsTable(tableName.getDb(), tableName.getTbl())) {
-      LOG.info(String.format("Skipping table creation because %s already exists and " +
+      LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
       response.getResult().setVersion(Catalog.getCatalogVersion());
       return false;
     }
     org.apache.hadoop.hive.metastore.api.Table tbl =
         createMetaStoreTable(params);
-    LOG.info(String.format("Creating table %s", tableName));
+    LOG.debug(String.format("Creating table %s", tableName));
     return createTable(tbl, params.if_not_exists, response);
   }
 
@@ -472,7 +472,7 @@ public class DdlExecutor {
           "Null or empty column list given as argument to DdlExecutor.createView");
     if (params.if_not_exists &&
         catalog.containsTable(tableName.getDb(), tableName.getTbl())) {
-      LOG.info(String.format("Skipping view creation because %s already exists and " +
+      LOG.debug(String.format("Skipping view creation because %s already exists and " +
           "ifNotExists is true.", tableName));
     }
 
@@ -480,7 +480,7 @@ public class DdlExecutor {
     org.apache.hadoop.hive.metastore.api.Table view =
         new org.apache.hadoop.hive.metastore.api.Table();
     setViewAttributes(params, view);
-    LOG.info(String.format("Creating view %s", tableName));
+    LOG.debug(String.format("Creating view %s", tableName));
     createTable(view, params.if_not_exists, response);
   }
 
@@ -519,7 +519,7 @@ public class DdlExecutor {
 
     if (params.if_not_exists &&
         catalog.containsTable(tblName.getDb(), tblName.getTbl())) {
-      LOG.info(String.format("Skipping table creation because %s already exists and " +
+      LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
       response.getResult().setVersion(Catalog.getCatalogVersion());
       return;
@@ -553,7 +553,7 @@ public class DdlExecutor {
     if (fileFormat != null) {
       setStorageDescriptorFileFormat(tbl.getSd(), fileFormat);
     }
-    LOG.info(String.format("Creating table %s LIKE %s", tblName, srcTblName));
+    LOG.debug(String.format("Creating table %s LIKE %s", tblName, srcTblName));
     createTable(tbl, params.if_not_exists, response);
   }
 
@@ -569,7 +569,7 @@ public class DdlExecutor {
         if (!ifNotExists) {
           throw e;
         }
-        LOG.info(String.format("Ignoring '%s' when creating table %s.%s because " +
+        LOG.debug(String.format("Ignoring '%s' when creating table %s.%s because " +
             "IF NOT EXISTS was specified.", e,
             newTable.getDbName(), newTable.getTableName()));
         return false;
@@ -674,7 +674,7 @@ public class DdlExecutor {
         new org.apache.hadoop.hive.metastore.api.Partition();
     if (ifNotExists && catalog.containsHdfsPartition(tableName.getDb(),
         tableName.getTbl(), partitionSpec)) {
-      LOG.info(String.format("Skipping partition creation because (%s) already exists " +
+      LOG.debug(String.format("Skipping partition creation because (%s) already exists " +
           "and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
       return;
     }
@@ -705,7 +705,7 @@ public class DdlExecutor {
         if (!ifNotExists) {
           throw e;
         }
-        LOG.info(String.format("Ignoring '%s' when adding partition to %s because" +
+        LOG.debug(String.format("Ignoring '%s' when adding partition to %s because" +
             " ifNotExists is true.", e, tableName));
       } finally {
         msClient.release();
@@ -723,7 +723,7 @@ public class DdlExecutor {
 
     if (ifExists && !catalog.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
         partitionSpec)) {
-      LOG.info(String.format("Skipping partition drop because (%s) does not exist " +
+      LOG.debug(String.format("Skipping partition drop because (%s) does not exist " +
           "and ifExists is true.", Joiner.on(", ").join(partitionSpec)));
       return;
     }
@@ -748,7 +748,7 @@ public class DdlExecutor {
         if (!ifExists) {
           throw e;
         }
-        LOG.info(String.format("Ignoring '%s' when dropping partition from %s because" +
+        LOG.debug(String.format("Ignoring '%s' when dropping partition from %s because" +
             " ifExists is true.", e, tableName));
       } finally {
         msClient.release();
@@ -1079,12 +1079,12 @@ public class DdlExecutor {
       if (allFinished_.isDone()) return;
       MetaStoreClient msClient = catalog.getMetaStoreClient();
       try {
-        LOG.info("Creating partition: " + partName_ + " in table: " + tblName_);
+        LOG.debug("Creating partition: " + partName_ + " in table: " + tblName_);
         msClient.getHiveClient().appendPartitionByName(tblName_.getDb(),
             tblName_.getTbl(), partName_);
         partitionCreated_.set(true);
       } catch (AlreadyExistsException e) {
-        LOG.info("Ignoring partition " + partName_ + ", since it already exists");
+        LOG.debug("Ignoring partition " + partName_ + ", since it already exists");
         // Ignore since partition already exists.
       } catch (Exception e) {
         allFinished_.setException(e);

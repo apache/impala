@@ -287,7 +287,7 @@ public class Analyzer {
     for (TupleId tid: tids) {
       outerJoinedTupleIds.put(tid, rhsRef);
     }
-    //LOG.info("outerJoinedTids: " + outerJoinedTupleIds.toString());
+    LOG.debug(conjunctsByOjClause.toString());
   }
 
   /**
@@ -438,7 +438,6 @@ public class Analyzer {
       if (rhsRef != null) {
         ojClauseByConjunct.put(conjunct.getId(), rhsRef);
         ojConjuncts.add(conjunct.getId());
-        //LOG.info(conjunctsByOjClause.toString());
       }
       if (fromWhereClause) {
         whereClauseConjuncts.add(conjunct.getId());
@@ -504,7 +503,7 @@ public class Analyzer {
           eqJoinConjuncts.get(lhsTupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
-        LOG.info("register: " + Integer.toString(e.getId().asInt()) + " " + e.toSql());
+        LOG.trace("register: " + Integer.toString(e.getId().asInt()) + " " + e.toSql());
       }
     }
   }
@@ -629,7 +628,7 @@ public class Analyzer {
     // TODO: fix this with a complete rewrite of how inline views are handled
     for (Collection<ExprId> ids: eqJoinConjuncts.values()) {
       for (ExprId id: ids) {
-        LOG.info("check id " + Integer.toString(id.asInt()));
+        LOG.trace("check id " + Integer.toString(id.asInt()));
         if (!analyzedIds.add(id)) continue;
 
         Predicate p = (Predicate) conjuncts.get(id);
@@ -696,7 +695,7 @@ public class Analyzer {
         if (i != j && valueTransfer[i][j]) strings.add(Integer.toString(j));
       }
       if (!strings.isEmpty()) {
-        LOG.info("transfer from " + Integer.toString(i) + " to: "
+        LOG.trace("transfer from " + Integer.toString(i) + " to: "
             + Joiner.on(" ").join(strings));
       }
     }
@@ -764,7 +763,7 @@ public class Analyzer {
       for (SlotId slotId: members) {
         strings.add(slotId.toString());
       }
-      LOG.info("equiv class: id=" + id.toString() + " members=("
+      LOG.trace("equiv class: id=" + id.toString() + " members=("
           + Joiner.on(" ").join(strings) + ")");
     }
   }
@@ -776,8 +775,7 @@ public class Analyzer {
   public void getEquivSlots(SlotId slotId, List<TupleId> tupleIds,
       List<SlotId> equivSlotIds) {
     equivSlotIds.clear();
-    // TODO: remove
-    LOG.info("getequivslots: slotid=" + Integer.toString(slotId.asInt()));
+    LOG.trace("getequivslots: slotid=" + Integer.toString(slotId.asInt()));
     EquivalenceClassId classId = equivClassBySlotId.get(slotId);
     for (SlotId memberId: equivClassMembers.get(classId)) {
       if (tupleIds.contains(descTbl.getSlotDesc(memberId).getParent().getId())) {
