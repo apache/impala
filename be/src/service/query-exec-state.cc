@@ -256,13 +256,17 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
       exec_request_.query_options, is_mini_llama));
   coord_.reset(new Coordinator(exec_env_));
-  RETURN_IF_ERROR(exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get()));
+  Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(UpdateQueryStatus(status));
+  }
   if (FLAGS_enable_rm) {
     // Add the Yarn Pool and the reservation wait time to the query's runtime profile.
     summary_profile_.AddInfoString("Yarn Pool", schedule_->yarn_pool());
     query_events_->MarkEvent("Resources reserved");
   }
-  Status status = coord_->Exec(*schedule_,  &output_exprs_);
+  status = coord_->Exec(*schedule_,  &output_exprs_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));

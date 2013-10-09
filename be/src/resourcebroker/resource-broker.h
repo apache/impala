@@ -194,9 +194,6 @@ class ResourceBroker {
   // fulfilled or rejected by the Llama. The original resource requester (the scheduler)
   // blocks on the promise.
   boost::unordered_map<llama::TUniqueId, ReservationPromise*> pending_requests_;
-
-  // Max time in milliseconds to wait for a resource request to be fulfilled by Llama.
-  static const int64_t DEFAULT_REQUEST_TIMEOUT = 60000;
 };
 
 std::ostream& operator<<(std::ostream& os,

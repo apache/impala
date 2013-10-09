@@ -33,6 +33,10 @@ using namespace impala;
 
 namespace impala {
 
+// Default value for the request_timeout in a reservation request. The timeout is the
+// max time in milliseconds to wait for a resource request to be fulfilled by Llama.
+const int64_t DEFAULT_REQUEST_TIMEOUT = 60000;
+
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     const TQueryExecRequest& request, const TQueryOptions& query_options,
     bool is_mini_llama)
@@ -112,6 +116,13 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
   } else if (request_.__isset.per_host_vcores) {
     v_cpu_cores = request_.per_host_vcores;
   }
+
+  // Set the reservation timeout from the query options or use a default.
+  int64_t timeout = DEFAULT_REQUEST_TIMEOUT;
+  if (query_options_.__isset.reservation_request_timeout) {
+    timeout = query_options_.reservation_request_timeout;
+  }
+  reservation_request->__set_request_timeout(timeout);
 
   // The memory_mb and v_cpu_cores estimates may legitimately be zero,
   // e.g., for constant selects. Do not reserve any resources in those cases.

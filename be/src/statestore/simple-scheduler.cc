@@ -776,7 +776,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
 }
 
 Status SimpleScheduler::Release(QuerySchedule* schedule) {
-  if (FLAGS_enable_rm && schedule->HasReservation()) {
+  if (FLAGS_enable_rm && schedule->NeedsRelease()) {
     DCHECK(resource_broker_ != NULL);
     TResourceBrokerReleaseRequest request;
     TResourceBrokerReleaseResponse response;

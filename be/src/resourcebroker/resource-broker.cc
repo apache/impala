@@ -238,7 +238,9 @@ void ResourceBroker::ReservationPromise::FillReservation(
     VLOG_QUERY << "Getting allocated resource for reservation id "
                << reservation_id << " and location " << host;
   }
-  reservation_->reservation_id << reservation_id;
+  TUniqueId id;
+  id << reservation_id;
+  reservation_->__set_reservation_id(id);
 }
 
 Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
@@ -298,10 +300,9 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
     pending_requests_[llama_response.reservation_id] = &reservation_promise;
   }
 
-  int64_t timeout = DEFAULT_REQUEST_TIMEOUT;
-  if (request.__isset.request_timeout) timeout = request.request_timeout;
+  DCHECK(request.__isset.request_timeout);
   bool timed_out = false;
-  bool request_granted = reservation_promise.Get(timeout, &timed_out);
+  bool request_granted = reservation_promise.Get(request.request_timeout, &timed_out);
 
   // Remove the promise from the pending-requests map.
   {
@@ -313,8 +314,15 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
     request_response_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   }
   if (timed_out) {
+    // Set the reservation_id to release it from Llama.
+    TUniqueId reservation_id;
+    reservation_id << llama_response.reservation_id;
+    response->__set_reservation_id(reservation_id);
     requests_timedout_metric_->Increment(1);
-    return Status("Resource reservation request timed out.");
+    stringstream error_msg;
+    error_msg << "Resource reservation request exceeded timeout of "
+              << request.request_timeout << "ms.";
+    return Status(error_msg.str());
   }
   if (!request_granted) {
     requests_rejected_metric_->Increment(1);

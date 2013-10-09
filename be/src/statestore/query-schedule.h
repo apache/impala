@@ -86,6 +86,10 @@ class QuerySchedule {
   const std::string& yarn_pool() { return yarn_pool_; }
   bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
 
+  // Granted or timed out reservations need to be released. In both such cases,
+  // the reservation_'s reservation_id is set.
+  bool NeedsRelease() const { return reservation_.__isset.reservation_id; }
+
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
   void SetNumBackends(int64_t num_backends) { num_backends_ = num_backends; }
