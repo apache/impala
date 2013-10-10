@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.Path;
@@ -81,7 +82,17 @@ public class ImpaladCatalog extends Catalog {
   // Lock used to synchronize refreshing the AuthorizationChecker.
   private final ReentrantReadWriteLock authzCheckerLock_ = new ReentrantReadWriteLock();
   private AuthorizationChecker authzChecker_;
+  // Flag to determine if the Catalog is ready to accept user requests. See isReady().
+  private final AtomicBoolean isReady_ = new AtomicBoolean(false);
 
+  public ImpaladCatalog(AuthorizationConfig authzConfig) {
+    this(CatalogInitStrategy.EMPTY, authzConfig);
+  }
+
+  /**
+   * C'tor used by tests that need to validate the ImpaladCatalog outside of the
+   * CatalogServer.
+   */
   public ImpaladCatalog(CatalogInitStrategy loadStrategy,
       AuthorizationConfig authzConfig) {
     super(loadStrategy);
@@ -97,6 +108,7 @@ public class ImpaladCatalog extends Catalog {
           new AuthorizationPolicyReader(authzConfig),
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
     }
+    if (loadStrategy != CatalogInitStrategy.EMPTY) isReady_.set(true);
   }
 
   private class AuthorizationPolicyReader implements Runnable {
@@ -213,6 +225,7 @@ public class ImpaladCatalog extends Catalog {
                 "Unexpected TCatalogObjectType: " + catalogObject.getType());
         }
       }
+      isReady_.set(true);
     } finally {
       catalogLock_.writeLock().unlock();
     }
@@ -419,4 +432,11 @@ public class ImpaladCatalog extends Catalog {
       if (db.removeFunction(thriftUdf.getSignature())) return;
     }
   }
+
+  /**
+   * Returns true if the ImpaladCatalog is ready to accept requests (has
+   * received and processed a valid catalog topic update from the StateStore),
+   * false otherwise.
+   */
+  public boolean isReady() { return isReady_.get(); }
 }

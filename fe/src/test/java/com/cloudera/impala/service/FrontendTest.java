@@ -4,6 +4,7 @@ package com.cloudera.impala.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.List;
 
@@ -19,11 +20,15 @@ import org.junit.Test;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TMetadataOpcode;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.collect.Lists;
 
 /**
@@ -35,13 +40,37 @@ import com.google.common.collect.Lists;
  *
  */
 public class FrontendTest {
-  private static Frontend fe = new Frontend(Catalog.CatalogInitStrategy.LAZY,
+  private static Frontend fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
       AuthorizationConfig.createAuthDisabledConfig());
 
   @BeforeClass
   public static void setUp() throws Exception {
-    fe = new Frontend(Catalog.CatalogInitStrategy.LAZY,
+    fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
         AuthorizationConfig.createAuthDisabledConfig());
+  }
+
+  @Test
+  public void TestCatalogNotReady() throws ImpalaException {
+    Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig());
+    TClientRequest request = new TClientRequest();
+    request.setSessionState(new TSessionState());
+    request.getSessionState().setUser("fake_user");
+    request.getSessionState().setDatabase("default");
+    request.setQueryOptions(new TQueryOptions());
+
+    // Queries that do not touch catalog objects should succeed.
+    request.setStmt("select 1");
+    fe.createExecRequest(request, new StringBuilder());
+
+    // A query that touches a catalog object should fail.
+    request.setStmt("show tables");
+    try {
+      fe.createExecRequest(request, new StringBuilder());
+      fail("Expected failure to due uninitialized catalog.");
+    } catch (AnalysisException e) {
+      assertEquals("This Impala daemon is not ready to accept user requests. " +
+          "Status: Waiting for catalog update from the StateStore.", e.getMessage());
+    }
   }
 
   @Test
@@ -166,6 +195,6 @@ public class FrontendTest {
 
   private TMetadataOpResponse execMetadataOp(TMetadataOpRequest req)
       throws ImpalaException {
-    return fe.execHiveServer2MetadataOp(req);
+    return fe_.execHiveServer2MetadataOp(req);
   }
 }

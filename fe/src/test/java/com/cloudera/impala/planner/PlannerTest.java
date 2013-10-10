@@ -18,8 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -148,7 +148,7 @@ public class PlannerTest {
    * of 'testCase'.
    */
   private void RunTestCase(TestCase testCase, TQueryOptions options,
-      StringBuilder errorLog, StringBuilder actualOutput) throws AuthorizationException {
+      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
 
@@ -256,7 +256,7 @@ public class PlannerTest {
   }
 
   private void runPlannerTestFile(String testFile, TQueryOptions options)
-      throws AuthorizationException {
+      throws CatalogException {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -293,8 +293,8 @@ public class PlannerTest {
     options.allow_unsupported_formats = true;
     try {
       runPlannerTestFile(testFile, options);
-    } catch (AuthorizationException e) {
-      fail("Authorization error: " + e.getMessage());
+    } catch (Exception e) {
+      fail("Error: " + e.getMessage());
     }
   }
 

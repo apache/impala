@@ -48,11 +48,9 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
-import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
@@ -109,36 +107,11 @@ public class Frontend {
   // C'tor used by some tests.
   public Frontend(Catalog.CatalogInitStrategy initStrategy,
       AuthorizationConfig authorizationConfig) {
-    this.authzConfig_ = authorizationConfig;
-    this.impaladCatalog_ = new ImpaladCatalog(initStrategy, authzConfig_);
+    authzConfig_ = authorizationConfig;
+    impaladCatalog_ = new ImpaladCatalog(initStrategy, authzConfig_);
   }
 
   public ImpaladCatalog getCatalog() { return impaladCatalog_; }
-
-  /**
-   * If isRefresh is false, invalidates a specific table's metadata, forcing the
-   * metadata to be reloaded on the next access.
-   * If isRefresh is true, performs an immediate incremental refresh.
-   */
-  private void resetTable(String dbName, String tableName, boolean isRefresh)
-      throws CatalogException {
-    Db db = impaladCatalog_.getDb(dbName, ImpalaInternalAdminUser.getInstance(),
-        Privilege.ANY);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database not found: " + dbName);
-    }
-    if (!db.containsTable(tableName)) {
-      throw new TableNotFoundException(
-          "Table not found: " + dbName + "." + tableName);
-    }
-    if (isRefresh) {
-      LOG.debug("Refreshing table metadata: " + dbName + "." + tableName);
-      db.refreshTable(tableName);
-    } else {
-      LOG.debug("Invalidating table metadata: " + dbName + "." + tableName);
-      db.invalidateTable(tableName);
-    }
-  }
 
   public TInternalCatalogUpdateResponse updateInternalCatalog(
       TInternalCatalogUpdateRequest req) throws CatalogException {
@@ -305,8 +278,8 @@ public class Frontend {
     // this the partition location. Otherwise this is the table location.
     String destPathString = null;
     if (request.isSetPartition_spec()) {
-      destPathString = impaladCatalog_.getHdfsPartition(tableName.getDb(), tableName.getTbl(),
-          request.getPartition_spec()).getLocation();
+      destPathString = impaladCatalog_.getHdfsPartition(tableName.getDb(),
+          tableName.getTbl(), request.getPartition_spec()).getLocation();
     } else {
       destPathString = impaladCatalog_.getTable(tableName.getDb(), tableName.getTbl(),
           ImpalaInternalAdminUser.getInstance(), Privilege.INSERT)
@@ -379,7 +352,6 @@ public class Frontend {
   /**
    * Returns all function signatures that match the pattern. If pattern is null,
    * matches all functions.
-   * @throws DatabaseNotFoundException
    */
   public List<String> getFunctions(TFunctionType type, String dbName, String fnPattern)
       throws DatabaseNotFoundException {
@@ -405,8 +377,8 @@ public class Frontend {
    */
   public TExecRequest createExecRequest(
       TClientRequest request, StringBuilder explainString) throws
-      AnalysisException, AuthorizationException, NotImplementedException,
-      InternalException {
+      AnalysisException, NotImplementedException,
+      InternalException, AuthorizationException {
     AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_,
         request.sessionState.database,
         new User(request.sessionState.user));

@@ -571,7 +571,11 @@ public class Analyzer {
     return descTbl;
   }
 
-  public ImpaladCatalog getCatalog() {
+  public ImpaladCatalog getCatalog() throws AnalysisException {
+    if (!catalog.isReady()) {
+      throw new AnalysisException("This Impala daemon is not ready to accept user " +
+          "requests. Status: Waiting for catalog update from the StateStore.");
+    }
     return catalog;
   }
 
@@ -900,7 +904,7 @@ public class Analyzer {
    * catalog access was successful. If false, no accessEvent will be added.
    */
   public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException, AuthorizationException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     Table table = null;
@@ -909,8 +913,8 @@ public class Analyzer {
     // This may trigger a metadata load, in which case we want to return the errors as
     // AnalysisExceptions.
     try {
-      table =
-          catalog.getTable(tableName.getDb(), tableName.getTbl(), getUser(), privilege);
+      table = getCatalog().getTable(tableName.getDb(),
+          tableName.getTbl(), getUser(), privilege);
       if (addAccessEvent) {
         // Add an audit event for this access
         TCatalogObjectType objectType = TCatalogObjectType.TABLE;
@@ -957,7 +961,7 @@ public class Analyzer {
    */
   public Db getDb(String dbName, Privilege privilege)
       throws AnalysisException, AuthorizationException {
-    Db db = catalog.getDb(dbName, getUser(), privilege);
+    Db db = getCatalog().getDb(dbName, getUser(), privilege);
     if (db == null) throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     accessEvents.add(new TAccessEvent(
         dbName, TCatalogObjectType.DATABASE, privilege.toString()));
@@ -975,7 +979,7 @@ public class Analyzer {
   public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
       throws AuthorizationException, AnalysisException {
     try {
-      return catalog.dbContainsTable(dbName, tableName, getUser(), privilege);
+      return getCatalog().dbContainsTable(dbName, tableName, getUser(), privilege);
     } catch (DatabaseNotFoundException e) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
