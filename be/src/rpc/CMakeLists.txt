@@ -26,5 +26,4 @@ add_library(Rpc
 )
 
 ADD_BE_TEST(thrift-util-test)
-# TODO: The thrift-server-test is disabled due to IMPALA-606
-# ADD_BE_TEST(thrift-server-test)
+ADD_BE_TEST(thrift-server-test)

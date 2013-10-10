@@ -42,9 +42,11 @@ TEST(SslTest, Connectivity) {
   server_key << impala_home << "/be/src/testutil/server-key.pem";
   FLAGS_ssl_private_key = server_key.str();
 
-  InProcessImpalaServer impala("localhost", FLAGS_be_port, 0, 0, "", 0);
+  // TODO: Revert to stack-allocated when IMPALA-618 is fixed.
+  InProcessImpalaServer* impala =
+      new InProcessImpalaServer("localhost", FLAGS_be_port, 0, 0, "", 0);
   EXIT_IF_ERROR(
-      impala.StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1, false));
+      impala->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1, false));
 
   ThriftClient<ImpalaServiceClient> ssl_client("localhost", FLAGS_beeswax_port, true);
   EXPECT_TRUE(ssl_client.Open().ok());
