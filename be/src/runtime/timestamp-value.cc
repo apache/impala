@@ -24,6 +24,8 @@ using namespace boost::gregorian;
 
 namespace impala {
   
+const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
+
 const double TimestampValue::FRACTIONAL = 0.000000001;
 
 time_t to_time_t(ptime t) {

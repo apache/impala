@@ -503,7 +503,8 @@ class LlvmCodeGen {
   // llvm representation of a few common types.  Owned by context.
   llvm::PointerType* ptr_type_;             // int8_t*
   llvm::Type* void_type_;                   // void
-  llvm::Type* string_val_type_;             // StringVal
+  llvm::Type* string_val_type_;             // StringValue
+  llvm::Type* timestamp_val_type_;          // TimestampValue
 
   // llvm constants to help with code gen verbosity
   llvm::Value* true_value_;

@@ -204,6 +204,8 @@ class  TimestampValue {
     return v;
   }
 
+  static const char* LLVM_CLASS_NAME;
+
  private:
   friend class UnusedClass;
 

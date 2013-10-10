@@ -22,6 +22,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 add_library(Exprs
   agg-fn-evaluator.cc
   aggregate-functions.cc
+  anyval-util.cc
   arithmetic-expr.cc
   binary-predicate.cc
   bool-literal.cc
@@ -50,7 +51,6 @@ add_library(Exprs
   tuple-is-null-predicate.cc
   native-udf-expr.cc
   udf-builtins.cc
-  udf-util.cc
   utility-functions.cc
 )
 

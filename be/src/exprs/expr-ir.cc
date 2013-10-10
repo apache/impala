@@ -29,7 +29,8 @@ void* IrExprGetValue(Expr* expr, TupleRow* row) {
 // (e.g. IntVal={bool, i32} can be coerced to i64).
 void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::TinyIntVal*,
            impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
-           impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*) { }
+           impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
+           impala_udf::TimestampVal*) { }
 
 #else
 #error "This file should only be compiled by clang."

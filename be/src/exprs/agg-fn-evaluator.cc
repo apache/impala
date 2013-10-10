@@ -20,7 +20,7 @@
 #include "common/logging.h"
 #include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
-#include "exprs/udf-util.h"
+#include "exprs/anyval-util.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"

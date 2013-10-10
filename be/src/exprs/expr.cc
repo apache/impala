@@ -18,6 +18,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
+#include "exprs/anyval-util.h"
 #include "exprs/arithmetic-expr.h"
 #include "exprs/binary-predicate.h"
 #include "exprs/bool-literal.h"
@@ -38,7 +39,6 @@
 #include "exprs/timestamp-literal.h"
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/native-udf-expr.h"
-#include "exprs/udf-util.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Data_types.h"
 #include "runtime/runtime-state.h"
@@ -917,19 +917,7 @@ Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
 
   // else set result.val
   builder.SetInsertPoint(non_null_block);
-  Value* val_ptr =
-      builder.CreateBitCast(raw_result, codegen->GetPtrType(type()), "val_ptr");
-  if (type() == TYPE_STRING) {
-    Value* ptr_ptr = builder.CreateStructGEP(val_ptr, 0, "ptr_ptr");
-    Value* ptr = builder.CreateLoad(ptr_ptr, "ptr");
-    result.SetPtr(ptr);
-    Value* len_ptr = builder.CreateStructGEP(val_ptr, 1, "len_ptr");
-    Value* len = builder.CreateLoad(len_ptr, "len");
-    result.SetLen(len);
-  } else {
-    Value* val = builder.CreateLoad(val_ptr, "val");
-    result.SetVal(val);
-  }
+  result.SetFromRawPtr(raw_result);
   builder.CreateRet(result.value());
 
   *fn = codegen->FinalizeFunction(*fn);

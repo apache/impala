@@ -35,6 +35,8 @@ DoubleVal Identity(FunctionContext* context, const DoubleVal& arg) { return arg;
 
 StringVal Identity(FunctionContext* context, const StringVal& arg) { return arg; }
 
+TimestampVal Identity(FunctionContext* context, const TimestampVal& arg) { return arg; }
+
 IntVal AllTypes(
     FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
@@ -84,3 +86,6 @@ IntVal Fn(FunctionContext*, const StringVal&, const IntVal&) { return IntVal::nu
 IntVal Fn2(FunctionContext*, const IntVal&) { return IntVal::null(); }
 IntVal Fn2(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::null(); }
 
+TimestampVal ConstantTimestamp(FunctionContext* context) {
+  return TimestampVal(2456575, 1); // 2013-10-09 00:00:00.000000001
+}

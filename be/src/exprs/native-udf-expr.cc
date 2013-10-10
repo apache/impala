@@ -18,8 +18,8 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include "codegen/llvm-codegen.h"
+#include "exprs/anyval-util.h"
 #include "exprs/opcode-registry.h"
-#include "exprs/udf-util.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
@@ -54,6 +54,7 @@ typedef BigIntVal (*BigIntUdfWrapper)(int8_t*, TupleRow*);
 typedef FloatVal (*FloatUdfWrapper)(int8_t*, TupleRow*);
 typedef DoubleVal (*DoubleUdfWrapper)(int8_t*, TupleRow*);
 typedef StringVal (*StringUdfWrapper)(int8_t*, TupleRow*);
+typedef TimestampVal (*TimestampUdfWrapper)(int8_t*, TupleRow*);
 
 void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
   NativeUdfExpr* udf_expr = reinterpret_cast<NativeUdfExpr*>(e);
@@ -127,7 +128,14 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
       e->result_.string_val.len = v.len;
       return &e->result_.string_val;
     }
-    case TYPE_TIMESTAMP: // TODO
+    case TYPE_TIMESTAMP: {
+      TimestampUdfWrapper fn =
+          reinterpret_cast<TimestampUdfWrapper>(udf_expr->udf_wrapper_);
+      TimestampVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
+      e->result_.timestamp_val = TimestampValue::FromTimestampVal(v);
+      return &e->result_.timestamp_val;
+    }
     default:
       DCHECK(false) << "Type not implemented: " << e->type();
   }

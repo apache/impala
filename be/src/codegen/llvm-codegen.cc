@@ -176,7 +176,8 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   // Get type for StringValue
   codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
 
-  // TODO: get type for Timestamp
+  // Get type for TimestampValue
+  codegen->timestamp_val_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
 
   // Verify size is correct
   const DataLayout* data_layout = codegen->execution_engine()->getDataLayout();
@@ -309,8 +310,10 @@ Type* LlvmCodeGen::GetType(PrimitiveType type) {
       return Type::getDoubleTy(context());
     case TYPE_STRING:
       return string_val_type_;
+    case TYPE_TIMESTAMP:
+      return timestamp_val_type_;
     default:
-      DCHECK(false) << "Invalid type.";
+      DCHECK(false) << "Invalid type: " << type;
       return NULL;
   }
 }

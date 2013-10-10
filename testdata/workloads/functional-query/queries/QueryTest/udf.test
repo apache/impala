@@ -57,11 +57,30 @@ string
 'why hello there'
 ====
 ---- QUERY
+select udf_test.identity(now());
+---- TYPES
+timestamp
+====
+---- QUERY
 select udf_test.identity(NULL);
 ---- TYPES
 boolean
 ---- RESULTS
 NULL
+====
+---- QUERY
+select udf_test.constant_timestamp();
+---- TYPES
+timestamp
+---- RESULTS
+2013-10-09 00:00:00.000000001
+====
+---- QUERY
+select from_utc_timestamp(udf_test.constant_timestamp(), "UTC");
+---- TYPES
+timestamp
+---- RESULTS
+2013-10-09 00:00:00.000000001
 ====
 # Test UDFs with different arguments
 ---- QUERY
@@ -94,6 +113,25 @@ string
 'aaaaaaa'
 'ccccc'
 'eeeeeeee'
+====
+---- QUERY
+select udf_test.identity(bool_col), udf_test.identity(tinyint_col),
+       udf_test.identity(smallint_col), udf_test.identity(int_col),
+       udf_test.identity(bigint_col), udf_test.identity(float_col),
+       udf_test.identity(double_col), udf_test.identity(string_col),
+       udf_test.identity(timestamp_col), udf_test.identity(year)
+from alltypestiny;
+---- TYPES
+boolean, tinyint, smallint, int, bigint, float, double, string, timestamp, int
+---- RESULTS
+true,0,0,0,0,0,0,'0',2009-02-01 00:00:00,2009
+false,1,1,1,10,1.100000023841858,10.1,'1',2009-02-01 00:01:00,2009
+true,0,0,0,0,0,0,'0',2009-04-01 00:00:00,2009
+false,1,1,1,10,1.100000023841858,10.1,'1',2009-04-01 00:01:00,2009
+true,0,0,0,0,0,0,'0',2009-01-01 00:00:00,2009
+false,1,1,1,10,1.100000023841858,10.1,'1',2009-01-01 00:01:00,2009
+true,0,0,0,0,0,0,'0',2009-03-01 00:00:00,2009
+false,1,1,1,10,1.100000023841858,10.1,'1',2009-03-01 00:01:00,2009
 ====
 ---- QUERY
 select sum(udf_test.all_types_fn(
