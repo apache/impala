@@ -116,7 +116,10 @@ export IMPALA_BUILD_THREADS=`nproc`
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad.
 # - Enable JNI check
-LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
+# When running hive UDFs, this check makes it unacceptably slow (over 100x)
+# Enable if you suspect a JNI issue
+# TODO: figure out how to turn this off only the stuff that can't run with it.
+#LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
 # - Points to the location of libbackend.so.
 LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_HOME}/lib/native/"
 # READER BEWARE: This always points to the debug build.

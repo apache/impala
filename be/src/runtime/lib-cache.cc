@@ -48,9 +48,9 @@ Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_li
                                 const string& symbol, void** fn_ptr) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, true, &lock, &entry));
+  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
   DCHECK(entry != NULL);
-  DCHECK(entry->is_shared_object);
+  DCHECK_EQ(entry->type, TYPE_SO);
 
   LibCacheEntry::SymbolMap::iterator it = entry->symbol_cache.find(symbol);
   if (it != entry->symbol_cache.end()) {
@@ -64,13 +64,13 @@ Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_li
 }
 
 Status LibCache::GetLocalLibPath(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-      bool is_shared_object, string* local_path) {
+      LibType type, string* local_path) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, is_shared_object,
+  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, type,
       &lock, &entry));
   DCHECK(entry != NULL);
-  DCHECK_EQ(entry->is_shared_object, is_shared_object);
+  DCHECK_EQ(entry->type, type);
   *local_path = entry->local_path;
   return Status::OK;
 }
@@ -79,32 +79,37 @@ Status LibCache::GetSoHandle(HdfsFsCache* hdfs_cache, const string& hdfs_lib_fil
                            void** handle) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, true, &lock, &entry));
+  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
   DCHECK(entry != NULL);
-  lock_guard<mutex>(entry->lock, adopt_lock_t());
-  DCHECK(entry->is_shared_object);
+  DCHECK_EQ(entry->type, TYPE_SO);
   *handle = entry->shared_object_handle;
   return Status::OK;
 }
 
 Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-    bool is_shared_object, const string& symbol) {
-  if (is_shared_object) {
+    LibType type, const string& symbol) {
+  if (type == TYPE_SO) {
     void* dummy_ptr = NULL;
     return GetSoFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr);
-  } else {
+  } else if (type == TYPE_IR) {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
-    RETURN_IF_ERROR(GetCacheEntry(
-        hdfs_cache, hdfs_lib_file, is_shared_object, &lock, &entry));
+    RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, type, &lock, &entry));
     DCHECK(entry != NULL);
-    DCHECK(!entry->is_shared_object);
+    DCHECK_EQ(entry->type, TYPE_IR);
     if (entry->symbols.find(symbol) == entry->symbols.end()) {
       stringstream ss;
       ss << "Symbol '" << symbol << "' does not exist in module: " << hdfs_lib_file;
       return Status(ss.str());
     }
     return Status::OK;
+  } else if (type == TYPE_JAR) {
+    unique_lock<mutex> lock;
+    LibCacheEntry* dummy_entry = NULL;
+    return GetCacheEntry(hdfs_cache, hdfs_lib_file, type, &lock, &dummy_entry);
+  } else {
+    DCHECK(false);
+    return Status("Shouldn't get here.");
   }
 }
 
@@ -141,7 +146,7 @@ void LibCache::DropCache() {
 }
 
 Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-    bool is_shared_object, unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
+    LibType type, unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
   unique_lock<mutex> lib_cache_lock(lock_);
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it != lib_cache_.end()) {
@@ -153,7 +158,7 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
     entry_lock->swap(local_entry_lock);
 
     RETURN_IF_ERROR((*entry)->copy_file_status);
-    DCHECK_EQ((*entry)->is_shared_object, is_shared_object);
+    DCHECK_EQ((*entry)->type, type);
     DCHECK(!(*entry)->local_path.empty());
     return Status::OK;
   }
@@ -173,7 +178,7 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
 
   // At this point we have the entry lock but not the lib cache lock.
   DCHECK(*entry != NULL);
-  (*entry)->is_shared_object = is_shared_object;
+  (*entry)->type = type;
 
   // Copy the file
   hdfsFS hdfs_conn = hdfs_cache->GetDefaultConnection();
@@ -181,15 +186,18 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   (*entry)->copy_file_status = CopyHdfsFile(hdfs_conn, hdfs_lib_file.c_str(), local_conn,
       FLAGS_local_library_dir.c_str(), &(*entry)->local_path);
   RETURN_IF_ERROR((*entry)->copy_file_status);
-  if (is_shared_object) {
+  if (type == TYPE_SO) {
     // dlopen the local library
     RETURN_IF_ERROR(DynamicOpen((*entry)->local_path, &(*entry)->shared_object_handle));
-  } else {
+  } else if (type == TYPE_IR) {
     // Load the module and populate all symbols.
     ObjectPool pool;
     scoped_ptr<LlvmCodeGen> codegen;
     RETURN_IF_ERROR(LlvmCodeGen::LoadFromFile(&pool, (*entry)->local_path, &codegen));
     codegen->GetSymbols(&(*entry)->symbols);
+  } else {
+    DCHECK_EQ(type, TYPE_JAR);
+    // Nothing to do.
   }
 
   return Status::OK;

@@ -1,0 +1,147 @@
+====
+---- QUERY
+select udf_test.lower('HelloWorld')
+---- RESULTS
+'helloworld'
+---- TYPES
+STRING
+====
+---- QUERY
+select udf_test.hive_pi()
+---- RESULTS
+3.141592653589793
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Mix our builtins and operators with hive udfs.
+select udf_test.hive_pi() + 2 * udf_test.hive_floor(pi())
+---- RESULTS
+9.141592653589793
+---- TYPES
+DOUBLE
+====
+---- QUERY
+select udf_test.hive_floor(1.93)
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select udf_test.hive_round(1.8)
+---- RESULTS
+2
+---- TYPES
+DOUBLE
+====
+---- QUERY
+select udf_test.hive_mod(100, 13)
+---- RESULTS
+9
+---- TYPES
+INT
+====
+---- QUERY
+select udf_test.hive_bin(100)
+---- RESULTS
+'1100100'
+---- TYPES
+STRING
+====
+---- QUERY
+select udf_test.hive_lower(NULL)
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+---- QUERY
+select udf_test.hive_pi(), udf_test.hive_mod(100, 5) + udf_test.round(3.1),
+udf_test.hive_lower('ABCD'), udf_test.hive_lower('zY')
+---- RESULTS
+3.141592653589793,3,'abcd','zy'
+---- TYPES
+DOUBLE, BIGINT, STRING, STRING
+====
+---- QUERY
+select min(udf_test.hive_pi()) from functional.alltypesagg
+---- RESULTS
+3.141592653589793
+---- TYPES
+DOUBLE
+====
+---- QUERY
+select udf_test.hive_lower(n_name) from tpch.nation order by 1 limit 5
+---- RESULTS
+'algeria'
+'argentina'
+'brazil'
+'canada'
+'china'
+---- TYPES
+STRING
+====
+# Test identity functions
+---- QUERY
+select udf_test.identity(true);
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+select udf_test.identity(cast(10 as tinyint));
+---- TYPES
+tinyint
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity(cast(10 as smallint));
+---- TYPES
+smallint
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity(cast(10 as int));
+---- TYPES
+int
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity(cast(10 as bigint));
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity(cast(10.0 as float));
+---- TYPES
+float
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity(cast(10.0 as double));
+---- TYPES
+double
+---- RESULTS
+10
+====
+---- QUERY
+select udf_test.identity("why hello there");
+---- TYPES
+string
+---- RESULTS
+'why hello there'
+====
+---- QUERY
+select udf_test.identity(NULL);
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====

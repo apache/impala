@@ -304,6 +304,19 @@
         </configuration>
       </plugin>
 
+      <!-- Build fe/tests/ to jar -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      <executions>
+        <execution>
+          <goals>
+            <goal>test-jar</goal>
+          </goals>
+        </execution>
+      </executions>
+      </plugin>
+
       <plugin>
         <groupId>net.sourceforge.czt</groupId>
         <artifactId>maven-cup-plugin</artifactId>

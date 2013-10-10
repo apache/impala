@@ -34,3 +34,8 @@ class TestUdfs(ImpalaTestSuite):
   def test_ir_functions(self, vector):
     self.run_test_case('QueryTest/load-ir-functions', vector)
     self.run_test_case('QueryTest/udf', vector)
+
+  @pytest.mark.execute_serially
+  def test_hive_udfs(self, vector):
+    self.run_test_case('QueryTest/load-hive-udfs', vector)
+    self.run_test_case('QueryTest/hive-udf', vector)

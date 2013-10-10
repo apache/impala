@@ -21,6 +21,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TUdf;
 
 /**
@@ -58,6 +59,19 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
+
+    if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {
+      if (udf_.getReturnType() == PrimitiveType.TIMESTAMP) {
+        throw new AnalysisException(
+            "Hive UDFs that use timestamp are not yet supported.");
+      }
+      for (int i = 0; i < udf_.getNumArgs(); ++i) {
+        if (udf_.getArgs()[i] == PrimitiveType.TIMESTAMP) {
+          throw new AnalysisException(
+              "Hive UDFs that use timestamp are not yet supported.");
+        }
+      }
+    }
 
     // Check the user provided symbol exists
     udf_.setSymbolName(lookupSymbol(

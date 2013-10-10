@@ -35,6 +35,7 @@ add_library(Exprs
   expr.cc
   float-literal.cc
   function-call.cc
+  hive-udf-call.cc
   in-predicate.cc
   int-literal.cc
   is-null-predicate.cc

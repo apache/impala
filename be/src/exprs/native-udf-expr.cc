@@ -321,7 +321,7 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
     string local_path;
     RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-          state->fs_cache(), hdfs_location_, false, &local_path));
+          state->fs_cache(), hdfs_location_, LibCache::TYPE_IR, &local_path));
 
     // Link the UDF module into this query's main module (essentially copy the UDF module
     // into the main module) so the UDF function is available for inlining in the main

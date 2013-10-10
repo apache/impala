@@ -29,6 +29,7 @@
 #include "exprs/date-literal.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
+#include "exprs/hive-udf-call.h"
 #include "exprs/in-predicate.h"
 #include "exprs/int-literal.h"
 #include "exprs/is-null-predicate.h"
@@ -345,10 +346,14 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
     case TExprNodeType::UDF_CALL:
-      if (texpr_node.udf_call_expr.binary_type == TFunctionBinaryType::HIVE) {
-        return Status("Hive UDFs are not yet implemented.");
+      if (!texpr_node.__isset.udf_call_expr) {
+        return Status("Udf call not set in thrift node");
       }
-      *expr = pool->Add(new NativeUdfExpr(texpr_node));
+      if (texpr_node.udf_call_expr.binary_type == TFunctionBinaryType::HIVE) {
+        *expr = pool->Add(new HiveUdfCall(texpr_node));
+      } else {
+        *expr = pool->Add(new NativeUdfExpr(texpr_node));
+      }
       return Status::OK;
     default:
       stringstream os;

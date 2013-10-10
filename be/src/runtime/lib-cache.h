@@ -30,7 +30,7 @@ class RuntimeState;
 class HdfsFsCache;
 
 // Process-wide cache of dynamically-linked libraries loaded from HDFS.
-// These libraries can either be shared objects or llvm modules. For
+// These libraries can either be shared objects, llvm modules or jars. For
 // shared objects, when we load the shared object, we dlopen() it and keep
 // it in our process. For modules, we store the symbols in the module to
 // service symbol lookups. We can't cache the module since it (i.e. the external
@@ -47,6 +47,12 @@ class HdfsFsCache;
 // - better cached module management.
 class LibCache {
  public:
+  enum LibType {
+    TYPE_SO,      // Shared object
+    TYPE_IR,      // IR intermediate
+    TYPE_JAR,     // Java jar file. We don't care about the contents in the BE.
+  };
+
   // Calls dlclose on all cached handles.
   ~LibCache();
 
@@ -54,7 +60,7 @@ class LibCache {
   // this file is not already on the local fs, it copies it and caches the
   // result. Returns an error if 'hdfs_lib_file' cannot be copied to the local fs.
   Status GetLocalLibPath(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      bool is_shared_object, std::string* local_path);
+      LibType type, std::string* local_path);
 
   // Copies 'hdfs_lib_file' to 'FLAGS_local_library_dir' and dlopens it, storing the
   // result in *handle.
@@ -64,7 +70,7 @@ class LibCache {
 
   // Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
   Status CheckSymbolExists(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      bool is_shared_object, const std::string& symbol);
+      LibType type, const std::string& symbol);
 
   // Returns a pointer to the function for the given library and symbol. 'hdfs_lib_file'
   // should be the HDFS path to a shared library (.so) file and 'symbol' should be a
@@ -88,8 +94,8 @@ class LibCache {
     // Lock protecting all fields in this entry
     boost::mutex lock;
 
-    // If true, this is a shared object, otherwise it is a llvm module.
-    bool is_shared_object;
+    // The type of this file.
+    LibType type;
 
     // The path on the local file system for this library.
     std::string local_path;
@@ -101,7 +107,7 @@ class LibCache {
     void* shared_object_handle;
 
     // mapping from symbol => address of loaded symbol.
-    // Only used if is_shared_object is true.
+    // Only used if the type is TYPE_SO is true.
     typedef boost::unordered_map<std::string, void*> SymbolMap;
     SymbolMap symbol_cache;
 
@@ -126,7 +132,7 @@ class LibCache {
   // No locks should be take before calling this. On return the entry's lock is
   // taken and returned in *entry_lock.
   Status GetCacheEntry(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      bool is_shared_object, boost::unique_lock<boost::mutex>* entry_lock,
+      LibType type, boost::unique_lock<boost::mutex>* entry_lock,
       LibCacheEntry** entry);
 };
 

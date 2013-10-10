@@ -96,12 +96,13 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   DCHECK(env != NULL);
   DCHECK(params.fn_binary_type == TFunctionBinaryType::NATIVE ||
          params.fn_binary_type == TFunctionBinaryType::IR);
-  bool is_shared_object = params.fn_binary_type == TFunctionBinaryType::NATIVE;
+  LibCache::LibType type = params.fn_binary_type == TFunctionBinaryType::NATIVE ?
+      LibCache::TYPE_SO : LibCache::TYPE_IR;
 
   string dummy_local_path;
   Status status =
       env->lib_cache()->GetLocalLibPath(env->fs_cache(), params.location,
-          is_shared_object, &dummy_local_path);
+          type, &dummy_local_path);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
     result->__set_error_msg(status.GetErrorMsg());
@@ -109,7 +110,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   }
 
   status = env->lib_cache()->CheckSymbolExists(
-      env->fs_cache(), params.location, is_shared_object, params.symbol);
+      env->fs_cache(), params.location, type, params.symbol);
   if (status.ok()) {
     // The FE specified symbol exists, just use that.
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
@@ -134,7 +135,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
       arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
 
   status = env->lib_cache()->CheckSymbolExists(
-      env->fs_cache(), params.location, is_shared_object, symbol);
+      env->fs_cache(), params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     result->__set_error_msg("Could not find symbol.");
