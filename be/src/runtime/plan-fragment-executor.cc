@@ -85,7 +85,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   const string& user =
       (request.query_globals.__isset.user) ? request.query_globals.user : "";
   runtime_state_.reset(
-      new RuntimeState(params.fragment_instance_id, request.query_options,
+      new RuntimeState(query_id_, params.fragment_instance_id, request.query_options,
         request.query_globals.now_string, user, exec_env_));
   RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_));
 

@@ -45,7 +45,7 @@ class SorterTest : public testing::Test {
   static const int BATCH_CAPACITY = 100;  // rows
 
   SorterTest() : mem_pool_(NULL), writer_(),
-      runtime_state_(TUniqueId(), TQueryOptions(), "", "", NULL) {
+      runtime_state_(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", NULL) {
     resource_pool_.reset(resource_mgr_.RegisterPool());
     Reset();
   }

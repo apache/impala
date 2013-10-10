@@ -454,7 +454,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
 
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
-    TFinalizeParams& finalize_params = query_exec_request.finalize_params;
+    const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateMetastoreRequest catalog_update;
     if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "

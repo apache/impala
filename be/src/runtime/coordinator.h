@@ -438,9 +438,13 @@ class Coordinator {
   // that any coordinator fragment has finished, which this method does not.
   Status WaitForAllBackends();
 
-  // Perform any post-query cleanup required. Called by Wait() only after all
-  // backends are returned.
+  // Perform any post-query cleanup required. Called by Wait() only after all backends
+  // have returned, or if the query has failed, in which case it only cleans up temporary
+  // data rather than finishing the INSERT in flight.
   Status FinalizeQuery();
+
+  // Moves all temporary staging files to their final destinations.
+  Status FinalizeSuccessfulInsert();
 
   // Outputs aggregate query profile summary.  This is assumed to be called at the end of
   // a query -- remote fragments' profiles must not be updated while this is running.

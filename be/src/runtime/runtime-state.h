@@ -67,7 +67,7 @@ typedef std::map<std::string, std::string> FileMoveMap;
 // query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
-  RuntimeState(const TUniqueId& fragment_instance_id,
+  RuntimeState(const TUniqueId& query_id, const TUniqueId& fragment_instance_id,
       const TQueryOptions& query_options, const std::string& now,
       const std::string& user, ExecEnv* exec_env);
 
@@ -101,6 +101,7 @@ class RuntimeState {
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
   }
+  const TUniqueId& query_id() const { return query_id_; }
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
@@ -248,6 +249,7 @@ class RuntimeState {
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
 
+  TUniqueId query_id_;
   TUniqueId fragment_instance_id_;
   TQueryOptions query_options_;
   ExecEnv* exec_env_;

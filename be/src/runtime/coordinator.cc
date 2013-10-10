@@ -493,20 +493,8 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   return query_status_;
 }
 
-Status Coordinator::FinalizeQuery() {
-  // All backends must have reported their final statuses before finalization,
-  // which is a post-condition of Wait.
-  DCHECK(has_called_wait_);
-  DCHECK(needs_finalization_);
-
-  VLOG_QUERY << "Finalizing query: " << query_id_;
-  SCOPED_TIMER(finalization_timer_);
+Status Coordinator::FinalizeSuccessfulInsert() {
   hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
-
-  // TODO: If this process fails, the state of the table's data is left
-  // undefined. We should do better cleanup: there's probably enough information
-  // here to roll back to the table's previous state.
-
   // INSERT finalization happens in the four following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
@@ -617,6 +605,31 @@ Status Coordinator::FinalizeQuery() {
   return Status::OK;
 }
 
+Status Coordinator::FinalizeQuery() {
+  // All backends must have reported their final statuses before finalization, which is a
+  // post-condition of Wait. If the query was not successful, still try to clean up the
+  // staging directory.
+  DCHECK(has_called_wait_);
+  DCHECK(needs_finalization_);
+
+  VLOG_QUERY << "Finalizing query: " << query_id_;
+  SCOPED_TIMER(finalization_timer_);
+  Status return_status = GetStatus();
+  if (return_status.ok()) {
+    return_status = FinalizeSuccessfulInsert();
+  }
+
+  DCHECK(finalize_params_.__isset.staging_dir);
+
+  hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
+  stringstream staging_dir;
+  staging_dir << finalize_params_.staging_dir << "/" << PrintId(query_id_,"_") << "/";
+  VLOG_QUERY << "Removing staging directory: " << staging_dir.str();
+  hdfsDelete(hdfs_connection, staging_dir.str().c_str(), 1);
+
+  return return_status;
+}
+
 Status Coordinator::WaitForAllBackends() {
   unique_lock<mutex> l(lock_);
   while (num_remaining_backends_ > 0 && query_status_.ok()) {
@@ -638,31 +651,37 @@ Status Coordinator::Wait() {
   SCOPED_TIMER(query_profile_->total_time_counter());
   if (has_called_wait_) return Status::OK;
   has_called_wait_ = true;
+  Status return_status = Status::OK;
   if (executor_.get() != NULL) {
     // Open() may block
-    RETURN_IF_ERROR(UpdateStatus(executor_->Open(), NULL));
+    return_status = UpdateStatus(executor_->Open(), NULL);
 
-    // If the coordinator fragment has a sink, it will have finished executing at this
-    // point.  It's safe therefore to copy the set of files to move and updated partitions
-    // into the query-wide set.
-    RuntimeState* state = runtime_state();
-    DCHECK(state != NULL);
+    if (return_status.ok()) {
+      // If the coordinator fragment has a sink, it will have finished executing at this
+      // point.  It's safe therefore to copy the set of files to move and updated
+      // partitions into the query-wide set.
+      RuntimeState* state = runtime_state();
+      DCHECK(state != NULL);
 
-    // No other backends should have updated these structures if the coordinator has a
-    // fragment.  (Backends have a sink only if the coordinator does not)
-    DCHECK_EQ(files_to_move_.size(), 0);
-    DCHECK_EQ(partition_row_counts_.size(), 0);
+      // No other backends should have updated these structures if the coordinator has a
+      // fragment.  (Backends have a sink only if the coordinator does not)
+      DCHECK_EQ(files_to_move_.size(), 0);
+      DCHECK_EQ(partition_row_counts_.size(), 0);
 
-    // Because there are no other updates, safe to copy the maps rather than merge them.
-    files_to_move_ = *state->hdfs_files_to_move();
-    partition_row_counts_ = *state->num_appended_rows();
-    partition_insert_stats_ = *state->insert_stats();
+      // Because there are no other updates, safe to copy the maps rather than merge them.
+      files_to_move_ = *state->hdfs_files_to_move();
+      partition_row_counts_ = *state->num_appended_rows();
+      partition_insert_stats_ = *state->insert_stats();
+    }
   } else {
     // Query finalization can only happen when all backends have reported
     // relevant state. They only have relevant state to report in the parallel
     // INSERT case, otherwise all the relevant state is from the coordinator
     // fragment which will be available after Open() returns.
-    RETURN_IF_ERROR(WaitForAllBackends());
+    // Ignore the returned status if finalization is required., since FinalizeQuery() will
+    // pick it up and needs to execute regardless.
+    Status status = WaitForAllBackends();
+    if (!needs_finalization_ && !status.ok()) return status;
   }
 
   // Query finalization is required only for HDFS table sinks

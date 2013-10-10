@@ -38,16 +38,16 @@ public class HdfsTableSink extends TableSink {
   protected final long DEFAULT_NUM_PARTITIONS = 10;
 
   // Exprs for computing the output partition(s).
-  protected final List<Expr> partitionKeyExprs;
+  protected final List<Expr> partitionKeyExprs_;
   // Whether to overwrite the existing partition(s).
-  protected final boolean overwrite;
+  protected final boolean overwrite_;
 
   public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
       boolean overwrite) {
     super(targetTable);
     Preconditions.checkState(targetTable instanceof HdfsTable);
-    this.partitionKeyExprs = partitionKeyExprs;
-    this.overwrite = overwrite;
+    partitionKeyExprs_ = partitionKeyExprs;
+    overwrite_ = overwrite;
   }
 
   @Override
@@ -59,7 +59,7 @@ public class HdfsTableSink extends TableSink {
     int numNodes = fragment.getNumNodes();
     // Compute the per-host number of partitions, taking the number of nodes
     // and the data partition of the fragment executing this sink into account.
-    long numPartitions = fragment.getNumDistinctValues(partitionKeyExprs);
+    long numPartitions = fragment.getNumDistinctValues(partitionKeyExprs_);
     if (numPartitions == -1) numPartitions = DEFAULT_NUM_PARTITIONS;
     long perPartitionMemReq = getPerPartitionMemReq(format);
 
@@ -100,10 +100,10 @@ public class HdfsTableSink extends TableSink {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName()
         + "\n");
-    output.append(prefix + "  overwrite=" + (overwrite ? "true" : "false") + "\n");
-    if (!partitionKeyExprs.isEmpty()) {
+    output.append(prefix + "  overwrite=" + (overwrite_ ? "true" : "false") + "\n");
+    if (!partitionKeyExprs_.isEmpty()) {
       output.append(prefix + "  partition keys: ");
-      for (Expr expr : partitionKeyExprs) {
+      for (Expr expr: partitionKeyExprs_) {
         output.append(expr.toSql() + ",");
       }
     }
@@ -112,7 +112,7 @@ public class HdfsTableSink extends TableSink {
     // Report the total number of partitions, independent of the number of nodes
     // and the data partition of the fragment executing this sink.
     if (explainLevel == TExplainLevel.VERBOSE) {
-      long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs);
+      long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs_);
       if (totalNumPartitions == -1) {
         output.append("  #partitions: unavailable");
       } else {
@@ -128,8 +128,8 @@ public class HdfsTableSink extends TableSink {
   @Override
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
-    THdfsTableSink hdfsTableSink =
-        new THdfsTableSink(Expr.treesToThrift(partitionKeyExprs), overwrite);
+    THdfsTableSink hdfsTableSink = new THdfsTableSink(
+        Expr.treesToThrift(partitionKeyExprs_), overwrite_);
     TTableSink tTableSink = new TTableSink(targetTable.getId().asInt(),
         TTableSinkType.HDFS);
     tTableSink.hdfs_table_sink = hdfsTableSink;

@@ -227,6 +227,10 @@ class HdfsTableSink : public DataSink {
   // Indicates whether the existing partitions should be overwritten.
   bool overwrite_;
 
+  // The directory in which to write intermediate results. Set to
+  // <hdfs_table_base_dir>/.impala_insert_staging/ during Init()
+  std::string staging_dir_;
+
   // string representation of c'tors unique_id. Used for per-partition Hdfs file names,
   // and for tmp Hdfs directories. Set in Prepare();
   std::string unique_id_str_;

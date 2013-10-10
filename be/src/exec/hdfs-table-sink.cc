@@ -113,6 +113,11 @@ Status HdfsTableSink::Init(RuntimeState* state) {
     return Status(error_msg.str());
   }
 
+  stringstream ss;
+  ss << table_desc_->hdfs_base_dir() << "/.impala_insert_staging/"
+     << PrintId(state->query_id(), "_") << "/";
+  staging_dir_ = ss.str();
+
   PrepareExprs(state);
 
   // Get file format for default partition in table descriptor, and
@@ -191,27 +196,23 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   return Status::OK;
 }
 
-// Note - this injects a random value into the directory name, so cannot be called
-// repeatedly to give the same answer.
-static void MakeTmpHdfsDirectoryName(const string& base_dir, const string& unique_id,
-                                     stringstream* ss) {
-  // Prefix the directory name with "." to make it hidden and append "_dir" at the end
-  // of the directory to avoid name clashes for unpartitioned tables.
-  (*ss) << base_dir << "/." << unique_id << "_" << rand() << "_dir/";
-}
-
 void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
   // Create hdfs_file_name_template and tmp_hdfs_file_name_template.
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
   stringstream hdfs_file_name_template;
   hdfs_file_name_template << table_desc_->hdfs_base_dir() << "/";
 
-  // Path: <hdfs_base_dir>/<unique_id>_dir/<partition_values>/<unique_id_str>
-  // Both the temporary directory and the file name, when moved to the
-  // real partition directory must be unique.
+  // Temporary files are written under the following path which is unique to this sink:
+  // <table_dir>/.impala_insert_staging/<query_id>/<per_fragment_unique_id>_dir/
+  // Both the temporary directory and the file name, when moved to the real partition
+  // directory must be unique.
+  // Prefix the directory name with "." to make it hidden and append "_dir" at the end
+  // of the directory to avoid name clashes for unpartitioned tables.
+  // The files are located in <partition_values>/<random_value>_data under
+  // tmp_hdfs_file_name_template.
   stringstream tmp_hdfs_file_name_template;
-  MakeTmpHdfsDirectoryName(table_desc_->hdfs_base_dir(), unique_id_str_,
-                           &tmp_hdfs_file_name_template);
+  tmp_hdfs_file_name_template << staging_dir_ << "/." << unique_id_str_ << "_"
+                              << rand() << "_dir/";
   output_partition->tmp_hdfs_dir_name = tmp_hdfs_file_name_template.str();
 
   stringstream common_suffix;
@@ -225,16 +226,14 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
     } else {
       string value_str;
       partition_key_exprs_[j]->PrintValue(value, &value_str);
-      // Directory names containing partition-key values need to be
-      // UrlEncoded, in particular to avoid problems when '/' is part
-      // of the key value (which might occur, for example, with date
-      // strings). Hive will URL decode the value transparently when
-      // Impala's frontend asks the metastore for partition key
-      // values, which makes it particularly important that we use the
-      // same encoding as Hive. It's also not necessary to encode the
-      // values when writing partition metadata. You can check this
-      // with 'show partitions <tbl>' in Hive, followed by a select
-      // from a decoded partition key value.
+      // Directory names containing partition-key values need to be UrlEncoded, in
+      // particular to avoid problems when '/' is part of the key value (which might
+      // occur, for example, with date strings). Hive will URL decode the value
+      // transparently when Impala's frontend asks the metastore for partition key values,
+      // which makes it particularly important that we use the same encoding as Hive. It's
+      // also not necessary to encode the values when writing partition metadata. You can
+      // check this with 'show partitions <tbl>' in Hive, followed by a select from a
+      // decoded partition key value.
       string encoded_str;
       UrlEncode(value_str, &encoded_str, true);
       // If the string is empty, map it to NULL (mimicking Hive's behaviour)

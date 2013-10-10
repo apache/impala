@@ -96,9 +96,9 @@ ostream& operator<<(ostream& os, const TUniqueId& id) {
   return os;
 }
 
-string PrintId(const TUniqueId& id) {
+string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
-  out << std::hex << id.hi << ":" << id.lo;
+  out << std::hex << id.hi << separator << id.lo;
   return out.str();
 }
 

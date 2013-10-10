@@ -21,6 +21,17 @@ import pytest
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 
+  @pytest.mark.excute_serially
+  def test_insert_removes_staging_files(self):
+    insert_staging_dir = \
+      "test-warehouse/functional.db/insert_overwrite_nopart/.impala_insert_staging"
+    self.hdfs_client.delete_file_dir(insert_staging_dir, recursive=True)
+    self.client.execute("""INSERT OVERWRITE
+functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""")
+    ls = self.hdfs_client.list_dir(insert_staging_dir)
+    assert len(ls['FileStatuses']['FileStatus']) == 0
+
+  @pytest.mark.excute_serially
   def test_insert_preserves_hidden_files(self):
     """Test that INSERT OVERWRITE preserves hidden files in the root table directory"""
     table_dir = "test-warehouse/functional.db/insert_overwrite_nopart/"

@@ -31,13 +31,13 @@ include "cli_service.thrift"
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error
   ABORT_ON_ERROR,
-  
+
   // maximum # of errors to be reported; Unspecified or 0 indicates backend default
   MAX_ERRORS,
-  
+
   // if true, disable llvm codegen
   DISABLE_CODEGEN,
-  
+
   // batch size to be used by backend; Unspecified or a size of 0 indicates backend
   // default
   BATCH_SIZE,
@@ -48,7 +48,7 @@ enum TImpalaQueryOptions {
   // a) an int (= number of bytes);
   // b) a float followed by "M" (MB) or "G" (GB)
   MEM_LIMIT,
-   
+
   // specifies the degree of parallelism with which to execute the query;
   // 1: single-node execution
   // NUM_NODES_ALL: executes on all nodes that contain relevant data
@@ -58,11 +58,11 @@ enum TImpalaQueryOptions {
   //      numNodes would be active at any point in time)
   // Constants (NUM_NODES_ALL, NUM_NODES_ALL_RACKS) are defined in JavaConstants.thrift.
   NUM_NODES,
-  
+
   // maximum length of the scan range; only applicable to HDFS scan range; Unspecified or
-  // a length of 0 indicates backend default;  
+  // a length of 0 indicates backend default;
   MAX_SCAN_RANGE_LENGTH,
-  
+
   // Maximum number of io buffers (per disk)
   MAX_IO_BUFFERS,
 
@@ -85,9 +85,9 @@ enum TImpalaQueryOptions {
   // backend instance will perform the debug action, otherwise all backends will behave
   // in that way.
   // If the string doesn't have the required format or if any of its components is
-  // invalid, the option is ignored. 
+  // invalid, the option is ignored.
   DEBUG_ACTION,
-  
+
   // If true, raise an error when the DEFAULT_ORDER_BY_LIMIT has been reached.
   ABORT_ON_DEFAULT_LIMIT_EXCEEDED,
 
@@ -95,21 +95,21 @@ enum TImpalaQueryOptions {
   // Valid values are "snappy", "gzip" and "none"
   // Leave blank to use default.
   PARQUET_COMPRESSION_CODEC,
-  
-  // HBase scan query option. If set and > 0, HBASE_CACHING is the value for 
+
+  // HBase scan query option. If set and > 0, HBASE_CACHING is the value for
   // "hbase.client.Scan.setCaching()" when querying HBase table. Otherwise, use backend
   // default.
   // If the value is too high, then the hbase region server will have a hard time (GC
   // pressure and long response times). If the value is too small, then there will be
   // extra trips to the hbase region server.
   HBASE_CACHING,
-  
+
   // HBase scan query option. If set, HBase scan will always set
   // "hbase.client.setCacheBlocks" to CACHE_BLOCKS. Default is false.
   // If the table is large and the query is doing big scan, set it to false to
   // avoid polluting the cache in the hbase region server.
   // If the table is small and the table is used several time, set it to true to improve
-  // performance. 
+  // performance.
   HBASE_CACHE_BLOCKS,
 
   // Target file size for inserts into parquet tables. 0 uses the default.
@@ -120,9 +120,9 @@ enum TImpalaQueryOptions {
 }
 
 // The summary of an insert.
-struct TInsertResult {  
+struct TInsertResult {
   // Number of appended rows per modified partition. Only applies to HDFS tables.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the 
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
   // root in an unpartitioned table being the empty string.
   1: required map<string, i64> rows_appended
 }
@@ -155,9 +155,9 @@ service ImpalaService extends beeswax.BeeswaxService {
   // necessarily indicate an error: the query might have finished).
   Status.TStatus Cancel(1:beeswax.QueryHandle query_id)
       throws(1:beeswax.BeeswaxException error);
-        
+
   // Invalidates all catalog metadata, forcing a reload
-  // DEPRECATED; execute query "invalidate metadata" to refresh metadata 
+  // DEPRECATED; execute query "invalidate metadata" to refresh metadata
   Status.TStatus ResetCatalog();
 
   // Invalidates a specific table's catalog metadata, forcing a reload on the next access
@@ -167,7 +167,7 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Returns the runtime profile string for the given query handle.
   string GetRuntimeProfile(1:beeswax.QueryHandle query_id)
       throws(1:beeswax.BeeswaxException error);
-  
+
   // Closes the query handle and return the result summary of the insert.
   TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
       throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);

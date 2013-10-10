@@ -53,7 +53,7 @@ std::ostream& operator<<(std::ostream& os, const parquet::Type::type& type);
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
-std::string PrintId(const TUniqueId& id);
+std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 std::string PrintTCatalogObjectType(const TCatalogObjectType::type& type);
 std::string PrintTDdlType(const TDdlType::type& type);

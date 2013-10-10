@@ -85,7 +85,7 @@ struct TPlanFragmentDestination {
 struct TPlanFragmentExecParams {
   // a globally unique id assigned to the entire query
   1: required Types.TUniqueId query_id
-  
+
   // a globally unique id assigned to this particular execution instance of
   // a TPlanFragment
   2: required Types.TUniqueId fragment_instance_id
@@ -113,8 +113,8 @@ struct TPlanFragmentExecParams {
 struct TQueryGlobals {
   // String containing a timestamp set as the current time.
   1: required string now_string
-  
-  // Name of the user executing this query. 
+
+  // Name of the user executing this query.
   2: optional string user
 }
 
@@ -152,7 +152,7 @@ struct TExecPlanFragmentParams {
   // Global query parameters assigned by coordinator.
   // required in V1
   7: optional TQueryGlobals query_globals
-  
+
   // options for the query
   // required in V1
   8: optional TQueryOptions query_options
@@ -176,17 +176,17 @@ struct TInsertStats {
   2: optional TParquetInsertStats parquet_stats
 }
 
-// The results of an INSERT query, sent to the coordinator as part of 
+// The results of an INSERT query, sent to the coordinator as part of
 // TReportExecStatusParams
 struct TInsertExecStatus {
   // Number of rows appended by an INSERT, per-partition.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the 
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
   // root in an unpartitioned table being the empty string.
   // The target table name is recorded in the corresponding TQueryExecRequest
   1: optional map<string, i64> num_appended_rows
- 
-  // A map from temporary absolute file path to final absolute destination. The 
-  // coordinator performs these updates after the query completes. 
+
+  // A map from temporary absolute file path to final absolute destination. The
+  // coordinator performs these updates after the query completes.
   2: required map<string, string> files_to_move;
 
   // Stats from running the insert, per-partition. The keys are coded the
@@ -220,11 +220,11 @@ struct TReportExecStatusParams {
   7: optional RuntimeProfile.TRuntimeProfileTree profile
 
   // Cumulative structural changes made by a table sink
-  // optional in V1 
+  // optional in V1
   8: optional TInsertExecStatus insert_exec_status;
-  
+
   // New errors that have not been reported to the coordinator
-  // optional in V1 
+  // optional in V1
   9: optional list<string> error_log
 }
 

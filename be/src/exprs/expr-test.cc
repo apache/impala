@@ -612,7 +612,7 @@ void TestSingleLiteralConstruction(const ColumnType& type, const void* value,
     const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
-  RuntimeState state(TUniqueId(), TQueryOptions(), "", "", NULL);
+  RuntimeState state(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", NULL);
 
   Expr* expr = Expr::CreateLiteral(&pool, type, const_cast<void*>(value));
   EXPECT_TRUE(expr != NULL);
@@ -623,7 +623,7 @@ void TestSingleLiteralConstruction(const ColumnType& type, const void* value,
 TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
-    RuntimeState state(TUniqueId(), TQueryOptions(), "", "", NULL);
+    RuntimeState state(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", NULL);
     Status status = Expr::Prepare(&expr, &state, RowDescriptor(), disable_codegen_);
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(expr.GetValue(NULL) == NULL);

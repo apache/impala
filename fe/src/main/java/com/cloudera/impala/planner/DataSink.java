@@ -57,8 +57,8 @@ public abstract class DataSink {
   /**
    * Returns an output sink appropriate for writing to the given table.
    */
-  public static DataSink createDataSink(Table table,
-      List<Expr> partitionKeyExprs, boolean overwrite) {
+  public static DataSink createDataSink(Table table, List<Expr> partitionKeyExprs,
+      boolean overwrite) {
     if (table instanceof HdfsTable) {
       return new HdfsTableSink(table, partitionKeyExprs, overwrite);
     } else if (table instanceof HBaseTable) {

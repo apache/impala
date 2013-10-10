@@ -244,6 +244,11 @@ struct TFinalizeParams {
 
   // The target table database
   4: required string table_db
+
+  // The full path in HDFS of a directory under which temporary files may be written
+  // during an INSERT. For a query with id a:b, files are written to <staging_dir>/.a_b/,
+  // and that entire directory is removed after the INSERT completes.
+  5: optional string staging_dir
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.

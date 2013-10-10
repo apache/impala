@@ -45,12 +45,13 @@ using namespace boost::algorithm;
 
 namespace impala {
 
-RuntimeState::RuntimeState(
+RuntimeState::RuntimeState(const TUniqueId& query_id,
     const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
     const string& now, const string& user, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
+    query_id_(query_id),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     is_cancelled_(false),
     is_mem_limit_exceeded_(false) {

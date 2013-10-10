@@ -86,7 +86,7 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
-    : runtime_state_(TUniqueId(), TQueryOptions(), "", "", &exec_env_),
+    : runtime_state_(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", &exec_env_),
       next_val_(0) {
   }
 
@@ -400,7 +400,7 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num, int channel_buffer_size,
               TPartitionType::type partition_type) {
-    RuntimeState state(TUniqueId(), TQueryOptions(), "", "", &exec_env_);
+    RuntimeState state(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", &exec_env_);
     state.set_desc_tbl(desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink =
