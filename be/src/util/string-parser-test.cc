@@ -26,12 +26,35 @@ using namespace boost;
 
 namespace impala {
 
+string space[] = {"", "   ", "\t\t\t", "\n\n\n", "\v\v\v", "\f\f\f", "\r\r\r"};
+int space_len = 7;
+
+// Tests conversion of s to integer with and without leading/trailing whitespace
 template<typename T>
 void TestIntValue(const char* s, T exp_val, StringParser::ParseResult exp_result) {
-  StringParser::ParseResult result;
-  T val = StringParser::StringToInt<T>(s, strlen(s), &result);
-  EXPECT_EQ(exp_val, val) << s;
-  EXPECT_EQ(result, exp_result);
+  for (int i = 0; i < space_len; ++i) {
+    for (int j = 0; j < space_len; ++j) {
+      // All combinations of leading and/or trailing whitespace.
+      string str = space[i] + s + space[j];
+      StringParser::ParseResult result;
+      T val = StringParser::StringToInt<T>(str.data(), str.length(), &result);
+      EXPECT_EQ(exp_val, val) << str;
+      EXPECT_EQ(result, exp_result);
+    }
+  }
+}
+
+void TestBoolValue(const char* s, bool exp_val, StringParser::ParseResult exp_result) {
+  for (int i = 0; i < space_len; ++i) {
+    for (int j = 0; j < space_len; ++j) {
+      // All combinations of leading and/or trailing whitespace.
+      string str = space[i] + s + space[j];
+      StringParser::ParseResult result;
+      bool val = StringParser::StringToBool(str.data(), str.length(), &result);
+      EXPECT_EQ(exp_val, val) << s;
+      EXPECT_EQ(result, exp_result);
+    }
+  }
 }
 
 // Compare Impala's float conversion function against strtod.
@@ -45,16 +68,20 @@ void TestFloatValue(const string& s, StringParser::ParseResult exp_result) {
   if (exp_result == StringParser::PARSE_SUCCESS) EXPECT_EQ(exp_val, val);
 }
 
-// Tests conversion of s to double and float with +/- prefixing (and no prefix).
+// Tests conversion of s to double and float with +/- prefixing (and no prefix) and with
+// and without leading/trailing whitespace
 void TestAllFloatVariants(const string& s, StringParser::ParseResult exp_result) {
-  string neg = "-" + s;
-  string pos = "+" + s;
-  TestFloatValue<float>(s, exp_result);
-  TestFloatValue<double>(s, exp_result);
-  TestFloatValue<float>(neg, exp_result);
-  TestFloatValue<double>(neg, exp_result);
-  TestFloatValue<float>(pos, exp_result);
-  TestFloatValue<double>(pos, exp_result);
+  string sign[] = {"", "+", "-"};
+  for (int i = 0; i < space_len; ++i) {
+    for (int j = 0; j < space_len; ++j) {
+      for (int k = 0; k < 3; ++k) {
+        // All combinations of leading and/or trailing whitespace and +/- sign.
+        string str = space[i] + sign[k] + s + space[j];
+        TestFloatValue<float>(str, exp_result);
+        TestFloatValue<double>(str, exp_result);
+      }
+    }
+  }
 }
 
 template<typename T>
@@ -104,6 +131,26 @@ TEST(StringToInt, Basic) {
   TestIntValue<int16_t>("-0", 0, StringParser::PARSE_SUCCESS);
   TestIntValue<int32_t>("+0", 0, StringParser::PARSE_SUCCESS);
   TestIntValue<int64_t>("-0", 0, StringParser::PARSE_SUCCESS);
+}
+
+TEST(StringToInt, InvalidLeadingTrailing) {
+  // Test that trailing garbage is not allowed.
+  TestIntValue<int8_t>("123xyz   ", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("-123xyz   ", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   123xyz   ", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   -12  3xyz ", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("12 3", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("-12 3", 0, StringParser::PARSE_FAILURE);
+
+  // Must have at least one leading valid digit.
+  TestIntValue<int8_t>("x123", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   x123", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   -x123", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   x-123", 0, StringParser::PARSE_FAILURE);
+
+  // Test empty string and string with only whitespaces.
+  TestIntValue<int8_t>("", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   ", 0, StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToInt, Limit) {
@@ -195,11 +242,23 @@ TEST(StringToFloat, Basic) {
   TestAllFloatVariants("456.789x10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789ex10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789e10x", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("456.789e10   sdfs ", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1e10   sdfs", StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToFloat, BruteForce) {
   TestFloatBruteForce<float>();
   TestFloatBruteForce<double>();
+}
+
+TEST(StringToBool, Basic) {
+  TestBoolValue("true", true, StringParser::PARSE_SUCCESS);
+  TestBoolValue("false", false, StringParser::PARSE_SUCCESS);
+
+  TestBoolValue("false xdfsd", false, StringParser::PARSE_FAILURE);
+  TestBoolValue("true xdfsd", false, StringParser::PARSE_FAILURE);
+  TestBoolValue("ffffalse xdfsd", false, StringParser::PARSE_FAILURE);
+  TestBoolValue("tttfalse xdfsd", false, StringParser::PARSE_FAILURE);
 }
 
 }

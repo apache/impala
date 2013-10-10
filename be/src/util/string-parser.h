@@ -21,10 +21,23 @@
 #include "common/compiler-util.h"
 
 #include "common/logging.h"
+
+// Our own definition of "isspace" that optimize on the ' ' branch.
+#define IS_SPACE(c) \
+  (LIKELY((c) == ' ') || \
+   UNLIKELY((c) == '\t' || (c) == '\n' || (c) == '\v' || (c) == '\f' || (c) == '\r'))
+
 namespace impala {
 
 // Utility functions for doing atoi/atof on non-null terminated strings.  On micro 
 // benchmarks, this is significantly faster than libc (atoi/strtol and atof/strtod).
+//
+// Strings with leading and trailing whitespaces are accepted.
+// Branching is heavily optimized for the non-whitespace successful case.
+// All the StringTo* functions first parse the input string assuming it has no leading
+// whitespace. If that first attempt was unsuccessful, these functions retry the parsing
+// after removing whitespace. Therefore, strings with whitespace take a perf hit on
+// branch mis-prediction.
 //
 // For overflows, we are following the mysql behavior, to cap values at the max/min value
 // for that data type.  This is different from hive, which returns NULL for overflow 
@@ -44,18 +57,62 @@ class StringParser {
     PARSE_OVERFLOW
   };
 
-  // This is considerably faster than glibc's implementation (25x).  
-  // In the case of overflow, the max/min value for the data type will be returned.
-  // Assumes s represents a decimal number.
   template <typename T>
   static inline T StringToInt(const char* s, int len, ParseResult* result) {
+    T ans = StringToIntInternal<T>(s, len, result);
+    if (LIKELY(*result == PARSE_SUCCESS)) return ans;
+
+    int i = SkipLeadingWhitespace(s, len);
+    return StringToIntInternal<T>(s + i, len - i, result);
+  }
+
+  // Convert a string s representing a number in given base into a decimal number.
+  template <typename T>
+  static inline T StringToInt(const char* s, int len, int base, ParseResult* result) {
+    T ans = StringToIntInternal<T>(s, len, base, result);
+    if (LIKELY(*result == PARSE_SUCCESS)) return ans;
+
+    int i = SkipLeadingWhitespace(s, len);
+    return StringToIntInternal<T>(s + i, len - i, base, result);
+  }
+
+  template <typename T>
+  static inline T StringToFloat(const char* s, int len, ParseResult* result) {
+    T ans = StringToFloatInternal<T>(s, len, result);
+    if (LIKELY(*result == PARSE_SUCCESS)) return ans;
+
+    int i = SkipLeadingWhitespace(s, len);
+    return StringToFloatInternal<T>(s + i, len - i, result);
+  }
+
+  // Parses a string for 'true' or 'false', case insensitive.
+  static inline bool StringToBool(const char* s, int len, ParseResult* result) {
+    bool ans = StringToBoolInternal(s, len, result);
+    if (LIKELY(*result == PARSE_SUCCESS)) return ans;
+
+    int i = SkipLeadingWhitespace(s, len);
+    return StringToBoolInternal(s + i, len - i, result);
+  }
+
+ private:
+  // This is considerably faster than glibc's implementation.
+  // In the case of overflow, the max/min value for the data type will be returned.
+  // Assumes s represents a decimal number.
+  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  template <typename T>
+  static inline T StringToIntInternal(const char* s, int len, ParseResult* result) {
+    if (UNLIKELY(len <= 0)) {
+      *result = PARSE_FAILURE;
+      return 0;
+    }
+
     typedef typename boost::make_unsigned<T>::type UnsignedT;
     UnsignedT val = 0;
     UnsignedT max_val = std::numeric_limits<T>::max();
     bool negative = false;
     int i = 0;
     switch (*s) {
-      case '-': 
+      case '-':
         negative = true;
         max_val = std::numeric_limits<T>::max() + 1;
       case '+': ++i;
@@ -70,6 +127,7 @@ class StringParser {
     const T max_div_10 = max_val / 10;
     const T max_mod_10 = max_val % 10;
 
+    int first = i;
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         T digit = s[i] - '0';
@@ -80,8 +138,15 @@ class StringParser {
         }
         val = val * 10 + digit;
       } else {
-        *result = PARSE_FAILURE;
-        return 0;
+        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+          // Reject the string because either the first char was not a digit,
+          // or the remaining chars are not all whitespace
+          *result = PARSE_FAILURE;
+          return 0;
+        }
+        // Returning here is slightly faster than breaking the loop.
+        *result = PARSE_SUCCESS;
+        return static_cast<T>(negative ? -val : val);
       }
     }
     *result = PARSE_SUCCESS;
@@ -89,12 +154,18 @@ class StringParser {
   }
 
   // Convert a string s representing a number in given base into a decimal number.
+  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
   template <typename T>
-  static inline T StringToInt(const char* s, int len, int base, ParseResult* result) {
+  static inline T StringToIntInternal(const char* s, int len, int base,
+                                      ParseResult* result) {
     typedef typename boost::make_unsigned<T>::type UnsignedT;
     UnsignedT val = 0;
     UnsignedT max_val = std::numeric_limits<T>::max();
     bool negative = false;
+    if (UNLIKELY(len <= 0)) {
+      *result = PARSE_FAILURE;
+      return 0;
+    }
     int i = 0;
     switch (*s) {
       case '-': 
@@ -105,6 +176,8 @@ class StringParser {
     
     const T max_div_base = max_val / base;
     const T max_mod_base = max_val % base;
+
+    int first = i;
     for (; i < len; ++i) {
       T digit;
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
@@ -114,13 +187,20 @@ class StringParser {
       } else if (s[i] >= 'A' && s[i] <= 'Z') {
         digit = (s[i] - 'A' + 10);
       } else {
-        *result = PARSE_FAILURE;
-        return 0;
+        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+          // Reject the string because either the first char was not an alpha/digit,
+          // or the remaining chars are not all whitespace
+          *result = PARSE_FAILURE;
+          return 0;
+        }
+        // skip trailing whitespace.
+        break;
       }
+
       // Bail, if we encounter a digit that is not available in base.
       if (digit >= base) break;
-      
-      // This is a tricky check to see if adding this digit will cause an 
+
+      // This is a tricky check to see if adding this digit will cause an
       // overflow.
       if (UNLIKELY(val > (max_div_base - (digit > max_mod_base)))) {
         *result = PARSE_OVERFLOW;
@@ -137,9 +217,10 @@ class StringParser {
   // already does it and will cap the values to -inf/inf
   // To avoid inaccurate conversions this function falls back to strtod for
   // scientific notation.
+  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
   // TOOD: Investigate using intrinsics to speed up the slow strtod path.
   template <typename T>
-  static inline T StringToFloat(const char* s, int len, ParseResult* result) {
+  static inline T StringToFloatInternal(const char* s, int len, ParseResult* result) {
     // Use double here to not lose precision while accumulating the result
     double val = 0;
     bool negative = false;
@@ -151,6 +232,7 @@ class StringParser {
     case '-': negative = true;
     case '+': i = 1;
     }
+    int first = i;
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         if (decimal) {
@@ -164,8 +246,14 @@ class StringParser {
       } else if (s[i] == 'e' || s[i] == 'E') {
         break;
       } else {
-        *result = PARSE_FAILURE;
-        return 0;
+        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+          // Reject the string because either the first char was not a digit, "," or "e",
+          // or the remaining chars are not all whitespace
+          *result = PARSE_FAILURE;
+          return 0;
+        }
+        // skip trailing whitespace.
+        break;
       }
     }
 
@@ -181,10 +269,13 @@ class StringParser {
       c_str[len - negative] = '\0';
       char* s_end;
       val = strtod(c_str, &s_end);
-      // Require the entire string to be parsed, otherwise return an error.
-      if (UNLIKELY((val == 0 && c_str == s_end) || (s_end != c_str + len - negative))) {
-        *result = PARSE_FAILURE;
-        return val;
+      if (s_end != c_str + len - negative) {
+        // skip trailing whitespace
+        int trailing_len = len - negative - (int)(s_end - c_str); 
+        if (UNLIKELY(!isAllWhitespace(s_end, trailing_len))) {
+          *result = PARSE_FAILURE;
+          return val;
+        }
       }
     }
 
@@ -197,28 +288,41 @@ class StringParser {
     return (T)(negative ? -val : val);
   }
 
-  // parses a string for 'true' or 'false', case insensitive
-  static inline bool StringToBool(const char* s, int len, ParseResult* result) {
+  // Parses a string for 'true' or 'false', case insensitive.
+  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  static inline bool StringToBoolInternal(const char* s, int len, ParseResult* result) {
     *result = PARSE_SUCCESS;
-    if (len == 4) {
-      bool match = (s[0] == 't' || s[0] == 'T') &&
-                   (s[1] == 'r' || s[1] == 'R') &&
+    if (len >= 4 && (s[0] == 't' || s[0] == 'T')) {
+      bool match = (s[1] == 'r' || s[1] == 'R') &&
                    (s[2] == 'u' || s[2] == 'U') &&
                    (s[3] == 'e' || s[3] == 'E');
-      if (match) return true;
-    } else if (len == 5) {
-      bool match = (s[0] == 'f' || s[0] == 'F') &&
-                   (s[1] == 'a' || s[1] == 'A') &&
+      if (match && LIKELY(isAllWhitespace(s+4, len-4))) return true;
+    } else if (len >= 5 && (s[0] == 'f' || s[0] == 'F')) {
+      bool match = (s[1] == 'a' || s[1] == 'A') &&
                    (s[2] == 'l' || s[2] == 'L') &&
                    (s[3] == 's' || s[3] == 'S') &&
                    (s[4] == 'e' || s[4] == 'E');
-      if (match) return false;
+      if (match && LIKELY(isAllWhitespace(s+5, len-5))) return false;
     }
     *result = PARSE_FAILURE;
     return false;
   }
 
- private:
+  // Returns the position of the first non-whitespace character in s.
+  static inline int SkipLeadingWhitespace(const char* s, int len) {
+    int i = 0;
+    while(i < len && IS_SPACE(s[i])) ++i;
+    return i;
+  }
+
+  // Returns true if s only contains whitespace.
+  static inline bool isAllWhitespace(const char* s, int len) {
+    for (int i = 0; i < len; ++i) {
+      if (!IS_SPACE(s[i])) return false;
+    }
+    return true;
+  }
+
   template<typename T>
   class StringParseTraits {
    public:
@@ -226,19 +330,35 @@ class StringParser {
     // e.g. the max/min int8_t has 3 characters.
     static int max_ascii_len();
   };
-  
+
   // Converts an ascii string to an integer of type T assuming it cannot overflow
-  // and the number is positive.
+  // and the number is positive. Leading whitespace is not allowed. Trailing whitespace
+  // will be skipped.
   template <typename T>
   static inline T StringToIntNoOverflow(const char* s, int len, ParseResult* result) {
     T val = 0;
-    for (int i = 0; i < len; ++i) {
+    if (UNLIKELY(len == 0)) {
+      *result = PARSE_SUCCESS;
+      return val;
+    }
+    // Factor out the first char for error handling speeds up the loop.
+    if (LIKELY(s[0] >= '0' && s[0] <= '9')) {
+      val = s[0] - '0';
+    } else {
+      *result = PARSE_FAILURE;
+      return 0;
+    }
+    for (int i = 1; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         T digit = s[i] - '0';
         val = val * 10 + digit;
       } else {
-        *result = PARSE_FAILURE;
-        return 0;
+        if ((UNLIKELY(!isAllWhitespace(s + i, len - i)))) {
+          *result = PARSE_FAILURE;
+          return 0;
+        }
+        *result = PARSE_SUCCESS;
+        return val;
       }
     }
     *result = PARSE_SUCCESS;

@@ -66,13 +66,16 @@ void AddTestData(TestData* data, const string& input) {
   data->data.push_back(StringValue(const_cast<char*>(str.c_str()), str.length()));
 }
 
-void AddTestData(TestData* data, int n, int32_t min = -10, int32_t max = 10) {
+void AddTestData(TestData* data, int n, int32_t min = -10, int32_t max = 10,
+                 bool leading_space = false, bool trailing_space = false) {
   for (int i = 0; i < n; ++i) {
     double val = rand();
     val /= RAND_MAX;
     val = static_cast<int32_t>((val * (max - min)) + min);
     stringstream ss;
+    if (leading_space) ss << "   ";
     ss << val;
+    if (trailing_space) ss << "   ";
     AddTestData(data, ss.str());
   }
 }
@@ -244,13 +247,44 @@ int main(int argc, char **argv) {
   AddTestData(&data, 1000, -5, 1000);
   data.result.resize(data.data.size());
 
+  TestData data_leading_space;
+  AddTestData(&data_leading_space, 1000, -5, 1000, true, false);
+  data_leading_space.result.resize(data_leading_space.data.size());
+
+  TestData data_trailing_space;
+  AddTestData(&data_trailing_space, 1000, -5, 1000, false, true);
+  data_trailing_space.result.resize(data_trailing_space.data.size());
+
+  TestData data_both_space;
+  AddTestData(&data_both_space, 1000, -5, 1000, true, true);
+  data_both_space.result.resize(data_trailing_space.data.size());
+
+  TestData data_garbage;
+  for (int i = 0; i < 1000; ++i) {
+    AddTestData(&data_garbage, "sdfsfdsfasd");
+  }
+  data_garbage.result.resize(data_garbage.data.size());
+
+  TestData data_trailing_garbage;
+  for (int i = 0; i < 1000; ++i) {
+    AddTestData(&data_trailing_garbage, "123    a");
+  }
+  data_trailing_garbage.result.resize(data_trailing_garbage.data.size());
+
   Benchmark suite("atoi");
   suite.AddBenchmark("strtol", TestStrtol, &data);
   suite.AddBenchmark("atoi", TestAtoi, &data);
-  suite.AddBenchmark("impala", TestImpala, &data);
   suite.AddBenchmark("impala_unsafe", TestImpalaUnsafe, &data);
   suite.AddBenchmark("impala_unrolled", TestImpalaUnrolled, &data);
   suite.AddBenchmark("impala_cased", TestImpalaCased, &data);
+
+  suite.AddBenchmark("impala", TestImpala, &data);
+  suite.AddBenchmark("impala_leading_space", TestImpala, &data_leading_space);
+  suite.AddBenchmark("impala_trailing_space", TestImpala, &data_trailing_space);
+  suite.AddBenchmark("impala_both_space", TestImpala, &data_both_space);
+  suite.AddBenchmark("impala_garbage", TestImpala, &data_garbage);
+  suite.AddBenchmark("impala_trailing_garbage", TestImpala, &data_trailing_garbage);
+
   cout << suite.Measure();
 
   return 0;
