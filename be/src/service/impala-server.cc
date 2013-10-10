@@ -368,7 +368,8 @@ class CancellationWork {
 };
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env) {
+    : exec_env_(exec_env),
+      current_catalog_version_(0L) {
   // Initialize default config
   InitializeConfigVariables();
 

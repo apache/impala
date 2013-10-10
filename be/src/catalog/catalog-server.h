@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/Frontend_types.h"
@@ -30,6 +31,7 @@ namespace impala {
 
 class StateStoreSubscriber;
 class Catalog;
+class TGetAllCatalogObjectsResponse;
 
 // The Impala CatalogServer manages the caching and persistence of cluster-wide metadata.
 // The CatalogServer aggregates the metadata from the Hive Metastore, the NameNode,
@@ -68,32 +70,69 @@ class CatalogServer {
   Catalog* catalog() const { return catalog_.get(); }
 
  private:
-  // Thrift API implementation which proxies requests onto this CatalogService
+  // Thrift API implementation which proxies requests onto this CatalogService.
   boost::shared_ptr<CatalogServiceIf> thrift_iface_;
   Metrics* metrics_;
   boost::scoped_ptr<Catalog> catalog_;
   boost::scoped_ptr<StateStoreSubscriber> state_store_subscriber_;
 
+  // Thread that polls the catalog for any updates.
+  boost::scoped_ptr<Thread> catalog_update_gathering_thread_;
+
   // Tracks the set of catalog objects that exist via their topic entry key.
   std::set<std::string> catalog_object_topic_entry_keys_;
 
-  // The last version of the catalog that was sent over a statestore heartbeat.
-  int64_t last_catalog_version_;
+  // Protects catalog_update_cv_, catalog_objects_, catalog_objects_from_version_, and
+  // last_sent_catalog_version.
+  boost::mutex catalog_lock_;
 
-  // Called during each StateStore heartbeat and used to update the current set of
-  // catalog objects in the IMPALA_CATALOG_TOPIC. Responds to each heartbeat with a
-  // delta update containing the set of changes since the last heartbeat.
-  // This function first calls into the Catalog to get the current set of catalog objects
-  // that exist (along with some metadata on each object) and then checks which objects
-  // are new or have been modified since the last heartbeat (by comparing the catalog
-  // version of the object with the last_catalog_version_ sent). As a final step, this
-  // function determines any deletions of catalog objects by looking at the
-  // difference of the last set of topic entry keys that were sent and the current
-  // set of topic entry keys. All updates are added to the subscriber_topic_updates list
-  // and sent back to the StateStore.
+  // Condition variable used to signal when the catalog_update_gathering_thread_ should
+  // fetch its next set of updates from the JniCatalog. At the end of each statestore
+  // heartbeat, this CV is signaled and the catalog_update_gathering_thread_ starts
+  // querying the JniCatalog for catalog objects. Protected by the catalog_lock_.
+  boost::condition_variable catalog_update_cv_;
+
+  // The latest available set of catalog objects_. Set by the
+  // catalog_update_gathering_thread_ and protected by the catalog_lock_.
+  boost::scoped_ptr<TGetAllCatalogObjectsResponse> catalog_objects_;
+
+  // Flag used to indicate when the catalog_objects_ are ready for processing by the
+  // heartbeat thread. Set to false at the end of each heartbeat, before signaling
+  // the catalog_update_gathering_thread_. Set to true by the
+  // catalog_update_gathering_thread_ when it is done setting the latest
+  // catalog_objects_.
+  bool catalog_objects_ready_;
+
+  // The last version of the catalog that was sent over a statestore heartbeat.
+  // Set in UpdateCatalogTopicCallback() and protected by the catalog_lock_.
+  int64_t last_sent_catalog_version_;
+
+  // The lower bound of versions gathered by the catalog_update_gathering_thread_ and
+  // protected by the catalog_lock_.
+  int64_t catalog_objects_from_version_;
+
+  // Called during each StateStore heartbeat and is responsible for updating the current
+  // set of catalog objects in the IMPALA_CATALOG_TOPIC. Responds to each heartbeat with a
+  // delta update containing the set of changes since the last heartbeat. This function
+  // enumerates all catalog objects that were returned by the last call to the JniCatalog,
+  // done via the catalog_update_gathering_thread_ thread. The topic is updated with any
+  // catalog objects that are new or have been modified since the last heartbeat (by
+  // comparing the catalog version of the object with the last_sent_catalog_version_
+  // sent). Also determines any deletions of catalog objects by looking at the
+  // difference of the last set of topic entry keys that were sent and the current set
+  // of topic entry keys. At the end of execution it notifies the
+  // catalog_update_gathering_thread_ to fetch the next set of updates from the
+  // JniCatalog.
+  // All updates are added to the subscriber_topic_updates list and sent back to the
+  // StateStore.
   void UpdateCatalogTopicCallback(
       const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
+
+  // Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
+  // to get the latest set of catalog objects that exist, along with some metadata on
+  // each object. The results are stored in the shared catalog_objects_ data structure.
+  void GatherCatalogUpdatesThread();
 
   void CatalogPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);

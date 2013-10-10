@@ -67,12 +67,12 @@ public class JniCatalog {
   }
 
   public JniCatalog(int impalaLogLevel, int otherLogLevel) throws InternalException {
-    catalog_ = new CatalogServiceCatalog(getServiceId());
-    ddlExecutor_ = new DdlExecutor(catalog_);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
+    catalog_ = new CatalogServiceCatalog(getServiceId());
+    ddlExecutor_ = new DdlExecutor(catalog_);
   }
 
   public static TUniqueId getServiceId() { return catalogServiceId_; }
