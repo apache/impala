@@ -82,7 +82,8 @@ public class CatalogObjectToFromThriftTest {
       Assert.assertEquals(newTable.name, thriftTable.tbl_name);
       Assert.assertEquals(newTable.numClusteringCols, 2);
       // Currently only have table stats on "functional.alltypes"
-      Assert.assertEquals(newTable.numRows, dbName.equals("functional") ? 7300 : -1);
+      if (dbName.equals("functional")) Assert.assertEquals(7300, newTable.numRows);
+
       HdfsTable newHdfsTable = (HdfsTable) newTable;
       Assert.assertEquals(newHdfsTable.getPartitions().size(), 25);
       boolean foundDefaultPartition = false;
