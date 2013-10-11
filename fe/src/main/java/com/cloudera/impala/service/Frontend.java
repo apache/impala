@@ -414,7 +414,6 @@ public class Frontend {
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
-    planner.computeResourceReqs(fragments, true, queryExecRequest);
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
@@ -426,6 +425,27 @@ public class Frontend {
       fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
+
+    // set fragment destinations
+    for (int i = 1; i < fragments.size(); ++i) {
+      PlanFragment dest = fragments.get(i).getDestFragment();
+      Integer idx = fragmentIdx.get(dest);
+      Preconditions.checkState(idx != null);
+      queryExecRequest.addToDest_fragment_idx(idx.intValue());
+    }
+
+    // set scan ranges/locations for scan nodes
+    LOG.debug("get scan range locations");
+    for (ScanNode scanNode: scanNodes) {
+      queryExecRequest.putToPer_node_scan_ranges(
+          scanNode.getId().asInt(),
+          scanNode.getScanRangeLocations(
+            request.queryOptions.getMax_scan_range_length()));
+    }
+
+    // Compute resource requirements after scan range locations because the cost
+    // estimates of scan nodes rely on them.
+    planner.computeResourceReqs(fragments, true, request.queryOptions, queryExecRequest);
 
     // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;
@@ -448,23 +468,6 @@ public class Frontend {
     }
 
     result.setQuery_exec_request(queryExecRequest);
-
-    // set fragment destinations
-    for (int i = 1; i < fragments.size(); ++i) {
-      PlanFragment dest = fragments.get(i).getDestFragment();
-      Integer idx = fragmentIdx.get(dest);
-      Preconditions.checkState(idx != null);
-      queryExecRequest.addToDest_fragment_idx(idx.intValue());
-    }
-
-    // set scan ranges/locations for scan nodes
-    LOG.debug("get scan range locations");
-    for (ScanNode scanNode: scanNodes) {
-      queryExecRequest.putToPer_node_scan_ranges(
-          scanNode.getId().asInt(),
-          scanNode.getScanRangeLocations(
-            request.queryOptions.getMax_scan_range_length()));
-    }
 
     // Global query parameters to be set in each TPlanExecRequest.
     queryExecRequest.query_globals = analysisResult.getAnalyzer().getQueryGlobals();

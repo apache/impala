@@ -27,6 +27,7 @@ import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TSortNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -136,7 +137,7 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
     Preconditions.checkState(useTopN);
     perHostMemCost = (long) Math.ceil(cardinality * avgRowSize);

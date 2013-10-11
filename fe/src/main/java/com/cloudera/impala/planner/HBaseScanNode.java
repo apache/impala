@@ -49,6 +49,7 @@ import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
@@ -421,8 +422,17 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
     // TODO: What's a good estimate of memory consumption?
     perHostMemCost = 1024L * 1024L * 1024L;
+  }
+
+  /**
+   * Returns the per-host upper bound of memory that any number of concurrent scan nodes
+   * will use. Used for estimating the per-host memory requirement of queries.
+   */
+  public static long getPerHostMemUpperBound() {
+    // TODO: What's a good estimate of memory consumption?
+    return 1024L * 1024L * 1024L;
   }
 }

@@ -21,8 +21,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -36,6 +38,7 @@ import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
@@ -51,10 +54,27 @@ import com.google.common.collect.Lists;
 public class HdfsScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsScanNode.class);
 
+  // Read size of the backend I/O manager. Used in computeCosts().
+  private final static long IO_MGR_BUFFER_SIZE = 8L * 1024L * 1024L;
+
+  // Maximum number of I/O buffers per thread executing this scan.
+  private final static long MAX_IO_BUFFERS_PER_THREAD = 10;
+
+  // Number of scanner threads per core executing this scan.
+  private final static int THREADS_PER_CORE = 3;
+
+  // Factor capturing the worst-case deviation from a uniform distribution of scan ranges
+  // among nodes. The factor of 1.2 means that a particular node may have 20% more
+  // scan ranges than would have been estimated assuming a uniform distribution.
+  private final static double SCAN_RANGE_SKEW_FACTOR = 1.2;
+
   private final HdfsTable tbl;
 
   // Partitions that are filtered in for scanning by the key ranges
   private final ArrayList<HdfsPartition> partitions = Lists.newArrayList();
+
+  // List of scan-range locations. Populated in getScanRangeLocations().
+  private List<TScanRangeLocations> scanRanges;
 
   private List<SingleColumnFilter> keyFilters;
 
@@ -166,7 +186,7 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
-    List<TScanRangeLocations> result = Lists.newArrayList();
+    scanRanges = Lists.newArrayList();
     for (HdfsPartition partition: partitions) {
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
@@ -205,14 +225,14 @@ public class HdfsScanNode extends ScanNode {
             TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
             scanRangeLocations.scan_range = scanRange;
             scanRangeLocations.locations = locations;
-            result.add(scanRangeLocations);
+            scanRanges.add(scanRangeLocations);
             remainingLength -= currentLength;
             currentOffset += currentLength;
           }
         }
       }
     }
-    return result;
+    return scanRanges;
   }
 
   @Override
@@ -249,16 +269,83 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
+    Preconditions.checkNotNull(scanRanges, "Cost estimation requires scan ranges.");
+    if (scanRanges.isEmpty()) {
+      perHostMemCost = 0;
+      return;
+    }
+
+    // Number of nodes for the purpose of resource estimation adjusted
+    // for the special cases listed below.
+    long adjNumNodes = numNodes;
+    if (numNodes <= 0) {
+      adjNumNodes = 1;
+    } else if (scanRanges.size() < numNodes) {
+      // TODO: Empirically evaluate whether there is more Hdfs block skew for relatively
+      // small files, i.e., whether this estimate is too optimistic.
+      adjNumNodes = scanRanges.size();
+    }
+
+    Preconditions.checkNotNull(desc);
+    Preconditions.checkNotNull(desc.getTable() instanceof HdfsTable);
+    HdfsTable table = (HdfsTable) desc.getTable();
+    int perHostScanRanges;
+    if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
+      // For the purpose of this estimation, the number of per-host scan ranges for
+      // Parquet files are equal to the number of non-partition columns scanned.
+      perHostScanRanges = 0;
+      for (SlotDescriptor slot: desc.getSlots()) {
+        if (slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
+          ++perHostScanRanges;
+        }
+      }
+    } else {
+      perHostScanRanges = (int) Math.ceil((
+          (double) scanRanges.size() / (double) adjNumNodes) * SCAN_RANGE_SKEW_FACTOR);
+    }
+
     // TODO: The total memory consumption for a particular query depends on the number
     // of *available* cores, i.e., it depends the resource consumption of other
     // concurrent queries. Figure out how to account for that.
-    // TODO: A better way to estimate the costs might be to ask the BE IoMgr
-    // to return an estimate.
-    // TODO: The calculation below is a worst-case estimate that is temporarily
-    // acceptable for testing resource management with hard memory limit enforcement.
-    long numCores = RuntimeEnv.INSTANCE.getNumCores();
-    // Impala starts up 3 scan ranges per core each using a default of 5 * 8MB buffers.
-    perHostMemCost = numCores * 3L * 5L * 8L * 1024L * 1024L;
+    int maxScannerThreads = Math.min(perHostScanRanges,
+        RuntimeEnv.INSTANCE.getNumCores() * THREADS_PER_CORE);
+    // Account for the max scanner threads query option.
+    if (queryOptions.isSetNum_scanner_threads() &&
+        queryOptions.getNum_scanner_threads() > 0) {
+      maxScannerThreads =
+          Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
+    }
+
+    long avgScanRangeBytes = (long) Math.ceil(totalBytes / (double) scanRanges.size());
+    // The +1 accounts for an extra I/O buffer to read past the scan range due to a
+    // trailing record spanning Hdfs blocks.
+    long perThreadIoBuffers =
+        Math.min((long) Math.ceil(avgScanRangeBytes / (double) IO_MGR_BUFFER_SIZE),
+            MAX_IO_BUFFERS_PER_THREAD) + 1;
+    perHostMemCost = maxScannerThreads * perThreadIoBuffers * IO_MGR_BUFFER_SIZE;
+
+    // Sanity check: the tighter estimation should not exceed the per-host maximum.
+    long perHostUpperBound = getPerHostMemUpperBound();
+    if (perHostMemCost > perHostUpperBound) {
+      LOG.warn(String.format("Per-host mem cost %s exceeded per-host upper bound %s.",
+          PrintUtils.printBytes(perHostMemCost),
+          PrintUtils.printBytes(perHostUpperBound)));
+      perHostMemCost = perHostUpperBound;
+    }
+  }
+
+  /**
+   * Hdfs scans use a shared pool of buffers managed by the I/O manager. Intuitively,
+   * the maximum number of I/O buffers is limited by the total disk bandwidth of a node.
+   * Therefore, this upper bound is independent of the number of concurrent scans and
+   * queries and helps to derive a tighter per-host memory estimate for queries with
+   * multiple concurrent scans.
+   */
+  public static long getPerHostMemUpperBound() {
+    // THREADS_PER_CORE each using a default of
+    // MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE bytes.
+    return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) THREADS_PER_CORE *
+        (long) MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE;
   }
 }

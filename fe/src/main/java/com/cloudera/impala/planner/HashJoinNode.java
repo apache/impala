@@ -34,6 +34,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THashJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -246,7 +247,7 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
         || numNodes == 0) {
       perHostMemCost = DEFAULT_PER_HOST_MEM;

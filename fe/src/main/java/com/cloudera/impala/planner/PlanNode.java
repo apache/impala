@@ -33,6 +33,7 @@ import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -417,7 +418,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * May only be called after this PlanNode has been placed in a PlanFragment because
    * the cost computation is dependent on the enclosing fragment's data partition.
    */
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
     perHostMemCost = 0;
   }
 }

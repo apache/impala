@@ -59,6 +59,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -1566,24 +1567,47 @@ public class Planner {
      * Returns true if at least one plan node was included in the estimation.
      * Otherwise returns false indicating the estimates are invalid.
      */
-    public boolean computeResourceEstimates(boolean excludeUnpartitionedFragments) {
+    public boolean computeResourceEstimates(boolean excludeUnpartitionedFragments,
+        TQueryOptions queryOptions) {
       Set<PlanFragment> uniqueFragments = Sets.newHashSet();
-      long perHostMem = 0L;
 
+      // Distinguish the per-host memory estimates for scan nodes and non-scan nodes to
+      // get a tighter estimate on the amount of memory required by multiple concurrent
+      // scans. The memory required by all concurrent scans of the same type (Hdfs/Hbase)
+      // cannot exceed the per-host upper memory bound for that scan type. Intuitively,
+      // the amount of I/O buffers is limited by the disk bandwidth.
+      long perHostHbaseScanMem = 0L;
+      long perHostHdfsScanMem = 0L;
+      long perHostNonScanMem = 0L;
       for (int i = 0; i < planNodes.size(); ++i) {
-       PlanNode node = planNodes.get(i);
-       PlanFragment fragment = node.getFragment();
-       if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
-       node.computeCosts();
-       uniqueFragments.add(fragment);
-       if (node.getPerHostMemCost() < 0) {
-         LOG.warn(String.format("Invalid per-host memory requirement %s of node %s.\n" +
-             "PlanNode stats are: numNodes=%s ", node.getPerHostMemCost(),
-             node.getClass().getSimpleName(), node.getNumNodes()));
-       }
-       perHostMem += node.getPerHostMemCost();
+        PlanNode node = planNodes.get(i);
+        PlanFragment fragment = node.getFragment();
+        if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
+        node.computeCosts(queryOptions);
+        uniqueFragments.add(fragment);
+        if (node.getPerHostMemCost() < 0) {
+          LOG.warn(String.format("Invalid per-host memory requirement %s of node %s.\n" +
+              "PlanNode stats are: numNodes=%s ", node.getPerHostMemCost(),
+              node.getClass().getSimpleName(), node.getNumNodes()));
+        }
+        if (node instanceof HBaseScanNode) {
+          perHostHbaseScanMem += node.getPerHostMemCost();
+        } else if (node instanceof HdfsScanNode) {
+          perHostHdfsScanMem += node.getPerHostMemCost();
+        } else {
+          perHostNonScanMem += node.getPerHostMemCost();
+        }
       }
+      // The memory required by concurrent scans cannot exceed the upper memory bound
+      // for that scan type.
+      // TODO: In the future, we may want to restrict scanner concurrency based on a
+      // memory limit. This estimation will need to accoung for that as well.
+      perHostHbaseScanMem =
+          Math.min(perHostHbaseScanMem, HBaseScanNode.getPerHostMemUpperBound());
+      perHostHdfsScanMem =
+          Math.min(perHostHdfsScanMem, HdfsScanNode.getPerHostMemUpperBound());
 
+      long perHostDataSinkMem = 0L;
       for (int i = 0; i < dataSinks.size(); ++i) {
         DataSink sink = dataSinks.get(i);
         PlanFragment fragment = sink.getFragment();
@@ -1595,8 +1619,12 @@ public class Planner {
           LOG.warn(String.format("Invalid per-host memory requirement %s of sink %s.\n" +
               sink.getPerHostMemCost(), sink.getClass().getSimpleName()));
         }
-        perHostMem += sink.getPerHostMemCost();
+        perHostDataSinkMem += sink.getPerHostMemCost();
       }
+
+      // Combine the memory estimates of all sinks, scans nodes and non-scan nodes.
+      long perHostMem = perHostHdfsScanMem + perHostHbaseScanMem + perHostNonScanMem +
+          perHostDataSinkMem;
 
       // The backend needs at least one thread per fragment.
       int perHostVcores = uniqueFragments.size();
@@ -1623,7 +1651,8 @@ public class Planner {
    * once resource estimation is more robust.
    */
   public void computeResourceReqs(List<PlanFragment> fragments,
-      boolean excludeUnpartitionedFragments, TQueryExecRequest request) {
+      boolean excludeUnpartitionedFragments, TQueryOptions queryOptions,
+      TQueryExecRequest request) {
     Preconditions.checkState(!fragments.isEmpty());
     Preconditions.checkNotNull(request);
 
@@ -1649,12 +1678,18 @@ public class Planner {
     long maxPerHostMem = Long.MIN_VALUE;
     int maxPerHostVcores = Integer.MIN_VALUE;
     for (PipelinedPlanNodeSet planNodeSet: planNodeSets) {
-      if (!planNodeSet.computeResourceEstimates(excludeUnpartitionedFragments)) continue;
+      if (!planNodeSet.computeResourceEstimates(
+          excludeUnpartitionedFragments, queryOptions)) {
+        continue;
+      }
       long perHostMem = planNodeSet.getPerHostMem();
       int perHostVcores = planNodeSet.getPerHostVcores();
       if (perHostMem > maxPerHostMem) maxPerHostMem = perHostMem;
       if (perHostVcores > maxPerHostVcores) maxPerHostVcores = perHostVcores;
     }
+
+    // Do not ask for more cores than are in the RuntimeEnv.
+    maxPerHostVcores = Math.min(maxPerHostVcores, RuntimeEnv.INSTANCE.getNumCores());
 
     // Legitimately set costs to zero if there are only unpartitioned fragments
     // and excludeUnpartitionedFragments is true.

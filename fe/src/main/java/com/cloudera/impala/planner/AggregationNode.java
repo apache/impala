@@ -29,6 +29,7 @@ import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -180,7 +181,7 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(fragment,
         "PlanNode must be placed into a fragment before calling this method.");
     perHostMemCost = 0;
