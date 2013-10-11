@@ -8,7 +8,7 @@ from functional.alltypes
 where year>2009 and month=4
 ---- TYPES
 string
----- RESULTS
+---- RESULTS: VERIFY_IS_SUBSET
 'PLAN FRAGMENT 0'
 '  PARTITION: RANDOM'
 ''
@@ -26,9 +26,7 @@ string
 explain select * from functional.alltypes
 ---- TYPES
 string
----- RESULTS
-'Estimated Per-Host Requirements: Memory=960.00MB VCores=1'
-''
+---- RESULTS: VERIFY_IS_SUBSET
 'PLAN FRAGMENT 0'
 '  PARTITION: UNPARTITIONED'
 ''
@@ -46,4 +44,3 @@ string
 '     table stats: 7300 rows total'
 '     columns missing stats: timestamp_col'
 ====
-
