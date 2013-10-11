@@ -27,8 +27,6 @@ and t1.zip + t2.zip = 10
 # join predicate between t1, t2 and t3 applied after last join
 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -38,18 +36,10 @@ PLAN FRAGMENT 0
   |    t1.id = t3.id
   |  other join predicates: t2.id = 15, t1.id - t2.id = 0
   |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1N 2N
   |
   |----3:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: t3.zip = 94720
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN
@@ -57,37 +47,19 @@ PLAN FRAGMENT 0
   |    t1.id - 1 = t2.id + 1
   |  other join predicates: t1.zip = 94611
   |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1N
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: t2.zip = 94104
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t1.id > 0
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=5.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0 1N 2N
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -102,14 +74,8 @@ PLAN FRAGMENT 1
   |    t1.id = t3.id
   |  other join predicates: t2.id = 15, t1.id - t2.id = 0
   |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1N 2N
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
@@ -117,23 +83,12 @@ PLAN FRAGMENT 1
   |    t1.id - 1 = t2.id + 1
   |  other join predicates: t1.zip = 94611
   |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1N
   |
   |----5:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t1.id > 0
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -145,11 +100,6 @@ PLAN FRAGMENT 2
   3:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t3.zip = 94720
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -161,11 +111,6 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t2.zip = 94104
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -180,8 +125,6 @@ from (select * from functional.testtbl a1) t1 left outer join (select * from fun
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -191,18 +134,10 @@ PLAN FRAGMENT 0
   |    a1.id = a3.id
   |  other join predicates: a2.id = 15, a1.id - a2.id = 0
   |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0 2N 4N
   |
   |----3:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: a3.zip = 94720
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN
@@ -210,37 +145,19 @@ PLAN FRAGMENT 0
   |    a1.id - 1 = a2.id + 1
   |  other join predicates: a1.zip = 94611
   |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0 2N
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: a2.zip = 94104
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a1.id > 0
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=5.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0 2N 4N
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -255,14 +172,8 @@ PLAN FRAGMENT 1
   |    a1.id = a3.id
   |  other join predicates: a2.id = 15, a1.id - a2.id = 0
   |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 2N 4N
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
@@ -270,23 +181,12 @@ PLAN FRAGMENT 1
   |    a1.id - 1 = a2.id + 1
   |  other join predicates: a1.zip = 94611
   |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 2N
   |
   |----5:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a1.id > 0
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -298,11 +198,6 @@ PLAN FRAGMENT 2
   3:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a3.zip = 94720
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -314,11 +209,6 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a2.zip = 94104
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -354,8 +244,6 @@ and t1.zip + t2.zip = 10
 # join predicate between t1, t2 and t3 applied after last join
 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -365,55 +253,29 @@ PLAN FRAGMENT 0
   |    t1.id = t3.id
   |  other join predicates: t1.id - t2.id = 0, t3.zip = 94720
   |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 1N 2
   |
   |----3:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: t3.id IS NOT NULL
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
   |  other join predicates: t2.zip = 94104
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 1
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: t2.id = 15
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t1.zip = 94611
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=4.94GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0N 1N 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: t1.id
@@ -428,19 +290,10 @@ PLAN FRAGMENT 1
   |    t1.id = t3.id
   |  other join predicates: t1.id - t2.id = 0, t3.zip = 94720
   |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0N 1N 2
   |
   |----8:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   7:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 0N 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -452,11 +305,6 @@ PLAN FRAGMENT 2
   3:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t3.id IS NOT NULL
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: t1.id - 1
@@ -470,19 +318,10 @@ PLAN FRAGMENT 3
   |  hash predicates:
   |    t1.id - 1 = t2.id + 1
   |  other join predicates: t2.zip = 94104
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0N 1
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   5:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -494,11 +333,6 @@ PLAN FRAGMENT 4
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t2.id = 15
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -510,11 +344,6 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: t1.zip = 94611
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -529,8 +358,6 @@ from (select * from functional.testtbl a1) t1 right outer join (select * from fu
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -540,55 +367,29 @@ PLAN FRAGMENT 0
   |    a1.id = a3.id
   |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
   |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 2N 4
   |
   |----3:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: a3.id IS NOT NULL
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
   |  other join predicates: a2.zip = 94104
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 2
   |
   |----1:SCAN HDFS
   |       table=functional.testtbl #partitions=0/1 size=0B compact
   |       predicates: a2.id = 15
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a1.zip = 94611
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=4.94GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0N 2N 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: a1.id
@@ -603,19 +404,10 @@ PLAN FRAGMENT 1
   |    a1.id = a3.id
   |  other join predicates: a1.id - a2.id = 0, a3.zip = 94720
   |  other predicates: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0N 2N 4
   |
   |----8:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   7:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 0N 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -627,11 +419,6 @@ PLAN FRAGMENT 2
   3:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a3.id IS NOT NULL
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: a1.id - 1
@@ -645,19 +432,10 @@ PLAN FRAGMENT 3
   |  hash predicates:
   |    a1.id - 1 = a2.id + 1
   |  other join predicates: a2.zip = 94104
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0N 2
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   5:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -669,11 +447,6 @@ PLAN FRAGMENT 4
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a2.id = 15
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -685,11 +458,6 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: a1.zip = 94611
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 NODE 1:
@@ -702,8 +470,6 @@ from functional.alltypesagg a
 right outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -712,35 +478,17 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    a.tinyint_col = b.id
   |  other predicates: a.tinyint_col IS NULL
-  |  cardinality: 13333
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 1
   |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |       table stats: 8 rows total
-  |       column stats: all
-  |       cardinality: 8
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 13333
-     per-host memory: unavailable
-     tuple ids: 0N 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: a.tinyint_col
@@ -754,19 +502,10 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    a.tinyint_col = b.id
   |  other predicates: a.tinyint_col IS NULL
-  |  cardinality: 13333
-  |  per-host memory: 9B
-  |  tuple ids: 0N 1
   |
   |----4:EXCHANGE
-  |       cardinality: 8
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 10000
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -777,11 +516,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
-     table stats: 8 rows total
-     column stats: all
-     cardinality: 8
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -792,11 +526,6 @@ PLAN FRAGMENT 3
 
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # same for full outer joins
 select a.tinyint_col, b.id
@@ -804,8 +533,6 @@ from functional.alltypesagg a
 full outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -814,35 +541,17 @@ PLAN FRAGMENT 0
   |  hash predicates:
   |    a.tinyint_col = b.id
   |  other predicates: a.tinyint_col IS NULL
-  |  cardinality: 13333
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 1N
   |
   |----1:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |       table stats: 8 rows total
-  |       column stats: all
-  |       cardinality: 8
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 13333
-     per-host memory: unavailable
-     tuple ids: 0N 1N
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: a.tinyint_col
@@ -856,19 +565,10 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    a.tinyint_col = b.id
   |  other predicates: a.tinyint_col IS NULL
-  |  cardinality: 13333
-  |  per-host memory: 9B
-  |  tuple ids: 0N 1N
   |
   |----4:EXCHANGE
-  |       cardinality: 8
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 10000
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -879,11 +579,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
-     table stats: 8 rows total
-     column stats: all
-     cardinality: 8
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -894,9 +589,4 @@ PLAN FRAGMENT 3
 
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====

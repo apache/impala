@@ -19,36 +19,21 @@ group by
   l_returnflag,
   l_linestatus
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
-  |  cardinality: 4
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate <= '1998-09-02'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     cardinality: 4
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_returnflag, l_linestatus
@@ -60,14 +45,8 @@ PLAN FRAGMENT 1
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity)), SUM(SUM(l_extendedprice)), SUM(SUM(l_extendedprice * (1.0 - l_discount))), SUM(SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax))), SUM(COUNT(l_quantity)), SUM(COUNT(l_extendedprice)), SUM(SUM(l_discount)), SUM(COUNT(l_discount)), SUM(COUNT(1))
   |  group by: l_returnflag, l_linestatus
-  |  cardinality: 4
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 8
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -79,18 +58,10 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * (1.0 - l_discount)), SUM(l_extendedprice * (1.0 - l_discount) * (1.0 + l_tax)), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   |  group by: l_returnflag, l_linestatus
-  |  cardinality: 4
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate <= '1998-09-02'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -122,141 +93,77 @@ from tpch.partsupp ps
   join tpch.region r
     on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n.n_regionkey = r.r_regionkey
-  |  cardinality: 585
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4
   |
   |----7:SCAN HDFS
   |       table=tpch.region #partitions=1/1 size=384B compact
   |       predicates: r.r_name = 'EUROPE'
-  |       table stats: 5 rows total
-  |       column stats: all
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 2926
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  cardinality: 2224
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  cardinality: 2224
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
   |       predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 556
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=2.81GB VCores=4
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps.ps_suppkey
 
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: 67.99KB
+    overwrite=true
 
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n.n_regionkey = r.r_regionkey
-  |  cardinality: 585
-  |  per-host memory: 4B
-  |  tuple ids: 0 1 2 3 4
   |
   |----13:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 2926
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3
   |
   |----12:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  cardinality: 2224
-  |  per-host memory: 10.74KB
-  |  tuple ids: 0 1 2
   |
   |----11:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   10:EXCHANGE
-     cardinality: 2224
-     per-host memory: 0B
-     tuple ids: 0 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -268,11 +175,6 @@ PLAN FRAGMENT 1
   7:SCAN HDFS
      table=tpch.region #partitions=1/1 size=384B
      predicates: r.r_name = 'EUROPE'
-     table stats: 5 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -283,11 +185,6 @@ PLAN FRAGMENT 2
 
   5:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -298,11 +195,6 @@ PLAN FRAGMENT 3
 
   3:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -315,22 +207,11 @@ PLAN FRAGMENT 4
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  cardinality: 2224
-  |  per-host memory: 1.79KB
-  |  tuple ids: 0 1
   |
   |----9:EXCHANGE
-  |       cardinality: 556
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -342,11 +223,6 @@ PLAN FRAGMENT 5
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 556
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
 select
@@ -355,50 +231,30 @@ select
 from  tpch.q2_minimum_cost_supplier_tmp1
 group by p_partkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: MIN(ps_supplycost)
   |  group by: p_partkey
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1/1 size=108.41KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.06GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: p_partkey
 
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: MIN(MIN(ps_supplycost))
   |  group by: p_partkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -410,17 +266,9 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: MIN(ps_supplycost)
   |  group by: p_partkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1/1 size=108.41KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select
@@ -442,59 +290,33 @@ order by
   t1.p_partkey
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    t1.p_partkey = t2.p_partkey
   |    t1.ps_supplycost = t2.ps_min_supplycost
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1/1 size=6.37KB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1/1 size=108.41KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=2.94GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   5:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 0 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -506,31 +328,17 @@ PLAN FRAGMENT 1
   3:TOP-N
   |  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 13.28KB
-  |  tuple ids: 0 1
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    t1.p_partkey = t2.p_partkey
   |    t1.ps_supplycost = t2.ps_min_supplycost
-  |  cardinality: unavailable
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1
   |
   |----4:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp1 #partitions=1/1 size=108.41KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -541,11 +349,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=tpch.q2_minimum_cost_supplier_tmp2 #partitions=1/1 size=6.37KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
@@ -571,84 +374,47 @@ order by
   o_orderdate
 limit 10
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   5:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  cardinality: 3913902180
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 12847
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
   |       predicates: c.c_mktsegment = 'BUILDING'
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 21429
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 89929
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o_orderdate < '1995-03-15'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate > '1995-03-15'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=152.37GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   11:EXCHANGE
-     cardinality: 10
-     per-host memory: unavailable
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_orderkey, o_orderdate, o_shippriority
@@ -660,21 +426,12 @@ PLAN FRAGMENT 1
   6:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: 360B
-  |  tuple ids: 3
   |
   10:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  cardinality: 3913902180
-  |  per-host memory: 8.02GB
-  |  tuple ids: 3
   |
   9:EXCHANGE
-     cardinality: 7827804360
-     per-host memory: 0B
-     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -686,44 +443,24 @@ PLAN FRAGMENT 2
   5:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_orderkey, o_orderdate, o_shippriority
-  |  cardinality: 3913902180
-  |  per-host memory: 144.35GB
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 12847
-  |  per-host memory: 69.06KB
-  |  tuple ids: 0 1 2
   |
   |----8:EXCHANGE
-  |       cardinality: 21429
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 89929
-  |  per-host memory: 483.40KB
-  |  tuple ids: 0 1
   |
   |----7:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate > '1995-03-15'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -735,11 +472,6 @@ PLAN FRAGMENT 3
   3:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
      predicates: c.c_mktsegment = 'BUILDING'
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 21429
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -751,11 +483,6 @@ PLAN FRAGMENT 4
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o_orderdate < '1995-03-15'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -790,73 +517,41 @@ order by
   o_orderpriority
 limit 10
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  cardinality: 5
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   4:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
-  |  cardinality: 5
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   3:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
-  |  cardinality: 5004990
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 8993
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 15000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.06GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   10:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  cardinality: 5
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   9:EXCHANGE
-     cardinality: 5
-     per-host memory: unavailable
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: o_orderpriority
@@ -868,27 +563,15 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: o_orderpriority ASC
   |  limit: 10
-  |  cardinality: 5
-  |  per-host memory: 120B
-  |  tuple ids: 3
   |
   4:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey)
   |  group by: o_orderpriority
-  |  cardinality: 5
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   8:AGGREGATE (merge)
   |  group by: o_orderpriority, l_orderkey
-  |  cardinality: 5004990
-  |  per-host memory: 25.20MB
-  |  tuple ids: 2
   |
   7:EXCHANGE
-     cardinality: 5004990
-     per-host memory: 0B
-     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -899,31 +582,17 @@ PLAN FRAGMENT 2
 
   3:AGGREGATE
   |  group by: o_orderpriority, l_orderkey
-  |  cardinality: 5004990
-  |  per-host memory: 126.01MB
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 8993
-  |  per-host memory: 48.34KB
-  |  tuple ids: 0 1
   |
   |----6:EXCHANGE
-  |       cardinality: 15000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -935,11 +604,6 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 15000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -979,132 +643,71 @@ order by
   revenue desc
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  cardinality: 24
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   11:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
-  |  cardinality: 24
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n_regionkey = r_regionkey
-  |  cardinality: 23665
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----9:SCAN HDFS
   |       table=tpch.region #partitions=1/1 size=384B compact
   |       predicates: r_name = 'ASIA'
-  |       table stats: 5 rows total
-  |       column stats: all
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = n_nationkey
-  |  cardinality: 118326
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4
   |
   |----7:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = c_nationkey
   |    o_custkey = c_custkey
-  |  cardinality: 89928
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  cardinality: 89928
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  cardinality: 89928
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 15000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=4.69GB VCores=6
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   21:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  cardinality: 24
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   20:EXCHANGE
-     cardinality: 24
-     per-host memory: unavailable
-     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: n_name
@@ -1116,21 +719,12 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 100
-  |  cardinality: 24
-  |  per-host memory: 576B
-  |  tuple ids: 6
   |
   19:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: n_name
-  |  cardinality: 24
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   18:EXCHANGE
-     cardinality: 48
-     per-host memory: 0B
-     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -1142,83 +736,45 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: n_name
-  |  cardinality: 24
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n_regionkey = r_regionkey
-  |  cardinality: 23665
-  |  per-host memory: 4B
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----17:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: 0B
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = n_nationkey
-  |  cardinality: 118326
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3 4
   |
   |----16:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = c_nationkey
   |    o_custkey = c_custkey
-  |  cardinality: 89928
-  |  per-host memory: 483.40KB
-  |  tuple ids: 0 1 2 3
   |
   |----15:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  cardinality: 89928
-  |  per-host memory: 32.23KB
-  |  tuple ids: 0 1 2
   |
   |----14:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  cardinality: 89928
-  |  per-host memory: 48.34KB
-  |  tuple ids: 0 1
   |
   |----13:EXCHANGE
-  |       cardinality: 15000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1230,11 +786,6 @@ PLAN FRAGMENT 3
   9:SCAN HDFS
      table=tpch.region #partitions=1/1 size=384B
      predicates: r_name = 'ASIA'
-     table stats: 5 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1245,11 +796,6 @@ PLAN FRAGMENT 4
 
   7:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1260,11 +806,6 @@ PLAN FRAGMENT 5
 
   5:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1275,11 +816,6 @@ PLAN FRAGMENT 6
 
   3:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -1291,11 +827,6 @@ PLAN FRAGMENT 7
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 15000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1326,43 +857,25 @@ where l_shipdate >= '1994-01-01' and
       l_discount <= 0.07 and
       l_quantity < 24
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * l_discount)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * l_discount))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1374,18 +887,10 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_extendedprice * l_discount)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1428,164 +933,87 @@ order by
   o_year
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 8
   |
   15:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
-  |  cardinality: 1955
-  |  per-host memory: unavailable
-  |  tuple ids: 8
   |
   14:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s_nationkey = n2.n_nationkey
-  |  cardinality: 188
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5 6 7
   |
   |----13:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 7
   |
   12:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n1.n_regionkey = r_regionkey
-  |  cardinality: 143
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5 6
   |
   |----11:SCAN HDFS
   |       table=tpch.region #partitions=1/1 size=384B compact
   |       predicates: r_name = 'AMERICA'
-  |       table stats: 5 rows total
-  |       column stats: all
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    c_nationkey = n1.n_nationkey
-  |  cardinality: 717
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----9:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o_custkey = c_custkey
-  |  cardinality: 545
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4
   |
   |----7:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  cardinality: 545
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_partkey = p_partkey
-  |  cardinality: 545
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
   |       predicates: p_type = 'ECONOMY ANODIZED STEEL'
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 1212
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  cardinality: 89928
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o_orderdate >= '1995-01-01', o_orderdate < '1996-12-31'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 15000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=3.75GB VCores=5
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   29:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 8
   |
   28:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 8
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: year(o_orderdate)
@@ -1597,21 +1025,12 @@ PLAN FRAGMENT 1
   16:TOP-N
   |  order by: year(o_orderdate) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 1.95KB
-  |  tuple ids: 8
   |
   27:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: year(o_orderdate)
-  |  cardinality: 1955
-  |  per-host memory: 10.00MB
-  |  tuple ids: 8
   |
   26:EXCHANGE
-     cardinality: 3910
-     per-host memory: 0B
-     tuple ids: 8
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: o_custkey
@@ -1623,66 +1042,36 @@ PLAN FRAGMENT 2
   15:AGGREGATE
   |  output: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: year(o_orderdate)
-  |  cardinality: 1955
-  |  per-host memory: 10.00MB
-  |  tuple ids: 8
   |
   14:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s_nationkey = n2.n_nationkey
-  |  cardinality: 188
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3 4 5 6 7
   |
   |----25:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 7
   |
   12:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    n1.n_regionkey = r_regionkey
-  |  cardinality: 143
-  |  per-host memory: 4B
-  |  tuple ids: 0 1 2 3 4 5 6
   |
   |----24:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: 0B
-  |       tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    c_nationkey = n1.n_nationkey
-  |  cardinality: 717
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----23:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    o_custkey = c_custkey
-  |  cardinality: 545
-  |  per-host memory: 161.13KB
-  |  tuple ids: 0 1 2 3 4
   |
   |----22:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   21:EXCHANGE
-     cardinality: 545
-     per-host memory: 0B
-     tuple ids: 0 1 2 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -1693,11 +1082,6 @@ PLAN FRAGMENT 3
 
   13:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 7
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -1709,11 +1093,6 @@ PLAN FRAGMENT 4
   11:SCAN HDFS
      table=tpch.region #partitions=1/1 size=384B
      predicates: r_name = 'AMERICA'
-     table stats: 5 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 6
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -1724,11 +1103,6 @@ PLAN FRAGMENT 5
 
   9:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 5
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -1739,11 +1113,6 @@ PLAN FRAGMENT 6
 
   7:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 7
   PARTITION: HASH_PARTITIONED: l_suppkey
@@ -1756,19 +1125,10 @@ PLAN FRAGMENT 7
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l_suppkey = s_suppkey
-  |  cardinality: 545
-  |  per-host memory: 10.74KB
-  |  tuple ids: 0 1 2 3
   |
   |----20:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   19:EXCHANGE
-     cardinality: 545
-     per-host memory: 0B
-     tuple ids: 0 1 2
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -1779,11 +1139,6 @@ PLAN FRAGMENT 8
 
   5:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 9
   PARTITION: RANDOM
@@ -1796,35 +1151,18 @@ PLAN FRAGMENT 9
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_partkey = p_partkey
-  |  cardinality: 545
-  |  per-host memory: 3.91KB
-  |  tuple ids: 0 1 2
   |
   |----18:EXCHANGE
-  |       cardinality: 1212
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l_orderkey = o_orderkey
-  |  cardinality: 89928
-  |  per-host memory: 48.34KB
-  |  tuple ids: 0 1
   |
   |----17:EXCHANGE
-  |       cardinality: 15000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 10
   PARTITION: RANDOM
@@ -1836,11 +1174,6 @@ PLAN FRAGMENT 10
   3:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p_type = 'ECONOMY ANODIZED STEEL'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 1212
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 11
   PARTITION: RANDOM
@@ -1852,11 +1185,6 @@ PLAN FRAGMENT 11
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o_orderdate >= '1995-01-01', o_orderdate < '1996-12-31'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 15000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -1910,131 +1238,70 @@ order by
   o_year desc
 limit 200
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  cardinality: 200
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   11:AGGREGATE (finalize)
   |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
-  |  cardinality: 46920
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 3622318
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----9:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_suppkey = s.s_suppkey
-  |  cardinality: 2752962
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4
   |
   |----7:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_suppkey = ps.ps_suppkey
   |    l.l_partkey = ps.ps_partkey
-  |  cardinality: 2752962
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.partsupp #partitions=1/1 size=112.71MB compact
-  |       table stats: 800000 rows total
-  |       column stats: all
-  |       cardinality: 800000
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 899286
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 1500000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 600122
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
   |       predicates: p.p_name LIKE '%green%'
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 20000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=3.75GB VCores=5
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   22:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  cardinality: 200
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   21:EXCHANGE
-     cardinality: 200
-     per-host memory: unavailable
-     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: n.n_name, year(o.o_orderdate)
@@ -2046,21 +1313,12 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: n.n_name ASC, year(o.o_orderdate) DESC
   |  limit: 200
-  |  cardinality: 200
-  |  per-host memory: 5.47KB
-  |  tuple ids: 6
   |
   20:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity))
   |  group by: n.n_name, year(o.o_orderdate)
-  |  cardinality: 46920
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   19:EXCHANGE
-     cardinality: 93840
-     per-host memory: 0B
-     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -2072,67 +1330,37 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: SUM(l.l_extendedprice * (1.0 - l.l_discount) - ps.ps_supplycost * l.l_quantity)
   |  group by: n.n_name, year(o.o_orderdate)
-  |  cardinality: 46920
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 3622318
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3 4 5
   |
   |----18:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_suppkey = s.s_suppkey
-  |  cardinality: 2752962
-  |  per-host memory: 32.23KB
-  |  tuple ids: 0 1 2 3 4
   |
   |----17:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_suppkey = ps.ps_suppkey
   |    l.l_partkey = ps.ps_partkey
-  |  cardinality: 2752962
-  |  per-host memory: 2.52MB
-  |  tuple ids: 0 1 2 3
   |
   |----16:EXCHANGE
-  |       cardinality: 800000
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 899286
-  |  per-host memory: 1.57MB
-  |  tuple ids: 0 1 2
   |
   |----15:EXCHANGE
-  |       cardinality: 1500000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   14:EXCHANGE
-     cardinality: 600122
-     per-host memory: 0B
-     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2143,11 +1371,6 @@ PLAN FRAGMENT 3
 
   9:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2158,11 +1381,6 @@ PLAN FRAGMENT 4
 
   7:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2173,11 +1391,6 @@ PLAN FRAGMENT 5
 
   5:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -2188,11 +1401,6 @@ PLAN FRAGMENT 6
 
   3:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1500000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -2205,22 +1413,11 @@ PLAN FRAGMENT 7
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 600122
-  |  per-host memory: 64.45KB
-  |  tuple ids: 0 1
   |
   |----13:EXCHANGE
-  |       cardinality: 20000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -2232,11 +1429,6 @@ PLAN FRAGMENT 8
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p.p_name LIKE '%green%'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 20000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -2293,99 +1485,54 @@ order by
   revenue desc
 limit 20
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  cardinality: 20
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   7:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  cardinality: 99150753711562752
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    c.c_nationkey = n.n_nationkey
-  |  cardinality: 59163
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 25
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 44964
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 44964
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o.o_orderdate >= '1993-10-01', o.o_orderdate < '1994-01-01'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 15000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_returnflag = 'R'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 3000608
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  cardinality: 20
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   15:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
@@ -2397,21 +1544,12 @@ PLAN FRAGMENT 1
   8:TOP-N
   |  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
   |  limit: 20
-  |  cardinality: 20
-  |  per-host memory: 2.03KB
-  |  tuple ids: 4
   |
   14:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  cardinality: 99150753711562752
-  |  per-host memory: 8192.00PB
-  |  tuple ids: 4
   |
   13:EXCHANGE
-     cardinality: 198301507423125504
-     per-host memory: 0B
-     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: o.o_custkey
@@ -2423,40 +1561,22 @@ PLAN FRAGMENT 2
   7:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
-  |  cardinality: 99150753711562752
-  |  per-host memory: 8192.00PB
-  |  tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    c.c_nationkey = n.n_nationkey
-  |  cardinality: 59163
-  |  per-host memory: 83B
-  |  tuple ids: 0 1 2 3
   |
   |----12:EXCHANGE
-  |       cardinality: 25
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 44964
-  |  per-host memory: 161.13KB
-  |  tuple ids: 0 1 2
   |
   |----11:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   10:EXCHANGE
-     cardinality: 44964
-     per-host memory: 0B
-     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2467,11 +1587,6 @@ PLAN FRAGMENT 3
 
   5:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 25
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2482,11 +1597,6 @@ PLAN FRAGMENT 4
 
   3:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2499,23 +1609,12 @@ PLAN FRAGMENT 5
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 44964
-  |  per-host memory: 48.34KB
-  |  tuple ids: 0 1
   |
   |----9:EXCHANGE
-  |       cardinality: 15000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_returnflag = 'R'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 3000608
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -2527,11 +1626,6 @@ PLAN FRAGMENT 6
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o.o_orderdate >= '1993-10-01', o.o_orderdate < '1994-01-01'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 15000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -2559,83 +1653,47 @@ join tpch.partsupp ps
   on ps.ps_suppkey = s.s_suppkey
 group by ps_partkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q11_part_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   5:AGGREGATE (finalize)
   |  output: SUM(ps_supplycost * ps_availqty)
   |  group by: ps_partkey
-  |  cardinality: 261329
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = ps.ps_suppkey
-  |  cardinality: 31995
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.partsupp #partitions=1/1 size=112.71MB compact
-  |       table stats: 800000 rows total
-  |       column stats: all
-  |       cardinality: 800000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    n.n_nationkey = s.s_nationkey
-  |  cardinality: 526
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n.n_name = 'GERMANY'
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.85MB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps_partkey
 
   WRITE TO HDFS table=tpch.q11_part_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   11:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ps_supplycost * ps_availqty))
   |  group by: ps_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   10:EXCHANGE
-     cardinality: 522658
-     per-host memory: 0B
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s.s_suppkey
@@ -2647,27 +1705,15 @@ PLAN FRAGMENT 1
   5:AGGREGATE
   |  output: SUM(ps_supplycost * ps_availqty)
   |  group by: ps_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    s.s_suppkey = ps.ps_suppkey
-  |  cardinality: 31995
-  |  per-host memory: 859.38KB
-  |  tuple ids: 0 1 2
   |
   |----9:EXCHANGE
-  |       cardinality: 800000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   8:EXCHANGE
-     cardinality: 526
-     per-host memory: 0B
-     tuple ids: 0 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -2678,11 +1724,6 @@ PLAN FRAGMENT 2
 
   3:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: n.n_nationkey
@@ -2695,19 +1736,10 @@ PLAN FRAGMENT 3
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    n.n_nationkey = s.s_nationkey
-  |  cardinality: 526
-  |  per-host memory: 10.74KB
-  |  tuple ids: 0 1
   |
   |----7:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   6:EXCHANGE
-     cardinality: 1
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2718,11 +1750,6 @@ PLAN FRAGMENT 4
 
   1:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -2734,60 +1761,35 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n.n_name = 'GERMANY'
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 insert overwrite table tpch.q11_sum_tmp
 select sum(part_value) as total_value
 from tpch.q11_part_tmp
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q11_sum_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(part_value)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q11_part_tmp #partitions=1/1 size=509.48KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q11_sum_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(part_value))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -2799,17 +1801,9 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(part_value)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q11_part_tmp #partitions=1/1 size=509.48KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Q12 - Shipping Mode and Order Priority Query
 # Modifications: Converted select from multiple tables to joins, added limit
@@ -2843,66 +1837,37 @@ order by
   l_shipmode
 limit 10
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  cardinality: 7
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   3:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   |  group by: l_shipmode
-  |  cardinality: 7
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 238
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 1500000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 159
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=971.57MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   10:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  cardinality: 7
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   9:EXCHANGE
-     cardinality: 7
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_shipmode
@@ -2914,21 +1879,12 @@ PLAN FRAGMENT 1
   4:TOP-N
   |  order by: l_shipmode ASC
   |  limit: 10
-  |  cardinality: 7
-  |  per-host memory: 224B
-  |  tuple ids: 2
   |
   8:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END)), SUM(SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END))
   |  group by: l_shipmode
-  |  cardinality: 7
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   7:EXCHANGE
-     cardinality: 14
-     per-host memory: 0B
-     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -2940,27 +1896,15 @@ PLAN FRAGMENT 2
   3:AGGREGATE
   |  output: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   |  group by: l_shipmode
-  |  cardinality: 7
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 238
-  |  per-host memory: 1.57MB
-  |  tuple ids: 0 1
   |
   |----6:EXCHANGE
-  |       cardinality: 1500000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   5:EXCHANGE
-     cardinality: 159
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -2971,11 +1915,6 @@ PLAN FRAGMENT 3
 
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1500000
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -2987,11 +1926,6 @@ PLAN FRAGMENT 4
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 159
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -3025,73 +1959,41 @@ order by
   c_count desc
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   4:AGGREGATE (finalize)
   |  output: COUNT(1)
   |  group by: COUNT(o_orderkey)
-  |  cardinality: 1000998
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   3:AGGREGATE (finalize)
   |  output: COUNT(o_orderkey)
   |  group by: c_custkey
-  |  cardinality: 201512
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 1350000
-  |  per-host memory: unavailable
-  |  tuple ids: 0N 1
   |
   |----1:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: NOT o.o_comment LIKE '%special%requests%'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1350000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.16MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   13:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   12:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_count
@@ -3103,21 +2005,12 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: COUNT(1) DESC, c_count DESC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 1.56KB
-  |  tuple ids: 4
   |
   11:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(1))
   |  group by: c_count
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 4
   |
   10:EXCHANGE
-     cardinality: 2001996
-     per-host memory: 0B
-     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: c_custkey
@@ -3129,21 +2022,12 @@ PLAN FRAGMENT 2
   4:AGGREGATE
   |  output: COUNT(1)
   |  group by: COUNT(o_orderkey)
-  |  cardinality: 1000998
-  |  per-host memory: 16.80MB
-  |  tuple ids: 4
   |
   9:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(o_orderkey))
   |  group by: c_custkey
-  |  cardinality: 201512
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   8:EXCHANGE
-     cardinality: 403024
-     per-host memory: 0B
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: o.o_custkey
@@ -3155,27 +2039,15 @@ PLAN FRAGMENT 3
   3:AGGREGATE
   |  output: COUNT(o_orderkey)
   |  group by: c_custkey
-  |  cardinality: 201512
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: RIGHT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 1350000
-  |  per-host memory: 161.13KB
-  |  tuple ids: 0N 1
   |
   |----7:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   6:EXCHANGE
-     cardinality: 1350000
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -3186,11 +2058,6 @@ PLAN FRAGMENT 4
 
   1:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -3202,11 +2069,6 @@ PLAN FRAGMENT 5
   0:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: NOT o.o_comment LIKE '%special%requests%'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1350000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.orders/orders.tbl 0:134217728
@@ -3226,59 +2088,33 @@ join tpch.part p
      l.l_shipdate >= '1995-09-01' and
      l.l_shipdate < '1995-10-01'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE (finalize)
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 60012
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 200000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.21MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   6:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l.l_partkey
@@ -3290,27 +2126,15 @@ PLAN FRAGMENT 1
   3:AGGREGATE
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 60012
-  |  per-host memory: 214.84KB
-  |  tuple ids: 0 1
   |
   |----5:EXCHANGE
-  |       cardinality: 200000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   4:EXCHANGE
-     cardinality: 60012
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3321,11 +2145,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 200000
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3337,11 +2156,6 @@ PLAN FRAGMENT 3
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -3362,51 +2176,31 @@ from tpch.lineitem
 where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
 group by l_suppkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.revenue
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
-  |  cardinality: 13152
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_suppkey
 
   WRITE TO HDFS table=tpch.revenue
-    overwrite=true  #partitions: 1
-    per-host memory: 68.50KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by: l_suppkey
-  |  cardinality: 13152
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 26304
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3418,67 +2212,39 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by: l_suppkey
-  |  cardinality: 13152
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 insert overwrite table tpch.max_revenue
 select max(total_revenue)
 from tpch.revenue
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.max_revenue
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: MAX(total_revenue)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.revenue #partitions=1/1 size=137.60KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.max_revenue
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: MAX(MAX(total_revenue))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3490,17 +2256,9 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: MAX(total_revenue)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.revenue #partitions=1/1 size=137.60KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Modifications - Added limit
 select
@@ -3517,74 +2275,40 @@ join tpch.max_revenue m
 order by s_suppkey
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    r.total_revenue = m.max_revenue
-  |  cardinality: 10000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.max_revenue #partitions=1/1 size=10B compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = r.supplier_no
-  |  cardinality: 10000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.revenue #partitions=1/1 size=137.60KB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=5.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   8:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 0 1 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3596,43 +2320,23 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: s_suppkey ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 13.47KB
-  |  tuple ids: 0 1 2
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    r.total_revenue = m.max_revenue
-  |  cardinality: 10000
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2
   |
   |----7:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_suppkey = r.supplier_no
-  |  cardinality: 10000
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3643,11 +2347,6 @@ PLAN FRAGMENT 2
 
   3:SCAN HDFS
      table=tpch.max_revenue #partitions=1/1 size=10B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -3658,11 +2357,6 @@ PLAN FRAGMENT 3
 
   1:SCAN HDFS
      table=tpch.revenue #partitions=1/1 size=137.60KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # Q16 - Parts/Supplier Relation Query
 insert overwrite table tpch.supplier_tmp
@@ -3670,41 +2364,25 @@ select s_suppkey
 from tpch.supplier
 where not s_comment like '%Customer%Complaints%'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.supplier_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
      predicates: NOT s_comment LIKE '%Customer%Complaints%'
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 9000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.10MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=tpch.supplier_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
      predicates: NOT s_comment LIKE '%Customer%Complaints%'
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 9000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 insert overwrite table tpch.q16_tmp
 select p_brand, p_type, p_size, ps_suppkey
@@ -3716,98 +2394,54 @@ join tpch.part p
 join tpch.supplier_tmp s
   on ps.ps_suppkey = s.s_suppkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q16_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  cardinality: 72000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.supplier_tmp #partitions=1/1 size=47.73KB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  cardinality: 72000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
   |       predicates: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 18000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=3.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=tpch.q16_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
-  |  cardinality: 72000
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = p.p_partkey
-  |  cardinality: 72000
-  |  per-host memory: 58.01KB
-  |  tuple ids: 0 1
   |
   |----5:EXCHANGE
-  |       cardinality: 18000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -3818,11 +2452,6 @@ PLAN FRAGMENT 1
 
   3:SCAN HDFS
      table=tpch.supplier_tmp #partitions=1/1 size=47.73KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3834,11 +2463,6 @@ PLAN FRAGMENT 2
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 18000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # Modifications: Added limit
 select p_brand, p_type, p_size, count(distinct ps_suppkey) as supplier_cnt
@@ -3853,56 +2477,32 @@ group by p_brand, p_type, p_size
 order by supplier_cnt desc, p_brand, p_type, p_size
 limit 1000
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  cardinality: 1000
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   2:AGGREGATE (merge finalize)
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   1:AGGREGATE
   |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   0:SCAN HDFS
      table=tpch.q16_tmp #partitions=1/1 size=27.10MB
      predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.06GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   7:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  cardinality: 1000
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   6:EXCHANGE
-     cardinality: 1000
-     per-host memory: unavailable
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: p_brand, p_type, p_size
@@ -3914,27 +2514,15 @@ PLAN FRAGMENT 1
   3:TOP-N
   |  order by: COUNT(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
   |  limit: 1000
-  |  cardinality: 1000
-  |  per-host memory: 42.97KB
-  |  tuple ids: 3
   |
   2:AGGREGATE (merge finalize)
   |  output: COUNT(ps_suppkey)
   |  group by: p_brand, p_type, p_size
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 3
   |
   5:AGGREGATE (merge)
   |  group by: p_brand, p_type, p_size, ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 2
   |
   4:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -3945,18 +2533,10 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 2
   |
   0:SCAN HDFS
      table=tpch.q16_tmp #partitions=1/1 size=27.10MB
      predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Q17 - Small-Quantity-Order Revenue Query
 insert overwrite table tpch.lineitem_tmp
@@ -3964,50 +2544,30 @@ select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
 from tpch.lineitem
 group by l_partkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.lineitem_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_quantity), COUNT(l_quantity)
   |  group by: l_partkey
-  |  cardinality: 261329
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_partkey
 
   WRITE TO HDFS table=tpch.lineitem_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity)), SUM(COUNT(l_quantity))
   |  group by: l_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 522658
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4019,17 +2579,9 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity), COUNT(l_quantity)
   |  group by: l_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Modifications: Converted selects from multiple tables to joins,
 # added round() call, removed subquery
@@ -4044,76 +2596,42 @@ where
   p.p_container = 'MED BOX' and
   l.l_quantity < lt.t_avg_quantity
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    p.p_partkey = lt.t_partkey
   |  other predicates: l.l_quantity < lt.t_avg_quantity
-  |  cardinality: 15933
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.lineitem_tmp #partitions=1/1 size=2.18MB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 15933
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
   |       predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 531
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=3.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   8:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4125,44 +2643,24 @@ PLAN FRAGMENT 1
   5:AGGREGATE
   |  output: SUM(l_extendedprice)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    p.p_partkey = lt.t_partkey
   |  other predicates: l.l_quantity < lt.t_avg_quantity
-  |  cardinality: 15933
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2
   |
   |----7:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
-  |  cardinality: 15933
-  |  per-host memory: 1.71KB
-  |  tuple ids: 0 1
   |
   |----6:EXCHANGE
-  |       cardinality: 531
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -4173,11 +2671,6 @@ PLAN FRAGMENT 2
 
   3:SCAN HDFS
      table=tpch.lineitem_tmp #partitions=1/1 size=2.18MB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -4189,11 +2682,6 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 531
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # Q18 - Large Value Customer Query
 insert overwrite table tpch.q18_tmp
@@ -4201,50 +2689,30 @@ select l_orderkey, sum(l_quantity) as t_sum_quantity
 from tpch.lineitem
 group by l_orderkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q18_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=976.80MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_orderkey
 
   WRITE TO HDFS table=tpch.q18_tmp
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 2001996
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4256,17 +2724,9 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: 16.80MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Modifications: Cast o_totalprice column due to float/double values not
 # allowed in GROUP BY.
@@ -4295,98 +2755,53 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   8:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   7:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_orderkey = t.l_orderkey
-  |  cardinality: 8992848
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.q18_tmp #partitions=1/1 size=16.13MB compact
   |       predicates: t.t_sum_quantity > 300.0
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 8992848
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.customer #partitions=1/1 size=23.08MB compact
-  |       table stats: 150000 rows total
-  |       column stats: all
-  |       cardinality: 150000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 8992848
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 1500000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=4.81GB VCores=4
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   16:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 4
   |
   15:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 4
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
@@ -4398,21 +2813,12 @@ PLAN FRAGMENT 1
   8:TOP-N
   |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 6.25KB
-  |  tuple ids: 4
   |
   14:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  cardinality: unavailable
-  |  per-host memory: 8192.00PB
-  |  tuple ids: 4
   |
   13:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 4
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l.l_orderkey
@@ -4424,53 +2830,29 @@ PLAN FRAGMENT 2
   7:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_orderkey = t.l_orderkey
-  |  cardinality: 8992848
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2 3
   |
   |----12:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    o.o_custkey = c.c_custkey
-  |  cardinality: 8992848
-  |  per-host memory: 483.40KB
-  |  tuple ids: 0 1 2
   |
   |----11:EXCHANGE
-  |       cardinality: 150000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    l.l_orderkey = o.o_orderkey
-  |  cardinality: 8992848
-  |  per-host memory: 1.57MB
-  |  tuple ids: 0 1
   |
   |----10:EXCHANGE
-  |       cardinality: 1500000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   9:EXCHANGE
-     cardinality: 6001215
-     per-host memory: 0B
-     tuple ids: 0
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -4482,11 +2864,6 @@ PLAN FRAGMENT 3
   5:SCAN HDFS
      table=tpch.q18_tmp #partitions=1/1 size=16.13MB
      predicates: t.t_sum_quantity > 300.0
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -4497,11 +2874,6 @@ PLAN FRAGMENT 4
 
   3:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 150000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -4512,11 +2884,6 @@ PLAN FRAGMENT 5
 
   1:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1500000
-     per-host memory: 960.00MB
-     tuple ids: 1
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -4527,11 +2894,6 @@ PLAN FRAGMENT 6
 
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Q19 - Discounted Revenue Query
 # Modifications: Added round() calls
@@ -4567,59 +2929,33 @@ or
   and l_shipinstruct = 'DELIVER IN PERSON'
 )
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE (finalize)
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
   |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
-  |  cardinality: 6001215
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.part #partitions=1/1 size=22.83MB compact
-  |       table stats: 200000 rows total
-  |       column stats: all
-  |       cardinality: 200000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.63MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   5:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4631,31 +2967,17 @@ PLAN FRAGMENT 1
   3:AGGREGATE
   |  output: SUM(l_extendedprice * (1.0 - l_discount))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l.l_partkey = p.p_partkey
   |  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
-  |  cardinality: 6001215
-  |  per-host memory: 644.53KB
-  |  tuple ids: 0 1
   |
   |----4:EXCHANGE
-  |       cardinality: 200000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -4666,11 +2988,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 200000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/tpch.lineitem/lineitem.tbl 0:134217728
@@ -4689,49 +3006,29 @@ select distinct p_partkey
 from tpch.part
 where p_name like 'forest%'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q20_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  group by: p_partkey
-  |  cardinality: 261329
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p_name LIKE 'forest%'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 20000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: p_partkey
 
   WRITE TO HDFS table=tpch.q20_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  group by: p_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 522658
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4742,18 +3039,10 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  group by: p_partkey
-  |  cardinality: 261329
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.part #partitions=1/1 size=22.83MB
      predicates: p_name LIKE 'forest%'
-     table stats: 200000 rows total
-     column stats: all
-     cardinality: 20000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_2
 insert overwrite table tpch.q20_tmp2
@@ -4769,51 +3058,31 @@ group by
   l_partkey,
   l_suppkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q20_tmp2
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(l_quantity)
   |  group by: l_partkey, l_suppkey
-  |  cardinality: 3436999008
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=93.89GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: l_partkey, l_suppkey
 
   WRITE TO HDFS table=tpch.q20_tmp2
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(l_quantity))
   |  group by: l_partkey, l_suppkey
-  |  cardinality: 3436999008
-  |  per-host memory: 9.39GB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 6873998016
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4825,18 +3094,10 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(l_quantity)
   |  group by: l_partkey, l_suppkey
-  |  cardinality: 3436999008
-  |  per-host memory: 84.51GB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 60012
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_3
 insert overwrite table tpch.q20_tmp3
@@ -4850,99 +3111,55 @@ from tpch.partsupp ps
   join tpch.q20_tmp1 t1
     on (ps.ps_partkey = t1.p_partkey)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q20_tmp3
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = t1.p_partkey
-  |  cardinality: 800000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.q20_tmp1 #partitions=1/1 size=13.42KB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    ps.ps_partkey = t2.l_partkey
   |    ps.ps_suppkey = t2.l_suppkey
-  |  cardinality: 800000
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.q20_tmp2 #partitions=1/1 size=7.83MB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=5.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: RANDOM
 
   WRITE TO HDFS table=tpch.q20_tmp3
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = t1.p_partkey
-  |  cardinality: 800000
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2
   |
   |----6:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_partkey = t2.l_partkey
   |    ps.ps_suppkey = t2.l_suppkey
-  |  cardinality: 800000
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1
   |
   |----5:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
-     table stats: 800000 rows total
-     column stats: all
-     cardinality: 800000
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -4953,11 +3170,6 @@ PLAN FRAGMENT 1
 
   3:SCAN HDFS
      table=tpch.q20_tmp1 #partitions=1/1 size=13.42KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -4968,11 +3180,6 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=tpch.q20_tmp2 #partitions=1/1 size=7.83MB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
@@ -4982,49 +3189,29 @@ from tpch.q20_tmp3
 where ps_availqty > sum_quantity
 group by ps_suppkey
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q20_tmp4
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  group by: ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q20_tmp3 #partitions=1/1 size=77.49KB
      predicates: ps_availqty > sum_quantity
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.06GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: ps_suppkey
 
   WRITE TO HDFS table=tpch.q20_tmp4
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  group by: ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -5035,18 +3222,10 @@ PLAN FRAGMENT 1
 
   1:AGGREGATE
   |  group by: ps_suppkey
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.q20_tmp3 #partitions=1/1 size=77.49KB
      predicates: ps_availqty > sum_quantity
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_5
 # Modifications: Added limit
@@ -5063,75 +3242,41 @@ order by
   s_name
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_suppkey = t4.ps_suppkey
-  |  cardinality: 526
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.q20_tmp4 #partitions=1/1 size=20.98KB compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 526
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
   |       predicates: n.n_name = 'CANADA'
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=3.88GB VCores=3
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   9:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   8:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 0 1 2
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -5143,43 +3288,23 @@ PLAN FRAGMENT 1
   5:TOP-N
   |  order by: s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 11.53KB
-  |  tuple ids: 0 1 2
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_suppkey = t4.ps_suppkey
-  |  cardinality: 526
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1 2
   |
   |----7:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 526
-  |  per-host memory: 4B
-  |  tuple ids: 0 1
   |
   |----6:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -5190,11 +3315,6 @@ PLAN FRAGMENT 2
 
   3:SCAN HDFS
      table=tpch.q20_tmp4 #partitions=1/1 size=20.98KB
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -5206,11 +3326,6 @@ PLAN FRAGMENT 3
   1:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n.n_name = 'CANADA'
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q21
 # Q21 - Suppliers Who Kept Orders Waiting Query
@@ -5245,24 +3360,16 @@ order by
   s_name
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   11:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: s_name
-  |  cardinality: 8528
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: LEFT OUTER JOIN
@@ -5270,110 +3377,57 @@ PLAN FRAGMENT 0
   |    l1.l_orderkey = l3.l_orderkey
   |  other join predicates: l3.l_suppkey != l1.l_suppkey
   |  other predicates: l3.l_orderkey IS NULL
-  |  cardinality: 567067
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4 5N
   |
   |----9:SCAN HDFS
   |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
   |       predicates: l3.l_receiptdate > l3.l_commitdate
-  |       table stats: 6001215 rows total
-  |       column stats: all
-  |       cardinality: 600122
-  |       per-host memory: unavailable
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: LEFT SEMI JOIN
   |  hash predicates:
   |    l1.l_orderkey = l2.l_orderkey
   |  other predicates: l2.l_suppkey != l1.l_suppkey
-  |  cardinality: 945862
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3 4
   |
   |----7:SCAN HDFS
   |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
-  |       table stats: 6001215 rows total
-  |       column stats: all
-  |       cardinality: 6001215
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 157769
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2 3
   |
   |----5:SCAN HDFS
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
   |       predicates: n_name = 'SAUDI ARABIA'
-  |       table stats: 25 rows total
-  |       column stats: all
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l1.l_orderkey = o.o_orderkey
-  |  cardinality: 2997616
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2
   |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
   |       predicates: o_orderstatus = 'F'
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 500000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l1.l_suppkey = s.s_suppkey
-  |  cardinality: 6001215
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |       table stats: 10000 rows total
-  |       column stats: all
-  |       cardinality: 10000
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=2.81GB VCores=4
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   22:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   21:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 6
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s_name
@@ -5385,21 +3439,12 @@ PLAN FRAGMENT 1
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 2.34KB
-  |  tuple ids: 6
   |
   20:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: s_name
-  |  cardinality: 8528
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   19:EXCHANGE
-     cardinality: 17056
-     per-host memory: 0B
-     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l1.l_orderkey
@@ -5411,9 +3456,6 @@ PLAN FRAGMENT 2
   11:AGGREGATE
   |  output: COUNT(*)
   |  group by: s_name
-  |  cardinality: 8528
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   10:HASH JOIN
   |  join op: LEFT OUTER JOIN (BROADCAST)
@@ -5421,33 +3463,18 @@ PLAN FRAGMENT 2
   |    l1.l_orderkey = l3.l_orderkey
   |  other join predicates: l3.l_suppkey != l1.l_suppkey
   |  other predicates: l3.l_orderkey IS NULL
-  |  cardinality: 567067
-  |  per-host memory: 1.89MB
-  |  tuple ids: 0 1 2 3 4 5N
   |
   |----18:EXCHANGE
-  |       cardinality: 600122
-  |       per-host memory: 0B
-  |       tuple ids: 5
   |
   8:HASH JOIN
   |  join op: LEFT SEMI JOIN (PARTITIONED)
   |  hash predicates:
   |    l1.l_orderkey = l2.l_orderkey
   |  other predicates: l2.l_suppkey != l1.l_suppkey
-  |  cardinality: 945862
-  |  per-host memory: 6.30MB
-  |  tuple ids: 0 1 2 3 4
   |
   |----17:EXCHANGE
-  |       cardinality: 6001215
-  |       per-host memory: 0B
-  |       tuple ids: 4
   |
   16:EXCHANGE
-     cardinality: 157769
-     per-host memory: 0B
-     tuple ids: 0 1 2 3
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -5459,11 +3486,6 @@ PLAN FRAGMENT 3
   9:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l3.l_receiptdate > l3.l_commitdate
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 600122
-     per-host memory: 960.00MB
-     tuple ids: 5
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -5474,11 +3496,6 @@ PLAN FRAGMENT 4
 
   7:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -5491,48 +3508,25 @@ PLAN FRAGMENT 5
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
-  |  cardinality: 157769
-  |  per-host memory: 4B
-  |  tuple ids: 0 1 2 3
   |
   |----15:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: 0B
-  |       tuple ids: 3
   |
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l1.l_orderkey = o.o_orderkey
-  |  cardinality: 2997616
-  |  per-host memory: 1.57MB
-  |  tuple ids: 0 1 2
   |
   |----14:EXCHANGE
-  |       cardinality: 500000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    l1.l_suppkey = s.s_suppkey
-  |  cardinality: 6001215
-  |  per-host memory: 32.23KB
-  |  tuple ids: 0 1
   |
   |----13:EXCHANGE
-  |       cardinality: 10000
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
@@ -5544,11 +3538,6 @@ PLAN FRAGMENT 6
   5:SCAN HDFS
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n_name = 'SAUDI ARABIA'
-     table stats: 25 rows total
-     column stats: all
-     cardinality: 1
-     per-host memory: 960.00MB
-     tuple ids: 3
 
 PLAN FRAGMENT 7
   PARTITION: RANDOM
@@ -5560,11 +3549,6 @@ PLAN FRAGMENT 7
   3:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
      predicates: o_orderstatus = 'F'
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 500000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 8
   PARTITION: RANDOM
@@ -5575,11 +3559,6 @@ PLAN FRAGMENT 8
 
   1:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====
 # QUERY_NAME : TPCH-Q22_QUERY_1
 # Q22 - Global Sales Opportunity Query
@@ -5604,51 +3583,31 @@ where
 group by
   substr(c_name, 1, 1)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   WRITE TO HDFS table=tpch.q22_customer_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: unavailable
+    overwrite=true
 
   1:AGGREGATE (finalize)
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
   |  group by: substr(c_name, 1, 1)
-  |  cardinality: 169450
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
      predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 7826
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: substr(c_name, 1, 1)
 
   WRITE TO HDFS table=tpch.q22_customer_tmp1
-    overwrite=true  #partitions: 1
-    per-host memory: 100.00KB
+    overwrite=true
 
   3:AGGREGATE (merge finalize)
   |  output: SUM(SUM(c_acctbal)), SUM(COUNT(c_acctbal))
   |  group by: substr(c_name, 1, 1)
-  |  cardinality: 169450
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 338900
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -5660,18 +3619,10 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: SUM(c_acctbal), COUNT(c_acctbal)
   |  group by: substr(c_name, 1, 1)
-  |  cardinality: 169450
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
      predicates: c.c_acctbal > 0.0, (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 7826
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # QUERY_NAME : TPCH-Q22_QUERY_2
 # Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
@@ -5703,84 +3654,47 @@ order by
   cntrycode
 limit 100
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   5:AGGREGATE (finalize)
   |  output: COUNT(*), SUM(c_acctbal)
   |  group by: substring(c_phone, 1, 2)
-  |  cardinality: 148799
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: LEFT OUTER JOIN
   |  hash predicates:
   |    c.c_custkey = o.o_custkey
   |  other predicates: o_custkey IS NULL
-  |  cardinality: 823795
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1 2N
   |
   |----3:SCAN HDFS
   |       table=tpch.orders #partitions=1/1 size=162.56MB compact
-  |       table stats: 1500000 rows total
-  |       column stats: all
-  |       cardinality: 1500000
-  |       per-host memory: unavailable
-  |       tuple ids: 2
   |
   2:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    substr(c.c_name, 1, 1) = ct.cust_name_char
   |  other predicates: c.c_acctbal > ct.avg_acctbal
-  |  cardinality: 78255
-  |  per-host memory: unavailable
-  |  tuple ids: 0 1
   |
   |----1:SCAN HDFS
   |       table=tpch.q22_customer_tmp1 #partitions=1/1 size=9B compact
-  |       table stats: unavailable
-  |       column stats: unavailable
-  |       cardinality: unavailable
-  |       per-host memory: unavailable
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
      predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 78255
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=2.95GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   13:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: unavailable
-  |  tuple ids: 3
   |
   12:EXCHANGE
-     cardinality: 100
-     per-host memory: unavailable
-     tuple ids: 3
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: substring(c_phone, 1, 2)
@@ -5792,21 +3706,12 @@ PLAN FRAGMENT 1
   6:TOP-N
   |  order by: substring(c_phone, 1, 2) ASC
   |  limit: 100
-  |  cardinality: 100
-  |  per-host memory: 3.13KB
-  |  tuple ids: 3
   |
   11:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*)), SUM(SUM(c_acctbal))
   |  group by: substring(c_phone, 1, 2)
-  |  cardinality: 148799
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   10:EXCHANGE
-     cardinality: 297598
-     per-host memory: 0B
-     tuple ids: 3
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: c.c_custkey
@@ -5818,28 +3723,16 @@ PLAN FRAGMENT 2
   5:AGGREGATE
   |  output: COUNT(*), SUM(c_acctbal)
   |  group by: substring(c_phone, 1, 2)
-  |  cardinality: 148799
-  |  per-host memory: 10.00MB
-  |  tuple ids: 3
   |
   4:HASH JOIN
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
   |    c.c_custkey = o.o_custkey
   |  other predicates: o_custkey IS NULL
-  |  cardinality: 823795
-  |  per-host memory: 1.57MB
-  |  tuple ids: 0 1 2N
   |
   |----9:EXCHANGE
-  |       cardinality: 1500000
-  |       per-host memory: 0B
-  |       tuple ids: 2
   |
   8:EXCHANGE
-     cardinality: 78255
-     per-host memory: 0B
-     tuple ids: 0 1
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -5850,11 +3743,6 @@ PLAN FRAGMENT 3
 
   3:SCAN HDFS
      table=tpch.orders #partitions=1/1 size=162.56MB
-     table stats: 1500000 rows total
-     column stats: all
-     cardinality: 1500000
-     per-host memory: 960.00MB
-     tuple ids: 2
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
@@ -5868,23 +3756,12 @@ PLAN FRAGMENT 4
   |  hash predicates:
   |    substr(c.c_name, 1, 1) = ct.cust_name_char
   |  other predicates: c.c_acctbal > ct.avg_acctbal
-  |  cardinality: 78255
-  |  per-host memory: 2.00GB
-  |  tuple ids: 0 1
   |
   |----7:EXCHANGE
-  |       cardinality: unavailable
-  |       per-host memory: 0B
-  |       tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.customer #partitions=1/1 size=23.08MB
      predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
-     table stats: 150000 rows total
-     column stats: all
-     cardinality: 78255
-     per-host memory: 960.00MB
-     tuple ids: 0
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -5895,9 +3772,4 @@ PLAN FRAGMENT 5
 
   1:SCAN HDFS
      table=tpch.q22_customer_tmp1 #partitions=1/1 size=9B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 1
 ====

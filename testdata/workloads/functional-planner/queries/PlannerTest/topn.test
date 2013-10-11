@@ -3,42 +3,24 @@ from functional.testtbl
 order by name
 limit 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:TOP-N
   |  order by: name ASC
   |  limit: 1
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 0
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:TOP-N
   |  order by: name ASC
   |  limit: 1
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 0
   |
   2:EXCHANGE
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -50,17 +32,9 @@ PLAN FRAGMENT 1
   1:TOP-N
   |  order by: name ASC
   |  limit: 1
-  |  cardinality: 1
-  |  per-host memory: 20B
-  |  tuple ids: 0
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -71,50 +45,29 @@ group by 1
 order by 2 desc
 limit 10
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
   |  order by: COUNT(*) DESC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: COUNT(*) DESC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   5:EXCHANGE
-     cardinality: 10
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: zip
@@ -126,21 +79,12 @@ PLAN FRAGMENT 1
   2:TOP-N
   |  order by: COUNT(*) DESC
   |  limit: 10
-  |  cardinality: 10
-  |  per-host memory: 120B
-  |  tuple ids: 1
   |
   4:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -152,18 +96,10 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -174,50 +110,29 @@ group by 1
 order by 2
 limit 4
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
   |  order by: SUM(float_col) ASC
   |  limit: 4
-  |  cardinality: 4
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   1:AGGREGATE (finalize)
   |  output: SUM(float_col)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.13GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: SUM(float_col) ASC
   |  limit: 4
-  |  cardinality: 4
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   5:EXCHANGE
-     cardinality: 4
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -229,21 +144,12 @@ PLAN FRAGMENT 1
   2:TOP-N
   |  order by: SUM(float_col) ASC
   |  limit: 4
-  |  cardinality: 4
-  |  per-host memory: 48B
-  |  tuple ids: 1
   |
   4:AGGREGATE (merge finalize)
   |  output: SUM(SUM(float_col))
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -255,18 +161,10 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: SUM(float_col)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -279,49 +177,28 @@ group by 1
 order by 2,3 desc
 limit 0
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:TOP-N
   |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
-  |  cardinality: 0
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   1:AGGREGATE (finalize)
   |  output: SUM(float_col), MIN(float_col)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 200
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.13GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:TOP-N
   |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
-  |  cardinality: 0
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   5:EXCHANGE
-     cardinality: 0
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -333,21 +210,12 @@ PLAN FRAGMENT 1
   2:TOP-N
   |  order by: SUM(float_col) ASC, MIN(float_col) DESC
   |  limit: 0
-  |  cardinality: 0
-  |  per-host memory: 0B
-  |  tuple ids: 1
   |
   4:AGGREGATE (merge finalize)
   |  output: SUM(SUM(float_col)), MIN(MIN(float_col))
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -359,17 +227,9 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: SUM(float_col), MIN(float_col)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 200
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3

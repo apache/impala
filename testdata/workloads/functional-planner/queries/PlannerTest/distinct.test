@@ -2,34 +2,19 @@
 select distinct *
 from functional.testtbl
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
@@ -40,14 +25,8 @@ PLAN FRAGMENT 1
 
   3:AGGREGATE (merge finalize)
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -58,17 +37,9 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -76,34 +47,19 @@ NODE 0:
 select distinct id, zip
 from functional.testtbl
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: id, zip
@@ -114,14 +70,8 @@ PLAN FRAGMENT 1
 
   3:AGGREGATE (merge finalize)
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -132,17 +82,9 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -150,48 +92,27 @@ NODE 0:
 select count(distinct id, zip)
 from functional.testtbl
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(if(id IS NULL, NULL, zip))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(if(id IS NULL, NULL, zip)))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   5:EXCHANGE
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: id, zip
@@ -203,20 +124,11 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge)
   |  output: COUNT(if(id IS NULL, NULL, zip))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -227,17 +139,9 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: id, zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -246,41 +150,23 @@ select tinyint_col, count(distinct int_col, bigint_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  group by: tinyint_col, int_col, bigint_col
-  |  cardinality: 6810496
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.03GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 11
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -292,20 +178,11 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge finalize)
   |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  group by: tinyint_col, int_col, bigint_col
-  |  cardinality: 6810496
-  |  per-host memory: 25.33MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 6810496
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -316,17 +193,9 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tinyint_col, int_col, bigint_col
-  |  cardinality: 6810496
-  |  per-host memory: 92.88MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -345,41 +214,23 @@ select tinyint_col, count(distinct int_col), sum(distinct int_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col)
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 11
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -391,20 +242,11 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col)
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 7601
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -415,17 +257,9 @@ PLAN FRAGMENT 2
 
   1:AGGREGATE
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -445,42 +279,24 @@ select tinyint_col, count(distinct int_col),
 min(distinct smallint_col), max(distinct string_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  output: MIN(smallint_col), MAX(string_col)
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 11
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -492,21 +308,12 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  output: MIN(MIN(smallint_col)), MAX(MAX(string_col))
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 7601
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -518,17 +325,9 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: MIN(smallint_col), MAX(string_col)
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -547,42 +346,24 @@ select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
 sum(int_col), min(smallint_col), max(bigint_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   5:EXCHANGE
-     cardinality: 11
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: tinyint_col
@@ -594,21 +375,12 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col
-  |  cardinality: 11
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  output: SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 7601
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -620,17 +392,9 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   |  group by: tinyint_col, int_col
-  |  cardinality: 7601
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     table stats: 10000 rows total
-     column stats: all
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -651,8 +415,6 @@ select t1.c, t2.c from
 (select count(distinct int_col) as c from functional.alltypestiny) t1 inner join
 (select count(distinct bigint_col) as c from functional.alltypestiny) t2 on (t1.c = t2.c)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -660,54 +422,27 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN
   |  hash predicates:
   |    COUNT(int_col) = COUNT(bigint_col)
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2 6
   |
   |----5:AGGREGATE (merge finalize)
   |    |  output: COUNT(bigint_col)
   |    |  group by:
-  |    |  cardinality: 1
-  |    |  per-host memory: unavailable
-  |    |  tuple ids: 6
   |    |
   |    4:AGGREGATE
   |    |  group by: bigint_col
-  |    |  cardinality: 2
-  |    |  per-host memory: unavailable
-  |    |  tuple ids: 5
   |    |
   |    3:SCAN HDFS
   |       table=functional.alltypestiny #partitions=4/4 size=460B
-  |       table stats: 8 rows total
-  |       column stats: all
-  |       cardinality: 8
-  |       per-host memory: unavailable
-  |       tuple ids: 4
   |
   2:AGGREGATE (merge finalize)
   |  output: COUNT(int_col)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  group by: int_col
-  |  cardinality: 2
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
-     table stats: 8 rows total
-     column stats: all
-     cardinality: 8
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -715,26 +450,14 @@ PLAN FRAGMENT 0
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    COUNT(int_col) = COUNT(bigint_col)
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2 6
   |
   |----15:EXCHANGE
-  |       cardinality: 1
-  |       per-host memory: unavailable
-  |       tuple ids: 6
   |
   10:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(int_col))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   9:EXCHANGE
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: UNPARTITIONED
@@ -746,14 +469,8 @@ PLAN FRAGMENT 1
   14:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(bigint_col))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 6
   |
   13:EXCHANGE
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 6
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: bigint_col
@@ -765,20 +482,11 @@ PLAN FRAGMENT 2
   5:AGGREGATE (merge)
   |  output: COUNT(bigint_col)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 6
   |
   12:AGGREGATE (merge)
   |  group by: bigint_col
-  |  cardinality: 2
-  |  per-host memory: 10.00MB
-  |  tuple ids: 5
   |
   11:EXCHANGE
-     cardinality: 2
-     per-host memory: 0B
-     tuple ids: 5
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
@@ -789,17 +497,9 @@ PLAN FRAGMENT 3
 
   4:AGGREGATE
   |  group by: bigint_col
-  |  cardinality: 2
-  |  per-host memory: 10.00MB
-  |  tuple ids: 5
   |
   3:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
-     table stats: 8 rows total
-     column stats: all
-     cardinality: 8
-     per-host memory: 960.00MB
-     tuple ids: 4
 
 PLAN FRAGMENT 4
   PARTITION: HASH_PARTITIONED: int_col
@@ -811,20 +511,11 @@ PLAN FRAGMENT 4
   2:AGGREGATE (merge)
   |  output: COUNT(int_col)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   8:AGGREGATE (merge)
   |  group by: int_col
-  |  cardinality: 2
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   7:EXCHANGE
-     cardinality: 2
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 5
   PARTITION: RANDOM
@@ -835,17 +526,9 @@ PLAN FRAGMENT 5
 
   1:AGGREGATE
   |  group by: int_col
-  |  cardinality: 2
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
-     table stats: 8 rows total
-     column stats: all
-     cardinality: 8
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115

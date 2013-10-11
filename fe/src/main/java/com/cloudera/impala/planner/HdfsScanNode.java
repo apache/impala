@@ -230,9 +230,11 @@ public class HdfsScanNode extends ScanNode {
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
     }
-    // Add table and column stats.
-    output.append(getStatsExplainString(prefix, detailLevel));
-    output.append("\n");
+    // Add table and column stats in verbose mode.
+    if (detailLevel == TExplainLevel.VERBOSE) {
+      output.append(getStatsExplainString(prefix, detailLevel));
+      output.append("\n");
+    }
     return output.toString();
   }
 

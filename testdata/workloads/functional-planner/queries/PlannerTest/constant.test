@@ -1,24 +1,14 @@
 select 1 + 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:MERGE
      merging 1 SELECT CONSTANT
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 0
 ====

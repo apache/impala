@@ -14,12 +14,10 @@ string
 ''
 '  WRITE TO HDFS table=functional.alltypessmall'
 '    overwrite=false'
-'    partition keys: year,4  #partitions: 2
+'    partition keys: year,4
 ''
 '  0:SCAN HDFS'
 '     table=functional.alltypes #partitions=1/24 size=19.71KB'
-'     table stats: 7300 rows total'
-'     columns missing stats: timestamp_col'
 ====
 ---- QUERY
 # Tests explain query
@@ -41,6 +39,4 @@ string
 ''
 '  0:SCAN HDFS'
 '     table=functional.alltypes #partitions=24/24 size=478.45KB'
-'     table stats: 7300 rows total'
-'     columns missing stats: timestamp_col'
 ====

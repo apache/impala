@@ -2,28 +2,16 @@
 select * FROM functional.alltypes
 where cast(year as string) = to_date( from_unixtime(unix_timestamp()) )
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -34,11 +22,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
@@ -48,36 +31,21 @@ from functional.testtbl
 where name like 'm%'
 group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: zip
@@ -89,14 +57,8 @@ PLAN FRAGMENT 1
   3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -108,46 +70,26 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: zip
-  |  cardinality: unavailable
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
      predicates: name LIKE 'm%'
-     table stats: unavailable
-     column stats: unavailable
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # all partitions are selected
 select * from functional.alltypes
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -158,11 +100,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -193,28 +130,16 @@ NODE 0:
 # predicate on first partition key
 select * from functional.alltypes where year = 2009
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -225,11 +150,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -248,28 +168,16 @@ NODE 0:
 # same predicate, phrased differently
 select * from functional.alltypes where year = 2009.0
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -280,11 +188,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -302,28 +205,16 @@ NODE 0:
 ====
 select * from functional.alltypes where 2009 = year
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -334,11 +225,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=238.68KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -357,28 +243,16 @@ NODE 0:
 # predicate on second partition key
 select * from functional.alltypes where month=1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=2/24 size=40.32KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 620
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 620
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -389,11 +263,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=2/24 size=40.32KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 620
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -402,28 +271,16 @@ NODE 0:
 # predicate on both partition keys
 select * from functional.alltypes where year=2009 and month=1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=1/24 size=19.95KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 310
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 310
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -434,11 +291,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=1/24 size=19.95KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 310
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -446,28 +298,16 @@ NODE 0:
 # single-sided range on 2nd key
 select * from functional.alltypes where year=2009 and month > 6
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=6/24 size=120.87KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1840
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1840
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -478,11 +318,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=6/24 size=120.87KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1840
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
@@ -494,28 +329,16 @@ NODE 0:
 ====
 select * from functional.alltypes where year=2009 and month < 6
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5/24 size=98.11KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1510
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1510
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -526,11 +349,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5/24 size=98.11KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1510
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -541,28 +359,16 @@ NODE 0:
 ====
 select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -573,11 +379,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -588,28 +389,16 @@ NODE 0:
 # adding a predicate that always evaluates to true shouldn't change anything
 select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is not null
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -620,11 +409,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -635,28 +419,16 @@ NODE 0:
 # adding a predicate that always evaluates to false should remove all partitions
 select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is null
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -667,38 +439,21 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 select * from functional.alltypes where year=2009 and (month in (1, 3, 5) or month = 7)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -709,11 +464,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=80.74KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -724,28 +474,16 @@ NODE 0:
 # single-sided ranges on both keys
 select * from functional.alltypes where year<=2009 and month < 6
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5/24 size=98.11KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1510
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1510
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -756,11 +494,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=5/24 size=98.11KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1510
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -772,28 +505,16 @@ NODE 0:
 # range on 2nd key
 select * from functional.alltypes where month < 9 and month > 6
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=81.46KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1240
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -804,11 +525,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=4/24 size=81.46KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 1240
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
@@ -819,28 +535,16 @@ NODE 0:
 # multiple predicates on first key; 2nd one applied as predicate
 select * from functional.alltypes where year < 2010 and year < 2009 and month > 6
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 7300
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -851,39 +555,22 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=0/24 size=0B
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 7300
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # multiple predicates on second key
 select * from functional.alltypes where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=9/24 size=180.49KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 2760
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 2760
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -894,11 +581,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=9/24 size=180.49KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 2760
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -914,28 +596,16 @@ NODE 0:
 # between predicate on second key
 select * from functional.alltypes where year = 2009 and month between 6 and 8
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -946,11 +616,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -960,28 +625,16 @@ NODE 0:
 # between predicates on first and second keys
 select * from functional.alltypes where year between 2009 and 2009 and month between 6 and 8
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -992,11 +645,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -1007,28 +655,16 @@ NODE 0:
 select * from functional.alltypes
 where year = 2009 and (month between 6 and 7 or month between 7 and 8)
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 920
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1039,11 +675,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=3/24 size=60.43KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 920
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
@@ -1053,28 +684,16 @@ NODE 0:
 # slot binding still determined
 select * from functional.alltypes where year - 1 = 2009
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=239.77KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 3650
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1085,11 +704,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypes #partitions=12/24 size=239.77KB
-     table stats: 7300 rows total
-     columns missing stats: timestamp_col
-     cardinality: 3650
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
@@ -1108,28 +722,16 @@ NODE 0:
 # multi-file non-partitioned table
 select * from functional.alltypesaggmultifilesNoPart
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifilesnopart #partitions=1/1 size=734.18KB
-     table stats: 10000 rows total
-     columns missing stats: timestamp_col
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 10000
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1140,11 +742,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifilesnopart #partitions=1/1 size=734.18KB
-     table stats: 10000 rows total
-     columns missing stats: timestamp_col
-     cardinality: 10000
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0 0:186852
@@ -1155,28 +752,16 @@ NODE 0:
 # multi-file partitioned table
 select * from functional.alltypesaggmultifiles where day <= 2
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifiles #partitions=2/10 size=145.97KB
-     table stats: unavailable
-     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=960.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1187,11 +772,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HDFS
      table=functional.alltypesaggmultifiles #partitions=2/10 size=145.97KB
-     table stats: unavailable
-     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-     cardinality: unavailable
-     per-host memory: 960.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435

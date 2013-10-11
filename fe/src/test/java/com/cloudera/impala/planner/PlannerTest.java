@@ -166,7 +166,7 @@ public class PlannerTest {
     TSessionState sessionState = new TSessionState(null, null, "default",
         System.getProperty("user.name"), null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
-    request.queryOptions.setExplain_level(TExplainLevel.VERBOSE);
+    request.queryOptions.setExplain_level(TExplainLevel.NORMAL);
     StringBuilder explainBuilder = new StringBuilder();
 
     TExecRequest execRequest = null;

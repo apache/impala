@@ -1,42 +1,24 @@
 # Distinct estimate
 select distinctpc(l_orderkey) from tpch.lineitem
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  output: DISTINCT_PC(l_orderkey)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=970.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   3:AGGREGATE (merge finalize)
   |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -48,64 +30,35 @@ PLAN FRAGMENT 1
   1:AGGREGATE
   |  output: DISTINCT_PC(l_orderkey)
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====
 # Distinct estimate with distinct
 select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   2:AGGREGATE (merge finalize)
   |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   1:AGGREGATE
   |  output: DISTINCT_PC(l_orderkey)
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=985.20MB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   6:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(l_orderkey)), DISTINCT_PC(DISTINCT_PC(DISTINCT_PC(l_orderkey)))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: unavailable
-  |  tuple ids: 2
   |
   5:EXCHANGE
-     cardinality: 1
-     per-host memory: unavailable
-     tuple ids: 2
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: l_orderkey
@@ -117,21 +70,12 @@ PLAN FRAGMENT 1
   2:AGGREGATE (merge)
   |  output: COUNT(l_orderkey), DISTINCT_PC(DISTINCT_PC(l_orderkey))
   |  group by:
-  |  cardinality: 1
-  |  per-host memory: 10.00MB
-  |  tuple ids: 2
   |
   4:AGGREGATE (merge)
   |  output: DISTINCT_PC(DISTINCT_PC(l_orderkey))
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: 10.00MB
-  |  tuple ids: 1
   |
   3:EXCHANGE
-     cardinality: 1000998
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -143,15 +87,7 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: DISTINCT_PC(l_orderkey)
   |  group by: l_orderkey
-  |  cardinality: 1000998
-  |  per-host memory: 25.20MB
-  |  tuple ids: 1
   |
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
-     table stats: 6001215 rows total
-     column stats: all
-     cardinality: 6001215
-     per-host memory: 960.00MB
-     tuple ids: 0
 ====

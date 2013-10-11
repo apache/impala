@@ -53,11 +53,11 @@ import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -205,7 +205,8 @@ public class Planner {
   public String getExplainString(ArrayList<PlanFragment> fragments,
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
-    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()) {
+    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()
+        && explainLevel == TExplainLevel.VERBOSE) {
       str.append(
           String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n\n",
           PrintUtils.printBytes(request.getPer_host_mem_req()),
@@ -222,7 +223,6 @@ public class Planner {
     }
     return str.toString();
   }
-
 
   /**
    * Return plan fragment that produces result of 'root'; recursively creates

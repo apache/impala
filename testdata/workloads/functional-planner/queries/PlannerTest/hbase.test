@@ -1,28 +1,16 @@
 # full scan of string typed row-key
 select * from functional_hbase.stringids
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:stringids
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 18309
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 18309
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -33,11 +21,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:stringids
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 18309
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -47,28 +30,16 @@ NODE 0:
 # full scan
 select * from functional_hbase.alltypessmall
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 200
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 200
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -79,11 +50,6 @@ PLAN FRAGMENT 1
 
   0:SCAN HBASE
      table:alltypessmall
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 200
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -95,29 +61,17 @@ NODE 0:
 select * from functional_hbase.alltypessmall
 where id < 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -129,11 +83,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -145,8 +94,6 @@ select * from functional_hbase.stringids
 where id = '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -155,21 +102,11 @@ PLAN FRAGMENT 0
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 0
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 0
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -183,11 +120,6 @@ PLAN FRAGMENT 1
      start key: 5
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 0
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
@@ -196,8 +128,6 @@ select * from functional_hbase.stringids
 where id > '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -205,21 +135,11 @@ PLAN FRAGMENT 0
      table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1008
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1008
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -232,11 +152,6 @@ PLAN FRAGMENT 1
      table:stringids
      start key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1008
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5\0:7
@@ -246,8 +161,6 @@ select * from functional_hbase.stringids
 where id >= '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -255,21 +168,11 @@ PLAN FRAGMENT 0
      table:stringids
      start key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1008
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1008
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -282,11 +185,6 @@ PLAN FRAGMENT 1
      table:stringids
      start key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1008
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:7
@@ -296,8 +194,6 @@ select * from functional_hbase.stringids
 where id < '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -305,21 +201,11 @@ PLAN FRAGMENT 0
      table:stringids
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 820
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 820
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -332,11 +218,6 @@ PLAN FRAGMENT 1
      table:stringids
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 820
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -346,8 +227,6 @@ select * from functional_hbase.stringids
 where id <= '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -355,21 +234,11 @@ PLAN FRAGMENT 0
      table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1226
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 1226
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -382,11 +251,6 @@ PLAN FRAGMENT 1
      table:stringids
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 1226
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -396,8 +260,6 @@ select * from functional_hbase.stringids
 where id > '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -406,21 +268,11 @@ PLAN FRAGMENT 0
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 402
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 402
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -434,11 +286,6 @@ PLAN FRAGMENT 1
      start key: 4\0
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 402
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5
@@ -447,8 +294,6 @@ select * from functional_hbase.stringids
 where id >= '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -457,21 +302,11 @@ PLAN FRAGMENT 0
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 402
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 402
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -485,11 +320,6 @@ PLAN FRAGMENT 1
      start key: 4
      stop key: 5
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 402
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5
@@ -498,8 +328,6 @@ select * from functional_hbase.stringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -508,21 +336,11 @@ PLAN FRAGMENT 0
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 806
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 806
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -536,11 +354,6 @@ PLAN FRAGMENT 1
      start key: 4\0
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 806
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5\0
@@ -549,8 +362,6 @@ select * from functional_hbase.stringids
 where id >= '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -559,21 +370,11 @@ PLAN FRAGMENT 0
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 806
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 806
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -587,11 +388,6 @@ PLAN FRAGMENT 1
      start key: 4
      stop key: 5\0
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 806
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
@@ -602,36 +398,21 @@ from functional_hbase.alltypessmall
 where id < 5
 group by 1
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:AGGREGATE (finalize)
   |  output: COUNT(*)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: unavailable
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1.13GB VCores=2
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   4:EXCHANGE
-     cardinality: unavailable
-     per-host memory: unavailable
-     tuple ids: 1
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
@@ -643,14 +424,8 @@ PLAN FRAGMENT 1
   3:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   2:EXCHANGE
-     cardinality: unavailable
-     per-host memory: 0B
-     tuple ids: 1
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
@@ -662,18 +437,10 @@ PLAN FRAGMENT 2
   1:AGGREGATE
   |  output: COUNT(*)
   |  group by: int_col
-  |  cardinality: unavailable
-  |  per-host memory: 128.00MB
-  |  tuple ids: 1
   |
   0:SCAN HBASE
      table:alltypessmall
      predicates: id < 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -683,29 +450,17 @@ NODE 0:
 # predicates on string columns against a constant string are converted to HBase filters
 select * from functional_hbase.alltypessmall where string_col = '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -717,11 +472,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -731,29 +481,17 @@ NODE 0:
 # test all comparison ops
 select * from functional_hbase.alltypessmall where string_col != '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col NOT_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -765,11 +503,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col NOT_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -778,29 +511,17 @@ NODE 0:
 ====
 select * from functional_hbase.alltypessmall where string_col < '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -812,11 +533,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -825,29 +541,17 @@ NODE 0:
 ====
 select * from functional_hbase.alltypessmall where string_col > '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -859,11 +563,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -872,29 +571,17 @@ NODE 0:
 ====
 select * from functional_hbase.alltypessmall where string_col <= '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS_OR_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -906,11 +593,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col LESS_OR_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -919,29 +601,17 @@ NODE 0:
 ====
 select * from functional_hbase.alltypessmall where string_col >= '4'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER_OR_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -953,11 +623,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      hbase filters: d:string_col GREATER_OR_EQUAL '4'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -968,8 +633,6 @@ NODE 0:
 select * from functional_hbase.alltypessmall
 where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -979,21 +642,11 @@ PLAN FRAGMENT 0
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 0
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 0
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1008,11 +661,6 @@ PLAN FRAGMENT 1
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 0
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -1022,8 +670,6 @@ NODE 0:
 # mix of predicates and functional_hbase. filters
 select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -1031,21 +677,11 @@ PLAN FRAGMENT 0
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 2
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1058,11 +694,6 @@ PLAN FRAGMENT 1
      table:alltypessmall
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 2
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -1073,8 +704,6 @@ NODE 0:
 select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
@@ -1084,21 +713,11 @@ PLAN FRAGMENT 0
      stop key: 5\0
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 80
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 80
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1113,11 +732,6 @@ PLAN FRAGMENT 1
      stop key: 5\0
      hbase filters: d:string_col EQUAL '4'
      predicates: tinyint_col = 5
-     table stats: 10000 rows total
-     column stats: unavailable
-     cardinality: 80
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
@@ -1125,29 +739,17 @@ NODE 0:
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1159,11 +761,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: CAST(string_col AS INT) >= 4
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -1173,29 +770,17 @@ NODE 0:
 # non-const comparisons cannot be turned into filters
 select * from functional_hbase.alltypessmall where string_col >= date_string_col
 ---- PLAN
-Estimated Per-Host Requirements: Memory=0B VCores=0
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   0:SCAN HBASE
      table:alltypessmall
      predicates: string_col >= date_string_col
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 ---- DISTRIBUTEDPLAN
-Estimated Per-Host Requirements: Memory=1024.00MB VCores=1
-
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
   1:EXCHANGE
-     cardinality: 20
-     per-host memory: unavailable
-     tuple ids: 0
 
 PLAN FRAGMENT 1
   PARTITION: RANDOM
@@ -1207,11 +792,6 @@ PLAN FRAGMENT 1
   0:SCAN HBASE
      table:alltypessmall
      predicates: string_col >= date_string_col
-     table stats: 100 rows total
-     column stats: unavailable
-     cardinality: 20
-     per-host memory: 1024.00MB
-     tuple ids: 0
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3

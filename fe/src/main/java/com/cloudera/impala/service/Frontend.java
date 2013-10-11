@@ -427,12 +427,13 @@ public class Frontend {
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
 
-    // The explain level query option only applies to explain stmts.
-    // For other queries, always get the verbose explain plan for logging
-    // and reporting through the query profile.
+    // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;
-    if (analysisResult.isExplainStmt()) {
+    if (request.queryOptions.isSetExplain_level()) {
       explainLevel = request.queryOptions.getExplain_level();
+    } else if (analysisResult.isExplainStmt()) {
+      // Use the NORMAL by default for explain statements.
+      explainLevel = TExplainLevel.NORMAL;
     }
 
     explainString.append(planner.getExplainString(fragments, queryExecRequest,

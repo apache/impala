@@ -111,17 +111,17 @@ public class HdfsTableSink extends TableSink {
 
     // Report the total number of partitions, independent of the number of nodes
     // and the data partition of the fragment executing this sink.
-    long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs);
-    if (totalNumPartitions == -1) {
-      output.append("  #partitions: unavailable");
-    } else {
-      output.append("  #partitions: " + totalNumPartitions);
-    }
-
-    output.append("\n");
     if (explainLevel == TExplainLevel.VERBOSE) {
-      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost) + "\n");
+      long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs);
+      if (totalNumPartitions == -1) {
+        output.append("  #partitions: unavailable");
+      } else {
+        output.append("  #partitions: " + totalNumPartitions);
+      }
+      output.append("\n");
+      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost));
     }
+    output.append("\n");
     return output.toString();
   }
 
