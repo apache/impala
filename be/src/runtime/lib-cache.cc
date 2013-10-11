@@ -31,17 +31,20 @@ DEFINE_string(local_library_dir, "/tmp",
               "Local directory to copy UDF libraries from HDFS into");
 
 LibCache::~LibCache() {
-  BOOST_FOREACH(LibMap::value_type& v, lib_cache_) {
-    if (v.second->shared_object_handle == NULL) continue;
-    int error = dlclose(v.second->shared_object_handle);
+  DropCache();
+}
+
+LibCache::LibCacheEntry::~LibCacheEntry() {
+  if (shared_object_handle != NULL) {
+    int error = dlclose(shared_object_handle);
     if (error != 0) {
-      LOG(WARNING) << "Error calling dlclose for " << v.first
+      LOG(WARNING) << "Error calling dlclose for " << local_path
                    << ": (Error: " << error << ") " << dlerror();
     }
   }
 }
 
-Status LibCache::GetFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
+Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
                                 const string& symbol, void** fn_ptr) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
@@ -72,7 +75,7 @@ Status LibCache::GetLocalLibPath(HdfsFsCache* hdfs_cache, const string& hdfs_lib
   return Status::OK;
 }
 
-Status LibCache::GetHandle(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
+Status LibCache::GetSoHandle(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
                            void** handle) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
@@ -88,7 +91,7 @@ Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_l
     bool is_shared_object, const string& symbol) {
   if (is_shared_object) {
     void* dummy_ptr = NULL;
-    return GetFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr);
+    return GetSoFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr);
   } else {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
@@ -103,6 +106,38 @@ Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_l
     }
     return Status::OK;
   }
+}
+
+void LibCache::RemoveEntry(const std::string hdfs_lib_file) {
+  unique_lock<mutex> lib_cache_lock(lock_);
+  LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
+  if (it == lib_cache_.end()) return;
+  VLOG(1) << "Removed lib cache entry: " << hdfs_lib_file;
+  unique_lock<mutex> entry_lock(it->second->lock);
+
+  // We have both locks now so no other thread can be updating lib_cache_
+  // or trying to get the entry.
+  lib_cache_.erase(it);
+
+  // Now that the entry is removed from the map, it means no future threads
+  // can find it->second (the entry), so it is safe to unlock.
+  entry_lock.unlock();
+
+  // Now that we've unlocked, we can delete this entry.
+  delete it->second;
+}
+
+void LibCache::DropCache() {
+  unique_lock<mutex> lib_cache_lock(lock_);
+  BOOST_FOREACH(LibMap::value_type& v, lib_cache_) {
+    {
+      // Lock to wait for any threads currently processing the entry.
+      unique_lock<mutex> entry_lock(v.second->lock);
+    }
+    VLOG(1) << "Removed lib cache entry: " << v.first;
+    delete v.second;
+  }
+  lib_cache_.clear();
 }
 
 Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
@@ -124,7 +159,7 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   }
   // Entry didn't exist. Add the entry then release lock_ (so other libraries
   // can be accessed).
-  *entry = pool_.Add(new LibCacheEntry());
+  *entry = new LibCacheEntry();
 
   // Grab the entry lock before adding it to lib_cache_. We still need to do more
   // work to initialize *entry and we don't want another thread to pick up
@@ -133,6 +168,8 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   entry_lock->swap(local_entry_lock);
   lib_cache_[hdfs_lib_file] = *entry;
   lib_cache_lock.unlock();
+
+  VLOG(1) << "Added lib cache entry: " << hdfs_lib_file;
 
   // At this point we have the entry lock but not the lib cache lock.
   DCHECK(*entry != NULL);
@@ -149,8 +186,9 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
     RETURN_IF_ERROR(DynamicOpen((*entry)->local_path, &(*entry)->shared_object_handle));
   } else {
     // Load the module and populate all symbols.
+    ObjectPool pool;
     scoped_ptr<LlvmCodeGen> codegen;
-    RETURN_IF_ERROR(LlvmCodeGen::LoadFromFile(&pool_, (*entry)->local_path, &codegen));
+    RETURN_IF_ERROR(LlvmCodeGen::LoadFromFile(&pool, (*entry)->local_path, &codegen));
     codegen->GetSymbols(&(*entry)->symbols);
   }
 

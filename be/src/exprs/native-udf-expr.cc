@@ -268,7 +268,7 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // interface with the code in impalad.
     void* udf_ptr;
     if (udf_type_ == TFunctionBinaryType::NATIVE) {
-      RETURN_IF_ERROR(state->lib_cache()->GetFunctionPtr(
+      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
           state->fs_cache(), hdfs_location_, symbol_name_, &udf_ptr));
     } else {
       udf_ptr = OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);

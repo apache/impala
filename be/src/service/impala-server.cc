@@ -49,6 +49,7 @@
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
+#include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
 #include "service/query-exec-state.h"
 #include "statestore/simple-scheduler.h"
@@ -1678,6 +1679,12 @@ void ImpalaServer::CatalogUpdateCallback(
       update_req.updated_objects.push_back(catalog_object);
     }
 
+    // We need to look up the dropped functions and remove them from the library
+    // cache. The data sent from the catalog service does not contain all the
+    // function metadata so we'll ask our local frontend for it. We need to do
+    // this before updating the catalog.
+    vector<TCatalogObject> dropped_functions;
+
     // Process all Catalog deletions (dropped objects). We only know the keys (object
     // names) so must parse each key to determine the TCatalogObject.
     BOOST_FOREACH(const string& key, delta.topic_deletions) {
@@ -1690,6 +1697,13 @@ void ImpalaServer::CatalogUpdateCallback(
         continue;
       }
       update_req.removed_objects.push_back(catalog_object);
+      if (catalog_object.type == TCatalogObjectType::FUNCTION) {
+        TCatalogObject dropped_function;
+        if (frontend_->GetCatalogObject(catalog_object, &dropped_function).ok()) {
+          dropped_functions.push_back(dropped_function);
+        }
+        // Nothing to do in error case.
+      }
     }
 
     // Call the FE to apply the changes to the Impalad Catalog.
@@ -1703,13 +1717,22 @@ void ImpalaServer::CatalogUpdateCallback(
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
       update.__set_from_version(0L);
       ImpaladMetrics::CATALOG_READY->Update(false);
+      // Dropped all cached lib files (this behaves as if all functions are dropped).
+      exec_env_->lib_cache()->DropCache();
     } else {
-      unique_lock<mutex> unique_lock(catalog_version_lock_);
-      current_catalog_version_ = new_catalog_version;
-      current_catalog_service_id_ = resp.catalog_service_id;
+      {
+        unique_lock<mutex> unique_lock(catalog_version_lock_);
+        current_catalog_version_ = new_catalog_version;
+        current_catalog_service_id_ = resp.catalog_service_id;
+      }
       ImpaladMetrics::CATALOG_READY->Update(current_catalog_version_ > 0);
       catalog_version_update_cv_.notify_all();
       UpdateCatalogMetrics();
+      // Remove all dropped functions from the library cache.
+      // TODO: is this expensive? We'd like to process heartbeats promptly.
+      for (int i = 0; i < dropped_functions.size(); ++i) {
+        exec_env_->lib_cache()->RemoveEntry(dropped_functions[i].fn.location);
+      }
     }
   }
 }

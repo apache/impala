@@ -75,6 +75,25 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/functions-ddl', vector)
 
   @pytest.mark.execute_serially
+  def test_create_drop_function(self, vector):
+    # This will create and drop the same function repeatedly, exercising the
+    # lib cache mechanism.
+    # TODO: it's hard to tell that the cache is working (i.e. if it did
+    # nothing to drop the cache, these tests would still pass). Testing
+    # that is a bit harder and requires us to update the udf binary in
+    # the middle.
+    create_fn_stmt = """create function f() returns int
+        location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'""";
+    drop_fn_stmt = "drop function f()"
+
+    self.client.execute("use udf_test")
+    self.client.execute("drop function if exists f()")
+
+    for i in xrange(1, 5):
+      self.client.execute(create_fn_stmt)
+      self.client.execute(drop_fn_stmt)
+
+  @pytest.mark.execute_serially
   def test_create_alter_tbl_properties(self, vector):
     self.client.execute("use default")
     self.client.execute("drop table if exists test_alter_tbl")
