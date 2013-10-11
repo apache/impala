@@ -172,7 +172,18 @@ Status ResourceBroker::RegisterWithLlama() {
 
     llama::TLlamaAMRegisterResponse response;
     LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address_;
-    llama_client->Register(response, request);
+    try {
+      llama_client->Register(response, request);
+    } catch (TTransportException& e) {
+      VLOG_RPC << "Retrying Registration: " << e.what();
+      status = llama_client.Reopen();
+      if (!status.ok()) {
+        usleep(LLAMA_REGISTRATION_WAIT_SECS * 1000 * 1000);
+        now = TimestampValue::local_time_micros().time_of_day().total_seconds();
+        continue;
+      }
+      llama_client->Register(response, request);
+    }
     RETURN_IF_ERROR(LlamaStatusToImpalaStatus(
         response.status, "Failed to register Resource Broker with Llama."));
     llama_handle_ = response.am_handle;
