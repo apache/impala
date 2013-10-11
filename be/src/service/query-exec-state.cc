@@ -288,6 +288,9 @@ void ImpalaServer::QueryExecState::Done() {
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
   TMetadataOpResponse metadata_op_result;
+  // Like the other Exec(), fill out as much profile information as we're able to.
+  summary_profile_.AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
+  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
   result_metadata_ = metadata_op_result.result_set_metadata;

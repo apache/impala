@@ -42,6 +42,12 @@ def needs_session(fn):
       self.session_handle = None
   return add_session
 
+def operation_id_to_query_id(operation_id):
+  lo, hi = operation_id.guid[:8],  operation_id.guid[8:]
+  lo = ''.join(['%0.2X' % ord(c) for c in lo[::-1]])
+  hi = ''.join(['%0.2X' % ord(c) for c in hi[::-1]])
+  return "%s:%s" % (lo, hi)
+
 class TestHS2(ImpalaTestSuite):
   def setup(self):
     host, port = IMPALAD_HS2_HOST_PORT.split(":")
@@ -195,3 +201,21 @@ class TestHS2(ImpalaTestSuite):
     self.socket = None
     self.impalad_test_service.wait_for_metric_value(
       "impala-server.num-open-hiveserver2-sessions", num_sessions)
+
+  @needs_session
+  def test_get_schemas(self):
+    get_schemas_req = TCLIService.TGetSchemasReq()
+    get_schemas_req.sessionHandle = self.session_handle
+    get_schemas_resp = self.hs2_client.GetSchemas(get_schemas_req)
+    TestHS2.check_response(get_schemas_resp)
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = get_schemas_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+    query_id = operation_id_to_query_id(get_schemas_resp.operationHandle.operationId)
+    profile_page = self.impalad_test_service.read_query_profile_page(query_id)
+
+    # Test fix for IMPALA-619
+    assert "Sql Statement: GET_SCHEMAS" in profile_page
+    assert "Query Type: DDL" in profile_page
