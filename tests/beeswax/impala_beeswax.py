@@ -71,9 +71,8 @@ class QueryResult(object):
                'Success: %s\n'
                'Took: %s(s)\n'
                'Data:\n%s\n'
-               'Runtime Profile:\n%s\n'
                % (self.summary, self.success, self.time_taken,
-                  self.__format_data(), self.runtime_profile)
+                  self.__format_data())
               )
     return message
 

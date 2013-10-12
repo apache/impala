@@ -142,6 +142,12 @@ def append_row_to_csv_file(csv_writer, query, result):
   """
   Write the results to a CSV file with '|' as the delimiter.
   """
+  # If the query failed, and returned an empty result, print its details to console.
+  if not result.success:
+    LOG.info("All threads failed for Query:%s, Scale Factor:%s, Table Format:%s" %
+        (query.name, query.scale_factor, query.table_format_str))
+    # Don't store a blank result.
+    return
   # Replace non-existent values with N/A for reporting results.
   if not result.std_dev: result.std_dev = 'N/A'
   if not result.avg_time: result.avg_time = 'N/A'

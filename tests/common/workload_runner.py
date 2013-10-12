@@ -163,8 +163,8 @@ class WorkloadRunner(object):
     query_executor.run()
     results = query_executor.get_results()
     # If all the threads failed, do not call __get_median_exec_result
-    # and return a blank result.
-    if not results: return None
+    # and return an empty execution result.
+    if not results: return QueryExecResult()
     return self.__get_median_exec_result(results)
 
   def __get_median_exec_result(self, results):
@@ -297,7 +297,10 @@ class WorkloadRunner(object):
     self.__summary = "\nWorkload [%s]:\n" % (queries[0].db.upper())
     # Save the results
     for query, results in query_results.iteritems():
-      exec_result = self.__get_median_exec_result(results)
+      if not results:
+        exec_result = QueryExecResult()
+      else:
+        exec_result = self.__get_median_exec_result(results)
       self.__result_map[query].append((exec_result, QueryExecResult()))
       self.__summary += " Impala Results: %s\n" % exec_result
 
