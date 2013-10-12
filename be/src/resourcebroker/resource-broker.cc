@@ -152,45 +152,37 @@ Status ResourceBroker::RegisterWithLlama() {
     Status status;
     ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
         llama_address_, &status);
-    if (!status.ok()) {
-      LOG(INFO) << "Failed to connect to Llama at " << llama_address_ << ".\n"
-                << "Error: " << status.GetErrorMsg() << "\n"
-                << "Retrying to connect in "
-                << LLAMA_REGISTRATION_WAIT_SECS << "s.";
-      usleep(LLAMA_REGISTRATION_WAIT_SECS * 1000 * 1000);
-      now = TimestampValue::local_time_micros().time_of_day().total_seconds();
-      continue;
-    }
-
-    // Register this resource broker with Llama.
-    llama::TLlamaAMRegisterRequest request;
-    request.__set_version(llama::TLlamaServiceVersion::V1);
-    request.__set_client_id(llama_client_id_);
-    llama::TNetworkAddress callback_address;
-    callback_address << llama_callback_address_;
-    request.__set_notification_callback_service(callback_address);
-
-    llama::TLlamaAMRegisterResponse response;
-    LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address_;
-    try {
-      llama_client->Register(response, request);
-    } catch (TTransportException& e) {
-      VLOG_RPC << "Retrying Registration: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) {
-        usleep(LLAMA_REGISTRATION_WAIT_SECS * 1000 * 1000);
-        now = TimestampValue::local_time_micros().time_of_day().total_seconds();
-        continue;
+    if (status.ok()) {
+      // Register this resource broker with Llama.
+      llama::TLlamaAMRegisterRequest request;
+      request.__set_version(llama::TLlamaServiceVersion::V1);
+      request.__set_client_id(llama_client_id_);
+      llama::TNetworkAddress callback_address;
+      callback_address << llama_callback_address_;
+      request.__set_notification_callback_service(callback_address);
+      llama::TLlamaAMRegisterResponse response;
+      LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address_;
+      try {
+        llama_client->Register(response, request);
+        RETURN_IF_ERROR(LlamaStatusToImpalaStatus(
+            response.status, "Failed to register Resource Broker with Llama."));
+        llama_handle_ = response.am_handle;
+        LOG(INFO) << "Received Llama client handle " << llama_handle_;
+        RETURN_IF_ERROR(RefreshLlamaNodes());
+        LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
+        return Status::OK;
+      } catch (TTransportException& e) {
+        llama_client.Reopen();
       }
-      llama_client->Register(response, request);
     }
-    RETURN_IF_ERROR(LlamaStatusToImpalaStatus(
-        response.status, "Failed to register Resource Broker with Llama."));
-    llama_handle_ = response.am_handle;
-    LOG(INFO) << "Received Llama client handle " << llama_handle_;
-    RETURN_IF_ERROR(RefreshLlamaNodes());
-    LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
-    return Status::OK;
+    LOG(INFO) << "Failed to connect to Llama at " << llama_address_ << ".\n"
+              << "Error: " << status.GetErrorMsg() << "\n"
+              << "Retrying to connect in "
+              << LLAMA_REGISTRATION_WAIT_SECS << "s.";
+    // Sleep even if we just need to Reopen() the client to stagger re-registrations
+    // of multiple Impalads with the Llama in case the Llama went down and came back up.
+    usleep(LLAMA_REGISTRATION_WAIT_SECS * 1000 * 1000);
+    now = TimestampValue::local_time_micros().time_of_day().total_seconds();
   }
   if ((now - start) >= LLAMA_REGISTRATION_TIMEOUT_SECS) {
     return Status("Failed to (re-)register Resource Broker with Llama.");
@@ -391,6 +383,19 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
 
 void ResourceBroker::AMNotification(const llama::TLlamaAMNotificationRequest& request,
     llama::TLlamaAMNotificationResponse& response) {
+  {
+    // This Impalad may have restarted, so it is possible Llama is sending notifications
+    // while this Impalad is registering with Llama.
+    lock_guard<mutex> l(llama_registration_lock_);
+    if (request.am_handle != llama_handle_) {
+      VLOG_QUERY << "Ignoring Llama AM notification with mismatched AM handle. "
+                 << "Known handle: " << llama_handle_ << ". Received handle: "
+                 << request.am_handle;
+      // Ignore all notifications with mismatched handles.
+      return;
+    }
+  }
+
   // Nothing to be done for heartbeats.
   if (request.heartbeat) return;
   VLOG_QUERY << "Received non-heartbeat AM notification";
