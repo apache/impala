@@ -400,6 +400,10 @@
               <value>${use_external_impalad}</value>
             </property>
           </systemProperties>
+          <excludes>
+            <!-- Disabled due to IMPALA-614 -->
+            <exclude>**/DataErrorsTest.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
 
