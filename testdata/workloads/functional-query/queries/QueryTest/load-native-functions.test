@@ -12,7 +12,10 @@ drop function if exists udf_test.identity(timestamp);
 drop function if exists udf_test.all_types_fn(
     string, boolean, tinyint, smallint, int, bigint, float, double);
 drop function if exists udf_test.no_args();
+drop function if exists udf_test.var_and(boolean...);
 drop function if exists udf_test.var_sum(int...);
+drop function if exists udf_test.var_sum(double...);
+drop function if exists udf_test.var_sum(string...);
 drop function if exists udf_test.var_sum_multiply(double, int...);
 drop function if exists udf_test.constant_timestamp();
 
@@ -60,7 +63,16 @@ create function udf_test.no_args() returns string
 location '/test-warehouse/libTestUdfs.so'
 symbol='_Z6NoArgsPN10impala_udf15FunctionContextE';
 
+create function udf_test.var_and(boolean...) returns boolean
+location '/test-warehouse/libTestUdfs.so' symbol='VarAnd';
+
 create function udf_test.var_sum(int...) returns int
+location '/test-warehouse/libTestUdfs.so' symbol='VarSum';
+
+create function udf_test.var_sum(double...) returns double
+location '/test-warehouse/libTestUdfs.so' symbol='VarSum';
+
+create function udf_test.var_sum(string...) returns string
 location '/test-warehouse/libTestUdfs.so' symbol='VarSum';
 
 create function udf_test.var_sum_multiply(double, int...) returns double

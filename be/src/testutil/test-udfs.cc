@@ -51,6 +51,15 @@ StringVal NoArgs(FunctionContext* context) {
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>("string")), 6);
 }
 
+BooleanVal VarAnd(FunctionContext* context, int n, const BooleanVal* args) {
+  bool result = true;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) return BooleanVal(false);
+    result &= args[i].val;
+  }
+  return BooleanVal(result);
+}
+
 IntVal VarSum(FunctionContext* context, int n, const IntVal* args) {
   int result = 0;
   bool is_null = true;
@@ -61,6 +70,37 @@ IntVal VarSum(FunctionContext* context, int n, const IntVal* args) {
   }
   if (is_null) return IntVal::null();
   return IntVal(result);
+}
+
+DoubleVal VarSum(FunctionContext* context, int n, const DoubleVal* args) {
+  double result = 0;
+  bool is_null = true;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) continue;
+    result += args[i].val;
+    is_null = false;
+  }
+  if (is_null) return DoubleVal::null();
+  return DoubleVal(result);
+}
+
+StringVal VarSum(FunctionContext* context, int n, const StringVal* args) {
+  int total_len = 0;
+  bool is_null = true;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) continue;
+    total_len += args[i].len;
+    is_null = false;
+  }
+  if (is_null) return StringVal::null();
+  StringVal result(context, total_len);
+  int offset = 0;
+  for (int i = 0; i < n; ++i) {
+    if (args[i].is_null) continue;
+    memcpy(result.ptr + offset, args[i].ptr, args[i].len);
+    offset += args[i].len;
+  }
+  return result;
 }
 
 DoubleVal VarSumMultiply(FunctionContext* context,

@@ -64,6 +64,24 @@ class AnyValUtil {
     TimestampValue tv = TimestampValue::FromTimestampVal(v);
     return tv.Hash(seed);
   }
+
+  // Returns the byte size of *Val for type t.
+  static int AnyValSize(PrimitiveType t) {
+    switch (t) {
+      case TYPE_BOOLEAN: return sizeof(BooleanVal);
+      case TYPE_TINYINT: return sizeof(TinyIntVal);
+      case TYPE_SMALLINT: return sizeof(SmallIntVal);
+      case TYPE_INT: return sizeof(IntVal);
+      case TYPE_BIGINT: return sizeof(BigIntVal);
+      case TYPE_FLOAT: return sizeof(FloatVal);
+      case TYPE_DOUBLE: return sizeof(DoubleVal);
+      case TYPE_STRING: return sizeof(StringVal);
+      case TYPE_TIMESTAMP: return sizeof(TimestampVal);
+      default:
+        DCHECK(false) << t;
+        return 0;
+    }
+  }
 };
 
 // Class for handling AnyVal subclasses during codegen. Codegen functions should use this

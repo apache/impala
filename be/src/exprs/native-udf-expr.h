@@ -49,6 +49,7 @@ class TExprNode;
 // - remove current Codegen/ComputeFn API
 class NativeUdfExpr: public Expr {
  public:
+  ~NativeUdfExpr();
   virtual std::string DebugString() const;
 
  protected:
@@ -82,9 +83,9 @@ class NativeUdfExpr: public Expr {
   // Function pointer to the JIT'd function produced by GetIrComputeFn().
   void* udf_wrapper_;
 
-  // Vector of preallocate input objects to pass to UDF if it has varargs.
+  // Buffer of preallocated input objects to pass to UDF if it has varargs.
   // TODO: Move to to ExprContext
-  std::vector<impala_udf::AnyVal*> varargs_input_;
+  uint8_t* varargs_input_;
 
   // Loads the native or IR function from HDFS and puts the result in *udf.
   Status GetUdf(RuntimeState* state, llvm::Function** udf);

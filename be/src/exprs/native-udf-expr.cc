@@ -39,9 +39,14 @@ NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
     symbol_name_(node.udf_call_expr.symbol_name),
     vararg_start_idx_(node.udf_call_expr.__isset.vararg_start_idx ?
         node.udf_call_expr.vararg_start_idx : -1),
-    udf_wrapper_(NULL) {
+    udf_wrapper_(NULL),
+    varargs_input_(NULL) {
   DCHECK(node.node_type == TExprNodeType::UDF_CALL);
   DCHECK(udf_type_ != TFunctionBinaryType::HIVE);
+}
+
+NativeUdfExpr::~NativeUdfExpr() {
+  delete[] varargs_input_;
 }
 
 typedef BooleanVal (*BooleanUdfWrapper)(int8_t*, TupleRow*);
@@ -133,13 +138,13 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
 
   if (vararg_start_idx_ != -1) {
-    DCHECK_GT(GetNumChildren(), vararg_start_idx_);
     // Allocate a scratch buffer for all the variable args.
-    varargs_input_.resize(GetNumChildren() - vararg_start_idx_);
-    for (int i = 0; i < varargs_input_.size(); ++i) {
-      varargs_input_[i] = CreateAnyVal(state->obj_pool(),
-          children_[vararg_start_idx_ + i]->type());
+    int var_args_buffer_size = 0;
+    DCHECK_GT(GetNumChildren(), vararg_start_idx_);
+    for (int i = vararg_start_idx_; i < GetNumChildren(); ++i) {
+      var_args_buffer_size += AnyValUtil::AnyValSize(children_[i]->type());
     }
+    varargs_input_ = new uint8_t[var_args_buffer_size];
   }
 
   llvm::Function* ir_udf_wrapper;
@@ -199,6 +204,7 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   // Call children to populate remaining arguments
   llvm::Function::arg_iterator arg = udf->arg_begin();
   ++arg; // Skip FunctionContext* arg
+  int varargs_input_offset = 0;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (vararg_start_idx_ == i) {
       // This is the start of the varargs, first add the number of args.
@@ -224,28 +230,30 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
 
     if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
       // Either no varargs or arguments before varargs begin.
-      llvm::Value* arg_ptr = builder.CreateAlloca(child_fn->getReturnType(), 0, "arg_ptr");
+      llvm::Value* arg_ptr = builder.CreateAlloca(
+          child_fn->getReturnType(), 0, "arg_ptr");
       builder.CreateStore(arg_val, arg_ptr);
 
-      // The *Val type returned by child_fn will be likely be lowered to a simpler type, so
-      // we must cast arg_ptr to the actual *Val struct pointer type expected by the UDF.
+      // The *Val type returned by child_fn will be likely be lowered to a simpler type,
+      // so we must cast arg_ptr to the actual *Val struct pointer type expected by the
+      // UDF.
       llvm::Value* cast_arg_ptr =
           builder.CreateBitCast(arg_ptr, arg->getType(), "cast_arg_ptr");
       udf_args.push_back(cast_arg_ptr);
       ++arg;
     } else {
-      // Store the result of child(i) in varargs_input_[i - vararg_start_idx_]
-      int varargs_input_idx = i - vararg_start_idx_;
+      // Store the result of child(i) in varargs_input_ + varargs_input_offset
       llvm::Type* arg_ptr_type = llvm::PointerType::get(arg_val->getType(), 0);
       llvm::Value* arg_ptr = codegen->CastPtrToLlvmPtr(
-          arg_ptr_type, &varargs_input_[varargs_input_idx]);
+          arg_ptr_type, varargs_input_ + varargs_input_offset);
       builder.CreateStore(arg_val, arg_ptr);
+      varargs_input_offset += AnyValUtil::AnyValSize(children_[i]->type());
     }
   }
 
   if (vararg_start_idx_ != -1) {
     // Add all the accumulated vararg inputs as one input argument.
-    udf_args.push_back(codegen->CastPtrToLlvmPtr(arg->getType(), &varargs_input_[0]));
+    udf_args.push_back(codegen->CastPtrToLlvmPtr(arg->getType(), varargs_input_));
   }
 
   // Call UDF

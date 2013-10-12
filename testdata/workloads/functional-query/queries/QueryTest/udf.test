@@ -230,11 +230,39 @@ int
 NULL
 ====
 ---- QUERY
+select udf_test.var_and(true, false, true)
+---- TYPES
+boolean
+---- RESULT
+false
+====
+---- QUERY
+select udf_test.var_and(true, true, true, true, true)
+---- TYPES
+boolean
+---- RESULT
+true
+====
+---- QUERY
 select udf_test.var_sum(1, 2, 3, 4, 5, 6)
 ---- TYPES
 int
 ---- RESULT
 21
+====
+---- QUERY
+select udf_test.var_sum(1.0, 2.0, 3.0)
+---- TYPES
+double
+---- RESULT
+6
+====
+---- QUERY
+select udf_test.var_sum("Hello", "World", "Foo", "Bar")
+---- TYPES
+string
+---- RESULT
+'HelloWorldFooBar'
 ====
 ---- QUERY
 select tinyint_col, int_col, udf_test.var_sum(tinyint_col, int_col)
