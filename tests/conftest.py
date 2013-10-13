@@ -24,14 +24,11 @@ def pytest_addoption(parser):
   parser.addoption("--impalad_hs2_port", default="21050", help=\
                    "The impalad HiveServer2 port.")
 
-  # TODO: Migrate test infrastructure to HiveServer2 and remove the need for this
-  # parameter.
-  parser.addoption("--hive_server", default="localhost:10000", help=\
-                   "The hive server host:port to connect to.")
+  parser.addoption("--metastore_server", default="localhost:9083", help=\
+                   "The Hive Metastore server host:port to connect to.")
 
   parser.addoption("--hive_server2", default="localhost:11050", help=\
                    "Hive's HiveServer2 host:port to connect to.")
-
 
   default_xml_path = os.path.join(os.environ['HADOOP_CONF_DIR'], "minicluster-conf.xml")
   parser.addoption("--minicluster_xml_conf", default=default_xml_path, help=\

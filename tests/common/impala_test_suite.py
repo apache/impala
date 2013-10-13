@@ -67,13 +67,12 @@ class ImpalaTestSuite(BaseTestSuite):
     """Setup section that runs before each test suite"""
     cls.hive_client, cls.client = [None, None]
     # Create a Hive Metastore Client (used for executing some test SETUP steps
-    hive_server_host, hive_server_port = pytest.config.option.hive_server.split(':')
+    metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
     cls.hive_transport = create_transport(
         use_kerberos=pytest.config.option.use_kerberos,
-        host=hive_server_host,
-        port=hive_server_port,
+        host=metastore_host,
+        port=metastore_port,
         service=pytest.config.option.hive_service_name)
-
     protocol = TBinaryProtocol.TBinaryProtocol(cls.hive_transport)
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()

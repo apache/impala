@@ -16,6 +16,4 @@ hive --service metastore -p $HIVE_METASTORE_PORT &
 # environment variable.
 hive --service hiveserver2 &
 
-# Starts hive-server (1) on the specified port.
-hive --service hiveserver -p $HIVE_SERVER_PORT &
-sleep 20
+sleep 10

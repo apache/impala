@@ -24,8 +24,8 @@ COMPUTE_COLUMN_STATS_STATEMENT =\
 
 HIVE_ARGS = "-hiveconf hive.root.logger=ERROR,console"
 
-def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None,
-                  continue_on_error=False, hive_cmd='hive'):
+def compute_stats(hive_metastore_host, hive_metastore_port, db_names=None,
+                  table_names=None, continue_on_error=False, hive_cmd='hive'):
   """
   Queries the Hive Metastore and runs compute stats over all tables
 
@@ -36,7 +36,7 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
   # TODO: Consider creating a utility module for this because it is also duplicated in
   # impala_test_suite.py.
   hive_transport = TTransport.TBufferedTransport(
-      TSocket.TSocket(hive_server_host, int(hive_server_port)))
+      TSocket.TSocket(hive_metastore_host, int(hive_metastore_port)))
   protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
   hive_metastore_client = ThriftHiveMetastore.Client(protocol)
   hive_client = ThriftHive.Client(protocol)
@@ -91,8 +91,8 @@ if __name__ == "__main__":
                     "if there is an error computing the table or column stats.")
   parser.add_option("--hive_cmd", dest="hive_cmd", default='hive',
                     help="The command to use for executing hive.")
-  parser.add_option("--hive_server", dest="hive_server", default='localhost:10000',
-                    help="<host:port> of hive server to connect to")
+  parser.add_option("--hive_metastore", dest="hive_metastore", default='localhost:9083',
+                    help="<host:port> of hive metastore server to connect to")
   parser.add_option("--db_names", dest="db_names", default=None,
                     help="Comma-separated list of database names for which to compute "\
                     "stats. Can be used in conjunction with the --table_names flag. "\
@@ -111,6 +111,6 @@ if __name__ == "__main__":
   if options.db_names is not None:
     db_names = [name.lower().strip() for name in options.db_names.split(',')]
 
-  compute_stats(*options.hive_server.split(':'), db_names=db_names,
+  compute_stats(*options.hive_metastore.split(':'), db_names=db_names,
       table_names=table_names, continue_on_error=options.continue_on_error,
       hive_cmd=options.hive_cmd)
