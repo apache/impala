@@ -86,6 +86,7 @@ class TestDdlStatements(ImpalaTestSuite):
         location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'""";
     drop_fn_stmt = "drop function f()"
 
+    self.client.execute("create database if not exists udf_test")
     self.client.execute("use udf_test")
     self.client.execute("drop function if exists f()")
 
