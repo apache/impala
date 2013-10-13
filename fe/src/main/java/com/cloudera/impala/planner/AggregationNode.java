@@ -24,7 +24,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.thrift.TAggregateFunction;
+import com.cloudera.impala.thrift.TAggregateFunctionCall;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -139,9 +139,9 @@ public class AggregationNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
 
-    List<TAggregateFunction> aggregateFunctions = Lists.newArrayList();
+    List<TAggregateFunctionCall> aggregateFunctions = Lists.newArrayList();
     for (FunctionCallExpr e: aggInfo.getAggregateExprs()) {
-      aggregateFunctions.add(e.toTAggregateFunction());
+      aggregateFunctions.add(e.toTAggregateFunctionCall());
     }
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,

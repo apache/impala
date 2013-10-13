@@ -19,6 +19,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -226,15 +227,13 @@ public class Function implements CatalogObject {
 
   public TFunction toThrift() {
     TFunction fn = new TFunction();
+    // TODO: this function should have a unique ID
+    fn.setId(0);
     fn.setSignature(signatureString());
-    fn.setFn_name(name_.toThrift());
-    fn.setFn_binary_type(binaryType_);
-    fn.setLocation(location_.toString());
-    List<TPrimitiveType> argTypes = Lists.newArrayList();
-    for (PrimitiveType argType: argTypes_) {
-      argTypes.add(argType.toThrift());
-    }
-    fn.setArg_types(argTypes);
+    fn.setName(name_.toThrift());
+    fn.setBinary_type(binaryType_);
+    if (location_ != null) fn.setLocation(location_.toString());
+    fn.setArg_types(PrimitiveType.toThrift(argTypes_));
     fn.setRet_type(getReturnType().toThrift());
     fn.setHas_var_args(hasVarArgs_);
     // TODO: Comment field is missing?
@@ -249,21 +248,22 @@ public class Function implements CatalogObject {
     }
 
     Function function = null;
-    if (fn.isSetUdf()) {
-      function = new Udf(FunctionName.fromThrift(fn.getFn_name()), argTypes,
+    if (fn.isSetScalar_fn()) {
+      function = new Udf(FunctionName.fromThrift(fn.getName()), argTypes,
           PrimitiveType.fromThrift(fn.getRet_type()), new HdfsURI(fn.getLocation()),
-          fn.getUdf().getSymbol_name());
-    } else if (fn.isSetUda()) {
-      function = new Uda(FunctionName.fromThrift(fn.getFn_name()), argTypes,
+          fn.getScalar_fn().getSymbol());
+    } else if (fn.isSetAggregate_fn()) {
+      TAggregateFunction aggFn = fn.getAggregate_fn();
+      function = new Uda(FunctionName.fromThrift(fn.getName()), argTypes,
           PrimitiveType.fromThrift(fn.getRet_type()),
-          ColumnType.fromThrift(fn.getUda().getIntermediate_type()),
-          new HdfsURI(fn.getLocation()), fn.getUda().getUpdate_fn_name(),
-          fn.getUda().getInit_fn_name(), fn.getUda().getSerialize_fn_name(),
-          fn.getUda().getMerge_fn_name(), fn.getUda().getFinalize_fn_name());
+          ColumnType.fromThrift(aggFn.getIntermediate_type()),
+          new HdfsURI(fn.getLocation()), aggFn.getUpdate_fn_symbol(),
+          aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
+          aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
     } else {
       throw new IllegalStateException("Expected function type to be either UDA or UDF.");
     }
-    function.setBinaryType(fn.getFn_binary_type());
+    function.setBinaryType(fn.getBinary_type());
     function.setHasVarArgs(fn.isHas_var_args());
     return function;
   }

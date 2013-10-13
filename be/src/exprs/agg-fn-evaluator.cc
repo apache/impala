@@ -40,10 +40,23 @@ typedef void (*InitFn)(FunctionContext*, AnyVal*);
 typedef void (*UpdateFn0)(FunctionContext*, AnyVal*);
 typedef void (*UpdateFn1)(FunctionContext*, const AnyVal&, AnyVal*);
 typedef void (*UpdateFn2)(FunctionContext*, const AnyVal&, const AnyVal&, AnyVal*);
+typedef void (*UpdateFn3)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, AnyVal*);
+typedef void (*UpdateFn4)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, const AnyVal&, AnyVal*);
+typedef void (*UpdateFn5)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, const AnyVal&, const AnyVal&, AnyVal*);
+typedef void (*UpdateFn6)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&, AnyVal*);
+typedef void (*UpdateFn7)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&, AnyVal*);
+typedef void (*UpdateFn8)(FunctionContext*, const AnyVal&, const AnyVal&,
+    const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&,
+    const AnyVal&, AnyVal*);
 typedef StringVal (*SerializeFn)(FunctionContext*, const StringVal&);
 typedef AnyVal (*FinalizeFn)(FunctionContext*, const AnyVal&);
 
-Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunction& desc,
+Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunctionCall& desc,
     AggFnEvaluator** result) {
   *result = pool->Add(new AggFnEvaluator(desc));
   RETURN_IF_ERROR(
@@ -51,22 +64,25 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunction& desc,
   return Status::OK;
 }
 
-AggFnEvaluator::AggFnEvaluator(const TAggregateFunction& desc)
-  : return_type_(desc.return_type),
-    intermediate_type_(desc.intermediate_type),
-    function_type_(desc.binary_type),
-    agg_op_(desc.op),
-    hdfs_location_(desc.binary_location),
-    init_fn_symbol_(desc.init_fn_name),
-    update_fn_symbol_(desc.update_fn_name),
-    merge_fn_symbol_(desc.merge_fn_name),
-    serialize_fn_symbol_(desc.serialize_fn_name),
-    finalize_fn_symbol_(desc.finalize_fn_name),
+AggFnEvaluator::AggFnEvaluator(const TAggregateFunctionCall& desc)
+  : return_type_(ThriftToType(desc.fn.ret_type)),
+    intermediate_type_(desc.fn.aggregate_fn.intermediate_type),
+    function_type_(desc.fn.binary_type),
     output_slot_desc_(NULL) {
-  if (desc.binary_type == TFunctionBinaryType::BUILTIN) {
+  if (function_type_ == TFunctionBinaryType::BUILTIN) {
+    agg_op_ = static_cast<TAggregationOp::type>(desc.fn.id);
     DCHECK_NE(agg_op_, TAggregationOp::INVALID);
   } else {
-    DCHECK_EQ(desc.binary_type, TFunctionBinaryType::NATIVE);
+    DCHECK_EQ(function_type_, TFunctionBinaryType::NATIVE);
+    DCHECK(desc.fn.__isset.aggregate_fn);
+
+    hdfs_location_ = desc.fn.location;
+    init_fn_symbol_ = desc.fn.aggregate_fn.init_fn_symbol;
+    update_fn_symbol_ = desc.fn.aggregate_fn.update_fn_symbol;
+    merge_fn_symbol_ = desc.fn.aggregate_fn.merge_fn_symbol;
+    serialize_fn_symbol_ = desc.fn.aggregate_fn.serialize_fn_symbol;
+    finalize_fn_symbol_ = desc.fn.aggregate_fn.finalize_fn_symbol;
+
     DCHECK(!hdfs_location_.empty());
     DCHECK(!init_fn_symbol_.empty());
     DCHECK(!update_fn_symbol_.empty());
@@ -253,6 +269,43 @@ void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
       reinterpret_cast<UpdateFn2>(fn)(ctx_.get(),
           *staging_input_vals_[0], *staging_input_vals_[1], staging_output_val_);
       break;
+    case 3:
+      reinterpret_cast<UpdateFn3>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], staging_output_val_);
+      break;
+    case 4:
+      reinterpret_cast<UpdateFn4>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], *staging_input_vals_[3], staging_output_val_);
+      break;
+    case 5:
+      reinterpret_cast<UpdateFn5>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], *staging_input_vals_[3],
+          *staging_input_vals_[4], staging_output_val_);
+      break;
+    case 6:
+      reinterpret_cast<UpdateFn6>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], *staging_input_vals_[3],
+          *staging_input_vals_[4], *staging_input_vals_[5], staging_output_val_);
+      break;
+    case 7:
+      reinterpret_cast<UpdateFn7>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], *staging_input_vals_[3],
+          *staging_input_vals_[4], *staging_input_vals_[5],
+          *staging_input_vals_[6], staging_output_val_);
+      break;
+    case 8:
+      reinterpret_cast<UpdateFn8>(fn)(ctx_.get(),
+          *staging_input_vals_[0], *staging_input_vals_[1],
+          *staging_input_vals_[2], *staging_input_vals_[3],
+          *staging_input_vals_[4], *staging_input_vals_[5],
+          *staging_input_vals_[6], *staging_input_vals_[7],
+          staging_output_val_);
+      break;
     default:
       DCHECK(false) << "NYI";
   }
@@ -267,43 +320,75 @@ void AggFnEvaluator::Merge(TupleRow* row, Tuple* dst) {
   return UpdateOrMerge(row, dst, fn_ptrs_.merge_fn);
 }
 
-void AggFnEvaluator::Serialize(Tuple* tuple) {
-  DCHECK_EQ(output_slot_desc_->type(), intermediate_type_.type);
-  if (fn_ptrs_.serialize_fn == NULL) return;
-  DCHECK_EQ(intermediate_type_.type, TYPE_STRING) << "NYI";
+void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
+  DCHECK_EQ(output_slot_desc_->type(), return_type_.type);
+  if (fn == NULL) return;
 
   bool slot_null = tuple->IsNull(output_slot_desc_->null_indicator_offset());
   void* slot = NULL;
   if (!slot_null) slot = tuple->GetSlot(output_slot_desc_->tuple_offset());
   SetAnyVal(slot, output_slot_desc_->type(), staging_output_val_);
 
-  StringVal sv = reinterpret_cast<SerializeFn>(fn_ptrs_.serialize_fn)(
-      ctx_.get(), *reinterpret_cast<StringVal*>(staging_output_val_));
-  SetOutputSlot(&sv, tuple);
+  switch (return_type_.type) {
+    case TYPE_BOOLEAN: {
+      typedef BooleanVal(*Fn)(FunctionContext*, AnyVal*);
+      BooleanVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_TINYINT: {
+      typedef TinyIntVal(*Fn)(FunctionContext*, AnyVal*);
+      TinyIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_SMALLINT: {
+      typedef SmallIntVal(*Fn)(FunctionContext*, AnyVal*);
+      SmallIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_INT: {
+      typedef IntVal(*Fn)(FunctionContext*, AnyVal*);
+      IntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_BIGINT: {
+      typedef BigIntVal(*Fn)(FunctionContext*, AnyVal*);
+      BigIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_FLOAT: {
+      typedef FloatVal(*Fn)(FunctionContext*, AnyVal*);
+      FloatVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_DOUBLE: {
+      typedef DoubleVal(*Fn)(FunctionContext*, AnyVal*);
+      DoubleVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_STRING: {
+      typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
+      StringVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    default:
+      DCHECK(false) << "NYI";
+  }
+}
+
+void AggFnEvaluator::Serialize(Tuple* tuple) {
+  SerializeOrFinalize(tuple, fn_ptrs_.serialize_fn);
 }
 
 void AggFnEvaluator::Finalize(Tuple* tuple) {
-  DCHECK_EQ(output_slot_desc_->type(), return_type_.type);
-  if (fn_ptrs_.finalize_fn == NULL) return;
-
-  bool slot_null = tuple->IsNull(output_slot_desc_->null_indicator_offset());
-  void* slot = NULL;
-  if (!slot_null) slot = tuple->GetSlot(output_slot_desc_->tuple_offset());
-  SetAnyVal(slot, output_slot_desc_->type(), staging_output_val_);
-
-  if (return_type_.type == TYPE_BIGINT) {
-    typedef BigIntVal(*Fn)(FunctionContext*, AnyVal*);
-    BigIntVal v = reinterpret_cast<Fn>(fn_ptrs_.finalize_fn)(
-        ctx_.get(), staging_output_val_);
-    SetOutputSlot(&v, tuple);
-  } else if (return_type_.type == TYPE_STRING) {
-    typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
-    StringVal v = reinterpret_cast<Fn>(fn_ptrs_.finalize_fn)(
-        ctx_.get(), staging_output_val_);
-    SetOutputSlot(&v, tuple);
-  } else {
-    DCHECK(false) << "NYI";
-  }
+  SerializeOrFinalize(tuple, fn_ptrs_.finalize_fn);
 }
 
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {

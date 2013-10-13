@@ -33,15 +33,15 @@ using namespace std;
 
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
-    udf_type_(node.udf_call_expr.binary_type),
-    hdfs_location_(node.udf_call_expr.binary_location),
-    symbol_name_(node.udf_call_expr.symbol_name),
-    vararg_start_idx_(node.udf_call_expr.__isset.vararg_start_idx ?
-        node.udf_call_expr.vararg_start_idx : -1),
+    udf_type_(node.fn_call_expr.fn.binary_type),
+    hdfs_location_(node.fn_call_expr.fn.location),
+    symbol_name_(node.fn_call_expr.fn.scalar_fn.symbol),
+    vararg_start_idx_(node.fn_call_expr.__isset.vararg_start_idx ?
+        node.fn_call_expr.vararg_start_idx : -1),
     udf_wrapper_(NULL),
     varargs_input_(NULL) {
-  DCHECK(node.node_type == TExprNodeType::UDF_CALL);
-  DCHECK(udf_type_ != TFunctionBinaryType::HIVE);
+  DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
+  DCHECK_NE(udf_type_, TFunctionBinaryType::HIVE);
 }
 
 NativeUdfExpr::~NativeUdfExpr() {

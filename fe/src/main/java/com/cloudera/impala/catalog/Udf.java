@@ -20,7 +20,7 @@ import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TUdf;
+import com.cloudera.impala.thrift.TScalarFunction;
 
 
 /**
@@ -50,8 +50,8 @@ public class Udf extends Function {
   @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
-    fn.setUdf(new TUdf());
-    fn.getUdf().setSymbol_name(symbolName_);
+    fn.setScalar_fn(new TScalarFunction());
+    fn.getScalar_fn().setSymbol(symbolName_);
     return fn;
   }
 }

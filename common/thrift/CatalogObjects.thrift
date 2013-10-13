@@ -101,15 +101,6 @@ struct TPartitionKeyValue {
   2: required string value
 }
 
-// Represents a fully qualified function name.
-struct TFunctionName {
-  // Name of the function's parent database.
-  1: required string db_name
-
-  // Name of the function
-  2: required string function_name
-}
-
 // Represents a fully qualified table name.
 struct TTableName {
   // Name of the table's parent database.
@@ -286,52 +277,6 @@ struct TDatabase {
   2: optional string location
 }
 
-struct TUdf {
-  // Name of function in the binary
-  1: required string symbol_name;
-}
-
-struct TUda {
-  1: required string update_fn_name
-  2: required string init_fn_name
-  // This function does not need to be specified by the UDA.
-  3: optional string serialize_fn_name
-  4: required string merge_fn_name
-  5: optional string finalize_fn_name
-  6: required Types.TColumnType intermediate_type
-}
-
-// Represents a function in the Catalog.
-struct TFunction {
-  // Fully qualified function name of the function to create
-  1: required TFunctionName fn_name
-
-  // Type of the udf. e.g. hive, native, ir
-  2: required Types.TFunctionBinaryType fn_binary_type
-
-  // HDFS path for the function binary. This binary must exist at the time the
-  // function is created.
-  3: required string location
-
-  // The types of the arguments to the function
-  4: required list<Types.TPrimitiveType> arg_types
-
-  // Return type for the function.
-  5: required Types.TPrimitiveType ret_type
-
-  // If true, this function takes var args.
-  6: required bool has_var_args
-
-  // Optional comment to attach to the function
-  7: optional string comment
-
-  8: optional string signature
-
-  // Only one of the below is set.
-  9: optional TUdf udf
-  10: optional TUda uda
-}
-
 struct TCatalog {
   // The CatalogService service ID.
   1: required Types.TUniqueId catalog_service_id
@@ -355,5 +300,5 @@ struct TCatalogObject {
   5: optional TTable table
 
   // Set iff object type is FUNCTION
-  6: optional TFunction fn
+  6: optional Types.TFunction fn
 }

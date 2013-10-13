@@ -14,7 +14,6 @@ drop function if exists function_ddl_test.fn2(int, string);
 drop function if exists function_ddl_test.fn_var_arg(int...);
 drop function if exists function_ddl_test.agg_fn(int);
 drop function if exists function_ddl_test.agg_fn(int, string);
-drop function if exists function_ddl_test.agg_fn_var_arg(double, string...);
 ====
 ---- QUERY
 # Verify all the test functions are removed
@@ -72,10 +71,6 @@ create aggregate function function_ddl_test.agg_fn(int, string) RETURNS int
 LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn_var_arg(double, string...) RETURNS int
-LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='VarArgUpdate'
-====
----- QUERY
 show functions in default
 ---- RESULTS
 'fn()'
@@ -100,7 +95,6 @@ show aggregate functions in function_ddl_test
 ---- RESULTS
 'agg_fn(INT)'
 'agg_fn(INT, STRING)'
-'agg_fn_var_arg(DOUBLE, STRING...)'
 ---- TYPES
 STRING
 ====
@@ -199,18 +193,7 @@ STRING
 drop function agg_fn(int)
 ====
 ---- QUERY
-show aggregate functions;
----- RESULTS
-'agg_fn(INT, STRING)'
-'agg_fn_var_arg(DOUBLE, STRING...)'
----- TYPES
-STRING
-====
----- QUERY
-drop function agg_fn_var_arg(double, string...)
-====
----- QUERY
-show aggregate functions;
+show aggregate functions
 ---- RESULTS
 'agg_fn(INT, STRING)'
 ---- TYPES
@@ -223,7 +206,7 @@ invalidate metadata
 ---- TYPES
 ====
 ---- QUERY
-show functions;
+show functions
 ---- RESULTS
 'fn(INT)'
 'fn(INT, STRING)'
@@ -233,7 +216,7 @@ show functions;
 STRING
 ====
 ---- QUERY
-show aggregate functions;
+show aggregate functions
 ---- RESULTS
 'agg_fn(INT, STRING)'
 ---- TYPES

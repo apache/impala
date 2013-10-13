@@ -20,7 +20,6 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
-import com.cloudera.impala.thrift.TFunctionName;
 
 /**
  * Represents a DROP [IF EXISTS] FUNCTION statement
@@ -55,8 +54,7 @@ public class DropFunctionStmt extends StatementBase {
 
   public TDropFunctionParams toThrift() {
     TDropFunctionParams params = new TDropFunctionParams();
-    params.setFn_name(new TFunctionName(desc_.getFunctionName().getDb(),
-        desc_.getFunctionName().getFunction()));
+    params.setFn_name(desc_.getFunctionName().toThrift());
     params.setArg_types(PrimitiveType.toThrift(desc_.getArgs()));
     params.setIf_exists(getIfExists());
     return params;

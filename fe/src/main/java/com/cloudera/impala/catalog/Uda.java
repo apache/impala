@@ -20,8 +20,8 @@ import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TUda;
 
 /**
  * Internal representation of a UDA.
@@ -29,13 +29,13 @@ import com.cloudera.impala.thrift.TUda;
 public class Uda extends Function {
   private ColumnType intermediateType_;
 
-  // The name inside the binary at location_ that contains this particular.
+  // The symbol inside the binary at location_ that contains this particular.
   // They can be null if it is not required.
-  private String updateFnName_;
-  private String initFnName_;
-  private String serializeFnName_;
-  private String mergeFnName_;
-  private String finalizeFnName_;
+  private String updateFnSymbol_;
+  private String initFnSymbol_;
+  private String serializeFnSymbol_;
+  private String mergeFnSymbol_;
+  private String finalizeFnSymbol_;
 
   public Uda(FunctionName fnName, FunctionArgs args, PrimitiveType retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
@@ -43,43 +43,43 @@ public class Uda extends Function {
 
   public Uda(FunctionName fnName, List<PrimitiveType> argTypes,
       PrimitiveType retType, ColumnType intermediateType,
-      HdfsURI location, String updateFnName, String initFnName,
-      String serializeFnName, String mergeFnName, String finalizeFnName) {
+      HdfsURI location, String updateFnSymbol, String initFnSymbol,
+      String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
     intermediateType_ = intermediateType;
-    updateFnName_ = updateFnName;
-    initFnName_ = initFnName;
-    serializeFnName_ = serializeFnName;
-    mergeFnName_ = mergeFnName;
-    finalizeFnName_ = finalizeFnName;
+    updateFnSymbol_ = updateFnSymbol;
+    initFnSymbol_ = initFnSymbol;
+    serializeFnSymbol_ = serializeFnSymbol;
+    mergeFnSymbol_ = mergeFnSymbol;
+    finalizeFnSymbol_ = finalizeFnSymbol;
   }
 
-  public String getUpdateFnName() { return updateFnName_; }
-  public String getInitFnName() { return initFnName_; }
-  public String getSerializeFnName() { return serializeFnName_; }
-  public String getMergeFnName() { return mergeFnName_; }
-  public String getFinalizeFnName() { return finalizeFnName_; }
+  public String getUpdateFnSymbol() { return updateFnSymbol_; }
+  public String getInitFnSymbol() { return initFnSymbol_; }
+  public String getSerializeFnSymbol() { return serializeFnSymbol_; }
+  public String getMergeFnSymbol() { return mergeFnSymbol_; }
+  public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
   public ColumnType getIntermediateType() { return intermediateType_; }
 
-  public void setUpdateFnName(String fn) { updateFnName_ = fn; }
-  public void setInitFnName(String fn) { initFnName_ = fn; }
-  public void setSerializeFnName(String fn) { serializeFnName_ = fn; }
-  public void setMergeFnName(String fn) { mergeFnName_ = fn; }
-  public void setFinalizeFnName(String fn) { finalizeFnName_ = fn; }
+  public void setUpdateFnSymbol(String fn) { updateFnSymbol_ = fn; }
+  public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }
+  public void setSerializeFnSymbol(String fn) { serializeFnSymbol_ = fn; }
+  public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
+  public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
   public void setIntermediateType(ColumnType t) { intermediateType_ = t; }
 
   @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
-    TUda uda = new TUda();
-    uda.setUpdate_fn_name(updateFnName_);
-    uda.setInit_fn_name(initFnName_);
-    if (serializeFnName_ == null) uda.setSerialize_fn_name(serializeFnName_);
-    uda.setMerge_fn_name(mergeFnName_);
-    uda.setFinalize_fn_name(finalizeFnName_);
+    TAggregateFunction uda = new TAggregateFunction();
+    uda.setUpdate_fn_symbol(updateFnSymbol_);
+    uda.setInit_fn_symbol(initFnSymbol_);
+    if (serializeFnSymbol_ == null) uda.setSerialize_fn_symbol(serializeFnSymbol_);
+    uda.setMerge_fn_symbol(mergeFnSymbol_);
+    uda.setFinalize_fn_symbol(finalizeFnSymbol_);
     uda.setIntermediate_type(intermediateType_.toThrift());
-    fn.setUda(uda);
+    fn.setAggregate_fn(uda);
     return fn;
   }
 }

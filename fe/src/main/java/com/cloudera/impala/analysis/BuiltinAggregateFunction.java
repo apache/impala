@@ -19,7 +19,9 @@ import java.util.ArrayList;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TAggregationOp;
+import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Preconditions;
 
@@ -74,10 +76,20 @@ public class BuiltinAggregateFunction extends Function {
       PrimitiveType retType, ColumnType intermediateType) throws AnalysisException {
     super(FunctionName.CreateBuiltinName(op.toString()), argTypes, retType, false);
     Preconditions.checkState(intermediateType != null);
+    Preconditions.checkState(op != null);
     intermediateType.analyze();
     op_ = op;
     intermediateType_ = intermediateType;
     setBinaryType(TFunctionBinaryType.BUILTIN);
+  }
+
+  @Override
+  public TFunction toThrift() {
+    TFunction fn = super.toThrift();
+    // TODO: for now, just put the op_ enum as the id.
+    fn.setId(op_.thriftOp.ordinal());
+    fn.setAggregate_fn(new TAggregateFunction(intermediateType_.toThrift()));
+    return fn;
   }
 
   public Operator op() { return op_; }

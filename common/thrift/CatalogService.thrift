@@ -42,7 +42,7 @@ struct TCreateDbParams {
 // Parameters of CREATE FUNCTION commands
 struct TCreateFunctionParams {
   // The function to create
-  1: required CatalogObjects.TFunction fn
+  1: required Types.TFunction fn
 
   // Do not throw an error if a function of the same signature already exists.
   2: optional bool if_not_exists
@@ -304,7 +304,7 @@ struct TDropTableOrViewParams {
 // Parameters of DROP FUNCTION commands
 struct TDropFunctionParams {
   // Fully qualified name of the function to drop
-  1: required CatalogObjects.TFunctionName fn_name
+  1: required Types.TFunctionName fn_name
 
   // The types of the arguments to the function
   2: required list<Types.TPrimitiveType> arg_types;

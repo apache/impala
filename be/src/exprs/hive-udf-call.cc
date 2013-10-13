@@ -59,10 +59,11 @@ struct HiveUdfCall::JniContext {
 };
 
 HiveUdfCall::HiveUdfCall(const TExprNode& node)
-  : Expr(node), hdfs_location_(node.udf_call_expr.binary_location),
-    class_name_(node.udf_call_expr.symbol_name),
+  : Expr(node), udf_(node.fn_call_expr.fn),
     jni_context_(new JniContext) {
-  DCHECK(node.__isset.udf_call_expr);
+  DCHECK(node.__isset.fn_call_expr);
+  DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
+  DCHECK_EQ(node.fn_call_expr.fn.binary_type, TFunctionBinaryType::HIVE);
 }
 
 HiveUdfCall::~HiveUdfCall() {
@@ -132,7 +133,8 @@ void* HiveUdfCall::Evaluate(Expr* e, TupleRow* row) {
   Status status = JniUtil::GetJniExceptionMsg(env);
   if (!status.ok()) {
     stringstream ss;
-    ss << "Hive UDF path=" << udf->hdfs_location_ << " class=" << udf->class_name_
+    ss << "Hive UDF path=" << udf->udf_.location << " class="
+       << udf->udf_.scalar_fn.symbol
        << " failed due to: " << status.GetErrorMsg();
     udf->state_->LogError(ss.str());
     return NULL;
@@ -148,7 +150,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
   // Copy the Hive Jar from hdfs to local file system.
   string local_path;
   RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-        state->fs_cache(), hdfs_location_, LibCache::TYPE_JAR, &local_path));
+        state->fs_cache(), udf_.location, LibCache::TYPE_JAR, &local_path));
 
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
@@ -167,11 +169,8 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
   int input_buffer_size = 0;
 
   THiveUdfExecutorCtorParams ctor_params;
-  ctor_params.expr.binary_location = local_path;
-  ctor_params.expr.symbol_name = class_name_;
-  ctor_params.ret_type = ToThrift(type());
+  ctor_params.fn = udf_;
   for (int i = 0; i < GetNumChildren(); ++i) {
-    ctor_params.arg_types.push_back(ToThrift(GetChild(i)->type()));
     ctor_params.input_byte_offsets.push_back(input_buffer_size);
     input_byte_offsets_.push_back(input_buffer_size);
     input_buffer_size += GetSlotSize(GetChild(i)->type());
@@ -208,8 +207,8 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 
 string HiveUdfCall::DebugString() const {
   stringstream out;
-  out << "HiveUdfCall(hdfs_location=" << hdfs_location_
-      << " classname=" << class_name_ << " "
+  out << "HiveUdfCall(hdfs_location=" << udf_.location
+      << " classname=" << udf_.scalar_fn.symbol << " "
       << Expr::DebugString() << ")";
   return out.str();
 }

@@ -21,6 +21,7 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
+include "CatalogObjects.thrift"
 include "Exprs.thrift"
 include "Types.thrift"
 
@@ -158,45 +159,24 @@ enum TAggregationOp {
   GROUP_CONCAT,
 }
 
-struct TAggregateFunction {
-  // The return type of this function.
-  1: required Types.TColumnType return_type
-
-  // The intermediate type used for this function.
-  2: required Types.TColumnType intermediate_type
+struct TAggregateFunctionCall {
+  // The aggregate function to call.
+  1: required Types.TFunction fn
 
   // The input exprs to this aggregate function
-  3: required list<Exprs.TExpr> input_exprs
+  2: required list<Exprs.TExpr> input_exprs
 
-  // Type of UDA. e.g. .so
-  4: required Types.TFunctionBinaryType binary_type
-
-  // For builtins, the builtin to use.
-  5: optional TAggregationOp op
-
-  // If set, this udf has varargs and this is the index for the first variable
-  // argument.
-  // e.g. if the signature was fn(int, double, string...), the index would be 2.
-  6: optional i32 vararg_start_idx
-
-  // Path in hdfs where the binary is. Set if it is a UDA
-  7: optional string binary_location
-
-  // Name of the symbol in the binary for the functions for the UDA
-  8: optional string init_fn_name
-  9: optional string update_fn_name
-  10: optional string merge_fn_name
-  11: optional string serialize_fn_name
-  12: optional string finalize_fn_name
+  // If set, this aggregate function udf has varargs and this is the index for the
+  // first variable argument.
+  3: optional i32 vararg_start_idx
 }
 
 struct TAggregationNode {
   1: optional list<Exprs.TExpr> grouping_exprs
-  2: required list<TAggregateFunction> aggregate_functions
+  2: required list<TAggregateFunctionCall> aggregate_functions
   3: required Types.TTupleId agg_tuple_id
 
-  // Set to true if this aggregation function requires finalization to complete after all
-  // rows have been aggregated, and this node is not an intermediate node.
+  // Set to true if this aggregation node needs to run the finalization step.
   4: required bool need_finalize
 
   // If true, this node is doing the merge phase of the aggregation (as opposed to the

@@ -302,7 +302,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       }
       *expr = pool->Add(new FloatLiteral(texpr_node));
       return Status::OK;
-    case TExprNodeType::FUNCTION_CALL:
+    case TExprNodeType::COMPUTE_FUNCTION_CALL:
       DCHECK(texpr_node.__isset.opcode);
       *expr = pool->Add(new FunctionCall(texpr_node));
       return Status::OK;
@@ -345,11 +345,11 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
     case TExprNodeType::TUPLE_IS_NULL_PRED:
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
       return Status::OK;
-    case TExprNodeType::UDF_CALL:
-      if (!texpr_node.__isset.udf_call_expr) {
+    case TExprNodeType::FUNCTION_CALL:
+      if (!texpr_node.__isset.fn_call_expr) {
         return Status("Udf call not set in thrift node");
       }
-      if (texpr_node.udf_call_expr.binary_type == TFunctionBinaryType::HIVE) {
+      if (texpr_node.fn_call_expr.fn.binary_type == TFunctionBinaryType::HIVE) {
         *expr = pool->Add(new HiveUdfCall(texpr_node));
       } else {
         *expr = pool->Add(new NativeUdfExpr(texpr_node));

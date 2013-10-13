@@ -433,7 +433,7 @@ public class ImpaladCatalog extends Catalog {
   }
 
   private void removeFunction(TFunction thriftUdf) {
-    Db db = getDb(thriftUdf.fn_name.getDb_name());
+    Db db = getDb(thriftUdf.name.getDb_name());
     // The parent database doesn't exist, nothing to do.
     if (db == null) return;
     db.removeFunction(thriftUdf.getSignature());

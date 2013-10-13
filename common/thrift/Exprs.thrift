@@ -27,7 +27,6 @@ enum TExprNodeType {
   COMPOUND_PRED,
   DATE_LITERAL,
   FLOAT_LITERAL,
-  FUNCTION_CALL,
   INT_LITERAL,
   IN_PRED,
   IS_NULL_PRED,
@@ -37,7 +36,11 @@ enum TExprNodeType {
   SLOT_REF,
   STRING_LITERAL,
   TUPLE_IS_NULL_PRED,
-  UDF_CALL,
+  FUNCTION_CALL,
+
+  // TODO: old style compute functions. this will be deprecated
+  COMPUTE_FUNCTION_CALL,
+
 }
 
 struct TBoolLiteral {
@@ -90,19 +93,13 @@ struct TStringLiteral {
   1: required string value;
 }
 
-struct TUdfCallExpr {
-  // Path in hdfs where the binary is
-  1: required string binary_location
+struct TFunctionCallExpr {
+  // The aggregate function to call.
+  1: required Types.TFunction fn
 
-  // Name of the class/function in the binary for this udf
-  2: required string symbol_name
-
-  3: required Types.TFunctionBinaryType binary_type
-
-  // If set, this udf has varargs and this is the index for the first variable
-  // argument.
-  // e.g. if the signature was fn(int, double, string...), the index would be 2.
-  4: optional i32 vararg_start_idx
+  // If set, this aggregate function udf has varargs and this is the index for the
+  // first variable argument.
+  2: optional i32 vararg_start_idx
 }
 
 // This is essentially a union over the subclasses of Expr.
@@ -124,7 +121,7 @@ struct TExprNode {
   14: optional TSlotRef slot_ref
   15: optional TStringLiteral string_literal
   16: optional TTupleIsNullPredicate tuple_is_null_pred
-  17: optional TUdfCallExpr udf_call_expr
+  17: optional TFunctionCallExpr fn_call_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

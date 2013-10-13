@@ -29,6 +29,7 @@ import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.opcode.FunctionRegistry;
 import com.cloudera.impala.thrift.TExprOpcode;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -68,6 +69,7 @@ public class OpcodeRegistry {
           args, PrimitiveType.INVALID_TYPE, false);
       this.operator = operator;
       this.udfInterface = false;
+      this.setBinaryType(TFunctionBinaryType.BUILTIN);
     }
 
     private BuiltinFunction(boolean udfInterface, TExprOpcode opcode,
@@ -77,6 +79,7 @@ public class OpcodeRegistry {
       this.operator = operator;
       this.opcode = opcode;
       this.udfInterface = udfInterface;
+      this.setBinaryType(TFunctionBinaryType.BUILTIN);
     }
   }
 

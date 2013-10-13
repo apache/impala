@@ -19,14 +19,11 @@ import java.util.HashMap;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
-import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionName;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
 import com.google.common.base.Preconditions;
@@ -67,16 +64,7 @@ public class CreateFunctionStmtBase extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
 
   protected TCreateFunctionParams toThrift() {
-    TFunction fn = new TFunction();
-    fn.setFn_name(new TFunctionName(fn_.dbName(), fn_.functionName()));
-    fn.setFn_binary_type(fn_.getBinaryType());
-    fn.setLocation(fn_.getLocation().toString());
-    fn.setArg_types(PrimitiveType.toThrift(fn_.getArgs()));
-    fn.setRet_type(fn_.getReturnType().toThrift());
-    fn.setHas_var_args(fn_.hasVarArgs());
-    fn.setComment(getComment());
-
-    TCreateFunctionParams params = new TCreateFunctionParams(fn);
+    TCreateFunctionParams params = new TCreateFunctionParams(fn_.toThrift());
     params.setIf_not_exists(getIfNotExists());
     return params;
   }

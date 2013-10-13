@@ -921,6 +921,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='AggUpdate'");
 
+    // TODO: remove these when the BE can execute them
+    AnalysisError("create aggregate function foo(int...) RETURNS int" + loc,
+        "UDAs with varargs are not yet supported.");
+    AnalysisError("create aggregate function "
+        + "foo(int, int, int, int, int, int, int , int, int) "
+        + "RETURNS int" + loc,
+      "UDAs with more than 8 arguments are not yet supported.");
+
     // Specify the complete symbol. If the user does this, we can't guess the
     // other function names.
     // TODO: think about these error messages more. Perhaps they can be made
@@ -961,11 +969,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
         "'/foo.jar' UPDATE_FN='b'", "Java UDAs are not supported.");
 
-    // Test missing .ll file.
+    // Test missing .ll file. TODO: reenable when we can run IR UDAs
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='Fn'", "Could not load binary: /foo.ll");
-    AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-        "'/foo.ll' UPDATE_FN='_ZABCD'", "Could not load binary: /foo.ll");
+            "'/foo.ll' UPDATE_FN='Fn'", "IR UDAs are not yet supported.");
+    //AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+    //    "'/foo.ll' UPDATE_FN='Fn'", "Could not load binary: /foo.ll");
+    //AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
+    //    "'/foo.ll' UPDATE_FN='_ZABCD'", "Could not load binary: /foo.ll");
 
     // Test cases where the UPDATE_FN doesn't contain "Update" in which case the user has
     // to explicitly specify the other functions.

@@ -106,12 +106,12 @@ public class UdfExecutor {
     THiveUdfExecutorCtorParams request = new THiveUdfExecutorCtorParams();
     JniUtil.deserializeThrift(protocolFactory, request, thriftParams);
 
-    String className = request.expr.symbol_name;
-    String jarFile = request.expr.binary_location;
-    PrimitiveType retType = PrimitiveType.fromThrift(request.ret_type);
-    PrimitiveType[] parameterTypes = new PrimitiveType[request.arg_types.size()];
-    for (int i = 0; i < request.arg_types.size(); ++i) {
-      parameterTypes[i] = PrimitiveType.fromThrift(request.arg_types.get(i));
+    String className = request.fn.scalar_fn.symbol;
+    String jarFile = request.fn.location;
+    PrimitiveType retType = PrimitiveType.fromThrift(request.fn.ret_type);
+    PrimitiveType[] parameterTypes = new PrimitiveType[request.fn.arg_types.size()];
+    for (int i = 0; i < request.fn.arg_types.size(); ++i) {
+      parameterTypes[i] = PrimitiveType.fromThrift(request.fn.arg_types.get(i));
     }
     inputBufferPtr_ = request.input_buffer_ptr;
     inputNullsPtr_ = request.input_nulls_ptr;

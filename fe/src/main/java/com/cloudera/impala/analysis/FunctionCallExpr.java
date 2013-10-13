@@ -25,31 +25,28 @@ import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
-import com.cloudera.impala.thrift.TAggregateFunction;
+import com.cloudera.impala.thrift.TAggregateFunctionCall;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TUdfCallExpr;
+import com.cloudera.impala.thrift.TFunctionCallExpr;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+// TODO: for aggregations, we need to unify the code paths for builtins and UDAs.
 public class FunctionCallExpr extends Expr {
   private final FunctionName fnName_;
   private final BuiltinAggregateFunction.Operator agg_op_;
   private final FunctionParams params_;
 
   // The function to call. This can either be a builtin scalar, UDF or UDA.
-  // Set in analyze() except if isDistributedAggregation_ is true.
+  // Set in analyze() except if this expr is created from creating the
+  // distributed plan for aggregations. In that case, fn_ is inherited from
+  // the FunctionCallExpr expr object that was created during the non-distributed
+  // planning phase.
   private Function fn_;
-
-  // If set, this a function call from distributing an aggregation.
-  // In that case, when constructing the single node plan, we analyze this
-  // FunctionCallExpr, but when distributing the plan, fn_ is just inherited
-  // by the other created FunctionCallExpr objects.
-  private boolean isMergeAggregation_;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     this(new FunctionName(functionName), new FunctionParams(false, params));
@@ -84,7 +81,6 @@ public class FunctionCallExpr extends Expr {
     params_ = params;
     // Just inherit the function object from 'e'.
     fn_ = e.fn_;
-    isMergeAggregation_ = true;
     if (params.exprs() != null) children.addAll(params.exprs());
   }
 
@@ -146,35 +142,33 @@ public class FunctionCallExpr extends Expr {
 
     if (fn_ instanceof Udf) {
       Udf udf = (Udf)fn_;
-      msg.node_type = TExprNodeType.UDF_CALL;
-      msg.setUdf_call_expr(new TUdfCallExpr());
-      msg.udf_call_expr.setBinary_location(udf.getLocation().toString());
-      msg.udf_call_expr.setSymbol_name(udf.getSymbolName());
-      msg.udf_call_expr.setBinary_type(udf.getBinaryType());
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
+      TFunctionCallExpr fnCall = new TFunctionCallExpr();
+      fnCall.setFn(udf.toThrift());
       if (udf.hasVarArgs()) {
-        msg.udf_call_expr.setVararg_start_idx(udf.getNumArgs() - 1);
+        fnCall.setVararg_start_idx(udf.getNumArgs() - 1);
       }
+      msg.setFn_call_expr(fnCall);
     } else {
       Preconditions.checkState(fn_ instanceof OpcodeRegistry.BuiltinFunction);
       OpcodeRegistry.BuiltinFunction builtin = (OpcodeRegistry.BuiltinFunction)fn_;
       if (builtin.udfInterface) {
-        msg.node_type = TExprNodeType.UDF_CALL;
-        msg.setUdf_call_expr(new TUdfCallExpr());
-        msg.udf_call_expr.setBinary_location("");
-        msg.udf_call_expr.setSymbol_name(fnName_.getFunction());
-        msg.udf_call_expr.setBinary_type(TFunctionBinaryType.BUILTIN);
+        msg.node_type = TExprNodeType.FUNCTION_CALL;
+        TFunctionCallExpr fnCall = new TFunctionCallExpr();
+        fnCall.setFn(fn_.toThrift());
         if (fn_.hasVarArgs()) {
-          msg.udf_call_expr.setVararg_start_idx(fn_.getNumArgs() - 1);
+          fnCall.setVararg_start_idx(fn_.getNumArgs() - 1);
         }
+        msg.setFn_call_expr(fnCall);
       } else {
         // TODO: remove. All builtins will go through UDF_CALL.
-        msg.node_type = TExprNodeType.FUNCTION_CALL;
+        msg.node_type = TExprNodeType.COMPUTE_FUNCTION_CALL;
       }
       msg.setOpcode(opcode);
     }
   }
 
-  public TAggregateFunction toTAggregateFunction() {
+  public TAggregateFunctionCall toTAggregateFunctionCall() {
     Preconditions.checkState(isAggregateFunction());
 
     List<TExpr> inputExprs = Lists.newArrayList();
@@ -182,35 +176,8 @@ public class FunctionCallExpr extends Expr {
       inputExprs.add(e.treeToThrift());
     }
 
-    TAggregateFunction f = new TAggregateFunction();
-    f.setReturn_type(ColumnType.createType(type).toThrift());
-    f.setBinary_type(fn_.getBinaryType());
-
-    if (fn_ instanceof BuiltinAggregateFunction) {
-      BuiltinAggregateFunction fn = (BuiltinAggregateFunction)fn_;
-      f.setOp(agg_op_.toThrift());
-      f.setIntermediate_type(fn.getIntermediateType().toThrift());
-    } else {
-      Preconditions.checkState(fn_ instanceof Uda);
-      Uda uda = (Uda)fn_;
-      f.setIntermediate_type(uda.getIntermediateType().toThrift());
-
-      // These are required for UDAs and should have been checked in analysis.
-      Preconditions.checkState(uda.getInitFnName() != null);
-      Preconditions.checkState(uda.getUpdateFnName() != null);
-      Preconditions.checkState(uda.getMergeFnName() != null);
-      f.setBinary_location(uda.getLocation().toString());
-      f.setInit_fn_name(uda.getInitFnName());
-      f.setUpdate_fn_name(uda.getUpdateFnName());
-      f.setMerge_fn_name(uda.getMergeFnName());
-
-      if (uda.getSerializeFnName() != null) {
-        f.setSerialize_fn_name(uda.getSerializeFnName());
-      }
-      if (uda.getFinalizeFnName() != null) {
-        f.setFinalize_fn_name(uda.getFinalizeFnName());
-      }
-    }
+    TAggregateFunctionCall f = new TAggregateFunctionCall();
+    f.setFn(fn_.toThrift());
     f.setInput_exprs(inputExprs);
     return f;
   }
@@ -372,9 +339,7 @@ public class FunctionCallExpr extends Expr {
     if (isAnalyzed) return;
     super.analyze(analyzer);
 
-    if (isMergeAggregation_) {
-      Preconditions.checkState(fn_ != null);
-      Preconditions.checkState(isAggregate());
+    if (fn_ != null && isAggregate()) {
       ColumnType intermediateType = null;
       if (fn_ instanceof Uda) {
         intermediateType = ((Uda)fn_).getIntermediateType();

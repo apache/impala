@@ -41,7 +41,7 @@ class AggFnEvaluator {
   // and returned in *result. This constructs the input Expr trees for
   // this aggregate function as specified in desc. The result is returned in
   // *result.
-  static Status Create(ObjectPool* pool, const TAggregateFunction& desc,
+  static Status Create(ObjectPool* pool, const TAggregateFunctionCall& desc,
       AggFnEvaluator** result);
 
   // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
@@ -89,7 +89,7 @@ class AggFnEvaluator {
   TFunctionBinaryType::type function_type_;
 
   // If it's a builtin, the opcode.
-  const TAggregationOp::type agg_op_;
+  TAggregationOp::type agg_op_;
 
   // HDFS path and function names for UDAs.
   std::string hdfs_location_;
@@ -119,7 +119,7 @@ class AggFnEvaluator {
   OpcodeRegistry::AggFnDescriptor fn_ptrs_;
 
   // Use Create() instead.
-  AggFnEvaluator(const TAggregateFunction& desc);
+  AggFnEvaluator(const TAggregateFunctionCall& desc);
 
   // TODO: these funtions below are not extensible and we need to use codegen to
   // generate the calls into the UDA functions (like for UDFs).
@@ -128,6 +128,11 @@ class AggFnEvaluator {
   // Sets up the arguments to call fn. This converts from the agg-expr signature,
   // taking TupleRow to the UDA signature taking AnvVals.
   void UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn);
+
+  // Sets up the arguments to call fn. This converts from the agg-expr signature,
+  // taking TupleRow to the UDA signature taking AnvVals.
+  void SerializeOrFinalize(Tuple* tuple, void* fn);
+
   // Writes the result in src into dst pointed to by output_slot_desc_
   void SetOutputSlot(const impala_udf::AnyVal* src, Tuple* dst);
   // Sets 'dst' to the value from 'slot'.
