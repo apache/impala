@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
@@ -36,7 +37,8 @@ public abstract class Predicate extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     type = PrimitiveType.BOOLEAN;
     // values: true/false/null

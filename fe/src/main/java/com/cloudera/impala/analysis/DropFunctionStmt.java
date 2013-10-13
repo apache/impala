@@ -65,6 +65,11 @@ public class DropFunctionStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    // For now, if authorization is enabled, the user needs ALL on the server
+    // to drop functions.
+    // TODO: this is not the right granularity but acceptable for now.
+    analyzer.getCatalog().checkCreateDropFunctionAccess(analyzer.getUser());
+
     desc_.getFunctionName().analyze(analyzer);
     String dbName = analyzer.getTargetDbName(desc_.getFunctionName());
     desc_.getFunctionName().setDb(dbName);

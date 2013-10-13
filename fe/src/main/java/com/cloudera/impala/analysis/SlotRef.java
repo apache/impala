@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -65,7 +66,8 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     if (isAnalyzed) return;
     super.analyze(analyzer);
     desc = analyzer.registerColumnRef(tblName, col);

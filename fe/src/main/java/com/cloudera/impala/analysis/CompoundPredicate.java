@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -96,7 +97,8 @@ public class CompoundPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
 
     // Check that children are predicates.

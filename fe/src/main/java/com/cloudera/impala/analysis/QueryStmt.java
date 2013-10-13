@@ -85,7 +85,8 @@ public abstract class QueryStmt extends StatementBase {
   /**
    * Creates sortInfo by resolving aliases and ordinals in the orderingExprs.
    */
-  protected void createSortInfo(Analyzer analyzer) throws AnalysisException {
+  protected void createSortInfo(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     if (orderByElements == null) {
       // not computing order by
       return;

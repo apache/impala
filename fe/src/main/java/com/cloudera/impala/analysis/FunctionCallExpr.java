@@ -17,6 +17,8 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Uda;
@@ -213,7 +215,8 @@ public class FunctionCallExpr extends Expr {
     return f;
   }
 
-  private void analyzeBuiltinAggFunction(Analyzer analyzer) throws AnalysisException {
+  private void analyzeBuiltinAggFunction(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     Preconditions.checkState(agg_op_ != null);
 
     if (params_.isStar() && agg_op_ != BuiltinAggregateFunction.Operator.COUNT) {
@@ -326,7 +329,7 @@ public class FunctionCallExpr extends Expr {
 
   // Sets fn_ to the proper function object.
   private void setFunction(Analyzer analyzer, PrimitiveType[] argTypes)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     // First check if this is a builtin
     FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(
         fnName_.getFunction());
@@ -341,6 +344,9 @@ public class FunctionCallExpr extends Expr {
       // Next check if it is a UDF/UDA
       String dbName = analyzer.getTargetDbName(fnName_);
       fnName_.setDb(dbName);
+
+      // User needs DB access.
+      analyzer.getDb(dbName, Privilege.ANY);
 
       if (!analyzer.getCatalog().functionExists(fnName_)) {
         throw new AnalysisException(fnName_ + "() unknown");
@@ -361,7 +367,8 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
 
     if (isMergeAggregation_) {

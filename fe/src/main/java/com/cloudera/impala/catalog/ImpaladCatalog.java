@@ -154,6 +154,15 @@ public class ImpaladCatalog extends Catalog {
     }
   }
 
+  public void checkCreateDropFunctionAccess(User user) throws AuthorizationException {
+    Preconditions.checkNotNull(user);
+    if (!hasAccess(user, new PrivilegeRequest(Privilege.ALL))) {
+      throw new AuthorizationException(String.format(
+          "User '%s' does not have privileges to CREATE/DROP functions.",
+          user.getName()));
+    }
+  }
+
   /**
    * Updates the internal Catalog based on the given TCatalogUpdateReq.
    * This method:

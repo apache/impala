@@ -306,7 +306,7 @@ public class SelectStmt extends QueryStmt {
    * @throws AnalysisException
    */
   private void analyzeAggregation(Analyzer analyzer)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     if (groupingExprs == null && !selectList.isDistinct()
         && !Expr.containsAggregate(resultExprs)) {
       // we're not computing aggregates
@@ -452,7 +452,8 @@ public class SelectStmt extends QueryStmt {
    * assumes that select list and having clause have been analyzed.
    */
   private Expr.SubstitutionMap createAvgSMap(
-      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer) throws AnalysisException {
+      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     Expr.SubstitutionMap result = new Expr.SubstitutionMap();
     for (FunctionCallExpr aggExpr : aggExprs) {
       if (aggExpr.getAggOp() != BuiltinAggregateFunction.Operator.AVG) {
@@ -498,7 +499,7 @@ public class SelectStmt extends QueryStmt {
    */
   private void createAggInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, InternalException, AuthorizationException {
     if (selectList.isDistinct()) {
        // Create aggInfo for SELECT DISTINCT ... stmt:
        // - all select list items turn into grouping exprs
@@ -588,7 +589,7 @@ public class SelectStmt extends QueryStmt {
     if (groupingExprs != null) {
       strBuilder.append(" GROUP BY ");
       for (int i = 0; i < groupingExprs.size(); ++i) {
-        strBuilder.append(groupingExprs.get(i). toSql());
+        strBuilder.append(groupingExprs.get(i).toSql());
         strBuilder.append((i+1 != groupingExprs.size()) ? ", " : "");
       }
     }

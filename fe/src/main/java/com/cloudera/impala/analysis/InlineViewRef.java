@@ -169,7 +169,7 @@ public class InlineViewRef extends TableRef {
    * 'case slotref is null then 1 else 2 end'
    */
   protected void makeOutputNullable(Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, InternalException, AuthorizationException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
     Expr.collectList(sMap.rhs, SlotRef.class, rhsSlotRefs);
@@ -199,7 +199,7 @@ public class InlineViewRef extends TableRef {
    * false otherwise.
    */
   private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      Expr.SubstitutionMap nullSMap) throws InternalException {
+      Expr.SubstitutionMap nullSMap) throws InternalException, AuthorizationException {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     if (expr.contains(TupleIsNullPredicate.class)) return true;

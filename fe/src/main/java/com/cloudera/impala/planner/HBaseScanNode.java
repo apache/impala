@@ -37,6 +37,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -110,7 +111,8 @@ public class HBaseScanNode extends ScanNode {
    * ValueRange construction.
    */
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
+  public void finalize(Analyzer analyzer) throws InternalException,
+      AuthorizationException {
     Preconditions.checkNotNull(keyRanges);
     Preconditions.checkState(keyRanges.size() == 1);
     super.finalize(analyzer);

@@ -26,6 +26,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
@@ -318,7 +319,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Call this once on the root of the plan tree before calling toThrift().
    * Subclasses need to override this.
    */
-  public void finalize(Analyzer analyzer) throws InternalException {
+  public void finalize(Analyzer analyzer) throws InternalException,
+      AuthorizationException {
     for (PlanNode child: children) {
       child.finalize(analyzer);
     }

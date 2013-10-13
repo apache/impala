@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
@@ -89,7 +90,8 @@ public class CaseExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+       AuthorizationException {
     super.analyze(analyzer);
 
     // Keep track of maximum compatible type of case expr and all when exprs.

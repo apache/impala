@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -89,7 +90,8 @@ public class HdfsScanNode extends ScanNode {
    * ValueRange construction.
    */
   @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
+  public void finalize(Analyzer analyzer) throws InternalException,
+      AuthorizationException {
     Preconditions.checkNotNull(keyFilters);
     super.finalize(analyzer);
 

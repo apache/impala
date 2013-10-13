@@ -23,6 +23,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotRef;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -56,7 +57,8 @@ public class SingleColumnFilter {
    * Does this by substituting valueExpr for SlotRefs of the slotId in all conjuncts,
    * and then calls the backend for evaluation.
    */
-  public boolean isTrue(Analyzer analyzer, Expr valueExpr) throws InternalException {
+  public boolean isTrue(Analyzer analyzer, Expr valueExpr) throws InternalException,
+      AuthorizationException {
     Preconditions.checkState(valueExpr.isConstant());
 
     // construct smap

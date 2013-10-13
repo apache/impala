@@ -77,7 +77,7 @@ public class ShowFunctionsStmt extends StatementBase {
       AuthorizationException {
     postAnalysisDb_ = (parsedDb_ == null ? analyzer.getDefaultDb() : parsedDb_);
     if (analyzer.getCatalog().getDb(
-        postAnalysisDb_, analyzer.getUser(), Privilege.ANY) == null) {
+        postAnalysisDb_, analyzer.getUser(), Privilege.VIEW_METADATA) == null) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb_);
     }
   }

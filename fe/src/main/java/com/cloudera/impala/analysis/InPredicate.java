@@ -19,6 +19,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
@@ -38,7 +39,8 @@ public class InPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(children);
 

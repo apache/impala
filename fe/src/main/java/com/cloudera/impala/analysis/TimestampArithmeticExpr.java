@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.cloudera.impala.analysis.ArithmeticExpr.Operator;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
@@ -102,7 +103,8 @@ public class TimestampArithmeticExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
 
     if (funcName != null) {

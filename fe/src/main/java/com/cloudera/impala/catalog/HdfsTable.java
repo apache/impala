@@ -411,7 +411,7 @@ public class HdfsTable extends Table {
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       Map<String, FileDescriptor> oldFileDescMap)
-      throws IOException, InvalidStorageDescriptorException {
+      throws IOException, InvalidStorageDescriptorException, AuthorizationException {
     partitions.clear();
     hdfsBaseDir = msTbl.getSd().getLocation();
 

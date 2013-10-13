@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
@@ -83,7 +84,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Throws exception if any errors found.
    * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
     for (Expr child: children) {
       child.analyze(analyzer);
     }
@@ -109,10 +111,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Helper function: analyze list of exprs
    * @param exprs
    * @param analyzer
-   * @throws AnalysisException
    */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     for (Expr expr: exprs) {
       expr.analyze(analyzer);
     }

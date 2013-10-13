@@ -851,7 +851,7 @@ public class Analyzer {
    * returns compatible type otherwise.
    */
   public PrimitiveType castAllToCompatibleType(List<Expr> exprs)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     // Determine compatible type of exprs.
     Expr lastCompatibleExpr = exprs.get(0);
     PrimitiveType compatibleType = null;

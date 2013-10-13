@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -34,7 +35,8 @@ public class PartitionKeyValue {
     this.value = value;
   }
 
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     if (isStatic() && !value.isConstant()) {
       throw new AnalysisException(
           String.format("Non-constant expressions are not supported " +

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -48,6 +49,7 @@ public class LikePredicate extends Predicate {
       return thriftOp;
     }
   }
+
   private final Operator op;
 
   public LikePredicate(Operator op, Expr e1, Expr e2) {
@@ -82,7 +84,8 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     if (getChild(0).getType() != PrimitiveType.STRING
         && !getChild(0).getType().isNull()) {
@@ -104,7 +107,7 @@ public class LikePredicate extends Predicate {
         Pattern.compile(((StringLiteral) getChild(1)).getValue());
       } catch (PatternSyntaxException e) {
         throw new AnalysisException(
-          "invalid regular expression in '" + this.toSql() + "'");
+            "invalid regular expression in '" + this.toSql() + "'");
       }
     }
   }

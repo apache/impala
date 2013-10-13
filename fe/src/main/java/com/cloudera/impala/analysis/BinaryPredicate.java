@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
@@ -94,7 +95,8 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
 
     PrimitiveType t1 = getChild(0).getType();

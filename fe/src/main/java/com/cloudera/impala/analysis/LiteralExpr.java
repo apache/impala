@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.math.BigInteger;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -33,7 +34,7 @@ public abstract class LiteralExpr extends Expr {
   }
 
   public static LiteralExpr create(String value, PrimitiveType type)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     Preconditions.checkArgument(type != PrimitiveType.INVALID_TYPE);
     switch (type) {
       case NULL_TYPE:

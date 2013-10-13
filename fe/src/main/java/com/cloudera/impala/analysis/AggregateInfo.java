@@ -20,6 +20,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -115,7 +116,7 @@ public class AggregateInfo {
   static public AggregateInfo create(
       ArrayList<Expr> groupingExprs, ArrayList<FunctionCallExpr> aggExprs,
       TupleDescriptor tupleDesc, Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, InternalException, AuthorizationException {
     Preconditions.checkState(
         (groupingExprs != null && !groupingExprs.isEmpty())
         || (aggExprs != null && !aggExprs.isEmpty()));
@@ -178,7 +179,7 @@ public class AggregateInfo {
   private void createDistinctAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, InternalException, AuthorizationException {
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     // make sure that all DISTINCT params are the same;
     // ignore top-level implicit casts in the comparison, we might have inserted
@@ -282,7 +283,8 @@ public class AggregateInfo {
    * The returned AggregateInfo shares its descriptor and smap with the input info;
    * createAggTupleDesc() must not be called on it.
    */
-  private void createMergeAggInfo(Analyzer analyzer) throws InternalException {
+  private void createMergeAggInfo(Analyzer analyzer) throws
+      InternalException, AuthorizationException {
     Preconditions.checkState(mergeAggInfo == null);
     TupleDescriptor inputDesc = aggTupleDesc;
     // construct grouping exprs
@@ -367,7 +369,7 @@ public class AggregateInfo {
   private void createSecondPhaseDistinctAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-      throws InternalException {
+      throws InternalException, AuthorizationException {
     Preconditions.checkState(secondPhaseDistinctAggInfo == null);
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     TupleDescriptor inputDesc = aggTupleDesc;

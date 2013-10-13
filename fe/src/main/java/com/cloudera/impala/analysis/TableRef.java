@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -171,7 +172,7 @@ public abstract class TableRef implements ParseNode {
    * and the TupleDescriptor (desc) of this table has been created.
    */
   public void analyzeJoin(Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException, InternalException, AuthorizationException {
     Preconditions.checkState(desc != null);
     analyzeJoinHints();
 

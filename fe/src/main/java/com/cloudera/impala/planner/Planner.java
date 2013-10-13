@@ -49,6 +49,7 @@ import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.ValuesStmt;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -89,7 +90,7 @@ public class Planner {
    */
   public ArrayList<PlanFragment> createPlanFragments(
       AnalysisContext.AnalysisResult analysisResult, TQueryOptions queryOptions)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     // Set queryStmt from analyzed SELECT or INSERT query.
     QueryStmt queryStmt = null;
     if (analysisResult.isInsertStmt() ||
@@ -814,7 +815,7 @@ public class Planner {
    */
   private PlanNode createQueryPlan(
       QueryStmt stmt, Analyzer analyzer, long defaultOrderByLimit)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     if (stmt instanceof SelectStmt) {
       return createSelectPlan((SelectStmt) stmt, analyzer, defaultOrderByLimit);
     } else {
@@ -848,7 +849,7 @@ public class Planner {
    */
   private PlanNode createSelectPlan(
       SelectStmt selectStmt, Analyzer analyzer, long defaultOrderByLimit)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     // no from clause -> materialize the select's exprs with a MergeNode
     if (selectStmt.getTableRefs().isEmpty()) {
       return createConstantSelectPlan(selectStmt, analyzer);
@@ -1088,7 +1089,7 @@ public class Planner {
    * Returns plan tree for an inline view ref.
    */
   private PlanNode createInlineViewPlan(Analyzer analyzer, InlineViewRef inlineViewRef)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     // If the subquery doesn't contain a limit clause, determine which conjuncts can be
     // evaluated inside the subquery tree;
     // if it does contain a limit clause, it's not correct to have the view plan
@@ -1194,7 +1195,7 @@ public class Planner {
       Analyzer analyzer,
       List<TupleId> lhsIds, TableRef rhs,
       List<Pair<Expr, Expr>> joinConjuncts,
-      List<Expr> joinPredicates) {
+      List<Expr> joinPredicates) throws AuthorizationException {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId rhsId = rhs.getId();
@@ -1292,7 +1293,7 @@ public class Planner {
    */
   private PlanNode createHashJoinNode(
       Analyzer analyzer, PlanNode outer, TableRef outerRef, TableRef innerRef)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     // the rows coming from the build node only need to have space for the tuple
     // materialized by that node
     PlanNode inner = createTableRefNode(analyzer, innerRef);
@@ -1329,7 +1330,7 @@ public class Planner {
    * InlineViewRef
    */
   private PlanNode createTableRefNode(Analyzer analyzer, TableRef tblRef)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     if (tblRef instanceof BaseTableRef) {
       return createScanNode(analyzer, tblRef);
     }
@@ -1349,7 +1350,7 @@ public class Planner {
    * The absorption of operands applies unnesting rules.
    */
   private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer)
-      throws NotImplementedException, InternalException {
+      throws NotImplementedException, InternalException, AuthorizationException {
     List<UnionOperand> operands = unionStmt.getUnionOperands();
     Preconditions.checkState(operands.size() > 0);
     MergeNode mergeNode =
@@ -1472,7 +1473,8 @@ public class Planner {
    * was passed to absordUnionOperand() (i.e., at the root of the recursion)
    */
   private void absorbUnionOperand(UnionOperand operand, MergeNode topMergeNode,
-      Qualifier topQualifier) throws NotImplementedException, InternalException {
+      Qualifier topQualifier) throws NotImplementedException, InternalException,
+      AuthorizationException {
     QueryStmt queryStmt = operand.getQueryStmt();
     Analyzer analyzer = operand.getAnalyzer();
     if (queryStmt instanceof SelectStmt) {

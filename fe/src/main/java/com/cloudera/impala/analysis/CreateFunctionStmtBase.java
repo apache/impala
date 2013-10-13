@@ -169,6 +169,11 @@ public class CreateFunctionStmtBase extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
+    // For now, if authorization is enabled, the user needs ALL on the server
+    // to create functions.
+    // TODO: this is not the right granularity but acceptable for now.
+    analyzer.getCatalog().checkCreateDropFunctionAccess(analyzer.getUser());
+
     // Validate function name is legal
     fn_.getFunctionName().analyze(analyzer);
 

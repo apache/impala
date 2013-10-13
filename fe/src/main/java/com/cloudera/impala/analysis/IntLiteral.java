@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.math.BigInteger;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -34,7 +35,8 @@ public class IntLiteral extends LiteralExpr {
     this.value = value;
   }
 
-  public IntLiteral(String value) throws AnalysisException {
+  public IntLiteral(String value) throws AnalysisException,
+      AuthorizationException {
     Long longValue = null;
     try {
       longValue = new Long(value);
@@ -46,7 +48,8 @@ public class IntLiteral extends LiteralExpr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
     if (value.compareTo(BigInteger.valueOf(Byte.MAX_VALUE)) <= 0 &&
         value.compareTo(BigInteger.valueOf(Byte.MIN_VALUE)) >= 0) {

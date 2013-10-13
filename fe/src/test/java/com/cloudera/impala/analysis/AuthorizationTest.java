@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.Assert;
@@ -35,6 +36,8 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -918,6 +921,65 @@ public class AuthorizationTest {
     AuthzError(context, "select * from alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: default.alltypes",
         currentUser);
+  }
+
+  @Test
+  public void TestFunction() throws AnalysisException, AuthorizationException {
+    AuthorizationConfig config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+        LocalGroupResourceAuthorizationProvider.class.getName());
+    ImpaladCatalog catalog = new  ImpaladCatalog(
+        Catalog.CatalogInitStrategy.LAZY, config);
+
+    // First try with the less privileged user.
+    User currentUser = new User("test_user");
+    AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
+        currentUser);
+    AuthzError(context, "show functions",
+        "User '%s' does not have privileges to access: default", currentUser);
+    AuthzOk(context, "show functions in tpch");
+
+    AuthzError(context, "create function f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+    AuthzError(context, "create function tpch.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+    AuthzError(context, "create function notdb.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+    AuthzError(context, "drop function if exists f()",
+        "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+    AuthzError(context, "drop function notdb.f()",
+        "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+    // Admin should be able to do everything
+    AnalysisContext adminContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
+        ADMIN_USER);
+    AuthzOk(adminContext, "show functions");
+    AuthzOk(adminContext, "show functions in tpch");
+
+    AuthzOk(adminContext, "create function f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+    AuthzOk(adminContext, "create function tpch.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+    AuthzOk(adminContext, "drop function if exists f()");
+
+    // Add default.f(), tpch.f()
+    catalog.addFunction(new Udf(new FunctionName("default", "f"),
+        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
+    catalog.addFunction(new Udf(new FunctionName("tpch", "f"),
+        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
+
+    AuthzError(context, "select default.f()",
+        "User '%s' does not have privileges to access: default.*",
+        currentUser);
+    // Couldn't create tpch.f() but can run it.
+    AuthzOk(context, "select tpch.f()");
+    AuthzOk(adminContext, "drop function tpch.f()");
   }
 
   @Test
