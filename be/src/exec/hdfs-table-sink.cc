@@ -481,6 +481,7 @@ void HdfsTableSink::Close(RuntimeState* state) {
     cur_partition->second.first->writer->Close();
     ClosePartitionFile(state, cur_partition->second.first);
   }
+  partition_keys_to_output_partitions_.clear();
 }
 
 Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {

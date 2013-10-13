@@ -338,6 +338,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
     int per_channel_buffer_size)
   : pool_(pool),
     row_desc_(row_desc),
+    closed_(false),
     current_thrift_batch_(&thrift_batch1_),
     profile_(NULL),
     serialize_batch_timer_(NULL),
@@ -415,6 +416,7 @@ Status DataStreamSender::Init(RuntimeState* state) {
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(profile_->total_time_counter());
+  DCHECK(!closed_);
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
@@ -456,10 +458,12 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 }
 
 void DataStreamSender::Close(RuntimeState* state) {
+  if (closed_) return;
   // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Close(state);
   }
+  closed_ = true;
 }
 
 int64_t DataStreamSender::GetNumDataBytesSent() const {

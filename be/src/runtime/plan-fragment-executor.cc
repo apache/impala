@@ -299,9 +299,6 @@ Status PlanFragmentExecutor::OpenInternal() {
   // true, so tearing down any data stream state (a separate
   // channel) in Close is safe.
   sink_->Close(runtime_state());
-
-  // Setting to NULL ensures that the d'tor won't double-close the sink.
-  sink_.reset(NULL);
   done_ = true;
 
   FragmentComplete();

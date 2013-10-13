@@ -84,6 +84,8 @@ class DataStreamSender : public DataSink {
   ObjectPool* pool_;
   const RowDescriptor& row_desc_;
   bool broadcast_;  // if true, send all rows on all channels
+  // If true, this sender has been closed. Not valid to call Send() anymore.
+  bool closed_;
 
   // serialized batches for broadcasting; we need two so we can write
   // one while the other one is still being sent

@@ -49,6 +49,8 @@ class DataSink {
 
   // Releases all resources that were allocated in Init()/Send().
   // Further Send() calls are illegal after calling Close().
+  // It must be okay to call this multiple times. Subsequent calls should
+  // be ignored.
   virtual void Close(RuntimeState* state) = 0;
 
   // Creates a new data sink from thrift_sink. A pointer to the
