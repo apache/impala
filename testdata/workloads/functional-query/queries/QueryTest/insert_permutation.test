@@ -10,6 +10,8 @@ use insert_permutation_test
 ---- QUERY
 create table perm_nopart(int_col1 int, string_col string, int_col2 int);
 create table perm_part(int_col1 int, string_col string) partitioned by (p1 int, p2 string);
+create table parquet_part(int_col1 int, string_col string)
+partitioned by (p1 int, p2 string) stored as parquetfile;
 ---- RESULTS
 ====
 ---- QUERY
@@ -177,4 +179,18 @@ select * from perm_nopart
 NULL,'NULL',NULL
 ---- TYPES
 INT,STRING,INT
+====
+---- QUERY
+# Test inserting NULLs due to an incomplete column mapping into a Parquet table.
+# Regression test against IMPALA-671.
+insert into parquet_part() partition(p1, p2='foo') values(2)
+---- RESULTS
+p1=2/p2=foo/: 1
+====
+---- QUERY
+select * from parquet_part
+---- RESULTS
+NULL,'NULL',2,'foo'
+---- TYPES
+INT,STRING,INT,STRING
 ====

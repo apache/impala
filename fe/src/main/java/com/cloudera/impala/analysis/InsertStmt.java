@@ -399,10 +399,9 @@ public class InsertStmt extends StatementBase {
       // expression.
       if (!matchFound) {
         if (tblColumn.getPosition() >= numClusteringCols) {
-          // Unmentioned non-clustering columns get NULL expressions. Note that we do not
-          // analyze them, nor do we type-check them, on the assumption that neither is
-          // necessary.
-          permutedSelectListExprs.add(new NullLiteral());
+          // Unmentioned non-clustering columns get NULL literals with the appropriate
+          // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
+          permutedSelectListExprs.add(new NullLiteral().castTo(tblColumn.getType()));
         }
       }
     }
