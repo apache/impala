@@ -4,6 +4,7 @@ create database if not exists function_ddl_test
 ====
 ---- QUERY
 # Drop the dummy udfs this test uses.
+drop function if exists default.fn();
 drop function if exists function_ddl_test.fn();
 drop function if exists function_ddl_test.fn(int);
 drop function if exists function_ddl_test.fn(int, string);
@@ -30,7 +31,11 @@ show aggregate functions in function_ddl_test
 STRING
 ====
 ---- QUERY
-# Add them and test function overloading.
+# Add them and test function overloading and scoping.
+create function default.fn() RETURNS int
+LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+====
+---- QUERY
 create function function_ddl_test.fn() RETURNS int
 LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
@@ -69,6 +74,13 @@ LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ---- QUERY
 create aggregate function function_ddl_test.agg_fn_var_arg(double, string...) RETURNS int
 LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='VarArgUpdate'
+====
+---- QUERY
+show functions in default
+---- RESULTS
+'fn()'
+---- TYPES
+STRING
 ====
 ---- QUERY
 show functions in function_ddl_test
@@ -119,6 +131,25 @@ show functions in function_ddl_test
 'fn(STRING, INT)'
 'fn2(INT)'
 'fn_var_arg(INT...)'
+---- TYPES
+STRING
+====
+---- QUERY
+use default
+====
+---- QUERY
+show functions;
+---- RESULTS
+'fn()'
+---- TYPES
+STRING
+====
+---- QUERY
+drop function fn()
+====
+---- QUERY
+show functions;
+---- RESULTS
 ---- TYPES
 STRING
 ====

@@ -78,13 +78,21 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->table.__set_tbl_name(object_name.substr(pos + 1));
       break;
     }
-    case TCatalogObjectType::FUNCTION:
+    case TCatalogObjectType::FUNCTION: {
       catalog_object->__set_type(object_type);
       catalog_object->__set_fn(TFunction());
-      // The key only contains the signature string, which is all that is needed to
-      // uniquely identify the function.
-      catalog_object->fn.__set_signature(object_name);
+      // The key only contains the database name and signature string, which is all that
+      // is needed to uniquely identify the function.
+      int pos = object_name.find(".");
+      if (pos == string::npos || pos >= object_name.size() - 1) {
+        stringstream error_msg;
+        error_msg << "Invalid function name: " << object_name;
+        return Status(error_msg.str());
+      }
+      catalog_object->fn.fn_name.__set_db_name(object_name.substr(0, pos));
+      catalog_object->fn.__set_signature(object_name.substr(pos + 1));
       break;
+    }
     case TCatalogObjectType::CATALOG:
     case TCatalogObjectType::UNKNOWN:
     default:
@@ -108,7 +116,8 @@ string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {
       entry_key << catalog_object.table.db_name << "." << catalog_object.table.tbl_name;
       break;
     case TCatalogObjectType::FUNCTION:
-      entry_key << catalog_object.fn.signature;
+      entry_key << catalog_object.fn.fn_name.db_name << "."
+                << catalog_object.fn.signature;
       break;
     case TCatalogObjectType::CATALOG:
       entry_key << catalog_object.catalog.catalog_service_id;

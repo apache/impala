@@ -227,7 +227,7 @@ public class ImpaladCatalog extends Catalog {
             removeTable(catalogObject.getTable());
             break;
           case FUNCTION:
-            removeUdf(catalogObject.getFn());
+            removeFunction(catalogObject.getFn());
             break;
           default:
             throw new IllegalStateException(
@@ -432,14 +432,11 @@ public class ImpaladCatalog extends Catalog {
     db.removeTable(thriftTable.tbl_name);
   }
 
-  private void removeUdf(TFunction thriftUdf) {
-    // Loops through all databases in the catalog looking for a matching UDF.
-    // TODO: Parse the signature string to find out the target database?
-    for (String dbName: dbCache_.getAllNames()) {
-      Db db = getDb(dbName);
-      if (db == null) continue;
-      if (db.removeFunction(thriftUdf.getSignature())) return;
-    }
+  private void removeFunction(TFunction thriftUdf) {
+    Db db = getDb(thriftUdf.fn_name.getDb_name());
+    // The parent database doesn't exist, nothing to do.
+    if (db == null) return;
+    db.removeFunction(thriftUdf.getSignature());
   }
 
   /**
