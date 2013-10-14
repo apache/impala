@@ -26,6 +26,23 @@
 #include "util/thread.h"
 
 DECLARE_string(hostname);
+DECLARE_int32(logbufsecs);
+
+using namespace boost;
+
+// Thread that flushes glog every logbufsecs sec. glog flushes the log file only if
+// logbufsecs has passed since the previous flush when a new log is written. That means
+// that on a quiet system, logs will be buffered indefinitely.
+shared_ptr<impala::Thread> glog_flusher;
+
+// glog_flusher thread.
+// Wakes up every logbufsecs sec to flush glog log file.
+static void GlogFlushThread() {
+  while(true) {
+    sleep(FLAGS_logbufsecs);
+    google::FlushLogFiles(google::GLOG_INFO);
+  }
+}
 
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   // Set the default hostname. The user can override this with the hostname flag.
@@ -35,6 +52,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::InitThreading();
+
+  // Initialize glog_flusher thread after InitGoogleLoggingSafe and InitThreading.
+  glog_flusher.reset(new Thread("common", "glog-flush-thread", &GlogFlushThread));
 
   LOG(INFO) << impala::GetVersionString();
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;
