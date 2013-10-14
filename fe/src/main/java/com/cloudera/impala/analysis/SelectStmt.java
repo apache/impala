@@ -255,7 +255,8 @@ public class SelectStmt extends QueryStmt {
   /**
    * Expand "*" select list item.
    */
-  private void expandStar(Analyzer analyzer) throws AnalysisException {
+  private void expandStar(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     if (tableRefs.isEmpty()) {
       throw new AnalysisException("'*' expression in select list requires FROM clause.");
     }
@@ -267,12 +268,9 @@ public class SelectStmt extends QueryStmt {
 
   /**
    * Expand "<tbl>.*" select list item.
-   * @param analyzer
-   * @param tblName
-   * @throws AnalysisException
    */
   private void expandStar(Analyzer analyzer, TableName tblName)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     TupleDescriptor tupleDesc = analyzer.getDescriptor(tblName);
     if (tupleDesc == null) {
       throw new AnalysisException("unknown table: " + tblName.toString());
@@ -282,16 +280,14 @@ public class SelectStmt extends QueryStmt {
 
   /**
    * Expand "*" for a particular tuple descriptor by appending
-   * refs for each column to selectListExprs.
-   * @param analyzer
-   * @param alias
-   * @param desc
-   * @throws AnalysisException
+   * analyzed slot refs for each column to selectListExprs.
    */
   private void expandStar(Analyzer analyzer, TableName tblName, TupleDescriptor desc)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     for (Column col: desc.getTable().getColumnsInHiveOrder()) {
-      resultExprs.add(new SlotRef(tblName, col.getName()));
+      SlotRef slotRef = new SlotRef(tblName, col.getName());
+      slotRef.analyze(analyzer);
+      resultExprs.add(slotRef);
       colLabels.add(col.getName().toLowerCase());
     }
   }

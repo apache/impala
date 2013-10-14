@@ -92,8 +92,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    analyzer.incrementCallDepth();
-    checkExprLimits(analyzer);
+    // Check the expr child limit.
+    if (children.size() > EXPR_CHILDREN_LIMIT) {
+      String sql = toSql();
+      String sqlSubstr = sql.substring(0, Math.min(80, sql.length()));
+      throw new AnalysisException(String.format("Exceeded the maximum number of child " +
+          "expressions (%s).\nExpression has %s children:\n%s...",
+          EXPR_CHILDREN_LIMIT, children.size(), sqlSubstr));
+    }
+
+    // analyzer may be null for certain literal constructions (e.g. IntLiteral).
+    if (analyzer != null) {
+      analyzer.incrementCallDepth();
+      // Check the expr depth limit. Do not print the toSql() to not overflow the stack.
+      if (analyzer.getCallDepth() > EXPR_DEPTH_LIMIT) {
+        throw new AnalysisException(String.format("Exceeded the maximum depth of an " +
+            "expresison tree (%s).", EXPR_DEPTH_LIMIT));
+      }
+    }
     for (Expr child: children) {
       child.analyze(analyzer);
     }
@@ -113,7 +129,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         numDistinctValues = Math.max(numDistinctValues, slotRef.numDistinctValues);
       }
     }
-    analyzer.decrementCallDepth();
+    if (analyzer != null) analyzer.decrementCallDepth();
   }
 
   /**
