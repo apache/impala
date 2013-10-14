@@ -39,6 +39,7 @@ public abstract class Predicate extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
     type = PrimitiveType.BOOLEAN;
     // values: true/false/null

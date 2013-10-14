@@ -51,6 +51,7 @@ public class BetweenPredicate extends Predicate {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(originalChildren);
 

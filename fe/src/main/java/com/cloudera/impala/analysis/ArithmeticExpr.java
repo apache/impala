@@ -107,6 +107,7 @@ public class ArithmeticExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
     for (Expr child: children) {
       Expr operand = (Expr) child;

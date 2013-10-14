@@ -86,6 +86,7 @@ public class LikePredicate extends Predicate {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
     if (getChild(0).getType() != PrimitiveType.STRING
         && !getChild(0).getType().isNull()) {

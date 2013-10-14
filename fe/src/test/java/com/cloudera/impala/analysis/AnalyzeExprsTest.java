@@ -1028,18 +1028,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testInfixExprDepthLimit("select 1 ", " + 1");
 
     // Function-call expr.
-    // TODO: Analysis of function-call exprs and UDFs is extremely slow (IMPALA-621).
-    // Re-enable these tests when feasible.
-    //testFuncExprDepthLimit("lower(", "'abc'", ")");
-    //
+    testFuncExprDepthLimit("lower(", "'abc'", ")");
+
     // UDF.
-    //catalog.addFunction(new Udf(new FunctionName("default", "udf"),
-    //    Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
-    //    new HdfsURI(""), null));
-    //testFuncExprDepthLimit("udf(", "1", ")");
-    //
+    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
+        Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
+        new HdfsURI(""), null));
+    testFuncExprDepthLimit("udf(", "1", ")");
+
     // Timestamp arithmetic expr.
-    //testFuncExprDepthLimit("date_add(", "now()", ", interval 1 day)");
+    testFuncExprDepthLimit("date_add(", "now()", ", interval 1 day)");
 
     // Casts.
     testFuncExprDepthLimit("cast(", "1", " as int)");

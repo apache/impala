@@ -79,11 +79,10 @@ public class CastExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
 
-    if (isImplicit) {
-      return;
-    }
+    if (isImplicit) return;
 
     // cast was asked for in the query, check for validity of cast
     PrimitiveType childType = getChild(0).getType();

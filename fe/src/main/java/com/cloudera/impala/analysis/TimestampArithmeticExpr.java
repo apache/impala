@@ -105,6 +105,7 @@ public class TimestampArithmeticExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
 
     if (funcName != null) {

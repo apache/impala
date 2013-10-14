@@ -92,6 +92,7 @@ public class CaseExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
        AuthorizationException {
+    if (isAnalyzed) return;
     super.analyze(analyzer);
 
     // Keep track of maximum compatible type of case expr and all when exprs.
