@@ -55,7 +55,7 @@ add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
 target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})
 
 ADD_BE_TEST(mem-pool-test)
-ADD_BE_TEST(free-list-test)
+ADD_BE_TEST(free-pool-test)
 ADD_BE_TEST(string-buffer-test)
 ADD_BE_TEST(data-stream-test)
 ADD_BE_TEST(timestamp-test)

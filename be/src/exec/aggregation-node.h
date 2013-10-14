@@ -22,7 +22,6 @@
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
 #include "runtime/descriptors.h"  // for TupleId
-#include "runtime/free-list.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 
