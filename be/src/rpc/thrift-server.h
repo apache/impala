@@ -25,10 +25,9 @@
 #include <thrift/TProcessor.h>
 
 #include "common/status.h"
+#include "rpc/auth-provider.h"
 #include "util/metrics.h"
 #include "util/thread.h"
-
-namespace boost { class thread; }
 
 namespace impala {
 
@@ -37,6 +36,7 @@ namespace impala {
 // described by a user-supplied TProcessor object.
 // If TNonblockingServer is used, client must use TFramedTransport.
 // If TThreadPoolServer is used, client must use TSocket as transport.
+// TODO: Need a builder to help with the unwieldy constructor
 class ThriftServer {
  public:
   // Username.
@@ -77,13 +77,15 @@ class ThriftServer {
   //  - name: human-readable name of this server. Should not contain spaces
   //  - processor: Thrift processor to handle RPCs
   //  - port: The port the server will listen for connections on
+  //  - auth_provider: Authentication scheme to use. If NULL, use the global default
+  //    demon<->demon provider.
   //  - metrics: if not NULL, the server will register metrics on this object
   //  - num_worker_threads: the number of worker threads to use in any thread pool
   //  - server_type: the type of IO strategy this server should employ
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
-      Metrics* metrics = NULL, int num_worker_threads = DEFAULT_WORKER_THREADS,
-      ServerType server_type = Threaded);
+      AuthProvider* auth_provider = NULL, Metrics* metrics = NULL,
+      int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
 
   // Enables secure access over SSL. Must be called before Start(). The arguments are
   // paths to certificate and private key files in .PEM format, respectively. If either
@@ -132,11 +134,6 @@ class ThriftServer {
   static const ConnectionContext* GetThreadConnectionContext();
 
  private:
-  // Creates a transport factory which itself creates new transport objects when a
-  // connection is made. Returns OK unless there was a Thrift error.
-  Status CreateTransportFactory(
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* transport_factory);
-
   // Creates the server socket on which this server listens. May be SSL enabled. Returns
   // OK unless there was a Thrift error.
   Status CreateSocket(
@@ -186,9 +183,6 @@ class ThriftServer {
       ConnectionContextSet;
   ConnectionContextSet connection_contexts_;
 
-  // True if using a secure transport
-  bool kerberos_enabled_;
-
   // True if metrics are enabled
   bool metrics_enabled_;
 
@@ -200,6 +194,9 @@ class ThriftServer {
 
   // Used to generate a unique connection id for every connection
   boost::uuids::random_generator uuid_generator_;
+
+  // Not owned by us, owned by the AuthManager
+  AuthProvider* auth_provider_;
 
   // Helper class which monitors starting servers. Needs access to internal members, and
   // is not used outside of this class.

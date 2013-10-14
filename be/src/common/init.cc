@@ -22,6 +22,7 @@
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/os-info.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "util/thread.h"
 
@@ -52,6 +53,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::InitThreading();
+  impala::InitAuth(argv[0]);
 
   // Initialize glog_flusher thread after InitGoogleLoggingSafe and InitThreading.
   glog_flusher.reset(new Thread("common", "glog-flush-thread", &GlogFlushThread));

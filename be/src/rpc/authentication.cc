@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/authorization.h"
+#include "rpc/authentication.h"
 
 #include <stdio.h>
 #include <signal.h>
@@ -29,9 +29,12 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include "rpc/auth-provider.h"
+#include "transport/TSaslClientTransport.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/network-util.h"
+#include "util/thread.h"
 
 using namespace std;
 using namespace boost;
@@ -39,23 +42,32 @@ using namespace boost::random;
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
-DEFINE_int32(kerberos_reinit_interval, 60, \
+
+DEFINE_int32(kerberos_reinit_interval, 60,
     "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
     "a ticket with a lifetime that is at least 2x the renewal interval.");
 DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
     "/usr/lib/x86_64-linux-gnu/sasl2", "Colon separated list of paths to look for SASL "
     "security library plugins.");
+DEFINE_bool(enable_ldap_auth, false,
+    "If true, use LDAP authentication for client connections");
 
 namespace impala {
 
-// Array of callbacks for the sasl library.
-static vector<sasl_callback_t> callbacks;
+// Array of callbacks for the Sasl library.
+static vector<sasl_callback_t> SASL_CALLBACKS;
 
 // Pattern for hostname substitution.
 static const string HOSTNAME_PATTERN = "_HOST";
 
-// The Impala service name.
-static string impala_service_name;
+// Constants for the two Sasl  mechanisms we support
+static const std::string KERBEROS_MECHANISM = "GSSAPI";
+static const std::string PLAIN_MECHANISM = "PLAIN";
+
+mutex KerberosAuthProvider::kinit_lock_;
+scoped_ptr<Thread> KerberosAuthProvider::kinit_thread_;
+
+AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
 // Output Sasl messages.
 // context: not used.
@@ -67,27 +79,22 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
   switch (level) {
   case SASL_LOG_NONE:
     break;
-
   case SASL_LOG_ERR:
   case SASL_LOG_FAIL:
-    LOG(ERROR) << "Kerberos: " << message;
+    LOG(ERROR) << "SASL message: " << message;
     break;
-
   case SASL_LOG_WARN:
-    LOG(WARNING) << "Kerberos: " << message;
+    LOG(WARNING) << "SASL message: " << message;
     break;
-
   case SASL_LOG_NOTE:
-    LOG(INFO) << "Kerberos: " << message;
+    LOG(INFO) << "SASL message: " << message;
     break;
-
   case SASL_LOG_DEBUG:
-    VLOG(1) << "Kerberos: " << message;
+    VLOG(1) << "SASL message: " << message;
     break;
-
   case SASL_LOG_TRACE:
   case SASL_LOG_PASS:
-    VLOG(3) << "Kerberos: " << message;
+    VLOG(3) << "SASL message: " << message;
     break;
   }
 
@@ -102,7 +109,7 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
 // len: length of the result
 // Return SASL_FAIL if the option is not handled, this does not fail the handshake.
 static int SaslGetOption(void* context, const char* plugin_name, const char* option,
-                         const char** result, unsigned* len) {
+    const char** result, unsigned* len) {
   // Handle Sasl Library options
   if (plugin_name == NULL) {
     // Return the logging level that we want the sasl library to use.
@@ -135,7 +142,8 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
     VLOG(3) << "SaslGetOption: Unknown option: " << option;
     return SASL_FAIL;
   }
-  VLOG(3) << "SaslGetOption: Unknown plugin: " << plugin_name;
+
+  VLOG(3) << "SaslGetOption: Unknown plugin: " << plugin_name << " : " << option;
   return SASL_FAIL;
 
 }
@@ -146,15 +154,15 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
 // auth_identity, alen: The identity (principal) and length.
 // default_realm, urlen: Realm of the user and length.
 // propctx: properties requested.
-static int SaslAuthorize(sasl_conn_t* conn, void* context,
-    const char* requested_user, unsigned rlen, const char* auth_identity, unsigned alen,
-    const char* def_realm, unsigned urlen, struct propctx* propctx) {
+static int SaslAuthorize(sasl_conn_t* conn, void* context, const char* requested_user,
+    unsigned rlen, const char* auth_identity, unsigned alen, const char* def_realm,
+    unsigned urlen, struct propctx* propctx) {
 
   string user(requested_user, rlen);
   string auth(auth_identity, alen);
   string realm(def_realm, urlen);
-  VLOG_CONNECTION << "Kerberos User: " << user << " for: " << auth << " from " << realm;
-
+  VLOG_CONNECTION << "SASL authorize. User: " << user << " for: " << auth << " from "
+                  << realm;
   return SASL_OK;
 }
 
@@ -171,7 +179,7 @@ static int SaslGetPath(void* context, const char** path) {
 
 // Periodically call kinit to get a ticket granting ticket from the kerberos server.
 // This is kept in the kerberos cache associated with this process.
-static void RunKinit() {
+void KerberosAuthProvider::RunKinit() {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
   stringstream sysstream;
@@ -194,8 +202,8 @@ static void RunKinit() {
   string kreturn;
 
   while (true) {
-    LOG(INFO) << "Registering "
-              << FLAGS_principal << " key_tab file " << FLAGS_keytab_file;
+    LOG(INFO) << "Registering " << FLAGS_principal << " key_tab file "
+              << FLAGS_keytab_file;
     bool succeeded = false;
     FILE* fp = popen(sysstream.str().c_str(), "r");
     if (fp == NULL) {
@@ -236,21 +244,51 @@ static void RunKinit() {
   }
 }
 
-Status InitKerberos(const string& appname) {
-  callbacks.resize(5);
-  callbacks[0].id = SASL_CB_LOG;
-  callbacks[0].proc = (int (*)())&SaslLogCallback;
-  callbacks[0].context = NULL;
-  callbacks[1].id = SASL_CB_GETOPT;
-  callbacks[1].proc = (int (*)())&SaslGetOption;
-  callbacks[1].context = NULL;
-  callbacks[2].id = SASL_CB_PROXY_POLICY;
-  callbacks[2].proc = (int (*)())&SaslAuthorize;
-  callbacks[2].context = NULL;
-  callbacks[3].id = SASL_CB_GETPATH;
-  callbacks[3].proc = (int (*)())&SaslGetPath;
-  callbacks[3].context = NULL;
-  callbacks[4].id = SASL_CB_LIST_END;
+Status InitAuth(const string& appname) {
+  // Application-wide set of callbacks.
+  SASL_CALLBACKS.resize(5);
+  SASL_CALLBACKS[0].id = SASL_CB_LOG;
+  SASL_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
+  SASL_CALLBACKS[0].context = NULL;
+  SASL_CALLBACKS[1].id = SASL_CB_GETOPT;
+  SASL_CALLBACKS[1].proc = (int (*)())&SaslGetOption;
+  SASL_CALLBACKS[1].context = NULL;
+  SASL_CALLBACKS[2].id = SASL_CB_PROXY_POLICY;
+  SASL_CALLBACKS[2].proc = (int (*)())&SaslAuthorize;
+  SASL_CALLBACKS[2].context = NULL;
+  SASL_CALLBACKS[3].id = SASL_CB_GETPATH;
+  SASL_CALLBACKS[3].proc = (int (*)())&SaslGetPath;
+  SASL_CALLBACKS[3].context = NULL;
+  SASL_CALLBACKS[4].id = SASL_CB_LIST_END;
+
+  try {
+    // We assume all impala processes are both server and client.
+    sasl::TSaslServer::SaslInit(&SASL_CALLBACKS[0], appname);
+    sasl::TSaslClient::SaslInit(&SASL_CALLBACKS[0]);
+  } catch (sasl::SaslServerImplException& e) {
+    stringstream err_msg;
+    err_msg << "Could not initialize Sasl library: " << e.what();
+    return Status(err_msg.str());
+  }
+
+  RETURN_IF_ERROR(AuthManager::GetInstance()->Init());
+  return Status::OK;
+}
+
+KerberosAuthProvider::KerberosAuthProvider(const string& principal,
+    const string& keytab_path) : principal_(principal), keytab_path_(keytab_path) {
+
+}
+
+Status KerberosAuthProvider::Start() {
+  // The "keytab" callback is never called.  Set the file name in the environment.
+  if (setenv("KRB5_KTNAME", keytab_path_.c_str(), 1)) {
+    string error_msg = GetStrErrMsg();
+    stringstream ss;
+    ss << "Kerberos could not set KRB5_KTNAME: " << error_msg;
+    LOG(ERROR) << ss;
+    return Status(ss.str());
+  }
 
   // Replace the string _HOST with our hostname.
   size_t off = FLAGS_principal.find(HOSTNAME_PATTERN);
@@ -271,74 +309,125 @@ Status InitKerberos(const string& appname) {
     LOG(ERROR) << ss;
     return Status(ss.str());
   }
-  impala_service_name = FLAGS_principal.substr(0, off);
+  service_name_ = FLAGS_principal.substr(0, off);
 
-  try {
-    // We assume all impala processes are both server and client.
-    sasl::TSaslServer::SaslInit(&callbacks[0], appname);
-    sasl::TSaslClient::SaslInit(&callbacks[0]);
-  } catch (sasl::SaslServerImplException&  e) {
-    LOG(ERROR) << "Could not initialize Sasl library: " << e.what();
-    return Status(e.what());
+  // Only start Kinit thread  if we're the first initialisation of this auth provider
+  lock_guard<mutex> l(kinit_lock_);
+  if (kinit_thread_.get() == NULL) {
+    kinit_thread_.reset(
+        new Thread("authentication", "kinit", &KerberosAuthProvider::RunKinit, this));
   }
 
-  // Run kinit every hour or as configured till we exit.
-  thread krun(RunKinit);
   return Status::OK;
 }
 
-Status GetKerberosTransportFactory(const string& principal,
-   const string& key_tab_file, shared_ptr<TTransportFactory>* factory) {
-
-  // The "keytab" callback is never called.  Set the file name in the environment.
-  if (setenv("KRB5_KTNAME", key_tab_file.c_str(), 1)) {
-    string error_msg = GetStrErrMsg();
-    stringstream ss;
-    ss << "Kerberos could not set KRB5_KTNAME: " << error_msg;
-    LOG(ERROR) << ss;
-    return Status(ss.str());
-  }
-
+Status KerberosAuthProvider::GetServerTransportFactory(
+    shared_ptr<TTransportFactory>* factory) {
   // The string should be service/hostname@realm
   vector<string> names;
-  split(names, principal, is_any_of("/@"));
+  split(names, principal_, is_any_of("/@"));
 
   if (names.size() != 3) {
     stringstream ss;
     ss << "Kerberos principal should of the form: <service>/<hostname>@<realm> - got: "
-        << principal;
+       << principal_;
     LOG(ERROR) << ss.str();
     return Status(ss.str());
   }
 
-  // TODO: What properties do we support? In meantime we pass an empty map.
-  map<string, string> props;
-
   try {
+    // TSaslServerTransport::Factory doesn't actually do anything with the properties
+    // argument, so we pass in an empty map
+    map<string, string> sasl_props;
     factory->reset(new TSaslServerTransport::Factory(
-        KERBEROS_MECHANISM, names[0], names[1], 0, props, callbacks));
+        KERBEROS_MECHANISM, names[0], names[1], 0, sasl_props, SASL_CALLBACKS));
   } catch (TTransportException& e) {
-    LOG(ERROR) << "Kerberos transport factory failed: " << e.what();
+    LOG(ERROR) << "Failed to create a Kerberos transport factory: " << e.what();
     return Status(e.what());
   }
 
   return Status::OK;
 }
 
-Status GetTSaslClient(const string& hostname, shared_ptr<sasl::TSasl>* saslClient) {
+Status KerberosAuthProvider::WrapClientTransport(const string& hostname,
+    shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+  shared_ptr<sasl::TSasl> sasl_client;
   map<string, string> props;
   // We do not set this.
   string auth_id;
 
   try {
-    saslClient->reset(new sasl::TSaslClient(KERBEROS_MECHANISM,
-        auth_id, impala_service_name, hostname, props, &callbacks[0]));
+    sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id, service_name_,
+        hostname, props, &SASL_CALLBACKS[0]));
+  } catch (sasl::SaslClientImplException& e) {
+    LOG(ERROR) << "Failed to create a GSSAPI/SASL client: " << e.what();
+    return Status(e.what());
+  }
+
+  wrapped_transport->reset(new TSaslClientTransport(sasl_client, raw_transport));
+  return Status::OK;
+}
+
+Status LdapAuthProvider::GetServerTransportFactory(
+    shared_ptr<TTransportFactory>* factory) {
+  try {
+    // TSaslServerTransport::Factory doesn't actually do anything with the properties
+    // argument, so we pass in an empty map
+    map<string, string> sasl_props;
+    factory->reset(new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0,
+        sasl_props, SASL_CALLBACKS));
   } catch (sasl::SaslClientImplException& e) {
     LOG(ERROR) << "Kerberos client create failed: " << e.what();
     return Status(e.what());
   }
+  return Status::OK;
+}
+
+Status LdapAuthProvider::WrapClientTransport(const string& hostname,
+  shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+  *wrapped_transport = raw_transport;
+  return Status::OK;
+}
+
+Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* factory) {
+  factory->reset(new TBufferedTransportFactory());
+  return Status::OK;
+}
+
+Status NoAuthProvider::WrapClientTransport(const string& hostname,
+    shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+  *wrapped_transport = raw_transport;
+  return Status::OK;
+}
+
+Status AuthManager::Init() {
+  // If principal is set, client-side uses Kerberos. The same is true server-side *unless*
+  // --enable_ldap_auth is true. If neither are set, we use a NoAuthProvider for both.
+  if (FLAGS_enable_ldap_auth) {
+    client_auth_provider_.reset(new LdapAuthProvider());
+    RETURN_IF_ERROR(client_auth_provider_->Start());
+  }
+
+  if (!FLAGS_principal.empty()) {
+    server_auth_provider_.reset(
+        new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file));
+    RETURN_IF_ERROR(server_auth_provider_->Start());
+  } else {
+    server_auth_provider_.reset(new NoAuthProvider());
+    RETURN_IF_ERROR(server_auth_provider_->Start());
+  }
 
   return Status::OK;
+}
+
+AuthProvider* AuthManager::GetClientFacingAuthProvider() {
+  if (client_auth_provider_.get() != NULL) return client_auth_provider_.get();
+  return GetServerFacingAuthProvider();
+}
+
+AuthProvider* AuthManager::GetServerFacingAuthProvider() {
+  DCHECK(server_auth_provider_.get() != NULL);
+  return server_auth_provider_.get();
 }
 
 }

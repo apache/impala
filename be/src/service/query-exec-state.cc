@@ -475,7 +475,7 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
       catalog_update.db_name = finalize_params.table_db;
 
       ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-          FLAGS_catalog_service_port, ThriftServer::ThreadPool);
+          FLAGS_catalog_service_port, NULL, false, ThriftServer::ThreadPool);
       RETURN_IF_ERROR(client.Open());
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";

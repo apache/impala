@@ -41,6 +41,10 @@
 #include "exec/hdfs-table-sink.h"
 #include "exec/scan-node.h"
 #include "exprs/expr.h"
+#include "rpc/authentication.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-server.h"
+#include "rpc/thrift-thread.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/client-cache.h"
 #include "runtime/descriptors.h"
@@ -60,11 +64,9 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
-#include "rpc/thrift-util.h"
-#include "rpc/thrift-server.h"
-#include "rpc/thrift-thread.h"
 #include "util/url-coding.h"
 #include "util/webserver.h"
+
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
@@ -2022,8 +2024,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // TThreadPoolServer.
     shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
     *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
-        beeswax_port, exec_env->metrics(), FLAGS_fe_service_threads,
-        ThriftServer::ThreadPool);
+        beeswax_port, AuthManager::GetInstance()->GetClientFacingAuthProvider(),
+        exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     (*beeswax_server)->SetConnectionHandler(handler.get());
     if (!FLAGS_ssl_server_certificate.empty()) {
@@ -2040,7 +2042,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
     *hs2_server = new ThriftServer(HS2_SERVER_NAME, hs2_fe_processor, hs2_port,
-        exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+        AuthManager::GetInstance()->GetClientFacingAuthProvider(), exec_env->metrics(),
+        FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     (*hs2_server)->SetConnectionHandler(handler.get());
     if (!FLAGS_ssl_server_certificate.empty()) {
@@ -2054,8 +2057,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
 
   if (be_port != 0 && be_server != NULL) {
     shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(handler));
-    *be_server = new ThriftServer("backend", be_processor, be_port, exec_env->metrics(),
-        FLAGS_be_service_threads);
+    *be_server = new ThriftServer("backend", be_processor, be_port, NULL,
+        exec_env->metrics(), FLAGS_be_service_threads);
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
   }

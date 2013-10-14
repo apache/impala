@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
   shared_ptr<ThreadFactory> thread_factory(new ThriftThreadFactory("test", "test"));
   shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
   ThriftServer* server = new ThriftServer("Network Test Server", processor,
-      FLAGS_port, NULL, 100, ThriftServer::ThreadPool);
+      FLAGS_port, NULL, NULL, 100, ThriftServer::ThreadPool);
   thread* server_thread = new thread(&TestServer::Server, handler.get(), server);
 
   string input;

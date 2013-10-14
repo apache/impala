@@ -30,8 +30,8 @@
 
 #include "transport/TSaslClientTransport.h"
 #include "transport/TSasl.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
-#include "util/authorization.h"
 #include "gen-cpp/Types_types.h"
 
 DECLARE_string(principal);
@@ -87,25 +87,36 @@ class ThriftClientImpl {
 
 // Utility client to a Thrift server. The parameter type is the Thrift interface type that
 // the server implements.
+// TODO: Consider a builder class to make constructing this class easier.
 template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl {
  public:
-  // If ssl is true, the Thrift client will attempt to connect via SSL.
-  ThriftClient(const std::string& ipaddress, int port, bool ssl = false,
-      ThriftServer::ServerType server_type = ThriftServer::Threaded);
+  // Creates, but does not connect,  a new ThriftClient for a remote server.
+  //  - ipaddress: address of remote server
+  //  - port: port on which remote service runs
+  //  - auth_provider: Authentication scheme to use. If NULL, use the global default
+  //    client<->demon authentication scheme.
+  //  - ssl: if true, SSL is enabled on this connection
+  //  - server_type - the threading strategy employed by the remote server (used to choose
+  //    a correct transport). TODO: Consider removing.
+  ThriftClient(const std::string& ipaddress, int port, AuthProvider* auth_provider = NULL,
+      bool ssl = false, ThriftServer::ServerType server_type = ThriftServer::Threaded);
 
   // Returns the object used to actually make RPCs against the remote server
   InterfaceType* iface() { return iface_.get(); }
 
  private:
   boost::shared_ptr<InterfaceType> iface_;
+
+  AuthProvider* auth_provider_;
 };
 
 template <class InterfaceType>
 ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port,
-    bool ssl, ThriftServer::ServerType server_type)
+    AuthProvider* auth_provider, bool ssl, ThriftServer::ServerType server_type)
     : ThriftClientImpl(ipaddress, port, ssl),
-        iface_(new InterfaceType(protocol_)) {
+      iface_(new InterfaceType(protocol_)),
+      auth_provider_(auth_provider) {
 
   switch (server_type) {
     case ThriftServer::Nonblocking:
@@ -128,12 +139,12 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
       DCHECK(false);
       break;
   }
-  // Check to enable kerberos
-  if (!FLAGS_principal.empty()) {
-    GetTSaslClient(ipaddress_, &sasl_client_);
-    transport_.reset(new apache::thrift::transport::TSaslClientTransport(
-        sasl_client_, transport_));
+
+  if (auth_provider_ == NULL) {
+    auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
   }
+
+  auth_provider_->WrapClientTransport(ipaddress_, transport_, &transport_);
 
   protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
   iface_.reset(new InterfaceType(protocol_));

@@ -19,6 +19,8 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "codegen/llvm-codegen.h"
+#include "rpc/auth-provider.h"
+#include "rpc/thrift-server.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
@@ -27,12 +29,10 @@
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
 #include "runtime/raw-value.h"
-#include "util/authorization.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/thread.h"
-#include "rpc/thrift-server.h"
 #include "util/mem-info.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -501,9 +501,6 @@ TEST_F(DataStreamTest, BasicTest) {
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, true);
   impala::LlvmCodeGen::InitializeLlvm();
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("data-stream-test"));
-  }
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

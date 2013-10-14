@@ -87,7 +87,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
-    self.user = getpass.getuser()
+    self.user = options.user
     self.is_alive = True
     self.use_kerberos = options.use_kerberos
     self.verbose = options.verbose
@@ -108,6 +108,7 @@ class ImpalaShell(cmd.Cmd):
     self.show_profiles = options.show_profiles
     self.ssl_enabled = options.ssl
     self.ca_cert = options.ca_cert
+    self.use_ldap = options.use_ldap
     # Stores the state of user input until a delimiter is seen.
     self.partial_cmd = str()
     # Stores the old prompt while the user input is incomplete.
@@ -125,6 +126,10 @@ class ImpalaShell(cmd.Cmd):
       self.readline.set_history_length(HISTORY_LENGTH)
     except ImportError:
       self.__disable_readline()
+
+    if self.use_ldap:
+      self.ldap_password = getpass.getpass("LDAP password for %s:" % self.user)
+
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -496,17 +501,25 @@ class ImpalaShell(cmd.Cmd):
         sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=self.ca_cert)
     else:
       sock = TSocket(host, port)
-    if not self.use_kerberos:
+    if not (self.use_ldap or self.use_kerberos):
       return TBufferedTransport(sock)
     # Initializes a sasl client
     def sasl_factory():
       sasl_client = sasl.Client()
       sasl_client.setAttr("host", host)
-      sasl_client.setAttr("service", self.kerberos_service_name)
+      if self.use_ldap:
+        sasl_client.setAttr("username", self.user)
+        sasl_client.setAttr("password", self.ldap_password)
+      else:
+        sasl_client.setAttr("service", self.kerberos_service_name)
       sasl_client.init()
       return sasl_client
     # GSSASPI is the underlying mechanism used by kerberos to authenticate.
-    return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
+    if self.use_kerberos:
+      return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
+    else:
+      return TSaslClientTransport(sasl_factory, "PLAIN", sock)
+
 
   def __get_sleep_interval(self, start_time):
     """Returns a step function of time to sleep in seconds before polling
@@ -1068,6 +1081,11 @@ if __name__ == "__main__":
                     help="Refresh Impala catalog after connecting")
   parser.add_option("-d", "--database", dest="default_db", default=None,
                     help="Issue a use database command on startup.")
+  parser.add_option("-l", "--ldap", dest="use_ldap", default=False, action="store_true",
+                    help="Use LDAP to authenticate with Impala. Impala must be configured"
+                    " to allow LDAP authentication.")
+  parser.add_option("-u", "--user", dest="user", default=getpass.getuser(),
+                    help="User to authenticate with.")
   parser.add_option("--ssl", dest="ssl", default=False, action="store_true",
                     help="Connect to Impala via SSL-secured connection")
   parser.add_option("--ca_cert", dest="ca_cert", default=None, help=("Full path to "
@@ -1088,6 +1106,10 @@ if __name__ == "__main__":
     print VERSION_STRING
     sys.exit(0)
 
+  if options.use_kerberos and options.use_ldap:
+    print_to_stderr("Please specify at most one authentication mechanism (-k or -l)")
+    sys.exit(1)
+
   if options.use_kerberos:
     print_to_stderr("Starting Impala Shell using Kerberos authentication")
     print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
@@ -1100,8 +1122,10 @@ if __name__ == "__main__":
     except OSError, e:
       print_to_stderr('klist not found on the system, install kerberos clients')
       sys.exit(1)
+  elif options.use_ldap:
+    print_to_stderr("Starting Impala Shell using LDAP-based authentication")
   else:
-     print_to_stderr("Starting Impala Shell without Kerberos authentication")
+    print_to_stderr("Starting Impala Shell without Kerberos authentication")
 
   if options.ssl:
     try:

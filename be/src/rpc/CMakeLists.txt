@@ -19,6 +19,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 
 add_library(Rpc
+  authentication.cc
   thrift-util.cc
   thrift-client.cc
   thrift-server.cc
@@ -27,3 +28,4 @@ add_library(Rpc
 
 ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(thrift-server-test)
+ADD_BE_TEST(authentication-test)

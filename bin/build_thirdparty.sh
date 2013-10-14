@@ -191,10 +191,9 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SASL -eq 1 ]; then
     # Disable everything except those protocols needed -- currently just Kerberos.
     # Sasl does not have a --with-pic configuration.
     CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
-      --disable-digest --disable-sql --disable-cram --disable-ldap \
-      --disable-otp --with-saslauthd=no \
+      --disable-sql --disable-otp  --enable-ldapdb --with-ldap=/usr/ --with-saslauthd=no \
       --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
-      --enable-static --enable-staticdlopen
+      --enable-static --enable-staticdlopen --enable-alwaystrue
     # the first time you do a make it fails, ignore the error.
     (make || true)
     make install

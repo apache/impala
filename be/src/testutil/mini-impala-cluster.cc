@@ -23,13 +23,13 @@
 #include "common/init.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
-#include "service/fe-support.h"
-#include "service/impala-server.h"
-#include "util/authorization.h"
-#include "util/jni-util.h"
-#include "util/logging.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
+#include "service/fe-support.h"
+#include "service/impala-server.h"
+#include "util/jni-util.h"
+#include "util/logging.h"
 #include "testutil/in-process-servers.h"
 
 DEFINE_int32(num_backends, 3, "The number of backends to start");
@@ -56,11 +56,6 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(HBaseTableFactory::Init());
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
-
-  // Enable Kerberos security, if requested.
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("Impalad"));
-  }
 
   int base_be_port = FLAGS_be_port;
   int base_subscriber_port = 21500;

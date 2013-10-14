@@ -29,7 +29,7 @@ DECLARE_string(catalog_service_host);
 
 Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-      FLAGS_catalog_service_port, ThriftServer::ThreadPool);
+      FLAGS_catalog_service_port, NULL, ThriftServer::ThreadPool);
   switch (request.op_type) {
     case TCatalogOpType::DDL: {
       RETURN_IF_ERROR(client.Open());
@@ -42,7 +42,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
     }
     case TCatalogOpType::RESET_METADATA: {
       ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-          FLAGS_catalog_service_port, ThriftServer::ThreadPool);
+          FLAGS_catalog_service_port, NULL, ThriftServer::ThreadPool);
       TResetMetadataResponse response;
       catalog_update_result_.reset(new TCatalogUpdateResult());
       RETURN_IF_ERROR(client.Open());

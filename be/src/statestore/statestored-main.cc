@@ -46,10 +46,6 @@ int main(int argc, char** argv) {
   FLAGS_webserver_port = 25010;
   InitCommonRuntime(argc, argv, false);
 
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("StateStore"));
-  }
-
   MemTracker mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
 
@@ -74,7 +70,7 @@ int main(int argc, char** argv) {
       new StateStoreServiceProcessor(state_store.thrift_iface()));
 
   ThriftServer* server = new ThriftServer("StateStoreService", processor,
-                                          FLAGS_state_store_port, metrics.get(), 5);
+      FLAGS_state_store_port, NULL, metrics.get(), 5);
   EXIT_IF_ERROR(server->Start());
 
   state_store.MainLoop();

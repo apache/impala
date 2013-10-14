@@ -144,7 +144,7 @@ Status StateStoreSubscriber::Start() {
   // Backend must be started before registration
   shared_ptr<TProcessor> processor(new StateStoreSubscriberProcessor(thrift_iface_));
   heartbeat_server_.reset(new ThriftServer("StateStoreSubscriber", processor,
-                                           heartbeat_address_.port, NULL, 5));
+      heartbeat_address_.port, NULL, NULL, 5));
   heartbeat_server_->Start();
   Status status = Register();
   if (status.ok()) is_registered_ = true;

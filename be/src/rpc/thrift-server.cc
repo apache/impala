@@ -32,13 +32,12 @@
 #include <gflags/gflags.h>
 
 #include "gen-cpp/Types_types.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
-#include "util/authorization.h"
+#include "rpc/thrift-thread.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/uid-util.h"
-#include "rpc/thrift-thread.h"
-
 #include <sstream>
 
 using namespace std;
@@ -207,7 +206,7 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   TTransport* transport = input->getTransport().get();
   shared_ptr<ConnectionContext> connection_ptr =
       shared_ptr<ConnectionContext>(new ConnectionContext);
-  if (!thrift_server_->kerberos_enabled_) {
+  if (!thrift_server_->auth_provider_->is_sasl()) {
     switch (thrift_server_->server_type_) {
       case Nonblocking:
         socket = static_cast<TSocket*>(
@@ -282,7 +281,8 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 }
 
 ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& processor,
-    int port, Metrics* metrics, int num_worker_threads, ServerType server_type)
+    int port, AuthProvider* auth_provider, Metrics* metrics, int num_worker_threads,
+    ServerType server_type)
     : started_(false),
       port_(port),
       ssl_enabled_(false),
@@ -293,7 +293,10 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
       server_(NULL),
       processor_(processor),
       connection_handler_(NULL),
-      kerberos_enabled_(false) {
+      auth_provider_(auth_provider) {
+  if (auth_provider_ == NULL) {
+    auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
+  }
   if (metrics != NULL) {
     metrics_enabled_ = true;
     stringstream count_ss;
@@ -328,24 +331,6 @@ Status ThriftServer::CreateSocket(shared_ptr<TServerTransport>* socket) {
     socket->reset(new TServerSocket(port_));
     return Status::OK;
   }
-}
-
-Status ThriftServer::CreateTransportFactory(
-    shared_ptr<TTransportFactory>* transport_factory) {
-  if (!FLAGS_principal.empty()) {
-    if (FLAGS_keytab_file.empty()) {
-      LOG(ERROR) << "Kerberos principal, '" << FLAGS_principal <<
-          "' specified, but no keyfile";
-      return Status("no keyfile");
-    }
-    RETURN_IF_ERROR(GetKerberosTransportFactory(FLAGS_principal,
-            FLAGS_keytab_file, transport_factory));
-    kerberos_enabled_ = true;
-  } else {
-    transport_factory->reset(server_type_ == Nonblocking ?
-        new TTransportFactory() : new TBufferedTransportFactory());
-  }
-  return Status::OK;
 }
 
 Status ThriftServer::EnableSsl(const string& certificate, const string& private_key) {
@@ -391,7 +376,7 @@ Status ThriftServer::Start() {
   shared_ptr<TServerTransport> server_socket;
   shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
-  RETURN_IF_ERROR(CreateTransportFactory(&transport_factory));
+  RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
 
   if (server_type_ != Threaded) {
     thread_mgr = ThreadManager::newSimpleThreadManager(num_worker_threads_);

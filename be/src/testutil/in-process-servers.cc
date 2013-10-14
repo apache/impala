@@ -93,7 +93,7 @@ Status InProcessStateStore::Start() {
       new StateStoreServiceProcessor(state_store_->thrift_iface()));
 
   state_store_server_.reset(new ThriftServer("StateStoreService", processor,
-                                             state_store_port_, metrics_.get(), 5));
+          state_store_port_, NULL, metrics_.get(), 5));
   state_store_main_loop_.reset(
       new Thread("state-store", "main-loop", &StateStore::MainLoop, state_store_.get()));
 

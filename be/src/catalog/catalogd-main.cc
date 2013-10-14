@@ -24,9 +24,9 @@
 #include "util/jni-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
-#include "util/authorization.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 
@@ -50,11 +50,6 @@ int main(int argc, char** argv) {
   FLAGS_state_store_subscriber_port = 23020;
   InitCommonRuntime(argc, argv, true);
 
-  // Enable Kerberos security if requested.
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("Catalogd"));
-  }
-
   EXIT_IF_ERROR(JniUtil::Init());
 
   scoped_ptr<Webserver> webserver(new Webserver());
@@ -77,7 +72,7 @@ int main(int argc, char** argv) {
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
 
   ThriftServer* server = new ThriftServer("CatalogService", processor,
-                                          FLAGS_catalog_service_port, metrics.get(), 5);
+      FLAGS_catalog_service_port, NULL, metrics.get(), 5);
   EXIT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();

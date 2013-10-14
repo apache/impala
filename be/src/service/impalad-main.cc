@@ -67,11 +67,6 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 
-  // Enable Kerberos security if requested.
-  if (!FLAGS_principal.empty()) {
-    EXIT_IF_ERROR(InitKerberos("Impalad"));
-  }
-
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
   StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver());

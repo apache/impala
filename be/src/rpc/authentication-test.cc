@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+#include "rpc/authentication.h"
 #include "util/network-util.h"
-#include "util/authorization.h"
-#include "common/init.h"
 #include "util/logging.h"
+#include "util/thread.h"
 
 using namespace std;
 
@@ -24,20 +24,32 @@ DECLARE_string(principal);
 
 namespace impala {
 
-TEST(KerberosTest, PrincipalSubstitution) {
-  FLAGS_principal = "username/_HOST";
-  // Warning: this kicks off a kinit thread
-  EXPECT_TRUE(InitKerberos("test-app").ok());
+class AuthTest : public ::testing::Test {
+ public:
+  static void SetUpTestCase() {
+    FLAGS_principal = "username/_HOST";
+    // Warning: this kicks off a kinit thread
+    EXPECT_TRUE(InitAuth("test").ok());
+  }
+};
+
+TEST_F(AuthTest, PrincipalSubstitution) {
   string hostname;
   EXPECT_TRUE(GetHostname(&hostname).ok());
   EXPECT_EQ(string::npos, FLAGS_principal.find("_HOST"));
   EXPECT_NE(string::npos, FLAGS_principal.find(hostname));
 }
 
+TEST_F(AuthTest, ValidAuthProviders) {
+  ASSERT_TRUE(AuthManager::GetInstance()->GetClientFacingAuthProvider() != NULL);
+  ASSERT_TRUE(AuthManager::GetInstance()->GetServerFacingAuthProvider() != NULL);
+}
+
 }
 
 int main(int argc, char** argv) {
+  impala::InitGoogleLoggingSafe(argv[0]);
+  impala::InitThreading();
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false);
   return RUN_ALL_TESTS();
 }
