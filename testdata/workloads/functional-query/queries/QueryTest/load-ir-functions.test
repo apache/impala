@@ -77,7 +77,7 @@ symbol='_Z6VarSumPN10impala_udf15FunctionContextEiPKNS_6IntValE';
 create function udf_test.var_sum(double...) returns double
 location '/test-warehouse/test-udfs.ll' symbol='VarSum';
 
-create function udf_test.var_sum(string...) returns string
+create function udf_test.var_sum(string...) returns int
 location '/test-warehouse/test-udfs.ll' symbol='VarSum';
 
 create function udf_test.var_sum_multiply(double, int...) returns double

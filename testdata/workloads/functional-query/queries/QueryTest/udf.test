@@ -260,9 +260,9 @@ double
 ---- QUERY
 select udf_test.var_sum("Hello", "World", "Foo", "Bar")
 ---- TYPES
-string
+int
 ---- RESULT
-'HelloWorldFooBar'
+16
 ====
 ---- QUERY
 select tinyint_col, int_col, udf_test.var_sum(tinyint_col, int_col)

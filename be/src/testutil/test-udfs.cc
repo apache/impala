@@ -84,23 +84,15 @@ DoubleVal VarSum(FunctionContext* context, int n, const DoubleVal* args) {
   return DoubleVal(result);
 }
 
-StringVal VarSum(FunctionContext* context, int n, const StringVal* args) {
+// TODO: have this return a StringVal (make sure not to use functions defined in other
+// compilation units, or change how this is built).
+IntVal VarSum(FunctionContext* context, int n, const StringVal* args) {
   int total_len = 0;
-  bool is_null = true;
   for (int i = 0; i < n; ++i) {
     if (args[i].is_null) continue;
     total_len += args[i].len;
-    is_null = false;
   }
-  if (is_null) return StringVal::null();
-  StringVal result(context, total_len);
-  int offset = 0;
-  for (int i = 0; i < n; ++i) {
-    if (args[i].is_null) continue;
-    memcpy(result.ptr + offset, args[i].ptr, args[i].len);
-    offset += args[i].len;
-  }
-  return result;
+  return IntVal(total_len);
 }
 
 DoubleVal VarSumMultiply(FunctionContext* context,
