@@ -185,7 +185,7 @@ Status Webserver::Start() {
       return Status(ss.str());
     }
     LOG(INFO) << "Webserver: Password file is " << FLAGS_webserver_password_file;
-    options.push_back("global_passwords_file");
+    options.push_back("global_auth_file");
     options.push_back(FLAGS_webserver_password_file.c_str());
   }
 
