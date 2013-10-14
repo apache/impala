@@ -47,6 +47,7 @@ Status SelectNode::Open(RuntimeState* state) {
 Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_)) {
@@ -60,7 +61,6 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
   while (true) {
     if (child_row_idx_ == child_row_batch_->num_rows()) {
       // fetch next batch
-      RETURN_IF_CANCELLED(state);
       child_row_batch_->Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, child_row_batch_.get(), &child_eos_));
       child_row_idx_ = 0;

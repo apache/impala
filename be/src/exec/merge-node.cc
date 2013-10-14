@@ -79,6 +79,7 @@ Status MergeNode::Open(RuntimeState* state) {
 Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
@@ -103,7 +104,6 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   while (child_idx_ < children_.size()) {
     // Row batch was either never set or we're moving on to a different child.
     if (child_row_batch_.get() == NULL) {
-      RETURN_IF_CANCELLED(state);
       child_row_batch_.reset(new RowBatch(
           child(child_idx_)->row_desc(), state->batch_size(), mem_tracker()));
       // Open child and fetch the first row batch.
@@ -127,7 +127,6 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
       // Fetch new batch if one is available, otherwise move on to next child.
       if (child_eos_) break;
-      RETURN_IF_CANCELLED(state);
       child_row_batch_->Reset();
       RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
           &child_eos_));

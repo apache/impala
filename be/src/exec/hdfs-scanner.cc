@@ -149,7 +149,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   }
 
   if (context_->cancelled()) return Status::CANCELLED;
-  RETURN_IF_MEM_LIMIT_EXCEEDED(state_);
+  RETURN_IF_ERROR(state_->CheckQueryState());
   return Status::OK;
 }
 

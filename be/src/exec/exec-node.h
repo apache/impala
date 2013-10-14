@@ -21,7 +21,6 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
-#include "runtime/mem-tracker.h"  // used in RETURN_IF_MEM_LIMIT_EXCEEDED()
 #include "util/runtime-profile.h"
 #include "util/blocking-queue.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -249,14 +248,6 @@ class ExecNode {
   // Appends option to 'runtime_exec_options_'
   void AddRuntimeExecOption(const std::string& option);
 };
-
-#define RETURN_IF_MEM_LIMIT_EXCEEDED(state) \
-  do { \
-    if (UNLIKELY((state)->instance_mem_tracker()->AnyLimitExceeded())) { \
-      state->LogMemLimitExceeded(); \
-      return Status::MEM_LIMIT_EXCEEDED; \
-    } \
-  } while (false)
 
 }
 #endif

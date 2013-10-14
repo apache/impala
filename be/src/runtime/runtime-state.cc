@@ -72,6 +72,7 @@ RuntimeState::RuntimeState(const string& now, const string& user)
 }
 
 RuntimeState::~RuntimeState() {
+  if (udf_pool_.get() != NULL) udf_pool_->FreeAll();
 }
 
 Status RuntimeState::Init(
@@ -155,11 +156,13 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
   file_errors_.push_back(make_pair(file_name, num_errors));
 }
 
-void RuntimeState::LogError(const string& error) {
+bool RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
   if (error_log_.size() < query_options_.max_errors) {
     error_log_.push_back(error);
+    return true;
   }
+  return false;
 }
 
 void RuntimeState::LogError(const Status& status) {
@@ -188,5 +191,17 @@ void RuntimeState::LogMemLimitExceeded() {
   ss << "Memory Limit Exceeded\n" << query_mem_tracker->LogUsage();
   LogError(ss.str());
 }
+
+Status RuntimeState::CheckQueryState() {
+  // TODO: it would be nice if this also checked for cancellation, but doing so breaks
+  // cases where we use Status::CANCELLED to indicate that the limit was reached.
+  if (instance_mem_tracker_->AnyLimitExceeded()) {
+    LogMemLimitExceeded();
+    return Status::MEM_LIMIT_EXCEEDED;
+  }
+  boost::lock_guard<boost::mutex> l(query_status_lock_);
+  return query_status_;
+}
+
 
 }

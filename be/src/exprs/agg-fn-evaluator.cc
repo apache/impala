@@ -80,7 +80,7 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   DCHECK(output_slot_desc != NULL);
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
-  ctx_.reset(FunctionContextImpl::CreateContext(pool));
+  ctx_.reset(FunctionContextImpl::CreateContext(state, pool));
 
   RETURN_IF_ERROR(Expr::Prepare(input_exprs_, state, desc, false));
 

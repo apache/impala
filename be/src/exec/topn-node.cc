@@ -72,6 +72,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
 Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(child(0)->Open(state));
 
@@ -80,7 +81,6 @@ Status TopNNode::Open(RuntimeState* state) {
     RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
     bool eos;
     do {
-      RETURN_IF_CANCELLED(state);
       batch.Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
       if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
@@ -89,7 +89,7 @@ Status TopNNode::Open(RuntimeState* state) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         InsertTupleRow(batch.GetRow(i));
       }
-      RETURN_IF_MEM_LIMIT_EXCEEDED(state);
+      RETURN_IF_ERROR(state->CheckQueryState());
     } while (!eos);
   }
   DCHECK_LE(priority_queue_->size(), limit_);
@@ -100,6 +100,7 @@ Status TopNNode::Open(RuntimeState* state) {
 Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
     int row_idx = row_batch->AddRow();

@@ -110,6 +110,18 @@ DoubleVal VarSumMultiply(FunctionContext* context,
   return DoubleVal(result * d.val);
 }
 
+BooleanVal TestError(FunctionContext* context) {
+  context->SetError("test UDF error");
+  context->SetError("this shouldn't show up");
+  return BooleanVal(false);
+}
+
+BooleanVal TestWarnings(FunctionContext* context) {
+  context->AddWarning("test UDF warning 1");
+  context->AddWarning("test UDF warning 2");
+  return BooleanVal(false);
+}
+
 // Dummy functions to test ddl.
 IntVal Fn(FunctionContext*) { return IntVal::null(); }
 IntVal Fn(FunctionContext*, const IntVal&) { return IntVal::null(); }

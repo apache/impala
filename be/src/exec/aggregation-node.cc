@@ -149,6 +149,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   while (true) {
     bool eos;
     RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(state->CheckQueryState());
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     SCOPED_TIMER(build_timer_);
 
@@ -172,7 +173,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     num_input_rows += batch.num_rows();
 
     batch.Reset();
-    RETURN_IF_MEM_LIMIT_EXCEEDED(state);
+    RETURN_IF_ERROR(state->CheckQueryState());
     if (eos) break;
   }
 
@@ -189,6 +190,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(get_results_timer_);
 

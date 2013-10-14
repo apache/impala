@@ -20,7 +20,7 @@
 #include <memory>
 #include <stdint.h>
 
-#include <boost/unordered_set.hpp>
+#include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>

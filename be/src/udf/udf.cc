@@ -14,6 +14,7 @@
 
 #include "udf/udf.h"
 #include <iostream>
+#include <sstream>
 #include <assert.h>
 
 // Be careful what this includes since this needs to be linked into the UDF's
@@ -36,9 +37,21 @@ class MemPool {
     return NULL;
   }
 };
+
+class RuntimeState {
+ public:
+  void set_query_status(const std::string& error_msg) {
+    assert(false);
+  }
+  bool LogError(const std::string& error) {
+    assert(false);
+    return false;
+  }
+};
 }
 #else
 #include "runtime/mem-pool.h"
+#include "runtime/runtime-state.h"
 #endif
 
 using namespace impala;
@@ -50,6 +63,7 @@ static const int MAX_WARNINGS = 1000;
 FunctionContext* FunctionContext::CreateTestContext() {
   FunctionContext* context = new FunctionContext;
   context->impl()->debug_ = true;
+  context->impl()->state_ = NULL;
   context->impl()->pool_ = NULL;
   return context;
 }
@@ -62,9 +76,6 @@ FunctionContext::~FunctionContext() {
   // in the uda harness now.
   impl_->CheckLocalAlloctionsEmpty();
   impl_->CheckAllocationsEmpty();
-  if (has_error()) {
-    cerr << "FunctionContext ran into error: " << error_msg() << endl;
-  }
   delete impl_;
 }
 
@@ -129,14 +140,22 @@ void FunctionContext::Free(int64_t bytes) {
 void FunctionContext::SetError(const char* error_msg) {
   if (impl_->error_msg_.empty()) {
     impl_->error_msg_ = error_msg;
+    stringstream ss;
+    ss << "UDF ERROR: " << error_msg;
+    if (impl_->state_ != NULL) impl_->state_->set_query_status(ss.str());
   }
 }
 
 bool FunctionContext::AddWarning(const char* warning_msg) {
-  ++impl_->num_warnings_;
-  if (impl_->warning_msgs_.size() >= MAX_WARNINGS) return false;
-  impl_->warning_msgs_.push_back(warning_msg);
-  return true;
+  if (impl_->num_warnings_++ >= MAX_WARNINGS) return false;
+  stringstream ss;
+  ss << "UDF WARNING: " << warning_msg;
+  if (impl_->state_ != NULL) {
+    return impl_->state_->LogError(ss.str());
+  } else {
+    cerr << ss.str() << endl;
+    return true;
+  }
 }
 
 uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {

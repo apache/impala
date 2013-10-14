@@ -33,7 +33,6 @@ using namespace std;
 
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
-    udf_context_(FunctionContextImpl::CreateContext()),
     udf_type_(node.udf_call_expr.binary_type),
     hdfs_location_(node.udf_call_expr.binary_location),
     symbol_name_(node.udf_call_expr.symbol_name),
@@ -136,6 +135,9 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
 
 Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
+
+  // TODO: this should come from the ExprContext
+  udf_context_.reset(FunctionContextImpl::CreateContext(state, state->udf_pool()));
 
   if (vararg_start_idx_ != -1) {
     // Allocate a scratch buffer for all the variable args.

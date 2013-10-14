@@ -172,12 +172,13 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(state->CheckQueryState());
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
-    RETURN_IF_MEM_LIMIT_EXCEEDED(state);
+    RETURN_IF_ERROR(state->CheckQueryState());
 
     // Call codegen version if possible
     if (process_build_batch_fn_ == NULL) {
@@ -198,8 +199,9 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
 
 Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   eos_ = false;
 
@@ -257,6 +259,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     *eos = true;

@@ -67,9 +67,6 @@ class FunctionContext {
   // Returns the version of Impala that's currently running.
   ImpalaVersion version() const;
 
-  // Returns the type of the i-th input argument (0 indexed).
-  Type GetArgType(int i) const;
-
   // Sets an error for this UDF. If this is called, this will trigger the
   // query to fail.
   void SetError(const char* error_msg);

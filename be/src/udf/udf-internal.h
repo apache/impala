@@ -26,6 +26,7 @@
 namespace impala {
 
 class MemPool;
+class RuntimeState;
 
 // This class actually implements the interface of FunctionContext. This is split to
 // hide the details from the external header.
@@ -33,8 +34,9 @@ class MemPool;
 class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
-  static impala_udf::FunctionContext* CreateContext(MemPool* pool = NULL) {
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool) {
     impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
+    ctx->impl_->state_ = state;
     ctx->impl_->pool_ = pool;
     return ctx;
   }
@@ -63,8 +65,12 @@ class FunctionContextImpl {
   // Parent context object. Not owned
   impala_udf::FunctionContext* context_;
 
-  // Pool to service allocations from.
+  // Pool to service allocations from. NULL for test contexts.
   MemPool* pool_;
+
+  // We use the query's runtime state to report errors and warnings. NULL for test
+  // contexts.
+  RuntimeState* state_;
 
   // If true, indicates this is a debug context which will do additional validation.
   bool debug_;
@@ -76,9 +82,6 @@ class FunctionContextImpl {
 
   // The number of warnings reported.
   int64_t num_warnings_;
-
-  // Stores the first num_warnings_ reported.
-  std::vector<std::string> warning_msgs_;
 
   std::map<uint8_t*, int> allocations_;
   std::vector<uint8_t*> local_allocations_;

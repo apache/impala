@@ -29,6 +29,8 @@
 
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
@@ -45,7 +47,6 @@ class ExecEnv;
 class Expr;
 class LlvmCodeGen;
 class TimestampValue;
-class MemTracker;
 class DataStreamRecvr;
 
 // Counts how many rows an INSERT query has added to a particular partition
@@ -131,6 +132,13 @@ class RuntimeState {
   // on first use.
   Status CreateCodegen();
 
+  Status query_status() { 
+    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    return query_status_;
+  };
+
+  MemPool* udf_pool() { return udf_pool_.get(); };
+
   // Create and return a stream receiver for fragment_instance_id_
   // from the data stream manager. The receiver is added to data_stream_recvrs_pool_.
   DataStreamRecvr* CreateRecvr(
@@ -139,10 +147,15 @@ class RuntimeState {
 
   void SetInstanceMemTracker(MemTracker* tracker) {
     instance_mem_tracker_ = tracker;
+
+    // TODO: this is a stopgap until we implement ExprContext
+    udf_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, "UDFs", tracker));
+    udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
   }
 
-  // Appends error to the error_log_ if there is space
-  void LogError(const std::string& error);
+  // Appends error to the error_log_ if there is space. Returns true if there was space
+  // and the error was logged.
+  bool LogError(const std::string& error);
 
   // If !status.ok(), appends the error to the error_log_
   void LogError(const Status& status);
@@ -185,6 +198,18 @@ class RuntimeState {
   RuntimeProfile::Counter* total_network_wait_timer() {
     return total_network_wait_timer_;
   }
+
+  // Sets query_status_ with err_msg if no error has been set yet.
+  void set_query_status(const std::string& err_msg) {
+    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    if (!query_status_.ok()) return;
+    query_status_ = Status(err_msg);
+  }
+
+  // Returns a non-OK status if query execution should stop (e.g., the query was cancelled
+  // or a mem limit was exceeded). Exec nodes should check this periodically so execution
+  // doesn't continue if the query terminates abnormally.
+  Status CheckQueryState();
 
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
@@ -254,7 +279,7 @@ class RuntimeState {
   // Total time waiting in network (across all threads)
   RuntimeProfile::Counter* total_network_wait_timer_;
 
-  // Fragment instance memory tracker.  Also contained in mem_trackers_
+  // Fragment instance memory tracker.
   MemTracker* instance_mem_tracker_;
 
   // if true, execution should stop with a CANCELLED status
@@ -263,6 +288,17 @@ class RuntimeState {
   // if true, execution should stop with MEM_LIMIT_EXCEEDED
   boost::mutex mem_limit_exceeded_lock_;
   bool is_mem_limit_exceeded_;
+
+  // Non-OK if an error has occurred and query execution should abort. Used only for
+  // asynchronously reporting such errors (e.g., when a UDF reports an error), so this
+  // will not necessarily be set in all error cases.
+  boost::mutex query_status_lock_;
+  Status query_status_;
+
+  // Memory tracker and pool for UDFs
+  // TODO: this is a stopgap until we implement ExprContext
+  boost::scoped_ptr<MemTracker> udf_mem_tracker_;
+  boost::scoped_ptr<MemPool> udf_pool_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);
