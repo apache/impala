@@ -122,6 +122,9 @@ void LibCache::RemoveEntry(const std::string hdfs_lib_file) {
 
   // We have both locks now so no other thread can be updating lib_cache_
   // or trying to get the entry.
+
+  // Get the entry before removing the iterator.
+  LibCacheEntry* entry = it->second;
   lib_cache_.erase(it);
 
   // Now that the entry is removed from the map, it means no future threads
@@ -129,7 +132,7 @@ void LibCache::RemoveEntry(const std::string hdfs_lib_file) {
   entry_lock.unlock();
 
   // Now that we've unlocked, we can delete this entry.
-  delete it->second;
+  delete entry;
 }
 
 void LibCache::DropCache() {
