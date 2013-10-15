@@ -78,7 +78,7 @@ import com.google.common.collect.Lists;
 @SuppressWarnings("restriction")
 public class UdfExecutorTest {
   private final String HIVE_BUILTIN_JAR = System.getenv("HIVE_HOME") + "/" +
-      "lib/hive-builtins-" + System.getenv("IMPALA_HIVE_VERSION") + ".jar";
+      "lib/hive-exec-" + System.getenv("IMPALA_HIVE_VERSION") + ".jar";
 
   // Allocations from the native heap. These are freed in bulk.
   ArrayList<Long> allocations_ = Lists.newArrayList();
