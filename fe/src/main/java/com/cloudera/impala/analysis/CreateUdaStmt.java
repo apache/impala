@@ -146,7 +146,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
             uda_.getSerializeFnName(), null, false, intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.SERIALIZE_FN) != null) {
-          reportSymbolNotFound(uda_.getSerializeFnName());
+          throw e;
         } else {
           // Ignore, these symbols are optional.
           uda_.setSerializeFnName(null);
@@ -159,7 +159,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
             uda_.getFinalizeFnName(), null, false, intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.FINALIZE_FN) != null) {
-          reportSymbolNotFound(uda_.getFinalizeFnName());
+          throw e;
         } else {
           // Ignore, these symbols are optional.
           uda_.setFinalizeFnName(null);
