@@ -96,14 +96,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
           runtime_state_->resource_pool()));
-
-  // Reserve one main thread from the pool
-  runtime_state_->resource_pool()->AcquireThreadToken();
-  has_thread_token_ = true;
-
-  average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
-      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
-          runtime_state_->resource_pool()));
   mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
       TCounterType::BYTES,
       bind<int64_t>(mem_fn(&MemTracker::consumption),
