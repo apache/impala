@@ -100,10 +100,6 @@ do
   cd $IMPALA_FE_DIR
   mvn test
 
-  # TODO: The process failure tests need to be updated to work with the CatalogService.
-  # this requires adjusting the timeout values and making changes to the ImpalaService()
-  # class. Disable them for now.
-  #${IMPALA_HOME}/tests/run-process-failure-tests.sh
-
-
+  # Finally, run the process failure tests.
+  ${IMPALA_HOME}/tests/run-process-failure-tests.sh
 done

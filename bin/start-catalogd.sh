@@ -43,4 +43,4 @@ do
 done
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/catalog/catalogd -statestore_subscriber_timeout_seconds=120 ${CATALOGD_ARGS}
+exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/catalog/catalogd ${CATALOGD_ARGS}

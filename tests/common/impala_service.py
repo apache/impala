@@ -170,8 +170,8 @@ class StateStoredService(BaseImpalaService):
   def __init__(self, hostname, webserver_port):
     super(StateStoredService, self).__init__(hostname, webserver_port)
 
-  def wait_for_live_backends(self, num_backends, timeout=15, interval=1):
-    self.wait_for_metric_value('statestore.live-backends', num_backends,
+  def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
+    self.wait_for_metric_value('statestore.live-backends', num_subscribers,
                                timeout=timeout, interval=interval)
 
 

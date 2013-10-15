@@ -179,18 +179,20 @@ def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
     wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
 
 def wait_for_catalog(impalad, timeout_in_seconds):
-  """Waits for the impalad catalog to become ready (contains at least 1 database)"""
+  """Waits for the impalad catalog to become ready"""
   start_time = time()
-  num_dbs = 0
-  while (time() - start_time < timeout_in_seconds and not num_dbs):
+  catalog_ready = False
+  while (time() - start_time < timeout_in_seconds and not catalog_ready):
     try:
       num_dbs = impalad.service.get_metric_value('catalog.num-databases')
       num_tbls = impalad.service.get_metric_value('catalog.num-tables')
-      print 'Waiting for Catalog... Status: %s DBs / %s tables' % (num_dbs, num_tbls)
-      sleep(2)
+      catalog_ready = impalad.service.get_metric_value('catalog.ready')
+      print 'Waiting for Catalog... Status: %s DBs / %s tables (ready=%s)' %\
+          (num_dbs, num_tbls, catalog_ready)
     except Exception, e:
       print e
-  if not num_dbs:
+    sleep(1)
+  if not catalog_ready:
     raise RuntimeError, 'Catalog was not initialized in expected time period.'
 
 def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
