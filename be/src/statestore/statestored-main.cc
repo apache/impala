@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("StateStoreService", processor,
                                           FLAGS_state_store_port, metrics.get(), 5);
-  server->Start();
+  EXIT_IF_ERROR(server->Start());
 
   state_store.MainLoop();
 }

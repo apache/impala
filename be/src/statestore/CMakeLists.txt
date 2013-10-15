@@ -32,3 +32,4 @@ target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 # Disabled pending state-store rewrite
 # ADD_BE_TEST(state-store-2.0-test)
 ADD_BE_TEST(simple-scheduler-test)
+ADD_BE_TEST(state-store-test)

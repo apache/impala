@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("CatalogService", processor,
                                           FLAGS_catalog_service_port, metrics.get(), 5);
-  server->Start();
+  EXIT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();
 }

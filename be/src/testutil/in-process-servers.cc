@@ -97,6 +97,6 @@ Status InProcessStateStore::Start() {
   state_store_main_loop_.reset(
       new Thread("state-store", "main-loop", &StateStore::MainLoop, state_store_.get()));
 
-  state_store_server_->Start();
+  RETURN_IF_ERROR(state_store_server_->Start());
   return WaitForServer("localhost", state_store_port_, 10, 100);
 }
