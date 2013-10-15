@@ -18,6 +18,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 
@@ -63,6 +64,8 @@ import org.apache.hadoop.hive.ql.udf.UDFTan;
 import org.apache.hadoop.hive.ql.udf.UDFTrim;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
 import org.apache.hadoop.hive.ql.udf.UDFUpper;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
 
@@ -202,11 +205,29 @@ public class UdfExecutorTest {
     }
 
     UdfExecutor e = new UdfExecutor(jar, c.getName(), expectedType, argTypes);
+    Method method = e.getMethod();
+    Object[] inputArgs = new Object[args.length];
+    for (int i = 0; i < args.length; ++i) {
+      if (args[i] instanceof String) {
+        // For authoring the test, we'll just pass string and make the proper
+        // object here.
+        if (method.getParameterTypes()[i] == Text.class) {
+          inputArgs[i] = createText((String)args[i]);
+        } else if (method.getParameterTypes()[i] == BytesWritable.class) {
+          inputArgs[i] = createBytes((String)args[i]);
+        } else {
+          Preconditions.checkState(method.getParameterTypes()[i] == String.class);
+          inputArgs[i] = args[i];
+        }
+      } else {
+        inputArgs[i] = args[i];
+      }
+    }
 
     // Run the executor a few times to make sure nothing gets messed up
     // between runs.
     for (int i = 0; i < 10; ++i) {
-      long r = e.evaluate(args);
+      long r = e.evaluate(inputArgs);
       if (validate) {
         switch (expectedType) {
           case BOOLEAN: {
@@ -263,14 +284,14 @@ public class UdfExecutorTest {
     TestUdf(jar, c, expectedValue, getType(expectedValue), true, args);
   }
 
-  void TestHiveUdf(Class<?> c, Writable expectedValue, boolean validate, Object... args)
-    throws MalformedURLException, ImpalaRuntimeException {
-    TestUdf(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), validate, args);
-  }
-
   void TestHiveUdf(Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
     TestUdf(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args);
+  }
+
+  void TestHiveUdfNoValidate(Class<?> c, Writable expectedValue, Object... args)
+      throws MalformedURLException, ImpalaRuntimeException {
+    TestUdf(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args);
   }
 
   @Test
@@ -281,8 +302,8 @@ public class UdfExecutorTest {
       throws ImpalaRuntimeException, MalformedURLException {
     TestHiveUdf(UDFRound.class, createDouble(1), createDouble(1.23));
     TestHiveUdf(UDFRound.class, createDouble(1.23), createDouble(1.234), createInt(2));
-    TestHiveUdf(UDFRand.class, createDouble(0), false);
-    TestHiveUdf(UDFRand.class, createDouble(0), false, createBigInt(10));
+    TestHiveUdfNoValidate(UDFRand.class, createDouble(0));
+    TestHiveUdfNoValidate(UDFRand.class, createDouble(0), createBigInt(10));
     TestHiveUdf(UDFFloor.class, createBigInt(1), createDouble(1.5));
     TestHiveUdf(UDFCeil.class, createBigInt(2), createDouble(1.5));
     TestHiveUdf(UDFExp.class, createDouble(Math.exp(10)), createDouble(10));
@@ -316,10 +337,10 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFHex.class, createBytes("1F4"), createBigInt(500));
     TestHiveUdf(UDFHex.class, createBytes("3E8"), createBigInt(1000));
 
-    TestHiveUdf(UDFHex.class, createText("31303030"), createText("1000"));
-    TestHiveUdf(UDFUnhex.class, createText("aAzZ"), createText("61417A5A"));
+    TestHiveUdf(UDFHex.class, createText("31303030"), "1000");
+    TestHiveUdf(UDFUnhex.class, createText("aAzZ"), "61417A5A");
     TestHiveUdf(UDFConv.class, createText("1111011"),
-        createText("123"), createInt(10), createInt(2));
+        "123", createInt(10), createInt(2));
     TestHiveUdf(UDFRound.class, createDouble(1), createDouble(1.23));
     freeAllocations();
   }
@@ -328,24 +349,21 @@ public class UdfExecutorTest {
   // Tests all the hive string UDFs. We are not testing for correctness of the UDFs
   // so it is sufficient to just cover the types.
   public void HiveStringsTest() throws ImpalaRuntimeException, MalformedURLException {
-    TestHiveUdf(UDFAscii.class, createInt('1'), createText("123"));
-    TestHiveUdf(UDFFindInSet.class, createInt(2),
-        createText("31"), createText("12,31,23"));
+    TestHiveUdf(UDFAscii.class, createInt('1'), "123");
+    TestHiveUdf(UDFFindInSet.class, createInt(2), "31", "12,31,23");
     TestHiveUdf(UDFLength.class, createInt(5), createText("Hello"));
-    TestHiveUdf(UDFLower.class, createText("foobar"), createText("FOOBAR"));
-    TestHiveUdf(UDFLpad.class, createText("foobar"),
-        createText("bar"), createInt(6), createText("foo"));
+    TestHiveUdf(UDFLower.class, createText("foobar"), "FOOBAR");
+    TestHiveUdf(UDFLpad.class, createText("foobar"), "bar", createInt(6), "foo");
     TestHiveUdf(UDFLTrim.class, createText("foobar  "), createText("  foobar  "));
-    TestHiveUdf(UDFRepeat.class, createText("abcabc"), createText("abc"), createInt(2));
-    TestHiveUdf(UDFReverse.class, createText("cba"), createText("abc"));
-    TestHiveUdf(UDFRpad.class, createText("foo"),
-        createText("foo"), createInt(3), createText("bar"));
-    TestHiveUdf(UDFRTrim.class, createText("  foobar"), createText("  foobar  "));
+    TestHiveUdf(UDFRepeat.class, createText("abcabc"), "abc", createInt(2));
+    TestHiveUdf(UDFReverse.class, createText("cba"), "abc");
+    TestHiveUdf(UDFRpad.class, createText("foo"), "foo", createInt(3), "bar");
+    TestHiveUdf(UDFRTrim.class, createText("  foobar"), "  foobar  ");
     TestHiveUdf(UDFSpace.class, createText("    "), createInt(4));
     TestHiveUdf(UDFSubstr.class, createText("World"),
-        createText("HelloWorld"), createInt(6), createInt(5));
-    TestHiveUdf(UDFTrim.class, createText("foobar"), createText("  foobar  "));
-    TestHiveUdf(UDFUpper.class, createText("FOOBAR"), createText("foobar"));
+        "HelloWorld", createInt(6), createInt(5));
+    TestHiveUdf(UDFTrim.class, createText("foobar"), "  foobar  ");
+    TestHiveUdf(UDFUpper.class, createText("FOOBAR"), "foobar");
     freeAllocations();
   }
 
@@ -359,7 +377,7 @@ public class UdfExecutorTest {
     TestUdf(null, TestUdf.class, createBigInt(1), createBigInt(1));
     TestUdf(null, TestUdf.class, createFloat(1.1f), createFloat(1.1f));
     TestUdf(null, TestUdf.class, createDouble(1.1), createDouble(1.1));
-    TestUdf(null, TestUdf.class, createBytes("ABCD"), createBytes("ABCD"));
+    TestUdf(null, TestUdf.class, createBytes("ABCD"), "ABCD");
     TestUdf(null, TestUdf.class, createDouble(3),
         createDouble(1), createDouble(2));
     freeAllocations();

@@ -221,6 +221,8 @@ public class UdfExecutor {
     }
   }
 
+  public Method getMethod() { return method_; }
+
   // Returns the primitive type that c is for. 'c' is expected to be
   // a subclass of Writable. This is a many to one mapping: e.g. many
   // writables map to the same type.
@@ -241,6 +243,9 @@ public class UdfExecutor {
     } else if (c == DoubleWritable.class) {
       return PrimitiveType.DOUBLE;
     } else if (c == BytesWritable.class || c == Text.class || c == String.class) {
+      // TODO: we don't distinguish between these types and will pick between them
+      // arbitrarily. This can be problematic, if for example, the UDF has different
+      // behavior for Bytes vs. Text.
       return PrimitiveType.STRING;
     }
     return PrimitiveType.INVALID_TYPE;
