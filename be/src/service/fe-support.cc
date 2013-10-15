@@ -57,7 +57,8 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
   char* name = const_cast<char*>("FeSupport");
   InitCommonRuntime(1, &name, false);
   LlvmCodeGen::InitializeLlvm();
-  new ExecEnv(); // This also caches it from the process.
+  ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
+  exec_env->set_is_fe_tests(true);
 }
 
 // Requires JniUtil::Init() to have been called.

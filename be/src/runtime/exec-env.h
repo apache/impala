@@ -84,6 +84,12 @@ class ExecEnv {
   // Starts any dependent services in their correct order
   virtual Status StartServices();
 
+  // Returns true if this environment was created from the FE tests. This makes the
+  // environment special since the JVM is started first and libraries are loaded
+  // differently.
+  bool is_fe_tests() { return is_fe_tests_; }
+  void set_is_fe_tests(bool v) { is_fe_tests_ = v; }
+
  protected:
   // Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
@@ -105,6 +111,7 @@ class ExecEnv {
  private:
   static ExecEnv* exec_env_;
   TimezoneDatabase tz_database_;
+  bool is_fe_tests_;
 };
 
 } // namespace impala

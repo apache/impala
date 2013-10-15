@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "util/dynamic-util.h"
+
 #include <dlfcn.h>
 #include <sstream>
+#include "runtime/exec-env.h"
 
 using namespace std;
 
@@ -32,7 +34,18 @@ Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr) {
 }
 
 Status DynamicOpen(const string& library, void** handle) {
-  *handle = dlopen(library.c_str(), RTLD_NOW);
+  int flags = RTLD_NOW;
+  // If we are loading shared libraries from the FE tests, where the Java
+  // side loads the initial impala binary (libfesupport.so), we are unable
+  // to load other libraries and have the symbols resolve. We'll load the
+  // secondary libraries with RTLD_LAZY, which means the symbols don't need
+  // to resolve at load time but will fail at dlsym(). This is generally
+  // undesirable (we want to fail early) and also not the best solution. This
+  // will prevent the FE tests from running the functions that cannot resolve
+  // the symbols (e.g. planner tests with some UDFs).
+  // TODO: this is to work around some build breaks. We need to fix this better.
+  if (ExecEnv::GetInstance()->is_fe_tests()) flags = RTLD_LAZY;
+  *handle = dlopen(library.c_str(), flags);
   if (*handle == NULL) {
     stringstream ss;
     ss << "Unable to load " << library << " dlerror: " << dlerror();
