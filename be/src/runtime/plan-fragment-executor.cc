@@ -87,6 +87,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
         request.query_globals.now_string, user, exec_env_));
+  RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
@@ -95,28 +96,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
           runtime_state_->resource_pool()));
-
-  // Set up three-level hierarchy of mem trackers: process, query, fragment instance.
-  // The instance tracker is tied to our profile.
-  bool has_query_mem_limit = request.query_options.__isset.mem_limit &&
-      request.query_options.mem_limit > 0;
-  int64_t bytes_limit = has_query_mem_limit ? request.query_options.mem_limit : -1;
-  query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(
-        query_id_, bytes_limit, exec_env_->process_mem_tracker());
-  mem_tracker_.reset(
-      new MemTracker(profile(), -1, profile()->name(), query_mem_tracker_.get()));
-  runtime_state_->SetInstanceMemTracker(mem_tracker_.get());
-  if (has_query_mem_limit) {
-    if (bytes_limit > MemInfo::physical_mem()) {
-      LOG(WARNING) << "Memory limit "
-                   << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
-                   << " exceeds physical memory of "
-                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
-    }
-    VLOG_QUERY << "Using query memory limit: "
-               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
-  }
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
@@ -127,7 +106,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
           runtime_state_->resource_pool()));
   mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
       TCounterType::BYTES,
-      bind<int64_t>(mem_fn(&MemTracker::consumption), mem_tracker_.get()));
+      bind<int64_t>(mem_fn(&MemTracker::consumption),
+          runtime_state_->instance_mem_tracker()));
   thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
       TCounterType::UNIT,
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
@@ -203,7 +183,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
-        mem_tracker_.get()));
+        runtime_state_->instance_mem_tracker()));
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;
@@ -477,7 +457,9 @@ void PlanFragmentExecutor::Close() {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
     mem_usage_sampled_counter_ = NULL;
   }
-  if (mem_tracker_.get() != NULL) mem_tracker_->UnregisterFromParent();
+  if (runtime_state_->instance_mem_tracker() != NULL) {
+    runtime_state_->instance_mem_tracker()->UnregisterFromParent();
+  }
   closed_ = true;
 }
 

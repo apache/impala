@@ -77,10 +77,12 @@ class RuntimeState {
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
 
-  // Set per-query state.
-  Status Init(const TUniqueId& fragment_instance_id,
-      const TQueryOptions& query_options, const std::string& now,
-      const std::string& user, ExecEnv* exec_env);
+  // Set up four-level hierarchy of mem trackers: process, query, fragment instance.
+  // The instance tracker is tied to our profile.
+  // Specific parts of the fragment (i.e. exec nodes, sinks, data stream senders, etc)
+  // will add a fourth level when they are initialized.
+  // This function also initializes a user function mem tracker (in the fourth level).
+  Status InitMemTrackers(const TUniqueId& query_id);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -107,7 +109,7 @@ class RuntimeState {
   HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
   ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
-  MemTracker* instance_mem_tracker() { return instance_mem_tracker_; }
+  MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -132,7 +134,7 @@ class RuntimeState {
   // on first use.
   Status CreateCodegen();
 
-  Status query_status() { 
+  Status query_status() {
     boost::lock_guard<boost::mutex> l(query_status_lock_);
     return query_status_;
   };
@@ -144,14 +146,6 @@ class RuntimeState {
   DataStreamRecvr* CreateRecvr(
       const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
       int buffer_size, RuntimeProfile* profile);
-
-  void SetInstanceMemTracker(MemTracker* tracker) {
-    instance_mem_tracker_ = tracker;
-
-    // TODO: this is a stopgap until we implement ExprContext
-    udf_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, "UDFs", tracker));
-    udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
-  }
 
   // Appends error to the error_log_ if there is space. Returns true if there was space
   // and the error was logged.
@@ -212,6 +206,11 @@ class RuntimeState {
   Status CheckQueryState();
 
  private:
+  // Set per-fragment state.
+  Status Init(const TUniqueId& fragment_instance_id,
+      const TQueryOptions& query_options, const std::string& now,
+      const std::string& user, ExecEnv* exec_env);
+
   static const int DEFAULT_BATCH_SIZE = 1024;
 
   DescriptorTbl* desc_tbl_;
@@ -279,8 +278,11 @@ class RuntimeState {
   // Total time waiting in network (across all threads)
   RuntimeProfile::Counter* total_network_wait_timer_;
 
-  // Fragment instance memory tracker.
-  MemTracker* instance_mem_tracker_;
+  // Memory usage of this fragment instance
+  boost::scoped_ptr<MemTracker> instance_mem_tracker_;
+
+  // MemTracker that is shared by all fragment instances running on this host.
+  boost::shared_ptr<MemTracker> query_mem_tracker_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

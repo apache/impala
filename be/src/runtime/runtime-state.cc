@@ -31,6 +31,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/jni-util.h"
+#include "util/mem-info.h"
 
 #include <jni.h>
 #include <iostream>
@@ -51,7 +52,6 @@ RuntimeState::RuntimeState(
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
-    instance_mem_tracker_(NULL),
     is_cancelled_(false),
     is_mem_limit_exceeded_(false) {
   Status status = Init(fragment_instance_id, query_options, now, user, exec_env);
@@ -64,7 +64,6 @@ RuntimeState::RuntimeState(const string& now, const string& user)
     unreported_error_idx_(0),
     user_(user),
     profile_(obj_pool_.get(), "<unnamed>"),
-    instance_mem_tracker_(NULL),
     is_cancelled_(false),
     is_mem_limit_exceeded_(false) {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
@@ -107,6 +106,33 @@ Status RuntimeState::Init(
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
   total_network_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkWaitTime");
 
+  return Status::OK;
+}
+
+Status RuntimeState::InitMemTrackers(const TUniqueId& query_id) {
+  bool has_query_mem_limit = query_options().__isset.mem_limit &&
+      query_options().mem_limit > 0;
+  int64_t bytes_limit = has_query_mem_limit ? query_options().mem_limit : -1;
+  query_mem_tracker_ =
+      MemTracker::GetQueryMemTracker(
+        query_id, bytes_limit, exec_env_->process_mem_tracker());
+  instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
+      runtime_profile()->name(), query_mem_tracker_.get()));
+  if (has_query_mem_limit) {
+    if (bytes_limit > MemInfo::physical_mem()) {
+      LOG(WARNING) << "Memory limit "
+                   << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                   << " exceeds physical memory of "
+                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+    }
+    VLOG_QUERY << "Using query memory limit: "
+               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+  }
+
+  // TODO: this is a stopgap until we implement ExprContext
+  udf_mem_tracker_.reset(
+      new MemTracker(runtime_profile(), -1, "UDFs", instance_mem_tracker_.get()));
+  udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
   return Status::OK;
 }
 
@@ -184,11 +210,9 @@ void RuntimeState::LogMemLimitExceeded() {
     if (is_mem_limit_exceeded_) return;
     is_mem_limit_exceeded_ = true;
   }
-  DCHECK(instance_mem_tracker_ != NULL);
-  MemTracker* query_mem_tracker = instance_mem_tracker_->parent();
-  DCHECK(query_mem_tracker != NULL);
+  DCHECK(query_mem_tracker_.get() != NULL);
   stringstream ss;
-  ss << "Memory Limit Exceeded\n" << query_mem_tracker->LogUsage();
+  ss << "Memory Limit Exceeded\n" << query_mem_tracker_->LogUsage();
   LogError(ss.str());
 }
 

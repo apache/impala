@@ -36,7 +36,6 @@ class DataSink;
 class DataStreamMgr;
 class RuntimeProfile;
 class RuntimeState;
-class MemTracker;
 class TRowBatch;
 class TPlanExecRequest;
 class TPlanFragment;
@@ -198,13 +197,6 @@ class PlanFragmentExecutor {
 
   // Stopwatch for this entire fragment. Started in Prepare(), stopped in Close().
   MonotonicStopWatch fragment_sw_;
-
-  // Memory usage of this fragment instance
-  boost::scoped_ptr<MemTracker> mem_tracker_;
-
-  // shared_ptr to query MemTracker; we need it to stick around at least until we're
-  // done
-  boost::shared_ptr<MemTracker> query_mem_tracker_;
 
   // Sampled memory usage at even time intervals.
   RuntimeProfile::TimeSeriesCounter* mem_usage_sampled_counter_;

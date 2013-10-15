@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 #include "util/network-util.h"
 #include "util/authorization.h"
+#include "common/init.h"
 #include "util/logging.h"
 
 using namespace std;
@@ -36,7 +37,7 @@ TEST(KerberosTest, PrincipalSubstitution) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitGoogleLoggingSafe(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false);
   return RUN_ALL_TESTS();
 }
