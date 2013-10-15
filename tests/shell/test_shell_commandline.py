@@ -144,8 +144,8 @@ class TestImpalaShell(object):
 
   @pytest.mark.execute_serially
   def test_completed_query_errors(self):
-    args = '-q "set abort_on_error=false;' +\
-        'select count(*) from functional_seq_snap.bad_seq_snap" --quiet'
+    args = ('-q "set abort_on_error=false;'
+        ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
     result = run_impala_shell_cmd(args)
     assert 'ERRORS ENCOUNTERED DURING EXECUTION:' in result.stderr
     assert 'Bad synchronization marker' in result.stderr
@@ -166,6 +166,29 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args + ' --output_delim="||"',
                                   expect_success=False)
     assert "Illegal delimiter" in result.stderr
+
+  @pytest.mark.execute_serially
+  def test_do_methods(self):
+    """Ensure that the do_ methods in the shell work.
+
+    Some of the do_ methods are implicitly tested in other tests, and as part of the test
+    setup.
+    """
+    # explain
+    args = '-q "explain select 1"'
+    run_impala_shell_cmd(args)
+    # show
+    args = '-q "show tables"'
+    run_impala_shell_cmd(args)
+    # with
+    args = '-q "with t1 as (select 1) select * from t1"'
+    run_impala_shell_cmd(args)
+    # describe and desc should return the same result.
+    args = '-q "describe %s.%s" -B' % (TEST_DB, TEST_TBL)
+    result_describe = run_impala_shell_cmd(args)
+    args = '-q "desc %s.%s" -B' % (TEST_DB, TEST_TBL)
+    result_desc = run_impala_shell_cmd(args)
+    assert result_describe.stdout == result_desc.stdout
 
 
 class ImpalaShellResult(object):

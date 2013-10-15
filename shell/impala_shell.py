@@ -63,19 +63,40 @@ class RpcStatus:
   OK = 0
   ERROR = 1
 
-# Simple Impala shell. Can issue queries (with configurable options)
-# Basic usage: type connect <host:port> to connect to an impalad
-# Then issue queries or other commands. Tab-completion should show the set of
-# available commands.
-# Methods that implement shell commands return a boolean tuple (stop, status)
-# stop is a flag the command loop uses to continue/discontinue the prompt.
-# Status tells the caller that the command completed successfully.
-# TODO: (amongst others)
-#   - Column headers / metadata support
-#   - A lot of rpcs return a verbose TStatus from thrift/Status.thrift
-#     This will be useful for better error handling. The next iteration
-#     of the shell should handle this return paramter.
+
+class RpcResult(object):
+  """Wrapper for Rpc results.
+
+  An Rpc results consists of the status and the result of the rpc.
+  If a queue object is passed to the ctor, get_results blocks until there's a result in
+  the queue. If the rpc result and status are passed to the ctor, it acts as a wrapper and
+  returns them.
+  """
+  def __init__(self, queue=None, result=None, status=None):
+    self.result_queue = queue
+    self.result = result
+    self.status = status
+
+  def get_results(self):
+    if self.result_queue:
+      # Block until the results are available.
+      # queue.get() without a timeout is not interruptable with KeyboardInterrupt.
+      # Set the timeout to a day (a reasonable limit for a single rpc call)
+      self.result, self.status = self.result_queue.get(True, 60*24*24)
+    return self.result, self.status
+
+
 class ImpalaShell(cmd.Cmd):
+  """ Simple Impala Shell.
+
+  Basic usage: type connect <host:port> to connect to an impalad
+  Then issue queries or other commands. Tab-completion should show the set of
+  available commands.
+  Methods that implement shell commands return a boolean tuple (stop, status)
+  stop is a flag the command loop uses to continue/discontinue the prompt.
+  Status tells the caller that the command completed successfully.
+  """
+
   DISCONNECTED_PROMPT = "[Not connected] > "
   # If not connected to an impalad, the server version is unknown.
   UNKNOWN_SERVER_VERSION = "Not Connected"
@@ -115,6 +136,10 @@ class ImpalaShell(cmd.Cmd):
     self.cached_prompt = str()
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
+    self.query_handle_closed = False
+    # Indicates whether the rpc being run is interruptable. If True, the signal handler
+    # reconnects and closes the query handle.
+    self.rpc_is_interruptable = False
     self.output_file = options.output_file
     # Output formatting flags/options
     self.output_delimiter = options.output_delimiter
@@ -171,7 +196,8 @@ class ImpalaShell(cmd.Cmd):
     # refreshed each time a connection is made. This is particularly helpful when
     # there is a version mismatch between the shell and the impalad.
     get_default_query_options = self.imp_service.get_default_configuration(False)
-    options, status = self.__do_rpc(lambda: get_default_query_options)
+    rpc_result = self.__do_rpc(lambda: get_default_query_options)
+    options, status = rpc_result.get_results()
     if status != RpcStatus.OK:
       print_to_stderr('Unable to retrive default query options')
     for option in options:
@@ -307,9 +333,22 @@ class ImpalaShell(cmd.Cmd):
 
   def __signal_handler(self, signal, frame):
     self.is_interrupted.set()
+    if not self.rpc_is_interruptable: return
+    # If the is_interruptable event object is set, the rpc may be still in progress.
+    # Create a new connection to the impalad and cancel the query.
+    try:
+      self.__connect()
+      print_to_stderr('Closing Query handle.')
+      self.__close_query()
+      if self.current_db:
+        self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
+    except Exception, e:
+      print_to_stderr("Failed to reconnect and close: %s" % str(e))
 
   def precmd(self, args):
     self.is_interrupted.clear()
+    self.rpc_is_interruptable = False
+    self.query_handle_closed = False
     args = self.sanitise_input(args)
     if not args: return args
     # Split args using sqlparse. If there are multiple queries present in user input,
@@ -438,7 +477,6 @@ class ImpalaShell(cmd.Cmd):
       if self.current_db:
         self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
-    self.last_query_handle = None
     # In the case that we lost connection while a command was being entered,
     # we may have a dangling command, clear partial_cmd
     self.partial_cmd = str()
@@ -530,16 +568,21 @@ class ImpalaShell(cmd.Cmd):
 
     return 1.0
 
-  def __create_beeswax_query_handle(self):
-    handle = BeeswaxService.Query()
-    handle.hadoop_user = self.user
-    return handle
+  def __create_beeswax_query(self, query_str):
+    """Create a beeswax query object from a query string"""
+    query = BeeswaxService.Query()
+    query.hadoop_user = self.user
+    query.query = query_str
+    query.configuration = self.__options_to_string_list()
+    return query
 
-  def __get_column_names(self, handle):
-    metadata = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle))
-    return [fs.name for fs in metadata[0].schema.fieldSchemas]
+  def __get_column_names(self):
+    rpc_result = self.__do_rpc(
+        lambda: self.imp_service.get_results_metadata(self.last_query_handle))
+    metadata, _ = rpc_result.get_results()
+    return [fs.name for fs in metadata.schema.fieldSchemas]
 
-  def __construct_table_header(self, handle, column_names):
+  def __construct_table_header(self, column_names):
     """ Constructs the table header for a given query handle.
 
     Should be called after the query has finished and before data is fetched. All data
@@ -558,46 +601,51 @@ class ImpalaShell(cmd.Cmd):
       return False
     return True
 
-  def __execute_query(self, query):
+  def __execute_query(self, query, is_insert=False):
     self.__print_if_verbose("Query: %s" % (query.query,))
-    start, end = time.time(), 0
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
+    start_time = time.time()
+    rpc_result = self.__do_rpc(lambda: self.imp_service.query(query))
+    self.last_query_handle, status = rpc_result.get_results()
 
     if self.is_interrupted.isSet():
       if status == RpcStatus.OK:
-        self.__cancel_and_close_query(handle)
+        self.__close_query()
       return False
     if status != RpcStatus.OK:
       return False
 
-    log = ""
     loop_start = time.time()
     while True:
-      query_state = self.__get_query_state(handle)
+      query_state = self.__get_query_state()
       if query_state == self.query_state["FINISHED"]:
-        log, get_log_status = self.__do_rpc(
-            lambda: self.imp_service.get_log(handle.log_context))
+        self.__print_error_log()
         break
       elif query_state == self.query_state["EXCEPTION"]:
-        print_to_stderr('Query aborted, unable to fetch data')
+        print_to_stderr('Query aborted.')
         if self.connected:
-          log, status = self.__do_rpc(
-              lambda: self.imp_service.get_log(handle.log_context))
-          print log
-          return self.__close_query_handle(handle)
+          self.__print_error_log()
+          # Close the query handle even if it's an insert.
+          return self.__close_query()
         else:
           return False
       elif self.is_interrupted.isSet():
-        return self.__cancel_and_close_query(handle)
+        return self.__close_query()
       time.sleep(self.__get_sleep_interval(loop_start))
 
+    if is_insert:
+      return self.__close_insert(query, start_time)
+    return self.__fetch(query, start_time)
+
+
+  def __fetch(self, query, start_time):
+    """Fetch all the results."""
     # impalad does not support the fetching of metadata for certain types of queries.
     if not self.__expect_result_metadata(query.query):
-      self.__close_query_handle(handle)
+      self.__close_query()
       return True
 
     # Results are ready, fetch them till they're done.
-    column_names = self.__get_column_names(handle)
+    column_names = self.__get_column_names()
     if self.write_delimited:
       formatter = DelimitedOutputFormatter(field_delim=self.output_delimiter)
       self.output_stream = OutputStream(formatter, filename=self.output_file)
@@ -605,64 +653,85 @@ class ImpalaShell(cmd.Cmd):
       if self.print_header:
         self.output_stream.write([column_names])
     else:
-      prettytable = self.__construct_table_header(handle, column_names)
+      prettytable = self.__construct_table_header(column_names)
       formatter = PrettyOutputFormatter(prettytable)
       self.output_stream = OutputStream(formatter, filename=self.output_file)
 
     result_rows = []
     num_rows_fetched = 0
+    self.rpc_is_interruptable = True
+    # If the user hit a Ctrl-C before rpc_is_interruptable is set, close the query.
+    if self.is_interrupted.isSet():
+      self.__close_query()
+      return False
     while True:
       # Fetch rows in batches of at most fetch_batch_size
-      (results, status) = self.__do_rpc(\
-        lambda: self.imp_service.fetch(handle, False, self.fetch_batch_size))
-
-      if self.is_interrupted.isSet() or status != RpcStatus.OK:
-        # Worth trying to cleanup the query even if fetch failed
-        self.__cancel_and_close_query(handle)
-        print log
+      # Since a single call to fetch() can potentially take a long time, we execute this
+      # rpc asynchronously to enable cancellation while it's in progress.
+      rpc_result = self.__do_rpc(
+        lambda: self.imp_service.fetch(self.last_query_handle, False,
+          self.fetch_batch_size))
+      result, status = rpc_result.get_results()
+      # is_interrupted is set when the user has explicitly cancelled the fetch.
+      # The query's already been closed, so there's no need to explicitly close it.
+      if self.is_interrupted.isSet(): return False
+      if status != RpcStatus.OK:
+        # The fetch failed, close the query.
+        self.__close_query()
         return False
-      num_rows_fetched += len(results.data)
-      result_rows.extend(results.data)
-      if len(result_rows) >= self.fetch_batch_size or not results.has_more:
+
+      num_rows_fetched += len(result.data)
+      result_rows.extend(result.data)
+      if len(result_rows) >= self.fetch_batch_size or not result.has_more:
         rows = [row.split('\t') for row in result_rows]
         self.output_stream.write(rows)
         result_rows = []
-      if not results.has_more:
+      if not result.has_more:
         break
-
+    self.rpc_is_interruptable = False
     # Don't include the time to get the runtime profile or runtime state log in the query
     # execution time
-    end = time.time()
-    self.__print_runtime_profile_if_enabled(handle)
+    end_time = time.time()
+    self.__print_runtime_profile_if_enabled()
     # Even though the query completed successfully, there may have been errors
     # encountered during execution
-    log, status = self.__do_rpc(lambda: self.imp_service.get_log(handle.log_context))
-    if log and log.strip():
-      print_to_stderr('\nERRORS ENCOUNTERED DURING EXECUTION: %s' % log)
+    self.__print_error_log()
 
     self.__print_if_verbose(
-      "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end - start))
-    self.last_query_handle = handle
-    return self.__close_query_handle(handle)
+      "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end_time - start_time))
+    return self.__close_query()
 
-  def __cancel_and_close_query(self, handle):
-    """Cancel a query and immediately close it"""
-    if self.__cancel_query(handle):
-      return self.__close_query_handle(handle)
-    else:
+  def __close_insert(self, query, start_time):
+    """Fetches the results of an INSERT query"""
+    rpc_result = self.__do_rpc(
+        lambda: self.imp_service.CloseInsert(self.last_query_handle))
+    insert_result, status = rpc_result.get_results()
+    end_time = time.time()
+    if status != RpcStatus.OK or self.is_interrupted.isSet():
       return False
 
-  def __close_query_handle(self, handle):
+    self.__print_runtime_profile_if_enabled()
+    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+    self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows,
+      end_time - start_time))
+    return True
+
+  def __close_query(self):
     """Close the query handle"""
-    (_, status) = self.__do_rpc(lambda: self.imp_service.close(handle))
+    # Make closing a query handle idempotent
+    if self.query_handle_closed:
+      return True
+    self.query_handle_closed = True
+    rpc_result = self.__do_rpc(lambda: self.imp_service.close(self.last_query_handle))
+    _, status = rpc_result.get_results()
     return status == RpcStatus.OK
 
-  def __print_runtime_profile_if_enabled(self, handle):
+  def __print_runtime_profile_if_enabled(self):
     if self.show_profiles:
-      self.__print_runtime_profile(handle)
+      self.__print_runtime_profile()
 
-  def __print_runtime_profile(self, handle):
-    profile = self.__get_runtime_profile(handle)
+  def __print_runtime_profile(self):
+    profile = self.__get_runtime_profile()
     if profile is not None:
       print "Query Runtime Profile:"
       print profile
@@ -694,68 +763,25 @@ class ImpalaShell(cmd.Cmd):
     if len(db_table_name) == 2:
       return db_table_name
 
-  def __handle_insert_query(self, query):
-    print_to_stderr("Query: %s" % (query.query,))
-    start, end = time.time(), 0
-    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
-    if status != RpcStatus.OK:
-      return False
 
-    query_successful = True
-    while True:
-      query_state = self.__get_query_state(handle)
-      if query_state == self.query_state["FINISHED"]:
-        break
-      elif query_state == self.query_state["EXCEPTION"]:
-        print_to_stderr('Query failed')
-        if self.connected:
-          # Retrieve error message (if any) from log.
-          log, status = self._ImpalaShell__do_rpc(
-            lambda: self.imp_service.get_log(handle.log_context))
-          print_to_stderr(log)
-          query_successful = False
-          break
-        else:
-          return False
-      elif self.is_interrupted.isSet():
-        return self.__cancel_and_close_query(handle)
-      time.sleep(0.05)
-
-    (insert_result, status) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
-    end = time.time()
-    if status != RpcStatus.OK or self.is_interrupted.isSet():
-      return False
-
-    if query_successful:
-      self.__print_runtime_profile_if_enabled(handle)
-      num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
-      self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
-      self.last_query_handle = handle
-    return query_successful
+  def __print_error_log(self):
+    rpc_result = self.__do_rpc(
+        lambda: self.imp_service.get_log(self.last_query_handle.log_context))
+    log, status = rpc_result.get_results()
+    if log and log.strip():
+      print_to_stderr("\nERRORS ENCOUNTERED DURING EXECUTION: %s" % log)
 
   def do_alter(self, args):
-    query = BeeswaxService.Query()
-    query.query = "alter %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("alter %s" % args))
 
   def do_create(self, args):
-    query = self.__create_beeswax_query_handle()
-    query.query = "create %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("create %s" % args))
 
   def do_drop(self, args):
-    query = self.__create_beeswax_query_handle()
-    query.query = "drop %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("drop %s" % args))
 
   def do_load(self, args):
-    query = self.__create_beeswax_query_handle()
-    query.query = "load %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("load %s" % args))
 
   def do_profile(self, args):
     """Prints the runtime profile of the last INSERT or SELECT query executed."""
@@ -765,89 +791,74 @@ class ImpalaShell(cmd.Cmd):
     elif self.last_query_handle is None:
       print_to_stderr('No previous query available to profile')
       return False
-    self.__print_runtime_profile(self.last_query_handle)
+    self.__print_runtime_profile()
     return True
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "select %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("select %s" % args))
 
   def do_values(self, args):
     """Executes a VALUES(...) query, fetching all rows"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "values %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("values %s" % args))
 
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "with %s" % (args,)
-    query.configuration = self.__options_to_string_list()
+    query = self.__create_beeswax_query("with %s" % args)
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query.query.lstrip(), posix=True)
     lexer.escapedquotes += "'"
     # Because the WITH clause may precede INSERT or SELECT queries,
     # just checking the first token is insufficient.
+    is_insert = False
     tokens = list(lexer)
-    if filter(self.INSERT_REGEX.match, tokens):
-      return self.__handle_insert_query(query)
-    return self.__execute_query(query)
+    if filter(self.INSERT_REGEX.match, tokens): is_insert = True
+    return self.__execute_query(query, is_insert=is_insert)
 
   def do_use(self, args):
     """Executes a USE... query"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "use %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    result = self.__execute_query(query)
-    if result:
-      self.current_db = args
+    result = self.__execute_query(self.__create_beeswax_query("use %s" % args))
+    if result: self.current_db = args
     return result
 
   def do_show(self, args):
     """Executes a SHOW... query, fetching all rows"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "show %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("show %s" % args))
 
   def do_describe(self, args):
     """Executes a DESCRIBE... query, fetching all rows"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "describe %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("describe %s" % args))
 
   def do_desc(self, args):
     return self.do_describe(args)
 
   def do_insert(self, args):
     """Executes an INSERT query"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "insert %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__handle_insert_query(query)
+    return self.__execute_query(self.__create_beeswax_query("insert %s" % args),
+        is_insert=True)
 
-  def __cancel_query(self, handle):
+  def __cancel_query(self):
     """Cancel a query on a keyboard interrupt from the shell."""
     print_to_stderr('Cancelling query ...')
     # Cancel sets query_state to EXCEPTION before calling cancel() in the
     # co-ordinator, so we don't need to wait.
-    (_, status) = self.__do_rpc(lambda: self.imp_service.Cancel(handle))
+    rpc_result = self.__do_rpc(lambda: self.imp_service.Cancel(self.last_query_handle))
+    _, status = rpc_result.get_results()
     return status == RpcStatus.OK
 
-  def __get_query_state(self, handle):
-    state, status = self.__do_rpc(lambda : self.imp_service.get_state(handle))
+  def __get_query_state(self):
+    rpc_result = self.__do_rpc(
+        lambda: self.imp_service.get_state(self.last_query_handle))
+    state, status = rpc_result.get_results()
     if status != RpcStatus.OK:
       return self.query_state["EXCEPTION"]
     return state
 
-  def __get_runtime_profile(self, handle):
-    profile, status = self.__do_rpc(lambda: self.imp_service.GetRuntimeProfile(handle))
+  def __get_runtime_profile(self):
+    rpc_result = self.__do_rpc(
+        lambda: self.imp_service.GetRuntimeProfile(self.last_query_handle))
+    profile, status = rpc_result.get_results()
     if status == RpcStatus.OK and profile:
       return profile
 
@@ -856,7 +867,8 @@ class ImpalaShell(cmd.Cmd):
 
     Blocks until the child thread terminates. Reads its results, if any,
     from a Queue object. The child thread puts its results in the Queue object
-    upon completion.
+    upon completion. If the rpc being run is interruptable, then it returns the result
+    queue without waiting for a result.
 
     """
     # The queue  is responsible for passing the rpc results from __do_rpc_thread
@@ -865,15 +877,19 @@ class ImpalaShell(cmd.Cmd):
     rpc_results = Queue()
     rpc_thread = threading.Thread(target=self.__do_rpc_thread, args=[rpc, rpc_results])
     rpc_thread.start()
-    rpc_thread.join()
-    # The results should be in the queue. If they're not, return (None, RpcStatus.ERROR)
-    try:
-      results = rpc_results.get_nowait()
-    except Empty:
-      # Unexpected exception in __do_rpc_thread.
-      print_to_stderr('Unexpected exception, no results returned.')
-      results = (None, RpcStatus.ERROR)
-    return results
+    if self.rpc_is_interruptable:
+      return RpcResult(queue=rpc_results)
+    else:
+      rpc_thread.join()
+      # The results should be in the queue. If they're not, return (None, RpcStatus.ERROR)
+      try:
+        result, status = rpc_results.get_nowait()
+        rpc_result = RpcResult(result=result, status=status)
+      except Empty:
+        # Unexpected exception in __do_rpc_thread.
+        print_to_stderr('Unexpected exception, no results returned.')
+        rpc_result = RpcResult(result=None, status=RpcStatus.ERROR)
+    return rpc_result
 
   def __do_rpc_thread(self, rpc, rpc_results):
     """Executes the RPC lambda provided with some error checking.
@@ -901,6 +917,7 @@ class ImpalaShell(cmd.Cmd):
             print 'RPC Error: %s' % '\n'.join(ret.error_msgs)
           status = RpcStatus.ERROR
       rpc_results.put((ret, status))
+      return
     except BeeswaxService.QueryNotFoundException, q:
       print_to_stderr('Error: Stale query handle')
     # beeswaxException prints out the entire object, printing
@@ -921,10 +938,7 @@ class ImpalaShell(cmd.Cmd):
 
   def do_explain(self, args):
     """Explain the query execution plan"""
-    query = self.__create_beeswax_query_handle()
-    query.query = "explain %s" % (args,)
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query("explain %s" % args))
 
   def do_history(self, args):
     """Display command history"""
@@ -966,10 +980,7 @@ class ImpalaShell(cmd.Cmd):
         self.__disable_readline()
 
   def default(self, args):
-    query = self.__create_beeswax_query_handle()
-    query.query = args
-    query.configuration = self.__options_to_string_list()
-    return self.__execute_query(query)
+    return self.__execute_query(self.__create_beeswax_query(args))
 
   def emptyline(self):
     """If an empty line is entered, do nothing"""
