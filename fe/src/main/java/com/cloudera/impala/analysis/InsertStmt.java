@@ -24,6 +24,7 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
@@ -142,6 +143,15 @@ public class InsertStmt extends StatementBase {
           table.getFullName()));
     }
 
+    if (table instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table;
+      if (!hdfsTable.hasWriteAccess()) {
+        throw new AnalysisException(String.format("Unable to INSERT into target table " +
+            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
+            ": %s", targetTableName, hdfsTable.getFirstLocationWithoutWriteAccess()));
+      }
+    }
+
     // Add target table to descriptor table.
     analyzer.getDescTbl().addReferencedTable(table);
 
@@ -170,7 +180,7 @@ public class InsertStmt extends StatementBase {
     // the select-list and any statically-valued columns in the PARTITION clause).
     //
     // First, we compute the set of mentioned columns, and reject statements that refer to
-    // non-existant columns, or duplicates (we must check both the column permutation, and
+    // non-existent columns, or duplicates (we must check both the column permutation, and
     // the set of partition keys). Next, we check that all partition columns are
     // mentioned. During this process we build the map from select-list expr index to
     // column in the targeted table.

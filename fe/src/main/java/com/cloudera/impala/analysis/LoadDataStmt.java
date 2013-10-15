@@ -31,6 +31,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.util.TAccessLevelUtil;
 import com.google.common.base.Preconditions;
 
 /*
@@ -115,10 +116,10 @@ public class LoadDataStmt extends StatementBase {
             "specified: " + dbName + "." + getTbl());
       }
     }
-    analyzeSourcePath(analyzer, (HdfsTable) table);
+    analyzePaths(analyzer, (HdfsTable) table);
   }
 
-  private void analyzeSourcePath(Analyzer analyzer, HdfsTable hdfsTable)
+  private void analyzePaths(Analyzer analyzer, HdfsTable hdfsTable)
       throws AnalysisException, AuthorizationException {
     // The user must have permission to access the source location. Since the files will
     // be moved from this location, the user needs to have all permission.
@@ -149,12 +150,23 @@ public class LoadDataStmt extends StatementBase {
         }
       }
 
+
+      String noWriteAccessErrorMsg = String.format("Unable to LOAD DATA into " +
+          "target table (%s) because Impala does not have WRITE access to HDFS " +
+          "location: ", hdfsTable.getFullName());
+
       HdfsPartition partition;
       if (partitionSpec != null) {
         partition = hdfsTable.getPartition(partitionSpec.getPartitionSpecKeyValues());
+        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+          throw new AnalysisException(noWriteAccessErrorMsg + partition.getLocation());
+        }
       } else {
         // "default" partition
         partition = hdfsTable.getPartitions().get(0);
+        if (!hdfsTable.hasWriteAccess()) {
+          throw new AnalysisException(noWriteAccessErrorMsg + hdfsTable.getLocation());
+        }
       }
       Preconditions.checkNotNull(partition);
 

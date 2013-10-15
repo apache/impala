@@ -1312,6 +1312,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +
           "functional_text_lzo.jointbl",
           "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+
+      // Verify with a read-only table
+      AnalysisError(String.format("load data inpath '%s' into table " +
+          "functional_seq.alltypes partition(year=2009, month=3)",
+          "/test-warehouse/alltypes_seq/year=2009/month=5", overwrite),
+          "Unable to LOAD DATA into target table (functional_seq.alltypes) because " +
+          "Impala does not have WRITE access to HDFS location: " +
+          "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=3");
     }
   }
 
@@ -1323,6 +1331,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       testInsertUnpartitioned(qualifier);
       testInsertWithPermutation(qualifier);
     }
+
+    // Test INSERT into a table that Impala does not have WRITE access to.
+    AnalysisError("insert into functional_seq.alltypes partition(year, month)" +
+        "select * from functional.alltypes",
+        "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
+        "does not have WRITE access to at least one HDFS path: " +
+        "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=1");
   }
 
   /**

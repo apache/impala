@@ -29,6 +29,7 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.service.DdlExecutor;
+import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnDef;
 import com.cloudera.impala.thrift.TColumnDesc;
@@ -61,6 +62,7 @@ public abstract class Table implements CatalogObject {
   protected final String owner;
   protected TTableDescriptor tableDesc;
   protected List<FieldSchema> fields;
+  protected TAccessLevel accessLevel = TAccessLevel.READ_WRITE;
 
   // Number of clustering columns.
   protected int numClusteringCols;
@@ -261,11 +263,16 @@ public abstract class Table implements CatalogObject {
     // Estimated number of rows
     numRows = thriftTable.isSetTable_stats() ?
         thriftTable.getTable_stats().getNum_rows() : -1;
+
+    // Default to READ_WRITE access if the field is not set.
+    accessLevel = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
+        TAccessLevel.READ_WRITE;
   }
 
   public TTable toThrift() throws TableLoadingException {
     TTable table = new TTable(db.getName(), name);
     table.setId(id.asInt());
+    table.setAccess_level(accessLevel);
     table.setColumns(fieldSchemaToColumnDef(getMetaStoreTable().getSd().getCols()));
     // populate with both partition keys and regular columns
     table.setPartition_columns(fieldSchemaToColumnDef(

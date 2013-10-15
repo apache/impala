@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -57,6 +58,7 @@ import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
+import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnStatsData;
 import com.cloudera.impala.thrift.THdfsFileBlock;
@@ -66,6 +68,8 @@ import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.cloudera.impala.util.FSPermissionChecker;
+import com.cloudera.impala.util.TAccessLevelUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -131,7 +135,7 @@ public class HdfsTable extends Table {
             " might be set incorrectly";
         throw new RuntimeException(error);
       }
-      DFS = (DistributedFileSystem)fs;
+      DFS = (DistributedFileSystem) fs;
     } catch (IOException e) {
       throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
     }
@@ -271,6 +275,35 @@ public class HdfsTable extends Table {
    * Returns the storage location (HDFS path) of this table.
    */
   public String getLocation() { return super.getMetaStoreTable().getSd().getLocation(); }
+
+  // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
+  // table) or if Impala has write permissions on all partition directories (for
+  // a partitioned table).
+  public boolean hasWriteAccess() {
+    return TAccessLevelUtil.impliesWriteAccess(accessLevel);
+  }
+
+  /**
+   * Returns the first location (HDFS path) that Impala does not have WRITE access
+   * to, or an null if none is found. For an unpartitioned table, this just
+   * checks the hdfsBaseDir. For a partitioned table it checks all partition directories.
+   */
+  public String getFirstLocationWithoutWriteAccess() {
+    if (getMetaStoreTable() == null) return null;
+
+    if (getMetaStoreTable().getPartitionKeysSize() == 0) {
+      if (!TAccessLevelUtil.impliesWriteAccess(accessLevel)) {
+        return hdfsBaseDir_;
+      }
+    } else {
+      for (HdfsPartition partition: partitions_) {
+        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+          return partition.getLocation();
+        }
+      }
+    }
+    return null;
+  }
 
   /**
    * Gets the HdfsPartition matching the given partition spec. Returns null if no match
@@ -414,22 +447,25 @@ public class HdfsTable extends Table {
       throws IOException, InvalidStorageDescriptorException, AuthorizationException {
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
-
     List<FileDescriptor> newFileDescs = Lists.newArrayList();
 
-    // INSERT statements need to refer to this if they try to write to new partitions.
+    // INSERT statements need to refer to this if they try to write to new partitions
     // Scans don't refer to this because by definition all partitions they refer to
     // exist.
     addDefaultPartition(msTbl.getSd());
 
     if (msTbl.getPartitionKeysSize() == 0) {
+      Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
       // This table has no partition key, which means it has no declared partitions.
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
-      Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
-      HdfsPartition part = addPartition(msTbl.getSd(), null,
+      addPartition(msTbl.getSd(), null,
           new ArrayList<LiteralExpr>(), oldFileDescMap, newFileDescs);
+      Path location = new Path(hdfsBaseDir_);
+      if (DFS.exists(location)) {
+        accessLevel = getAvailableAccessLevel(location);
+      }
     } else {
       // keep track of distinct partition key values and how many nulls there are
       Set<String>[] uniquePartitionKeys = new HashSet[numClusteringCols];
@@ -465,9 +501,17 @@ public class HdfsTable extends Table {
         }
         HdfsPartition partition = addPartition(msPartition.getSd(), msPartition,
             keyValues, oldFileDescMap, newFileDescs);
-
         if (partition != null && msPartition.getParameters() != null) {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
+          if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+            // TODO: READ_ONLY isn't exactly correct because the it's possible the
+            // partition does not have READ permissions either. When we start checking
+            // whether we can READ from a table, this should be updated to set the
+            // table's access level to the "lowest" effective level across all
+            // partitions. That is, if one partition has READ_ONLY and another has
+            // WRITE_ONLY the table's access level should be NONE.
+            accessLevel = TAccessLevel.READ_ONLY;
+          }
         }
       }
 
@@ -484,6 +528,29 @@ public class HdfsTable extends Table {
       loadBlockMd(newFileDescs);
     }
     uniqueHostPortsCount_ = countUniqueHostPorts(partitions_);
+  }
+
+  /**
+   * Gets the AccessLevel that is available for Impala for this table based on the
+   * permissions Impala has on the given path. Throws an IOException of the
+   * location does not exist.
+   */
+  private TAccessLevel getAvailableAccessLevel(Path location) throws IOException {
+    FSPermissionChecker permisisonChecker = FSPermissionChecker.getInstance();
+    if (permisisonChecker.hasAccess(DFS, location, FsAction.READ_WRITE)) {
+      return TAccessLevel.READ_WRITE;
+    } else if (permisisonChecker.hasAccess(DFS, location, FsAction.READ)) {
+      LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
+          location, getFullName()));
+      return TAccessLevel.READ_ONLY;
+    } else if (permisisonChecker.hasAccess(DFS, location, FsAction.WRITE)) {
+      LOG.debug(String.format("Impala does not have WRITE access to '%s' in table: %s",
+          location, getFullName()));
+      return TAccessLevel.WRITE_ONLY;
+    }
+    LOG.debug(String.format("Impala does not have READ or WRITE access to " +
+        "'%s' in table: %s", location, getFullName()));
+    return TAccessLevel.NONE;
   }
 
   /**
@@ -559,7 +626,7 @@ public class HdfsTable extends Table {
       }
 
       HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
-          fileFormatDescriptor, fileDescriptors);
+          fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
       partitions_.add(partition);
       return partition;
     } else {

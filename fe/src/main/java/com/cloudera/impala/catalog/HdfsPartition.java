@@ -17,7 +17,6 @@ package com.cloudera.impala.catalog;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.ArrayUtils;
@@ -29,6 +28,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
+import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
@@ -37,7 +37,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Query-relevant information for one table partition.
@@ -186,13 +185,8 @@ public class HdfsPartition {
 
   private final HdfsTable table;
   private final List<LiteralExpr> partitionKeyValues;
-
   // estimated number of rows in partition; -1: unknown
   private long numRows = -1;
-
-  // partition-specific stats for each column
-  // TODO: fill this
-  private final Map<Column, ColumnStats> columnStats = Maps.newHashMap();
   private static AtomicLong partitionIdCounter = new AtomicLong();
 
   // A unique ID for each partition, used to identify a partition in the thrift
@@ -211,6 +205,7 @@ public class HdfsPartition {
   private final String location;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
   private boolean isDirty_ = false;
+  private final TAccessLevel accessLevel;
 
   public HdfsStorageDescriptor getInputFormatDescriptor() {
     return fileFormatDescriptor;
@@ -235,6 +230,10 @@ public class HdfsPartition {
   public void setNumRows(long numRows) { this.numRows = numRows; }
   public long getNumRows() { return numRows; }
 
+  // Returns the HDFS permissions Impala has to this partition's directory - READ_ONLY,
+  // READ_WRITE, etc.
+  public TAccessLevel getAccessLevel() { return accessLevel; }
+
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been
    * made and this partition's metadata should not be reused during the next
@@ -256,7 +255,7 @@ public class HdfsPartition {
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors, long id,
-      String location) {
+      String location, TAccessLevel accessLevel) {
     this.table = table;
     this.msPartition = msPartition;
     this.location = location;
@@ -264,6 +263,7 @@ public class HdfsPartition {
     this.fileDescriptors = ImmutableList.copyOf(fileDescriptors);
     this.fileFormatDescriptor = fileFormatDescriptor;
     this.id = id;
+    this.accessLevel = accessLevel;
     // TODO: instead of raising an exception, we should consider marking this partition
     // invalid and moving on, so that table loading won't fail and user can query other
     // partitions.
@@ -279,10 +279,10 @@ public class HdfsPartition {
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
-      List<HdfsPartition.FileDescriptor> fileDescriptors) {
+      List<HdfsPartition.FileDescriptor> fileDescriptors, TAccessLevel accessLevel) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
         partitionIdCounter.getAndIncrement(), msPartition != null ?
-            msPartition.getSd().getLocation() : null);
+            msPartition.getSd().getLocation() : null, accessLevel);
   }
 
   public static HdfsPartition defaultPartition(
@@ -291,7 +291,8 @@ public class HdfsPartition {
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
     return new HdfsPartition(table, null, emptyExprList,
         storageDescriptor, emptyFileDescriptorList,
-        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID, null);
+        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID, null,
+        TAccessLevel.READ_WRITE);
   }
 
   /*
@@ -387,8 +388,10 @@ public class HdfsPartition {
         fileDescriptors.add(HdfsPartition.FileDescriptor.fromThrift(desc));
       }
     }
+    TAccessLevel accessLevel = thriftPartition.isSetAccess_level() ?
+        thriftPartition.getAccess_level() : TAccessLevel.READ_WRITE;
     return new HdfsPartition(table, null, literalExpr, storageDesc, fileDescriptors, id,
-        thriftPartition.getLocation());
+        thriftPartition.getLocation(), accessLevel);
   }
 
   private static LiteralExpr TExprNodeToLiteralExpr(
@@ -432,6 +435,7 @@ public class HdfsPartition {
         thriftHdfsPart.addToFile_desc(fd.toThrift());
       }
     }
+
     return thriftHdfsPart;
   }
 }

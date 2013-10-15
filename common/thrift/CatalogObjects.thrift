@@ -74,6 +74,14 @@ enum TTablePropertyType {
   SERDE_PROPERTY
 }
 
+// The access level that is available to Impala on the Catalog object.
+enum TAccessLevel {
+  NONE,
+  READ_WRITE,
+  READ_ONLY,
+  WRITE_ONLY,
+}
+
 // Mapping from names defined by Avro to values in the THdfsCompression enum.
 const map<string, THdfsCompression> COMPRESSION_MAP = {
   "": THdfsCompression.NONE,
@@ -187,6 +195,9 @@ struct THdfsPartition {
   9: required THdfsCompression compression
   10: optional list<THdfsFileDesc> file_desc
   11: optional string location
+
+  // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
+  12: optional TAccessLevel access_level
 }
 
 struct THdfsTable {
@@ -233,34 +244,37 @@ struct TTable {
   // metadata.
   3: optional Types.TTableId id
 
+  // The access level Impala has on this table (READ_WRITE, READ_ONLY, etc).
+  4: optional TAccessLevel access_level
+
   // List of columns (excludes partition columns)
-  4: optional list<TColumnDef> columns
+  5: optional list<TColumnDef> columns
 
   // List of partition columns (empty list if table is not partitioned)
-  5: optional list<TColumnDef> partition_columns
+  6: optional list<TColumnDef> partition_columns
 
   // Table stats data for the table.
-  6: optional TTableStatsData table_stats
+  7: optional TTableStatsData table_stats
 
   // Column stats for the table. May not be set if there were errors loading the
   // table metadata or if the table did not contain any column stats data.
-  7: optional map<string, TColumnStatsData> column_stats
+  8: optional map<string, TColumnStatsData> column_stats
 
   // Set if there were any errors loading the Table metadata.
-  8: optional Status.TStatus load_status
+  9: optional Status.TStatus load_status
 
   // Determines whether this is an HDFS or HBASE table.
-  9: optional TTableType table_type
+  10: optional TTableType table_type
 
   // Set iff this is an HDFS table
-  10: optional THdfsTable hdfs_table
+  11: optional THdfsTable hdfs_table
 
   // Set iff this is an Hbase table
-  11: optional THBaseTable hbase_table
+  12: optional THBaseTable hbase_table
 
   // The Hive Metastore representation of this table. May not be set if there were
   // errors loading the table metadata
-  12: optional hive_metastore.Table metastore_table
+  13: optional hive_metastore.Table metastore_table
 }
 
 // Represents a database, and the metadata associated with it, in the Catalog

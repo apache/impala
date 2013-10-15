@@ -79,6 +79,10 @@ hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader
 hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
  /test-warehouse/alltypessmall/year=2009/month=1/.hidden
 
+# Configure alltypes_seq as a read-only table
+hadoop fs -chmod -R 444 /test-warehouse/alltypes_seq/year=2009/month=1
+hadoop fs -chmod -R 444 /test-warehouse/alltypes_seq/year=2009/month=3
+
 # TODO: For some reason DROP TABLE IF EXISTS sometimes fails on HBase if the table does
 # not exist. To work around this, disable exit on error before executing this command.
 # Need to investigate this more, but this works around the problem to unblock automation.
