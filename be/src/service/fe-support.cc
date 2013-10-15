@@ -83,6 +83,9 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
                      JniUtil::internal_exc_class(), result_bytes);
 
+  // Optimize the module so any UDF functions are jit'd
+  if (state.codegen() != NULL) state.codegen()->OptimizeModule();
+
   TColumnValue val;
   e->GetValue(NULL, false, &val);
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &val, &result_bytes), env,

@@ -125,7 +125,7 @@ string IntLiteral::DebugString() const {
     default:
       DCHECK(false) << "IntLiteral::DebugString(): bad type: " << type_.DebugString();
   }
-  out << ")";
+  out << " type=" << TypeToString(type()) << ")";
   return out.str();
 }
 

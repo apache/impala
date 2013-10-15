@@ -64,6 +64,7 @@ RuntimeState::RuntimeState(const string& now, const string& user)
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     user_(user),
+    exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     is_mem_limit_exceeded_(false) {

@@ -204,16 +204,41 @@ select udf_test.identity(a.tinyint_col),
 from alltypesagg a join alltypessmall b on
   (udf_test.identity(a.tinyint_col) = udf_test.identity(b.id))
 and udf_test.identity(a.tinyint_col + b.tinyint_col) < 5
+where udf_test.identity(a.month) = udf_test.identity(1)
+and udf_test.identity(a.day) = udf_test.identity(1)
 order by udf_test.identity(a.string_col)
 limit 5
 ---- TYPES
 tinyint, int, string
 ---- RESULTS
 1,1,'1'
-1,1,'1'
-1,1,'1'
-1,1,'1'
-1,1,'1'
+1,1,'101'
+2,2,'102'
+1,1,'11'
+1,1,'111'
+====
+---- QUERY
+select udf_test.identity(int_col),
+       udf_test.identity(min(bool_col)),
+       udf_test.identity(max(bool_col))
+from alltypesagg group by udf_test.identity(int_col)
+having udf_test.identity(udf_test.identity(int_col) > udf_test.identity(998))
+---- TYPES
+int,boolean,boolean
+---- RESULTS
+999,false,false
+====
+---- QUERY
+select udf_test.identity(year),
+       udf_test.identity(min(month)),
+       udf_test.identity(min(string_col)),
+       udf_test.identity(max(timestamp_col))
+from alltypesagg group by udf_test.identity(year)
+having udf_test.identity(udf_test.identity(year) = udf_test.identity(2010))
+---- TYPES
+int,int,string,timestamp
+---- RESULTS
+2010,1,'0',2010-01-10 18:02:05.100000000
 ====
 ---- QUERY
 select min(udf_test.identity(int_col)) from alltypesagg where int_col is null;

@@ -36,28 +36,36 @@ public abstract class LiteralExpr extends Expr {
   public static LiteralExpr create(String value, PrimitiveType type)
       throws AnalysisException, AuthorizationException {
     Preconditions.checkArgument(type != PrimitiveType.INVALID_TYPE);
+    LiteralExpr expr = null;
     switch (type) {
       case NULL_TYPE:
-        return new NullLiteral();
+        expr = new NullLiteral();
+        break;
       case BOOLEAN:
-        return new BoolLiteral(value);
+        expr = new BoolLiteral(value);
+        break;
       case TINYINT:
       case SMALLINT:
       case INT:
       case BIGINT:
-        return new IntLiteral(value);
+        expr = new IntLiteral(value);
+        break;
       case FLOAT:
       case DOUBLE:
-        return new FloatLiteral(value);
+        expr = new FloatLiteral(value);
+        break;
       case STRING:
-        return new StringLiteral(value);
+        expr = new StringLiteral(value);
+        break;
       case DATE:
       case DATETIME:
       case TIMESTAMP:
         throw new AnalysisException(
             "DATE/DATETIME/TIMESTAMP literals not supported: " + value);
+      default:
+        Preconditions.checkState(false);
     }
-    return null;
+    return (LiteralExpr)expr.uncheckedCastTo(type);
   }
 
   // Returns the string representation of the literal's value. Used when passing
