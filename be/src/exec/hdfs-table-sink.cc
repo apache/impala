@@ -76,7 +76,12 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
     }
   }
   // Sanity check.
-  DCHECK_LE(partition_key_exprs_.size(), table_desc_->col_names().size());
+  DCHECK_LE(partition_key_exprs_.size(), table_desc_->col_names().size())
+    << DebugString();
+  DCHECK_EQ(partition_key_exprs_.size(), table_desc_->num_clustering_cols())
+    << DebugString();
+  DCHECK_GE(output_exprs_.size(),
+      table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
   return Status::OK;
 }
@@ -502,7 +507,9 @@ Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_
 string HdfsTableSink::DebugString() const {
   stringstream out;
   out << "HdfsTableSink(overwrite=" << (overwrite_ ? "true" : "false")
+      << " table_desc=" << table_desc_->DebugString()
       << " partition_key_exprs=" << Expr::DebugString(partition_key_exprs_)
+      << " output_exprs=" << Expr::DebugString(output_exprs_)
       << ")";
   return out.str();
 }

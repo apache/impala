@@ -70,6 +70,7 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
+  DCHECK_GE(output_exprs_.size(), num_non_partition_cols) << parent_->DebugString();
 
   {
     SCOPED_TIMER(parent_->encode_timer());
