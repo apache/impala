@@ -278,11 +278,12 @@ class RuntimeState {
   // Total time waiting in network (across all threads)
   RuntimeProfile::Counter* total_network_wait_timer_;
 
+  // MemTracker that is shared by all fragment instances running on this host.
+  // The query mem tracker must be released after the instance_mem_tracker_.
+  boost::shared_ptr<MemTracker> query_mem_tracker_;
+
   // Memory usage of this fragment instance
   boost::scoped_ptr<MemTracker> instance_mem_tracker_;
-
-  // MemTracker that is shared by all fragment instances running on this host.
-  boost::shared_ptr<MemTracker> query_mem_tracker_;
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

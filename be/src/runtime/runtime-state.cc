@@ -72,6 +72,10 @@ RuntimeState::RuntimeState(const string& now, const string& user)
 
 RuntimeState::~RuntimeState() {
   if (udf_pool_.get() != NULL) udf_pool_->FreeAll();
+  // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
+  // delete instance_mem_tracker_ first.
+  instance_mem_tracker_.reset();
+  query_mem_tracker_.reset();
 }
 
 Status RuntimeState::Init(
