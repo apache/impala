@@ -37,6 +37,7 @@ namespace impala {
 // This has O(1) Allocate() and Free().
 // This is not thread safe.
 // TODO: consider integrating this with MemPool.
+// TODO: consider changing to something more granular than doubling.
 class FreePool {
  public:
   // C'tor, initializes the FreePool to be empty. All allocations come from the
@@ -58,7 +59,7 @@ class FreePool {
     FreeListNode* allocation = lists_[free_list_idx].next;
     if (allocation == NULL) {
       // There wasn't an existing allocation of the right size, allocate a new one.
-      size = BitUtil::RoundUp(size, 2);
+      size = 1 << free_list_idx;
       allocation = reinterpret_cast<FreeListNode*>(
           mem_pool_->Allocate(size + sizeof(FreeListNode)));
     } else {
@@ -77,16 +78,36 @@ class FreePool {
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
-    // On debug, check that list is valid.
-    bool found = false;
-    for (int i = 0; i < NUM_LISTS && !found; ++i) {
-      if (list == &lists_[i]) found = true;
-    }
-    DCHECK(found);
+    CheckValidAllocation(list);
 #endif
     // Add node to front of list.
     node->next = list->next;
     list->next = node;
+  }
+
+  // Returns an allocation that is at least 'size'. If the current allocation
+  // backing 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is
+  // made and the contents of ptr are copied into it.
+  uint8_t* Reallocate(uint8_t* ptr, int size) {
+    if (ptr == NULL || reinterpret_cast<int64_t>(ptr) == 0x1) return Allocate(size);
+    FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
+    FreeListNode* list = node->list;
+#ifndef NDEBUG
+    CheckValidAllocation(list);
+#endif
+    int bucket_idx = (list - &lists_[0]);
+    // This is the actual size of ptr.
+    int allocation_size = 1 << bucket_idx;
+
+    // If it's already big enough, just return the ptr.
+    if (allocation_size >= size) return ptr;
+
+    // Make a new one. Since Allocate() already rounds up to powers of 2, this
+    // effectively doubles for the caller.
+    uint8_t* new_ptr = Allocate(size);
+    memcpy(new_ptr, ptr, allocation_size);
+    Free(ptr);
+    return new_ptr;
   }
 
  private:
@@ -99,6 +120,15 @@ class FreePool {
       FreeListNode* list; // Used when it is being used by the caller.
     };
   };
+
+  void CheckValidAllocation(FreeListNode* computed_list_ptr) {
+    // On debug, check that list is valid.
+    bool found = false;
+    for (int i = 0; i < NUM_LISTS && !found; ++i) {
+      if (computed_list_ptr == &lists_[i]) found = true;
+    }
+    DCHECK(found);
+  }
 
   // MemPool to allocate from. Unowned.
   MemPool* mem_pool_;

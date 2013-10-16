@@ -32,6 +32,8 @@ class AggregateFunctions {
  public:
   // Initializes dst to NULL.
   static void InitNull(FunctionContext*, AnyVal* dst);
+  // Initializes dst to NULL and sets dst->ptr to NULL.
+  static void InitNullString(FunctionContext* c, StringVal* dst);
 
   // Initializes dst to 0.
   template <typename T>
@@ -52,13 +54,6 @@ class AggregateFunctions {
   // MaxUpdate/MaxMerge
   template <typename T>
   static void Max(FunctionContext*, const T& src, T* dst);
-
-  // For string intermediates, we use the input as a ptr to a scratch struct.
-  // We want to convert it to the real string val.
-  // TODO: when the planner is updated, input should be a fixed array and not
-  // a StringVal.
-  static void InitScratch(FunctionContext* c, StringVal* dst);
-  static StringVal SerializeScratch(FunctionContext* c, const StringVal& input);
 
   // String concat
   static void StringConcat(FunctionContext*, const StringVal& src,

@@ -26,6 +26,28 @@ add_library(Udf udf.cc)
 add_library(ImpalaUdf udf.cc)
 set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
-ADD_BE_TEST(udf-test)
-ADD_BE_TEST(uda-test)
+# We can't use the normal link list since we want to pick up libImpalaUdf (the external
+# library) rather than the interal libUdf.
+set (UDF_TEST_LINK_LIBS
+  -Wl,--start-group
+  Common
+  GlobalFlags
+  ImpalaUdf
+  Runtime
+  Util
+  -Wl,--end-group
+# Below are all external dependencies.  They should some after the impala libs.
+  ${Boost_LIBRARIES}
+  glogstatic
+  gflagsstatic
+  -lboost_date_time
+  gtest)
+  
+ADD_EXECUTABLE(udf-test udf-test.cc)
+TARGET_LINK_LIBRARIES(udf-test ${UDF_TEST_LINK_LIBS})
+ADD_TEST(udf-test "${EXECUTABLE_OUTPUT_PATH}/udf-test")
+
+ADD_EXECUTABLE(uda-test uda-test.cc)
+TARGET_LINK_LIBRARIES(uda-test ${UDF_TEST_LINK_LIBS})
+ADD_TEST(uda-test "${EXECUTABLE_OUTPUT_PATH}/uda-test")
 

@@ -140,6 +140,32 @@ TEST(FreePoolTest, Loop) {
   mem_pool.FreeAll();
 }
 
+TEST(FreePoolTest, ReAlloc) {
+  MemTracker tracker;
+  MemPool mem_pool(&tracker);
+  FreePool pool(&mem_pool);
+
+  uint8_t* ptr = pool.Reallocate(NULL, 0);
+  ptr = pool.Reallocate(ptr, 0);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 0);
+
+  ptr = pool.Reallocate(ptr, 600);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8);
+  uint8_t* ptr2 = pool.Reallocate(ptr, 200);
+  EXPECT_TRUE(ptr == ptr2);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8);
+
+  uint8_t* ptr3 = pool.Reallocate(ptr, 2000);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8);
+  EXPECT_TRUE(ptr2 != ptr3);
+
+  // The original 600 allocation should be there.
+  ptr = pool.Allocate(600);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8);
+
+  mem_pool.FreeAll();
+}
+
 }
 
 int main(int argc, char **argv) {

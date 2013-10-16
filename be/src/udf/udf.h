@@ -90,7 +90,14 @@ class FunctionContext {
   // in this object causing the query to fail.
   uint8_t* Allocate(int byte_size);
 
-  // Frees a buffer returned from Allocate()
+  // Reallocates 'ptr' to the new byte_size. If the currently underlying allocation
+  // is big enough, the original ptr will be returned. If the allocation needs to
+  // grow, a new allocation is made that is at least 'byte_size' and the contents
+  // of 'ptr' will be copied into it.
+  // This should be used for buffers that constantly get appended to.
+  uint8_t* Reallocate(uint8_t* ptr, int byte_size);
+
+  // Frees a buffer returned from Allocate() or Reallocate()
   void Free(uint8_t* buffer);
 
   // For allocations that cannot use the Allocate() API provided by this

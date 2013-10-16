@@ -72,92 +72,34 @@ void AggregateFunctions::Max(FunctionContext*, const T& src, T* dst) {
   if (dst->is_null || src.val > dst->val) *dst = src;
 }
 
-// This is the intermediate we use when the function returns a string to avoid
-// excessive allocations. This is currently wrapped in a StringValue slot which
-// is not good. We want to have this be in a CHAR(N) slot.
-struct StringValScratch {
-  // Size of 'buffer'
-  int buffer_len;
-
-  // The length of the current string stored. buffer[0, str_len) is the current str.
-  int str_len;
-  uint8_t* buffer;
-
-  StringValScratch() :
-    buffer_len(0), str_len(0), buffer(NULL) {}
-
-  // Resizes the scratch to new_len if necessary. If copy is true, the current
-  // bytes are copied into the new bigger buffer. Otherwise, the buffer's values are
-  // undefined.
-  // If the new_len is bigger, we size the underlying buffer to 1.5 * new_len
-  // TODO: what's the best constant? Any constant > 1 is O(1) amortized.
-  void ResizeBufferTo(FunctionContext* ctx, int new_len, bool copy) {
-    if (new_len <= buffer_len) return;
-    DCHECK_GT(new_len, 0);
-    new_len += new_len / 2;
-    uint8_t* new_buffer = ctx->Allocate(new_len);
-    if (copy) memcpy(new_buffer, buffer, str_len);
-    ctx->Free(buffer);
-    buffer = new_buffer;
-    buffer_len = new_len;
-  }
-
-  void Set(FunctionContext* ctx, const StringVal& sv) {
-    ResizeBufferTo(ctx, sv.len, false);
-    memcpy(buffer, sv.ptr, sv.len);
-    str_len = sv.len;
-  }
-
-  // Appends sv to the end of the current string. This doubles the underlying
-  // buffer if it needs to go.
-  void Append(FunctionContext* ctx, const StringVal& sv) {
-    if (sv.len == 0) return;
-    int new_len = str_len + sv.len;
-    if (new_len > buffer_len) ResizeBufferTo(ctx, new_len, true);
-    memcpy(buffer + str_len, sv.ptr, sv.len);
-    str_len += sv.len;
-  }
-};
-
-void AggregateFunctions::InitScratch(FunctionContext* c, StringVal* dst) {
-  dst->is_null = false;
-  dst->len = sizeof(StringValScratch);
-  // TODO: provide an object pool like interface on FunctionContext?
-  dst->ptr = reinterpret_cast<uint8_t*>(new StringValScratch);
-}
-
-StringVal AggregateFunctions::SerializeScratch(FunctionContext* c, const StringVal& sv) {
-  DCHECK(!sv.is_null);
-  DCHECK_EQ(sv.len, sizeof(StringValScratch));
-  StringValScratch* scratch = reinterpret_cast<StringValScratch*>(sv.ptr);
-  StringVal result = StringVal::null();
-  if (scratch->buffer != NULL) result = StringVal(scratch->buffer, scratch->str_len);
-  delete scratch;
-  return result;
+void AggregateFunctions::InitNullString(FunctionContext* c, StringVal* dst) {
+  dst->is_null = true;
+  dst->ptr = NULL;
+  dst->len = 0;
 }
 
 template<>
 void AggregateFunctions::Min(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;
-  DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, sizeof(StringValScratch));
-  StringValScratch* scratch = reinterpret_cast<StringValScratch*>(dst->ptr);
-  StringValue src_sv = StringValue::FromStringVal(src);
-  StringValue dst_sv = StringValue(reinterpret_cast<char*>(scratch->buffer),
-      scratch->str_len);
-  if (scratch->buffer == NULL || src_sv < dst_sv) scratch->Set(ctx, src);
+  if (dst->is_null ||
+      StringValue::FromStringVal(src) < StringValue::FromStringVal(*dst)) {
+    ctx->Free(dst->ptr);
+    uint8_t* copy = ctx->Allocate(src.len);
+    memcpy(copy, src.ptr, src.len);
+    *dst = StringVal(copy, src.len);
+  }
 }
 
 template<>
 void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;
-  DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, sizeof(StringValScratch));
-  StringValScratch* scratch = reinterpret_cast<StringValScratch*>(dst->ptr);
-  StringValue src_sv = StringValue::FromStringVal(src);
-  StringValue dst_sv = StringValue(reinterpret_cast<char*>(scratch->buffer),
-      scratch->str_len);
-  if (scratch->buffer == NULL || src_sv > dst_sv) scratch->Set(ctx, src);
+  if (dst->is_null ||
+      StringValue::FromStringVal(src) > StringValue::FromStringVal(*dst)) {
+    ctx->Free(dst->ptr);
+    uint8_t* copy = ctx->Allocate(src.len);
+    memcpy(copy, src.ptr, src.len);
+    *dst = StringVal(copy, src.len);
+  }
 }
 
 template<>
@@ -189,21 +131,22 @@ void AggregateFunctions::Max(FunctionContext*,
 void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src,
       const StringVal& separator, StringVal* result) {
   if (src.is_null) return;
-  if (src.is_null) return;
-  DCHECK(!result->is_null);
-  DCHECK_EQ(result->len, sizeof(StringValScratch));
-
-  StringValScratch* scratch = reinterpret_cast<StringValScratch*>(result->ptr);
-  if (scratch->buffer == NULL) {
-    scratch->Set(ctx, src);
+  if (result->is_null) {
+    uint8_t* copy = ctx->Allocate(src.len);
+    memcpy(copy, src.ptr, src.len);
+    *result = StringVal(copy, src.len);
     return;
   }
-  if (separator.is_null) {
-    scratch->Append(ctx, DEFAULT_STRING_CONCAT_DELIM);
-  } else {
-    scratch->Append(ctx, separator);
-  }
-  scratch->Append(ctx, src);
+
+  const StringVal* sep_ptr = separator.is_null ? &DEFAULT_STRING_CONCAT_DELIM :
+      &separator;
+
+  int new_size = result->len + sep_ptr->len + src.len;
+  result->ptr = ctx->Reallocate(result->ptr, new_size);
+  memcpy(result->ptr + result->len, sep_ptr->ptr, sep_ptr->len);
+  result->len += sep_ptr->len;
+  memcpy(result->ptr + result->len, src.ptr, src.len);
+  result->len += src.len;
 }
 
 // Compute distinctpc and distinctpcsa using Flajolet and Martin's algorithm
@@ -213,7 +156,7 @@ void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src
 // There are 4 phases to compute the aggregate:
 //   1. allocate a bitmap, stored in the aggregation tuple's output string slot
 //   2. update the bitmap per row (UpdateDistinctEstimateSlot)
-//   3. for distribtued plan, merge the bitmaps from all the nodes
+//   3. for distributed plan, merge the bitmaps from all the nodes
 //      (UpdateMergeEstimateSlot)
 //   4. compute the estimate using the bitmaps when all the rows are processed
 //      (FinalizeEstimateSlot)

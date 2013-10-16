@@ -90,30 +90,24 @@ static OpcodeRegistry::AggFnDescriptor MaxDesc() {
 template<> inline
 OpcodeRegistry::AggFnDescriptor MinDesc<StringVal>() {
   return OpcodeRegistry::AggFnDescriptor(
-      (void*)AggregateFunctions::InitScratch,
+      (void*)AggregateFunctions::InitNullString,
       COERCE_CAST2_SAME(AggregateFunctions::Min, StringVal),
-      COERCE_CAST2_SAME(AggregateFunctions::Min, StringVal),
-      (void*)AggregateFunctions::SerializeScratch,
-      (void*)AggregateFunctions::SerializeScratch);
+      COERCE_CAST2_SAME(AggregateFunctions::Min, StringVal));
 }
 
 template<> inline
 OpcodeRegistry::AggFnDescriptor MaxDesc<StringVal>() {
   return OpcodeRegistry::AggFnDescriptor(
-      (void*)AggregateFunctions::InitScratch,
+      (void*)AggregateFunctions::InitNullString,
       COERCE_CAST2_SAME(AggregateFunctions::Max, StringVal),
-      COERCE_CAST2_SAME(AggregateFunctions::Max, StringVal),
-      (void*)AggregateFunctions::SerializeScratch,
-      (void*)AggregateFunctions::SerializeScratch);
+      COERCE_CAST2_SAME(AggregateFunctions::Max, StringVal));
 }
 
 static OpcodeRegistry::AggFnDescriptor StringConcatDesc() {
   return OpcodeRegistry::AggFnDescriptor(
-      (void*)AggregateFunctions::InitScratch,
+      (void*)AggregateFunctions::InitNullString,
       (void*)AggregateFunctions::StringConcat,
-      (void*)AggregateFunctions::StringConcat,
-      (void*)AggregateFunctions::SerializeScratch,
-      (void*)AggregateFunctions::SerializeScratch);
+      (void*)AggregateFunctions::StringConcat);
 }
 
 template<typename T>
@@ -241,7 +235,6 @@ void InitAggregateBuiltins(OpcodeRegistry::AggregateBuiltins* fns) {
   (*fns)[make_pair(TAggregationOp::DISTINCT_PCSA, TYPE_STRING)] =
       DistinctPcsaDesc<StringVal>();
 }
-
 
 }
 

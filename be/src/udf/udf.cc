@@ -25,16 +25,25 @@
 #if IMPALA_UDF_SDK_BUILD
 // For the SDK build, we are building the .lib that the developers would use to
 // write UDFs. They want to link against this to run their UDFs in a test environment.
-// Pulling in mem-pool is very undesirable since it pulls in many other libaries.
+// Pulling in free-pool is very undesirable since it pulls in many other libraries.
 // Instead, we'll implement a dummy version that is not used.
 // When they build their library to a .so, they'd use the version of FunctionContext
-// in the main binary, which does include MemPool.
+// in the main binary, which does include FreePool.
 namespace impala {
-class MemPool {
+class FreePool {
  public:
+  FreePool(MemPool*) { }
+
   uint8_t* Allocate(int byte_size) {
-    assert(false);
-    return NULL;
+    return reinterpret_cast<uint8_t*>(malloc(byte_size));
+  }
+
+  uint8_t* Reallocate(uint8_t* ptr, int byte_size) {
+    return reinterpret_cast<uint8_t*>(realloc(ptr, byte_size));
+  }
+
+  void Free(uint8_t* ptr) {
+    free(ptr);
   }
 };
 
@@ -50,7 +59,7 @@ class RuntimeState {
 };
 }
 #else
-#include "runtime/mem-pool.h"
+#include "runtime/free-pool.h"
 #include "runtime/runtime-state.h"
 #endif
 
@@ -60,11 +69,19 @@ using namespace std;
 
 static const int MAX_WARNINGS = 1000;
 
+// Create a FunctionContext. The caller is responsible for calling delete on it.
+FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool) {
+  impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
+  ctx->impl_->state_ = state;
+  ctx->impl_->pool_ = new FreePool(pool);
+  return ctx;
+}
+
 FunctionContext* FunctionContext::CreateTestContext() {
   FunctionContext* context = new FunctionContext;
   context->impl()->debug_ = true;
   context->impl()->state_ = NULL;
-  context->impl()->pool_ = NULL;
+  context->impl()->pool_ = new FreePool(NULL);
   return context;
 }
 
@@ -76,6 +93,7 @@ FunctionContext::~FunctionContext() {
   // in the uda harness now.
   impl_->CheckLocalAlloctionsEmpty();
   impl_->CheckAllocationsEmpty();
+  delete impl_->pool_;
   delete impl_;
 }
 
@@ -100,15 +118,17 @@ const char* FunctionContext::error_msg() const {
 
 uint8_t* FunctionContext::Allocate(int byte_size) {
   if (byte_size == 0) return NULL;
-  uint8_t* buffer = NULL;
-  if (impl_->pool_ == NULL) {
-    buffer = new uint8_t[byte_size];
-  } else {
-    buffer = impl_->pool_->Allocate(byte_size);
-  }
+  uint8_t* buffer = impl_->pool_->Allocate(byte_size);
   impl_->allocations_[buffer] = byte_size;
   if (impl_->debug_) memset(buffer, 0xff, byte_size);
   return buffer;
+}
+
+uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
+  impl_->allocations_.erase(ptr);
+  ptr = impl_->pool_->Reallocate(ptr, byte_size);
+  impl_->allocations_[ptr] = byte_size;
+  return ptr;
 }
 
 void FunctionContext::Free(uint8_t* buffer) {
@@ -119,7 +139,7 @@ void FunctionContext::Free(uint8_t* buffer) {
       // fill in garbage value into the buffer to increase the chance of detecting misuse
       memset(buffer, 0xff, it->second);
       impl_->allocations_.erase(it);
-      if (impl_->pool_ == NULL) delete[] buffer;
+      impl_->pool_->Free(buffer);
     } else {
       SetError(
           "FunctionContext::Free() on buffer that is not freed or was not allocated.");
@@ -160,21 +180,14 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
 
 uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
   if (byte_size == 0) return NULL;
-  uint8_t* buffer = NULL;
-  if (pool_ == NULL) {
-    buffer = new uint8_t[byte_size];
-  } else {
-    buffer = pool_->Allocate(byte_size);
-  }
+  uint8_t* buffer = pool_->Allocate(byte_size);
   local_allocations_.push_back(buffer);
   return buffer;
 }
 
 void FunctionContextImpl::FreeLocalAllocations() {
-  // TODO: these should be reused rather than freed.
-  // TODO: Integrate with MemPool
   for (int i = 0; i < local_allocations_.size(); ++i) {
-    if (pool_ == NULL) delete[] local_allocations_[i];
+    pool_->Free(local_allocations_[i]);
   }
   local_allocations_.clear();
 }

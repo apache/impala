@@ -25,21 +25,17 @@
 
 namespace impala {
 
+class FreePool;
 class MemPool;
 class RuntimeState;
 
 // This class actually implements the interface of FunctionContext. This is split to
 // hide the details from the external header.
-// Note: The actual UDF code does not include this file.
+// Note: The actual user code does not include this file.
 class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
-  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool) {
-    impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
-    ctx->impl_->state_ = state;
-    ctx->impl_->pool_ = pool;
-    return ctx;
-  }
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool);
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
 
@@ -65,8 +61,8 @@ class FunctionContextImpl {
   // Parent context object. Not owned
   impala_udf::FunctionContext* context_;
 
-  // Pool to service allocations from. NULL for test contexts.
-  MemPool* pool_;
+  // Pool to service allocations from.
+  FreePool* pool_;
 
   // We use the query's runtime state to report errors and warnings. NULL for test
   // contexts.
@@ -83,9 +79,14 @@ class FunctionContextImpl {
   // The number of warnings reported.
   int64_t num_warnings_;
 
+  // Allocations made and still owned by the user function.
   std::map<uint8_t*, int> allocations_;
   std::vector<uint8_t*> local_allocations_;
 
+  // The number of bytes allocated externally by the user function. In some cases,
+  // it is too inconvenient to use the Allocate()/Free() APIs in the FunctionContext,
+  // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
+  // have to track those allocations manually.
   int64_t external_bytes_tracked_;
 };
 
