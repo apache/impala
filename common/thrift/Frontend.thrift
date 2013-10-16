@@ -287,6 +287,13 @@ struct TQueryExecRequest {
   // Estimated per-host CPU requirements in YARN virtual cores.
   // Used for resource management.
   12: optional i16 per_host_vcores
+
+  // List of error/warning messages the FE uses to pass to the BE, so that they can be
+  // appended to BE error messages. The list is indexed (by convention) according to the
+  // specific error in the BE that the message should be appended to. Currently, only
+  // index 0 is used for a warning message about missing table and/or column stats
+  // relevant to this query.
+  13: optional list<string> fe_error_msgs
 }
 
 enum TCatalogOpType {

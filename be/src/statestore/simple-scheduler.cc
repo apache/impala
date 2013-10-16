@@ -764,11 +764,16 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   schedule->CreateReservationRequest(
       pool, resource_broker_->llama_nodes(), &reservation_request);
   if (resource_broker_ != NULL && !reservation_request.resources.empty()) {
-    LOG(INFO) << "Asking IRB for reservation";
-    RETURN_IF_ERROR(
-        resource_broker_->Reserve(reservation_request, schedule->reservation()));
-    LOG(INFO) << "IRB fullfilled reservation: "
-              << schedule->reservation()->allocated_resources.size();
+    Status status = resource_broker_->Reserve(
+        reservation_request, schedule->reservation());
+    if (!status.ok()) {
+      // Warn about missing table and/or column stats if necessary.
+      if(schedule->request().__isset.fe_error_msgs &&
+          !schedule->request().fe_error_msgs.empty()) {
+        status.AddErrorMsg(schedule->request().fe_error_msgs[0]);
+      }
+      return status;
+    }
     RETURN_IF_ERROR(schedule->ValidateReservation());
     AddToActiveResourceMaps(*schedule->reservation(), coord);
   }

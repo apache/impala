@@ -36,6 +36,8 @@ abstract public class ScanNode extends PlanNode {
     desc_ = desc;
   }
 
+  public TupleDescriptor getTupleDesc() { return desc_; }
+
   /**
    * Returns all scan ranges plus their locations. Needs to be preceded by a call to
    * finalize().
@@ -87,6 +89,18 @@ abstract public class ScanNode extends PlanNode {
           Joiner.on(", ").join(columnsMissingStats)));
     }
     return output.toString();
+  }
+
+  /**
+   * Returns true if the table underlying this scan is missing table stats
+   * or column stats relevant to this scan node.
+   */
+  public boolean isTableMissingStats() {
+    if (desc_.getTable().getNumRows() == -1) return true;
+    for (SlotDescriptor slot: desc_.getSlots()) {
+      if (!slot.getStats().hasStats()) return true;
+    }
+    return false;
   }
 
   /**

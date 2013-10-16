@@ -61,7 +61,6 @@ import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogOpRequest;
 import com.cloudera.impala.thrift.TCatalogOpType;
 import com.cloudera.impala.thrift.TColumn;
-import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
@@ -86,6 +85,7 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.cloudera.impala.util.TResultRowBuilder;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -492,13 +492,24 @@ public class Frontend {
       queryExecRequest.addToDest_fragment_idx(idx.intValue());
     }
 
-    // set scan ranges/locations for scan nodes
+    // Set scan ranges/locations for scan nodes.
+    // Also assemble list of tables names missing stats for assembling a warning message.
+    List<String> tablesMissingStats = Lists.newArrayList();
     LOG.debug("get scan range locations");
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
           scanNode.getScanRangeLocations(
               queryCtxt.request.query_options.getMax_scan_range_length()));
+      if (scanNode.isTableMissingStats()) {
+        tablesMissingStats.add(scanNode.getTupleDesc().getTable().getFullName());
+      }
+    }
+    if (!tablesMissingStats.isEmpty()) {
+      String warnMsg = "Warning: The following tables are missing relevant table " +
+          "and/or column statistics leading to inaccurate resource estimates:\n" +
+          Joiner.on(", ").join(tablesMissingStats);
+      queryExecRequest.addToFe_error_msgs(warnMsg);
     }
 
     // Compute resource requirements after scan range locations because the cost
