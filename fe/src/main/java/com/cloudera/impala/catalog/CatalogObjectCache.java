@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
@@ -114,6 +115,14 @@ public class CatalogObjectCache<T extends CatalogObject> {
    * Add all the names to the known object set.
    */
   public void add(List<String> names) { for (String name: names) add(name); }
+
+  /**
+   *  Returns all the objects in the cache. This is not thread safe (the returned
+   *  list is not a copy).
+   */
+  public Collection<T> getAllObjects() {
+    return metadataCache_.asMap().values();
+  }
 
   public void clear() {
     synchronized (nameVersionMap_) {

@@ -419,11 +419,21 @@ public abstract class Catalog {
    * it from the metastore. How the metadata is loaded is based on the
    * CatalogInitStrategy that was set in the c'tor. If the CatalogInitStrategy is
    * IMMEDIATE, the table metadata will be loaded in parallel.
-   * TODO: Until UDF metadata is persisted, it would be good for this function to
-   * not invalidate UDF metadata.
    */
   public long reset() {
     catalogLock_.writeLock().lock();
+    try {
+      return resetInternal();
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Executes the underlying reset logic. catalogLock_.writeLock() must
+   * be taken before calling this.
+   */
+  protected long resetInternal() {
     try {
       nextTableId.set(0);
       dbCache_.clear();
@@ -469,8 +479,6 @@ public abstract class Catalog {
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
       throw new IllegalStateException(e);
-    } finally {
-      catalogLock_.writeLock().unlock();
     }
   }
 

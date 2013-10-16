@@ -216,3 +216,26 @@ show aggregate functions;
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Call invalidate metadata and make sure the functions are still there
+invalidate metadata
+---- RESULTS
+---- TYPES
+====
+---- QUERY
+show functions;
+---- RESULTS
+'fn(INT)'
+'fn(INT, STRING)'
+'fn(STRING, INT)'
+'fn2(INT)'
+---- TYPES
+STRING
+====
+---- QUERY
+show aggregate functions;
+---- RESULTS
+'agg_fn(INT, STRING)'
+---- TYPES
+STRING
+====

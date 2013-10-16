@@ -375,6 +375,13 @@ public class Db implements CatalogObject {
   }
 
   /**
+   * Returns a map of functionNames to list of (overloaded) functions with that name.
+   */
+  public HashMap<String, List<Function>> getAllFunctions() {
+    return functions;
+  }
+
+  /**
    * Marks the table as invalid so the next access will trigger a metadata load.
    */
   public long invalidateTable(String tableName) {

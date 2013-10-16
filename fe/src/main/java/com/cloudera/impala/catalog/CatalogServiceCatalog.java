@@ -15,10 +15,13 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalog;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -26,6 +29,7 @@ import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
+import com.google.common.collect.Lists;
 
 /**
  * Specialized Catalog that implements the CatalogService specific Catalog
@@ -175,6 +179,51 @@ public class CatalogServiceCatalog extends Catalog {
       } catch (Exception e) {
         // Swallow all exceptions.
       }
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  @Override
+  public long reset() {
+    catalogLock_.writeLock().lock();
+
+    // Since UDFs/UDAs are not persisted in the metastore, we won't clear
+    // them across reset. To do this, we store all the functions before
+    // clearing and restore them after.
+    // TODO: Everything about this. Persist them.
+    List<Pair<String, HashMap<String, List<Function>>>> functions =
+        Lists.newArrayList();
+    for (Db db: dbCache_.getAllObjects()) {
+      if (db.numFunctions() == 0) continue;
+      functions.add(Pair.create(db.getName(), db.getAllFunctions()));
+    }
+
+    try {
+      // Reset the dbs.
+      resetInternal();
+
+      // Restore UDFs/UDAs.
+      for (Pair<String, HashMap<String, List<Function>>> dbfns: functions) {
+        Db db = null;
+        try {
+          db = dbCache_.get(dbfns.first);
+        } catch (Exception e) {
+          continue;
+        }
+        if (db == null) {
+          // DB no longer exists.
+          // TODO: We could restore this DB and then add the functions back.
+          continue;
+        }
+
+        for (List<Function> fns: dbfns.second.values()) {
+          for (Function fn: fns) {
+            db.addFunction(fn);
+          }
+        }
+      }
+      return getCatalogVersion();
     } finally {
       catalogLock_.writeLock().unlock();
     }
