@@ -103,6 +103,10 @@ public class AggregationNode extends PlanNode {
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality < 0) cardinality = -1;
+    // An AggregationNode cannot increase the cardinality.
+    if (getChild(0).getCardinality() != -1) {
+      cardinality = Math.min(getChild(0).getCardinality(), cardinality);
+    }
     LOG.debug("stats Agg: cardinality=" + Long.toString(cardinality));
   }
 
@@ -186,14 +190,19 @@ public class AggregationNode extends PlanNode {
         "PlanNode must be placed into a fragment before calling this method.");
     perHostMemCost = 0;
     long perHostCardinality = fragment.getNumDistinctValues(aggInfo.getGroupingExprs());
-    if (perHostCardinality != -1) {
-      // take HAVING predicate into account
-      perHostCardinality =
-          Math.round((double) perHostCardinality * computeSelectivity());
-      perHostMemCost += Math.max(perHostCardinality * avgRowSize *
-          Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
-    } else {
-      perHostMemCost += DEFAULT_PER_HOST_MEM;
+    if (perHostCardinality == -1) {
+      perHostMemCost = DEFAULT_PER_HOST_MEM;
+      return;
     }
+
+    // Per-host cardinality cannot be greater than the total output cardinality.
+    if (cardinality != -1) {
+      perHostCardinality = Math.min(perHostCardinality, cardinality);
+    }
+    // take HAVING predicate into account
+    perHostCardinality =
+        Math.round((double) perHostCardinality * computeSelectivity());
+    perHostMemCost += Math.max(perHostCardinality * avgRowSize *
+        Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }
 }
