@@ -298,7 +298,9 @@ public class UdfExecutor {
       }
       case STRING: {
         byte[] bytes = null;
-        if (obj instanceof BytesWritable) {
+        if (obj instanceof byte[]) {
+          bytes = (byte[]) obj;
+        } else if (obj instanceof BytesWritable) {
           bytes = ((BytesWritable)obj).getBytes();
         } else if (obj instanceof Text) {
           bytes = ((Text)obj).getBytes();
