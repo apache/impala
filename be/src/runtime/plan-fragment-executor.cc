@@ -112,7 +112,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   int64_t bytes_limit = -1;
   if (request.__isset.reserved_resource &&
       request.reserved_resource.memory_mb > 0) {
-    bytes_limit = request.reserved_resource.memory_mb * 1024 * 1024;
+    bytes_limit =
+        static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
     VLOG_QUERY << "Using query memory limit from resource reservation: "
         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   } else if (request.query_ctxt.request.query_options.__isset.mem_limit &&
