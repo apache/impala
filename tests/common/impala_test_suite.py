@@ -109,7 +109,7 @@ class ImpalaTestSuite(BaseTestSuite):
         self.hive_client.drop_table(db_name, table_name, True)
       self.hive_client.drop_database(db_name, True, False)
 
-  def run_test_case(self, test_file_name, vector):
+  def run_test_case(self, test_file_name, vector, use_db=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -119,7 +119,7 @@ class ImpalaTestSuite(BaseTestSuite):
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
     # Change the database to reflect the file_format, compression codec etc.
-    self.change_database(self.client, table_format_info)
+    self.change_database(self.client, table_format_info, use_db)
     sections = self.load_query_test_file(self.get_workload(), test_file_name)
     updated_sections = list()
     for test_section in sections:
@@ -186,8 +186,10 @@ class ImpalaTestSuite(BaseTestSuite):
         assert False, 'Unsupported setup command: %s' % row
 
   @classmethod
-  def change_database(cls, impala_client, table_format):
-    db_name =  QueryTestSectionReader.get_db_name(table_format)
+  def change_database(cls, impala_client, table_format=None, db_name=None):
+    if db_name == None:
+      assert table_format != None
+      db_name =  QueryTestSectionReader.get_db_name(table_format)
     query = 'use %s' % db_name
     # Clear the exec_options before executing a USE statement.
     # The USE statement should not fail for negative exec_option tests.

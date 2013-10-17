@@ -1,82 +1,82 @@
 ====
 # Test identity functions
 ---- QUERY
-select udf_test.identity(true);
+select identity(true);
 ---- TYPES
 boolean
 ---- RESULTS
 true
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as tinyint));
+select identity(cast(10 as tinyint));
 ---- TYPES
 tinyint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as smallint));
+select identity(cast(10 as smallint));
 ---- TYPES
 smallint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as int));
+select identity(cast(10 as int));
 ---- TYPES
 int
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as bigint));
+select identity(cast(10 as bigint));
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10.0 as float));
+select identity(cast(10.0 as float));
 ---- TYPES
 float
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10.0 as double));
+select identity(cast(10.0 as double));
 ---- TYPES
 double
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity("why hello there");
+select identity("why hello there");
 ---- TYPES
 string
 ---- RESULTS
 'why hello there'
 ====
 ---- QUERY
-select udf_test.identity(now());
+select identity(now());
 ---- TYPES
 timestamp
 ====
 ---- QUERY
-select udf_test.identity(NULL);
+select identity(NULL);
 ---- TYPES
 boolean
 ---- RESULTS
 NULL
 ====
 ---- QUERY
-select udf_test.constant_timestamp();
+select constant_timestamp();
 ---- TYPES
 timestamp
 ---- RESULTS
 2013-10-09 00:00:00.000000001
 ====
 ---- QUERY
-select from_utc_timestamp(udf_test.constant_timestamp(), "UTC");
+select from_utc_timestamp(constant_timestamp(), "UTC");
 ---- TYPES
 timestamp
 ---- RESULTS
@@ -84,14 +84,14 @@ timestamp
 ====
 # Test UDFs with different arguments
 ---- QUERY
-select udf_test.all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
+select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
 ---- TYPES
 int
 ---- RESULTS
 29
 ====
 ---- QUERY
-select udf_test.no_args();
+select no_args();
 ---- TYPES
 string
 ---- RESULTS
@@ -99,14 +99,14 @@ string
 ====
 # Test UDFs over tables
 ---- QUERY
-select sum(udf_test.identity(bigint_col)) from functional.alltypes
+select sum(identity(bigint_col)) from functional.alltypes
 ---- TYPES
 bigint
 ---- RESULTS
 328500
 ====
 ---- QUERY
-select udf_test.identity(a) from functional.tinytable;
+select identity(a) from functional.tinytable;
 ---- TYPES
 string
 ---- RESULTS
@@ -115,12 +115,12 @@ string
 'eeeeeeee'
 ====
 ---- QUERY
-select udf_test.identity(bool_col), udf_test.identity(tinyint_col),
-       udf_test.identity(smallint_col), udf_test.identity(int_col),
-       udf_test.identity(bigint_col), udf_test.identity(float_col),
-       udf_test.identity(double_col), udf_test.identity(string_col),
-       udf_test.identity(timestamp_col), udf_test.identity(year)
-from alltypestiny;
+select identity(bool_col), identity(tinyint_col),
+       identity(smallint_col), identity(int_col),
+       identity(bigint_col), identity(float_col),
+       identity(double_col), identity(string_col),
+       identity(timestamp_col), identity(year)
+from functional.alltypestiny;
 ---- TYPES
 boolean, tinyint, smallint, int, bigint, float, double, string, timestamp, int
 ---- RESULTS
@@ -134,7 +134,7 @@ true,0,0,0,0,0,0,'0',2009-03-01 00:00:00,2009
 false,1,1,1,10,1.100000023841858,10.1,'1',2009-03-01 00:01:00,2009
 ====
 ---- QUERY
-select sum(udf_test.all_types_fn(
+select sum(all_types_fn(
     string_col, bool_col, tinyint_col, smallint_col,
     int_col, bigint_col, float_col, double_col))
 from functional.alltypes;
@@ -148,7 +148,7 @@ bigint
 799350
 ====
 ---- QUERY
-select udf_test.no_args() from alltypes limit 1;
+select no_args() from functional.alltypes limit 1;
 ---- TYPES
 string
 ---- RESULTS
@@ -156,38 +156,38 @@ string
 ====
 # Chain UDFs/exprs together to test glue
 ---- QUERY
-select udf_test.identity(udf_test.no_args());
+select identity(no_args());
 ---- TYPES
 string
 ---- RESULTS
 'string'
 ====
 ---- QUERY
-select udf_test.identity(cast(udf_test.identity(3.0) as bigint));
+select identity(cast(identity(3.0) as bigint));
 ---- TYPES
 bigint
 ---- RESULTS
 3
 ====
 ---- QUERY
-select count(*) from alltypessmall having udf_test.identity(count(*)) > 1
+select count(*) from functional.alltypessmall having identity(count(*)) > 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(udf_test.identity(id)) from functional.alltypessmall
-having udf_test.identity(count(*)) > 1
+select count(identity(id)) from functional.alltypessmall
+having identity(count(*)) > 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(udf_test.identity(id)) from functional.alltypessmall
-group by udf_test.identity(int_col)
-having udf_test.identity(count(*)) > 10
+select count(identity(id)) from functional.alltypessmall
+group by identity(int_col)
+having identity(count(*)) > 10
 ---- TYPES
 bigint
 ---- RESULTS
@@ -198,17 +198,17 @@ bigint
 12
 ====
 ---- QUERY
-select udf_test.identity(a.tinyint_col),
-       udf_test.identity(b.id),
-       udf_test.identity(a.string_col)
-from alltypesagg a join alltypessmall b on
-  (udf_test.identity(a.tinyint_col) = udf_test.identity(b.id))
-and udf_test.identity(a.tinyint_col + b.tinyint_col) < 5
-where udf_test.identity(a.month) = udf_test.identity(1)
-and udf_test.identity(a.day) = udf_test.identity(1)
-and udf_test.identity(a.string_col) > udf_test.identity('88')
-and udf_test.identity(b.bool_col) = udf_test.identity(false)
-order by udf_test.identity(a.string_col)
+select identity(a.tinyint_col),
+       identity(b.id),
+       identity(a.string_col)
+from functional.alltypesagg a join functional.alltypessmall b on
+  (identity(a.tinyint_col) = identity(b.id))
+and identity(a.tinyint_col + b.tinyint_col) < 5
+where identity(a.month) = identity(1)
+and identity(a.day) = identity(1)
+and identity(a.string_col) > identity('88')
+and identity(b.bool_col) = identity(false)
+order by identity(a.string_col)
 limit 5
 ---- TYPES
 tinyint, int, string
@@ -220,92 +220,92 @@ tinyint, int, string
 1,1,'911'
 ====
 ---- QUERY
-select udf_test.identity(int_col),
-       udf_test.identity(min(udf_test.identity(bool_col))),
-       udf_test.identity(max(udf_test.identity(tinyint_col))),
-       udf_test.identity(max(udf_test.identity(smallint_col))),
-       udf_test.identity(max(udf_test.identity(int_col))),
-       udf_test.identity(max(udf_test.identity(bigint_col))),
-       udf_test.identity(max(udf_test.identity(float_col))),
-       udf_test.identity(max(udf_test.identity(double_col))),
-       udf_test.identity(max(udf_test.identity(string_col))),
-       udf_test.identity(max(udf_test.identity(timestamp_col)))
-from alltypesagg
-where udf_test.identity(udf_test.identity(tinyint_col) > udf_test.identity(1))
-group by udf_test.identity(int_col)
-having udf_test.identity(udf_test.identity(int_col) > udf_test.identity(998))
+select identity(int_col),
+       identity(min(identity(bool_col))),
+       identity(max(identity(tinyint_col))),
+       identity(max(identity(smallint_col))),
+       identity(max(identity(int_col))),
+       identity(max(identity(bigint_col))),
+       identity(max(identity(float_col))),
+       identity(max(identity(double_col))),
+       identity(max(identity(string_col))),
+       identity(max(identity(timestamp_col)))
+from functional.alltypesagg
+where identity(identity(tinyint_col) > identity(1))
+group by identity(int_col)
+having identity(identity(int_col) > identity(998))
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,timestamp
 ---- RESULTS
 999,false,9,99,999,9990,1098.900024414062,10089.9,'999',2010-01-10 18:02:05.100000000
 ====
 ---- QUERY
-select udf_test.identity(year),
-       udf_test.identity(min(udf_test.identity(month))),
-       udf_test.identity(min(string_col)),
-       udf_test.identity(max(timestamp_col))
-from alltypesagg group by udf_test.identity(year)
-having udf_test.identity(udf_test.identity(year) = udf_test.identity(2010))
+select identity(year),
+       identity(min(identity(month))),
+       identity(min(string_col)),
+       identity(max(timestamp_col))
+from functional.alltypesagg group by identity(year)
+having identity(identity(year) = identity(2010))
 ---- TYPES
 int,int,string,timestamp
 ---- RESULTS
 2010,1,'0',2010-01-10 18:02:05.100000000
 ====
 ---- QUERY
-select min(udf_test.identity(int_col)) from alltypesagg where int_col is null;
+select min(identity(int_col)) from functional.alltypesagg where int_col is null;
 ---- TYPES
 int
----- RESULT
+---- RESULTS
 NULL
 ====
 ---- QUERY
-select udf_test.var_sum(NULL, NULL, NULL)
+select var_sum(NULL, NULL, NULL)
 ---- TYPES
 int
----- RESULT
+---- RESULTS
 NULL
 ====
 ---- QUERY
-select udf_test.var_and(true, false, true)
+select var_and(true, false, true)
 ---- TYPES
 boolean
----- RESULT
+---- RESULTS
 false
 ====
 ---- QUERY
-select udf_test.var_and(true, true, true, true, true)
+select var_and(true, true, true, true, true)
 ---- TYPES
 boolean
----- RESULT
+---- RESULTS
 true
 ====
 ---- QUERY
-select udf_test.var_sum(1, 2, 3, 4, 5, 6)
+select var_sum(1, 2, 3, 4, 5, 6)
 ---- TYPES
 int
----- RESULT
+---- RESULTS
 21
 ====
 ---- QUERY
-select udf_test.var_sum(1.0, 2.0, 3.0)
+select var_sum(1.0, 2.0, 3.0)
 ---- TYPES
 double
----- RESULT
+---- RESULTS
 6
 ====
 ---- QUERY
-select udf_test.var_sum("Hello", "World", "Foo", "Bar")
+select var_sum("Hello", "World", "Foo", "Bar")
 ---- TYPES
 int
----- RESULT
+---- RESULTS
 16
 ====
 ---- QUERY
-select tinyint_col, int_col, udf_test.var_sum(tinyint_col, int_col)
+select tinyint_col, int_col, var_sum(tinyint_col, int_col)
 from functional.alltypestiny
 ---- TYPES
 tinyint, int, int
----- RESULT
+---- RESULTS
 0,0,0
 1,1,2
 0,0,0
@@ -316,32 +316,32 @@ tinyint, int, int
 1,1,2
 ====
 ---- QUERY
-select udf_test.var_sum_multiply(NULL, 1, 2)
+select var_sum_multiply(NULL, 1, 2)
 ---- TYPES
 double
----- RESULT
+---- RESULTS
 NULL
 ====
 ---- QUERY
-select udf_test.var_sum_multiply(1.0, 1, 2, NULL, 3)
+select var_sum_multiply(1.0, 1, 2, NULL, 3)
 ---- TYPES
 double
----- RESULT
-NULL
+---- RESULTS
+6
 ====
 ---- QUERY
-select udf_test.var_sum_multiply(5.0, 1, 2, 3, 4, 5, 6)
+select var_sum_multiply(5.0, 1, 2, 3, 4, 5, 6)
 ---- TYPES
 double
----- RESULT
+---- RESULTS
 105
 ====
 ---- QUERY
-select tinyint_col, int_col, udf_test.var_sum_multiply(2, tinyint_col, int_col)
+select tinyint_col, int_col, var_sum_multiply(2, tinyint_col, int_col)
 from functional.alltypestiny
 ---- TYPES
 tinyint, int, double
----- RESULT
+---- RESULTS
 0,0,0
 1,1,4
 0,0,0
