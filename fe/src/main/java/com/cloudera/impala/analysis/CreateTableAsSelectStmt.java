@@ -22,6 +22,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableId;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.service.DdlExecutor;
@@ -114,9 +115,13 @@ public class CreateTableAsSelectStmt extends StatementBase {
         createStmt_.setLocation(new HdfsURI(msTbl.getSd().getLocation()));
       }
 
-      // Create a "temp" table based off the given metastore.api.Table object.
-      Table table = Table.fromMetastoreTable(
-          analyzer.getCatalog().getNextTableId(), db, msTbl);
+      // Create a "temp" table based off the given metastore.api.Table object. Normally,
+      // the CatalogService assigns all table IDs, but in this case we need to assign the
+      // "temp" table an ID locally. This table ID cannot conflict with any table in the
+      // SelectStmt (or the BE will be very confused). To ensure the ID is unique within
+      // this query, just assign it the invalid table ID. The CatalogServer will assign
+      // this table a proper ID once it is created there as part of the CTAS execution.
+      Table table = Table.fromMetastoreTable(new TableId(), db, msTbl);
       Preconditions.checkState(table != null && table instanceof HdfsTable);
 
       HdfsTable hdfsTable = (HdfsTable) table;

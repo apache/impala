@@ -217,7 +217,11 @@ public class Db implements CatalogObject {
     } else {
       TableLoadingException loadingException = new TableLoadingException(
           Joiner.on("\n").join(thriftTable.getLoad_status().getError_msgs()));
-      IncompleteTable table = new IncompleteTable(parentCatalog.getNextTableId(),
+      // This table's metadata is incomplete. It will show up in the catalog, but
+      // if it is accessed it will throw a TableLoadingException. The TableId for
+      // the table doesn't matter because can never be sent to the BE, so just assign
+      // it an invalid ID.
+      IncompleteTable table = new IncompleteTable(new TableId(),
           this, thriftTable.getTbl_name(), loadingException);
       tableCache.add(table);
     }
