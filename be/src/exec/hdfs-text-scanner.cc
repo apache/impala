@@ -90,6 +90,8 @@ void HdfsTextScanner::Close() {
 
   scan_node_->ReleaseCodegenFn(THdfsFileFormat::TEXT, codegen_fn_);
   codegen_fn_ = NULL;
+
+  HdfsScanner::Close();
 }
 
 void HdfsTextScanner::InitNewRange() {
@@ -417,7 +419,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
       ++num_tuples_processed;
       --num_tuples;
 
-      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, tuple_row)) {
+      if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, tuple_row)) {
         ++num_tuples_materialized;
         tuple_ = next_tuple(tuple_);
         tuple_row = next_row(tuple_row);

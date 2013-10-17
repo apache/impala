@@ -332,6 +332,8 @@ void HdfsParquetScanner::Close() {
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();
+
+  HdfsScanner::Close();
 }
 
 HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
@@ -656,7 +658,7 @@ Status HdfsParquetScanner::AssembleRows() {
       }
 
       row->SetTuple(scan_node_->tuple_idx(), tuple);
-      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) {
+      if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
         row = next_row(row);
         tuple = next_tuple(tuple);
         ++num_to_commit;

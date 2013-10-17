@@ -70,6 +70,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
+      num_conjuncts_copies_(0),
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
@@ -151,53 +152,6 @@ Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) 
   return Status::OK;
 }
 
-Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_params) {
-  // Convert the input ranges into per file DiskIO::ScanRange objects
-  int num_ranges_missing_volume_id = 0;
-  for (int i = 0; i < scan_range_params.size(); ++i) {
-    DCHECK(scan_range_params[i].scan_range.__isset.hdfs_file_split);
-    const THdfsFileSplit& split = scan_range_params[i].scan_range.hdfs_file_split;
-    const string& path = split.path;
-
-    HdfsFileDesc* desc = NULL;
-    SplitsMap::iterator desc_it = per_file_splits_.find(path);
-    if (desc_it == per_file_splits_.end()) {
-      desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
-      per_file_splits_[path] = desc;
-      desc->file_length = split.file_length;
-    } else {
-      desc = desc_it->second;
-    }
-
-    if (scan_range_params[i].volume_id == -1) {
-      if (!unknown_disk_id_warned_) {
-        AddRuntimeExecOption("Missing Volume Id");
-        LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
-                     << " Check your hdfs settings to enable block location metadata.";
-        unknown_disk_id_warned_ = true;
-      }
-      ++num_ranges_missing_volume_id;
-    }
-
-    desc->splits.push_back(AllocateScanRange(desc->filename.c_str(),
-       split.length, split.offset, split.partition_id, scan_range_params[i].volume_id));
-  }
-
-  // Update server wide metrics for number of scan ranges and ranges that have
-  // incomplete metadata.
-  ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params.size());
-  ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
-
-  // Add per volume stats to the runtime profile
-  PerVolumnStats per_volume_stats;
-  stringstream str;
-  UpdateHdfsSplitStats(scan_range_params, &per_volume_stats);
-  PrintHdfsSplitStats(per_volume_stats, &str);
-  runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
-
-  return Status::OK;
-}
-
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
     int64_t offset, int64_t partition_id, int disk_id) {
   DCHECK_GE(disk_id, -1);
@@ -221,8 +175,8 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
 }
 
 HdfsFileDesc* HdfsScanNode::GetFileDesc(const string& filename) {
-  DCHECK(per_file_splits_.find(filename) != per_file_splits_.end());
-  return per_file_splits_[filename];
+  DCHECK(file_descs_.find(filename) != file_descs_.end());
+  return file_descs_[filename];
 }
 
 void HdfsScanNode::SetFileMetadata(const string& filename, void* metadata) {
@@ -264,6 +218,21 @@ void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, Function* fn) {
   DCHECK(it != codegend_fn_map_.end());
   unique_lock<mutex> l(codgend_fn_map_lock_);
   it->second.push_back(fn);
+}
+
+vector<Expr*>* HdfsScanNode::GetConjuncts() {
+  unique_lock<mutex> l(conjuncts_copies_lock_);
+  DCHECK(!conjuncts_copies_.empty());
+  vector<Expr*>* conjuncts = conjuncts_copies_.back();
+  conjuncts_copies_.pop_back();
+  return conjuncts;
+}
+
+void HdfsScanNode::ReleaseConjuncts(vector<Expr*>* conjuncts) {
+  DCHECK(conjuncts != NULL);
+  unique_lock<mutex> l(conjuncts_copies_lock_);
+  conjuncts_copies_.push_back(conjuncts);
+  DCHECK_LE(conjuncts_copies_.size(), num_conjuncts_copies_);
 }
 
 HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
@@ -390,42 +359,76 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     return Status(ss.str());
   }
 
-  // Codegen scanner specific functions
-  if (state->codegen_enabled()) {
-    // If the codegen'd conjuncts are not thread safe, we will need to make copies of
-    // the exprs and codegen those as well.
-    if (!codegend_conjuncts_thread_safe_) {
-      int num_copies = state->resource_pool()->num_available_threads();
-      for (int i = 0; i < num_copies; ++i) {
-        vector<Expr*> conjuncts_copy_text;
-        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_text, false));
-        Function* text_fn = HdfsTextScanner::Codegen(this, conjuncts_copy_text);
-        if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT].push_back(text_fn);
+  // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
+  // file_descs_ and per_type_files_.
+  DCHECK(scan_range_params_ != NULL)
+      << "Must call SetScanRanges() before calling Prepare()";
 
-        vector<Expr*> conjuncts_copy_seq;
-        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_seq, false));
-        Function* seq_fn = HdfsSequenceScanner::Codegen(this, conjuncts_copy_seq);
-        if (seq_fn != NULL) {
-          codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
-        }
+  int num_ranges_missing_volume_id = 0;
+  for (int i = 0; i < scan_range_params_->size(); ++i) {
+    DCHECK((*scan_range_params_)[i].scan_range.__isset.hdfs_file_split);
+    const THdfsFileSplit& split = (*scan_range_params_)[i].scan_range.hdfs_file_split;
+    const string& path = split.path;
 
-        vector<Expr*> conjuncts_copy_avro;
-        RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy_avro, false));
-        Function* avro_fn = HdfsAvroScanner::Codegen(this, conjuncts_copy_avro);
-        if (avro_fn != NULL) codegend_fn_map_[THdfsFileFormat::AVRO].push_back(avro_fn);
+    HdfsFileDesc* file_desc = NULL;
+    FileDescMap::iterator file_desc_it = file_descs_.find(path);
+    if (file_desc_it == file_descs_.end()) {
+      // Add new file_desc to file_descs_ and per_type_files_
+      file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
+      file_descs_[path] = file_desc;
+      file_desc->file_length = split.file_length;
+
+      HdfsPartitionDescriptor* partition_desc =
+          hdfs_table_->GetPartition(split.partition_id);
+      if (partition_desc == NULL) {
+        stringstream ss;
+        ss << "Could not find partition with id: " << split.partition_id;
+        return Status(ss.str());
       }
+      ++num_unqueued_files_;
+      per_type_files_[partition_desc->file_format()].push_back(file_desc);
+      // Safe to call multiple times per partition
+      RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
     } else {
-      // Codegen function is thread safe, we can just use a single copy of the conjuncts
-      Function* text_fn = HdfsTextScanner::Codegen(this, conjuncts());
-      Function* seq_fn = HdfsSequenceScanner::Codegen(this, conjuncts());
-      Function* avro_fn = HdfsAvroScanner::Codegen(this, conjuncts());
-      if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT].push_back(text_fn);
-      if (seq_fn != NULL) {
-        codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE].push_back(seq_fn);
-      }
-      if (avro_fn != NULL) codegend_fn_map_[THdfsFileFormat::AVRO].push_back(avro_fn);
+      // File already processed
+      file_desc = file_desc_it->second;
     }
+
+    if ((*scan_range_params_)[i].volume_id == -1) {
+      if (!unknown_disk_id_warned_) {
+        AddRuntimeExecOption("Missing Volume Id");
+        LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
+                     << " Check your hdfs settings to enable block location metadata.";
+        unknown_disk_id_warned_ = true;
+      }
+      ++num_ranges_missing_volume_id;
+    }
+
+    file_desc->splits.push_back(
+        AllocateScanRange(file_desc->filename.c_str(), split.length, split.offset,
+                          split.partition_id, (*scan_range_params_)[i].volume_id));
   }
+
+  // Update server wide metrics for number of scan ranges and ranges that have
+  // incomplete metadata.
+  ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params_->size());
+  ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
+
+  // Add per volume stats to the runtime profile
+  PerVolumnStats per_volume_stats;
+  stringstream str;
+  UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
+  PrintHdfsSplitStats(per_volume_stats, &str);
+  runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
+
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::TEXT));
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::LZO_TEXT));
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::RC_FILE));
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::SEQUENCE_FILE));
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::AVRO));
+  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::PARQUET));
+
+  num_conjuncts_copies_ = conjuncts_copies_.size();
 
   // We need at least one scanner thread to make progress. We need to make this
   // reservation before any ranges are issued.
@@ -442,14 +445,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 }
 
 // This function initiates the connection to hdfs and starts up the initial scanner
-// threads.
-// Splits are accumulated by file type and the scanner subclasses are passed
-// the initial splits.  Scanners are expected to queue up a non-zero number of
-// those splits to the io mgr (via the ScanNode).
+// threads. The scanner subclasses are passed the initial splits.  Scanners are expected
+// to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
 
-  if (per_file_splits_.empty()) {
+  if (file_descs_.empty()) {
     SetDone();
     return Status::OK;
   }
@@ -501,30 +502,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   counters_running_ = true;
 
   int total_splits = 0;
-  // Walk all the files on this node and coalesce all the files with the same
-  // format.
-  // Also, initialize all the exprs for all the partition keys.
-  map<THdfsFileFormat::type, vector<HdfsFileDesc*> > per_type_files;
-  for (SplitsMap::iterator it = per_file_splits_.begin();
-       it != per_file_splits_.end(); ++it) {
-    vector<DiskIoMgr::ScanRange*>& splits = it->second->splits;
-    DCHECK(!splits.empty());
-
-    ScanRangeMetadata* metadata =
-        reinterpret_cast<ScanRangeMetadata*>(splits[0]->meta_data());
-    int64_t partition_id = metadata->partition_id;
-    HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-    if (partition == NULL) {
-      stringstream ss;
-      ss << "Could not find partition with id: " << partition_id;
-      return Status(ss.str());
-    }
-
-    ++num_unqueued_files_;
-    total_splits += splits.size();
-
-    RETURN_IF_ERROR(partition->PrepareExprs(state));
-    per_type_files[partition->file_format()].push_back(it->second);
+  for (FileDescMap::iterator it = file_descs_.begin(); it != file_descs_.end(); ++it) {
+    total_splits += it->second->splits.size();
   }
 
   if (total_splits == 0) {
@@ -538,19 +517,19 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   // Issue initial ranges for all file types.
   RETURN_IF_ERROR(
-      HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]));
+      HdfsTextScanner::IssueInitialRanges(this, per_type_files_[THdfsFileFormat::TEXT]));
   RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files[THdfsFileFormat::SEQUENCE_FILE]));
+      per_type_files_[THdfsFileFormat::SEQUENCE_FILE]));
   RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files[THdfsFileFormat::RC_FILE]));
+      per_type_files_[THdfsFileFormat::RC_FILE]));
   RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files[THdfsFileFormat::AVRO]));
+      per_type_files_[THdfsFileFormat::AVRO]));
   RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
-        per_type_files[THdfsFileFormat::PARQUET]));
-  if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
+        per_type_files_[THdfsFileFormat::PARQUET]));
+  if (!per_type_files_[THdfsFileFormat::LZO_TEXT].empty()) {
     // This will dlopen the lzo binary and can fail if it is not present
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
-        this, per_type_files[THdfsFileFormat::LZO_TEXT]));
+        this, per_type_files_[THdfsFileFormat::LZO_TEXT]));
   }
 
   if (progress_.done()) SetDone();
@@ -562,6 +541,10 @@ void HdfsScanNode::Close(RuntimeState* state) {
 
   state->resource_pool()->SetThreadAvailableCb(NULL);
   scanner_threads_.JoinAll();
+
+  // All conjuncts should have been released
+  DCHECK_EQ(conjuncts_copies_.size(), num_conjuncts_copies_)
+      << "conjuncts_copies_ leak, check that ReleaseConjuncts() is being called";
 
   num_owned_io_buffers_ -= materialized_row_batches_->Cleanup();
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
@@ -866,3 +849,72 @@ void HdfsScanNode::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
          << PrettyPrinter::Print(i->second.second, TCounterType::BYTES) << " ";
   }
 }
+
+Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
+  // Nothing to do
+  if (per_type_files_[format].empty()) return Status::OK;
+
+  // This query's current thread quota
+  int num_threads = runtime_state_->resource_pool()->num_available_threads();
+  // The number of splits for this format
+  int num_splits = 0;
+  BOOST_FOREACH(HdfsFileDesc* desc, per_type_files_[format]) {
+    num_splits += desc->splits.size();
+  }
+
+  int num_codegen_copies;
+  if (!codegend_conjuncts_thread_safe_) {
+    // If the codegen'd conjuncts are not thread safe, we need to make copies of the exprs
+    // and codegen those as well.
+    num_codegen_copies = min(num_threads, num_splits);
+  } else {
+    // Codegen function is thread safe, we can just use a single copy of the conjuncts
+    num_codegen_copies = 1;
+  }
+
+  for (int i = 0; i < num_codegen_copies; ++i) {
+    vector<Expr*> conjuncts_copy;
+    RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy, false));
+    Function* fn;
+    switch (format) {
+      case THdfsFileFormat::TEXT:
+      case THdfsFileFormat::LZO_TEXT:
+        fn = HdfsTextScanner::Codegen(this, conjuncts_copy);
+        break;
+      case THdfsFileFormat::SEQUENCE_FILE:
+        fn = HdfsSequenceScanner::Codegen(this, conjuncts_copy);
+        break;
+      case THdfsFileFormat::AVRO:
+        fn = HdfsAvroScanner::Codegen(this, conjuncts_copy);
+        break;
+      default:
+        // No codegen for this format
+        fn = NULL;
+    }
+    if (fn != NULL) {
+      codegend_fn_map_[format].push_back(fn);
+    } else {
+      break;
+    }
+  }
+
+  // In addition to the codegen'd functions, create non-codegen'd copies of the conjuncts
+  // for use with EvalConjuncts(), or as a fallback if our thread quota increases or one
+  // of the Codegen() calls fails.
+
+  // Since this is the fallback, create the maximum number of copies we'll possibly
+  // need.
+  int max_threads = runtime_state_->exec_env()->thread_mgr()->system_threads_quota();
+  int num_noncodegen_copies = min(max_threads, num_splits);
+
+  // No point making more copies than the maximum possible number of threads
+  while (num_noncodegen_copies > 0 && conjuncts_copies_.size() < max_threads) {
+    vector<Expr*>* conjuncts = pool_->Add(new vector<Expr*>());
+    RETURN_IF_ERROR(CreateConjuncts(conjuncts, true));
+    conjuncts_copies_.push_back(conjuncts);
+    --num_noncodegen_copies;
+  }
+
+  return Status::OK;
+}
+

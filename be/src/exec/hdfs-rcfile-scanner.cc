@@ -524,7 +524,7 @@ Status HdfsRCFileScanner::ProcessRange() {
 
         current_row->SetTuple(scan_node_->tuple_idx(), tuple);
         // Evaluate the conjuncts and add the row to the batch
-        if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
+        if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, current_row)) {
           ++num_to_commit;
           current_row = next_row(current_row);
           tuple = next_tuple(tuple);

@@ -52,9 +52,9 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
       context_(NULL),
-      codegen_fn_(NULL),
       conjuncts_(NULL),
       num_conjuncts_(0),
+      codegen_fn_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
       batch_(NULL),
@@ -68,6 +68,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
 HdfsScanner::~HdfsScanner() {
   DCHECK(codegen_fn_ == NULL);
   DCHECK(batch_ == NULL);
+  DCHECK(conjuncts_ == NULL);
 }
 
 Status HdfsScanner::Prepare(ScannerContext* context) {
@@ -75,20 +76,17 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
   stream_ = context->GetStream();
   template_tuple_ = scan_node_->InitTemplateTuple(
       state_, context_->partition_descriptor()->partition_key_values());
-  RETURN_IF_ERROR(CreateConjunctsCopy());
+  conjuncts_ = scan_node_->GetConjuncts();
+  num_conjuncts_ = conjuncts_->size();
   StartNewRowBatch();
   return Status::OK;
 }
 
-Status HdfsScanner::CreateConjunctsCopy() {
-  DCHECK(conjuncts_ == NULL);
-  // This is only used to create copies of exprs when codegen is not available.
-  RETURN_IF_ERROR(scan_node_->CreateConjuncts(&conjuncts_mem_, true));
-  if (conjuncts_mem_.size() > 0) {
-    conjuncts_ = &conjuncts_mem_[0];
+void HdfsScanner::Close() {
+  if (conjuncts_ != NULL) {
+    scan_node_->ReleaseConjuncts(conjuncts_);
+    conjuncts_ = NULL;
   }
-  num_conjuncts_ = conjuncts_mem_.size();
-  return Status::OK;
 }
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
@@ -179,7 +177,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
 
     TupleRow* current_row = row_batch->GetRow(row_idx);
     current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
+    if (!ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, current_row)) {
       return 0;
     }
     // Add first tuple
@@ -212,11 +210,11 @@ int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
 
   if (template_tuple_ == NULL) {
     // Must be conjuncts on constant exprs.
-    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
+    if (!ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) return 0;
     return num_tuples;
   } else {
     row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
+    if (!ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) return 0;
     row = next_row(row);
 
     for (int n = 1; n < num_tuples; ++n) {
@@ -250,7 +248,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
   }
 
   tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
-  return ExecNode::EvalConjuncts(&conjuncts_mem_[0], num_conjuncts_, tuple_row);
+  return ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, tuple_row);
 }
 
 // Codegen for WriteTuple(above).  The signature matches WriteTuple (except for the

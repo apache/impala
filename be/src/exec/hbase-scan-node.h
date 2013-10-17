@@ -46,8 +46,6 @@ class HBaseScanNode : public ScanNode {
   // Close the hbase_scanner_, and report errors.
   virtual void Close(RuntimeState* state);
 
-  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
-
   const int suggested_max_caching() const { return suggested_max_caching_; }
 
  protected:

@@ -26,7 +26,7 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
     InitTuple(template_tuple_, tuple);
     MaterializeTuple(pool, data, tuple);
     tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
-    if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, tuple_row)) {
+    if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, tuple_row)) {
       ++num_to_commit;
       tuple_row = next_row(tuple_row);
       tuple = next_tuple(tuple);

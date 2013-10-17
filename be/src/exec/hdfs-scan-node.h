@@ -102,12 +102,6 @@ class HdfsScanNode : public ScanNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual void Close(RuntimeState* state);
 
-  // ScanNode methods
-  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
-
-  // Methods for the scanners to use
-  Status CreateConjuncts(std::vector<Expr*>* exprs, bool disable_codegen);
-
   int limit() const { return limit_; }
 
   bool compact_data() const { return compact_data_; }
@@ -149,8 +143,16 @@ class HdfsScanNode : public ScanNode {
   // codegen function to use.  Returns NULL if codegen should not be used.
   llvm::Function* GetCodegenFn(THdfsFileFormat::type);
 
-  // Each call to GetCodegenFn must call ReleaseCodegenFn.
+  // Each call to GetCodegenFn() must call ReleaseCodegenFn().
   void ReleaseCodegenFn(THdfsFileFormat::type type, llvm::Function* fn);
+
+  // Returns a prepared copy of the query's conjunct exprs. Scanners use the conjunct
+  // exprs directly when they cannot use a codegen'd function.
+  std::vector<Expr*>* GetConjuncts();
+
+  // Each call to GetConjuncts() must call ReleaseConjuncts().
+  // TODO: this won't be necessary when exprs are threadsafe.
+  void ReleaseConjuncts(std::vector<Expr*>* conjuncts);
 
   inline void IncNumScannersCodegenEnabled() {
     ++num_scanners_codegen_enabled_;
@@ -275,9 +277,13 @@ class HdfsScanNode : public ScanNode {
   // this once per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
 
-  // Files and their splits
-  typedef std::map<std::string, HdfsFileDesc*> SplitsMap;
-  SplitsMap per_file_splits_;
+  // File path => file descriptor (which includes the file's splits)
+  typedef std::map<std::string, HdfsFileDesc*> FileDescMap;
+  FileDescMap file_descs_;
+
+  // File format => file descriptors.
+  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
+  FileFormatsMap per_type_files_;
 
   // Number of files that have not been issued from the scanners.
   AtomicInt<int> num_unqueued_files_;
@@ -299,6 +305,16 @@ class HdfsScanNode : public ScanNode {
   boost::mutex codgend_fn_map_lock_;
   typedef std::map<THdfsFileFormat::type, std::list<llvm::Function*> > CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
+
+  // Copies of the conjuncts for use by the scanners when they cannot use codegen'd
+  // functions.
+  // TODO: We will only need one copy once exprs are threadsafe.
+  boost::mutex conjuncts_copies_lock_;
+  std::list<std::vector<Expr*>*> conjuncts_copies_;
+
+  // The number of non-codegen'd conjuncts copies we made in CreateConjunctsCopies(). Used
+  // for debugging.
+  int num_conjuncts_copies_;
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
@@ -393,6 +409,14 @@ class HdfsScanNode : public ScanNode {
   // If true, counters are actively running and need to be reported in the runtime
   // profile.
   bool counters_running_;
+
+  // Creates the necessary codegen functions and conjuncts copies for format. Codegen
+  // functions are stored in codegend_fn_map_[format] and non-codegen'd conjuncts are
+  // stored in conjuncts_copies_.
+  Status CreateConjunctsCopies(THdfsFileFormat::type format);
+
+  // Create a prepared copy of the conjuncts for this node.
+  Status CreateConjuncts(std::vector<Expr*>* exprs, bool disable_codegen);
 
   // Called when scanner threads are available for this scan node. This will
   // try to spin up as many scanner threads as the quota allows.

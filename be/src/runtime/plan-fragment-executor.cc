@@ -136,12 +136,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
   }
 
-  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "PrepareTime");
-  {
-    SCOPED_TIMER(prepare_timer);
-    RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
-  }
-
   // set scan ranges
   vector<ExecNode*> scan_nodes;
   vector<TScanRangeParams> no_scan_ranges;
@@ -151,6 +145,12 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     const vector<TScanRangeParams>& scan_ranges =
         FindWithDefault(params.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
     scan_node->SetScanRanges(scan_ranges);
+  }
+
+  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "PrepareTime");
+  {
+    SCOPED_TIMER(prepare_timer);
+    RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   }
 
   PrintVolumeIds(params.per_node_scan_ranges);

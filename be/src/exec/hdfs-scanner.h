@@ -101,9 +101,10 @@ class HdfsScanner {
   // This function should only return on error or end of scan range.
   virtual Status ProcessSplit() = 0;
 
-  // Release all resources the scanner has allocated.  This is the last chance for
-  // the scanner to attach any resources to the ScannerContext object.
-  virtual void Close() = 0;
+  // Release all resources the scanner has allocated.  This is the last chance for the
+  // scanner to attach any resources to the ScannerContext object. Subclasses overriding
+  // this function must call HdfsScanner::Close().
+  virtual void Close();
 
   // Scanner subclasses must implement these static functions as well.  Unfortunately,
   // c++ does not allow static virtual functions.
@@ -145,16 +146,13 @@ class HdfsScanner {
 
   // Conjuncts for this scanner.  Multiple scanners from multiple threads can
   // be scanning and Exprs are currently not thread safe.
-  std::vector<Expr*> conjuncts_mem_;
+  std::vector<Expr*>* conjuncts_;
+
+  // Cache of conjuncts_->size()
+  int num_conjuncts_;
 
   // Codegen fn to use.  NULL if codegen is not enabled for this scanner.
   llvm::Function* codegen_fn_;
-
-  // Cache of &conjuncts[0] to avoid using vector functions.
-  Expr** conjuncts_;
-
-  // Cache of conjuncts_mem_.size()
-  int num_conjuncts_;
 
   // A partially materialized tuple with only partition key slots set.
   // The non-partition key slots are set to NULL.  The template tuple
@@ -208,12 +206,6 @@ class HdfsScanner {
       int, int, int, int);
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
-
-  // Create a copy of the conjuncts. Exprs are not thread safe (they store results
-  // inside the expr) so each scanner needs its own copy.  This is not needed for
-  // codegen'd scanners since they evaluate exprs with a different mechanism.
-  // TODO: fix exprs
-  Status CreateConjunctsCopy();
 
   // Initializes write_tuples_fn_ to the jitted function if codegen is possible.
   // Also sets codegen_fn_.

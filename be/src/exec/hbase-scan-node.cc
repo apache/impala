@@ -100,8 +100,21 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
-  hbase_scanner_->set_num_requested_cells(sorted_non_key_slots_.size());
-
+  // Convert TScanRangeParams to ScanRanges
+  DCHECK(scan_range_params_ != NULL)
+      << "Must call SetScanRanges() before calling Prepare()";
+  BOOST_FOREACH(const TScanRangeParams& params, *scan_range_params_) {
+    DCHECK(params.scan_range.__isset.hbase_key_range);
+    const THBaseKeyRange& key_range = params.scan_range.hbase_key_range;
+    scan_range_vector_.push_back(HBaseTableScanner::ScanRange());
+    HBaseTableScanner::ScanRange& sr = scan_range_vector_.back();
+    if (key_range.__isset.startKey) {
+      sr.set_start_key(key_range.startKey);
+    }
+    if (key_range.__isset.stopKey) {
+      sr.set_stop_key(key_range.stopKey);
+    }
+  }
   return Status::OK;
 }
 
@@ -285,20 +298,4 @@ void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const 
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->DebugString(indentation_level + 1, out);
   }
-}
-
-Status HBaseScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_ranges) {
-  BOOST_FOREACH(const TScanRangeParams& params, scan_ranges) {
-    DCHECK(params.scan_range.__isset.hbase_key_range);
-    const THBaseKeyRange& key_range = params.scan_range.hbase_key_range;
-    scan_range_vector_.push_back(HBaseTableScanner::ScanRange());
-    HBaseTableScanner::ScanRange& sr = scan_range_vector_.back();
-    if (key_range.__isset.startKey) {
-      sr.set_start_key(key_range.startKey);
-    }
-    if (key_range.__isset.stopKey) {
-      sr.set_stop_key(key_range.stopKey);
-    }
-  }
-  return Status::OK;
 }

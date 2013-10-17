@@ -82,15 +82,17 @@ class ScanNode : public ExecNode {
  public:
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
+      scan_range_params_(NULL),
       active_scanner_thread_counter_(TCounterType::UNIT, 0),
       active_hdfs_read_thread_counter_(TCounterType::UNIT, 0) {}
 
-  // Set up counters
   virtual Status Prepare(RuntimeState* state);
 
-  // Convert scan_ranges into node-specific scan restrictions.  This should be
-  // called after Prepare()
-  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges) = 0;
+  // This should be called before Prepare(), and the argument must be not destroyed until
+  // after Prepare().
+  void SetScanRanges(const std::vector<TScanRangeParams>& scan_range_params) {
+    scan_range_params_ = &scan_range_params;
+  }
 
   virtual bool IsScanNode() const { return true; }
 
@@ -136,6 +138,9 @@ class ScanNode : public ExecNode {
   static const std::string NUM_SCANNER_THREADS_STARTED;
 
  protected:
+  // The scan ranges this scan node is responsible for. Not owned.
+  const std::vector<TScanRangeParams>* scan_range_params_;
+
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
   // # rows/tuples read from the scanner (including those discarded by EvalConjucts())
   RuntimeProfile::Counter* rows_read_counter_;
