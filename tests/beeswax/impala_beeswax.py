@@ -197,11 +197,11 @@ class ImpalaBeeswaxClient(object):
 
   def refresh(self):
     """Invalidate the Impalad catalog"""
-    return self.__execute_query("invalidate metadata")
+    return self.execute("invalidate metadata")
 
   def refresh_table(self, db_name, table_name):
     """Refresh a specific table from the catalog"""
-    return self.__execute_query("refresh %s.%s" % (db_name, table_name))
+    return self.execute("refresh %s.%s" % (db_name, table_name))
 
   def fetch_results(self, query_string, query_handle):
     """Fetches query results given a handle and query type (insert, use, other)"""
