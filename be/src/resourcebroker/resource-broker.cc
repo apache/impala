@@ -278,6 +278,8 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
     // Check whether Llama has been restarted. If so, re-register with it.
     if (LlamaHasRestarted(llama_response.status)) {
       RETURN_IF_ERROR(RegisterWithLlama());
+      // Set the new Llama handle received from re-registering.
+      llama_request.__set_am_handle(llama_handle_);
       LOG(INFO) << "Retrying reservation request: " << request;
       continue;
     }
@@ -364,6 +366,8 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
     // Check whether Llama has been restarted. If so, re-register with it.
     if (LlamaHasRestarted(llama_response.status)) {
       RETURN_IF_ERROR(RegisterWithLlama());
+      // Set the new Llama handle received from re-registering.
+      llama_request.__set_am_handle(llama_handle_);
       LOG(INFO) << "Retrying release of reservation with id "
                 << request.reservation_id;
       continue;
