@@ -399,11 +399,11 @@ public class HdfsPartition {
     try {
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:
-          return LiteralExpr.create(Double.toString(exprNode.float_literal.value),
-              primitiveType);
+          return (LiteralExpr)(LiteralExpr.create(Double.toString(
+              exprNode.float_literal.value), primitiveType).castTo(primitiveType));
         case INT_LITERAL:
-          return LiteralExpr.create(Long.toString(exprNode.int_literal.value),
-              primitiveType);
+          return (LiteralExpr)(LiteralExpr.create(Long.toString(
+              exprNode.int_literal.value), primitiveType).castTo(primitiveType));
         case STRING_LITERAL:
           return LiteralExpr.create(exprNode.string_literal.value, primitiveType);
         case NULL_LITERAL:
