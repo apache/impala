@@ -31,6 +31,7 @@
 #include "util/network-util.h"
 #include "util/llama-util.h"
 #include "gen-cpp/ResourceBrokerService.h"
+#include "gen-cpp/Llama_types.h"
 
 using namespace std;
 using namespace impala;
@@ -492,6 +493,23 @@ ostream& operator<<(ostream& os, const TResourceBrokerReservationRequest& reques
   for (int i = 0; i < request.resources.size(); ++i) {
     os << request.resources[i];
     if (i + 1 != request.resources.size()) os << ",";
+  }
+  os << "])";
+  return os;
+}
+
+ostream& operator<<(ostream& os, const TResourceBrokerReservationResponse& reservation) {
+  os << "Granted Reservation("
+     << "reservation id=" << reservation.reservation_id << " "
+     << "resources=[";
+  int count = 0;
+  map<TNetworkAddress, llama::TAllocatedResource>::const_iterator alloc_resource;
+  for (alloc_resource = reservation.allocated_resources.begin();
+      alloc_resource != reservation.allocated_resources.end();
+      ++alloc_resource) {
+    os << alloc_resource->second;
+    ++count;
+    if (count != reservation.allocated_resources.size()) os << ",";
   }
   os << "])";
   return os;

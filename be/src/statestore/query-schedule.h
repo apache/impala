@@ -19,6 +19,7 @@
 #include <string>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "common/global-types.h"
 #include "common/status.h"
@@ -59,13 +60,12 @@ class QuerySchedule {
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
       const TQueryOptions& query_options, bool is_mini_llama);
 
-  // Creates a reservation request for the given pool in reservation_request.
+  // Creates a reservation request for the given pool in reservation_request_.
   // The request contains one resource per entry in unique_hosts_. The per-host resources
   // are based on planner estimates in the exec request or on manual overrides given
   // set in the query options.
   void CreateReservationRequest(const std::string& pool,
-      const std::vector<std::string>& llama_nodes,
-      TResourceBrokerReservationRequest* reservation_request);
+      const std::vector<std::string>& llama_nodes);
 
   // Returns OK if reservation_ contains a matching resource for each
   // of the hosts in fragment_exec_params_. Returns an error otherwise.
@@ -99,6 +99,9 @@ class QuerySchedule {
   std::vector<FragmentExecParams>& exec_params() { return fragment_exec_params_; }
   boost::unordered_set<TNetworkAddress>& unique_hosts() { return unique_hosts_; }
   TResourceBrokerReservationResponse* reservation() { return &reservation_; }
+  const TResourceBrokerReservationRequest* reservation_request() {
+    return reservation_request_.get();
+  }
 
  private:
   // Populates the bi-directional hostport mapping for the Mini Llama based on
@@ -140,6 +143,9 @@ class QuerySchedule {
   // Yarn pool from which resources were requested for this query schedule.
   // Set in CreateReservationRequest().
   std::string yarn_pool_;
+
+  // Reservation request to be submitted to Llama. Set in CreateReservationRequest().
+  boost::scoped_ptr<TResourceBrokerReservationRequest> reservation_request_;
 
   // Fulfilled reservation request. Populated by scheduler.
   TResourceBrokerReservationResponse reservation_;

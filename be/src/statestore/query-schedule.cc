@@ -84,18 +84,19 @@ void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
 }
 
 void QuerySchedule::CreateReservationRequest(const string& pool,
-    const vector<string>& llama_nodes,
-    TResourceBrokerReservationRequest* reservation_request) {
+    const vector<string>& llama_nodes) {
   yarn_pool_ = pool;
-  reservation_request->resources.clear();
-  reservation_request->version = TResourceBrokerServiceVersion::V1;
-  reservation_request->queue = pool;
-  reservation_request->gang = true;
+  DCHECK(reservation_request_.get() == NULL);
+  reservation_request_.reset(new TResourceBrokerReservationRequest());
+  reservation_request_->resources.clear();
+  reservation_request_->version = TResourceBrokerServiceVersion::V1;
+  reservation_request_->queue = pool;
+  reservation_request_->gang = true;
 
   // Set optional request timeout from query options.
   if (query_options_.__isset.reservation_request_timeout) {
     DCHECK_GT(query_options_.reservation_request_timeout, 0);
-    reservation_request->__set_request_timeout(
+    reservation_request_->__set_request_timeout(
         query_options_.reservation_request_timeout);
   }
 
@@ -122,7 +123,7 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
   if (query_options_.__isset.reservation_request_timeout) {
     timeout = query_options_.reservation_request_timeout;
   }
-  reservation_request->__set_request_timeout(timeout);
+  reservation_request_->__set_request_timeout(timeout);
 
   // The memory_mb and v_cpu_cores estimates may legitimately be zero,
   // e.g., for constant selects. Do not reserve any resources in those cases.
@@ -132,8 +133,8 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
 
   random_generator uuid_generator;
   BOOST_FOREACH(const TNetworkAddress& host, unique_hosts_) {
-    reservation_request->resources.push_back(llama::TResource());
-    llama::TResource& resource = reservation_request->resources.back();
+    reservation_request_->resources.push_back(llama::TResource());
+    llama::TResource& resource = reservation_request_->resources.back();
     uuid id = uuid_generator();
     resource.client_resource_id.hi = *reinterpret_cast<uint64_t*>(&id.data[0]);
     resource.client_resource_id.lo = *reinterpret_cast<uint64_t*>(&id.data[8]);

@@ -199,6 +199,9 @@ class ResourceBroker {
 std::ostream& operator<<(std::ostream& os,
     const TResourceBrokerReservationRequest& request);
 
+std::ostream& operator<<(std::ostream& os,
+    const TResourceBrokerReservationResponse& reservation);
+
 }
 
 #endif

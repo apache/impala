@@ -257,13 +257,28 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       exec_request_.query_options, is_mini_llama));
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
+  if (FLAGS_enable_rm) {
+    // Add the Yarn pool and the reservation request to the query profile.
+    summary_profile_.AddInfoString("Yarn Pool", schedule_->yarn_pool());
+    if (status.ok()) {
+      DCHECK(schedule_->reservation_request() != NULL);
+      stringstream reservation_request_ss;
+      reservation_request_ss << *schedule_->reservation_request();
+      summary_profile_.AddInfoString("Resource reservation request",
+          reservation_request_ss.str());
+    }
+  }
+
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
+
   if (FLAGS_enable_rm) {
-    // Add the Yarn Pool and the reservation wait time to the query's runtime profile.
-    summary_profile_.AddInfoString("Yarn Pool", schedule_->yarn_pool());
+    // Add the granted reservation to the query profile.
+    stringstream reservation_ss;
+    reservation_ss << *schedule_->reservation();
+    summary_profile_.AddInfoString("Granted resource reservation", reservation_ss.str());
     query_events_->MarkEvent("Resources reserved");
   }
   status = coord_->Exec(*schedule_,  &output_exprs_);

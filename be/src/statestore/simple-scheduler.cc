@@ -760,12 +760,12 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   string pool;
   RETURN_IF_ERROR(
       GetYarnPool(schedule->request().user, schedule->query_options(), &pool));
-  TResourceBrokerReservationRequest reservation_request;
-  schedule->CreateReservationRequest(
-      pool, resource_broker_->llama_nodes(), &reservation_request);
-  if (resource_broker_ != NULL && !reservation_request.resources.empty()) {
+  schedule->CreateReservationRequest(pool, resource_broker_->llama_nodes());
+  const TResourceBrokerReservationRequest* reservation_request =
+      schedule->reservation_request();
+  if (!reservation_request->resources.empty()) {
     Status status = resource_broker_->Reserve(
-        reservation_request, schedule->reservation());
+        *reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
       if(schedule->request().__isset.fe_error_msgs &&
