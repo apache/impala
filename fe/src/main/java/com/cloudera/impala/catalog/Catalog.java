@@ -105,8 +105,11 @@ public abstract class Catalog {
    * the given CatalogInitStrategy.
    */
   public Catalog(CatalogInitStrategy initStrategy) {
-    this.initStrategy_ = initStrategy;
-    this.metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
+    initStrategy_ = initStrategy;
+    // Don't create any metastore clients for empty catalogs.
+    if (initStrategy != CatalogInitStrategy.EMPTY) {
+      metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
+    }
     reset();
   }
 
