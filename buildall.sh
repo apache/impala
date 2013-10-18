@@ -120,7 +120,7 @@ fi
 if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
 then
   echo "Couldn't find thirdparty build files.  Building thirdparty."
-  $IMPALA_HOME/bin/build_thirdparty.sh $*
+  $IMPALA_HOME/bin/build_thirdparty.sh $([ ${CLEAN_ACTION} -eq 0 ] && echo '-noclean')
 fi
 
 if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
