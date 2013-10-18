@@ -147,12 +147,17 @@ Status ResourceBroker::RegisterWithLlama() {
   lock_guard<mutex> l(llama_registration_lock_);
   if (llama_handle_ != current_llama_handle) return Status::OK;
 
+  bool needs_reopen = false;
   int64_t now = TimestampValue::local_time_micros().time_of_day().total_seconds();
   while((now - start) < LLAMA_REGISTRATION_TIMEOUT_SECS) {
     // Connect to the Llama.
     Status status;
     ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
         llama_address_, &status);
+    if (needs_reopen) {
+      status = llama_client.Reopen();
+      needs_reopen = false;
+    }
     if (status.ok()) {
       // Register this resource broker with Llama.
       llama::TLlamaAMRegisterRequest request;
@@ -173,7 +178,7 @@ Status ResourceBroker::RegisterWithLlama() {
         LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
         return Status::OK;
       } catch (TTransportException& e) {
-        llama_client.Reopen();
+        needs_reopen = true;
       }
     }
     LOG(INFO) << "Failed to connect to Llama at " << llama_address_ << ".\n"
