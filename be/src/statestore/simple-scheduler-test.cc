@@ -172,9 +172,22 @@ TEST_F(SimpleSchedulerTest, InitPoolWhiteList) {
   // Check the pool determination logic.
   string pool;
   EXPECT_TRUE(sched->GetYarnPool("admin", TQueryOptions(), &pool).ok());
-  EXPECT_EQ("prod", pool);
+  // Staging is the default pool
+  EXPECT_EQ("Staging", pool);
   EXPECT_TRUE(sched->GetYarnPool("i-want-default", TQueryOptions(), &pool).ok());
   EXPECT_EQ("Staging", pool);
+
+  TQueryOptions options;
+  // Only admin can use prod
+  options.__set_yarn_pool("prod");
+  EXPECT_FALSE(sched->GetYarnPool("user", options, &pool).ok());
+  EXPECT_TRUE(sched->GetYarnPool("admin", options, &pool).ok());
+
+  // Everyone can use the default pool
+  options.__set_yarn_pool("Staging");
+  EXPECT_TRUE(sched->GetYarnPool("user", options, &pool).ok());
+  EXPECT_TRUE(sched->GetYarnPool("admin", options, &pool).ok());
+
 }
 
 }

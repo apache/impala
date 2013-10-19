@@ -663,20 +663,33 @@ Status SimpleScheduler::GetYarnPool(const string& user,
     const TQueryOptions& query_options, string* pool) const {
   if (query_options.__isset.yarn_pool) {
     *pool = query_options.yarn_pool;
-    // TODO: Validate that this user may submit to this pool. YARN will take care of this
-    // in the first instance, but it's good to save an RPC.
-    return Status::OK;
+    if (*pool == default_pool_) return Status::OK;
+
+    UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(user);
+    if (pool_it == user_pool_whitelist_.end()) {
+      stringstream ss;
+      ss << "No whitelist found for user: " << user << " to access pool: " << *pool;
+      return Status(ss.str());
+    }
+
+    BOOST_FOREACH(const string& whitelisted_pool, pool_it->second) {
+      if (whitelisted_pool == *pool) return Status::OK;
+    }
+
+    stringstream ss;
+    ss << "User: " << user << " not authorized to access pool: " << pool;
+    return Status(ss.str());
   }
+
+  // Otherwise, look for the default pool.
   if (user_pool_whitelist_.empty()) {
     return Status("Either a default pool must be configured, or the pool must be "
         "explicitly specified by a query option");
   }
 
-  UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(user);
-  if (pool_it == user_pool_whitelist_.end()) {
-    pool_it = user_pool_whitelist_.find(DEFAULT_USER);
-    DCHECK(pool_it != user_pool_whitelist_.end());
-  }
+  // Per YARN, the default pool is used if a pool is not explicitly configured.
+  UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(DEFAULT_USER);
+  DCHECK(pool_it != user_pool_whitelist_.end());
   DCHECK(!pool_it->second.empty());
   *pool = pool_it->second[0];
   return Status::OK;
@@ -740,12 +753,14 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
     user_pool_whitelist_[user] = splits;
   }
 
-  if (user_pool_whitelist_.find(DEFAULT_USER) == user_pool_whitelist_.end()) {
+  UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(DEFAULT_USER);
+  if (pool_it == user_pool_whitelist_.end() || pool_it->second.size() == 0) {
     stringstream err_msg;
     err_msg << "No default pool mapping found. Please set a value for user '*' in "
             << conf_path;
     return Status(err_msg.str());
   }
+  default_pool_ = pool_it->second[0];
 
   return Status::OK;
 }
