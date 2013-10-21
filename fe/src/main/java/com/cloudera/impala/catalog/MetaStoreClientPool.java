@@ -110,6 +110,15 @@ public class MetaStoreClientPool {
    * Gets a client from the pool. If the pool is empty a new client is created.
    */
   public MetaStoreClient getClient() {
+    // The MetaStoreClient c'tor relies on knowing the Hadoop version by asking
+    // org.apache.hadoop.util.VersionInfo. The VersionInfo class relies on opening
+    // the 'common-version-info.properties' file as a resource from hadoop-common*.jar
+    // using the Thread's context classloader. If necessary, set the Thread's context
+    // classloader, otherwise VersionInfo will fail in it's c'tor.
+    if (Thread.currentThread().getContextClassLoader() == null) {
+      Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+    }
+
     MetaStoreClient client = clientPool.poll();
     // The pool was empty so create a new client and return that.
     if (client == null) {
