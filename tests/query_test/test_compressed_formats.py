@@ -45,14 +45,14 @@ class TestCompressedFormats(ImpalaTestSuite):
     if file_format in ['rc', 'seq']:
       # Test that compressed RC/sequence files are supported
       db_suffix = '_%s_%s' % (file_format, suffix)
-      self.copy_and_query_compressed_file(
+      self.__copy_and_query_compressed_file(
        'tinytable', db_suffix, suffix, '000000_0', extension)
 
     elif file_format is 'text':
       # Test that that compressed text files (or at least text files with a
       # compressed extension) fail.
       db_suffix = ""
-      self.copy_and_query_compressed_file(
+      self.__copy_and_query_compressed_file(
         'tinytable', db_suffix, suffix, 'data.csv', extension,
         'Compressed text files are not supported')
 
@@ -61,7 +61,7 @@ class TestCompressedFormats(ImpalaTestSuite):
 
 
   # TODO: switch to using hive metastore API rather than hive shell.
-  def copy_and_query_compressed_file(self, table_name, db_suffix, compression_codec,
+  def __copy_and_query_compressed_file(self, table_name, db_suffix, compression_codec,
                                      file_name, extension, expected_error=None):
     # We want to create a test table with a compressed file that has a file
     # extension. We'll do this by making a copy of an existing table with hive.
@@ -99,4 +99,3 @@ class TestCompressedFormats(ImpalaTestSuite):
         raise
     finally:
       call(["hive", "-e", drop_cmd]);
-

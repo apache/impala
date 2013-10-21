@@ -47,7 +47,6 @@ class TestHdfsPermissions(ImpalaTestSuite):
     self.client.execute('drop database if exists %s' % TEST_DB)
     self.hdfs_client.delete_file_dir('test-warehouse/read-only-test', recursive=True)
 
-  @pytest.mark.execute_serially
   def test_insert_into_read_only_table(self, vector):
     self.client.execute('use %s' % TEST_DB)
 

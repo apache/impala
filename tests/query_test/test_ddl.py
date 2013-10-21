@@ -20,6 +20,8 @@ class TestDdlStatements(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDdlStatements, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
@@ -99,7 +101,7 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_create_alter_bulk_partition(self, vector):
     # Only run during exhaustive exploration strategy, this doesn't add a lot of extra
     # coverage to the existing test cases and takes a couple minutes to execute.
-    if self.exploration_strategy() != 'exhaustive': return
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
 
     self.client.execute("use default")
     self.client.execute("drop table if exists foo_part")

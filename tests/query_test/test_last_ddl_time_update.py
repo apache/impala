@@ -29,6 +29,11 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
+    if cls.exploration_strategy() == 'core':
+      # Don't run on core.  This test is very slow and we are unlikely
+      # to regress here.
+      cls.TestMatrix.add_constraint(lambda v: False)
+
   def __cleanup(self):
     self.execute_query("drop table if exists %s" % FULL_NAME)
     self.execute_query("drop database if exists %s" % DB_NAME)

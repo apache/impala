@@ -15,11 +15,10 @@ class TestLoadData(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestLoadData, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
-        v.get_value('exec_option')['batch_size'] == 0 and\
-        v.get_value('exec_option')['disable_codegen'] == False and\
-        v.get_value('exec_option')['num_nodes'] != 1)
+        v.get_value('table_format').compression_codec == 'none')
 
   def setup_method(self, method):
     # Cleanup any existing files in the test tables and staging directories.
@@ -55,7 +54,6 @@ class TestLoadData(ImpalaTestSuite):
     assert 0 == call(["hadoop", "fs", "-test", "-e", path], shell=False),\
         "Path does not exist."
 
-  @pytest.mark.execute_serially
   def test_load(self, vector):
     self.run_test_case('QueryTest/load', vector)
     # The hidden files should not have been moved as part of the load operation.
