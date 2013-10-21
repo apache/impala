@@ -251,4 +251,13 @@ public class CatalogObjectCache<T extends CatalogObject> {
       throw new IllegalStateException(e);
     }
   }
+
+  /**
+   * Returns the CatalogObject with the given name if present, null otherwise.
+   */
+  public T getIfPresent(String name) {
+    synchronized (nameVersionMap_) {
+      return metadataCache_.getIfPresent(name.toLowerCase());
+    }
+  }
 }

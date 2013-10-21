@@ -101,8 +101,7 @@ public class CatalogServiceCatalog extends Catalog {
           if (tbl.getCatalogVersion() >= fromVersion) {
             try {
               catalogTbl.setTable(tbl.toThrift());
-            } catch (TableLoadingException e) {
-              // TODO: tbl.toThrift() should not throw a TableLoadingException.
+            } catch (Exception e) {
               LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
                   dbName, tblName, e.getMessage()), e);
               continue;
@@ -183,10 +182,10 @@ public class CatalogServiceCatalog extends Catalog {
       resetInternal();
 
       // Restore UDFs/UDAs.
-      for (Pair<String, HashMap<String, List<Function>>> dbfns: functions) {
+      for (Pair<String, HashMap<String, List<Function>>> dbFns: functions) {
         Db db = null;
         try {
-          db = dbCache_.get(dbfns.first);
+          db = dbCache_.get(dbFns.first);
         } catch (Exception e) {
           continue;
         }
@@ -196,7 +195,7 @@ public class CatalogServiceCatalog extends Catalog {
           continue;
         }
 
-        for (List<Function> fns: dbfns.second.values()) {
+        for (List<Function> fns: dbFns.second.values()) {
           for (Function fn: fns) {
             db.addFunction(fn);
           }

@@ -1849,7 +1849,6 @@ void ImpalaServer::CatalogUpdateCallback(
       if (catalog_object.type == TCatalogObjectType::CATALOG) {
         update_req.__set_catalog_service_id(catalog_object.catalog.catalog_service_id);
         new_catalog_version = catalog_object.catalog_version;
-        continue;
       }
       update_req.updated_objects.push_back(catalog_object);
     }
@@ -1912,17 +1911,42 @@ void ImpalaServer::CatalogUpdateCallback(
   }
 }
 
-void ImpalaServer::WaitForCatalogUpdate(
+Status ImpalaServer::ProcessCatalogUpdateResult(
     const TCatalogUpdateResult& catalog_update_result) {
-  int64_t min_req_catalog_version = catalog_update_result.version;
-  VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
-             << " current version: " << current_catalog_version_;
-  unique_lock<mutex> unique_lock(catalog_version_lock_);
-  // TODO: What about query cancellation?
-  while (current_catalog_version_ < min_req_catalog_version &&
-         current_catalog_service_id_ == catalog_update_result.catalog_service_id) {
-    catalog_version_update_cv_.wait(unique_lock);
+  // If this update result contains a catalog object to add or remove,
+  // assume it is "fast" update and directly apply the update to the local
+  // impalad's catalog cache. Otherwise, wait for a statestore heartbeat
+  // that contains this update version.
+  if (catalog_update_result.__isset.updated_catalog_object ||
+      catalog_update_result.__isset.removed_catalog_object) {
+    TUpdateCatalogCacheRequest update_req;
+    update_req.__set_is_delta(true);
+    update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
+
+    if (catalog_update_result.__isset.updated_catalog_object) {
+      update_req.updated_objects.push_back(catalog_update_result.updated_catalog_object);
+    }
+    if (catalog_update_result.__isset.removed_catalog_object) {
+      update_req.removed_objects.push_back(catalog_update_result.removed_catalog_object);
+    }
+     // Apply the changes to the local catalog cache.
+    TUpdateCatalogCacheResponse resp;
+    Status status = frontend_->UpdateCatalogCache(update_req, &resp);
+    if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
+    return status;
+  } else {
+    int64_t min_req_catalog_version = catalog_update_result.version;
+    unique_lock<mutex> unique_lock(catalog_version_lock_);
+    VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
+               << " current version: " << current_catalog_version_;
+
+    // TODO: What about query cancellation?
+    while (current_catalog_version_ < min_req_catalog_version &&
+           current_catalog_service_id_ == catalog_update_result.catalog_service_id) {
+      catalog_version_update_cv_.wait(unique_lock);
+    }
   }
+  return Status::OK;
 }
 
 void ImpalaServer::MembershipCallback(

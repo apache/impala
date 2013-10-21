@@ -52,8 +52,8 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class Db implements CatalogObject {
   private static final Logger LOG = Logger.getLogger(Db.class);
-  private final Catalog parentCatalog;
-  private final TDatabase thriftDb;
+  private final Catalog parentCatalog_;
+  private final TDatabase thriftDb_;
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
@@ -90,10 +90,10 @@ public class Db implements CatalogObject {
   private Table loadTable(String tableName, Table oldValue) throws TableLoadingException,
       TableNotFoundException {
     tableName = tableName.toLowerCase();
-    MetaStoreClient msClient = parentCatalog.getMetaStoreClient();
+    MetaStoreClient msClient = parentCatalog_.getMetaStoreClient();
     try {
       // Try to load the table Metadata
-      return Table.load(parentCatalog.getNextTableId(), msClient.getHiveClient(),
+      return Table.load(parentCatalog_.getNextTableId(), msClient.getHiveClient(),
           this, tableName, oldValue);
     } finally {
       msClient.release();
@@ -125,8 +125,8 @@ public class Db implements CatalogObject {
 
 
   private Db(String name, Catalog catalog) {
-    thriftDb = new TDatabase(name);
-    this.parentCatalog = catalog;
+    thriftDb_ = new TDatabase(name);
+    this.parentCatalog_ = catalog;
     functions = new HashMap<String, List<Function>>();
   }
 
@@ -167,8 +167,8 @@ public class Db implements CatalogObject {
     return new Db(db.getDb_name(), parentCatalog);
   }
 
-  public TDatabase toThrift() { return thriftDb; }
-  public String getName() { return thriftDb.getDb_name(); }
+  public TDatabase toThrift() { return thriftDb_; }
+  public String getName() { return thriftDb_.getDb_name(); }
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.DATABASE;
   }
@@ -198,13 +198,27 @@ public class Db implements CatalogObject {
   }
 
   /**
+   * Returns the Table with the given name if present in the table cache, null otherwise.
+   */
+  public Table getTableIfPresent(String tblName) {
+    return tableCache.getIfPresent(tblName);
+  }
+
+  /**
    * Adds a table to the table list. Table cache will be populated on the next
    * getTable().
    */
   public long addTable(String tableName) { return tableCache.add(tableName); }
 
-  public void addTable(TTable thriftTable) throws TableLoadingException {
-    // If LoadStatus is not set, or if it is set to OK it indicates loading of the table
+  /**
+   * Creates a new Table object from the given thrift representation and adds
+   * it to the table list, assigning it the given catalog version. If the thrift table
+   * has a LoadStatus that is not set to OK, it indicates that the metadata is incomplete
+   * and a new IncompleteTable will be added to the table list.
+   */
+  public void addTable(TTable thriftTable, long catalogVersion)
+      throws TableLoadingException {
+    // If LoadStatus is not set, or if it is set to OK, it indicates loading of the table
     // was successful.
     if (!thriftTable.isSetLoad_status() ||
         thriftTable.getLoad_status().status_code == TStatusCode.OK) {
@@ -213,6 +227,7 @@ public class Db implements CatalogObject {
       Table table = Table.fromMetastoreTable(new TableId(thriftTable.getId()), this,
           thriftTable.getMetastore_table());
       table.loadFromThrift(thriftTable);
+      table.setCatalogVersion(catalogVersion);
       tableCache.add(table);
     } else {
       TableLoadingException loadingException = new TableLoadingException(
@@ -223,6 +238,7 @@ public class Db implements CatalogObject {
       // it an invalid ID.
       IncompleteTable table = new IncompleteTable(new TableId(),
           this, thriftTable.getTbl_name(), loadingException);
+      table.setCatalogVersion(catalogVersion);
       tableCache.add(table);
     }
   }
@@ -343,18 +359,16 @@ public class Db implements CatalogObject {
   /**
    * See comment in Catalog.
    */
-  public boolean removeFunction(Function desc) {
+  public Function removeFunction(Function desc) {
     // TODO: remove this from persistent store.
     synchronized (functions) {
       Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
-      if (fn == null) return false;
+      if (fn == null) return null;
       List<Function> fns = functions.get(desc.functionName());
       Preconditions.checkNotNull(fns);
-      boolean exists = fns.remove(fn);
-      if (fns.isEmpty()) {
-        functions.remove(desc.functionName());
-      }
-      return exists;
+      fns.remove(fn);
+      if (fns.isEmpty()) functions.remove(desc.functionName());
+      return fn;
     }
   }
 
@@ -397,5 +411,5 @@ public class Db implements CatalogObject {
   public long getCatalogVersion() { return catalogVersion_; }
   @Override
   public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
-  public Catalog getParentCatalog() { return parentCatalog; }
+  public Catalog getParentCatalog() { return parentCatalog_; }
 }

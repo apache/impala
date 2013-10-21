@@ -112,8 +112,10 @@ public class JniCatalog {
     resp.getResult().setCatalog_service_id(getServiceId());
 
     if (req.isSetTable_name()) {
-      resp.result.setVersion(catalog_.resetTable(req.getTable_name(),
+      resp.result.setUpdated_catalog_object(catalog_.resetTable(req.getTable_name(),
           req.isIs_refresh()));
+      resp.getResult().setVersion(
+          resp.getResult().getUpdated_catalog_object().getCatalog_version());
     } else {
       // Invalidate the catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());

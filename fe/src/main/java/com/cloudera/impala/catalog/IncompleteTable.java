@@ -72,7 +72,7 @@ public class IncompleteTable extends Table {
   }
 
   @Override
-  public TTable toThrift() throws TableLoadingException {
+  public TTable toThrift() {
     TTable table = new TTable(db.getName(), name);
     table.setId(id.asInt());
     table.setLoad_status(new TStatus(TStatusCode.INTERNAL_ERROR,

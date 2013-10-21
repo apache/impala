@@ -55,7 +55,6 @@ class TestCancellation(ImpalaTestSuite):
       NUM_CANCELATION_ITERATIONS = 3
 
   def cleanup_test_table(self, table_format):
-    self.execute_query("invalidate metadata")
     self.execute_query("drop table if exists ctas_cancel", table_format=table_format)
 
   def execute_cancel_test(self, vector):

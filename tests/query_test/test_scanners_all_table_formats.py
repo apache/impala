@@ -76,7 +76,7 @@ class TestUnmatchedSchema(ImpalaTestSuite):
         "create external table jointbl_test like jointbl", vector)
 
     # Update the location of the new table to point the same location as the old table
-    location  = self.__get_table_location('jointbl', vector)
+    location = self.__get_table_location('jointbl', vector)
     self.execute_query_using_client(self.client,
         "alter table jointbl_test set location '%s'" % location, vector)
 

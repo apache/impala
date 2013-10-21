@@ -38,6 +38,12 @@ struct TCatalogUpdateResult {
 
   // The status of the operation, OK if the operation was successful.
   3: required Status.TStatus status
+
+  // The resulting TCatalogObject that was added or modified, if applicable.
+  4: optional CatalogObjects.TCatalogObject updated_catalog_object
+
+  // The resulting TCatalogObject that was removed, if applicable.
+  5: optional CatalogObjects.TCatalogObject removed_catalog_object
 }
 
 // Request for executing a DDL operation (CREATE, ALTER, DROP).

@@ -294,7 +294,7 @@ public abstract class Table implements CatalogObject {
         TAccessLevel.READ_WRITE;
   }
 
-  public TTable toThrift() throws TableLoadingException {
+  public TTable toThrift() {
     TTable table = new TTable(db.getName(), name);
     table.setId(id.asInt());
     table.setAccess_level(accessLevel);

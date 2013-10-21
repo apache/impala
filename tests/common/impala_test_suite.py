@@ -103,10 +103,18 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def cleanup_db(self, db_name):
     # To drop a db, we need to first drop all the tables in that db
-    if db_name in self.hive_client.get_all_databases():
-      for table_name in self.hive_client.get_all_tables(db_name):
-        self.hive_client.drop_table(db_name, table_name, True)
-      self.hive_client.drop_database(db_name, True, False)
+    self.client.execute("use default")
+    if db_name in self.client.execute("show databases").data:
+      for tbl_name in self.client.execute("show tables in " + db_name).data:
+        full_tbl_name = '%s.%s' % (db_name, tbl_name)
+        result = self.client.execute("describe formatted " + full_tbl_name)
+        if 'VIRTUAL_VIEW' in '\n'.join(result.data):
+          self.client.execute("drop view " + full_tbl_name)
+        else:
+          self.client.execute("drop table " + full_tbl_name)
+      for fn_name in self.client.execute("show functions in " + db_name).data:
+        self.client.execute("drop function %s.%s" + (db_name, fn_name))
+      self.client.execute("drop database " + db_name)
 
   def run_test_case(self, test_file_name, vector, use_db=None):
     """

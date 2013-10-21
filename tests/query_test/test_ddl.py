@@ -49,7 +49,6 @@ class TestDdlStatements(ImpalaTestSuite):
   def cleanup(self):
     map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
     self.cleanup_hdfs_dirs()
-    self.client.refresh()
 
   def cleanup_hdfs_dirs(self):
     # Cleanup the test table HDFS dirs between test runs so there are no errors the next

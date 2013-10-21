@@ -66,6 +66,8 @@ import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
+import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TCreateDbParams;
@@ -73,6 +75,7 @@ import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
 import com.cloudera.impala.thrift.TCreateTableParams;
+import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDbParams;
@@ -83,6 +86,7 @@ import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogResponse;
@@ -174,7 +178,7 @@ public class DdlExecutor {
    */
   private void alterTable(TAlterTableParams params, TDdlExecResponse response)
       throws ImpalaException, MetaException, org.apache.thrift.TException,
-      InvalidObjectException, ImpalaException, TableLoadingException {
+      InvalidObjectException, ImpalaException {
     switch (params.getAlter_type()) {
       case ADD_REPLACE_COLUMNS:
         TAlterTableAddReplaceColsParams addReplaceColParams =
@@ -239,7 +243,10 @@ public class DdlExecutor {
         throw new UnsupportedOperationException(
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
     }
-    response.result.setVersion(catalog.resetTable(params.getTable_name(), true));
+    response.result.setUpdated_catalog_object(
+        catalog.resetTable(params.getTable_name(), true));
+    response.result.setVersion(
+        response.result.getUpdated_catalog_object().getCatalog_version());
   }
 
   /**
@@ -270,7 +277,9 @@ public class DdlExecutor {
       LOG.debug(String.format("Altering view %s", tableName));
       applyAlterTable(msTbl);
     }
-    resp.result.setVersion(catalog.resetTable(tableName.toThrift(), true));
+    resp.result.setUpdated_catalog_object(
+        catalog.resetTable(tableName.toThrift(), true));
+    resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
 
   /**
@@ -287,7 +296,7 @@ public class DdlExecutor {
    */
   private void createDatabase(TCreateDbParams params, TDdlExecResponse resp)
       throws MetaException, AlreadyExistsException, InvalidObjectException,
-      org.apache.thrift.TException {
+      org.apache.thrift.TException, ImpalaException {
     Preconditions.checkNotNull(params);
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
@@ -322,7 +331,8 @@ public class DdlExecutor {
         msClient.release();
       }
     }
-    resp.result.setVersion(catalog.addDb(dbName));
+    resp.result.setUpdated_catalog_object(catalog.addDb(dbName));
+    resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
 
   private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
@@ -335,6 +345,11 @@ public class DdlExecutor {
       throw new AlreadyExistsException("Function " + fn.signatureString() +
           " already exists.");
     }
+    TCatalogObject addedObject = new TCatalogObject();
+    addedObject.setType(TCatalogObjectType.FUNCTION);
+    addedObject.setFn(fn.toThrift());
+    addedObject.setCatalog_version(fn.getCatalogVersion());
+    resp.result.setUpdated_catalog_object(addedObject);
     resp.result.setVersion(fn.getCatalogVersion());
   }
 
@@ -368,6 +383,12 @@ public class DdlExecutor {
       }
     }
     resp.result.setVersion(catalog.removeDb(params.getDb()));
+    TCatalogObject removedObject = new TCatalogObject();
+    removedObject.setType(TCatalogObjectType.DATABASE);
+    removedObject.setDb(new TDatabase());
+    removedObject.getDb().setDb_name(params.getDb());
+    removedObject.setCatalog_version(resp.result.getVersion());
+    resp.result.setRemoved_catalog_object(removedObject);
   }
 
   /**
@@ -389,6 +410,13 @@ public class DdlExecutor {
       }
     }
     resp.result.setVersion(catalog.removeTable(params.getTable_name()));
+    TCatalogObject removedObject = new TCatalogObject();
+    removedObject.setType(TCatalogObjectType.TABLE);
+    removedObject.setTable(new TTable());
+    removedObject.getTable().setTbl_name(tableName.getTbl());
+    removedObject.getTable().setDb_name(tableName.getDb());
+    removedObject.setCatalog_version(resp.result.getVersion());
+    resp.result.setRemoved_catalog_object(removedObject);
   }
 
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)
@@ -399,19 +427,24 @@ public class DdlExecutor {
     }
     Function desc = new Function(new FunctionName(params.fn_name),
         argTypes, PrimitiveType.INVALID_TYPE, false);
-    LOG.debug(String.format("Dropping UDF %s", desc.signatureString()));
-    long version = catalog.removeFunction(desc);
-    if (version == Catalog.INITIAL_CATALOG_VERSION) {
+    LOG.debug(String.format("Dropping Function %s", desc.signatureString()));
+    Function fn = catalog.removeFunction(desc);
+    if (fn == null) {
       if (!params.if_exists) {
         throw new NoSuchObjectException(
             "Function: " + desc.signatureString() + " does not exist.");
-      } else {
-        // The user specified IF NOT EXISTS and the function didn't exist, just
-        // return the current catalog version.
-        version = Catalog.getCatalogVersion();
       }
+      // The user specified IF NOT EXISTS and the function didn't exist, just
+      // return the current catalog version.
+      resp.result.setVersion(Catalog.getCatalogVersion());
+    } else {
+      TCatalogObject removedObject = new TCatalogObject();
+      removedObject.setType(TCatalogObjectType.FUNCTION);
+      removedObject.setFn(fn.toThrift());
+      removedObject.setCatalog_version(fn.getCatalogVersion());
+      resp.result.setRemoved_catalog_object(removedObject);
+      resp.result.setVersion(fn.getCatalogVersion());
     }
-    resp.result.setVersion(version);
   }
 
   /**
@@ -579,8 +612,10 @@ public class DdlExecutor {
       }
     }
 
-    response.result.setVersion(catalog.addTable(
-        newTable.getDbName(), newTable.getTableName()));
+    response.result.setUpdated_catalog_object(catalog.addTable(newTable.getDbName(),
+        newTable.getTableName()));
+    response.result.setVersion(
+        response.result.getUpdated_catalog_object().getCatalog_version());
     return true;
   }
 
@@ -803,9 +838,20 @@ public class DdlExecutor {
         msClient.release();
       }
     }
-    // Rename the table in the Catalog and get the version.
-    response.result.setVersion(
-        catalog.renameTable(tableName.toThrift(), newTableName.toThrift()));
+
+    // Rename the table in the Catalog and get the resulting catalog object.
+    // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
+    TCatalogObject newTable =
+        catalog.renameTable(tableName.toThrift(), newTableName.toThrift());
+    TCatalogObject removedObject = new TCatalogObject();
+    removedObject.setType(TCatalogObjectType.TABLE);
+    removedObject.setTable(new TTable());
+    removedObject.getTable().setTbl_name(tableName.getTbl());
+    removedObject.getTable().setDb_name(tableName.getDb());
+    removedObject.setCatalog_version(newTable.getCatalog_version());
+    response.result.setRemoved_catalog_object(removedObject);
+    response.result.setUpdated_catalog_object(newTable);
+    response.result.setVersion(newTable.getCatalog_version());
   }
 
   /**
@@ -1000,23 +1046,13 @@ public class DdlExecutor {
   }
 
   /**
-   * Calculates the next transient_lastDdlTime value. This is exactly how Hive updates
-   * the last ddl time.
+   * Calculates the next transient_lastDdlTime value.
    */
   private static long calculateDdlTime(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    // This is exactly how Hive updates the last ddl time.
     long existingLastDdlTime = Catalog.getLastDdlTime(msTbl);
     long currentTime = System.currentTimeMillis() / 1000;
-    while (existingLastDdlTime == currentTime) {
-      // We need to make sure that lastDdlTime will be changed but we don't want to set
-      // lastDdlTime to a future time when this function returns. If the last DDL and
-      // this one happened within a sec, sleep for a second.
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {}
-      currentTime = System.currentTimeMillis() / 1000;
-    }
+    if (existingLastDdlTime == currentTime) ++currentTime;
     return currentTime;
   }
 
@@ -1181,9 +1217,15 @@ public class DdlExecutor {
         msClient.release();
       }
     }
-    response.setResult(new TCatalogUpdateResult(JniCatalog.getServiceId(),
-        catalog.resetTable(tblName.toThrift(), true),
-        new TStatus(TStatusCode.OK, new ArrayList<String>())));
+
+    response.setResult(new TCatalogUpdateResult());
+    response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
+    response.getResult().setStatus(
+        new TStatus(TStatusCode.OK, new ArrayList<String>()));
+    response.getResult().setUpdated_catalog_object(
+        catalog.resetTable(tblName.toThrift(), true));
+    response.getResult().setVersion(
+        response.getResult().getUpdated_catalog_object().getCatalog_version());
     return response;
   }
 }

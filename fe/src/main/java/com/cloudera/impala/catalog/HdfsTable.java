@@ -879,7 +879,7 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTable toThrift() throws TableLoadingException {
+  public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HDFS_TABLE);
     table.setHdfs_table(getHdfsTable());

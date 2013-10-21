@@ -34,16 +34,8 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_insert_permutation(self, vector):
+    map(self.cleanup_db, ["insert_permutation_test"])
     self.run_test_case('QueryTest/insert_permutation', vector)
 
   def teardown_method(self, method):
     map(self.cleanup_db, ["insert_permutation_test"])
-
-  def cleanup_db(cls, db_name):
-    # TODO: Find a common place to put this method
-    # To drop a db, we need to first drop all the tables in that db
-    if db_name in cls.hive_client.get_all_databases():
-      for table_name in cls.hive_client.get_all_tables(db_name):
-        cls.hive_client.drop_table(db_name, table_name, True)
-      cls.hive_client.drop_database(db_name, True, False)
-    cls.client.refresh()

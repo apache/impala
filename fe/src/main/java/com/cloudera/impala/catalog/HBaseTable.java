@@ -479,7 +479,7 @@ public class HBaseTable extends Table {
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
 
   @Override
-  public TTable toThrift() throws TableLoadingException {
+  public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HBASE_TABLE);
     table.setHbase_table(getTHBaseTable());

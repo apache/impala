@@ -145,14 +145,10 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
               ddl_params.create_table_params.if_not_exists);
         }
       } else {
-        // CREATE TABLE AS SELECT waits for its catalog update once the DML
+        // CREATE TABLE AS SELECT performs its catalog update once the DML
         // portion of the operation has completed.
-        // TODO: For CREATE and ALTER statements, the CatalogServer should return the
-        // resulting TCatalogObject in the update_catalog_result. This object could be
-        // applied to the local impalad catalog cache immediately, which would avoid the
-        // need to wait for the update to be come from the StateStore.
-        parent_server_->WaitForCatalogUpdate(
-            *catalog_op_executor_->update_catalog_result());
+        RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+            *catalog_op_executor_->update_catalog_result()));
       }
       return Status::OK;
     }
@@ -173,8 +169,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
           exec_request_.load_data_request.table_name);
       catalog_op_executor_.reset(new CatalogOpExecutor());
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
-      parent_server_->WaitForCatalogUpdate(
-          *catalog_op_executor_->update_catalog_result());
+      RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+          *catalog_op_executor_->update_catalog_result()));
       return Status::OK;
     }
     default:
@@ -506,7 +502,7 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
       RETURN_IF_ERROR(status);
-      parent_server_->WaitForCatalogUpdate(resp.result);
+      RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result));
     }
   }
   query_events_->MarkEvent("DML Metastore update finished");

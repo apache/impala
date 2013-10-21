@@ -32,6 +32,7 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
@@ -116,13 +117,19 @@ public abstract class Catalog {
   public Catalog() { this(CatalogInitStrategy.LAZY); }
 
   /**
-   * Adds a database name to the metadata cache and marks the metadata as
-   * uninitialized. Used by CREATE DATABASE statements.
+   * Adds a database name to the metadata cache and returns the database's
+   * Thrift representation. Used by CREATE DATABASE statements.
    */
-  public long addDb(String dbName) {
+  public TCatalogObject addDb(String dbName) throws ImpalaException {
+    TCatalogObject db = new TCatalogObject(TCatalogObjectType.DATABASE,
+        Catalog.INITIAL_CATALOG_VERSION);
     catalogLock_.writeLock().lock();
     try {
-      return dbCache_.add(dbName);
+      dbCache_.add(dbName);
+      Db newDb = dbCache_.get(dbName);
+      db.setDb(newDb.toThrift());
+      db.setCatalog_version(newDb.getCatalogVersion());
+      return db;
     } finally {
       catalogLock_.writeLock().unlock();
     }
@@ -140,6 +147,13 @@ public abstract class Catalog {
     } catch (ImpalaException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  /**
+   * Returns the Db with the given name if present in the db cache, null otherwise.
+   */
+  public Db getDbIfPresent(String dbName) {
+    return dbCache_.getIfPresent(dbName);
   }
 
   /**
@@ -170,19 +184,30 @@ public abstract class Catalog {
   }
 
   /**
-   * Adds a new table to the catalog and marks its metadata as uninitialized.
-   * Returns the catalog version that include this change, or INITIAL_CATALOG_VERSION
-   * if the database does not exist.
+   * Adds a new table to the catalog and returns the the table's Thrift representation.
+   * If the operations succeeds, returns a TCatalogObject that include this change. If
+   * the database does not exist a CatalogObject with a version of
+   * INITIAL_CATALOG_VERSION will be returned.
    */
-  public long addTable(String dbName, String tblName) {
+  public TCatalogObject addTable(String dbName, String tblName)
+      throws TableLoadingException {
+    TCatalogObject tbl = new TCatalogObject(TCatalogObjectType.TABLE,
+        Catalog.INITIAL_CATALOG_VERSION);
     catalogLock_.writeLock().lock();
     try {
       Db db = getDb(dbName);
-      if (db != null) return db.addTable(tblName);
+      if (db != null) {
+        db.addTable(tblName);
+        Table newTbl = db.getTable(tblName);
+        Preconditions.checkNotNull(newTbl);
+        tbl.setType(newTbl.getCatalogObjectType());
+        tbl.setCatalog_version(newTbl.getCatalogVersion());
+        tbl.setTable(newTbl.toThrift());
+      }
     } finally {
       catalogLock_.writeLock().unlock();
     }
-    return Catalog.INITIAL_CATALOG_VERSION;
+    return tbl;
   }
 
   /**
@@ -243,12 +268,13 @@ public abstract class Catalog {
   }
 
   /**
-   * Renames a table and returns the catalog version that contains the change.
+   * Renames a table and returns the thrift representation of the new table.
    * This is equivalent to an atomic drop + add of the table. Returns
-   * the current catalog version if the target parent database does not exist
-   * in the catalog.
+   * a catalog object with a version of INITIAL_CATALOG_VERSION if the target
+   * parent database does not exist in the catalog.
    */
-  public long renameTable(TTableName oldTableName, TTableName newTableName) {
+  public TCatalogObject renameTable(TTableName oldTableName, TTableName newTableName)
+      throws TableLoadingException {
     // Ensure the removal of the old table and addition of the new table happen
     // atomically.
     catalogLock_.writeLock().lock();
@@ -285,24 +311,40 @@ public abstract class Catalog {
    * If isRefresh is true, performs an immediate incremental refresh.
    * Returns the catalog version that will contain the updated metadata.
    */
-  public long resetTable(TTableName tableName, boolean isRefresh) {
+  public TCatalogObject resetTable(TTableName tableName, boolean isRefresh)
+      throws TableLoadingException {
+    Db db;
     catalogLock_.writeLock().lock();
     try {
-      Db db = getDb(tableName.getDb_name());
-      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
+      db = getDb(tableName.getDb_name());
+      if (db == null) return null;
       if (isRefresh) {
         // TODO: This is not good because refreshes might take a long time we
         // shouldn't hold the catalog write lock the entire time. Instead,
         // we could consider making refresh() happen in the background or something
         // similar.
         LOG.debug("Refreshing table metadata: " + db.getName() + "." + tableName);
-        return db.refreshTable(tableName.getTable_name());
+        db.refreshTable(tableName.getTable_name());
       } else {
         LOG.debug("Invalidating table metadata: " + db.getName() + "." + tableName);
-        return db.invalidateTable(tableName.getTable_name());
+        db.invalidateTable(tableName.getTable_name());
       }
+      // Downgrade to a read lock.
+      catalogLock_.readLock().lock();
     } finally {
       catalogLock_.writeLock().unlock();
+    }
+
+    // Read lock should be acquired when we get here.
+    try {
+      Table table = db.getTable(tableName.getTable_name());
+      TCatalogObject catalogObject = new TCatalogObject();
+      catalogObject.setType(table.getCatalogObjectType());
+      catalogObject.setCatalog_version(table.getCatalogVersion());
+      catalogObject.setTable(table.toThrift());
+      return catalogObject;
+    } finally {
+      catalogLock_.readLock().unlock();
     }
   }
 
@@ -343,17 +385,18 @@ public abstract class Catalog {
   }
 
   /**
-   * Removes a function from the catalog. Returns true if the UDF was removed.
-   * Returns the catalog version that will reflect this change. Returns a version of
-   * INITIAL_CATALOG_VERSION if the function did not exist.
+   * Removes a function from the catalog. Increments the catalog version and returns
+   * the Function object that was removed if the function existed, otherwise returns
+   * null.
    */
-  public long removeFunction(Function desc) {
+  public Function removeFunction(Function desc) {
     catalogLock_.writeLock().lock();
     try {
       Db db = getDb(desc.dbName());
-      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
-      return db.removeFunction(desc) ? Catalog.incrementAndGetCatalogVersion() :
-        Catalog.INITIAL_CATALOG_VERSION;
+      if (db == null) return null;
+      Function fn = db.removeFunction(desc);
+      if (fn != null) fn.setCatalogVersion(Catalog.incrementAndGetCatalogVersion());
+      return fn;
     } finally {
       catalogLock_.writeLock().unlock();
     }

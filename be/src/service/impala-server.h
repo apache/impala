@@ -578,14 +578,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CancelFromThreadPool(uint32_t thread_id,
       const CancellationWork& cancellation_work);
 
-  // Waits until the Impalad Catalog has reached a version that includes the specified
-  // update result. Called from QueryExecState after executing statements that modify
-  // the catalog (DDL operations and DML operations that add new partitions).
+  // Processes a CatalogUpdateResult returned from the CatalogServer and ensures
+  // the update has been applied to the local impalad's catalog cache. Called from
+  // QueryExecState after executing any statement that modifies the catalog.
+  // If the TCatalogUpdateResult contains TCatalogObject(s) to add and/or remove, this
+  // function will update the cache by directly calling UpdateCatalog() with the
+  // TCatalogObject results.
+  // If the TCatalogUpdateResult does not contain any objects to apply, this function will
+  // wait until the local impalad's catalog cache has been updated from a statestore
+  // heartbeat that includes this catalog update's catalog version.
   // TODO: This function will wait until the local impalad processed the catalog update,
   // it would be useful to also have a way to wait until all impalad instances in the
-  // cluster have processed the metadata update. This could be done by waiting for
-  // 2 additional statestore heartbeats after this impalad has received the metadata.
-  void WaitForCatalogUpdate(const TCatalogUpdateResult& catalog_update_result);
+  // cluster have processed the metadata update.
+  Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result);
 
   // To be run in a thread. Every FLAGS_idle_session_timeout / 2 seconds, wakes up and
   // checks all sessions for their last-idle time. Those that have been idle for longer

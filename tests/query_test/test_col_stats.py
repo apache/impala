@@ -47,7 +47,6 @@ class TestColStats(ImpalaTestSuite):
 
   def __cleanup(self):
     self.cleanup_db(TEST_DB)
-    self.client.execute("invalidate metadata")
 
   def test_incompatible_col_stats(self, vector):
     """Tests Impala is able to use tables when the column stats data is not compatible

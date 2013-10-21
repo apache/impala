@@ -43,7 +43,6 @@ class TestInsertQueries(ImpalaTestSuite):
   @classmethod
   def setup_class(cls):
     super(TestInsertQueries, cls).setup_class()
-    cls.client.refresh()
 
   @pytest.mark.execute_serially
   def test_insert1(self, vector):

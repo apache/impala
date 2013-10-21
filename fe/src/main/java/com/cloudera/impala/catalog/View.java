@@ -143,7 +143,7 @@ public class View extends Table {
   }
 
   @Override
-  public TTable toThrift() throws TableLoadingException {
+  public TTable toThrift() {
     TTable view = super.toThrift();
     view.setTable_type(TTableType.VIEW);
     return view;
