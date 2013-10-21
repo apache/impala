@@ -258,7 +258,12 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       // Allocate a new buffer for reading the row group.  Row groups have a
       // fixed number of rows so take a guess at how big it will be based on
       // the previous row group size.
-      row_group_buffer_ = data_buffer_pool_->Allocate(row_group_length_);
+      // The row group length depends on the user data and can be very big. This
+      // can cause us to go way over the mem limit so use TryAllocate instead.
+      row_group_buffer_ = data_buffer_pool_->TryAllocate(row_group_length_);
+      if (row_group_length_ > 0 && row_group_buffer_ == NULL) {
+        return Status::MEM_LIMIT_EXCEEDED;
+      }
       row_group_buffer_size_ = row_group_length_;
     }
     RETURN_IF_ERROR(ReadColumnBuffers());

@@ -90,23 +90,15 @@ class MemPool {
   // of the the current chunk. Creates a new chunk if there aren't any chunks
   // with enough capacity.
   uint8_t* Allocate(int size) {
-    if (size == 0) return NULL;
+    return Allocate<false>(size);
+  }
 
-    int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
-    if (current_chunk_idx_ == -1
-        || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
-          > chunks_[current_chunk_idx_].size) {
-      FindChunk(num_bytes);
-    }
-    ChunkInfo& info = chunks_[current_chunk_idx_];
-    DCHECK(info.owns_data);
-    uint8_t* result = info.data + info.allocated_bytes;
-    DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
-    info.allocated_bytes += num_bytes;
-    total_allocated_bytes_ += num_bytes;
-    DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
-    peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
-    return result;
+  // Same as Allocate() except the mem limit is checked before the allocation and
+  // this call will fail (returns NULL) if it does.
+  // The caller must handle the NULL case. This should be used for allocations
+  // where the size can be very big to bound the amount by which we exceed mem limits.
+  uint8_t* TryAllocate(int size) {
+    return Allocate<true>(size);
   }
 
   // Returns 'byte_size' to the current chunk back to the mem pool. This can
@@ -242,7 +234,9 @@ class MemPool {
   // Find or allocated a chunk with at least min_size spare capacity and update
   // current_chunk_idx_. Also updates chunks_, chunk_sizes_ and allocated_bytes_
   // if a new chunk needs to be created.
-  void FindChunk(int min_size);
+  // If check_limits is true, this call can fail (returns false) if adding a
+  // new chunk exceeds the mem limits.
+  bool FindChunk(int min_size, bool check_limits);
 
   // Check integrity of the supporting data structures; always returns true but DCHECKs
   // all invariants.
@@ -256,6 +250,32 @@ class MemPool {
   int GetFreeOffset() const {
     if (current_chunk_idx_ == -1) return 0;
     return chunks_[current_chunk_idx_].allocated_bytes;
+  }
+
+  template <bool CHECK_LIMIT_FIRST>
+  uint8_t* Allocate(int size) {
+    if (size == 0) return NULL;
+
+    int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
+    if (current_chunk_idx_ == -1
+        || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
+          > chunks_[current_chunk_idx_].size) {
+      if (CHECK_LIMIT_FIRST) {
+        // If we couldn't allocate a new chunk, return NULL.
+        if (!FindChunk(num_bytes, true)) return NULL;
+      } else {
+        FindChunk(num_bytes, false);
+      }
+    }
+    ChunkInfo& info = chunks_[current_chunk_idx_];
+    DCHECK(info.owns_data);
+    uint8_t* result = info.data + info.allocated_bytes;
+    DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
+    info.allocated_bytes += num_bytes;
+    total_allocated_bytes_ += num_bytes;
+    DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
+    peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
+    return result;
   }
 };
 

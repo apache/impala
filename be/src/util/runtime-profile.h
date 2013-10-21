@@ -127,6 +127,20 @@ class RuntimeProfile {
       value_.UpdateMax(new_val);
     }
 
+    // Tries to update the current value by delta. If current_value() + delta
+    // exceeds max, return false and current_value is not changed.
+    bool TryUpdate(int64_t delta, int64_t max) {
+      while (true) {
+        int64_t old_val = current_value_;
+        int64_t new_val = old_val + delta;
+        if (new_val > max) return false;
+        if (LIKELY(current_value_.Swap(old_val, new_val))) {
+          value_.UpdateMax(new_val);
+          return true;
+        }
+      }
+    }
+
     virtual void Set(int64_t v) {
       current_value_ = v;
       value_.UpdateMax(v);

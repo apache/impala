@@ -109,15 +109,19 @@ class AtomicInt {
     while (true) {
       T old_value = value_;
       T new_value = std::max(old_value, value);
-      if (LIKELY(__sync_bool_compare_and_swap(&value_, old_value, new_value))) break;
+      if (LIKELY(Swap(old_value, new_value))) break;
     }
   }
   void UpdateMin(T value) {
     while (true) {
       T old_value = value_;
       T new_value = std::min(old_value, value);
-      if (LIKELY(__sync_bool_compare_and_swap(&value_, old_value, new_value))) break;
+      if (LIKELY(Swap(old_value, new_value))) break;
     }
+  }
+
+  bool Swap(T old_val, T new_val) {
+    return __sync_bool_compare_and_swap(&value_, old_val, new_val);
   }
 
  private:

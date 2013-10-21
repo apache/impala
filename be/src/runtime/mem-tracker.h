@@ -79,6 +79,38 @@ class MemTracker {
     }
   }
 
+  // Increases consumption of this tracker and its ancestors by 'bytes' only if
+  // they can all consume 'bytes'. If this brings any of them over, none of them
+  // are updated.
+  // Returns true if the try succeeded.
+  bool TryConsume(int64_t bytes) {
+    if (bytes == 0) return true;
+    if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
+    int i = 0;
+    for (; i < all_trackers_.size(); ++i) {
+      if (all_trackers_[i]->limit_ < 0) {
+        all_trackers_[i]->consumption_->Update(bytes);
+      } else {
+        if (!all_trackers_[i]->consumption_->TryUpdate(bytes, all_trackers_[i]->limit_)) {
+          // One of the trackers failed
+          break;
+        }
+      }
+    }
+    // Everyone succeeded, return.
+    if (i == all_trackers_.size()) return true;
+
+    // Someone failed, roll back the ones that succeeded.
+    // TODO: this doesn't roll it back completely since the max values for
+    // the updated trackers aren't decremented. The max values are only used
+    // for error reporting so this is probably okay. Rolling those back is
+    // pretty hard; we'd need something like 2PC.
+    for (int j = 0; j < i; ++j) {
+      all_trackers_[j]->Release(bytes);
+    }
+    return false;
+  }
+
   // Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
     if (bytes == 0) return;

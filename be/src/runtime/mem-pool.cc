@@ -87,7 +87,7 @@ void MemPool::FreeAll() {
   }
 }
 
-void MemPool::FindChunk(int min_size) {
+bool MemPool::FindChunk(int min_size, bool check_limits) {
   // Try to allocate from a free chunk. The first free chunk, if any, will be immediately
   // after the current chunk.
   int first_free_idx = current_chunk_idx_ + 1;
@@ -120,6 +120,13 @@ void MemPool::FindChunk(int min_size) {
       }
     }
     chunk_size = ::max(min_size, chunk_size);
+
+    if (check_limits) {
+      if (!mem_tracker_->TryConsume(chunk_size)) return false;
+    } else {
+      mem_tracker_->Consume(chunk_size);
+    }
+
     // If there are no free chunks put it at the end, otherwise before the first free.
     if (first_free_idx == static_cast<int>(chunks_.size())) {
       chunks_.push_back(ChunkInfo(chunk_size));
@@ -129,9 +136,6 @@ void MemPool::FindChunk(int min_size) {
       chunks_.insert(insert_chunk, ChunkInfo(chunk_size));
     }
     total_reserved_bytes_ += chunk_size;
-
-    // update and check limits
-    mem_tracker_->Consume(chunk_size);
   }
 
   if (current_chunk_idx_ > 0) {
@@ -142,6 +146,7 @@ void MemPool::FindChunk(int min_size) {
 
   DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
   DCHECK(CheckIntegrity(true));
+  return true;
 }
 
 void MemPool::AcquireData(MemPool* src, bool keep_current) {
