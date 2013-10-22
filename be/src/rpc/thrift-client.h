@@ -58,6 +58,12 @@ class ThriftClientImpl {
   // Close the connection with the remote server. May be called repeatedly.
   void Close();
 
+  // Set receive timeout on the underlying TSocket.
+  void setRecvTimeout(int32_t ms) { socket_->setRecvTimeout(ms); }
+
+  // Set send timeout on the underlying TSocket.
+  void setSendTimeout(int32_t ms) { socket_->setSendTimeout(ms); }
+
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
       : ipaddress_(ipaddress), port_(port), ssl_(ssl) {

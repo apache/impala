@@ -99,6 +99,10 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
     *client_key = NULL;
     return status;
   }
+  // Set the TSocket's send and receive timeouts.
+  client_impl->setRecvTimeout(recv_timeout_ms_);
+  client_impl->setSendTimeout(send_timeout_ms_);
+
   // Because the client starts life 'checked out', we don't add it to the cache map
   client_map_[*client_key] = client_impl.get();
   client_impl.release();

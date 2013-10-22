@@ -87,8 +87,13 @@ class ClientCacheHelper {
  private:
   template <class T> friend class ClientCache;
   // Private constructor so that only ClientCache can instantiate this class.
-  ClientCacheHelper(uint32_t num_tries, uint64_t wait_ms)
-      : num_tries_(num_tries), wait_ms_(wait_ms), metrics_enabled_(false) { }
+  ClientCacheHelper(uint32_t num_tries, uint64_t wait_ms, int32_t send_timeout_ms,
+      int32_t recv_timeout_ms)
+      : num_tries_(num_tries),
+        wait_ms_(wait_ms),
+        send_timeout_ms_(send_timeout_ms),
+        recv_timeout_ms_(recv_timeout_ms),
+        metrics_enabled_(false) { }
 
   // Protects all member variables
   // TODO: have more fine-grained locks or use lock-free data structures,
@@ -109,6 +114,12 @@ class ClientCacheHelper {
 
   // Time to wait between failed connection attempts.
   uint64_t wait_ms_;
+
+  // Time to wait for the underlying socket to send data, e.g., for an RPC.
+  int32_t send_timeout_ms_;
+
+  // Time to wait for the underlying socket to receive data, e.g., for an RPC response.
+  int32_t recv_timeout_ms_;
 
   // Metrics
   bool metrics_enabled_;
@@ -177,17 +188,19 @@ class ClientCache {
  public:
   typedef ThriftClient<T> Client;
 
-  ClientCache() : client_cache_helper_(1, 0) {
+  ClientCache() : client_cache_helper_(1, 0, 0, 0) {
     client_factory_ =
         boost::bind<ThriftClientImpl*>(
             boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);
   }
 
   // Create a ClientCache where connections are tried num_tries times, with a pause of
-  // wait_ms between attempts.
-  // If num_tries == 0, retry connections indefinitely.
-  ClientCache(uint32_t num_tries, uint32_t wait_ms)
-      : client_cache_helper_(num_tries, wait_ms) {
+  // wait_ms between attempts. The underlying TSocket's send and receive timeouts of
+  // each connection can also be set. If num_tries == 0, retry connections indefinitely.
+  // A send/receive timeout of 0 means there is no timeout.
+  ClientCache(uint32_t num_tries, uint64_t wait_ms, int32_t send_timeout_ms = 0,
+      int32_t recv_timeout_ms = 0)
+      : client_cache_helper_(num_tries, wait_ms, send_timeout_ms, recv_timeout_ms) {
     client_factory_ =
         boost::bind<ThriftClientImpl*>(
             boost::mem_fn(&ClientCache::MakeClient), this, _1, _2);
