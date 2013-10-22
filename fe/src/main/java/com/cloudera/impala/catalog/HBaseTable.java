@@ -226,8 +226,8 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public void loadFromTTable(TTable table) throws TableLoadingException {
-    super.loadFromTTable(table);
+  public void loadFromThrift(TTable table) throws TableLoadingException {
+    super.loadFromThrift(table);
     loadInternal();
   }
 

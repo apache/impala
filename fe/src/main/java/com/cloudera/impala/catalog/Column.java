@@ -96,4 +96,11 @@ public class Column {
     if (columnDesc.isSetCol_stats()) col.updateStats(columnDesc.getCol_stats());
     return col;
   }
+
+  public TColumnDesc toThrift() {
+    TColumnDesc colDesc = new TColumnDesc(name, type.toThrift());
+    if (comment != null) colDesc.setComment(comment);
+    colDesc.setCol_stats(getStats().toThrift());
+    return colDesc;
+  }
 }

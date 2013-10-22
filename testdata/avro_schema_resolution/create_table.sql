@@ -2,8 +2,10 @@ USE functional_avro_snap;
 
 DROP TABLE IF EXISTS schema_resolution_test;
 
--- Specify schema in SERDEPROPERTIES instead of TBLPROPERTIES to validate IMP-538
-CREATE EXTERNAL TABLE schema_resolution_test
+-- Specify the Avro schema in SERDEPROPERTIES instead of TBLPROPERTIES to validate
+-- IMPALA-538. Also, give the table a different column definition (col1, col2) than what
+-- is defined in the Avro schema for testing mismatched table/deserializer schemas.
+CREATE EXTERNAL TABLE schema_resolution_test (col1 string, col2 string)
 ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
 WITH SERDEPROPERTIES ('avro.schema.literal'='{
 "name": "a",

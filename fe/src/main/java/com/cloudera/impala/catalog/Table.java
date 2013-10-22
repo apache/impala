@@ -28,10 +28,8 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -235,7 +233,7 @@ public abstract class Table implements CatalogObject {
     return getPrimitiveType(fs.getType());
   }
 
-  public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
+  public void loadFromThrift(TTable thriftTable) throws TableLoadingException {
     List<TColumnDesc> columns = new ArrayList<TColumnDesc>();
     columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
@@ -265,36 +263,25 @@ public abstract class Table implements CatalogObject {
     table.setId(id.asInt());
     table.setAccess_level(accessLevel);
 
-    // Populate with both regular columns and clustering columns.
-    table.setColumns(fieldSchemaToColumnDesc(getMetaStoreTable().getSd().getCols()));
-    for (TColumnDesc colDesc: table.getColumns()) {
-      Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
-      colDesc.setCol_stats(column.getStats().toThrift());
+    // Populate both regular columns and clustering columns (if there are any).
+    table.setColumns(new ArrayList<TColumnDesc>());
+    table.setClustering_columns(new ArrayList<TColumnDesc>());
+    for (int i = 0; i < colsByPos.size(); ++i) {
+      TColumnDesc colDesc = colsByPos.get(i).toThrift();
+      // Clustering columns come first.
+      if (i < numClusteringCols) {
+        table.addToClustering_columns(colDesc);
+      } else {
+        table.addToColumns(colDesc);
+      }
     }
 
-    table.setClustering_columns(fieldSchemaToColumnDesc(
-        getMetaStoreTable().getPartitionKeys()));
-    for (TColumnDesc colDesc: table.getClustering_columns()) {
-      Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
-      colDesc.setCol_stats(column.getStats().toThrift());
-    }
     table.setMetastore_table(getMetaStoreTable());
     if (numRows != -1) {
       table.setTable_stats(new TTableStatsData());
       table.getTable_stats().setNum_rows(numRows);
     }
     return table;
-  }
-
-  protected static List<TColumnDesc> fieldSchemaToColumnDesc(List<FieldSchema> fields) {
-    List<TColumnDesc> colDescs = Lists.newArrayList();
-    for (FieldSchema fs: fields) {
-      TColumnDesc colDesc = new TColumnDesc(fs.getName(),
-          getPrimitiveType(fs.getType()).toThrift());
-      if (fs.getComment() != null) colDesc.setComment(fs.getComment());
-      colDescs.add(colDesc);
-    }
-    return colDescs;
   }
 
   protected static PrimitiveType getPrimitiveType(String typeName) {

@@ -54,13 +54,11 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumnStatsData;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
@@ -844,8 +842,8 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
-    super.loadFromTTable(thriftTable);
+  public void loadFromThrift(TTable thriftTable) throws TableLoadingException {
+    super.loadFromThrift(thriftTable);
     THdfsTable hdfsTable = thriftTable.getHdfs_table();
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();
     nullColumnValue_ = hdfsTable.nullColumnValue;
@@ -872,21 +870,6 @@ public class HdfsTable extends Table {
   public TTable toThrift() throws TableLoadingException {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HDFS_TABLE);
-
-    // populate with both partition keys and regular columns
-    String inputFormat = getMetaStoreTable().getSd().getInputFormat();
-    if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-      MetaStoreClient client = db.getParentCatalog().getMetaStoreClient();
-      try {
-        table.setColumns(
-            fieldSchemaToColumnDesc(client.getHiveClient().getFields(db.getName(), name)));
-      } catch (Exception e) {
-        throw new TableLoadingException("Failed to load metadata for table: " + name, e);
-      } finally {
-        client.release();
-      }
-    }
-
     table.setHdfs_table(getHdfsTable());
     return table;
   }

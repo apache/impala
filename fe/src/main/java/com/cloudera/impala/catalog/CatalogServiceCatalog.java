@@ -27,7 +27,6 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.collect.Lists;
 
@@ -103,8 +102,10 @@ public class CatalogServiceCatalog extends Catalog {
             try {
               catalogTbl.setTable(tbl.toThrift());
             } catch (TableLoadingException e) {
-              // TODO: tbl.toThrift() shouldn't throw a TableLoadingException.
-              throw new IllegalStateException(e);
+              // TODO: tbl.toThrift() should not throw a TableLoadingException.
+              LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
+                  dbName, tblName, e.getMessage()), e);
+              continue;
             }
             catalogTbl.setCatalog_version(tbl.getCatalogVersion());
           } else {

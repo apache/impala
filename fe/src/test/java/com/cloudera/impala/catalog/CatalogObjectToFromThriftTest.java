@@ -77,7 +77,7 @@ public class CatalogObjectToFromThriftTest {
       // Now try to load the thrift struct.
       Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
           catalog.getDb(dbName), thriftTable.getMetastore_table());
-      newTable.loadFromTTable(thriftTable);
+      newTable.loadFromThrift(thriftTable);
       Assert.assertTrue(newTable instanceof HdfsTable);
       Assert.assertEquals(newTable.name, thriftTable.tbl_name);
       Assert.assertEquals(newTable.numClusteringCols, 2);
@@ -101,6 +101,32 @@ public class CatalogObjectToFromThriftTest {
     }
   }
 
+  /**
+   * Validates proper to/fromThrift behavior for a table whose column definition does not
+   * match its Avro schema definition. The expected behavior is that the Avro schema
+   * definition will override any columns defined in the table.
+   */
+  @Test
+  public void TestMismatchedAvroAndTableSchemas() throws DatabaseNotFoundException,
+      TableNotFoundException, TableLoadingException {
+    Table table = catalog.getTable("functional_avro_snap", "schema_resolution_test");
+    TTable thriftTable = table.toThrift();
+    Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
+    Assert.assertTrue(thriftTable.isSetTable_type());
+    Assert.assertEquals(thriftTable.getColumns().size(), 8);
+    Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
+    Assert.assertEquals(thriftTable.getTable_type(), TTableType.HDFS_TABLE);
+
+    // Now try to load the thrift struct.
+    Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
+        catalog.getDb("functional_avro_snap"), thriftTable.getMetastore_table());
+    newTable.loadFromThrift(thriftTable);
+    Assert.assertEquals(newTable.getColumns().size(), 8);
+
+    // The table schema does not match the Avro schema - it has only 2 columns.
+    Assert.assertEquals(newTable.getMetaStoreTable().getSd().getCols().size(), 2);
+  }
+
   @Test
   public void TestHBaseTables() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
@@ -110,7 +136,7 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
-    Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
+    Assert.assertEquals(thriftTable.getClustering_columns().size(), 1);
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HBASE_TABLE);
     THBaseTable hbaseTable = thriftTable.getHbase_table();
     Assert.assertEquals(hbaseTable.getFamilies().size(), 13);
@@ -123,7 +149,7 @@ public class CatalogObjectToFromThriftTest {
 
     Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
         catalog.getDb(dbName), thriftTable.getMetastore_table());
-    newTable.loadFromTTable(thriftTable);
+    newTable.loadFromThrift(thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);
@@ -142,7 +168,7 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
-    Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
+    Assert.assertEquals(thriftTable.getClustering_columns().size(), 1);
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HBASE_TABLE);
     THBaseTable hbaseTable = thriftTable.getHbase_table();
     Assert.assertEquals(hbaseTable.getFamilies().size(), 13);
@@ -160,7 +186,7 @@ public class CatalogObjectToFromThriftTest {
     // Table.
     Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
         catalog.getDb(dbName), thriftTable.getMetastore_table());
-    newTable.loadFromTTable(thriftTable);
+    newTable.loadFromThrift(thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);

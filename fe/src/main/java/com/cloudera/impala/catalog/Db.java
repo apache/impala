@@ -212,7 +212,7 @@ public class Db implements CatalogObject {
       Preconditions.checkState(thriftTable.isSetMetastore_table());
       Table table = Table.fromMetastoreTable(new TableId(thriftTable.getId()), this,
           thriftTable.getMetastore_table());
-      table.loadFromTTable(thriftTable);
+      table.loadFromThrift(thriftTable);
       tableCache.add(table);
     } else {
       TableLoadingException loadingException = new TableLoadingException(
