@@ -200,7 +200,8 @@ Status ExecEnv::StartServices() {
     DCHECK(resource_broker_.get() != NULL);
     RETURN_IF_ERROR(resource_broker_->Init());
     DCHECK(cgroups_mgr_.get() != NULL);
-    cgroups_mgr_->Init(FLAGS_cgroup_hierarchy_path, FLAGS_staging_cgroup);
+    RETURN_IF_ERROR(
+        cgroups_mgr_->Init(FLAGS_cgroup_hierarchy_path, FLAGS_staging_cgroup));
   }
 
   // Initialize global memory limit.
