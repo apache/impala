@@ -79,6 +79,11 @@ class ResourceBroker {
   void set_scheduler(Scheduler* scheduler) { scheduler_ = scheduler; };
 
  private:
+  // Registers this resource broker with the Llama and refreshes the Llama nodes
+  // after a successful registration. Returns a non-OK status if the registration
+  // or the node refresh failed.
+  Status RegisterAndRefreshLlama();
+
   // Registers this resource broker with the Llama. Returns a non-OK status is the
   // registration failed.
   Status RegisterWithLlama();

@@ -42,6 +42,9 @@ using namespace boost::uuids;
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 
+// TODO: Refactor the Llama restart and thrift connect/reconnect/reopen logic into
+// a common place.
+
 namespace impala {
 
 // String to search for in Llama error messages to detect that Llama has restarted,
@@ -132,7 +135,13 @@ Status ResourceBroker::Init() {
   DCHECK(llama_client_id_.empty());
   random_generator uuid_generator;
   llama_client_id_= lexical_cast<string>(uuid_generator());
+  RETURN_IF_ERROR(RegisterAndRefreshLlama());
+  return Status::OK;
+}
+
+Status ResourceBroker::RegisterAndRefreshLlama() {
   RETURN_IF_ERROR(RegisterWithLlama());
+  RETURN_IF_ERROR(RefreshLlamaNodes());
   return Status::OK;
 }
 
@@ -174,9 +183,7 @@ Status ResourceBroker::RegisterWithLlama() {
             response.status, "Failed to register Resource Broker with Llama."));
         llama_handle_ = response.am_handle;
         LOG(INFO) << "Received Llama client handle " << llama_handle_;
-        RETURN_IF_ERROR(RefreshLlamaNodes());
-        LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
-        return Status::OK;
+        break;
       } catch (TTransportException& e) {
         needs_reopen = true;
       }
@@ -283,7 +290,7 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
 
     // Check whether Llama has been restarted. If so, re-register with it.
     if (LlamaHasRestarted(llama_response.status)) {
-      RETURN_IF_ERROR(RegisterWithLlama());
+      RETURN_IF_ERROR(RegisterAndRefreshLlama());
       // Set the new Llama handle received from re-registering.
       llama_request.__set_am_handle(llama_handle_);
       LOG(INFO) << "Retrying reservation request: " << request;
@@ -371,7 +378,7 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
 
     // Check whether Llama has been restarted. If so, re-register with it.
     if (LlamaHasRestarted(llama_response.status)) {
-      RETURN_IF_ERROR(RegisterWithLlama());
+      RETURN_IF_ERROR(RegisterAndRefreshLlama());
       // Set the new Llama handle received from re-registering.
       llama_request.__set_am_handle(llama_handle_);
       LOG(INFO) << "Retrying release of reservation with id "
@@ -464,17 +471,43 @@ void ResourceBroker::NMNotification(const llama::TLlamaNMNotificationRequest& re
 }
 
 Status ResourceBroker::RefreshLlamaNodes() {
-  Status status;
-  ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-      llama_address_, &status);
-  RETURN_IF_ERROR(status);
-  llama::TLlamaAMGetNodesRequest request;
-  request.__set_am_handle(llama_handle_);
-  request.__set_version(llama::TLlamaServiceVersion::V1);
-  llama::TLlamaAMGetNodesResponse response;
-  llama_client->GetNodes(response, request);
-  RETURN_IF_ERROR(LlamaStatusToImpalaStatus(response.status));
-  llama_nodes_ = response.nodes;
+  llama::TLlamaAMGetNodesRequest llama_request;
+  llama_request.__set_am_handle(llama_handle_);
+  llama_request.__set_version(llama::TLlamaServiceVersion::V1);
+  llama::TLlamaAMGetNodesResponse llama_response;
+
+  int attempts = 0;
+  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
+    ++attempts;
+    Status status;
+    ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
+        llama_address_, &status);
+    RETURN_IF_ERROR(status);
+    try {
+      llama_client->GetNodes(llama_response, llama_request);
+    } catch (TTransportException& e) {
+      VLOG_RPC << "Retrying GetNodes: " << e.what();
+      status = llama_client.Reopen();
+      if (!status.ok()) continue;
+      llama_client->GetNodes(llama_response, llama_request);
+    }
+    // Check whether Llama has been restarted. If so, re-register with it.
+    if (LlamaHasRestarted(llama_response.status)) {
+      RETURN_IF_ERROR(RegisterWithLlama());
+      // Set the new Llama handle received from re-registering.
+      llama_request.__set_am_handle(llama_handle_);
+      LOG(INFO) << "Retrying GetNodes";
+      continue;
+    }
+    break;
+  }
+  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
+    return Status("GetNodes request aborted due to connectivity issues with Llama.");
+  }
+
+  RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
+  llama_nodes_ = llama_response.nodes;
+  LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
 
   // The Llama is a Mini Llama if all nodes know to it are on 127.0.0.1.
   is_mini_llama_ = true;
