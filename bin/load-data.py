@@ -7,12 +7,16 @@
 import collections
 import os
 import re
+import sqlparse
 import subprocess
 import sys
 import tempfile
 import time
 from itertools import product
 from optparse import OptionParser
+from Queue import Queue
+from tests.beeswax.impala_beeswax import *
+from threading import Thread
 
 parser = OptionParser()
 parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
@@ -32,7 +36,7 @@ parser.add_option("-f", "--force_reload", dest="force_reload", action="store_tru
 parser.add_option("--compute_stats", dest="compute_stats", action="store_true",
                   default= False, help="Execute COMPUTE STATISTICS statements on the "\
                   "tables that are loaded")
-parser.add_option("--impalad", dest="impala_shell_args", default="localhost:21000",
+parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="Impala daemon to connect to")
 parser.add_option("--table_names", dest="table_names", default=None,
                   help="Only load the specified tables - specified as a comma-seperated "\
@@ -48,8 +52,11 @@ parser.add_option("--workload_dir", dest="workload_dir",
 parser.add_option("--dataset_dir", dest="dataset_dir",
                   default=os.environ['IMPALA_DATASET_DIR'],
                   help="Directory that contains Impala datasets")
+parser.add_option("--use_kerberos", action="store_true", default=False,
+                  help="Load data on a kerberized cluster.")
 options, args = parser.parse_args()
 
+DATA_LOAD_DIR = '/tmp/data-load-files'
 WORKLOAD_DIR = options.workload_dir
 DATASET_DIR = options.dataset_dir
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
@@ -59,7 +66,6 @@ GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "
                       "--workload=%s --scale_factor=%s --verbose"
 HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/hive')
 HIVE_ARGS = "-hiveconf hive.root.logger=WARN,console -v"
-IMPALA_SHELL_CMD = os.path.join(os.environ['IMPALA_HOME'], 'bin/impala-shell.sh')
 HADOOP_CMD = os.path.join(os.environ['HADOOP_HOME'], 'bin/hadoop')
 
 def available_workloads(workload_dir):
@@ -74,31 +80,44 @@ def validate_workloads(all_workloads, workloads):
       sys.exit(1)
 
 def exec_cmd(cmd, error_msg, expect_success=True):
-  ret_val = subprocess.call(cmd, shell=True)
-  if expect_success and ret_val != 0:
-    print error_msg
-    sys.exit(ret_val)
+  ret_val = -1
+  try:
+    ret_val = subprocess.call(cmd, shell=True)
+  except Exception as e:
+    error_msg = "%s: %s" % (error_msg, str(e))
+  finally:
+    if expect_success and ret_val != 0:
+      print error_msg
   return ret_val
 
 def exec_hive_query_from_file(file_name):
+  if not os.path.exists(file_name): return
   hive_cmd = "%s %s -f %s" % (HIVE_CMD, HIVE_ARGS, file_name)
-  print 'Executing Hive Command: ' + hive_cmd
+  print 'Executing Hive Command: %s' % hive_cmd
   exec_cmd(hive_cmd,  'Error executing file from Hive: ' + file_name)
 
 def exec_hbase_query_from_file(file_name):
+  if not os.path.exists(file_name): return
   hbase_cmd = "hbase shell %s" % file_name
+  print 'Executing HBase Command: %s' % hbase_cmd
   exec_cmd(hbase_cmd, 'Error executing hbase create commands')
 
-def exec_impala_query_from_file(file_name):
-  impala_refresh_cmd = "%s --impalad=%s -q 'invalidate metadata'" %\
-      (IMPALA_SHELL_CMD, options.impala_shell_args)
-  impala_cmd = "%s --impalad=%s -f %s" %\
-      (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
-  # Refresh catalog before and after
-  exec_cmd(impala_refresh_cmd, 'Error executing refresh from Impala.')
-  print 'Executing Impala Command: ' + impala_cmd
-  exec_cmd(impala_cmd, 'Error executing file from Impala: ' + file_name)
-  exec_cmd(impala_refresh_cmd, 'Error executing refresh from Impala.')
+def exec_impala_query_from_file(file_name, result_queue):
+  """Execute each query in an Impala query file individually"""
+  is_success = True
+  try:
+    impala_client = ImpalaBeeswaxClient(options.impalad,
+        use_kerberos=options.use_kerberos)
+    impala_client.connect()
+    with open(file_name, 'r+') as query_file:
+      queries = sqlparse.split(query_file.read())
+    for query in queries:
+      query = sqlparse.format(query.rstrip(';'), strip_comments=True)
+      result = impala_client.execute(query)
+  except Exception as e:
+    print "Data Loading from Impala failed with error: %s" % str(e)
+    is_success = False
+  result_queue.put(is_success)
 
 def exec_bash_script(file_name):
   bash_cmd = "bash %s" % file_name
@@ -152,6 +171,32 @@ def exec_hadoop_fs_cmd(args, expect_success=True):
   exec_cmd(cmd, "Error executing Hadoop command, exiting",
       expect_success=expect_success)
 
+def exec_impala_query_from_file_parallel(query_files):
+  if not query_files: return
+  # Refresh Catalog
+  print "Invalidating metadata"
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client.connect()
+  impala_client.execute('invalidate metadata')
+  result_queue = Queue()
+  threads = []
+  for query_file in query_files:
+    thread = Thread(target=exec_impala_query_from_file, args=[query_file, result_queue])
+    thread.daemon = True
+    threads.append(thread)
+    thread.start()
+  # Keep looping until the number of results retrieved is the same as the number of
+  # threads spawned, or until a data loading query fails. result_queue.get() will
+  # block until a result is available in the queue.
+  num_fetched_results = 0
+  while num_fetched_results < len(threads):
+    success = result_queue.get()
+    num_fetched_results += 1
+    if not success: sys.exit(1)
+  # There is a small window where a thread may still be alive even if all the threads have
+  # finished putting their results in the queue.
+  for thread in threads: thread.join()
+
 if __name__ == "__main__":
   all_workloads = available_workloads(WORKLOAD_DIR)
   workloads = []
@@ -166,37 +211,36 @@ if __name__ == "__main__":
     workloads = options.workloads.split(",")
     validate_workloads(all_workloads, workloads)
 
+
   print 'Starting data load for the following workloads: ' + ', '.join(workloads)
 
   loading_time_map = collections.defaultdict(float)
   for workload in workloads:
     start_time = time.time()
     dataset = get_dataset_for_workload(workload)
-    dataset_dir = os.path.join(DATASET_DIR, dataset)
-    os.chdir(dataset_dir)
     generate_schema_statements(workload)
+    assert os.path.isdir(os.path.join(DATA_LOAD_DIR, dataset)), ("Data loading files "
+        "do not exist for (%s)" % dataset)
+    os.chdir(os.path.join(DATA_LOAD_DIR, dataset))
     copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
+    dataset_dir_contents = os.listdir(os.getcwd())
+    load_file_substr = "%s-%s" % (workload, options.exploration_strategy)
+    # Data loading with Impala is done in parallel, each file format has a separate query
+    # file.
+    create_filename = '%s-impala-generated' % load_file_substr
+    load_filename = '%s-impala-load-generated' % load_file_substr
+    impala_create_files = [f for f in dataset_dir_contents if create_filename in f]
+    impala_load_files = [f for f in dataset_dir_contents if load_filename in f]
 
-    generated_hbase_file = 'load-%s-%s-hbase.create' % (workload,
-                                                        options.exploration_strategy)
-    if os.path.exists(generated_hbase_file):
-      exec_hbase_query_from_file(os.path.join(dataset_dir, generated_hbase_file))
-
-    generated_impala_file = \
-        'load-%s-%s-impala-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_impala_file):
-      exec_impala_query_from_file(os.path.join(dataset_dir, generated_impala_file))
-
-    generated_hive_file =\
-        'load-%s-%s-hive-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_hive_file):
-      exec_hive_query_from_file(os.path.join(dataset_dir, generated_hive_file))
-
-    generated_impala_file = \
-        'load-%s-%s-impala-load-generated.sql' % (workload, options.exploration_strategy)
-    if os.path.exists(generated_impala_file):
-      exec_impala_query_from_file(os.path.join(dataset_dir, generated_impala_file))
-
+    # Execute the data loading scripts.
+    # Creating tables in Impala have no dependencies, so we execute them first.
+    # HBase table inserts are done via hive, so the hbase tables need to be created before
+    # running the hive script. Finally, some of the Impala inserts depend on hive tables,
+    # so they're done at the end.
+    exec_impala_query_from_file_parallel(impala_create_files)
+    exec_hbase_query_from_file('load-%s-hbase-generated.create' % load_file_substr)
+    exec_hive_query_from_file('load-%s-hive-generated.sql' % load_file_substr)
+    exec_impala_query_from_file_parallel(impala_load_files)
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0

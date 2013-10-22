@@ -26,10 +26,12 @@
 #    or LOAD directly if the file already exists in HDFS.
 import collections
 import csv
+import glob
 import math
 import json
 import os
 import random
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -70,8 +72,9 @@ if options.workload is None:
   parser.print_help()
   sys.exit(1)
 
-WORKLOAD_DIR = os.environ['IMPALA_HOME'] + '/testdata/workloads'
-DATASET_DIR = os.environ['IMPALA_HOME'] + '/testdata/datasets'
+DATA_LOAD_DIR = '/tmp/data-load-files'
+WORKLOAD_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'workloads')
+DATASET_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'datasets')
 AVRO_SCHEMA_DIR = "avro_schemas"
 IMPALA_SUPPORTED_INSERT_FORMATS = ['parquet', 'hbase', 'text']
 
@@ -357,20 +360,20 @@ class Statements(object):
     self.load_base = list()
 
   def write_to_file(self, filename):
-    # Make sure we create the base tables first. It is important that we always write
-    # to the output file, even if there are no statements to generate. This makes sure
-    # the output file is empty and the user doesn't unexpectedly load some stale data.
+    # If there is no content to write, skip
+    if self.__is_empty(): return
     output = self.create + self.load_base + self.load
     with open(filename, 'w') as f:
       f.write('\n\n'.join(output))
+
+  def __is_empty(self):
+    return not (self.create or self.load or self.load_base)
 
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
   # TODO: This method has become very unwieldy. It has to be re-factored sooner than
   # later.
   # Parquet statements to be executed separately by Impala
-  impala_output = Statements()
-  impala_load = Statements()
   hive_output = Statements()
   hbase_output = Statements()
 
@@ -379,6 +382,8 @@ def generate_statements(output_name, test_vectors, sections,
     table_names = [name.lower() for name in options.table_names.split(',')]
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
+    impala_output = Statements()
+    impala_load = Statements()
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
@@ -526,11 +531,15 @@ def generate_statements(output_name, test_vectors, sections,
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
-  impala_output.write_to_file('load-' + output_name + '-impala-generated.sql')
-  impala_load.write_to_file('load-' + output_name + '-impala-load-generated.sql')
+    impala_output.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
+        (output_name, file_format, codec, compression_type))
+    impala_load.write_to_file("load-%s-impala-load-generated-%s-%s-%s.sql" %
+        (output_name, file_format, codec, compression_type))
+
+
   hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')
   hbase_output.create.append("exit")
-  hbase_output.write_to_file('load-' + output_name + '-hbase.create')
+  hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
@@ -555,6 +564,23 @@ if __name__ == "__main__":
 
   target_dataset = test_vectors[0].dataset
   print 'Target Dataset: ' + target_dataset
+  dataset_load_dir = os.path.join(DATA_LOAD_DIR, target_dataset)
+  # If the directory containing the sql files does not exist, create it. Else nuke all the
+  # files corresponding to the current workload.
+  try:
+    os.makedirs(dataset_load_dir)
+  except OSError:
+    # Directory already exists, remove it.
+    shutil.rmtree(dataset_load_dir)
+    # Recreate the workload dir
+    os.makedirs(dataset_load_dir)
+  finally:
+    # Make sure that the directory was created and is empty.
+    assert os.path.isdir(dataset_load_dir)
+    assert len(os.listdir(dataset_load_dir)) == 0
+    # Make the dataset dir the current working directory
+    os.chdir(dataset_load_dir)
+
   schema_template_file = os.path.join(DATASET_DIR, target_dataset,
                                       '%s_schema_template.sql' % target_dataset)
 
