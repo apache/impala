@@ -27,7 +27,7 @@ from collections import defaultdict
 from HTMLParser import HTMLParser
 from random import choice, shuffle
 from tests.common.impala_service import *
-from tests.util.shell_util import exec_shell_cmd
+from tests.util.shell_util import exec_process_async, exec_process
 from time import sleep, time
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
@@ -135,7 +135,14 @@ class Process(object):
 
   def start(self):
     LOG.info("Starting process: %s" % ' '.join(self.cmd))
-    exec_shell_cmd(' '.join(self.cmd), run_in_background=True)
+    self.process = exec_process_async(' '.join(self.cmd))
+
+  def wait(self):
+    """Wait until the current process has exited, and returns
+    (return code, stdout, stderr)"""
+    LOG.info("Waiting for process: %s" % ' '.join(self.cmd))
+    stdout, stderr = self.process.communicate()
+    return self.process.returncode, stdout, stderr
 
   def kill(self):
     """
@@ -147,7 +154,7 @@ class Process(object):
     if pid is None:
       assert 0, "No processes %s found" % self.cmd
     LOG.info('Killing: %s (PID: %d)'  % (' '.join(self.cmd), pid))
-    exec_shell_cmd("kill -9 %d" % pid)
+    exec_process("kill -9 %d" % pid)
     return pid
 
   def restart(self):

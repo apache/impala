@@ -22,13 +22,21 @@ logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('shell_util')
 LOG.setLevel(level=logging.DEBUG)
 
-def exec_shell_cmd(cmd, run_in_background=False):
-  """Executes a command in the shell, pipes the output to local variables"""
+def exec_process(cmd):
+  """Executes a subprocess, waiting for completion. The process exit code, stdout and
+  stderr are returned as a tuple."""
   LOG.debug('Executing: %s' % (cmd,))
   # Popen needs a list as its first parameter.  The first element is the command,
   # with the rest being arguments.
-  p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
-  if not run_in_background:
-    stdout, stderr = p.communicate()
-    rc = p.returncode
-    return rc, stdout, stderr
+  p = exec_process_async(cmd)
+  stdout, stderr = p.communicate()
+  rc = p.returncode
+  return rc, stdout, stderr
+
+def exec_process_async(cmd):
+  """Executes a subprocess, returning immediately. The process object is returned for
+  later retrieval of the exit code etc. """
+  LOG.debug('Executing: %s' % (cmd,))
+  # Popen needs a list as its first parameter.  The first element is the command,
+  # with the rest being arguments.
+  return Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)

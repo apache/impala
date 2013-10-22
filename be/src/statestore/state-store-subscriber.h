@@ -148,6 +148,17 @@ class StateStoreSubscriber {
   // more topics may be subscribed to.
   bool is_registered_;
 
+  // Protects registration_id_. Must be taken after lock_ if both are to be taken
+  // together.
+  boost::mutex registration_id_lock_;
+
+  // Set during Register(), this is the unique ID of the current registration with the
+  // statestore. If this subscriber must recover, or disconnects and then reconnects, the
+  // registration_id_ will change after Register() is called again. This allows the
+  // subscriber to reject communication from the statestore that pertains to a previous
+  // registration.
+  TUniqueId registration_id_;
+
   // Mapping of subscription ids to the associated callback. Because this mapping
   // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
   // is deleted before being unregistered. The UpdateCallback destructor checks for
@@ -177,7 +188,10 @@ class StateStoreSubscriber {
   Metrics::BooleanMetric* connected_to_statestore_metric_;
 
   // Amount of time last spent in recovery mode
-  Metrics::DoubleMetric* last_recovery_time_metric_;
+  Metrics::DoubleMetric* last_recovery_duration_metric_;
+
+  // When the last recovery happened.
+  Metrics::StringMetric* last_recovery_time_metric_;
 
   // Accumulated statistics on the frequency of heartbeats
   StatsMetric<double>* heartbeat_interval_metric_;
@@ -185,10 +199,12 @@ class StateStoreSubscriber {
   // Tracks the time between heartbeats
   MonotonicStopWatch heartbeat_interval_timer_;
 
-  // Accumulated statistics on the time taken to process each
-  // heartbeat from the state-store (that is, to call all
-  // callbacks)
+  // Accumulated statistics on the time taken to process each heartbeat from the
+  // state-store (that is, to call all callbacks)
   StatsMetric<double>* heartbeat_duration_metric_;
+
+  // Current registration ID, in string form.
+  Metrics::StringMetric* registration_id_metric_;
 
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StateStoreSubscriberThriftIf;
@@ -206,8 +222,10 @@ class StateStoreSubscriber {
   // "from_version" field of the TTopicDelta response. The next state-store update will
   // be based off the version the subscriber responds with.
   // If the subscriber is in recovery mode, this method returns immediately.
-  // Returns OK if not in recovery mode, and an error otherwise.
+  // Returns OK if not in recovery mode and the registration ID is current, and an error
+  // otherwise.
   Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
+      const TUniqueId& registration_id,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the

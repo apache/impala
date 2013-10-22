@@ -23,7 +23,7 @@ import sys
 
 # We whitelist valid test directories. If a new test directory is added, update this.
 VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_tests',
-                   'shell', 'hs2']
+                   'shell', 'hs2', 'statestore']
 
 TEST_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests')
 TEST_RESULT_DIR = os.path.join(TEST_DIR, 'results')

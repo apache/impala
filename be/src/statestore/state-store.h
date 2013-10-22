@@ -22,6 +22,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/StateStoreSubscriber.h"
@@ -93,12 +94,18 @@ class StateStore {
   // The only constructor; initialises member variables only.
   StateStore(Metrics* metrics);
 
-  // Registers a new subscriber with the given unique subscriber ID,
-  // running a heartbeat service at the given location, with the
-  // provided list of topic subscriptions.
+  // Registers a new subscriber with the given unique subscriber ID, running a heartbeat
+  // service at the given location, with the provided list of topic subscriptions.
+  // The registration_id output parameter is the unique ID for this registration, used to
+  // distinguish old registrations from new ones for the same subscriber.
+  //
+  // If a registration already exists for this subscriber, the old registration is removed
+  // and a new one is created. Subscribers may receive a heartbeat intended for the old
+  // registration, since one may be in flight when a new RegisterSubscriber() is received.
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
-      const std::vector<TTopicRegistration>& topic_registrations);
+      const std::vector<TTopicRegistration>& topic_registrations,
+      TUniqueId* registration_id);
 
   void RegisterWebpages(Webserver* webserver);
 
@@ -244,16 +251,16 @@ class StateStore {
   typedef boost::unordered_map<TopicId, Topic> TopicMap;
   TopicMap topics_;
 
-  // The state-store-side representation of an individual subscriber
-  // client, which tracks a variety of bookkeeping information. This
-  // includes the list of subscribed topics (and whether updates to
-  // them should be deleted on failure), the list of updates made by
-  // this subscriber (in order to be able to efficiently delete them
-  // on failure), and the subscriber's ID and network location.
+  // The state-store-side representation of an individual subscriber client, which tracks
+  // a variety of bookkeeping information. This includes the list of subscribed topics
+  // (and whether updates to them should be deleted on failure), the list of updates made
+  // by this subscriber (in order to be able to efficiently delete them on failure), and
+  // the subscriber's ID and network location.
   class Subscriber {
    public:
-    Subscriber(const SubscriberId& subscriber_id, const TNetworkAddress& network_address,
-               const std::vector<TTopicRegistration>& subscribed_topics);
+    Subscriber(const SubscriberId& subscriber_id, const TUniqueId& registration_id,
+        const TNetworkAddress& network_address,
+        const std::vector<TTopicRegistration>& subscribed_topics);
 
     // The TopicState contains information on whether entries written by this
     // subscriber should be considered transient, as well as the last topic entry version
@@ -273,13 +280,13 @@ class StateStore {
     const Topics& subscribed_topics() const { return subscribed_topics_; }
     const TNetworkAddress& network_address() const { return network_address_; }
     const SubscriberId& id() const { return subscriber_id_; }
+    const TUniqueId& registration_id() const { return registration_id_; }
 
-    // Records the fact that an update to this topic is owned by this
-    // subscriber.  The version number of the update is saved so that
-    // only those updates which are made most recently by this
-    // subscriber - and not overwritten by another subscriber - are
-    // deleted on failure. If the topic the entry belongs to is not
-    // marked as transient, no update will be recorded.
+    // Records the fact that an update to this topic is owned by this subscriber.  The
+    // version number of the update is saved so that only those updates which are made
+    // most recently by this subscriber - and not overwritten by another subscriber - are
+    // deleted on failure. If the topic the entry belongs to is not marked as transient,
+    // no update will be recorded.
     void AddTransientUpdate(const TopicId& topic_id, const TopicEntryKey& topic_key,
         TopicEntry::Version version);
 
@@ -304,6 +311,12 @@ class StateStore {
     // the subscriber itself on a Register call.
     const SubscriberId subscriber_id_;
 
+    // Unique identifier for the current registration of this subscriber. A new
+    // registration ID is handed out every time a subscriber successfully calls
+    // RegisterSubscriber() to distinguish between distinct connections from subscribers
+    // with the same subscriber_id_.
+    const TUniqueId registration_id_;
+
     // The location of the heartbeat service that this subscriber runs.
     const TNetworkAddress network_address_;
 
@@ -318,17 +331,26 @@ class StateStore {
     TransientEntryMap transient_entries_;
   };
 
-  // Protects access to subscribers_
+  // Protects access to subscribers_ and subscriber_uuid_generator_
   boost::mutex subscribers_lock_;
 
-  // Map of subscribers currently connected; upon failure their entry
-  // is removed from this map.
-  typedef boost::unordered_map<SubscriberId, Subscriber> SubscriberMap;
+  // Map of subscribers currently connected; upon failure their entry is removed from this
+  // map. Subscribers must only be removed by UnregisterSubscriber() which ensures that
+  // the correct cleanup is done. If a subscriber re-registers, it must be unregistered
+  // prior to re-entry into this map.
+  // Subscribers are held in shared_ptrs so that RegisterSubscriber() may overwrite their
+  // entry in this map while UpdateSubscriber() tries to update an existing registration
+  // without risk of use-after-free.
+  typedef boost::unordered_map<SubscriberId, boost::shared_ptr<Subscriber> >
+    SubscriberMap;
   SubscriberMap subscribers_;
 
+  // Used to generated unique IDs for each new registration.
+  boost::uuids::random_generator subscriber_uuid_generator_;
+
   // Work item passed to subscriber heartbeat threads. First entry is the *earliest* time
-  // (in ns since epoch) that the next heartbeat should be sent, the second entry is the
-  // subscriber to send it to.
+  // (in microseconds since epoch) that the next heartbeat should be sent, the second
+  // entry is the subscriber to send it to.
   typedef std::pair<int64_t, SubscriberId> ScheduledSubscriberUpdate;
 
   // Pool of threads that send heartbeats to subscribers one-by-one. Each subscriber has a
@@ -382,6 +404,10 @@ class StateStore {
   // failed subscribers. Otherwise, it sends the deltas to the
   // subscriber, and receives and processes a list of updates.
   Status ProcessOneSubscriber(Subscriber* subscriber);
+
+  // Unregister a subscriber, removing all of its transient entries and evicting it from
+  // the subscriber map. Callers must hold subscribers_lock_ prior to calling this method.
+  void UnregisterSubscriber(Subscriber* subscriber);
 
   // Populates a TUpdateStateRequest with the update state for this subscriber. Iterates
   // over all updates in all subscribed topics, populating the given

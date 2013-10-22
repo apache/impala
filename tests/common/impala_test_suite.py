@@ -26,7 +26,6 @@ from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
 from tests.common.workload_runner import Query
-from tests.util.shell_util import exec_shell_cmd
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite

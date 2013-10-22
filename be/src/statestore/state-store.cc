@@ -19,8 +19,9 @@
 #include "gen-cpp/StateStoreService_types.h"
 #include "statestore/failure-detector.h"
 #include "rpc/thrift-util.h"
-#include "util/stopwatch.h"
+#include "util/debug-util.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 #include "util/webserver.h"
 
 #include <boost/thread.hpp>
@@ -30,15 +31,19 @@ using namespace std;
 using namespace boost;
 
 DEFINE_int32(statestore_max_missed_heartbeats, 5, "Maximum number of consecutive "
-             "heartbeats an impalad can miss before being declared failed by the "
-             "state-store.");
+    "heartbeats an impalad can miss before being declared failed by the "
+    "state-store.");
 DEFINE_int32(statestore_suspect_heartbeats, 2, "(Advanced) Number of consecutive "
-             "heartbeats an impalad can miss before being suspected of failure by the"
-             " state-store");
+    "heartbeats an impalad can miss before being suspected of failure by the"
+    " state-store");
 DEFINE_int32(statestore_num_heartbeat_threads, 10, "(Advanced) Number of threads used to "
-             " send heartbeats in parallel to all registered subscribers.");
+    " send heartbeats in parallel to all registered subscribers.");
+DEFINE_int32(statestore_heartbeat_frequency_ms, 500, "(Advanced) Frequency (in ms) with"
+    " which state-store sends heartbeats to subscribers.");
 
 DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running");
+
+DECLARE_int32(statestore_subscriber_timeout_seconds);
 
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
@@ -58,10 +63,8 @@ const StateStore::TopicEntry::Version StateStore::Subscriber::TOPIC_INITIAL_VERS
 // most one entry per subscriber.
 const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
 
-// The minimum frequency with which to attempt heartbeats to each subscriber. Subscribers
-// may experience larger delays between heartbeats, but will not receive them more
-// frequently.
-const int32_t MIN_HEARTBEAT_DELTA_MS = 500;
+// Heartbeats that miss their deadline by this much are logged.
+const uint32_t HEARTBEAT_WARN_THRESHOLD_MS = 2000;
 
 typedef ClientConnection<StateStoreSubscriberClient> StateStoreSubscriberConnection;
 
@@ -73,10 +76,12 @@ class StateStoreThriftIf : public StateStoreServiceIf {
   }
 
   virtual void RegisterSubscriber(TRegisterSubscriberResponse& response,
-                                  const TRegisterSubscriberRequest& params) {
+      const TRegisterSubscriberRequest& params) {
+    TUniqueId registration_id;
     Status status = state_store_->RegisterSubscriber(params.subscriber_id,
-        params.subscriber_location, params.topic_registrations);
+        params.subscriber_location, params.topic_registrations, &registration_id);
     status.ToThrift(&response.status);
+    response.__set_registration_id(registration_id);
   }
  private:
   StateStore* state_store_;
@@ -118,9 +123,11 @@ void StateStore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
 }
 
 StateStore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
-    const TNetworkAddress& network_address,
+    const TUniqueId& registration_id, const TNetworkAddress& network_address,
     const vector<TTopicRegistration>& subscribed_topics)
-      : subscriber_id_(subscriber_id), network_address_(network_address) {
+    : subscriber_id_(subscriber_id),
+      registration_id_(registration_id),
+      network_address_(network_address) {
   BOOST_FOREACH(const TTopicRegistration& topic, subscribed_topics) {
     TopicState topic_state;
     topic_state.is_transient = topic.is_transient;
@@ -202,20 +209,22 @@ void StateStore::SubscribersHandler(const Webserver::ArgumentMap& args,
   (*output) << "<h2>Subscribers</h2>";
   (*output) << "<table class ='table table-striped'>"
             << "<tr><th>Id</th><th>Address</th><th>Subscribed topics</th>"
-            << "<th>Transient entries</th></tr>";
+            << "<th>Transient entries</th>"
+            << "<th>Registration Id</th></tr>";
   lock_guard<mutex> l(subscribers_lock_);
   BOOST_FOREACH(const SubscriberMap::value_type& subscriber, subscribers_) {
-    (*output) << "<tr><td>" << subscriber.second.id() << "</td><td>"
-              << subscriber.second.network_address() << "</td><td>"
-              << subscriber.second.subscribed_topics().size() << "</td><td>"
-              << subscriber.second.transient_entries().size() << "</td></tr>";
+    (*output) << "<tr><td>" << subscriber.second->id() << "</td><td>"
+              << subscriber.second->network_address() << "</td><td>"
+              << subscriber.second->subscribed_topics().size() << "</td><td>"
+              << subscriber.second->transient_entries().size() << "</td><td>"
+              << subscriber.second->registration_id() << "</td></tr>";
   }
   (*output) << "</table>";
 }
 
 Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TNetworkAddress& location,
-    const vector<TTopicRegistration>& topic_registrations) {
+    const vector<TTopicRegistration>& topic_registrations, TUniqueId* registration_id) {
   if (subscriber_id.empty()) return Status("Subscriber ID cannot be empty string");
 
   // Create any new topics first, so that when the subscriber is first
@@ -237,24 +246,15 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     lock_guard<mutex> l(subscribers_lock_);
     SubscriberMap::iterator subscriber_it = subscribers_.find(subscriber_id);
     if (subscriber_it != subscribers_.end()) {
-      // To avoid having to deal with ownership of a Subscriber that would be replaced by
-      // a new registration from the same client while the update loop is processing it,
-      // we disallow duplicate registrations. What this usually means is that the client
-      // has failed and recovered, but the statestore has not yet detected the
-      // failure. Since the statestore is probably in the middle of trying to contact the
-      // old subscriber, it won't try and contact the new one until it detects the
-      // failure, so it's ok to ignore the request. The subscriber will retry until
-      // successful anyhow.
-      stringstream ss;
-      ss << "Duplicate registration of subscriber: " << subscriber_id;
-      LOG(WARNING) << "Duplicate registration of subscriber: " << subscriber_id
-                   << ", possible duplicate subscriber IDs or recovering subscriber";
-      return Status(ss.str());
+      UnregisterSubscriber(subscriber_it->second.get());
     }
 
-    subscribers_.insert(make_pair(subscriber_id,
-        Subscriber(subscriber_id, location, topic_registrations)));
-    failure_detector_->UpdateHeartbeat(subscriber_id, true);
+    UUIDToTUniqueId(subscriber_uuid_generator_(), registration_id);
+    shared_ptr<Subscriber> current_registration(
+        new Subscriber(subscriber_id, *registration_id, location, topic_registrations));
+    subscribers_.insert(make_pair(subscriber_id, current_registration));
+    failure_detector_->UpdateHeartbeat(
+        PrintId(current_registration->registration_id()), true);
     num_subscribers_metric_->Update(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
   }
@@ -283,10 +283,14 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
     GatherTopicUpdates(*subscriber, &update_state_request);
   }
 
+  // Set the expected registration ID, so that the subscriber can reject this update if
+  // they have moved on to a new registration instance.
+  update_state_request.__set_registration_id(subscriber->registration_id());
+
   // Second: try and send it
   Status status;
   StateStoreSubscriberConnection client(client_cache_.get(),
-                                        subscriber->network_address(), &status);
+      subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
   TUpdateStateResponse response;
@@ -409,61 +413,92 @@ void StateStore::SetExitFlag() {
 
 void StateStore::UpdateSubscriber(int thread_id,
     const ScheduledSubscriberUpdate& update) {
-  // Wait until update time
-  int64_t now = TimestampValue::local_time_micros();
-  int64_t diff = update.first - now;
-  while (diff > 0) {
-    SleepForMs(diff);
-    now = TimestampValue::local_time_micros();
-    diff = now - update.first;
-  }
+  int64_t update_deadline = update.first;
+  if (update_deadline != 0L) {
+    // Wait until deadline.
+    int64_t diff_ms = update_deadline - ms_since_epoch();
+    while (diff_ms > 0) {
+      SleepForMs(diff_ms);
+      diff_ms = update_deadline - ms_since_epoch();
+    }
+    VLOG(3) << "Sending update to: " << update.second << " (deadline accuracy: "
+            << abs(diff_ms) << "ms)";
 
-  Subscriber* subscriber = NULL;
+    if (diff_ms > HEARTBEAT_WARN_THRESHOLD_MS) {
+      // TODO: This should be a healthcheck in a monitored metric in CM, which would
+      // require a 'rate' metric type.
+      LOG(WARNING) << "Missed subscriber (" << update.second << ") deadline by "
+                   << diff_ms << "ms";
+    }
+  } else {
+    // The first update is scheduled immediately and has a deadline of 0. There's no need
+    // to wait.
+    VLOG(3) << "Initial update to: " << update.second;
+  }
+  shared_ptr<Subscriber> subscriber;
   {
     lock_guard<mutex> l(subscribers_lock_);
     SubscriberMap::iterator it = subscribers_.find(update.second);
     if (it == subscribers_.end()) return;
-    subscriber = &(it->second);
+    subscriber = it->second;
   }
-
   // Give up the lock here so that others can get to the queue
-  Status status = ProcessOneSubscriber(subscriber);
-  if (!status.ok()) {
-    if (failure_detector_->GetPeerState(subscriber->id()) == FailureDetector::OK) {
-      LOG(INFO) << "Unable to update subscriber at " << subscriber->network_address()
-                << ",  received error " << status.GetErrorMsg();
-    }
-  }
-
-  if (failure_detector_->UpdateHeartbeat(subscriber->id(), status.ok()) ==
-      FailureDetector::FAILED) {
-    // TODO: Consider if a metric to track the number of failures would be useful.
+  Status status = ProcessOneSubscriber(subscriber.get());
+  {
     lock_guard<mutex> l(subscribers_lock_);
-    // TODO: Make clear that 'failure' isn't necessarily an error
-    LOG(INFO) << "Subscriber: " << subscriber->id()
-              << " has either failed or disconnected.";
-    // Close all active clients so that the next attempt to use them causes a Reopen
-    client_cache_->CloseConnections(subscriber->network_address());
+    // Check again if this registration has been removed while we were processing the
+    // heartbeat.
+    SubscriberMap::iterator it = subscribers_.find(update.second);
+    if (it == subscribers_.end()) return;
 
-    // Delete all transient entries
-    lock_guard<mutex> topic_lock(topic_lock_);
-    BOOST_FOREACH(StateStore::Subscriber::TransientEntryMap::value_type entry,
-                  subscriber->transient_entries()) {
-      StateStore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
-      DCHECK(topic_it != topics_.end());
-      topic_it->second.DeleteIfVersionsMatch(entry.second, // version
-                                             entry.first.second); // key
+    if (!status.ok()) {
+      LOG(INFO) << "Unable to update subscriber at " << subscriber->network_address()
+                << ", received error " << status.GetErrorMsg();
     }
-    num_subscribers_metric_->Increment(-1L);
-    subscriber_set_metric_->Remove(subscriber->id());
-    subscribers_.erase(subscriber->id());
-  } else {
-    // TODO: Consider changing heartbeat frequency dynamically; if e.g. last heartbeat was
-    // a failure may want to send another heartbeat more quickly to confirm.
-    int64_t now = TimestampValue::local_time_micros();
-    subscriber_heartbeat_threadpool_.Offer(
-        make_pair(now + MIN_HEARTBEAT_DELTA_MS, subscriber->id()));
+
+    if (failure_detector_->UpdateHeartbeat(PrintId(
+        subscriber->registration_id()), status.ok()) == FailureDetector::FAILED) {
+      // TODO: Consider if a metric to track the number of failures would be useful.
+      LOG(INFO) << "Subscriber '" << subscriber->id() << "' has failed, disconnected "
+                << "or re-registered (last known registration ID: "
+                << PrintId(subscriber->registration_id()) << ")";
+      UnregisterSubscriber(subscriber.get());
+    } else {
+      // Schedule the next heartbeat.
+      int64_t deadline_ms = ms_since_epoch() + FLAGS_statestore_heartbeat_frequency_ms;
+      VLOG(3) << "Next deadline for: " << subscriber->id() << " is in "
+              << FLAGS_statestore_heartbeat_frequency_ms << "ms";
+      subscriber_heartbeat_threadpool_.Offer(make_pair(deadline_ms, subscriber->id()));
+    }
   }
+}
+
+void StateStore::UnregisterSubscriber(Subscriber* subscriber) {
+  SubscriberMap::const_iterator it = subscribers_.find(subscriber->id());
+  if (it == subscribers_.end() ||
+      it->second->registration_id() != subscriber->registration_id()) {
+    // Already failed and / or replaced with a new registration
+    return;
+  }
+
+  // Close all active clients so that the next attempt to use them causes a Reopen()
+  client_cache_->CloseConnections(subscriber->network_address());
+
+  // Prevent the failure detector from growing without bound
+  failure_detector_->EvictPeer(PrintId(subscriber->registration_id()));
+
+  // Delete all transient entries
+  lock_guard<mutex> topic_lock(topic_lock_);
+  BOOST_FOREACH(StateStore::Subscriber::TransientEntryMap::value_type entry,
+      subscriber->transient_entries()) {
+    StateStore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
+    DCHECK(topic_it != topics_.end());
+    topic_it->second.DeleteIfVersionsMatch(entry.second, // version
+        entry.first.second); // key
+  }
+  num_subscribers_metric_->Increment(-1L);
+  subscriber_set_metric_->Remove(subscriber->id());
+  subscribers_.erase(subscriber->id());
 }
 
 Status StateStore::MainLoop() {

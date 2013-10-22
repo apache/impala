@@ -43,11 +43,18 @@ class FailureDetector {
   // state. If 'seen' is true, this method indicates that a heartbeat has been
   // received. If seen is 'false', this method indicates that a heartbeat has
   // not been received since the last successful heartbeat receipt.
-  // This method returns the current state of the updated peer.
+  //
+  // This method returns the current state of the updated peer. Note that this may be
+  // different from the state implied by seen - a single missed heartbeat, for example, may
+  // not cause a peer to enter the SUSPECTED or FAILED states. The failure detector has
+  // the benefit of looking at all samples, rather than just the most recent one.
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen) = 0;
 
-  // Returns the current state of a peer.
+  // Returns the current estimated state of a peer.
   virtual PeerState GetPeerState(const std::string& peer) = 0;
+
+  // Remove a peer from the failure detector completely.
+  virtual void EvictPeer(const std::string& peer) = 0;
 
   // Utility method to convert a PeerState enum to a string.
   static const std::string& PeerStateToString(PeerState peer_state);
@@ -70,6 +77,8 @@ class TimeoutFailureDetector : public FailureDetector {
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
 
   virtual PeerState GetPeerState(const std::string& peer);
+
+  virtual void EvictPeer(const std::string& peer);
 
  private:
   // Protects all members
@@ -108,6 +117,8 @@ class MissedHeartbeatFailureDetector : public FailureDetector {
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
 
   virtual PeerState GetPeerState(const std::string& peer);
+
+  virtual void EvictPeer(const std::string& peer);
 
  private:
   // Protects all members

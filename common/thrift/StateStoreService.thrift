@@ -105,6 +105,10 @@ struct TRegisterSubscriberRequest {
 struct TRegisterSubscriberResponse {
   // Whether the call was executed correctly at the application level
   1: required Status.TStatus status;
+
+  // Unique identifier for this registration. Changes with every call to
+  // RegisterSubscriber().
+  2: optional Types.TUniqueId registration_id;
 }
 
 service StateStoreService {
@@ -119,6 +123,9 @@ struct TUpdateStateRequest {
 
   // Map from topic name to a list of changes for that topic.
   2: required map<string, TTopicDelta> topic_deltas;
+
+  // Registration ID for the last known registration from this subscriber.
+  3: optional Types.TUniqueId registration_id;
 }
 
 struct TUpdateStateResponse {

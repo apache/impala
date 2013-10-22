@@ -6,7 +6,6 @@ import pytest
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.util.shell_util import exec_shell_cmd
 
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
