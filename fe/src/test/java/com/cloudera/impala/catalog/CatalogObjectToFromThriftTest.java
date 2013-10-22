@@ -56,7 +56,7 @@ public class CatalogObjectToFromThriftTest {
       Assert.assertEquals(thriftTable.tbl_name, "alltypes");
       Assert.assertEquals(thriftTable.db_name, dbName);
       Assert.assertTrue(thriftTable.isSetTable_type());
-      Assert.assertEquals(thriftTable.getPartition_columns().size(), 2);
+      Assert.assertEquals(thriftTable.getClustering_columns().size(), 2);
       Assert.assertEquals(thriftTable.getTable_type(), TTableType.HDFS_TABLE);
       THdfsTable hdfsTable = thriftTable.getHdfs_table();
       Assert.assertTrue(hdfsTable.hdfsBaseDir != null);
@@ -110,7 +110,7 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
-    Assert.assertEquals(thriftTable.getPartition_columns().size(), 0);
+    Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HBASE_TABLE);
     THBaseTable hbaseTable = thriftTable.getHbase_table();
     Assert.assertEquals(hbaseTable.getFamilies().size(), 13);
@@ -142,7 +142,7 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
-    Assert.assertEquals(thriftTable.getPartition_columns().size(), 0);
+    Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HBASE_TABLE);
     THBaseTable hbaseTable = thriftTable.getHbase_table();
     Assert.assertEquals(hbaseTable.getFamilies().size(), 13);

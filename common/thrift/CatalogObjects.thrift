@@ -227,11 +227,11 @@ struct TTable {
   // The access level Impala has on this table (READ_WRITE, READ_ONLY, etc).
   5: optional TAccessLevel access_level
 
-  // List of columns (excludes partition columns)
+  // List of columns (excludes clustering columns)
   6: optional list<TColumnDesc> columns
 
-  // List of partition columns (empty list if table is not partitioned)
-  7: optional list<TColumnDesc> partition_columns
+  // List of clustering columns (empty list if table has no clustering columns)
+  7: optional list<TColumnDesc> clustering_columns
 
   // Table stats data for the table.
   8: optional TTableStatsData table_stats

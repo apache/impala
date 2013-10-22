@@ -237,7 +237,7 @@ public abstract class Table implements CatalogObject {
 
   public void loadFromTTable(TTable thriftTable) throws TableLoadingException {
     List<TColumnDesc> columns = new ArrayList<TColumnDesc>();
-    columns.addAll(thriftTable.getPartition_columns());
+    columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
 
     fields = new ArrayList<FieldSchema>();
@@ -249,8 +249,7 @@ public abstract class Table implements CatalogObject {
         col.getType().toString().toLowerCase(), col.getComment()));
     }
 
-    // The number of clustering columns is the number of partition keys.
-    numClusteringCols = thriftTable.getPartition_columns().size();
+    numClusteringCols = thriftTable.getClustering_columns().size();
 
     // Estimated number of rows
     numRows = thriftTable.isSetTable_stats() ?
@@ -266,16 +265,16 @@ public abstract class Table implements CatalogObject {
     table.setId(id.asInt());
     table.setAccess_level(accessLevel);
 
-    // Populate with both regular columns and partition key columns.
+    // Populate with both regular columns and clustering columns.
     table.setColumns(fieldSchemaToColumnDesc(getMetaStoreTable().getSd().getCols()));
     for (TColumnDesc colDesc: table.getColumns()) {
       Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
       colDesc.setCol_stats(column.getStats().toThrift());
     }
 
-    table.setPartition_columns(fieldSchemaToColumnDesc(
+    table.setClustering_columns(fieldSchemaToColumnDesc(
         getMetaStoreTable().getPartitionKeys()));
-    for (TColumnDesc colDesc: table.getPartition_columns()) {
+    for (TColumnDesc colDesc: table.getClustering_columns()) {
       Column column = colsByName.get(colDesc.getColumnName().toLowerCase());
       colDesc.setCol_stats(column.getStats().toThrift());
     }
