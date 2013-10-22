@@ -208,8 +208,10 @@ class WorkloadRunner(object):
     If the user has specified a subset of queries to execute, only extract those query
     strings.
     """
+    query_regex = None
     if query_names:
-      query_names = [query_name.upper() for query_name in query_names.split(',')]
+      # Build a single regex from all query name regex strings.
+      query_regex = r'(?:' + ')|('.join([name for name in query_names.split(',')]) + ')'
     workload_base_dir = os.path.join(WORKLOAD_DIR, workload)
     if not isdir(workload_base_dir):
       raise ValueError,\
@@ -227,7 +229,7 @@ class WorkloadRunner(object):
       # If query_names is not none, only extract user specified queries to
       # the query map.
       if query_names:
-        sections = [s for s in sections if s['QUERY_NAME'].upper() in query_names]
+        sections = [s for s in sections if re.match(query_regex, s['QUERY_NAME'], re.I)]
       for section in sections:
         query_map[test_name].append((section['QUERY_NAME'],
                                      (section['QUERY'], section['RESULTS'])))
@@ -341,6 +343,10 @@ class WorkloadRunner(object):
     """
     LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
     query_map = WorkloadRunner.__extract_queries_from_test_files(workload, query_names)
+    if not query_map:
+      LOG.error('No queries selected to run.')
+      return
+
     test_vectors = None
     if table_formats:
       table_formats = table_formats.split(',')
