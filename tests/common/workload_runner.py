@@ -211,7 +211,7 @@ class WorkloadRunner(object):
     query_regex = None
     if query_names:
       # Build a single regex from all query name regex strings.
-      query_regex = r'(?:' + ')|('.join([name for name in query_names.split(',')]) + ')'
+      query_regex = r'(?:' + '$)|('.join([name for name in query_names.split(',')]) + '$)'
     workload_base_dir = os.path.join(WORKLOAD_DIR, workload)
     if not isdir(workload_base_dir):
       raise ValueError,\
