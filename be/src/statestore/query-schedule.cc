@@ -35,7 +35,12 @@ namespace impala {
 
 // Default value for the request_timeout in a reservation request. The timeout is the
 // max time in milliseconds to wait for a resource request to be fulfilled by Llama.
-const int64_t DEFAULT_REQUEST_TIMEOUT = 60000;
+// The default value of five minutes was determined to be reasonable based on
+// experiments on a 20-node cluster with TPCDS 15TB and 8 concurrent clients.
+// Over 30% of queries timed out with a reservation timeout of 1 minute but only less
+// than 5% timed out when using 5 minutes. Still, the default value is somewhat
+// arbitrary and a good value is workload dependent.
+const int64_t DEFAULT_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     const TQueryExecRequest& request, const TQueryOptions& query_options,
@@ -119,7 +124,7 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
   }
 
   // Set the reservation timeout from the query options or use a default.
-  int64_t timeout = DEFAULT_REQUEST_TIMEOUT;
+  int64_t timeout = DEFAULT_REQUEST_TIMEOUT_MS;
   if (query_options_.__isset.reservation_request_timeout) {
     timeout = query_options_.reservation_request_timeout;
   }
