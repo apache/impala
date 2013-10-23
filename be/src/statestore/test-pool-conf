@@ -4,6 +4,6 @@
 admin: prod, dev.
 root:
 user: dev.
-*: Staging
+*: Staging, Default
 
 [groups]

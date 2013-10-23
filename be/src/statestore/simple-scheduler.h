@@ -183,8 +183,8 @@ class SimpleScheduler : public Scheduler {
   // Map from a user ID to a list of pools they are allowed to submit work to.
   UserPoolMap user_pool_whitelist_;
 
-  // Default pool read from the whitelist, for queries without an explicit pool
-  std::string default_pool_;
+  // Default pools read from the whitelist, accessible to all users.
+  std::set<std::string> default_pools_;
 
   // Adds the granted reservation and resources to the active_reservations_ and
   // active_client_resources_ maps, respectively.

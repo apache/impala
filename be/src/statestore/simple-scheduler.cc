@@ -663,7 +663,7 @@ Status SimpleScheduler::GetYarnPool(const string& user,
     const TQueryOptions& query_options, string* pool) const {
   if (query_options.__isset.yarn_pool) {
     *pool = query_options.yarn_pool;
-    if (*pool == default_pool_) return Status::OK;
+    if (default_pools_.find(*pool) != default_pools_.end()) return Status::OK;
 
     UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(user);
     if (pool_it == user_pool_whitelist_.end()) {
@@ -677,17 +677,16 @@ Status SimpleScheduler::GetYarnPool(const string& user,
     }
 
     stringstream ss;
-    ss << "User: " << user << " not authorized to access pool: " << pool;
+    ss << "User: " << user << " not authorized to access pool: " << *pool;
     return Status(ss.str());
   }
 
-  // Otherwise, look for the default pool.
   if (user_pool_whitelist_.empty()) {
     return Status("Either a default pool must be configured, or the pool must be "
         "explicitly specified by a query option");
   }
 
-  // Per YARN, the default pool is used if a pool is not explicitly configured.
+  // Per YARN, a default pool is used if a pool is not explicitly configured.
   UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(DEFAULT_USER);
   DCHECK(pool_it != user_pool_whitelist_.end());
   DCHECK(!pool_it->second.empty());
@@ -760,7 +759,7 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
             << conf_path;
     return Status(err_msg.str());
   }
-  default_pool_ = pool_it->second[0];
+  default_pools_.insert(pool_it->second.begin(), pool_it->second.end());
 
   return Status::OK;
 }

@@ -166,7 +166,7 @@ TEST_F(SimpleSchedulerTest, InitPoolWhiteList) {
   EXPECT_EQ(3, pool_map.size());
   EXPECT_EQ(2, pool_map.find("admin")->second.size());
   EXPECT_EQ(pool_map.end(), pool_map.find("root"));
-  EXPECT_EQ(1, pool_map.find("*")->second.size());
+  EXPECT_EQ(2, pool_map.find("*")->second.size());
   EXPECT_EQ("Staging", pool_map.find("*")->second[0]);
 
   // Check the pool determination logic.
@@ -183,11 +183,13 @@ TEST_F(SimpleSchedulerTest, InitPoolWhiteList) {
   EXPECT_FALSE(sched->GetYarnPool("user", options, &pool).ok());
   EXPECT_TRUE(sched->GetYarnPool("admin", options, &pool).ok());
 
-  // Everyone can use the default pool
+  // Everyone can use the default pools
   options.__set_yarn_pool("Staging");
   EXPECT_TRUE(sched->GetYarnPool("user", options, &pool).ok());
   EXPECT_TRUE(sched->GetYarnPool("admin", options, &pool).ok());
-
+  options.__set_yarn_pool("Default");
+  EXPECT_TRUE(sched->GetYarnPool("user", options, &pool).ok());
+  EXPECT_TRUE(sched->GetYarnPool("admin", options, &pool).ok());
 }
 
 }
