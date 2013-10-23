@@ -85,10 +85,12 @@ DEFINE_int32(resource_broker_cnxn_attempts, 10, "The number of times to retry an
     "RPC connection to Llama. A setting of 0 means retry indefinitely");
 DEFINE_int32(resource_broker_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
     "to wait between attempts to make an RPC connection to the Llama.");
-DEFINE_int32(resource_broker_send_timeout, 1000, "Time to wait, in ms, "
-    "for the underlying socket of an RPC to Llama to successfully send data.");
-DEFINE_int32(resource_broker_recv_timeout, 1000, "Time to wait, in ms, "
-    "for the underlying socket of an RPC to Llama to successfully receive data.");
+DEFINE_int32(resource_broker_send_timeout, 0, "Time to wait, in ms, "
+    "for the underlying socket of an RPC to Llama to successfully send data. "
+    "A setting of 0 means the socket will wait indefinitely.");
+DEFINE_int32(resource_broker_recv_timeout, 0, "Time to wait, in ms, "
+    "for the underlying socket of an RPC to Llama to successfully receive data. "
+    "A setting of 0 means the socket will wait indefinitely.");
 
 namespace impala {
 
