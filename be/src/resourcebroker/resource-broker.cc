@@ -42,6 +42,11 @@ using namespace boost::uuids;
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 
+DECLARE_int32(resource_broker_cnxn_attempts);
+DECLARE_int32(resource_broker_cnxn_retry_interval_ms);
+DECLARE_int32(resource_broker_send_timeout);
+DECLARE_int32(resource_broker_recv_timeout);
+
 // TODO: Refactor the Llama restart and thrift connect/reconnect/reopen logic into
 // a common place.
 
@@ -92,7 +97,11 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
     metrics_(metrics),
     scheduler_(NULL),
     llama_callback_thrift_iface_(new LlamaNotificationThriftIf(this)),
-    llama_client_cache_(new ClientCache<llama::LlamaAMServiceClient>()),
+    llama_client_cache_(new ClientCache<llama::LlamaAMServiceClient>(
+        FLAGS_resource_broker_cnxn_attempts,
+        FLAGS_resource_broker_cnxn_retry_interval_ms,
+        FLAGS_resource_broker_send_timeout,
+        FLAGS_resource_broker_recv_timeout)),
     is_mini_llama_(false) {
   DCHECK(metrics != NULL);
   request_rpc_time_metric_ =

@@ -81,6 +81,15 @@ DEFINE_string(cgroup_hierarchy_path, "", "If Resource Management is enabled, thi
 DEFINE_string(staging_cgroup, "impala_staging", "Name of the cgroup that a query's "
     "execution threads are moved into once the query completes.");
 
+DEFINE_int32(resource_broker_cnxn_attempts, 10, "The number of times to retry an "
+    "RPC connection to Llama. A setting of 0 means retry indefinitely");
+DEFINE_int32(resource_broker_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
+    "to wait between attempts to make an RPC connection to the Llama.");
+DEFINE_int32(resource_broker_send_timeout, 1000, "Time to wait, in ms, "
+    "for the underlying socket of an RPC to Llama to successfully send data.");
+DEFINE_int32(resource_broker_recv_timeout, 1000, "Time to wait, in ms, "
+    "for the underlying socket of an RPC to Llama to successfully receive data.");
+
 namespace impala {
 
 ExecEnv* ExecEnv::exec_env_ = NULL;
