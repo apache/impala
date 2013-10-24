@@ -28,7 +28,7 @@ string RecursionStack(int level) {
   return RecursionStack(level - 1);
 }
 
-TEST(DebugUtil, StackDump) { 
+TEST(DebugUtil, StackDump) {
   cout << "Stack: " << endl << GetStackTrace() << endl;
   cout << "Stack Recursion: " << endl << RecursionStack(5) << endl;
 }
@@ -44,16 +44,38 @@ TEST(DebugUtil, QueryIdParsing) {
   EXPECT_TRUE(ParseId("abcdabcdabcdabcd:abcdabcdabcdabcd", &id));
   EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0xabcdabcdabcdabcd);
-  
+
   EXPECT_TRUE(ParseId("abcdabcdabcdabcd:1234abcdabcd5678", &id));
   EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
-  
+
   EXPECT_TRUE(ParseId("cdabcdabcdabcd:1234abcdabcd5678", &id));
   EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
-  
+
   EXPECT_TRUE(ParseId("cdabcdabcdabcd:abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0xabcdabcd5678);
+
+  // Pre-CDH5 CM sends query IDs separated by a space, not a colon.
+  EXPECT_FALSE(ParseId("zbcdabcdabcdabcd abcdabcdabcdabcd", &id));
+  EXPECT_FALSE(ParseId("~bcdabcdabcdabcd abcdabcdabcdabcd", &id));
+  EXPECT_FALSE(ParseId("abcdabcdabcdabcd !bcdabcdabcdabcd", &id));
+  EXPECT_FALSE(ParseId("abcdabcdabcdabcd :abcdabcdabcdabc", &id));
+
+  EXPECT_TRUE(ParseId("abcdabcdabcdabcd abcdabcdabcdabcd", &id));
+  EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0xabcdabcdabcdabcd);
+
+  EXPECT_TRUE(ParseId("abcdabcdabcdabcd 1234abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+
+  EXPECT_TRUE(ParseId("cdabcdabcdabcd 1234abcdabcd5678", &id));
+  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
+  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+
+  EXPECT_TRUE(ParseId("cdabcdabcdabcd abcdabcd5678", &id));
   EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0xabcdabcd5678);
 }
@@ -64,4 +86,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

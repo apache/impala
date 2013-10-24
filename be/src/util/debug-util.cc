@@ -106,10 +106,14 @@ bool ParseId(const string& s, TUniqueId* id) {
   DCHECK(id != NULL);
 
   const char* hi_part = s.c_str();
-  char* colon = const_cast<char*>(strchr(hi_part, ':'));
-  if (colon == NULL) return false;
-  const char* lo_part = colon + 1;
-  *colon = '\0';
+  char* separator = const_cast<char*>(strchr(hi_part, ':'));
+  if (separator == NULL) {
+    // CM pre CDH5 sends query IDs with a space separator
+    separator = const_cast<char*>(strchr(hi_part, ' '));
+    if (separator == NULL) return false;
+  }
+  const char* lo_part = separator + 1;
+  *separator = '\0';
 
   char* error_hi = NULL;
   char* error_lo = NULL;
@@ -117,7 +121,7 @@ bool ParseId(const string& s, TUniqueId* id) {
   id->lo = strtoul(lo_part, &error_lo, 16);
 
   bool valid = *error_hi == '\0' && *error_lo == '\0';
-  *colon = ':';
+  *separator = ':';
   return valid;
 }
 
