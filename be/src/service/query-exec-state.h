@@ -19,8 +19,9 @@
 #include "exec/catalog-op-executor.h"
 #include "util/runtime-profile.h"
 #include "runtime/timestamp-value.h"
-#include "gen-cpp/Frontend_types.h"
+#include "service/child-query.h"
 #include "service/impala-server.h"
+#include "gen-cpp/Frontend_types.h"
 
 #include <boost/thread.hpp>
 #include <boost/unordered_set.hpp>
@@ -46,6 +47,9 @@ class QueryExecStateCleaner;
 // To avoid deadlocks, the caller must *not* acquire query_exec_state_map_lock_
 // while holding the exec state's lock.
 // TODO: Consider renaming to RequestExecState for consistency.
+// TODO: Compute stats is the only stmt that requires child queries. Once the
+// CatalogService performs background stats gathering the concept of child queries
+// will likely become obsolete. Remove all child-query related code from this class.
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(ExecEnv* exec_env, Frontend* frontend,
@@ -68,7 +72,7 @@ class ImpalaServer::QueryExecState {
   Status Exec(const TMetadataOpRequest& exec_request);
 
   // Call this to ensure that rows are ready when calling FetchRows().
-  // Must be preceded by call to Exec().
+  // Must be preceded by call to Exec(). Waits for all child queries to complete.
   Status Wait();
 
   // Return at most max_rows from the current batch. If the entire current batch has
@@ -180,8 +184,8 @@ class ImpalaServer::QueryExecState {
   // not set for ddl queries, or queries with "limit 0"
   boost::scoped_ptr<Coordinator> coord_;
 
- // Runs statements that query or modify the catalog via the CatalogService.
- boost::scoped_ptr<CatalogOpExecutor> catalog_op_executor_;
+  // Runs statements that query or modify the catalog via the CatalogService.
+  boost::scoped_ptr<CatalogOpExecutor> catalog_op_executor_;
 
   // Result set used for requests that return results and are not QUERY
   // statements. For example, EXPLAIN, LOAD, and SHOW use this.
@@ -235,6 +239,16 @@ class ImpalaServer::QueryExecState {
   // Start/end time of the query
   TimestampValue start_time_, end_time_;
 
+  // List of child queries to be executed on behalf of this query.
+  std::vector<ChildQuery> child_queries_;
+
+  // Thread to execute child_queries_ in and the resulting status. The status is OK iff
+  // all child queries complete successfully. Otherwise, status contains the error of the
+  // first child query that failed (child queries are executed serially and abort on the
+  // first error).
+  Status child_queries_status_;
+  boost::scoped_ptr<Thread> child_queries_thread_;
+
   // Executes a local catalog operation (an operation that does not need to execute
   // against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op);
@@ -253,6 +267,10 @@ class ImpalaServer::QueryExecState {
   // Also sets up profile and pre-execution counters.
   // Non-blocking.
   Status ExecQueryOrDmlRequest(const TQueryExecRequest& query_exec_request);
+
+  // Core logic of executing a ddl statement. May internally initiate execution of
+  // queries (e.g., compute stats) or dml (e.g., create table as select)
+  Status ExecDdlRequest();
 
   // Executes a LOAD DATA
   Status ExecLoadDataRequest();
@@ -283,6 +301,30 @@ class ImpalaServer::QueryExecState {
   // ready until all BEs complete execution. This can be called as part of Wait(),
   // at which point results will be avilable.
   void SetCreateTableAsSelectResultSet();
+
+  // Updates the metastore's table and column statistics based on the child-query results
+  // of a compute stats command.
+  // TODO: Unify the various ways that the Metastore is updated for DDL/DML.
+  // For example, INSERT queries update partition metadata in UpdateCatalog() using a
+  // TUpdateCatalogRequest, whereas our DDL uses a TCatalogOpRequest for very similar
+  // purposes. Perhaps INSERT should use a TCatalogOpRequest as well.
+  Status UpdateTableAndColumnStats();
+
+  // Asynchronously executes all child_queries_ one by one. Calls ExecChildQueries()
+  // in a new child_queries_thread_.
+  void ExecChildQueriesAsync();
+
+  // Serially executes the queries in child_queries_ by calling the child query's
+  // ExecAndWait(). This function is blocking and is intended to be run in a separate
+  // thread to ensure that Exec() remains non-blocking. Sets child_queries_status_.
+  // Must not be called while holding lock_.
+  void ExecChildQueries();
+
+  // Waits for all child queries to complete successfully or with an error, by joining
+  // child_queries_thread_. Returns a non-OK status if a child query fails or if the
+  // parent query is cancelled (subsequent children will not be executed). Returns OK
+  // if child_queries_thread_ is not set or if all child queries finished successfully.
+  Status WaitForChildQueries();
 };
 
 }

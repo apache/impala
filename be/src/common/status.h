@@ -22,6 +22,7 @@
 #include "common/logging.h"
 #include "common/compiler-util.h"
 #include "gen-cpp/Status_types.h"  // for TStatus
+#include "gen-cpp/cli_service_types.h" // for HS2 TStatus
 
 namespace impala {
 
@@ -93,6 +94,12 @@ class Status {
 
   // same as previous c'tor
   Status& operator=(const TStatus& status);
+
+  // "Copy c'tor from HS2 TStatus.
+  Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
+
+  // same as previous c'tor
+  Status& operator=(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
   // assign from stringstream
   Status& operator=(const std::stringstream& stream);

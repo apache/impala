@@ -201,7 +201,7 @@ parser code {:
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG,
   KW_AVROFILE, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
-  KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COUNT, KW_CREATE,
+  KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_COUNT, KW_CREATE,
   KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DELIMITED,
   KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
@@ -311,6 +311,7 @@ nonterminal Qualifier union_op;
 
 nonterminal AlterTableStmt alter_tbl_stmt;
 nonterminal StatementBase alter_view_stmt;
+nonterminal ComputeStatsStmt compute_stats_stmt;
 nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
@@ -412,6 +413,8 @@ stmt ::=
   {: RESULT = alter_tbl; :}
   | alter_view_stmt:alter_view
   {: RESULT = alter_view; :}
+  | compute_stats_stmt:compute_stats
+  {: RESULT = compute_stats; :}
   | create_tbl_as_select_stmt:create_tbl_as_select
   {: RESULT = create_tbl_as_select; :}
   | create_tbl_like_stmt:create_tbl_like
@@ -819,6 +822,11 @@ alter_view_stmt ::=
   {: RESULT = new AlterViewStmt(table, view_def); :}
   | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
+  ;
+
+compute_stats_stmt ::=
+  KW_COMPUTE KW_STATS table_name:table
+  {: RESULT = new ComputeStatsStmt(table); :}
   ;
 
 drop_db_stmt ::=

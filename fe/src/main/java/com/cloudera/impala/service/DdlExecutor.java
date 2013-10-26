@@ -26,13 +26,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
+import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
+import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -40,10 +49,12 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
@@ -66,10 +77,13 @@ import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
+import com.cloudera.impala.thrift.TAlterTableUpdateStatsParams;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
 import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.thrift.TColumnStats;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
@@ -84,10 +98,14 @@ import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.thrift.TTableStats;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogResponse;
 import com.google.common.base.Joiner;
@@ -151,6 +169,9 @@ public class DdlExecutor {
         break;
       case CREATE_FUNCTION:
         createFunction(ddlRequest.getCreate_fn_params(), response);
+        break;
+      case COMPUTE_STATS:
+        Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
         break;
       case DROP_DATABASE:
         dropDatabase(ddlRequest.getDrop_db_params(), response);
@@ -239,6 +260,10 @@ public class DdlExecutor {
         alterTableSetTblProperties(TableName.fromThrift(params.getTable_name()),
             params.getSet_tbl_properties_params());
         break;
+      case UPDATE_STATS:
+        Preconditions.checkState(params.isSetUpdate_stats_params());
+        alterTableUpdateStats(params.getUpdate_stats_params(), response);
+        break;
       default:
         throw new UnsupportedOperationException(
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
@@ -283,16 +308,182 @@ public class DdlExecutor {
   }
 
   /**
+   * Alters an existing table's table and column statistics.
+   */
+  private void alterTableUpdateStats(TAlterTableUpdateStatsParams params,
+      TDdlExecResponse resp) throws NoSuchObjectException, MetaException, TException,
+        CatalogException {
+    Preconditions.checkState(params.isSetColumn_stats() && params.isSetPartition_stats()
+        && params.isSetTable_stats());
+
+    TableName tableName = TableName.fromThrift(params.getTable_name());
+    Preconditions.checkState(tableName != null && tableName.isFullyQualified());
+    LOG.info(String.format("Updating table stats for %s", tableName));
+
+    Table table = catalog.getTable(tableName.getDb(), tableName.getTbl());
+    // Deep copy the msTbl to avoid updating our cache before successfully persisting
+    // the results to the metastore.
+    org.apache.hadoop.hive.metastore.api.Table msTbl =
+        table.getMetaStoreTable().deepCopy();
+    List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
+        Lists.newArrayList();
+    if (table instanceof HdfsTable) {
+      // Fill the msPartitions from the the cached metadata.
+      HdfsTable hdfsTable = (HdfsTable) table;
+      for (HdfsPartition p: hdfsTable.getPartitions()) {
+        if (p.getMetaStorePartition() != null) {
+          msPartitions.add(p.getMetaStorePartition());
+        }
+      }
+    }
+
+    MetaStoreClient msClient = catalog.getMetaStoreClient();
+    int numUpdatedPartitions;
+    int numUpdatedColumns;
+    try {
+        // Update the table and partition row counts based on the query results.
+        numUpdatedPartitions = updateTableStats(table, params, msTbl, msPartitions);
+
+        // Create Hive column stats from the query results.
+        ColumnStatistics colStats = createHiveColStats(params.getColumn_stats(), table);
+        numUpdatedColumns = colStats.getStatsObjSize();
+
+        // Ensure updates are atomic with respect to conflicting DDL operations.
+        synchronized (metastoreDdlLock) {
+          // Alter all partitions in bulk.
+          msClient.getHiveClient().alter_partitions(tableName.getDb(),
+              tableName.getTbl(), msPartitions);
+
+          // Update column stats.
+          msClient.getHiveClient().updateTableColumnStatistics(colStats);
+
+          // Update the table stats. Apply the table alteration last to ensure the
+          // lastDdlTime is as accurate as possible.
+          applyAlterTable(msTbl);
+        }
+    } finally {
+      msClient.release();
+    }
+
+    // Set the results to be reported to the client.
+    TResultSet resultSet = new TResultSet();
+    resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
+        new TColumn("summary", TPrimitiveType.STRING))));
+    TColumnValue resultColVal = new TColumnValue();
+    resultColVal.setStringVal("Updated " + numUpdatedPartitions + " partition(s) and " +
+        numUpdatedColumns + " column(s).");
+    TResultRow resultRow = new TResultRow();
+    resultRow.setColVals(Lists.newArrayList(resultColVal));
+    resultSet.setRows(Lists.newArrayList(resultRow));
+    resp.setResult_set(resultSet);
+  }
+
+  /**
+   * Updates the row counts of the given Hive partitions and the total row count of the
+   * given Hive table based on the given update stats parameters.
+   * Missing or new partitions as a result of concurrent table alterations are ignored.
+   * Returns the number of successfully updated partitions.
+   */
+  private int updateTableStats(Table table, TAlterTableUpdateStatsParams params,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions) {
+    Preconditions.checkState(params.isSetPartition_stats());
+    Preconditions.checkState(params.isSetTable_stats());
+
+    // Update the partitions' ROW_COUNT parameter.
+    int numUpdatedPartitions = 0;
+    for(org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
+      TTableStats partitionStats = params.partition_stats.get(msPartition.getValues());
+      if (partitionStats == null) continue;
+      LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
+          Joiner.on(",").join(msPartition.getValues()), partitionStats.num_rows));
+      msPartition.putToParameters(StatsSetupConst.ROW_COUNT,
+          String.valueOf(partitionStats.num_rows));
+      ++numUpdatedPartitions;
+    }
+    // For unpartitioned tables and HBase tables report a single updated partition.
+    if (table.getNumClusteringCols() == 0 || table instanceof HBaseTable) {
+      numUpdatedPartitions = 1;
+    }
+
+    // Update the table's ROW_COUNT parameter.
+    msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
+        String.valueOf(params.getTable_stats().num_rows));
+    return numUpdatedPartitions;
+  }
+
+  /**
+   * Create Hive column statistics for the given table based on the give map from column
+   * name to column stats. Missing or new columns as a result of concurrent table
+   * alterations are ignored.
+   */
+  private static ColumnStatistics createHiveColStats(
+      Map<String, TColumnStats> columnStats, Table table) {
+    // Collection of column statistics objects to be returned.
+    ColumnStatistics colStats = new ColumnStatistics();
+    colStats.setStatsDesc(
+        new ColumnStatisticsDesc(true, table.getDb().getName(), table.getName()));
+    // Generate Hive column stats objects from the update stats params.
+    for (Map.Entry<String, TColumnStats> entry: columnStats.entrySet()) {
+      String colName = entry.getKey();
+      Column tableCol = table.getColumn(entry.getKey());
+      // Ignore columns that were dropped in the meantime.
+      if (tableCol == null) continue;
+      ColumnStatisticsData colStatsData =
+          createHiveColStatsData(entry.getValue(), tableCol.getType());
+      if (colStatsData == null) continue;
+      LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s",
+          colName, entry.getValue().getNum_distinct_values(),
+          entry.getValue().getNum_nulls()));
+      ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
+          tableCol.getType().toString(), colStatsData);
+      colStats.addToStatsObj(colStatsObj);
+    }
+    return colStats;
+  }
+
+  private static ColumnStatisticsData createHiveColStatsData(TColumnStats colStats,
+      PrimitiveType colType) {
+    ColumnStatisticsData colStatsData = new ColumnStatisticsData();
+    long ndvs = colStats.getNum_distinct_values();
+    long numNulls = colStats.getNum_nulls();
+    switch(colType) {
+      case BOOLEAN:
+        // TODO: Gather and set the numTrues and numFalse stats as well. The planner
+        // currently does not rely on them.
+        colStatsData.setBooleanStats(new BooleanColumnStatsData(1, -1, numNulls));
+        break;
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case BIGINT:
+      case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
+        // TODO: Gather and set the min/max values stats as well. The planner
+        // currently does not rely on them.
+        colStatsData.setLongStats(new LongColumnStatsData(-1, -1, numNulls, ndvs));
+        break;
+      case FLOAT:
+      case DOUBLE:
+        // TODO: Gather and set the min/max values stats as well. The planner
+        // currently does not rely on them.
+        colStatsData.setDoubleStats(new DoubleColumnStatsData(-1, -1, numNulls, ndvs));
+        break;
+      case STRING:
+        // TODO: Gather and set the maxColLen/avgColLen stats as well. The planner
+        // currently does not rely on them significantly.
+        colStatsData.setStringStats(new StringColumnStatsData(-1, -1, numNulls, ndvs));
+        break;
+      default:
+        return null;
+    }
+    return colStatsData;
+  }
+
+  /**
    * Creates a new database in the metastore and adds the db name to the internal
    * metadata cache, marking its metadata to be lazily loaded on the next access.
    * Re-throws any Hive Meta Store exceptions encountered during the create, these
    * may vary depending on the Meta Store connection type (thrift vs direct db).
-   *
-   * @param dbName - The name of the new database.
-   * @param comment - Comment to attach to the database, or null for no comment.
-   * @param location - Hdfs path to use as the default location for new table data or
-   *                   null to use default location.
-   * @param ifNotExists - If true, no errors are thrown if the database already exists
    */
   private void createDatabase(TCreateDbParams params, TDdlExecResponse resp)
       throws MetaException, AlreadyExistsException, InvalidObjectException,
@@ -357,9 +548,6 @@ public class DdlExecutor {
    * Drops a database from the metastore and removes the database's metadata from the
    * internal cache. The database must be empty (contain no tables) for the drop operation
    * to succeed. Re-throws any Hive Meta Store exceptions encountered during the drop.
-   *
-   * @param dbName - The name of the database to drop
-   * @param ifExists - If true, no errors will be thrown if the database does not exist.
    */
   private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
       throws MetaException, NoSuchObjectException, InvalidOperationException,
@@ -451,21 +639,6 @@ public class DdlExecutor {
    * Creates a new table in the metastore and adds an entry to the metadata cache to
    * lazily load the new metadata on the next access. Re-throws any Hive Meta Store
    * exceptions encountered during the create.
-   *
-   * @param tableName - Fully qualified name of the new table.
-   * @param column - List of column definitions for the new table.
-   * @param partitionColumn - List of partition column definitions for the new table.
-   * @param owner - Owner of this table.
-   * @param isExternal
-   *    If true, table is created as external which means the data will not be deleted
-   *    if dropped. External tables can also be created on top of existing data.
-   * @param comment - Optional comment to attach to the table (null for no comment).
-   * @param location - Hdfs path to use as the location for table data or null to use
-   *                   default location.
-   * @param ifNotExists - If true, no errors are thrown if the table already exists
-   * @return Returns true if a new table was created in the metastore as a result of this
-   *         call. Returns false if creation was skipped - this indicates the table already
-   *         existed and the caller specified IF NOT EXISTS.
    */
   private boolean createTable(TCreateTableParams params, TDdlExecResponse response)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
@@ -523,20 +696,6 @@ public class DdlExecutor {
    * No data is copied as part of this process, it is a metadata only operation. If the
    * creation succeeds, an entry is added to the metadata cache to lazily load the new
    * table's metadata on the next access.
-   *
-   * @param tableName - Fully qualified name of the new table.
-   * @param srcTableName - Fully qualified name of the old table.
-   * @param owner - Owner of this table.
-   * @param isExternal
-   *    If true, table is created as external which means the data will not be deleted
-   *    if dropped. External tables can also be created on top of existing data.
-   * @param comment - Optional comment to attach to the table or an empty string for no
-                      comment. Null to copy comment from the source table.
-   * @param fileFormat - The file format for the new table or null to copy file format
-   *                     from source table.
-   * @param location - Hdfs path to use as the location for table data or null to use
-   *                   default location.
-   * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response)
       throws MetaException, NoSuchObjectException, AlreadyExistsException,
@@ -544,7 +703,8 @@ public class DdlExecutor {
       ImpalaException, TableLoadingException, TableNotFoundException {
     Preconditions.checkNotNull(params);
 
-    THdfsFileFormat fileFormat = params.isSetFile_format() ? params.getFile_format() : null;
+    THdfsFileFormat fileFormat =
+        params.isSetFile_format() ? params.getFile_format() : null;
     String comment = params.isSetComment() ? params.getComment() : null;
     TableName tblName = TableName.fromThrift(params.getTable_name());
     TableName srcTblName = TableName.fromThrift(params.getSrc_table_name());
@@ -587,6 +747,8 @@ public class DdlExecutor {
     if (fileFormat != null) {
       setStorageDescriptorFileFormat(tbl.getSd(), fileFormat);
     }
+    // Set the row count of this table to unknown.
+    tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
     LOG.debug(String.format("Creating table %s LIKE %s", tblName, srcTblName));
     createTable(tbl, params.if_not_exists, response);
   }

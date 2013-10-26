@@ -1,0 +1,310 @@
+====
+---- QUERY
+# test computing stats on a partitioned text table with all types
+create table compute_stats_db.alltypes like functional.alltypes;
+insert into compute_stats_db.alltypes partition(year, month)
+select * from functional.alltypes;
+====
+---- QUERY
+compute stats compute_stats_db.alltypes
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+2009,1,310,1,'24.56KB','TEXT'
+2009,2,280,1,'22.27KB','TEXT'
+2009,3,310,1,'24.67KB','TEXT'
+2009,4,300,1,'24.06KB','TEXT'
+2009,5,310,1,'24.97KB','TEXT'
+2009,6,300,1,'24.16KB','TEXT'
+2009,7,310,1,'24.97KB','TEXT'
+2009,8,310,1,'24.97KB','TEXT'
+2009,9,300,1,'24.16KB','TEXT'
+2009,10,310,1,'24.97KB','TEXT'
+2009,11,300,1,'24.16KB','TEXT'
+2009,12,310,1,'24.97KB','TEXT'
+2010,1,310,1,'24.97KB','TEXT'
+2010,2,280,1,'22.54KB','TEXT'
+2010,3,310,1,'24.97KB','TEXT'
+2010,4,300,1,'24.16KB','TEXT'
+2010,5,310,1,'24.97KB','TEXT'
+2010,6,300,1,'24.16KB','TEXT'
+2010,7,310,1,'24.97KB','TEXT'
+2010,8,310,1,'24.97KB','TEXT'
+2010,9,300,1,'24.16KB','TEXT'
+2010,10,310,1,'24.97KB','TEXT'
+2010,11,300,1,'24.16KB','TEXT'
+2010,12,310,1,'24.97KB','TEXT'
+Total,,7300,24,'586.84KB',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',8161,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',666,0,-1,-1
+'string_col','STRING',10,0,-1,-1
+'timestamp_col','TIMESTAMP',5678,0,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test computing stats on an partitioned text table with all types
+create table compute_stats_db.alltypesnopart like functional.alltypesnopart;
+insert into compute_stats_db.alltypesnopart
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col, timestamp_col
+from functional.alltypessmall;
+====
+---- QUERY
+compute stats compute_stats_db.alltypesnopart
+---- RESULTS
+'Updated 1 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypesnopart
+---- LABELS
+#ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+100,3,'7.73KB','TEXT'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypesnopart
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',105,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',12,0,-1,-1
+'string_col','STRING',10,0,-1,-1
+'timestamp_col','TIMESTAMP',101,0,16,16
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test computing stats on a partitioned parquet table with all types
+create table compute_stats_db.alltypes_parquet
+like functional_parquet.alltypes;
+insert into compute_stats_db.alltypes_parquet partition(year, month)
+select * from functional.alltypes;
+====
+---- QUERY
+compute stats compute_stats_db.alltypes_parquet
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_parquet
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+2009,1,310,1,'6.60KB','PARQUET'
+2009,2,280,1,'6.14KB','PARQUET'
+2009,3,310,1,'6.60KB','PARQUET'
+2009,4,300,1,'6.46KB','PARQUET'
+2009,5,310,1,'6.60KB','PARQUET'
+2009,6,300,1,'6.46KB','PARQUET'
+2009,7,310,1,'6.60KB','PARQUET'
+2009,8,310,1,'6.60KB','PARQUET'
+2009,9,300,1,'6.46KB','PARQUET'
+2009,10,310,1,'6.60KB','PARQUET'
+2009,11,300,1,'6.46KB','PARQUET'
+2009,12,310,1,'6.60KB','PARQUET'
+2010,1,310,1,'6.60KB','PARQUET'
+2010,2,280,1,'6.14KB','PARQUET'
+2010,3,310,1,'6.62KB','PARQUET'
+2010,4,300,1,'6.47KB','PARQUET'
+2010,5,310,1,'6.60KB','PARQUET'
+2010,6,300,1,'6.46KB','PARQUET'
+2010,7,310,1,'6.60KB','PARQUET'
+2010,8,310,1,'6.60KB','PARQUET'
+2010,9,300,1,'6.46KB','PARQUET'
+2010,10,310,1,'6.60KB','PARQUET'
+2010,11,300,1,'6.46KB','PARQUET'
+2010,12,310,1,'6.60KB','PARQUET'
+Total,,7300,24,'156.36KB',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_parquet
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',8161,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',666,0,-1,-1
+'string_col','STRING',10,0,-1,-1
+'timestamp_col','TIMESTAMP',5678,0,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test computing stats on an HBase table
+create table compute_stats_db.alltypessmall_hbase
+like functional_hbase.alltypessmall;
+====
+---- QUERY
+compute stats compute_stats_db.alltypessmall_hbase
+---- RESULTS
+'Updated 1 partition(s) and 12 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypessmall_hbase
+---- LABELS
+REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
+---- RESULTS: VERIFY_IS_EQUAL
+regex:.+,'',5,'1.37KB'
+regex:.+,'1',42,'10.73KB'
+regex:.+,'3',42,'10.77KB'
+regex:.+,'5',42,'10.76KB'
+regex:.+,'7',42,'10.73KB'
+regex:.+,'9',23,'5.86KB'
+'Total','',196,'50.22KB'
+---- TYPES
+STRING, STRING, BIGINT, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypessmall_hbase
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bigint_col','BIGINT',10,0,8,8
+'bool_col','BOOLEAN',2,0,1,1
+'date_string_col','STRING',12,0,-1,-1
+'double_col','DOUBLE',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'int_col','INT',10,0,4,4
+'month','INT',4,0,4,4
+'smallint_col','SMALLINT',10,0,2,2
+'string_col','STRING',10,0,-1,-1
+'timestamp_col','TIMESTAMP',101,0,16,16
+'tinyint_col','TINYINT',10,0,1,1
+'year','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test computing stats on an binary HBase table
+create table compute_stats_db.alltypessmall_hbase_bin
+like functional_hbase.alltypessmallbinary;
+====
+---- QUERY
+compute stats compute_stats_db.alltypessmall_hbase_bin
+---- RESULTS
+'Updated 1 partition(s) and 12 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY: VERIFY_IS_EQUAL
+show table stats compute_stats_db.alltypessmall_hbase_bin
+---- LABELS
+REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
+---- RESULTS
+regex:.+,'',1,'315B'
+---- TYPES
+STRING, STRING, BIGINT, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypessmall_hbase_bin
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bigint_col','BIGINT',10,0,8,8
+'bool_col','BOOLEAN',2,0,1,1
+'date_string_col','STRING',12,0,-1,-1
+'double_col','DOUBLE',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'int_col','INT',10,0,4,4
+'month','INT',4,0,4,4
+'smallint_col','SMALLINT',10,0,2,2
+'string_col','STRING',10,0,-1,-1
+'timestamp_col','TIMESTAMP',101,0,16,16
+'tinyint_col','TINYINT',10,0,1,1
+'year','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test computing stats on an empty table
+create table compute_stats_db.alltypes_empty like functional_rc_snap.alltypes
+====
+---- QUERY
+compute stats compute_stats_db.alltypes_empty
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_empty
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+Total,,0,0,'0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_empty
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',0,0,1,1
+'smallint_col','SMALLINT',0,0,2,2
+'int_col','INT',0,0,4,4
+'bigint_col','BIGINT',0,0,8,8
+'float_col','FLOAT',0,0,4,4
+'double_col','DOUBLE',0,0,8,8
+'date_string_col','STRING',0,0,-1,-1
+'string_col','STRING',0,0,-1,-1
+'timestamp_col','TIMESTAMP',0,0,16,16
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====

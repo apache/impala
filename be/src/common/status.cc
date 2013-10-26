@@ -61,6 +61,28 @@ Status& Status::operator=(const TStatus& status) {
   return *this;
 }
 
+Status::Status(const apache::hive::service::cli::thrift::TStatus& hs2_status)
+  : error_detail_(
+      hs2_status.statusCode
+        == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS ? NULL
+          : new ErrorDetail(
+              static_cast<TStatusCode::type>(hs2_status.statusCode),
+              hs2_status.errorMessage)) {
+}
+
+Status& Status::operator=(
+    const apache::hive::service::cli::thrift::TStatus& hs2_status) {
+  delete error_detail_;
+  if (hs2_status.statusCode
+        == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS) {
+    error_detail_ = NULL;
+  } else {
+    error_detail_ = new ErrorDetail(
+        static_cast<TStatusCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
+  }
+  return *this;
+}
+
 void Status::AddErrorMsg(TStatusCode::type code, const std::string& msg) {
   if (error_detail_ == NULL) {
     error_detail_ = new ErrorDetail(code, msg);

@@ -25,6 +25,7 @@ add_library(Service
   impala-hs2-server.cc
   impala-beeswax-server.cc
   query-exec-state.cc
+  child-query.cc
 )
 
 # this shared library provides Impala executor functionality to FE test.

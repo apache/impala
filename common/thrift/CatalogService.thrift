@@ -19,6 +19,7 @@ include "CatalogObjects.thrift"
 include "JniCatalog.thrift"
 include "Types.thrift"
 include "Status.thrift"
+include "Data.thrift"
 
 // CatalogServer service API and related structs.
 
@@ -81,6 +82,9 @@ struct TDdlExecRequest {
 
   // Parameters for DROP FUNCTION
   12: optional JniCatalog.TDropFunctionParams drop_fn_params
+
+  // Parameters for COMPUTE STATS
+  13: optional JniCatalog.TComputeStatsParams compute_stats_params
 }
 
 // Response from executing a TDdlExecRequest
@@ -93,6 +97,10 @@ struct TDdlExecResponse {
   // table or whether creation was skipped because the table already existed, in which
   // case this flag would be false
   2: optional bool new_table_created;
+
+  // Result of DDL operation to be returned to the client. Currently only set
+  // by COMPUTE STATS.
+  3: optional Data.TResultSet result_set
 }
 
 // Updates the metastore with new partition information and returns a response

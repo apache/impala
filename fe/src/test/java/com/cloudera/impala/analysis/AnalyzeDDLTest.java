@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import static org.junit.Assert.assertTrue;
+
 import java.util.ArrayList;
 
 import junit.framework.Assert;
@@ -447,6 +449,29 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER VIEW a able.
     AnalysisError("alter view functional.alltypes rename to new_alltypes",
         "ALTER VIEW not allowed on a table: functional.alltypes");
+  }
+
+  @Test
+  public void TestComputeStats() throws AnalysisException {
+    // Analyze the stmt itself as well as the generated child queries.
+    ParseNode parseNode = AnalyzesOk("compute stats functional.alltypes");
+    assertTrue(parseNode instanceof ComputeStatsStmt);
+    ComputeStatsStmt stmt = (ComputeStatsStmt) parseNode;
+    AnalyzesOk(stmt.getTblStatsQuery());
+    AnalyzesOk(stmt.getColStatsQuery());
+
+    parseNode = AnalyzesOk("compute stats functional_hbase.alltypes");
+    assertTrue(parseNode instanceof ComputeStatsStmt);
+    stmt = (ComputeStatsStmt) parseNode;
+    AnalyzesOk(stmt.getTblStatsQuery());
+    AnalyzesOk(stmt.getColStatsQuery());
+
+    // Cannot compute stats on a database.
+    AnalysisError("compute stats tbl_does_not_exist",
+        "Table does not exist: default.tbl_does_not_exist");
+    // Cannot compute stats on a view.
+    AnalysisError("compute stats functional.alltypes_view",
+        "COMPUTE STATS not allowed on a view: functional.alltypes_view");
   }
 
   @Test

@@ -165,6 +165,9 @@ class Coordinator {
 
   const ProgressUpdater& progress() { return progress_; }
 
+  // Returns query_status_.
+  Status GetStatus();
+
  private:
   class BackendExecState;
 
@@ -420,9 +423,6 @@ class Coordinator {
   // the query is not being cancelled in the case where the query limit is
   // reached.
   void CancelRemoteFragments();
-
-  // Returns query_status_.
-  Status GetStatus();
 
   // Acquires lock_ and updates query_status_ with 'status' if it's not already
   // an error status, and returns the current query_status_.

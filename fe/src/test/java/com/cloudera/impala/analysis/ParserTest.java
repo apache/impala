@@ -1880,6 +1880,23 @@ public class ParserTest {
   }
 
   @Test
+  public void TestComputeStats() {
+    ParsesOk("compute stats bar");
+    ParsesOk("compute stats `bar`");
+    ParsesOk("compute stats foo.bar");
+    ParsesOk("compute stats `foo`.`bar`");
+
+    // Missing table name.
+    ParserError("compute stats");
+    // Missing 'stats' keyword.
+    ParserError("compute foo");
+    // Cannot use string literal as table name.
+    ParserError("compute stats 'foo'");
+    // Cannot analyze multiple tables in one stmt.
+    ParserError("compute stats foo bar");
+  }
+
+  @Test
   public void TestGetErrorMsg() {
 
     // missing select
@@ -1888,8 +1905,8 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, INVALIDATE, LOAD, " +
-        "REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
+        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, INVALIDATE, " +
+        "LOAD, REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",

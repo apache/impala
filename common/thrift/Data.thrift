@@ -16,6 +16,7 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
+include "CatalogObjects.thrift"
 
 // Serialized, self-contained version of a RowBatch (in be/src/runtime/row-batch.h).
 struct TRowBatch {
@@ -51,3 +52,14 @@ struct TColumnValue {
 struct TResultRow {
   1: list<TColumnValue> colVals
 }
+
+struct TResultSetMetadata {
+  1: required list<CatalogObjects.TColumn> columns
+}
+
+// List of rows and metadata describing their columns.
+struct TResultSet {
+  1: required list<TResultRow> rows
+  2: required TResultSetMetadata schema
+}
+

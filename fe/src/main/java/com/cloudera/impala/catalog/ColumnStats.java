@@ -42,7 +42,8 @@ public class ColumnStats {
   private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
       PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
       PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
-      PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TINYINT);
+      PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
+      PrimitiveType.TINYINT);
 
   // in bytes: excludes serialization overhead
   private double avgSize;
@@ -144,12 +145,14 @@ public class ColumnStats {
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
           numNulls = boolStats.getNumNulls();
+          numDistinctValues = (numNulls > 0) ? 3 : 2;
         }
         break;
       case TINYINT:
       case SMALLINT:
       case INT:
       case BIGINT:
+      case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
         isCompatible = statsData.isSetLongStats();
         if (isCompatible) {
           LongColumnStatsData longStats = statsData.getLongStats();

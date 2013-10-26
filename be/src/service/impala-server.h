@@ -240,6 +240,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
  private:
   class FragmentExecState;
+  friend class ChildQuery;
 
   // Query result set stores converted rows returned by QueryExecState.fetchRows(). It
   // provides an interface to convert Impala rows to external API rows.

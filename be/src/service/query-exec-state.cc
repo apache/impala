@@ -109,49 +109,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       return Status::OK;
     }
     case TStmtType::DDL: {
-      string op_type = catalog_op_type() == TCatalogOpType::DDL ?
-         PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
-      summary_profile_.AddInfoString("DDL Type", op_type);
-
-      if (catalog_op_type() != TCatalogOpType::DDL &&
-          catalog_op_type() != TCatalogOpType::RESET_METADATA) {
-        Status status = ExecLocalCatalogOp(exec_request_.catalog_op_request);
-        lock_guard<mutex> l(lock_);
-        return UpdateQueryStatus(status);
-      }
-
-      catalog_op_executor_.reset(new CatalogOpExecutor());
-      Status status = catalog_op_executor_->Exec(exec_request->catalog_op_request);
-      {
-        lock_guard<mutex> l(lock_);
-        RETURN_IF_ERROR(UpdateQueryStatus(status));
-      }
-
-      // If this is a CTAS request, there will usually be more work to do
-      // after executing the CREATE TABLE statement (the INSERT portion of the operation).
-      // The exception is if the user specified IF NOT EXISTS and the table already
-      // existed, in which case we do not execute the INSERT.
-      if (catalog_op_type() == TCatalogOpType::DDL &&
-          ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
-        if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
-          // At this point, the remainder of the CTAS request executes
-          // like a normal DML request. As with other DML requests, it will
-          // wait for another catalog update if any partitions were altered as a result
-          // of the operation.
-          DCHECK(exec_request_.__isset.query_exec_request);
-          RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
-        } else {
-          DCHECK(exec_request_.catalog_op_request.
-              ddl_params.create_table_params.if_not_exists);
-        }
-      } else {
-        // CREATE TABLE AS SELECT performs its catalog update once the DML
-        // portion of the operation has completed.
-        RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
-            *catalog_op_executor_->update_catalog_result(),
-            exec_request_.query_options.sync_ddl));
-      }
-      return Status::OK;
+      DCHECK(exec_request_.__isset.catalog_op_request);
+      return ExecDdlRequest();
     }
     case TStmtType::LOAD: {
       DCHECK(exec_request_.__isset.load_data_request);
@@ -177,7 +136,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
     }
     default:
       stringstream errmsg;
-      errmsg << "Unknown  exec request stmt type: " << exec_request->stmt_type;
+      errmsg << "Unknown  exec request stmt type: " << exec_request_.stmt_type;
       return Status(errmsg.str());
   }
 }
@@ -301,6 +260,64 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   return Status::OK;
 }
 
+Status ImpalaServer::QueryExecState::ExecDdlRequest() {
+  string op_type = catalog_op_type() == TCatalogOpType::DDL ?
+      PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
+  summary_profile_.AddInfoString("DDL Type", op_type);
+
+  if (catalog_op_type() != TCatalogOpType::DDL &&
+      catalog_op_type() != TCatalogOpType::RESET_METADATA) {
+    Status status = ExecLocalCatalogOp(exec_request_.catalog_op_request);
+    lock_guard<mutex> l(lock_);
+    return UpdateQueryStatus(status);
+  }
+
+  if (ddl_type() == TDdlType::COMPUTE_STATS) {
+    TComputeStatsParams& compute_stats_params =
+        exec_request_.catalog_op_request.ddl_params.compute_stats_params;
+    // Add child queries for computing table and column stats.
+    child_queries_.push_back(
+        ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
+    child_queries_.push_back(
+        ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
+    ExecChildQueriesAsync();
+    return Status::OK;
+  }
+
+  catalog_op_executor_.reset(new CatalogOpExecutor());
+  Status status = catalog_op_executor_->Exec(exec_request_.catalog_op_request);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(UpdateQueryStatus(status));
+  }
+
+  // If this is a CTAS request, there will usually be more work to do
+  // after executing the CREATE TABLE statement (the INSERT portion of the operation).
+  // The exception is if the user specified IF NOT EXISTS and the table already
+  // existed, in which case we do not execute the INSERT.
+  if (catalog_op_type() == TCatalogOpType::DDL &&
+      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+    if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
+      // At this point, the remainder of the CTAS request executes
+      // like a normal DML request. As with other DML requests, it will
+      // wait for another catalog update if any partitions were altered as a result
+      // of the operation.
+      DCHECK(exec_request_.__isset.query_exec_request);
+      RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
+    } else {
+      DCHECK(exec_request_.catalog_op_request.
+          ddl_params.create_table_params.if_not_exists);
+    }
+  } else {
+    // CREATE TABLE AS SELECT performs its catalog update once the DML
+    // portion of the operation has completed.
+    RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+        *catalog_op_executor_->update_catalog_result(),
+        exec_request_.query_options.sync_ddl));
+  }
+  return Status::OK;
+}
+
 void ImpalaServer::QueryExecState::Done() {
   unique_lock<mutex> l(lock_);
   MarkActive();
@@ -309,7 +326,6 @@ void ImpalaServer::QueryExecState::Done() {
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
 }
-
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
@@ -324,9 +340,14 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
 }
 
 Status ImpalaServer::QueryExecState::Wait() {
+  RETURN_IF_ERROR(WaitForChildQueries());
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
     RETURN_IF_ERROR(UpdateCatalog());
+  }
+
+  if (ddl_type() == TDdlType::COMPUTE_STATS) {
+    RETURN_IF_ERROR(UpdateTableAndColumnStats());
   }
 
   if (!returns_result_set()) {
@@ -455,6 +476,11 @@ Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* r
 }
 
 void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
+  // Cancel and close child queries before cancelling parent.
+  BOOST_FOREACH(ChildQuery& child_query, child_queries_) {
+    child_query.Cancel();
+  }
+
   // If the query is completed, no need to cancel.
   if (eos_) return;
   // we don't want multiple concurrent cancel calls to end up executing
@@ -578,6 +604,61 @@ void ImpalaServer::QueryExecState::MarkActive() {
   lock_guard<mutex> l(expiration_data_lock_);
   last_active_time_ = ms_since_epoch();
   ++ref_count_;
+}
+
+Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
+  DCHECK(child_queries_.size() == 2);
+  catalog_op_executor_.reset(new CatalogOpExecutor());
+  Status status = catalog_op_executor_->ExecComputeStats(
+      exec_request_.catalog_op_request.ddl_params.compute_stats_params,
+      child_queries_[0].result_schema(),
+      child_queries_[0].result_data(),
+      child_queries_[1].result_schema(),
+      child_queries_[1].result_data());
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(UpdateQueryStatus(status));
+  }
+  RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+      *catalog_op_executor_->update_catalog_result(),
+      exec_request_.query_options.sync_ddl));
+
+  // Set the results to be reported to the client.
+  const TDdlExecResponse* ddl_resp = catalog_op_executor_->ddl_exec_response();
+  if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
+    result_metadata_ = ddl_resp->result_set.schema;
+    request_result_set_.reset(new vector<TResultRow>);
+    request_result_set_->assign(
+        ddl_resp->result_set.rows.begin(), ddl_resp->result_set.rows.end());
+  }
+
+  query_events_->MarkEvent("Metastore update finished");
+  return Status::OK;
+}
+
+void ImpalaServer::QueryExecState::ExecChildQueriesAsync() {
+  DCHECK(child_queries_thread_.get() == NULL);
+  child_queries_thread_.reset(new Thread("query-exec-state", "async child queries",
+      bind(&ImpalaServer::QueryExecState::ExecChildQueries, this)));
+}
+
+void ImpalaServer::QueryExecState::ExecChildQueries() {
+  for (int i = 0; i < child_queries_.size(); ++i) {
+    if (!child_queries_status_.ok()) return;
+    child_queries_status_ = child_queries_[i].ExecAndFetch();
+  }
+}
+
+Status ImpalaServer::QueryExecState::WaitForChildQueries() {
+  if (child_queries_thread_.get() == NULL) return Status::OK;
+  child_queries_thread_->Join();
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(query_status_);
+    RETURN_IF_ERROR(UpdateQueryStatus(child_queries_status_));
+  }
+  query_events_->MarkEvent("Child queries finished");
+  return Status::OK;
 }
 
 }

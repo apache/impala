@@ -17,7 +17,7 @@ from tests.verifiers.metric_verifier import MetricVerifier
 QUERIES = ['select l_returnflag from lineitem',
            'select count(l_returnflag) from lineitem',
            'select * from lineitem limit 50',
-           ]
+           'compute stats lineitem']
 
 QUERY_TYPE = ["SELECT", "CTAS"]
 
@@ -47,6 +47,14 @@ class TestCancellation(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['text', 'parquet'] and\
         v.get_value('table_format').compression_codec == 'none'))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    # Ignore 'compute stats' queries for the CTAS query type.
+    cls.TestMatrix.add_constraint(lambda v: not (v.get_value('query_type') == 'CTAS' and
+         v.get_value('query').startswith('compute stats')))
+    # Ignore debug actions for 'compute stats' because cancellation of 'compute stats'
+    # relies on child queries eventually making forward progress, but debug actions
+    # will cause child queries to hang indefinitely.
+    cls.TestMatrix.add_constraint(lambda v: not (v.get_value('action') == 'WAIT' and
+         v.get_value('query').startswith('compute stats')))
     # tpch tables are not generated for hbase as the data loading takes a very long time.
     # TODO: Add cancellation tests for hbase.
     cls.TestMatrix.add_constraint(lambda v:\
@@ -132,7 +140,8 @@ class TestCancellationSerial(TestCancellation):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationSerial, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS')
+    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS' or
+        v.get_value('query').startswith('compute stats'))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') != 0)
     cls.TestMatrix.add_constraint(lambda v: v.get_value('action') is None)
     # Don't run across all cancel delay options unless running in exhaustive mode

@@ -18,6 +18,7 @@ namespace java com.cloudera.impala.thrift
 include "CatalogObjects.thrift"
 include "Types.thrift"
 include "Status.thrift"
+include "cli_service.thrift"
 
 // Structs used to execute DDL operations using the JniCatalog.
 
@@ -30,6 +31,7 @@ enum TDdlType {
   CREATE_TABLE_LIKE,
   CREATE_VIEW,
   CREATE_FUNCTION,
+  COMPUTE_STATS,
   DROP_DATABASE,
   DROP_TABLE,
   DROP_VIEW,
@@ -48,6 +50,8 @@ enum TAlterTableType {
   SET_FILE_FORMAT,
   SET_LOCATION,
   SET_TBL_PROPERTIES,
+  // Used internally by the COMPUTE STATS DDL command.
+  UPDATE_STATS
 }
 
 // Parameters of CREATE DATABASE commands
@@ -167,6 +171,23 @@ struct TAlterTableSetLocationParams {
   2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 }
 
+// Parameters for updating the table and/or column statistics
+// of a table. Used internally by a COMPUTE STATS command.
+struct TAlterTableUpdateStatsParams {
+  // Fully qualified name of the table to be updated.
+  1: required CatalogObjects.TTableName table_name
+
+  // Table-level stats.
+  2: optional CatalogObjects.TTableStats table_stats
+
+  // Partition-level stats. Maps from a list of partition-key values
+  // to its partition stats.
+  3: optional map<list<string>, CatalogObjects.TTableStats> partition_stats
+
+  // Column-level stats. Maps from column name to column stats.
+  4: optional map<string, CatalogObjects.TColumnStats> column_stats
+}
+
 // Parameters for all ALTER TABLE commands.
 struct TAlterTableParams {
   1: required TAlterTableType alter_type
@@ -200,6 +221,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE SET TBLPROPERTIES
   11: optional TAlterTableSetTblPropertiesParams set_tbl_properties_params
+
+  // Parameters for updating table/column stats. Used internally by COMPUTE STATS
+  12: optional TAlterTableUpdateStatsParams update_stats_params
 }
 
 // Parameters of CREATE TABLE LIKE commands
@@ -294,6 +318,18 @@ struct TCreateOrAlterViewParams {
 
   // Do not throw an error if a table or view of the same name already exists
   7: optional bool if_not_exists
+}
+
+// Parameters of a COMPUTE STATS command
+struct TComputeStatsParams {
+  // Fully qualified name of the table to compute stats for.
+  1: required CatalogObjects.TTableName table_name
+
+  // Query for gathering per-partition row count.
+  2: required string tbl_stats_query
+
+  // Query for gethering per-column NDVs and number of NULLs.
+  3: required string col_stats_query
 }
 
 // Parameters of DROP DATABASE commands

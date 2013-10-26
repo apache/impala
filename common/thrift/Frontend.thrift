@@ -54,16 +54,6 @@ struct TSessionState {
   4: required Types.TNetworkAddress network_address
 }
 
-struct TResultSetMetadata {
-  1: required list<CatalogObjects.TColumn> columns
-}
-
-// List of rows and metadata describing their columns.
-struct TResultSet {
-  1: required list<Data.TResultRow> rows
-  2: required TResultSetMetadata schema
-}
-
 // Struct for HiveUdf expr to create the proper execution object in the FE
 // java side. See exprs/hive-udf-call.h for how hive Udfs are executed in general.
 // TODO: this could be the UdfID, collapsing the first 3 arguments but synchronizing
@@ -304,7 +294,7 @@ struct TQueryExecRequest {
       per_node_scan_ranges
 
   // Metadata of the query result set (only for select)
-  5: optional TResultSetMetadata result_set_metadata
+  5: optional Data.TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
   6: optional TFinalizeParams finalize_params
@@ -437,7 +427,7 @@ struct TExecRequest {
   4: optional TCatalogOpRequest catalog_op_request
 
   // Metadata of the query result set (not set for DML)
-  5: optional TResultSetMetadata result_set_metadata
+  5: optional Data.TResultSetMetadata result_set_metadata
 
   // Result of EXPLAIN. Set iff stmt_type is EXPLAIN
   6: optional TExplainResult explain_result

@@ -220,6 +220,15 @@ public class AuditingTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestComputeStats() throws AnalysisException, AuthorizationException {
+    List<TAccessEvent> accessEvents = AnalyzeAccessEvents(
+        "COMPUTE STATS functional_seq_snap.alltypes");
+    Assert.assertEquals(accessEvents, Lists.newArrayList(
+        new TAccessEvent(
+            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "ALTER")));
+  }
+
+  @Test
   public void TestDescribe() throws AuthorizationException, AnalysisException {
     List<TAccessEvent> accessEvents =
         AnalyzeAccessEvents("describe functional.alltypesagg");

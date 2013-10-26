@@ -55,6 +55,10 @@ public class AnalysisContext {
       return stmt instanceof AlterViewStmt;
     }
 
+    public boolean isComputeStatsStmt() {
+      return stmt instanceof ComputeStatsStmt;
+    }
+
     public boolean isQueryStmt() {
       return stmt instanceof QueryStmt;
     }
@@ -150,9 +154,9 @@ public class AnalysisContext {
           isShowCreateTableStmt() || isDescribeStmt() || isCreateTableLikeStmt() ||
           isCreateTableStmt() || isCreateViewStmt() || isCreateDbStmt() ||
           isDropDbStmt() || isDropTableOrViewStmt() || isResetMetadataStmt() ||
-          isAlterTableStmt() || isAlterViewStmt() || isCreateUdfStmt() ||
-          isCreateUdaStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
-          isCreateTableAsSelectStmt();
+          isAlterTableStmt() || isAlterViewStmt() || isComputeStatsStmt() ||
+          isCreateUdfStmt() || isCreateUdaStmt() || isShowFunctionsStmt() ||
+          isDropFunctionStmt() || isCreateTableAsSelectStmt();
     }
 
     public boolean isDmlStmt() {
@@ -167,6 +171,11 @@ public class AnalysisContext {
     public AlterViewStmt getAlterViewStmt() {
       Preconditions.checkState(isAlterViewStmt());
       return (AlterViewStmt) stmt;
+    }
+
+    public ComputeStatsStmt getComputeStatsStmt() {
+      Preconditions.checkState(isComputeStatsStmt());
+      return (ComputeStatsStmt) stmt;
     }
 
     public CreateTableLikeStmt getCreateTableLikeStmt() {

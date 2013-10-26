@@ -217,6 +217,8 @@ STRING
 ---- QUERY
 # Stats on a partitioned Hdfs table stored as text
 show table stats alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
 ---- RESULTS
 2009,1,310,1,'19.95KB','TEXT'
 2009,2,280,1,'18.12KB','TEXT'
@@ -326,7 +328,7 @@ show column stats alltypes
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
 'id','INT',9299,0,4,4
-'bool_col','BOOLEAN',-1,0,1,1
+'bool_col','BOOLEAN',2,0,1,1
 'tinyint_col','TINYINT',11,0,1,1
 'smallint_col','SMALLINT',11,0,2,2
 'int_col','INT',11,0,4,4
@@ -335,7 +337,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',11,0,8,8
 'date_string_col','STRING',822,0,8,8
 'string_col','STRING',9,0,1,1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
+'timestamp_col','TIMESTAMP',7171,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -349,7 +351,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
 'id','INT',63,0,4,4
 'bigint_col','BIGINT',7,0,8,8
-'bool_col','BOOLEAN',-1,0,1,1
+'bool_col','BOOLEAN',2,0,1,1
 'date_string_col','STRING',12,0,8,8
 'double_col','DOUBLE',11,0,8,8
 'float_col','FLOAT',15,0,4,4
@@ -357,7 +359,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'month','INT',5,0,4,4
 'smallint_col','SMALLINT',11,0,2,2
 'string_col','STRING',9,0,1,1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
+'timestamp_col','TIMESTAMP',107,0,16,16
 'tinyint_col','TINYINT',11,0,1,1
 'year','INT',1,0,4,4
 ---- TYPES

@@ -418,14 +418,6 @@ public class CatalogTest {
       // Now try to apply a matching column stats data and ensure it succeeds.
       assertTrue(table.getColumn("string_col").updateStats(stringColStatsData));
       assertEquals(3, table.getColumn("string_col").getStats().getMaxSize());
-
-      // Finally, try to update stats for a column type that doesn't support stats
-      try {
-        table.getColumn("timestamp_col").updateStats(stringColStatsData);
-        assertTrue("Expected update to fail for unsupported stat column type.", false);
-      } catch (IllegalStateException e) {
-        // Ignore
-      }
     } finally {
       // Make sure to invalidate the metadata so the next test isn't using bad col stats
       catalog.getDb("functional").invalidateTable("functional");

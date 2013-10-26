@@ -69,6 +69,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("column", new Integer(SqlParserSymbols.KW_COLUMN));
     keywordMap.put("columns", new Integer(SqlParserSymbols.KW_COLUMNS));
     keywordMap.put("comment", new Integer(SqlParserSymbols.KW_COMMENT));
+    keywordMap.put("compute", new Integer(SqlParserSymbols.KW_COMPUTE));
     keywordMap.put("count", new Integer(SqlParserSymbols.KW_COUNT));
     keywordMap.put("create", new Integer(SqlParserSymbols.KW_CREATE));
     keywordMap.put("data", new Integer(SqlParserSymbols.KW_DATA));

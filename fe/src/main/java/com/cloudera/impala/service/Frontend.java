@@ -243,6 +243,13 @@ public class Frontend {
       req.setCreate_fn_params(stmt.toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isComputeStatsStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.COMPUTE_STATS);
+      req.setCompute_stats_params(analysis.getComputeStatsStmt().toThrift());
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropDbStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();

@@ -17,6 +17,7 @@
 #define IMPALA_EXEC_CATALOG_OP_EXECUTOR_H
 
 #include <boost/scoped_ptr.hpp>
+#include "gen-cpp/cli_service_types.h"
 #include "gen-cpp/Frontend_types.h"
 
 namespace impala {
@@ -34,6 +35,15 @@ class CatalogOpExecutor {
   // Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
 
+  // Translates the given compute stats params and its child-query results into
+  // a new table alteration request for updating the stats metadata, and executes
+  // the alteration via Exec();
+  Status ExecComputeStats(const TComputeStatsParams& compute_stats_params,
+      const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
+      const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
+      const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
+      const apache::hive::service::cli::thrift::TRowSet& col_stats_data);
+
   // Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   // If called before Exec(), this will return NULL. Only set if the
   // TCatalogOpType is DDL.
@@ -49,6 +59,17 @@ class CatalogOpExecutor {
   }
 
  private:
+  // Helper functions used in ExecComputeStats() for setting the thrift structs in params
+  // for the table/column stats based on the results of the corresponding child query.
+  static void SetTableStats(
+      const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
+      const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
+      TAlterTableUpdateStatsParams* params);
+  static void SetColumnStats(
+      const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
+      const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
+      TAlterTableUpdateStatsParams* params);
+
   // Response from executing the DDL request, see ddl_exec_response().
   boost::scoped_ptr<TDdlExecResponse> exec_response_;
 
