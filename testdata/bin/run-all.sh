@@ -17,6 +17,7 @@
 
 # If -format is passed, format the mini-dfs cluster.
 HDFS_FORMAT_CLUSTER=""
+
 if [ "$1" == "-format" ]; then
   echo "Formatting cluster"
   HDFS_FORMAT_CLUSTER="-format"
