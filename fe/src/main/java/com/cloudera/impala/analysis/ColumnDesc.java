@@ -18,7 +18,7 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumn;
 
 /**
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
@@ -60,10 +60,10 @@ public class ColumnDesc {
     return sb.toString();
   }
 
-  public TColumnDesc toThrift() {
-    TColumnDesc colDesc = new TColumnDesc(
-        new TColumnDesc(getColName(), getColType().toThrift()));
-    colDesc.setComment(getComment());
-    return colDesc;
+  public TColumn toThrift() {
+    TColumn col = new TColumn(
+        new TColumn(getColName(), getColType().toThrift()));
+    col.setComment(getComment());
+    return col;
   }
 }

@@ -146,4 +146,11 @@ public class StringLiteral extends LiteralExpr {
     newLiteral = new DateLiteral(value, targetType);
     return newLiteral;
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    if (!(o instanceof StringLiteral)) return -1;
+    StringLiteral other = (StringLiteral) o;
+    return value.compareTo(other.getStringValue());
+  }
 }

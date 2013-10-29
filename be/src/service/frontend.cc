@@ -70,6 +70,7 @@ Frontend::Frontend() {
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getStats", "([B)[B", &get_stats_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
@@ -132,6 +133,11 @@ Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
   return JniUtil::CallJniMethod(fe_, get_db_names_id_, params, db_names);
 }
 
+Status Frontend::GetStats(const TShowStatsParams& params,
+    TResultSet* result) {
+  return JniUtil::CallJniMethod(fe_, get_stats_id_, params, result);
+}
+
 Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
     const string* pattern, const TSessionState* session, TGetFunctionsResult* functions) {
   TGetFunctionsParams params;
@@ -181,7 +187,7 @@ Status Frontend::ValidateSettings() {
 }
 
 Status Frontend::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
-    TMetadataOpResponse* result) {
+    TResultSet* result) {
   return JniUtil::CallJniMethod(fe_, exec_hs2_metadata_op_id_, request, result);
 }
 

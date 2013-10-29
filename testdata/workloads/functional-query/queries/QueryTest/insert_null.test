@@ -51,7 +51,7 @@ select * from alltypesinsert
 ---- SETUP
 DROP PARTITIONS alltypesinsert
 ---- TYPES
-int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS
 ====
 ---- QUERY

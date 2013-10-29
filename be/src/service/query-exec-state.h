@@ -110,7 +110,7 @@ class ImpalaServer::QueryExecState {
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   int num_rows_fetched() const { return num_rows_fetched_; }
-  bool returns_result_set() { return !result_metadata_.columnDescs.empty(); }
+  bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
   const TExecRequest& exec_request() const { return exec_request_; }

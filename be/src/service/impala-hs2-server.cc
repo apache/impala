@@ -76,13 +76,13 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
   // Convert expr value to HS2 TRow and store it in TRowSet.
   virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
     int num_col = col_values.size();
-    DCHECK_EQ(num_col, metadata_.columnDescs.size());
+    DCHECK_EQ(num_col, metadata_.columns.size());
     result_set_->rows.push_back(TRow());
     TRow& trow = result_set_->rows.back();
     trow.colVals.resize(num_col);
     for (int i = 0; i < num_col; ++i) {
       ImpalaServer::ExprValueToHiveServer2TColumnValue(col_values[i],
-          metadata_.columnDescs[i].columnType, &(trow.colVals[i]));
+          metadata_.columns[i].columnType, &(trow.colVals[i]));
     }
     return Status::OK;
   }
@@ -90,13 +90,13 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
   // Convert TResultRow to HS2 TRow and store it in TRowSet.
   virtual Status AddOneRow(const TResultRow& row) {
     int num_col = row.colVals.size();
-    DCHECK_EQ(num_col, metadata_.columnDescs.size());
+    DCHECK_EQ(num_col, metadata_.columns.size());
     result_set_->rows.push_back(TRow());
     TRow& trow = result_set_->rows.back();
     trow.colVals.resize(num_col);
     for (int i = 0; i < num_col; ++i) {
       ImpalaServer::TColumnValueToHiveServer2TColumnValue(row.colVals[i],
-          metadata_.columnDescs[i].columnType, &(trow.colVals[i]));
+          metadata_.columns[i].columnType, &(trow.colVals[i]));
     }
     return Status::OK;
   }
@@ -613,16 +613,16 @@ void ImpalaServer::GetResultSetMetadata(
     // Convert TResultSetMetadata to TGetResultSetMetadataResp
     const TResultSetMetadata* result_set_md = exec_state->result_metadata();
     DCHECK(result_set_md != NULL);
-    if (result_set_md->columnDescs.size() > 0) {
+    if (result_set_md->columns.size() > 0) {
       return_val.__isset.schema = true;
-      return_val.schema.columns.resize(result_set_md->columnDescs.size());
-      for (int i = 0; i < result_set_md->columnDescs.size(); ++i) {
+      return_val.schema.columns.resize(result_set_md->columns.size());
+      for (int i = 0; i < result_set_md->columns.size(); ++i) {
         return_val.schema.columns[i].__set_columnName(
-            result_set_md->columnDescs[i].columnName);
+            result_set_md->columns[i].columnName);
         return_val.schema.columns[i].position = i;
         return_val.schema.columns[i].typeDesc.types.resize(1);
         return_val.schema.columns[i].typeDesc.types[0].__isset.primitiveEntry = true;
-        TPrimitiveType::type col_type = result_set_md->columnDescs[i].columnType;
+        TPrimitiveType::type col_type = result_set_md->columns[i].columnType;
         return_val.schema.columns[i].typeDesc.types[0].primitiveEntry.__set_type(
             TypeToHiveServer2Type(ThriftToType(col_type)));
       }

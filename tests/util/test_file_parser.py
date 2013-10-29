@@ -75,7 +75,7 @@ def parse_query_test_file(file_name, valid_section_names=None):
   # Update the valid section names as we support other test types
   # (ex. planner, data error)
   if valid_section_names is None:
-    return parse_test_file(file_name, ['QUERY', 'RESULTS', 'TYPES', 'SETUP'])
+    return parse_test_file(file_name, ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP'])
   else:
     return parse_test_file(file_name, valid_section_names)
 

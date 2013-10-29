@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.thrift.TColumnStatsData;
+import com.cloudera.impala.thrift.TColumnStats;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -36,7 +36,7 @@ import com.google.common.base.Preconditions;
  */
 public class ColumnStats {
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
-  private TColumnStatsData colStats;
+  private TColumnStats colStats;
 
   // Set of the currently supported column stats column types.
   private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
@@ -44,8 +44,10 @@ public class ColumnStats {
       PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
       PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TINYINT);
 
-  // in bytes; includes serialization overhead. TODO: Should this be a double?
-  private float avgSerializedSize;
+  // in bytes: excludes serialization overhead
+  private double avgSize;
+  // in bytes; includes serialization overhead.
+  private double avgSerializedSize;
   private long maxSize;  // in bytes
   private long numDistinctValues;
   private long numNulls;
@@ -60,12 +62,14 @@ public class ColumnStats {
    * sets avgSerializedSize and maxSize to their slot size.
    */
   private void initColStats(PrimitiveType colType) {
+    avgSize = -1;
     avgSerializedSize = -1;
     maxSize = -1;
     numDistinctValues = -1;
     numNulls = -1;
     if (colType.isFixedLengthType()) {
       avgSerializedSize = colType.getSlotSize();
+      avgSize = colType.getSlotSize();
       maxSize = colType.getSlotSize();
     }
   }
@@ -113,7 +117,8 @@ public class ColumnStats {
     this.numDistinctValues = numDistinctValues;
   }
   public void setNumNulls(long numNulls) { this.numNulls = numNulls; }
-  public float getAvgSerializedSize() { return avgSerializedSize; }
+  public double getAvgSerializedSize() { return avgSerializedSize; }
+  public double getAvgSize() { return avgSize; }
   public long getMaxSize() { return maxSize; }
   public boolean hasNulls() { return numNulls > 0; }
   public long getNumNulls() { return numNulls; }
@@ -168,8 +173,8 @@ public class ColumnStats {
           numDistinctValues = stringStats.getNumDVs();
           numNulls = stringStats.getNumNulls();
           maxSize = stringStats.getMaxColLen();
-          avgSerializedSize = PrimitiveType.STRING.getSlotSize()
-              + Double.valueOf(stringStats.getAvgColLen()).floatValue();
+          avgSize = Double.valueOf(stringStats.getAvgColLen()).floatValue();
+          avgSerializedSize = avgSize + PrimitiveType.STRING.getSlotSize();
         }
         break;
       case BINARY:
@@ -178,8 +183,8 @@ public class ColumnStats {
           BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
           numNulls = binaryStats.getNumNulls();
           maxSize = binaryStats.getMaxColLen();
-          avgSerializedSize = PrimitiveType.BINARY.getSlotSize()
-              + Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+          avgSize = Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+          avgSerializedSize = avgSize + PrimitiveType.BINARY.getSlotSize();
         }
         break;
       default:
@@ -197,17 +202,17 @@ public class ColumnStats {
     return SUPPORTED_COL_TYPES.contains(colType);
   }
 
-  public void update(PrimitiveType colType, TColumnStatsData statsData) {
-    avgSerializedSize =
-        Double.valueOf(statsData.getAvg_serialized_size()).floatValue();
-    maxSize = statsData.getMax_size();
-    numDistinctValues = statsData.getNum_distinct_values();
-    numNulls = statsData.getNum_nulls();
+  public void update(PrimitiveType colType, TColumnStats stats) {
+    avgSize = Double.valueOf(stats.getAvg_size()).floatValue();
+    avgSerializedSize = colType.getSlotSize() + avgSize;
+    maxSize = stats.getMax_size();
+    numDistinctValues = stats.getNum_distinct_values();
+    numNulls = stats.getNum_nulls();
   }
 
-  public TColumnStatsData toThrift() {
-    TColumnStatsData colStats = new TColumnStatsData();
-    colStats.setAvg_serialized_size(avgSerializedSize);
+  public TColumnStats toThrift() {
+    TColumnStats colStats = new TColumnStats();
+    colStats.setAvg_size(avgSize);
     colStats.setMax_size(maxSize);
     colStats.setNum_distinct_values(numDistinctValues);
     colStats.setNum_nulls(numNulls);

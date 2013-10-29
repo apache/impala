@@ -401,14 +401,15 @@ bigint, string, int
 # joins on empty tables
 select * from emptytable t1 full outer join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
-int, string, int, string
+string, int, string, int
 ---- RESULTS
 ====
 ---- QUERY
-select * from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
+select count(*) from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
 ---- TYPES
-int, string, string
+bigint
 ---- RESULTS
+100
 ====
 ---- QUERY
 select count(*) from greptiny t1 left outer join emptytable t2 on (t1.field=t2.field)

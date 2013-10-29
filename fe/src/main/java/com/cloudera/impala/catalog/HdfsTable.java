@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
@@ -59,16 +59,21 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.FSPermissionChecker;
 import com.cloudera.impala.util.TAccessLevelUtil;
+import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -100,6 +105,12 @@ public class HdfsTable extends Table {
 
   // Map from filename to FileDescriptor
   private final Map<String, FileDescriptor> fileDescMap_ = Maps.newHashMap();
+
+  // Total number of Hdfs files in this table. Set in load().
+  private long numHdfsFiles_;
+
+  // Sum of sizes of all Hdfs files in this table. Set in load().
+  private long totalHdfsBytes_;
 
   // Number of the unique host/ports of datanodes that hold data for this table
   private int uniqueHostPortsCount_ = 0;
@@ -401,33 +412,8 @@ public class HdfsTable extends Table {
       colsByName.put(s.getName(), col);
       ++pos;
 
-
-      ColumnStatistics colStats = null;
-      try {
-        colStats = client.getTableColumnStatistics(db.getName(), name, s.getName());
-      } catch (Exception e) {
-        // don't try to load stats for this column
-        continue;
-      }
-
-      // we should never see more than one ColumnStatisticsObj here
-      if (colStats.getStatsObj().size() > 1) continue;
-
-      if (!ColumnStats.isSupportedColType(col.getType())) {
-        LOG.warn(String.format("Column stats are available for table %s / " +
-            "column '%s', but Impala does not currently support column stats for this " +
-            "type of column (%s)",  name, col.getName(), col.getType().toString()));
-        continue;
-      }
-
-      // Update the column stats data
-      if (!col.updateStats(colStats.getStatsObj().get(0).getStatsData())) {
-        LOG.warn(String.format("Applying the column stats update to table %s / " +
-            "column '%s' did not succeed because column type (%s) was not compatible " +
-            "with the column stats data. Performance may suffer until column stats are" +
-            " regenerated for this column.",
-            name, col.getName(), col.getType().toString()));
-      }
+      // Load and set column stats in col.
+      loadColumnStats(col, client);
     }
   }
 
@@ -627,6 +613,8 @@ public class HdfsTable extends Table {
       HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
           fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
       partitions_.add(partition);
+      numHdfsFiles_ += fileDescriptors.size();
+      totalHdfsBytes_ += partition.getSize();
       return partition;
     } else {
       LOG.warn("Path " + partDirPath + " does not exist for partition. Ignoring.");
@@ -662,6 +650,8 @@ public class HdfsTable extends Table {
    */
   public void load(Table cachedEntry, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+    numHdfsFiles_ = 0;
+    totalHdfsBytes_ = 0;
     LOG.debug("load table: " + db.getName() + "." + name);
     // turn all exceptions into TableLoadingException
     try {
@@ -760,6 +750,17 @@ public class HdfsTable extends Table {
       numRows = getRowCount(msTbl.getParameters());
       LOG.debug("table #rows=" + Long.toString(numRows));
 
+      // For unpartitioned tables set the numRows in its partitions
+      // to the table's numRows.
+      if (numClusteringCols == 0 && !partitions_.isEmpty()) {
+        // Unpartitioned tables have a 'dummy' partition and a default partition.
+        // Temp tables used in CTAS statements have one partition.
+        Preconditions.checkState(partitions_.size() == 2 || partitions_.size() == 1);
+        for (HdfsPartition p: partitions_) {
+          p.setNumRows(numRows);
+        }
+      }
+
       // populate Avro schema if necessary
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
         // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
@@ -849,8 +850,14 @@ public class HdfsTable extends Table {
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
 
+    numHdfsFiles_ = 0;
+    totalHdfsBytes_ = 0;
     for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
-      partitions_.add(HdfsPartition.fromThrift(this, part.getKey(), part.getValue()));
+      HdfsPartition hdfsPart =
+          HdfsPartition.fromThrift(this, part.getKey(), part.getValue());
+      numHdfsFiles_ += hdfsPart.getFileDescriptors().size();
+      totalHdfsBytes_ += hdfsPart.getSize();
+      partitions_.add(hdfsPart);
     }
     uniqueHostPortsCount_ = countUniqueDataNetworkLocations(partitions_);
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
@@ -890,6 +897,8 @@ public class HdfsTable extends Table {
     return hdfsTable;
   }
 
+  public long getNumHdfsFiles() { return numHdfsFiles_; }
+  public long getTotalHdfsBytes() { return totalHdfsBytes_; }
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   @Override
   public int getNumNodes() { return uniqueHostPortsCount_; }
@@ -937,5 +946,62 @@ public class HdfsTable extends Table {
     }
     Preconditions.checkNotNull(majorityFormat);
     return majorityFormat;
+  }
+
+  /**
+   * Returns statistics on this table as a tabular result set. Used for the
+   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
+   * inside this method.
+   */
+  public TResultSet getTableStats() {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata resultSchema = new TResultSetMetadata();
+    result.setSchema(resultSchema);
+    for (int i = 0; i < numClusteringCols; ++i) {
+      // Add the partition-key values as strings for simplicity.
+      Column partCol = colsByPos.get(i);
+      TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
+      resultSchema.addToColumns(colDesc);
+    }
+    resultSchema.addToColumns(new TColumn("#Rows", TPrimitiveType.BIGINT));
+    resultSchema.addToColumns(new TColumn("#Files", TPrimitiveType.BIGINT));
+    resultSchema.addToColumns(new TColumn("Size", TPrimitiveType.STRING));
+    resultSchema.addToColumns(new TColumn("Format", TPrimitiveType.STRING));
+
+    // Pretty print partitions and their stats.
+    ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);
+    Collections.sort(orderedPartitions);
+
+    for (HdfsPartition p: orderedPartitions) {
+      // Ignore dummy default partition.
+      if (p.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) continue;
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+
+      // Add the partition-key values (as strings for simplicity).
+      for (LiteralExpr expr: p.getPartitionValues()) {
+        rowBuilder.add(expr.getStringValue());
+      }
+
+      // Add number of rows, files, bytes and the file format.
+      rowBuilder.add(p.getNumRows()).add(p.getFileDescriptors().size())
+          .addBytes(p.getSize())
+          .add(p.getInputFormatDescriptor().getFileFormat().toString());
+      result.addToRows(rowBuilder.get());
+    }
+
+    // For partitioned tables add a summary row at the bottom.
+    if (numClusteringCols > 0) {
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+      int numEmptyCells = numClusteringCols - 1;
+      rowBuilder.add("Total");
+      for (int i = 0; i < numEmptyCells; ++i) {
+        rowBuilder.add("");
+      }
+
+      // Total num rows, files, and bytes (leave format empty).
+      rowBuilder.add(numRows).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("");
+      result.addToRows(rowBuilder.get());
+    }
+    return result;
   }
 }

@@ -1042,4 +1042,49 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   public void TestUseStatement() {
     Assert.assertTrue(AnalyzesOk("USE functional") instanceof UseStmt);
   }
+
+  @Test
+  public void TestDescribe() throws AnalysisException {
+    AnalyzesOk("describe formatted functional.alltypes");
+    AnalyzesOk("describe functional.alltypes");
+    AnalysisError("describe formatted nodb.alltypes",
+        "Database does not exist: nodb");
+    AnalysisError("describe functional.notbl",
+        "Table does not exist: functional.notbl");
+  }
+
+  @Test
+  public void TestShow() throws AnalysisException {
+    AnalyzesOk("show databases");
+    AnalyzesOk("show databases like '*pattern'");
+
+    AnalyzesOk("show tables");
+    AnalyzesOk("show tables like '*pattern'");
+
+    AnalyzesOk("show functions");
+    AnalyzesOk("show functions like '*pattern'");
+    AnalyzesOk("show functions in functional");
+    AnalyzesOk("show functions in functional like '*pattern'");
+    // Database doesn't exist.
+    AnalysisError("show functions in baddb", "Database does not exist: baddb");
+    AnalysisError("show functions in baddb like '*pattern'",
+        "Database does not exist: baddb");
+  }
+
+  @Test
+  public void TestShowStats() throws AnalysisException {
+    String[] statsQuals = new String[] {"table", "column"};
+    for (String qual : statsQuals) {
+      AnalyzesOk(String.format("show %s stats functional.alltypes", qual));
+      // Database/table doesn't exist.
+      AnalysisError(String.format("show %s stats baddb.alltypes", qual),
+          "Database does not exist: baddb");
+      AnalysisError(String.format("show %s stats functional.badtbl", qual),
+          "Table does not exist: functional.badtbl");
+      // Cannot show stats on a view.
+      AnalysisError(String.format("show %s stats functional.alltypes_view", qual),
+          String.format("SHOW %s STATS not applicable to a view: " +
+              "functional.alltypes_view", qual.toUpperCase()));
+    }
+  }
 }

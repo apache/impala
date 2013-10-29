@@ -43,9 +43,9 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
-import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -780,6 +780,20 @@ public class AuthorizationTest {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
     }
+
+    // Show table/column stats.
+    String[] statsQuals = new String[] { "table", "column" };
+    for (String qual: statsQuals) {
+      AuthzOk(String.format("show %s stats functional.alltypesagg", qual));
+      AuthzOk(String.format("show %s stats functional.alltypes", qual));
+      // User does not have access to db/table.
+      AuthzError(String.format("show %s stats nodb.tbl", qual),
+          "User '%s' does not have privileges to access: nodb.tbl");
+      AuthzError(String.format("show %s stats functional.badtbl", qual),
+          "User '%s' does not have privileges to access: functional.badtbl");
+      AuthzError(String.format("show %s stats functional_rc.alltypes", qual),
+          "User '%s' does not have privileges to access: functional_rc.alltypes");
+    }
   }
 
   @Test
@@ -818,15 +832,16 @@ public class AuthorizationTest {
     req.get_tables_req.setSchemaName("functional");
     // Get all tables
     req.get_tables_req.setTableName("%");
-    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
-    assertEquals(4, resp.results.size());
-    assertEquals("alltypes", resp.results.get(0).colVals.get(2).stringVal.toLowerCase());
+    TResultSet resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(4, resp.rows.size());
+    assertEquals("alltypes",
+        resp.rows.get(0).colVals.get(2).stringVal.toLowerCase());
     assertEquals(
-        "alltypesagg", resp.results.get(1).colVals.get(2).stringVal.toLowerCase());
+        "alltypesagg", resp.rows.get(1).colVals.get(2).stringVal.toLowerCase());
     assertEquals(
-        "complex_view", resp.results.get(2).colVals.get(2).stringVal.toLowerCase());
+        "complex_view", resp.rows.get(2).colVals.get(2).stringVal.toLowerCase());
     assertEquals(
-        "view_view", resp.results.get(3).colVals.get(2).stringVal.toLowerCase());
+        "view_view", resp.rows.get(3).colVals.get(2).stringVal.toLowerCase());
   }
 
   @Test
@@ -837,13 +852,13 @@ public class AuthorizationTest {
     req.get_schemas_req = new TGetSchemasReq();
     // Get all schema (databases).
     req.get_schemas_req.setSchemaName("%");
-    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
+    TResultSet resp = fe.execHiveServer2MetadataOp(req);
     List<String> expectedDbs = Lists.newArrayList("functional",
         "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
-    assertEquals(expectedDbs.size(), resp.results.size());
-    for (int i = 0; i < resp.results.size(); ++i) {
+    assertEquals(expectedDbs.size(), resp.rows.size());
+    for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
-          resp.results.get(i).colVals.get(0).stringVal.toLowerCase());
+          resp.rows.get(i).colVals.get(0).stringVal.toLowerCase());
     }
   }
 
@@ -857,20 +872,20 @@ public class AuthorizationTest {
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
     req.get_columns_req.setColumnName("stri%");
-    TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
-    assertEquals(1, resp.results.size());
+    TResultSet resp = fe.execHiveServer2MetadataOp(req);
+    assertEquals(1, resp.rows.size());
 
     // User does not have permission to access the table, no results should be returned.
     req.get_columns_req.setTableName("alltypesnopart");
     resp = fe.execHiveServer2MetadataOp(req);
-    assertEquals(0, resp.results.size());
+    assertEquals(0, resp.rows.size());
 
     // User does not have permission to access db or table, no results should be
     // returned.
     req.get_columns_req.setSchemaName("functional_seq_gzip");
     req.get_columns_req.setTableName("alltypes");
     resp = fe.execHiveServer2MetadataOp(req);
-    assertEquals(0, resp.results.size());
+    assertEquals(0, resp.rows.size());
   }
 
   @Test

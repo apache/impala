@@ -29,19 +29,19 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TFunctionType;
-import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.google.common.collect.Lists;
 
 /**
  * Metadata operation. It contains static methods to execute HiveServer2 metadata
  * operations and return the results, result schema and an unique request id in
- * TMetadataOpResponse.
+ * TResultSet.
  */
 public class MetadataOp {
   private static final Logger LOG = LoggerFactory.getLogger(MetadataOp.class);
@@ -77,123 +77,123 @@ public class MetadataOp {
    * Initialize result set schema for each of the HiveServer2 operations
    */
   private static void initialzeResultSetSchemas() {
-    GET_CATALOGS_MD.addToColumnDescs(new TColumnDesc("TABLE_CAT", TPrimitiveType.STRING));
+    GET_CATALOGS_MD.addToColumns(new TColumn("TABLE_CAT", TPrimitiveType.STRING));
 
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_CAT", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_MD", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_NAME", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("COLUMN_NAME", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("DATA_TYPE", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("TYPE_NAME", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("COLUMN_SIZE", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("BUFFER_LENGTH", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("DECIMAL_DIGITS", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("NUM_PREC_RADIX", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("NULLABLE", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("REMARKS", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("COLUMN_DEF", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SQL_DATA_TYPE", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SQL_DATETIME_SUB", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("CHAR_OCTET_LENGTH", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("ORDINAL_POSITION", TPrimitiveType.INT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("IS_NULLABLE", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SCOPE_CATALOG", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SCOPE_SCHEMA", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SCOPE_TABLE", TPrimitiveType.STRING));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("SOURCE_DATA_TYPE", TPrimitiveType.SMALLINT));
-    GET_COLUMNS_MD.addToColumnDescs(
-        new TColumnDesc("IS_AUTO_INCREMENT", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("TABLE_CAT", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("TABLE_MD", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("TABLE_NAME", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("COLUMN_NAME", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("DATA_TYPE", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("TYPE_NAME", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("COLUMN_SIZE", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("BUFFER_LENGTH", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("DECIMAL_DIGITS", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("NUM_PREC_RADIX", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("NULLABLE", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("REMARKS", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("COLUMN_DEF", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SQL_DATA_TYPE", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SQL_DATETIME_SUB", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("CHAR_OCTET_LENGTH", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("ORDINAL_POSITION", TPrimitiveType.INT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("IS_NULLABLE", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SCOPE_CATALOG", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SCOPE_SCHEMA", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SCOPE_TABLE", TPrimitiveType.STRING));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("SOURCE_DATA_TYPE", TPrimitiveType.SMALLINT));
+    GET_COLUMNS_MD.addToColumns(
+        new TColumn("IS_AUTO_INCREMENT", TPrimitiveType.STRING));
 
-    GET_SCHEMAS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_SCHEM", TPrimitiveType.STRING));
-    GET_SCHEMAS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_CATALOG", TPrimitiveType.STRING));
+    GET_SCHEMAS_MD.addToColumns(
+        new TColumn("TABLE_SCHEM", TPrimitiveType.STRING));
+    GET_SCHEMAS_MD.addToColumns(
+        new TColumn("TABLE_CATALOG", TPrimitiveType.STRING));
 
-    GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_CAT", TPrimitiveType.STRING));
-    GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_SCHEM", TPrimitiveType.STRING));
-    GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_NAME", TPrimitiveType.STRING));
-    GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_TYPE", TPrimitiveType.STRING));
-    GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("REMARKS", TPrimitiveType.STRING));
+    GET_TABLES_MD.addToColumns(
+        new TColumn("TABLE_CAT", TPrimitiveType.STRING));
+    GET_TABLES_MD.addToColumns(
+        new TColumn("TABLE_SCHEM", TPrimitiveType.STRING));
+    GET_TABLES_MD.addToColumns(
+        new TColumn("TABLE_NAME", TPrimitiveType.STRING));
+    GET_TABLES_MD.addToColumns(
+        new TColumn("TABLE_TYPE", TPrimitiveType.STRING));
+    GET_TABLES_MD.addToColumns(
+        new TColumn("REMARKS", TPrimitiveType.STRING));
 
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("TYPE_NAME", TPrimitiveType.STRING));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("DATA_TYPE", TPrimitiveType.INT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("PRECISION", TPrimitiveType.INT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("LITERAL_PREFIX", TPrimitiveType.STRING));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("LITERAL_SUFFIX", TPrimitiveType.STRING));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("CREATE_PARAMS", TPrimitiveType.STRING));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("NULLABLE", TPrimitiveType.INT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("CASE_SENSITIVE", TPrimitiveType.BOOLEAN));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("SEARCHABLE", TPrimitiveType.SMALLINT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("UNSIGNED_ATTRIBUTE", TPrimitiveType.BOOLEAN));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("FIXED_PREC_SCALE", TPrimitiveType.BOOLEAN));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("AUTO_INCREMENT", TPrimitiveType.BOOLEAN));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("LOCAL_TYPE_NAME", TPrimitiveType.STRING));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("MINIMUM_SCALE", TPrimitiveType.SMALLINT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("MAXIMUM_SCALE", TPrimitiveType.SMALLINT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("SQL_DATA_TYPE", TPrimitiveType.INT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("SQL_DATETIME_SUB", TPrimitiveType.INT));
-    GET_TYPEINFO_MD.addToColumnDescs(
-        new TColumnDesc("NUM_PREC_RADIX", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("TYPE_NAME", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("DATA_TYPE", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("PRECISION", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("LITERAL_PREFIX", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("LITERAL_SUFFIX", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("CREATE_PARAMS", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("NULLABLE", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("CASE_SENSITIVE", TPrimitiveType.BOOLEAN));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("SEARCHABLE", TPrimitiveType.SMALLINT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("UNSIGNED_ATTRIBUTE", TPrimitiveType.BOOLEAN));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("FIXED_PREC_SCALE", TPrimitiveType.BOOLEAN));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("AUTO_INCREMENT", TPrimitiveType.BOOLEAN));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("LOCAL_TYPE_NAME", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("MINIMUM_SCALE", TPrimitiveType.SMALLINT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("MAXIMUM_SCALE", TPrimitiveType.SMALLINT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("SQL_DATA_TYPE", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("SQL_DATETIME_SUB", TPrimitiveType.INT));
+    GET_TYPEINFO_MD.addToColumns(
+        new TColumn("NUM_PREC_RADIX", TPrimitiveType.INT));
 
-    GET_TABLE_TYPES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_TYPE", TPrimitiveType.STRING));
+    GET_TABLE_TYPES_MD.addToColumns(
+        new TColumn("TABLE_TYPE", TPrimitiveType.STRING));
 
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("FUNCTION_CAT", TPrimitiveType.STRING));
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("FUNCTION_SCHEM", TPrimitiveType.STRING));
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("FUNCTION_NAME", TPrimitiveType.STRING));
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("REMARKS", TPrimitiveType.STRING));
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("FUNCTION_TYPE", TPrimitiveType.INT));
-    GET_FUNCTIONS_MD.addToColumnDescs(
-        new TColumnDesc("SPECIFIC_NAME", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("FUNCTION_CAT", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("FUNCTION_SCHEM", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("FUNCTION_NAME", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("REMARKS", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("FUNCTION_TYPE", TPrimitiveType.INT));
+    GET_FUNCTIONS_MD.addToColumns(
+        new TColumn("SPECIFIC_NAME", TPrimitiveType.STRING));
   }
 
   /**
@@ -302,24 +302,24 @@ public class MetadataOp {
   }
 
   /**
-   * Executes the GetCatalogs HiveServer2 operation and returns TMetadataOpResponse.
+   * Executes the GetCatalogs HiveServer2 operation and returns TResultSet.
    * Hive does not have a catalog concept. It always returns an empty result set.
    */
-  public static TMetadataOpResponse getCatalogs() {
-    return createEmptyMetadataOpResponse(GET_CATALOGS_MD);
+  public static TResultSet getCatalogs() {
+    return createEmptyResultSet(GET_CATALOGS_MD);
   }
 
   /**
-   * Executes the GetColumns HiveServer2 operation and returns TMetadataOpResponse.
+   * Executes the GetColumns HiveServer2 operation and returns TResultSet.
    * It queries the Impala catalog to return the list of table columns that fit the
    * search patterns.
    * catalogName, schemaName, tableName and columnName are JDBC search patterns.
    */
-  public static TMetadataOpResponse getColumns(ImpaladCatalog catalog,
+  public static TResultSet getColumns(ImpaladCatalog catalog,
       String catalogName, String schemaName, String tableName, String columnName,
       User user)
       throws ImpalaException {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
+    TResultSet result = createEmptyResultSet(GET_COLUMNS_MD);
 
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
@@ -361,23 +361,23 @@ public class MetadataOp {
           row.colVals.add(NULL_COL_VAL); // SCOPE_TABLE
           row.colVals.add(NULL_COL_VAL); // SOURCE_DATA_TYPE
           row.colVals.add(createTColumnValue("NO")); // IS_AUTO_INCREMENT
-          result.results.add(row);
+          result.rows.add(row);
         }
       }
     }
-    LOG.debug("Returning " + result.results.size() + " table columns");
+    LOG.debug("Returning " + result.rows.size() + " table columns");
     return result;
   }
 
   /**
-   * Executes the GetSchemas HiveServer2 operation and returns TMetadataOpResponse.
+   * Executes the GetSchemas HiveServer2 operation and returns TResultSet.
    * It queries the Impala catalog to return the list of schemas that fit the search
    * pattern.
    * catalogName and schemaName are JDBC search patterns.
    */
-  public static TMetadataOpResponse getSchemas(ImpaladCatalog catalog,
+  public static TResultSet getSchemas(ImpaladCatalog catalog,
       String catalogName, String schemaName, User user) throws ImpalaException {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_SCHEMAS_MD);
+    TResultSet result = createEmptyResultSet(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
@@ -389,24 +389,24 @@ public class MetadataOp {
       row.colVals = Lists.newArrayList();
       row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEM
       row.colVals.add(EMPTY_COL_VAL); // default Hive catalog is an empty string.
-      result.results.add(row);
+      result.rows.add(row);
     }
 
-    LOG.debug("Returning " + result.results.size() + " schemas");
+    LOG.debug("Returning " + result.rows.size() + " schemas");
     return result;
   }
 
   /**
-   * Executes the GetTables HiveServer2 operation and returns TMetadataOpResponse.
+   * Executes the GetTables HiveServer2 operation and returns TResultSet.
    * It queries the Impala catalog to return the list of tables that fit the search
    * patterns.
    * catalogName, schemaName and tableName are JDBC search patterns.
    * tableTypes specifies which table types to search for (TABLE, VIEW, etc).
    */
-  public static TMetadataOpResponse getTables(ImpaladCatalog catalog, String catalogName,
+  public static TResultSet getTables(ImpaladCatalog catalog, String catalogName,
       String schemaName, String tableName, List<String> tableTypes, User user)
           throws ImpalaException{
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLES_MD);
+    TResultSet result = createEmptyResultSet(GET_TABLES_MD);
 
     // Impala catalog only contains TABLE. Returns an empty set if the search does not
     // include TABLE.
@@ -439,28 +439,28 @@ public class MetadataOp {
         row.colVals.add(TABLE_TYPE_COL_VAL);
         // TODO: Return table comments when it is available in the Impala catalog.
         row.colVals.add(EMPTY_COL_VAL);
-        result.results.add(row);
+        result.rows.add(row);
       }
     }
-    LOG.debug("Returning " + result.results.size() + " tables");
+    LOG.debug("Returning " + result.rows.size() + " tables");
     return result;
   }
 
   /**
    * Executes the GetTypeInfo HiveServer2 operation and returns Impala supported types.
    */
-  public static TMetadataOpResponse getTypeInfo() {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TYPEINFO_MD);
-    result.results = GET_TYPEINFO_RESULTS;
+  public static TResultSet getTypeInfo() {
+    TResultSet result = createEmptyResultSet(GET_TYPEINFO_MD);
+    result.rows = GET_TYPEINFO_RESULTS;
     return result;
   }
 
   /**
    * Executes the GetTableTypes HiveServer2 operation.
    */
-  public static TMetadataOpResponse getTableTypes() {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLE_TYPES_MD);
-    result.results = GET_TABLE_TYPES_RESULTS;
+  public static TResultSet getTableTypes() {
+    TResultSet result = createEmptyResultSet(GET_TABLE_TYPES_MD);
+    result.rows = GET_TABLE_TYPES_RESULTS;
     return result;
   }
 
@@ -478,15 +478,15 @@ public class MetadataOp {
   }
 
   /**
-   * Executes the GetFunctions HiveServer2 operation and returns TMetadataOpResponse.
+   * Executes the GetFunctions HiveServer2 operation and returns TResultSet.
    * Returns the list of functions that fit the search patterns.
    * catalogName, schemaName and functionName are JDBC search patterns.
    * @throws ImpalaException
    */
-  public static TMetadataOpResponse getFunctions(ImpaladCatalog catalog,
+  public static TResultSet getFunctions(ImpaladCatalog catalog,
       String catalogName, String schemaName, String functionName,
       User user) throws ImpalaException {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_FUNCTIONS_MD);
+    TResultSet result = createEmptyResultSet(GET_FUNCTIONS_MD);
 
     // Impala's built-in functions do not have a catalog name or schema name.
     if (!isEmptyPattern(catalogName) || !isEmptyPattern(schemaName)) {
@@ -497,14 +497,14 @@ public class MetadataOp {
 
     for (String builtinFn: OpcodeRegistry.instance().getFunctionNames()) {
       if (!functionPattern.matcher(builtinFn).matches()) continue;
-      result.results.add(createFunctionResultRow(builtinFn));
+      result.rows.add(createFunctionResultRow(builtinFn));
     }
 
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
         schemaName, null, null, functionName, user);
     for (List<String> fns: dbsMetadata.functions) {
       for (String fn: fns) {
-        result.results.add(createFunctionResultRow(fn));
+        result.rows.add(createFunctionResultRow(fn));
       }
     }
 
@@ -557,14 +557,13 @@ public class MetadataOp {
   }
 
   /**
-   * Returns an TMetadataOpResponse with the specified schema. The
+   * Returns an TResultSet with the specified schema. The
    * result set will be empty.
    */
-  private static TMetadataOpResponse createEmptyMetadataOpResponse(
-      TResultSetMetadata metadata) {
-    TMetadataOpResponse result = new TMetadataOpResponse();
-    result.results = Lists.newArrayList();
-    result.result_set_metadata = metadata;
+  private static TResultSet createEmptyResultSet(TResultSetMetadata metadata) {
+    TResultSet result = new TResultSet();
+    result.rows = Lists.newArrayList();
+    result.schema = metadata;
     return result;
   }
 

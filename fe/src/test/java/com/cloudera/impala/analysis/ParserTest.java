@@ -1137,12 +1137,8 @@ public class ParserTest {
 
   @Test
   public void TestShow() {
-    // Missing arguments
-    ParserError("SHOW");
     // Short form ok
     ParsesOk("SHOW TABLES");
-    // Malformed pattern (no quotes)
-    ParserError("SHOW TABLES tablename");
     // Well-formed pattern
     ParsesOk("SHOW TABLES 'tablename|othername'");
     // Empty pattern ok
@@ -1166,7 +1162,26 @@ public class ParserTest {
     ParsesOk("SHOW AGGREGATE FUNCTIONS in DB LIKE 'pattern'");
     ParsesOk("SHOW AGGREGATE FUNCTIONS in DB");
 
+    // Show table/column stats.
+    ParsesOk("SHOW TABLE STATS tbl");
+    ParsesOk("SHOW TABLE STATS db.tbl");
+    ParsesOk("SHOW TABLE STATS `db`.`tbl`");
+    ParsesOk("SHOW COLUMN STATS tbl");
+    ParsesOk("SHOW COLUMN STATS db.tbl");
+    ParsesOk("SHOW COLUMN STATS `db`.`tbl`");
+
+    // Missing arguments
+    ParserError("SHOW");
+    // Malformed pattern (no quotes)
+    ParserError("SHOW TABLES tablename");
     ParserError("SHOW UNKNOWN FUNCTIONS");
+    // Missing table/column qualifier.
+    ParserError("SHOW STATS tbl");
+    // Missing table.
+    ParserError("SHOW TABLE STATS");
+    ParserError("SHOW COLUMN STATS");
+    // String literal not accepted.
+    ParserError("SHOW TABLE STATS 'strlit'");
   }
 
   @Test

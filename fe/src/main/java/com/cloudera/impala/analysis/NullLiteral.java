@@ -55,4 +55,10 @@ public class NullLiteral extends LiteralExpr {
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.NULL_LITERAL;
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    if (!(o instanceof NullLiteral)) return -1;
+    return 0;
+  }
 }

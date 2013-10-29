@@ -242,18 +242,18 @@ smallint, int, tinyint, int, int, float, string
 # joins on empty tables
 select * from emptytable t1 join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
-int, string, int, string
+string, int, string, int
 ---- RESULTS
 ====
 ---- QUERY
 select * from emptytable t1 join greptiny t2 on (t1.field=t2.field)
 ---- TYPES
-int, string, string
+string, int, string
 ---- RESULTS
 ====
 ---- QUERY
 select * from greptiny t1 join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
-string, int, string
+string, string, int
 ---- RESULTS
 ====

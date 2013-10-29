@@ -10,14 +10,14 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 # limit 0 on hbase table
 select * from functional_hbase.alltypessmall where string_col = '4' limit 0
 ---- TYPES
-int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
 ---- RESULTS
 ====
 ---- QUERY
 # limit 0 with arithmetic expr
 select * from functional_hbase.alltypessmall where string_col = '4' limit 3 % 3
 ---- TYPES
-int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
 ---- RESULTS
 ====
 ---- QUERY

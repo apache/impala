@@ -73,6 +73,9 @@ class Frontend {
   Status GetDbNames(const std::string* pattern, const TSessionState* session,
       TGetDbsResult* table_names);
 
+  // Call FE to get the table/column stats.
+  Status GetStats(const TShowStatsParams& params, TResultSet* result);
+
   // Return all functions of 'type' that match the optional argument 'pattern'.
   // If pattern is NULL match all functions, otherwise match only those functions that
   // match the pattern string.
@@ -106,7 +109,7 @@ class Frontend {
 
   // Calls FE to execute HiveServer2 metadata operation.
   Status ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
-                                   TMetadataOpResponse* result);
+      TResultSet* result);
 
   // Writes a table of all Hadoop configurations, either in text or as HTML per the
   // as_text parameter, to the output stringstream.
@@ -133,6 +136,7 @@ class Frontend {
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
+  jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp

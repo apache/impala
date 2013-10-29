@@ -28,8 +28,8 @@ import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.ViewRef;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.thrift.TTableDescriptor;
+import com.cloudera.impala.thrift.TTableType;
 
 /**
  * Table metadata representing a view.

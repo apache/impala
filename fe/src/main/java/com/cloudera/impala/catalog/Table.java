@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
@@ -30,10 +31,10 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
-import com.cloudera.impala.thrift.TTableStatsData;
+import com.cloudera.impala.thrift.TTableStats;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -186,6 +187,38 @@ public abstract class Table implements CatalogObject {
   }
 
   /**
+   * Loads the column stats for col from the Hive Metastore.
+   */
+  protected void loadColumnStats(Column col, HiveMetaStoreClient client) {
+    ColumnStatistics colStats = null;
+    try {
+      colStats = client.getTableColumnStatistics(db.getName(), name, col.getName());
+    } catch (Exception e) {
+      // don't try to load stats for this column
+      return;
+    }
+
+    // we should never see more than one ColumnStatisticsObj here
+    if (colStats.getStatsObj().size() > 1) return;
+
+    if (!ColumnStats.isSupportedColType(col.getType())) {
+      LOG.warn(String.format("Column stats are available for table %s / " +
+          "column '%s', but Impala does not currently support column stats for this " +
+          "type of column (%s)",  name, col.getName(), col.getType().toString()));
+      return;
+    }
+
+    // Update the column stats data
+    if (!col.updateStats(colStats.getStatsObj().get(0).getStatsData())) {
+      LOG.warn(String.format("Applying the column stats update to table %s / " +
+          "column '%s' did not succeed because column type (%s) was not compatible " +
+          "with the column stats data. Performance may suffer until column stats are" +
+          " regenerated for this column.",
+          name, col.getName(), col.getType().toString()));
+    }
+  }
+
+  /**
    * Returns the value of the ROW_COUNT constant, or -1 if not found.
    */
   protected static long getRowCount(Map<String, String> parameters) {
@@ -234,14 +267,16 @@ public abstract class Table implements CatalogObject {
   }
 
   public void loadFromThrift(TTable thriftTable) throws TableLoadingException {
-    List<TColumnDesc> columns = new ArrayList<TColumnDesc>();
+    List<TColumn> columns = new ArrayList<TColumn>();
     columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
 
     fields = new ArrayList<FieldSchema>();
+    colsByPos.clear();
+    colsByPos.ensureCapacity(columns.size());
     for (int i = 0; i < columns.size(); ++i) {
-      Column col = Column.fromThrift(columns.get(i), i);
-      colsByPos.add(col);
+      Column col = Column.fromThrift(columns.get(i));
+      colsByPos.add(col.getPosition(), col);
       colsByName.put(col.getName().toLowerCase(), col);
       fields.add(new FieldSchema(col.getName(),
         col.getType().toString().toLowerCase(), col.getComment()));
@@ -264,10 +299,10 @@ public abstract class Table implements CatalogObject {
     table.setAccess_level(accessLevel);
 
     // Populate both regular columns and clustering columns (if there are any).
-    table.setColumns(new ArrayList<TColumnDesc>());
-    table.setClustering_columns(new ArrayList<TColumnDesc>());
+    table.setColumns(new ArrayList<TColumn>());
+    table.setClustering_columns(new ArrayList<TColumn>());
     for (int i = 0; i < colsByPos.size(); ++i) {
-      TColumnDesc colDesc = colsByPos.get(i).toThrift();
+      TColumn colDesc = colsByPos.get(i).toThrift();
       // Clustering columns come first.
       if (i < numClusteringCols) {
         table.addToClustering_columns(colDesc);
@@ -278,7 +313,7 @@ public abstract class Table implements CatalogObject {
 
     table.setMetastore_table(getMetaStoreTable());
     if (numRows != -1) {
-      table.setTable_stats(new TTableStatsData());
+      table.setTable_stats(new TTableStats());
       table.getTable_stats().setNum_rows(numRows);
     }
     return table;

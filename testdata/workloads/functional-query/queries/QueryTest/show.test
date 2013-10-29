@@ -207,3 +207,159 @@ show databases like 'functional'
 ---- TYPES
 STRING
 ====
+---- QUERY
+show databases like 'functional'
+---- RESULTS
+'functional'
+---- TYPES
+STRING
+====
+---- QUERY
+# Stats on a partitioned Hdfs table stored as text
+show table stats alltypes
+---- RESULTS
+2009,1,310,1,'19.95KB','TEXT'
+2009,2,280,1,'18.12KB','TEXT'
+2009,3,310,1,'20.06KB','TEXT'
+2009,4,300,1,'19.61KB','TEXT'
+2009,5,310,1,'20.36KB','TEXT'
+2009,6,300,1,'19.71KB','TEXT'
+2009,7,310,1,'20.36KB','TEXT'
+2009,8,310,1,'20.36KB','TEXT'
+2009,9,300,1,'19.71KB','TEXT'
+2009,10,310,1,'20.36KB','TEXT'
+2009,11,300,1,'19.71KB','TEXT'
+2009,12,310,1,'20.36KB','TEXT'
+2010,1,310,1,'20.36KB','TEXT'
+2010,2,280,1,'18.39KB','TEXT'
+2010,3,310,1,'20.36KB','TEXT'
+2010,4,300,1,'19.71KB','TEXT'
+2010,5,310,1,'20.36KB','TEXT'
+2010,6,300,1,'19.71KB','TEXT'
+2010,7,310,1,'20.36KB','TEXT'
+2010,8,310,1,'20.36KB','TEXT'
+2010,9,300,1,'19.71KB','TEXT'
+2010,10,310,1,'20.36KB','TEXT'
+2010,11,300,1,'19.71KB','TEXT'
+2010,12,310,1,'20.36KB','TEXT'
+Total,,7300,24,'478.45KB',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Stats on an unpartitioned Hdfs table stored as text
+show table stats alltypesaggmultifilesnopart
+---- LABELS
+#ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+10000,4,'734.18KB','TEXT'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Stats on an Hdfs with mixed partition formats
+show table stats alltypesmixedformat
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+2009,1,310,1,'19.59KB','TEXT'
+2009,2,0,1,'21.35KB','SEQUENCE_FILE'
+2009,3,0,1,'17.42KB','RC_FILE'
+Total,,310,3,'58.36KB',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Stats on a table that has no statistics
+show table stats functional_parquet.alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+2009,1,-1,1,'6.61KB','PARQUET'
+2009,2,-1,1,'6.15KB','PARQUET'
+2009,3,-1,1,'6.61KB','PARQUET'
+2009,4,-1,1,'6.47KB','PARQUET'
+2009,5,-1,1,'6.61KB','PARQUET'
+2009,6,-1,1,'6.47KB','PARQUET'
+2009,7,-1,1,'6.61KB','PARQUET'
+2009,8,-1,1,'6.60KB','PARQUET'
+2009,9,-1,1,'6.47KB','PARQUET'
+2009,10,-1,1,'6.61KB','PARQUET'
+2009,11,-1,1,'6.47KB','PARQUET'
+2009,12,-1,1,'6.60KB','PARQUET'
+2010,1,-1,1,'6.61KB','PARQUET'
+2010,2,-1,1,'6.15KB','PARQUET'
+2010,3,-1,1,'6.62KB','PARQUET'
+2010,4,-1,1,'6.47KB','PARQUET'
+2010,5,-1,1,'6.61KB','PARQUET'
+2010,6,-1,1,'6.47KB','PARQUET'
+2010,7,-1,1,'6.61KB','PARQUET'
+2010,8,-1,1,'6.61KB','PARQUET'
+2010,9,-1,1,'6.47KB','PARQUET'
+2010,10,-1,1,'6.61KB','PARQUET'
+2010,11,-1,1,'6.47KB','PARQUET'
+2010,12,-1,1,'6.61KB','PARQUET'
+Total,,-1,24,'156.57KB',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+# Stats on an HBase table
+show table stats functional_hbase.alltypesagg
+---- LABELS
+REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
+---- RESULTS: VERIFY_IS_EQUAL
+regex:.+,'',4,'1.18KB'
+regex:.+,'1',4044,'1.09MB'
+regex:.+,'3',4021,'1.09MB'
+regex:.+,'5',4041,'1.09MB'
+regex:.+,'7',4039,'1.09MB'
+regex:.+,'9',2014,'561.71KB'
+'Total','',18163,'4.93MB'
+---- TYPES
+STRING, STRING, BIGINT, STRING
+====
+---- QUERY
+# Column stats on an HdfsTable
+show column stats alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',9299,0,4,4
+'bool_col','BOOLEAN',-1,0,1,1
+'tinyint_col','TINYINT',11,0,1,1
+'smallint_col','SMALLINT',11,0,2,2
+'int_col','INT',11,0,4,4
+'bigint_col','BIGINT',7,0,8,8
+'float_col','FLOAT',15,0,4,4
+'double_col','DOUBLE',11,0,8,8
+'date_string_col','STRING',822,0,8,8
+'string_col','STRING',9,0,1,1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Column stats on an HBaseTable
+show column stats functional_hbase.alltypessmall
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',63,0,4,4
+'bigint_col','BIGINT',7,0,8,8
+'bool_col','BOOLEAN',-1,0,1,1
+'date_string_col','STRING',12,0,8,8
+'double_col','DOUBLE',11,0,8,8
+'float_col','FLOAT',15,0,4,4
+'int_col','INT',11,0,4,4
+'month','INT',5,0,4,4
+'smallint_col','SMALLINT',11,0,2,2
+'string_col','STRING',9,0,1,1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'tinyint_col','TINYINT',11,0,1,1
+'year','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====

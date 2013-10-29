@@ -66,4 +66,13 @@ public class BoolLiteral extends LiteralExpr {
     msg.node_type = TExprNodeType.BOOL_LITERAL;
     msg.bool_literal = new TBoolLiteral(value);
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    if (!(o instanceof BoolLiteral)) return -1;
+    BoolLiteral other = (BoolLiteral) o;
+    if (value && !other.getValue()) return 1;
+    if (!value && other.getValue()) return -1;
+    return 0;
+  }
 }

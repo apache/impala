@@ -232,6 +232,17 @@ public class AuditingTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestShowStats() throws AnalysisException, AuthorizationException{
+    String[] statsQuals = new String[]{ "table", "column" };
+    for (String qual: statsQuals) {
+      List<TAccessEvent> accessEvents =
+          AnalyzeAccessEvents(String.format("show %s stats functional.alltypes", qual));
+      Assert.assertEquals(accessEvents, Lists.newArrayList(new TAccessEvent(
+          "functional.alltypes", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+    }
+  }
+
+  @Test
   public void TestLoad() throws AuthorizationException, AnalysisException {
     List<TAccessEvent> accessEvents = AnalyzeAccessEvents("load data inpath " +
         "'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +

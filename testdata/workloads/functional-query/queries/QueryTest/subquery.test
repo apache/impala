@@ -326,6 +326,7 @@ select * from (select y from (select 1 y) a where y < 10) b
 ---- TYPES
 tinyint
 ---- RESULTS
+1
 ====
 ---- QUERY
 # Constant selects in subqueries

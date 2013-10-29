@@ -105,4 +105,9 @@ class DateLiteral extends LiteralExpr {
     Preconditions.checkState(false);
     return this;
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    throw new IllegalStateException("DateLiteral is not supported.");
+  }
 }

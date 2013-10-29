@@ -114,4 +114,13 @@ public class IntLiteral extends LiteralExpr {
   public void swapSign() throws NotImplementedException {
     value = value.negate();
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    if (!(o instanceof IntLiteral)) return -1;
+    IntLiteral other = (IntLiteral) o;
+    if (getValue() > other.getValue()) return 1;
+    if (getValue() < other.getValue()) return -1;
+    return 0;
+  }
 }

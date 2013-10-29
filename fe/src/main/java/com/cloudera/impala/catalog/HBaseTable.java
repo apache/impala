@@ -46,10 +46,15 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.THBaseTable;
+import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
 
 /**
@@ -222,19 +227,6 @@ public class HBaseTable extends Table {
   @Override
   public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    loadInternal();
-  }
-
-  @Override
-  public void loadFromThrift(TTable table) throws TableLoadingException {
-    super.loadFromThrift(table);
-    loadInternal();
-  }
-
-  /**
-   * Populates the all member variables.
-   */
-  private void loadInternal() throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
     try {
       hbaseTableName = getHBaseTableName(getMetaStoreTable());
@@ -282,6 +274,8 @@ public class HBaseTable extends Table {
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
             getPrimitiveType(s.getType()), s.getComment(), -1);
         tmpCols.add(col);
+        // Load column stats from the Hive metastore into col.
+        loadColumnStats(col, client);
       }
 
       // HBase columns are ordered by columnFamily,columnQualifier,
@@ -306,6 +300,18 @@ public class HBaseTable extends Table {
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " + name,
           e);
+    }
+  }
+
+  @Override
+  public void loadFromThrift(TTable table) throws TableLoadingException {
+    super.loadFromThrift(table);
+    try {
+      hbaseTableName = getHBaseTableName(getMetaStoreTable());
+      hTable = new HTable(hbaseConf, hbaseTableName);
+    } catch (Exception e) {
+      throw new TableLoadingException("Failed to load metadata for HBase table from " +
+          "thrift table: " + name, e);
     }
   }
 
@@ -353,10 +359,6 @@ public class HBaseTable extends Table {
     boolean isCompressed = false;
 
     try {
-      Path tableDir = HTableDescriptor.getTableDir(
-          FSUtils.getRootDir(hbaseConf), Bytes.toBytes(hbaseTableName));
-      FileSystem fs = tableDir.getFileSystem(hbaseConf);
-
       // Check to see if things are compressed.
       // If they are we'll estimate a compression factor.
       HColumnDescriptor[] families =
@@ -374,8 +376,7 @@ public class HBaseTable extends Table {
 
         HRegionInfo info = location.getRegionInfo();
         // Get the size on hdfs
-        Path regionDir = tableDir.suffix("/" + info.getEncodedName());
-        currentHdfsSize += fs.getContentSummary(regionDir).getLength();
+        currentHdfsSize += getHdfsSize(info);
 
         Scan s = new Scan(info.getStartKey());
         // Get a small sample of rows
@@ -436,6 +437,17 @@ public class HBaseTable extends Table {
   }
 
   /**
+   * Returns the Hdfs size of the given region in bytes.
+   */
+  public long getHdfsSize(HRegionInfo info) throws IOException {
+    Path tableDir = HTableDescriptor.getTableDir(
+        FSUtils.getRootDir(hbaseConf), Bytes.toBytes(hbaseTableName));
+    FileSystem fs = tableDir.getFileSystem(hbaseConf);
+    Path regionDir = tableDir.suffix("/" + info.getEncodedName());
+    return fs.getContentSummary(regionDir).getLength();
+  }
+
+  /**
    * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
@@ -451,6 +463,8 @@ public class HBaseTable extends Table {
   }
 
   public String getHBaseTableName() { return hbaseTableName; }
+  public HTable getHTable() { return hTable; }
+  public static Configuration getHBaseConf() { return hbaseConf; }
 
   @Override
   public int getNumNodes() {
@@ -507,13 +521,16 @@ public class HBaseTable extends Table {
     }
     final List<HRegionLocation> regionList = new ArrayList<HRegionLocation>();
     byte[] currentKey = startKey;
-    do {
-      // always reload region location info.
-      HRegionLocation regionLocation = hbaseTbl.getRegionLocation(currentKey, true);
-      regionList.add(regionLocation);
-      currentKey = regionLocation.getRegionInfo().getEndKey();
-    } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
-             (endKeyIsEndOfTable || Bytes.compareTo(currentKey, endKey) < 0));
+    // Make sure only one thread is accessing the hbaseTbl.
+    synchronized(hbaseTbl) {
+      do {
+        // always reload region location info.
+        HRegionLocation regionLocation = hbaseTbl.getRegionLocation(currentKey, true);
+        regionList.add(regionLocation);
+        currentKey = regionLocation.getRegionInfo().getEndKey();
+      } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
+          (endKeyIsEndOfTable || Bytes.compareTo(currentKey, endKey) < 0));
+    }
     return regionList;
   }
 
@@ -521,4 +538,57 @@ public class HBaseTable extends Table {
    * Returns the input-format class string for HBase tables read by Hive.
    */
   public static String getInputFormat() { return hbaseInputFormat; }
+
+  /**
+   * Returns statistics on this table as a tabular result set. Used for the
+   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
+   * inside this method.
+   */
+  public TResultSet getTableStats() {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata resultSchema = new TResultSetMetadata();
+    result.setSchema(resultSchema);
+    resultSchema.addToColumns(new TColumn("Region Location", TPrimitiveType.STRING));
+    resultSchema.addToColumns(new TColumn("Start RowKey",
+        TPrimitiveType.STRING));
+    resultSchema.addToColumns(new TColumn("Est. #Rows", TPrimitiveType.BIGINT));
+    resultSchema.addToColumns(new TColumn("Size", TPrimitiveType.STRING));
+
+    // TODO: Consider fancier stats maintenance techniques for speeding up this process.
+    // Currently, we list all regions and perform a mini-scan of each of them to
+    // estimate the number of rows, the data size, etc., which is rather expensive.
+    try {
+      long totalNumRows = 0;
+      long totalHdfsSize = 0;
+      List<HRegionLocation> regions = HBaseTable.getRegionsInRange(hTable,
+          HConstants.EMPTY_END_ROW, HConstants.EMPTY_START_ROW);
+      for (HRegionLocation region: regions) {
+        TResultRowBuilder rowBuilder = new TResultRowBuilder();
+        HRegionInfo regionInfo = region.getRegionInfo();
+        Pair<Long, Long> estRowStats = getEstimatedRowStats(regionInfo.getStartKey(),
+            regionInfo.getEndKey());
+
+        long numRows = estRowStats.first.longValue();
+        long hdfsSize = getHdfsSize(regionInfo);
+        totalNumRows += numRows;
+        totalHdfsSize += hdfsSize;
+
+        // Add the region location, start rowkey, number of rows and raw Hdfs size.
+        rowBuilder.add(String.valueOf(region.getHostname()))
+            .add(Bytes.toString(regionInfo.getStartKey())).add(numRows)
+            .addBytes(hdfsSize);
+        result.addToRows(rowBuilder.get());
+      }
+
+      // Total num rows and raw Hdfs size.
+      if (regions.size() > 1) {
+        TResultRowBuilder rowBuilder = new TResultRowBuilder();
+        rowBuilder.add("Total").add("").add(totalNumRows).addBytes(totalHdfsSize);
+        result.addToRows(rowBuilder.get());
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return result;
+  }
 }

@@ -34,15 +34,19 @@ import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TTableStats;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
- * Query-relevant information for one table partition.
+ * Query-relevant information for one table partition. Partitions are comparable
+ * based on their partition-key values. The comparison orders partitions in ascending
+ * order with NULLs sorting last. The ordering is useful for displaying partitions
+ * in SHOW statements.
  */
-public class HdfsPartition {
+public class HdfsPartition implements Comparable<HdfsPartition> {
   /**
    * Metadata for a single file in this partition.
    * TODO: Do we even need this class? Just get rid of it and use the Thrift version?
@@ -395,8 +399,12 @@ public class HdfsPartition {
     }
     TAccessLevel accessLevel = thriftPartition.isSetAccess_level() ?
         thriftPartition.getAccess_level() : TAccessLevel.READ_WRITE;
-    return new HdfsPartition(table, null, literalExpr, storageDesc, fileDescriptors, id,
-        thriftPartition.getLocation(), accessLevel);
+    HdfsPartition partition = new HdfsPartition(table, null, literalExpr, storageDesc,
+        fileDescriptors, id, thriftPartition.getLocation(), accessLevel);
+    if (thriftPartition.isSetStats()) {
+      partition.setNumRows(thriftPartition.getStats().getNum_rows());
+    }
+    return partition;
   }
 
   private static LiteralExpr TExprNodeToLiteralExpr(
@@ -434,6 +442,7 @@ public class HdfsPartition {
         fileFormatDescriptor.getFileFormat().toThrift(), thriftExprs,
         fileFormatDescriptor.getBlockSize(), fileFormatDescriptor.getCompression());
     thriftHdfsPart.setLocation(location);
+    thriftHdfsPart.setStats(new TTableStats(numRows));
     if (includeFileDescriptorMetadata) {
       // Add block location information
       for (FileDescriptor fd: fileDescriptors) {
@@ -442,5 +451,19 @@ public class HdfsPartition {
     }
 
     return thriftHdfsPart;
+  }
+
+  /**
+   * Comparison method to allow ordering of HdfsPartitions by their partition-key values.
+   */
+  @Override
+  public int compareTo(HdfsPartition o) {
+    int sizeDiff = partitionKeyValues.size() - o.getPartitionValues().size();
+    if (sizeDiff != 0) return sizeDiff;
+    for (int i = 0; i < partitionKeyValues.size(); ++i) {
+      int cmp = partitionKeyValues.get(i).compareTo(o.getPartitionValues().get(i));
+      if (cmp != 0) return cmp;
+    }
+    return 0;
   }
 }

@@ -61,12 +61,13 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
-import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
-import com.cloudera.impala.thrift.TMetadataOpResponse;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TShowStatsParams;
+import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 
@@ -214,6 +215,26 @@ public class JniFrontend {
     }
   }
 
+  public byte[] getStats(byte[] thriftShowStatsParams) throws ImpalaException {
+    TShowStatsParams params = new TShowStatsParams();
+    JniUtil.deserializeThrift(protocolFactory, params, thriftShowStatsParams);
+    Preconditions.checkState(params.isSetTable_name());
+    TResultSet result;
+    if (params.isIs_show_col_stats()) {
+      result = frontend.getColumnStats(params.getTable_name().getDb_name(),
+          params.getTable_name().getTable_name());
+    } else {
+      result = frontend.getTableStats(params.getTable_name().getDb_name(),
+          params.getTable_name().getTable_name());
+    }
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
   /**
    * Returns a list of function names matching an optional pattern.
    * The argument is a serialized TGetFunctionsParams object.
@@ -269,13 +290,13 @@ public class JniFrontend {
   }
 
   /**
-   * Executes a HiveServer2 metadata operation and returns a TMetadataOpResponse
+   * Executes a HiveServer2 metadata operation and returns a TResultSet
    */
   public byte[] execHiveServer2MetadataOp(byte[] metadataOpsParams)
       throws ImpalaException {
     TMetadataOpRequest params = new TMetadataOpRequest();
     JniUtil.deserializeThrift(protocolFactory, params, metadataOpsParams);
-    TMetadataOpResponse result = frontend.execHiveServer2MetadataOp(params);
+    TResultSet result = frontend.execHiveServer2MetadataOp(params);
 
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

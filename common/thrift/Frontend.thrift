@@ -54,6 +54,16 @@ struct TSessionState {
   4: required Types.TNetworkAddress network_address
 }
 
+struct TResultSetMetadata {
+  1: required list<CatalogObjects.TColumn> columns
+}
+
+// List of rows and metadata describing their columns.
+struct TResultSet {
+  1: required list<Data.TResultRow> rows
+  2: required TResultSetMetadata schema
+}
+
 // Struct for HiveUdf expr to create the proper execution object in the FE
 // java side. See exprs/hive-udf-call.h for how hive Udfs are executed in general.
 // TODO: this could be the UdfID, collapsing the first 3 arguments but synchronizing
@@ -165,6 +175,12 @@ struct TShowDbsParams {
   1: optional string show_pattern
 }
 
+// Parameters for SHOW TABLE/COLUMN STATS commands
+struct TShowStatsParams {
+  1: required bool is_show_col_stats
+  2: CatalogObjects.TTableName table_name
+}
+
 // Parameters for SHOW FUNCTIONS commands
 struct TShowFunctionsParams {
   // Type of function to show.
@@ -218,10 +234,6 @@ struct TUseDbParams {
 struct TExplainResult {
   // each line in the explain plan occupies an entry in the list
   1: required list<Data.TResultRow> results
-}
-
-struct TResultSetMetadata {
-  1: required list<CatalogObjects.TColumnDesc> columnDescs
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.
@@ -319,6 +331,7 @@ struct TQueryExecRequest {
 enum TCatalogOpType {
   SHOW_TABLES,
   SHOW_DBS,
+  SHOW_STATS,
   USE,
   DESCRIBE,
   SHOW_FUNCTIONS,
@@ -352,6 +365,9 @@ struct TCatalogOpRequest {
   // Parameters for RESET/INVALIDATE METADATA, executed using the CatalogServer.
   // See CatalogService.TResetMetadataRequest for more details.
   8: optional CatalogService.TResetMetadataRequest reset_metadata_params
+
+  // Parameters for SHOW TABLE/COLUMN STATS
+  9: optional TShowStatsParams show_stats_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
@@ -385,15 +401,6 @@ struct TMetadataOpRequest {
   // enabled, only the server objects this user has access to will be returned.
   // If not set, access checks will be skipped (used for internal Impala requests)
   10: optional TSessionState session
-}
-
-// Output of JniFrontend.hiveServer2MetadataOperation
-struct TMetadataOpResponse {
-  // Schema of the result
-  1: required TResultSetMetadata result_set_metadata
-
-  // Result set
-  2: required list<Data.TResultRow> results
 }
 
 // Tracks accesses to Catalog objects for use during auditing. This information, paired

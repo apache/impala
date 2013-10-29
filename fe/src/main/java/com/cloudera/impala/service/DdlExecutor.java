@@ -67,8 +67,7 @@ import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
 import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
-import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TColumnDesc;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
@@ -613,7 +612,7 @@ public class DdlExecutor {
    * Appends one or more columns to the given table, optionally replacing all existing
    * columns.
    */
-  private void alterTableAddReplaceCols(TableName tableName, List<TColumnDesc> columns,
+  private void alterTableAddReplaceCols(TableName tableName, List<TColumn> columns,
       boolean replaceExistingCols) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
@@ -636,7 +635,7 @@ public class DdlExecutor {
    * column, add a comment to a column, or change the datatype of a column.
    */
   private void alterTableChangeCol(TableName tableName, String colName,
-      TColumnDesc newColDesc) throws MetaException, InvalidObjectException,
+      TColumn newCol) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
        TableLoadingException, ColumnNotFoundException {
     synchronized (metastoreDdlLock) {
@@ -646,11 +645,11 @@ public class DdlExecutor {
       while (iterator.hasNext()) {
         FieldSchema fs = iterator.next();
         if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
-          fs.setName(newColDesc.getColumnName());
-          fs.setType(newColDesc.getColumnType().toString().toLowerCase());
+          fs.setName(newCol.getColumnName());
+          fs.setType(newCol.getColumnType().toString().toLowerCase());
           // Don't overwrite the existing comment unless a new comment is given
-          if (newColDesc.getComment() != null) {
-            fs.setComment(newColDesc.getComment());
+          if (newCol.getComment() != null) {
+            fs.setComment(newCol.getComment());
           }
           break;
         }
@@ -966,10 +965,10 @@ public class DdlExecutor {
         .getMetaStoreTable().deepCopy();
   }
 
-  public static List<FieldSchema> buildFieldSchemaList(List<TColumnDesc> columnDescs) {
+  public static List<FieldSchema> buildFieldSchemaList(List<TColumn> columns) {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
-    for (TColumnDesc col: columnDescs) {
+    for (TColumn col: columns) {
       FieldSchema fs = new FieldSchema(col.getColumnName(),
           col.getColumnType().toString().toLowerCase(), col.getComment());
       fsList.add(fs);

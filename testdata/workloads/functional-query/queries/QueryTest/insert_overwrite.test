@@ -63,6 +63,7 @@ select 3
 from tinyinttable
 limit 0
 ---- RESULTS
+: 0
 ====
 ---- QUERY
 select count(*) from insert_overwrite_nopart

@@ -119,6 +119,10 @@ public class AnalysisContext {
       return stmt instanceof ShowDbsStmt;
     }
 
+    public boolean isShowStatsStmt() {
+      return stmt instanceof ShowStatsStmt;
+    }
+
     public boolean isShowFunctionsStmt() {
       return stmt instanceof ShowFunctionsStmt;
     }
@@ -137,13 +141,13 @@ public class AnalysisContext {
       return false;
     }
 
-    public boolean isDdlStmt() {
-      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt() ||
-          isCreateTableLikeStmt() || isCreateTableStmt() || isCreateViewStmt() ||
-          isCreateDbStmt() || isDropDbStmt() || isDropTableOrViewStmt() ||
-          isResetMetadataStmt() || isAlterTableStmt() || isAlterViewStmt() ||
-          isCreateUdfStmt() || isCreateUdaStmt() || isShowFunctionsStmt() ||
-          isDropFunctionStmt() || isCreateTableAsSelectStmt();
+    public boolean isCatalogOp() {
+      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isShowStatsStmt() ||
+          isDescribeStmt() || isCreateTableLikeStmt() || isCreateTableStmt() ||
+          isCreateViewStmt() || isCreateDbStmt() || isDropDbStmt() ||
+          isDropTableOrViewStmt() || isResetMetadataStmt() || isAlterTableStmt() ||
+          isAlterViewStmt() || isCreateUdfStmt() || isCreateUdaStmt() ||
+          isShowFunctionsStmt() || isDropFunctionStmt() || isCreateTableAsSelectStmt();
     }
 
     public boolean isDmlStmt() {
@@ -242,6 +246,11 @@ public class AnalysisContext {
     public ShowDbsStmt getShowDbsStmt() {
       Preconditions.checkState(isShowDbsStmt());
       return (ShowDbsStmt) stmt;
+    }
+
+    public ShowStatsStmt getShowStatsStmt() {
+      Preconditions.checkState(isShowStatsStmt());
+      return (ShowStatsStmt) stmt;
     }
 
     public ShowFunctionsStmt getShowFunctionsStmt() {

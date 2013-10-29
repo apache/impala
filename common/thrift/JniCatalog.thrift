@@ -97,7 +97,7 @@ struct TAlterTableOrViewRenameParams {
 // Parameters for ALTER TABLE ADD|REPLACE COLUMNS commands.
 struct TAlterTableAddReplaceColsParams {
   // List of columns to add to the table
-  1: required list<CatalogObjects.TColumnDesc> columns
+  1: required list<CatalogObjects.TColumn> columns
 
   // If true, replace all existing columns. If false add (append) columns to the table.
   2: required bool replace_existing_cols
@@ -137,7 +137,7 @@ struct TAlterTableChangeColParams {
   1: required string col_name
 
   // New column definition for the target column.
-  2: required CatalogObjects.TColumnDesc new_col_def
+  2: required CatalogObjects.TColumn new_col_def
 }
 
 // Parameters for ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES commands.
@@ -237,10 +237,10 @@ struct TCreateTableParams {
   1: required CatalogObjects.TTableName table_name
 
   // List of columns to create
-  2: required list<CatalogObjects.TColumnDesc> columns
+  2: required list<CatalogObjects.TColumn> columns
 
   // List of partition columns
-  3: optional list<CatalogObjects.TColumnDesc> partition_columns
+  3: optional list<CatalogObjects.TColumn> partition_columns
 
   // The file format for this table
   4: required CatalogObjects.THdfsFileFormat file_format
@@ -278,7 +278,7 @@ struct TCreateOrAlterViewParams {
   1: required CatalogObjects.TTableName view_name
 
   // List of column definitions for the view
-  2: required list<CatalogObjects.TColumnDesc> columns
+  2: required list<CatalogObjects.TColumn> columns
 
   // The owner of the view
   3: required string owner

@@ -98,4 +98,13 @@ public class FloatLiteral extends LiteralExpr {
     // swapping sign does not change the type
     value = -value;
   }
+
+  @Override
+  public int compareTo(LiteralExpr o) {
+    if (!(o instanceof FloatLiteral)) return -1;
+    FloatLiteral other = (FloatLiteral) o;
+    if (value > other.getValue()) return 1;
+    if (value < other.getValue()) return -1;
+    return 0;
+  }
 }

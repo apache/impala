@@ -209,6 +209,15 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       SetResultSet(db_names.dbs);
       return Status::OK;
     }
+    case TCatalogOpType::SHOW_STATS: {
+      const TShowStatsParams& params = catalog_op.show_stats_params;
+      TResultSet response;
+      RETURN_IF_ERROR(frontend_->GetStats(params, &response));
+      // Set the result set and its schema from the response.
+      request_result_set_.reset(new vector<TResultRow>(response.rows));
+      result_metadata_ = response.schema;
+      return Status::OK;
+    }
     case TCatalogOpType::SHOW_FUNCTIONS: {
       const TShowFunctionsParams* params = &catalog_op.show_fns_params;
       TGetFunctionsResult functions;
@@ -291,14 +300,14 @@ void ImpalaServer::QueryExecState::Done() {
 
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
-  TMetadataOpResponse metadata_op_result;
+  TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
-  result_metadata_ = metadata_op_result.result_set_metadata;
-  request_result_set_.reset(new vector<TResultRow>(metadata_op_result.results));
+  result_metadata_ = metadata_op_result.schema;
+  request_result_set_.reset(new vector<TResultRow>(metadata_op_result.rows));
   return Status::OK;
 }
 

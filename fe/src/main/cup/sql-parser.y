@@ -217,7 +217,7 @@ terminal
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
   KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRING, KW_SUM,
   KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE,
-  KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN,
+  KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN,
   KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
@@ -249,6 +249,7 @@ nonterminal List<UnionOperand> values_operand_list;
 nonterminal UseStmt use_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
+nonterminal ShowStatsStmt show_stats_stmt;
 nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
@@ -397,6 +398,8 @@ stmt ::=
   {: RESULT = show_tables; :}
   | show_dbs_stmt:show_dbs
   {: RESULT = show_dbs; :}
+  | show_stats_stmt:show_stats
+  {: RESULT = show_stats; :}
   | show_functions_stmt:show_functions
   {: RESULT = show_functions; :}
   | describe_stmt:describe
@@ -1188,6 +1191,13 @@ show_dbs_stmt ::=
   {: RESULT = new ShowDbsStmt(); :}
   | KW_SHOW dbs_or_schemas_kw show_pattern:showPattern
   {: RESULT = new ShowDbsStmt(showPattern); :}
+  ;
+
+show_stats_stmt ::=
+  KW_SHOW KW_TABLE KW_STATS table_name:table
+  {: RESULT = new ShowStatsStmt(table, false); :}
+  | KW_SHOW KW_COLUMN KW_STATS table_name:table
+  {: RESULT = new ShowStatsStmt(table, true); :}
   ;
 
 show_functions_stmt ::=

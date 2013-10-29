@@ -24,10 +24,10 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
-import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.collect.Lists;
 
@@ -79,13 +79,13 @@ public class FrontendTest {
     TMetadataOpRequest getInfoReq = new TMetadataOpRequest();
     getInfoReq.opcode = TMetadataOpcode.GET_TYPE_INFO;
     getInfoReq.get_info_req = new TGetInfoReq();
-    TMetadataOpResponse resp = execMetadataOp(getInfoReq);
+    TResultSet resp = execMetadataOp(getInfoReq);
     // DatabaseMetaData.getTypeInfo has 18 columns.
-    assertEquals(18, resp.result_set_metadata.columnDescs.size());
-    assertEquals(18, resp.results.get(0).colVals.size());
+    assertEquals(18, resp.schema.columns.size());
+    assertEquals(18, resp.rows.get(0).colVals.size());
     // All primitives types, except INVALID_TYPE, DATE, DATETIME and CHAR, should be
     // returned. Therefore #supported types =  PrimitiveType.values().length - 4.
-    assertEquals(PrimitiveType.values().length - 4, resp.results.size());
+    assertEquals(PrimitiveType.values().length - 4, resp.rows.size());
   }
 
   @Test
@@ -95,12 +95,12 @@ public class FrontendTest {
     req.opcode = TMetadataOpcode.GET_SCHEMAS;
     req.get_schemas_req = new TGetSchemasReq();
     req.get_schemas_req.setSchemaName("default%");
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
     // HiveServer2 GetSchemas has 2 columns.
-    assertEquals(2, resp.result_set_metadata.columnDescs.size());
-    assertEquals(2, resp.results.get(0).colVals.size());
-    assertEquals(1, resp.results.size());
-    assertEquals("default", resp.results.get(0).colVals.get(0).stringVal.toLowerCase());
+    assertEquals(2, resp.schema.columns.size());
+    assertEquals(2, resp.rows.get(0).colVals.size());
+    assertEquals(1, resp.rows.size());
+    assertEquals("default", resp.rows.get(0).colVals.get(0).stringVal.toLowerCase());
   }
 
   @Test
@@ -111,12 +111,12 @@ public class FrontendTest {
     req.get_tables_req = new TGetTablesReq();
     req.get_tables_req.setSchemaName("functional");
     req.get_tables_req.setTableName("all_ypes");
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
     // HiveServer2 GetTables has 5 columns.
-    assertEquals(5, resp.result_set_metadata.columnDescs.size());
-    assertEquals(5, resp.results.get(0).colVals.size());
-    assertEquals(1, resp.results.size());
-    assertEquals("alltypes", resp.results.get(0).colVals.get(2).stringVal.toLowerCase());
+    assertEquals(5, resp.schema.columns.size());
+    assertEquals(5, resp.rows.get(0).colVals.size());
+    assertEquals(1, resp.rows.size());
+    assertEquals("alltypes", resp.rows.get(0).colVals.get(2).stringVal.toLowerCase());
   }
 
   @Test
@@ -128,15 +128,15 @@ public class FrontendTest {
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
     req.get_columns_req.setColumnName("stri%");
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
     // TODO: HiveServer2 thrift says the result set columns should be the
     // same as ODBC SQLColumns, which has 18 columns. But the HS2 implementation has
     // 23 columns. Follow the HS2 implementation for now because the HS2 thrift comment
     // could be outdated.
-    assertEquals(23, resp.result_set_metadata.columnDescs.size());
-    assertEquals(23, resp.results.get(0).colVals.size());
-    assertEquals(1, resp.results.size());
-    TResultRow row = resp.results.get(0);
+    assertEquals(23, resp.schema.columns.size());
+    assertEquals(23, resp.rows.get(0).colVals.size());
+    assertEquals(1, resp.rows.size());
+    TResultRow row = resp.rows.get(0);
     assertEquals("functional", row.colVals.get(1).stringVal.toLowerCase());
     assertEquals("alltypes", row.colVals.get(2).stringVal.toLowerCase());
     assertEquals("string_col", row.colVals.get(3).stringVal.toLowerCase());
@@ -148,11 +148,11 @@ public class FrontendTest {
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_CATALOGS;
     req.get_catalogs_req = new TGetCatalogsReq();
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
 
     // HiveServer2 GetCatalogs() has 1 column.
-    assertEquals(1, resp.result_set_metadata.columnDescs.size());
-    assertEquals(0, resp.results.size());
+    assertEquals(1, resp.schema.columns.size());
+    assertEquals(0, resp.rows.size());
   }
 
   @Test
@@ -160,12 +160,12 @@ public class FrontendTest {
     // Impala should only return TABLE as the only table type.
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLE_TYPES;
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
     // HiveServer2 GetTableTypes() has 1 column.
-    assertEquals(1, resp.result_set_metadata.columnDescs.size());
-    assertEquals(1, resp.results.get(0).colVals.size());
-    assertEquals(1, resp.results.size());
-    assertEquals("TABLE", resp.results.get(0).getColVals().get(0).stringVal);
+    assertEquals(1, resp.schema.columns.size());
+    assertEquals(1, resp.rows.get(0).colVals.size());
+    assertEquals(1, resp.rows.size());
+    assertEquals("TABLE", resp.rows.get(0).getColVals().get(0).stringVal);
   }
 
   @Test
@@ -175,25 +175,25 @@ public class FrontendTest {
     req.opcode = TMetadataOpcode.GET_FUNCTIONS;
     req.get_functions_req = new TGetFunctionsReq();
     req.get_functions_req.setFunctionName("sub%");
-    TMetadataOpResponse resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
 
     // HiveServer2 GetFunctions() has 6 columns.
-    assertEquals(6, resp.result_set_metadata.columnDescs.size());
-    assertEquals(6, resp.results.get(0).colVals.size());
+    assertEquals(6, resp.schema.columns.size());
+    assertEquals(6, resp.rows.get(0).colVals.size());
 
-    assertEquals(3, resp.results.size());
+    assertEquals(3, resp.rows.size());
 
     List<String> expectedResult = Lists.newArrayList();
     expectedResult.add("subdate");
     expectedResult.add("substr");
     expectedResult.add("substring");
-    for (TResultRow row: resp.results) {
+    for (TResultRow row: resp.rows) {
       String fn = row.colVals.get(2).stringVal.toLowerCase();
       assertTrue(fn + " not found", expectedResult.remove(fn));
     }
   }
 
-  private TMetadataOpResponse execMetadataOp(TMetadataOpRequest req)
+  private TResultSet execMetadataOp(TMetadataOpRequest req)
       throws ImpalaException {
     return fe_.execHiveServer2MetadataOp(req);
   }

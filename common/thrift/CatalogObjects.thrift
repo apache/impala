@@ -102,17 +102,17 @@ struct TTableName {
   2: required string table_name
 }
 
-struct TTableStatsData {
+struct TTableStats {
   // Estimated number of rows in the table or -1 if unknown
   1: required i64 num_rows;
 }
 
 // Column stats data that Impala uses.
-struct TColumnStatsData {
-  // Average serialized size and max size, in bytes. Includes serialization overhead.
+struct TColumnStats {
+  // Average size and max size, in bytes. Excludes serialization overhead.
   // For fixed-length types (those which don't need additional storage besides the slot
-  // they occupy), sets avg_serialized_size and max_size to their slot size.
-  1: required double avg_serialized_size
+  // they occupy), sets avg_size and max_size to their slot size.
+  1: required double avg_size
   2: required i64 max_size
 
   // Estimated number of distinct values.
@@ -122,12 +122,21 @@ struct TColumnStatsData {
   4: required i64 num_nulls
 }
 
-struct TColumnDesc {
+struct TColumn {
   1: required string columnName
   2: required Types.TPrimitiveType columnType
   3: optional string comment
   // Stats for this table, if any are available.
-  4: optional TColumnStatsData col_stats
+  4: optional TColumnStats col_stats
+  // Ordinal position in the source table
+  5: optional i32 position
+
+  // Indicates whether this is an HBase column. If true, implies
+  // all following HBase-specific fields are set.
+  6: optional bool is_hbase_column
+  7: optional string column_family
+  8: optional string column_qualifier
+  9: optional bool is_binary
 }
 
 // Represents a block in an HDFS file
@@ -176,6 +185,9 @@ struct THdfsPartition {
 
   // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
   12: optional TAccessLevel access_level
+
+  // Statistics on this partition, e.g., number of rows in this partition.
+  13: optional TTableStats stats
 }
 
 struct THdfsTable {
@@ -228,13 +240,13 @@ struct TTable {
   5: optional TAccessLevel access_level
 
   // List of columns (excludes clustering columns)
-  6: optional list<TColumnDesc> columns
+  6: optional list<TColumn> columns
 
   // List of clustering columns (empty list if table has no clustering columns)
-  7: optional list<TColumnDesc> clustering_columns
+  7: optional list<TColumn> clustering_columns
 
   // Table stats data for the table.
-  8: optional TTableStatsData table_stats
+  8: optional TTableStats table_stats
 
   // Determines the table type - either HDFS, HBASE, or VIEW.
   9: optional TTableType table_type

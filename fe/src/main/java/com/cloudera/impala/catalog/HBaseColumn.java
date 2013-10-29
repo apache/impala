@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import com.cloudera.impala.thrift.TColumn;
+
 // Describes an HBase column mapped to a Hive column (as described in the metastore).
 // this.name describes the column name in Hive.
 // This class adds the HBase columnFamily and columnQualifier,
@@ -31,14 +33,8 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
     this.binaryEncoded = binaryEncoded;
   }
 
-  public String getColumnFamily() {
-    return columnFamily;
-  }
-
-  public String getColumnQualifier() {
-    return columnQualifier;
-  }
-
+  public String getColumnFamily() { return columnFamily; }
+  public String getColumnQualifier() { return columnQualifier; }
   public boolean isBinaryEncoded() { return binaryEncoded; }
 
   @Override
@@ -51,5 +47,18 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
     }
     int qualifierCmp = columnQualifier.compareTo(o.columnQualifier);
     return qualifierCmp;
+  }
+
+  @Override
+  public TColumn toThrift() {
+    TColumn colDesc = new TColumn(name, type.toThrift());
+    if (comment != null) colDesc.setComment(comment);
+    colDesc.setCol_stats(getStats().toThrift());
+    colDesc.setPosition(position);
+    colDesc.setIs_hbase_column(true);
+    colDesc.setColumn_family(columnFamily);
+    colDesc.setColumn_qualifier(columnQualifier);
+    colDesc.setIs_binary(binaryEncoded);
+    return colDesc;
   }
 }

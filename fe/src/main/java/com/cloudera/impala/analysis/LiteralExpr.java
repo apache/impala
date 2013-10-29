@@ -26,7 +26,11 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TQueryGlobals;
 import com.google.common.base.Preconditions;
 
-public abstract class LiteralExpr extends Expr {
+/**
+ * Representation of a literal expression. Literals are comparable to allow
+ * ordering of HdfsPartitions whose partition-key values are represented as literals.
+ */
+public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr> {
 
   public LiteralExpr() {
     numDistinctValues = 1;

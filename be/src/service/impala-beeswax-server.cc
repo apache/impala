@@ -91,14 +91,14 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
   // it in this result set.
   virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
     int num_col = col_values.size();
-    DCHECK_EQ(num_col, metadata_.columnDescs.size());
+    DCHECK_EQ(num_col, metadata_.columns.size());
     stringstream out_stream;
     out_stream.precision(ASCII_PRECISION);
     for (int i = 0; i < num_col; ++i) {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
       RawValue::PrintValue(col_values[i],
-          ThriftToType(metadata_.columnDescs[i].columnType), scales[i], &out_stream);
+          ThriftToType(metadata_.columns[i].columnType), scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
     return Status::OK;
@@ -108,7 +108,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
   // result set.
   virtual Status AddOneRow(const TResultRow& row) {
     int num_col = row.colVals.size();
-    DCHECK_EQ(num_col, metadata_.columnDescs.size());
+    DCHECK_EQ(num_col, metadata_.columns.size());
     stringstream out_stream;
     out_stream.precision(ASCII_PRECISION);
     for (int i = 0; i < num_col; ++i) {
@@ -277,15 +277,15 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     const TResultSetMetadata* result_set_md = exec_state->result_metadata();
     results_metadata.__isset.schema = true;
     results_metadata.schema.__isset.fieldSchemas = true;
-    results_metadata.schema.fieldSchemas.resize(result_set_md->columnDescs.size());
+    results_metadata.schema.fieldSchemas.resize(result_set_md->columns.size());
     for (int i = 0; i < results_metadata.schema.fieldSchemas.size(); ++i) {
-      TPrimitiveType::type col_type = result_set_md->columnDescs[i].columnType;
+      TPrimitiveType::type col_type = result_set_md->columns[i].columnType;
       results_metadata.schema.fieldSchemas[i].__set_type(
           TypeToOdbcString(ThriftToType(col_type)));
 
       // Fill column name
       results_metadata.schema.fieldSchemas[i].__set_name(
-          result_set_md->columnDescs[i].columnName);
+          result_set_md->columns[i].columnName);
     }
   }
 
@@ -478,12 +478,12 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
   // ODBC-190: set Beeswax's Results.columns to work around bug ODBC-190;
   // TODO: remove the block of code when ODBC-190 is resolved.
   const TResultSetMetadata* result_metadata = exec_state->result_metadata();
-  query_results->columns.resize(result_metadata->columnDescs.size());
-  for (int i = 0; i < result_metadata->columnDescs.size(); ++i) {
+  query_results->columns.resize(result_metadata->columns.size());
+  for (int i = 0; i < result_metadata->columns.size(); ++i) {
     // TODO: As of today, the ODBC driver does not support boolean and timestamp data
     // type but it should. This is tracked by ODBC-189. We should verify that our
     // boolean and timestamp type are correctly recognized when ODBC-189 is closed.
-    TPrimitiveType::type col_type = result_metadata->columnDescs[i].columnType;
+    TPrimitiveType::type col_type = result_metadata->columns[i].columnType;
     query_results->columns[i] = TypeToOdbcString(ThriftToType(col_type));
   }
   query_results->__isset.columns = true;

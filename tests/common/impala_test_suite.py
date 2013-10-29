@@ -121,7 +121,6 @@ class ImpalaTestSuite(BaseTestSuite):
     # Change the database to reflect the file_format, compression codec etc.
     self.change_database(self.client, table_format_info, use_db)
     sections = self.load_query_test_file(self.get_workload(), test_file_name)
-    updated_sections = list()
     for test_section in sections:
       if 'QUERY' not in test_section:
         assert 0, 'Error in test file %s. Test cases require a -- QUERY section.\n%s' %\
@@ -145,16 +144,12 @@ class ImpalaTestSuite(BaseTestSuite):
         result = self.execute_query_expect_success(IMPALAD, query, exec_options)
       assert result is not None
 
-      if pytest.config.option.update_results:
-        updated_sections.append(
-            self.__update_results(test_file_name, test_section, result))
-      else:
-        verify_raw_results(test_section, result,
-                           vector.get_value('table_format').file_format)
-
+      verify_raw_results(test_section, result, 
+                         vector.get_value('table_format').file_format,
+                         pytest.config.option.update_results)
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
-      write_test_file(output_file, updated_sections)
+      write_test_file(output_file, sections)
 
   def execute_test_case_setup(self, setup_section, table_format):
     """
@@ -312,13 +307,6 @@ class ImpalaTestSuite(BaseTestSuite):
     assert table is not None
     self.hive_client.drop_table(db_name, table_name, True)
     self.hive_client.create_table(table)
-
-  def __update_results(self, test_file_name, test_section, exec_result):
-    test_section['RESULTS'] = '\n'.join(parse_result_rows(exec_result))
-    if 'TYPES' in test_section:
-      col_types = [fs.type.upper() for fs in exec_result.schema.fieldSchemas]
-      test_section['TYPES'] = ', '.join(col_types)
-    return test_section
 
   @classmethod
   def create_table_info_dimension(cls, exploration_strategy):

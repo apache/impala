@@ -15,10 +15,22 @@ from tests.util.test_file_parser import remove_comments
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_result_verfier')
 
+# Special prefix for column values that indicates the actual column value
+# is equal to the expected one if the actual value matches the given regex.
+# Accepted syntax in test files is 'regex: pattern' without the quotes.
+COLUMN_REGEX_PREFIX_PATTERN = "regex:"
+COLUMN_REGEX_PREFIX = re.compile(COLUMN_REGEX_PREFIX_PATTERN, re.I)
+
+# Special prefix for row values that indicates the actual row value
+# is equal to the expected one if the actual value matches the given regex.
+ROW_REGEX_PREFIX_PATTERN = 'row_regex:'
+ROW_REGEX_PREFIX = re.compile(ROW_REGEX_PREFIX_PATTERN, re.I)
+
 # Represents a single test result (row set)
 class QueryTestResult(object):
   def __init__(self, result_list, column_types, order_matters):
     self.column_types = column_types
+    self.result_list = result_list
     # The order of the result set might be different if running with multiple nodes.
     # Unless there is an ORDER BY clause, the results should be sorted for comparison.
     test_results = result_list
@@ -41,18 +53,22 @@ class QueryTestResult(object):
 # Represents a row in a result set
 class ResultRow(object):
   def __init__(self, row_string, column_types):
-    self.skip_comparison = False
-    # TODO: Still need to add support for verifying regex results. For now just skip
-    # this verification
-    if row_string and row_string.strip().startswith('regex:'):
-      self.skip_comparison = True
-      self.columns = list()
-    else:
-      self.columns = self.__parse_row(row_string, column_types)
+    self.columns = self.__parse_row(row_string, column_types)
+    self.row_string = row_string
+    # If applicable, pre-compile the regex that actual row values (row_string)
+    # should be matched against instead of self.columns.
+    self.regex = None
+    if row_string and ROW_REGEX_PREFIX.match(row_string):
+      pattern = row_string[len(ROW_REGEX_PREFIX_PATTERN):].strip()
+      self.regex = re.compile(pattern)
+      if self.regex is None:
+        assert False, "Invalid row regex specification: %s" % self.row_string
 
   def __parse_row(self, row_string, column_types):
     """Parses a row string and build a list of ResultColumn objects"""
     column_values = list()
+    if not row_string:
+      return column_values
     string_val = None
     current_column = 0
     for col_val in row_string.split(','):
@@ -80,8 +96,12 @@ class ResultRow(object):
   def __eq__(self, other):
     if not isinstance(other, self.__class__):
       return False
-    return (self.skip_comparison or other.skip_comparison) or\
-        (self.columns == other.columns)
+    # Check equality based on a supplied regex if one was given.
+    if self.regex is not None:
+      return self.regex.match(other.row_string)
+    if other.regex is not None:
+      return other.regex.match(self.row_string)
+    return self.columns == other.columns
 
   def __ne__(self, other):
     return not self.__eq__(other)
@@ -104,6 +124,14 @@ class ResultColumn(object):
     """Value of the column and the type (double, float, string, etc...)"""
     self.value = value
     self.column_type = column_type.lower()
+    # If applicable, pre-compile the regex that actual column values
+    # should be matched against instead of self.value.
+    self.regex = None
+    if COLUMN_REGEX_PREFIX.match(value):
+      pattern = self.value[len(COLUMN_REGEX_PREFIX_PATTERN)].strip()
+      self.regex = re.compile(pattern)
+      if self.regex is None:
+        assert False, "Invalid column regex specification: %s" % self.value
 
   def __eq__(self, other):
     if not isinstance(other, self.__class__):
@@ -111,6 +139,12 @@ class ResultColumn(object):
     # Make sure the column types are the same
     if self.column_type != other.column_type:
       return False
+
+    # Check equality based on a supplied regex if one was given.
+    if self.regex is not None:
+      return self.regex.match(other.value)
+    if other.regex is not None:
+      return other.regex.match(self.value)
 
     if (self.value == 'NULL' or other.value == 'NULL') or \
        ('inf' in self.value or 'inf' in other.value):
@@ -162,32 +196,31 @@ def verify_results(expected_results, actual_results, order_matters):
   if not order_matters:
     expected_results = sorted(expected_results)
     actual_results = sorted(actual_results)
+  assert expected_results == actual_results
 
-  if len(expected_results) > 0 and 'regex:' in expected_results[0]:
-    return
-
-  failure_str = '\nExpected:\n%s\n\nActual:\n%s' %\
-      ('\n'.join(expected_results), '\n'.join(actual_results))
-
-  assert expected_results == actual_results, failure_str
-
-def verify_raw_results(test_section, exec_result, file_format):
+def verify_raw_results(test_section, exec_result, file_format, update_section=False):
   """
-  Accepts a raw exec_result object and verifies it matches the expected results
+  Accepts a raw exec_result object and verifies it matches the expected results.
+  If update_section is true, updates test_section with the actual results
+  if they don't match the expected results. If update_section is false, failed
+  verifications result in assertion failures, otherwise they are ignored.
 
   This process includes the parsing/transformation of the raw data results into the
   result format used in the tests.
   """
   expected_results = None
 
-  if test_section.get('RESULTS'):
+  if 'RESULTS' in test_section:
     expected_results = remove_comments(test_section['RESULTS'])
   else:
     LOG.info("No results found. Skipping verification");
     return
 
-  if test_section.get('TYPES'):
-    expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
+  if 'TYPES' in test_section:
+    # Distinguish between an empty list and a list with an empty string.
+    expected_types = list()
+    if test_section.get('TYPES'):
+      expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
 
     # Avro does not support as many types as Hive, so the Avro test tables may
     # have different column types than we expect (e.g., INT instead of
@@ -203,25 +236,57 @@ def verify_raw_results(test_section, exec_result, file_format):
     else:
       actual_types = parse_column_types(exec_result.schema)
 
-    verify_results(expected_types, actual_types, order_matters=True)
+    try:
+      verify_results(expected_types, actual_types, order_matters=True)
+    except AssertionError:
+      if update_section:
+        test_section['TYPES'] = ', '.join(actual_types)
+      else:
+        raise
   else:
     # This is an insert, so we are comparing the number of rows inserted
     expected_types = ['BIGINT']
     actual_types = ['BIGINT']
+
+  if 'LABELS' in test_section:
+    # Distinguish between an empty list and a list with an empty string.
+    expected_labels = list()
+    if test_section.get('LABELS'):
+      expected_labels = [c.strip().upper() for c in test_section['LABELS'].split(',')]
+    actual_labels = parse_column_labels(exec_result.schema)
+    try:
+      verify_results(expected_labels, actual_labels, order_matters=True)
+    except AssertionError:
+      if update_section:
+        test_section['LABELS'] = ', '.join(actual_labels)
+      else:
+        raise
 
   # Get the verifier if specified. In the absence of an explicit
   # verifier, defaults to verifying equality.
   verifier = test_section.get('VERIFIER')
 
   order_matters = contains_order_by(exec_result.query)
+
+  # If the test section is explicitly annotated to specify the order matters,
+  # then do not sort the actual and expected results.
+  if verifier and verifier.upper() == 'VERIFY_IS_EQUAL':
+    order_matters = True
+
   # If the test result section is explicitly annotated to specify order does not matter,
   # then sort the actual and expected results before verification.
   if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
     order_matters = False
   expected = QueryTestResult(expected_results.split('\n'), expected_types, order_matters)
   actual = QueryTestResult(parse_result_rows(exec_result), actual_types, order_matters)
-  assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + vefifier
-  VERIFIER_MAP[verifier](expected, actual)
+  assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + verifier
+  try:
+    VERIFIER_MAP[verifier](expected, actual)
+  except AssertionError:
+    if update_section:
+      test_section['RESULTS'] = '\n'.join(actual.result_list)
+    else:
+      raise
 
 def contains_order_by(query):
   """Returns true of the query contains an 'order by' clause"""
@@ -230,6 +295,10 @@ def contains_order_by(query):
 def parse_column_types(schema):
   """Enumerates all field schemas and returns a list of column type strings"""
   return [fs.type.upper() for fs in schema.fieldSchemas]
+
+def parse_column_labels(schema):
+  """Enumerates all field schemas and returns a list of column label strings"""
+  return [fs.name.upper() for fs in schema.fieldSchemas]
 
 def parse_result_rows(exec_result):
   """

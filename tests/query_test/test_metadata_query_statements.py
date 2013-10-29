@@ -29,7 +29,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db('hive_test_db')
 
-  def test_show_tables(self, vector):
+  def test_show(self, vector):
     self.run_test_case('QueryTest/show', vector)
 
   def test_describe_table(self, vector):
