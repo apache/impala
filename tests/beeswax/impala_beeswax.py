@@ -33,13 +33,14 @@ from thrift.Thrift import TApplicationException
 # __str__ preserves the exception type.
 # TODO: Add the ability to print some of the stack.
 class ImpalaBeeswaxException(Exception):
+  __name__ = "ImpalaBeeswaxException"
   def __init__(self, message, inner_exception):
     self.__message = message
     if inner_exception is not None:
       self.inner_exception = inner_exception
 
   def __str__(self):
-    return "%s:\n %s" % (self.__class__, self.__message)
+    return "%s:\n %s" % (self.__name__, self.__message)
 
 # Encapsulates a typical query result.
 class QueryResult(object):
@@ -103,9 +104,8 @@ class ImpalaBeeswaxClient(object):
     if query_option_dict is None:
       raise ValueError, 'Cannot pass None value for query options'
     self.clear_query_options()
-    if len(query_option_dict.keys()) > 0:
-      for name in query_option_dict.keys():
-        self.set_query_option(name, query_option_dict[name])
+    for name, value in query_option_dict.iteritems():
+      self.set_query_option(name, value)
 
   def get_query_option(self, name):
     return self.__query_options.get(name.upper())
@@ -260,10 +260,10 @@ class ImpalaBeeswaxClient(object):
 
   def __build_error_message(self, exception):
     """Construct a meaningful exception string"""
-    message = '%s' % exception
+    message = str(exception)
     if isinstance(exception, BeeswaxService.BeeswaxException):
       message = exception.message
-    return 'INNER EXCEPTION: %s\n MESSAGE: %s' % (type(exception), message)
+    return 'INNER EXCEPTION: %s\n MESSAGE: %s' % (exception.__class__, message)
 
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking.

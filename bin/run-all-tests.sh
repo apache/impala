@@ -83,7 +83,7 @@ do
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
-      --table_format=text/none
+      --table_format=text/none --exec_options="disable_codegen:False"
 
   # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
   # functional-query workload because the larger datasets (ex. tpch) are not generated
