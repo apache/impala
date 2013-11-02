@@ -69,6 +69,33 @@ IMPALA=SUCCESS
 HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
+# Test that creating a view in Impala with "NULLS FIRST/LAST" works when the nulls
+# ordering is the default behavior. View creation in Hive will fail because the NULLS
+# FIRST/LAST is not supported.
+create view test as
+select id, int_col, string_col from functional.alltypesagg
+order by int_col asc nulls last limit 10
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
+---- CREATE_VIEW
+# A view created in Impala with "NULLS FIRST/LAST" will not work in Hive when the null
+# ordering is not the default.
+create view test as
+select id, int_col, string_col from functional.alltypesagg
+order by int_col desc nulls last limit 10
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+====
+---- CREATE_VIEW
 # Test that exotic column names are quoted in
 # Impala's view to make them parseable by Hive.
 # Hive cannot parse the unquoted identifiers starting with "_",

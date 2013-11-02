@@ -94,6 +94,7 @@ public abstract class QueryStmt extends StatementBase {
 
     ArrayList<Expr> orderingExprs = Lists.newArrayList();
     ArrayList<Boolean> isAscOrder = Lists.newArrayList();
+    ArrayList<Boolean> nullsFirstParams = Lists.newArrayList();
 
     // extract exprs
     for (OrderByElement orderByElement: orderByElements) {
@@ -101,6 +102,7 @@ public abstract class QueryStmt extends StatementBase {
       // we need to print it
       orderingExprs.add(orderByElement.getExpr().clone(null));
       isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
+      nullsFirstParams.add(orderByElement.getNullsFirstParam());
     }
     substituteOrdinals(orderingExprs, "ORDER BY");
     Expr ambiguousAlias = getFirstAmbiguousAlias(orderingExprs);
@@ -111,7 +113,7 @@ public abstract class QueryStmt extends StatementBase {
     Expr.substituteList(orderingExprs, aliasSMap);
     Expr.analyze(orderingExprs, analyzer);
 
-    sortInfo = new SortInfo(orderingExprs, isAscOrder);
+    sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
   }
 
   /**

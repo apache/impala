@@ -46,12 +46,19 @@ Status TopNNode::Init(const TPlanNode& tnode) {
   is_asc_order_.insert(
       is_asc_order_.begin(), tnode.sort_node.is_asc_order.begin(),
       tnode.sort_node.is_asc_order.end());
+  if (tnode.sort_node.__isset.nulls_first) {
+    nulls_first_.insert(
+        nulls_first_.begin(), tnode.sort_node.nulls_first.begin(),
+        tnode.sort_node.nulls_first.end());
+  } else {
+    nulls_first_.assign(is_asc_order_.size(), false);
+  }
+
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
   abort_on_default_limit_exceeded_ = tnode.sort_node.is_default_limit;
 
-  // TODO: Get nulls_first from the plan node
   tuple_row_less_than_.reset(new TupleRowComparator(
-      lhs_ordering_exprs_, rhs_ordering_exprs_, is_asc_order_, false));
+      lhs_ordering_exprs_, rhs_ordering_exprs_, is_asc_order_, nulls_first_));
   priority_queue_.reset(
       new priority_queue<TupleRow*, vector<TupleRow*>, TupleRowComparator>(
           *tuple_row_less_than_));

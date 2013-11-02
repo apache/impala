@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.Iterator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -53,8 +52,6 @@ public class SortNode extends PlanNode {
     this.tupleIds.addAll(input.getTupleIds());
     this.nullableTupleIds.addAll(input.getNullableTupleIds());
     this.children.add(input);
-    Preconditions.checkArgument(
-        info.getOrderingExprs().size() == info.getIsAscOrder().size());
   }
 
   /**
@@ -103,6 +100,7 @@ public class SortNode extends PlanNode {
     return Objects.toStringHelper(this)
         .add("ordering_exprs", Expr.debugString(info.getOrderingExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
+        .add("nulls_first", "[" + Joiner.on(" ").join(info.getNullsFirst()) + "]")
         .addValue(super.debugString())
         .toString();
   }
@@ -112,7 +110,7 @@ public class SortNode extends PlanNode {
     msg.node_type = TPlanNodeType.SORT_NODE;
     msg.sort_node = new TSortNode(
         Expr.treesToThrift(info.getOrderingExprs()), info.getIsAscOrder(), useTopN,
-        isDefaultLimit);
+        isDefaultLimit).setNulls_first(info.getNullsFirst());
   }
 
   @Override
@@ -120,17 +118,17 @@ public class SortNode extends PlanNode {
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(detailPrefix + "order by: ");
-    Iterator<Expr> expr = info.getOrderingExprs().iterator();
-    Iterator<Boolean> isAsc = info.getIsAscOrder().iterator();
-    boolean start = true;
-    while (expr.hasNext()) {
-      if (start) {
-        start = false;
-      } else {
+    for (int i = 0; i < info.getOrderingExprs().size(); ++i) {
+      if (i > 0) {
         output.append(", ");
       }
-      output.append(expr.next().toSql() + " ");
-      output.append(isAsc.next() ? "ASC" : "DESC");
+      output.append(info.getOrderingExprs().get(i).toSql() + " ");
+      output.append(info.getIsAscOrder().get(i) ? "ASC" : "DESC");
+
+      Boolean nullsFirstParam = info.getNullsFirstParams().get(i);
+      if (nullsFirstParam != null) {
+        output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
+      }
     }
     output.append("\n");
     return output.toString();

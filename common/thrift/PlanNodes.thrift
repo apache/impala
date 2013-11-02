@@ -191,6 +191,9 @@ struct TSortNode {
   3: required bool use_top_n;
   // Indicates whether the imposed limit comes DEFAULT_ORDER_BY_LIMIT.
   4: required bool is_default_limit
+  // Indicates, for each expr, if nulls should be listed first or last. This is
+  // independent of is_asc_order.
+  5: optional list<bool> nulls_first
 }
 
 struct TMergeNode {

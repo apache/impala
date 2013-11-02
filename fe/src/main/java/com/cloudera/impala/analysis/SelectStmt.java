@@ -598,8 +598,7 @@ public class SelectStmt extends QueryStmt {
     if (orderByElements != null) {
       strBuilder.append(" ORDER BY ");
       for (int i = 0; i < orderByElements.size(); ++i) {
-        strBuilder.append(orderByElements.get(i).getExpr().toSql());
-        strBuilder.append(orderByElements.get(i).getIsAsc() ? " ASC" : " DESC");
+        strBuilder.append(orderByElements.get(i).toSql());
         strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
       }
     }

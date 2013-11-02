@@ -161,6 +161,20 @@ public class ToSqlTest extends AnalyzerTest {
         "order by string_col DESC, float_col ASC, int_col DESC",
         "SELECT id, string_col FROM functional.alltypes " +
         "ORDER BY string_col DESC, float_col ASC, int_col DESC");
+    testToSql("select id, string_col from functional.alltypes " +
+        "order by string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC",
+        "SELECT id, string_col FROM functional.alltypes " +
+        "ORDER BY string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC");
+
+    // Check we do not print NULLS FIRST/LAST unless necessary
+    testToSql("select id, string_col from functional.alltypes " +
+        "order by string_col DESC NULLS FIRST, float_col ASC NULLS LAST, " +
+        "int_col DESC",
+        "SELECT id, string_col FROM functional.alltypes " +
+        "ORDER BY string_col DESC, float_col ASC, " +
+        "int_col DESC");
   }
 
   // Test the toSql() output of queries with all clauses.
@@ -171,13 +185,13 @@ public class ToSqlTest extends AnalyzerTest {
         "where double_col > 2.5 AND string_col != \"abc\"" +
         "group by bigint_col, int_col " +
         "having count(int_col) > 10 OR sum(bigint_col) > 20 " +
-        "order by 2 DESC, 3 ASC",
+        "order by 2 DESC NULLS LAST, 3 ASC",
         "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) " +
         "FROM functional.alltypes " +
         "WHERE double_col > 2.5 AND string_col != 'abc' " +
         "GROUP BY bigint_col, int_col " +
         "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
-        "ORDER BY 2 DESC, 3 ASC");
+        "ORDER BY 2 DESC NULLS LAST, 3 ASC");
   }
 
   @Test
@@ -198,22 +212,22 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("(select bool_col, int_col from functional.alltypes) " +
         "union all (select bool_col, int_col from functional.alltypessmall) " +
         "union all (select bool_col, bigint_col " +
-        "from functional.alltypes order by 1 limit 1) " +
-        "order by int_col, bool_col limit 10",
+        "from functional.alltypes order by 1 nulls first limit 1) " +
+        "order by int_col nulls first, bool_col limit 10",
         "SELECT bool_col, int_col FROM functional.alltypes " +
         "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION ALL SELECT bool_col, bigint_col " +
-        "FROM functional.alltypes ORDER BY 1 ASC LIMIT 1 " +
-        "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
+        "FROM functional.alltypes ORDER BY 1 ASC NULLS FIRST LIMIT 1 " +
+        "ORDER BY int_col ASC NULLS FIRST, bool_col ASC LIMIT 10");
     // With 'order by' and 'limit' on union but not on last select.
     testToSql("select bool_col, int_col from functional.alltypes " +
         "union all select bool_col, int_col from functional.alltypessmall " +
         "union all (select bool_col, bigint_col from functional.alltypes) " +
-        "order by int_col, bool_col limit 10",
+        "order by int_col nulls first, bool_col limit 10",
         "SELECT bool_col, int_col FROM functional.alltypes " +
         "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION ALL (SELECT bool_col, bigint_col FROM functional.alltypes) " +
-        "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
+        "ORDER BY int_col ASC NULLS FIRST, bool_col ASC LIMIT 10");
     // Nested unions require parenthesis.
     testToSql("select bool_col, int_col from functional.alltypes " +
         "union all (select bool_col, int_col from functional.alltypessmall " +
@@ -269,11 +283,11 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select t1.id, t2.id from " +
         "(select id, string_col from functional.alltypes) t1 inner join " +
         "(select id, float_col from functional.alltypes) t2 on (t1.id = t2.id) " +
-        "order by t1.id, t2.id",
+        "order by t1.id, t2.id nulls first",
         "SELECT t1.id, t2.id FROM " +
         "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
         "(SELECT id, float_col FROM functional.alltypes) t2 ON (t1.id = t2.id) " +
-        "ORDER BY t1.id ASC, t2.id ASC");
+        "ORDER BY t1.id ASC, t2.id ASC NULLS FIRST");
     // Test undoing expr substitution in where-clause conjuncts.
     testToSql("select t1.id, t2.id from " +
         "(select id, string_col from functional.alltypes) t1, " +
@@ -316,13 +330,13 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT * FROM t1");
     // WITH clause in complex query with joins and and order by + limit.
     testToSql("with t as (select int_col x, bigint_col y from functional.alltypestiny " +
-        "order by id limit 2) " +
+        "order by id nulls first limit 2) " +
         "select * from t t1 left outer join t t2 on t1.y = t2.x " +
-        "full outer join t t3 on t2.y = t3.x order by t1.x limit 10",
+        "full outer join t t3 on t2.y = t3.x order by t1.x nulls first limit 10",
         "WITH t AS (SELECT int_col x, bigint_col y FROM functional.alltypestiny " +
-        "ORDER BY id ASC LIMIT 2) " +
+        "ORDER BY id ASC NULLS FIRST LIMIT 2) " +
         "SELECT * FROM t t1 LEFT OUTER JOIN t t2 ON t1.y = t2.x " +
-        "FULL OUTER JOIN t t3 ON t2.y = t3.x ORDER BY t1.x ASC LIMIT 10");
+        "FULL OUTER JOIN t t3 ON t2.y = t3.x ORDER BY t1.x ASC NULLS FIRST LIMIT 10");
   }
 
   // Test the toSql() output of insert queries.

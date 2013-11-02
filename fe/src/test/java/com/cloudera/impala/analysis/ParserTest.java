@@ -27,7 +27,6 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.collect.Lists;
 
 public class ParserTest {
@@ -288,9 +287,29 @@ public class ParserTest {
              "order by string_col, 15.7 * float_col, int_col + bigint_col");
     ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
              "order by string_col asc, 15.7 * float_col desc, int_col + bigint_col asc");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col asc, float_col desc, int_col + bigint_col " +
+             "asc nulls first");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col asc, float_col desc, int_col + bigint_col " +
+             "desc nulls last");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col asc, float_col desc, int_col + bigint_col " +
+             "nulls first");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col asc, float_col desc nulls last, int_col + bigint_col " +
+             "nulls first");
     ParsesOk("select int_col from alltypes order by true, false, NULL");
     ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
                 "order by by string_col asc desc");
+    ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+                "nulls first");
+    ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+                "order by string_col nulls");
+    ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+                "order by string_col nulls first asc");
+    ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+                "order by string_col nulls first last");
   }
 
   @Test
@@ -349,12 +368,17 @@ public class ParserTest {
     // Union with order by,
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) order by a");
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) order by a nulls first");
     // Union with limit.
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) limit 10");
     // Union with order by and limit.
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) order by a limit 10");
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) order by a " +
+        "nulls first limit 10");
     // Union with some select blocks in parenthesis, and others not.
     ParsesOk("(select a from test) union select a from test " +
         "union (select a from test) union select a from test");
@@ -1890,8 +1914,8 @@ public class ParserTest {
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
         "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
 
@@ -1900,8 +1924,8 @@ public class ParserTest {
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
         "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
@@ -1909,8 +1933,8 @@ public class ParserTest {
         "(1 - i)\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
         "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     // Long line: error in the middle

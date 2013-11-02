@@ -29,6 +29,8 @@ order by
   i_manufact
 limit 100
 ---- RESULTS
+6011008,'amalgbrand #8',84,'eseeing',NULL
+2002002,'importoimporto #2',242,'ableeseable',NULL
 9006005,'corpmaxi #5',839,'n stprieing',8147.2001953125
 4003002,'exportiedu pack #2',207,'ationbarable',7984.699996948242
 7006006,'corpbrand #6',878,'eingationeing',6619.1201171875
@@ -94,8 +96,6 @@ limit 100
 7010009,'univnameless #9',9,'n st',30.23999977111816
 5004002,'edu packscholar #2',306,'callybarpri',28
 6006003,'corpcorp #3',548,'eingeseanti',5.699999809265137
-6011008,'amalgbrand #8',84,'eseeing',NULL
-2002002,'importoimporto #2',242,'ableeseable',NULL
 ---- TYPES
 INT, STRING, INT, STRING, DOUBLE
 ====

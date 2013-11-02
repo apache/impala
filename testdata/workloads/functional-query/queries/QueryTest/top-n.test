@@ -56,11 +56,76 @@ NULL,1000
 TINYINT, BIGINT
 ====
 ---- QUERY
-# Same query order by asc first desc
-select tinyint_col, count(*) 
-from alltypesagg 
-group by 1 
+# Same query order by asc first col, NULL should be last
+# because it compares greater.
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
+order by 1
+limit 10
+---- RESULTS
+1,1000
+2,1000
+3,1000
+4,1000
+5,1000
+6,1000
+7,1000
+8,1000
+9,1000
+NULL,1000
+---- TYPES
+TINYINT, BIGINT
+====
+---- QUERY
+# Same query order by asc first col, NULL should be first
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
+order by 1 nulls first
+limit 10
+---- RESULTS
+NULL,1000
+1,1000
+2,1000
+3,1000
+4,1000
+5,1000
+6,1000
+7,1000
+8,1000
+9,1000
+---- TYPES
+TINYINT, BIGINT
+====
+---- QUERY
+# Same query but first col desc.
+# NULL should be first because it compares greater
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
 order by 1 desc
+limit 20
+---- RESULTS
+NULL,1000
+9,1000
+8,1000
+7,1000
+6,1000
+5,1000
+4,1000
+3,1000
+2,1000
+1,1000
+---- TYPES
+TINYINT, BIGINT
+====
+---- QUERY
+# Same query as above but NULL should be last
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
+order by 1 desc nulls last
 limit 20
 ---- RESULTS
 9,1000
@@ -82,6 +147,7 @@ from alltypesagg
 order by date_string_col, int_col desc
 limit 10
 ---- RESULTS
+'01/01/10',NULL
 '01/01/10',999
 '01/01/10',998
 '01/01/10',997
@@ -91,7 +157,6 @@ limit 10
 '01/01/10',993
 '01/01/10',992
 '01/01/10',991
-'01/01/10',990
 ---- TYPES
 STRING, INT
 ====
@@ -170,10 +235,10 @@ limit 20
 2,2,120
 2,1,90
 2,0,90
+NULL,NULL,10
 NULL,2,30
 NULL,1,30
 NULL,0,30
-NULL,NULL,10
 ---- TYPES
 TINYINT, SMALLINT, BIGINT
 ====
@@ -185,6 +250,10 @@ group by 1, 2
 order by 1 desc, 2
 limit 20
 ---- RESULTS
+NULL,0,30
+NULL,1,30
+NULL,2,30
+NULL,NULL,10
 2,0,90
 2,1,90
 2,2,120
@@ -194,10 +263,6 @@ limit 20
 0,0,120
 0,1,90
 0,2,90
-NULL,0,30
-NULL,1,30
-NULL,2,30
-NULL,NULL,10
 ---- TYPES
 TINYINT, SMALLINT, BIGINT
 ====
@@ -209,6 +274,10 @@ group by 1, 2
 order by 1 desc, 2 desc
 limit 20
 ---- RESULTS
+NULL,NULL,10
+NULL,2,30
+NULL,1,30
+NULL,0,30
 2,2,120
 2,1,90
 2,0,90
@@ -218,9 +287,30 @@ limit 20
 0,2,90
 0,1,90
 0,0,120
+---- TYPES
+TINYINT, SMALLINT, BIGINT
+====
+---- QUERY
+# Multiple ordering columns with asc/desc and nulls first/last
+select tinyint_col % 3, smallint_col % 3, count(*)
+from alltypesagg
+where day = 1
+group by 1, 2
+order by 2 desc nulls last, 1 asc nulls first
+limit 20
+---- RESULTS
 NULL,2,30
+0,2,90
+1,2,90
+2,2,120
 NULL,1,30
+0,1,90
+1,1,120
+2,1,90
 NULL,0,30
+0,0,120
+1,0,90
+2,0,90
 NULL,NULL,10
 ---- TYPES
 TINYINT, SMALLINT, BIGINT
@@ -491,12 +581,12 @@ group by 1
 order by avg(tinyint_col) - avg(float_col) desc
 limit 10
 ---- RESULTS
+NULL,10,NULL
 1,2000,-544.8499889141322
 2,2000,-544.9500045645237
 0,1990,-545
 3,2000,-545.0499953591824
 4,2000,-545.1500110459327
-NULL,10,NULL
 ---- TYPES
 INT, BIGINT, DOUBLE
 ====

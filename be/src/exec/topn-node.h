@@ -59,6 +59,7 @@ class TopNNode : public ExecNode {
 
   std::vector<TupleDescriptor*> tuple_descs_;
   std::vector<bool> is_asc_order_;
+  std::vector<bool> nulls_first_;
 
   // True if the limit_ comes from DEFAULT_ORDER_BY_LIMIT and the query option
   // ABORT_ON_DEFAULT_LIMIT_EXCEEDED is set.
