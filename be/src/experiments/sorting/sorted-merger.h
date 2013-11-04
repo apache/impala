@@ -37,8 +37,8 @@ class TupleRow;
 // into a single sorted stream. The input and output rows share the same row_desc.
 // Row comparison is done on the exprs in sort_exprs_lhs/_rhs. 'is_asc' determines
 // if each expr comparison is done in ascending or descending sort order.
-// If 'nulls_first' is true, NULL values precede all other values, otherwise
-// they follow all other values.
+// The nulls_first vector determines, for each expr, if NULL values come before
+// or after all other values.
 // If 'remove_dups' is true, duplicates are removed during merging.
 // The merger will try to use no more than 'mem_limit' total memory.
 // TODO: Utilize normalized keys if we have them.
@@ -49,7 +49,7 @@ class SortedMerger {
       const std::vector<Expr*>& sort_exprs_lhs,
       const std::vector<Expr*>& sort_exprs_rhs,
       const std::vector<bool>& is_asc,
-      bool nulls_first,
+      const std::vector<bool>& nulls_first,
       bool remove_dups,
       uint64_t mem_limit);
   ~SortedMerger();

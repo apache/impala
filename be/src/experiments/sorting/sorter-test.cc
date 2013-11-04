@@ -44,7 +44,7 @@ class SorterTest : public testing::Test {
  public:
   static const int BATCH_CAPACITY = 100;  // rows
 
-  SorterTest() : mem_pool_(NULL), writer_(),
+  SorterTest() : writer_(),
       runtime_state_(TUniqueId(), TUniqueId(), TQueryOptions(), "", "", NULL) {
     resource_pool_.reset(resource_mgr_.RegisterPool());
     Reset();
@@ -242,8 +242,8 @@ class SorterTest : public testing::Test {
     return
       new Sorter(writer_.get(), io_mgr_.get(), reader_, resource_pool_.get(),
                  **output_tuple_desc, output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
-                 sort_ascending, nulls_first, remove_dups, sort_key_size,
-                 mem_limit, block_size);
+                 sort_ascending, vector<bool>(sort_ascending.size(), nulls_first),
+                 remove_dups, sort_key_size, mem_limit, block_size);
   }
 
   SortedMerger* SetupTwoIntDataMerger(bool nulls_first, bool remove_dups,
@@ -260,7 +260,8 @@ class SorterTest : public testing::Test {
         &output_slot_exprs, &sort_exprs_lhs, &sort_exprs_rhs);
     return
         new SortedMerger(**output_row_desc, sort_exprs_lhs, sort_exprs_rhs,
-            sort_ascending, nulls_first, remove_dups, mem_limit);
+            sort_ascending, vector<bool>(sort_ascending.size(), nulls_first),
+            remove_dups, mem_limit);
   }
 
   // Produces a RowBatch with 2 columns of data, the first unique and increasing and
@@ -327,8 +328,8 @@ class SorterTest : public testing::Test {
     return
       new Sorter(writer_.get(), io_mgr_.get(), reader_, resource_pool_.get(),
                  **output_tuple_desc, output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
-                 sort_ascending, nulls_first, remove_dups, sort_key_size,
-                 mem_limit, block_size);
+                 sort_ascending, vector<bool>(sort_ascending.size(), nulls_first),
+                 remove_dups, sort_key_size, mem_limit, block_size);
   }
 
   // Produces a RowBatch with 2 columns of data, a float and a timestamp.
@@ -401,8 +402,8 @@ class SorterTest : public testing::Test {
     return
       new Sorter(writer_.get(), io_mgr_.get(), reader_, resource_pool_.get(),
                  **output_tuple_desc, output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
-                 sort_ascending, nulls_first, remove_dups, sort_key_size,
-                 mem_limit, block_size);
+                 sort_ascending, vector<bool>(sort_ascending.size(), nulls_first),
+                 remove_dups, sort_key_size, mem_limit, block_size);
   }
 
   // Produces a RowBatch with 2 columns of data, an int and a string.
@@ -439,7 +440,6 @@ class SorterTest : public testing::Test {
 
  private:
   ObjectPool obj_pool_;
-  MemPool mem_pool_;
   MemTracker mem_tracker_;
   scoped_ptr<DiskWriter> writer_;
   scoped_ptr<DiskIoMgr> io_mgr_;

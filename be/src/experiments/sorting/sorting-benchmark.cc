@@ -298,7 +298,6 @@ bool my_cmp(void* x_arg, void* y_arg) {
 // Data is inlined into the vector -- i.e., vector<SortTuple>.
 template <typename sort_tuple_t>
 void TestFlatImpala(TestData* data, Timer* timer, uint64_t num_rows) {
-  MemPool mem_pool(NULL);
   BufferPool buffer_pool(512, 1024*1024*8);
   ObjectPool obj_pool;
   BlockMemPool block_mem_pool(&obj_pool, &buffer_pool);
@@ -486,14 +485,15 @@ void TestMergeBandwidth(TestData* data, Timer* timer, uint64_t num_rows,
   vector<Expr*> sort_exprs_lhs;
   vector<Expr*> sort_exprs_rhs;
   vector<bool> sort_ascending;
+  vector<bool> nulls_first;
   for (int i = 0; i < num_keys; ++i) {
     int key_slot_id = key_slots[i];
     sort_exprs_lhs.push_back(new OffsetSlotRef(tuple_desc, key_slot_id));
     sort_exprs_rhs.push_back(new OffsetSlotRef(tuple_desc, key_slot_id));
     sort_ascending.push_back(true);
+    nulls_first.push_back(true);
   }
 
-  bool nulls_first = true;
   bool remove_dups = false;
   scoped_ptr<SortedMerger> merger(new SortedMerger(*row_desc,
                                        sort_exprs_lhs, sort_exprs_rhs,
@@ -554,6 +554,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
   vector<Expr*> sort_exprs_lhs;
   vector<Expr*> sort_exprs_rhs;
   vector<bool> sort_ascending;
+  vector<bool> nulls_first;
   int ideal_sort_key_size = num_keys /* NULL bytes */;
   int string_id = 0;
   for (int i = 0; i < num_keys; ++i) {
@@ -561,6 +562,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
     sort_exprs_lhs.push_back(new OffsetSlotRef(tuple_desc, key_slot_id));
     sort_exprs_rhs.push_back(new OffsetSlotRef(tuple_desc, key_slot_id));
     sort_ascending.push_back(true);
+    nulls_first.push_back(true);
 
     SlotDescriptor* slot = tuple_desc->slots()[key_slot_id];
     if (slot->type() == TYPE_STRING) {
@@ -588,7 +590,6 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
   ThreadResourceMgr resource_mgr;
   ThreadResourceMgr::ResourcePool* resource_pool = resource_mgr.RegisterPool();
 
-  bool nulls_first = true;
   bool remove_dups = false;
   scoped_ptr<Sorter> sorter(new Sorter(&writer, &io_mgr, reader, resource_pool,*tuple_desc,
                                        output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
@@ -862,6 +863,7 @@ void TestBandwidth(uint64_t num_rows) {
 int main(int argc, char **argv) {
   CpuInfo::Init();
   DiskInfo::Init();
+  InitThreading();
   cout << Benchmark::GetMachineInfo() << endl;
 
   if (argc != 4) {

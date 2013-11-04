@@ -164,8 +164,8 @@ inline bool KeyNormalizer::NormalizeKey(TupleRow* row, uint8_t* dst,
   for (int i = 0; i < key_exprs_.size(); ++i) {
     uint8_t* key = reinterpret_cast<uint8_t*>(key_exprs_[i]->GetValue(row));
     int offset = key_len_ - bytes_left;
-    bool went_over = NormalizeKeyColumn(key_exprs_[i]->type(), null_bit_, is_asc_[i],
-                                        key, dst + offset, &bytes_left);
+    bool went_over = NormalizeKeyColumn(key_exprs_[i]->type(), !nulls_first_[i],
+                                        is_asc_[i], key, dst + offset, &bytes_left);
     if (went_over) {
       if (key_idx_over_budget != NULL) *key_idx_over_budget = i;
       return true;

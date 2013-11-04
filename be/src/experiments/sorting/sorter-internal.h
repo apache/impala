@@ -50,7 +50,7 @@ class Sorter::SortTupleComparator {
  public:
   SortTupleComparator(BlockedVector<Tuple>* tuples,
       const std::vector<Expr*>& key_exprs_lhs, const std::vector<Expr*>& key_exprs_rhs,
-      std::vector<bool> is_asc, bool nulls_first)
+      const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
     : tuples_(tuples),
       tuple_comparator_(key_exprs_lhs, key_exprs_rhs, is_asc, nulls_first) {
   }
@@ -102,6 +102,8 @@ class Sorter::RunBuilder {
  public:
   RunBuilder(Sorter* sorter, BufferPool* buffer_pool);
 
+  ~RunBuilder();
+
   // Adds a Row to this Run.
   void AddRow(TupleRow* row);
 
@@ -129,7 +131,8 @@ class Sorter::RunBuilder {
   // the normalized key is insufficent.
   void DoSort(std::vector<Expr*>* incomplete_sort_exprs_lhs,
               std::vector<Expr*>* incomplete_sort_exprs_rhs,
-              std::vector<bool>* is_asc);
+              std::vector<bool>* is_asc,
+              std::vector<bool>* nulls_first);
 
   // Sort all Tuples.
   void Sort();

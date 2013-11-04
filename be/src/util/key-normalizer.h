@@ -55,9 +55,9 @@ class KeyNormalizer {
   // Initializes the normalizer with the key exprs and length alloted to each normalized
   // key.
   KeyNormalizer(const std::vector<Expr*>& key_exprs, int key_len,
-      const std::vector<bool>& is_asc, bool nulls_first)
+      const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
       : key_exprs_(key_exprs), key_len_(key_len), is_asc_(is_asc),
-        null_bit_(!nulls_first) {
+        nulls_first_(nulls_first) {
   }
 
   // Normalizes all keys and writes the value into dst.
@@ -101,9 +101,7 @@ class KeyNormalizer {
   std::vector<Expr*> key_exprs_;
   int key_len_;
   std::vector<bool> is_asc_;
-
-  // 0 if nulls_first, 1 otherwise
-  uint8_t null_bit_;
+  std::vector<bool> nulls_first_;
 };
 
 }

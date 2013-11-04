@@ -52,8 +52,8 @@ class Sorter {
   // sort_exprs_lhs/rhs (which references the output tuple), in order.
   // The bool vector is_asc determines whether a particular comparison is done in
   // ascending or descending order.
-  // If 'nulls_first' is true, NULL values precede all other values, otherwise
-  // they follow all other values.
+  // The nulls_first vector determines, for each expr, if NULL values come before
+  // or after all other values.
   // If 'remove_dups' is true, removes duplicates during the merging steps.
   // The Sorter will use no more than 'mem_limit' bytes for its buffer space
   // and no more than 'sort_key_size' bytes for its inlined sort key.
@@ -84,7 +84,7 @@ class Sorter {
       const std::vector<Expr*>& sort_exprs_lhs,
       const std::vector<Expr*>& sort_exprs_rhs,
       const std::vector<bool>& is_asc,
-      bool nulls_first,
+      const std::vector<bool>& nulls_first,
       bool remove_dups,
       uint32_t sort_key_size,
       uint64_t mem_limit,
@@ -200,7 +200,7 @@ class Sorter {
   const std::vector<Expr*> sort_exprs_lhs_;
   const std::vector<Expr*> sort_exprs_rhs_;
   const std::vector<bool> is_asc_;
-  const bool nulls_first_;
+  const std::vector<bool> nulls_first_;
   const bool remove_dups_;
   const bool extract_keys_;
   const float run_size_prop_;

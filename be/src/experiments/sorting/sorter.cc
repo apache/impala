@@ -50,8 +50,8 @@ Sorter::Sorter(
     const vector<Expr*>& sort_exprs_lhs,
     const vector<Expr*>& sort_exprs_rhs,
     const vector<bool>& is_asc,
-    bool nulls_first, bool remove_dups,
-    uint32_t sort_key_size, uint64_t mem_limit,
+    const vector<bool>& nulls_first,
+    bool remove_dups, uint32_t sort_key_size, uint64_t mem_limit,
     int64_t block_size, bool extract_keys, float run_size_prop,
     bool parallelize_run_building)
     : output_tuple_desc_(output_tuple_desc),
@@ -126,6 +126,10 @@ Sorter::RunBuilder::RunBuilder(Sorter* sorter, BufferPool* buffer_pool)
   }
 }
 
+Sorter::RunBuilder::~RunBuilder() {
+  unsorted_aux_pool_->FreeAll();
+}
+
 void Sorter::RunBuilder::AddRow(TupleRow* row) {
   Tuple* tuple = tuples_.AllocateElement();
 
@@ -165,7 +169,8 @@ void Sorter::RunBuilder::AddRow(TupleRow* row) {
 
 void Sorter::RunBuilder::DoSort(vector<Expr*>* incomplete_sort_exprs_lhs,
                                 vector<Expr*>* incomplete_sort_exprs_rhs,
-                                vector<bool>* is_asc) {
+                                vector<bool>* is_asc,
+                                vector<bool>* nulls_first) {
   if (sorter_->extract_keys_) {
     int sort_tuple_size = sorter_->sort_key_size_ + sizeof(SortTuple);
 
@@ -175,7 +180,7 @@ void Sorter::RunBuilder::DoSort(vector<Expr*>* incomplete_sort_exprs_lhs,
     } else {
       function<bool (SortTuple*, SortTuple*)> sort_key_cmp = SortTupleComparator(&tuples_,
           *incomplete_sort_exprs_lhs, *incomplete_sort_exprs_rhs, *is_asc,
-          sorter_->nulls_first_);
+          *nulls_first);
 
       SortUtil<SortTuple>::SortNormalized(sort_tuples_.Begin(), sort_tuples_.End(),
           sort_tuple_size, sizeof(SortTuple), sorter_->sort_key_size_, &sort_key_cmp);
@@ -189,7 +194,7 @@ void Sorter::RunBuilder::DoSort(vector<Expr*>* incomplete_sort_exprs_lhs,
     } else {
       function<bool (Tuple*, Tuple*)> sort_key_cmp = TupleRowComparator(
           *incomplete_sort_exprs_lhs, *incomplete_sort_exprs_rhs, *is_asc,
-          sorter_->nulls_first_);
+          *nulls_first);
 
       SortUtil<Tuple>::SortNormalized(tuples_.Begin(), tuples_.End(),
           sort_tuple_size, sorter_->tuple_size_, sorter_->sort_key_size_, &sort_key_cmp);
@@ -202,7 +207,7 @@ void Sorter::RunBuilder::Sort() {
 
   bool complete_key = (first_sort_expr_over_budget_ == sorter_->sort_exprs_lhs_.size());
   if (complete_key) {
-    DoSort(NULL, NULL, NULL);
+    DoSort(NULL, NULL, NULL, NULL);
   } else {
     // Use comparator which falls back on comparing evaluated sort exprs if keys equal.
     // Be sure to only compare sort exprs that are not fully in the normalized key.
@@ -214,7 +219,10 @@ void Sorter::RunBuilder::Sort() {
         sorter_->sort_exprs_rhs_.end());
     vector<bool> is_asc(
         sorter_->is_asc_.begin() + first_sort_expr_over_budget_, sorter_->is_asc_.end());
-    DoSort(&incomplete_sort_exprs_lhs, &incomplete_sort_exprs_rhs, &is_asc);
+    vector<bool> nulls_first(
+        sorter_->nulls_first_.begin() + first_sort_expr_over_budget_,
+        sorter_->nulls_first_.end());
+    DoSort(&incomplete_sort_exprs_lhs, &incomplete_sort_exprs_rhs, &is_asc, &nulls_first);
   }
 }
 

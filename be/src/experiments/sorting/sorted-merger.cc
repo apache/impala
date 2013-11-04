@@ -33,7 +33,7 @@ SortedMerger::SortedMerger(
     const std::vector<Expr*>& sort_exprs_lhs,
     const std::vector<Expr*>& sort_exprs_rhs,
     const std::vector<bool>& is_asc,
-    bool nulls_first, bool remove_dups, uint64_t mem_limit)
+    const std::vector<bool>& nulls_first, bool remove_dups, uint64_t mem_limit)
     : row_desc_(row_desc),
       remove_dups_(remove_dups),
       merge_heap_(TupleRowComparator(sort_exprs_lhs, sort_exprs_rhs, is_asc, nulls_first)),
@@ -102,6 +102,8 @@ SortedMerger::~SortedMerger() {
     delete input_runs_[i]->batch_supplier();
     delete input_runs_[i];
   }
+  last_output_row_pool_->FreeAll();
+  tuple_pool_->FreeAll();
 }
 
 void SortedMerger::AddRun(RowBatchSupplier* batch_supplier) {
