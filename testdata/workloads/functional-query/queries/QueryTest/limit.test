@@ -14,6 +14,13 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 ---- RESULTS
 ====
 ---- QUERY
+# limit 0 with arithmetic expr
+select * from functional_hbase.alltypessmall where string_col = '4' limit 3 % 3
+---- TYPES
+int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+---- RESULTS
+====
+---- QUERY
 # limit 0 on complex subquery join
 select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
 from (
@@ -91,6 +98,23 @@ NULL,1000
 ====
 ---- QUERY
 select tinyint_col, count(*) from alltypesagg group by 1 limit 10
+---- TYPES
+tinyint, bigint
+---- RESULTS
+1,1000
+2,1000
+3,1000
+4,1000
+5,1000
+6,1000
+7,1000
+8,1000
+9,1000
+NULL,1000
+====
+---- QUERY
+# Test a more complex arithmetic expression
+select tinyint_col, count(*) from alltypesagg group by 1 limit ((2+3-0) * 2 % 100)
 ---- TYPES
 tinyint, bigint
 ---- RESULTS

@@ -46,6 +46,20 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
 ====
 ---- QUERY
+# Same UNION ALL with limits containing arithmetic expressions (that all evaluate to 1).
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1 limit 3-2
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1 order by int_col limit 1*1*1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2 limit 1&1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
 # Only UNION DISTINCT, no nested unions
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 union distinct

@@ -30,8 +30,8 @@ import com.google.common.collect.Lists;
 public class ValuesStmt extends UnionStmt {
 
   public ValuesStmt(List<UnionOperand> operands,
-      ArrayList<OrderByElement> orderByElements, long limit) {
-    super(operands, orderByElements, limit);
+      ArrayList<OrderByElement> orderByElements, Expr limitExpr) {
+    super(operands, orderByElements, limitExpr);
   }
 
   @Override
@@ -47,8 +47,8 @@ public class ValuesStmt extends UnionStmt {
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
 
-    if (withClause != null) {
-      strBuilder.append(withClause.toSql());
+    if (withClause_ != null) {
+      strBuilder.append(withClause_.toSql());
       strBuilder.append(" ");
     }
 
@@ -78,7 +78,8 @@ public class ValuesStmt extends UnionStmt {
     for (UnionOperand operand: operands) {
       operandClones.add(operand.clone());
     }
-    ValuesStmt valuesClone = new ValuesStmt(operandClones, cloneOrderByElements(), limit);
+    ValuesStmt valuesClone = new ValuesStmt(operandClones, cloneOrderByElements(),
+        limitExpr_ == null ? null : limitExpr_.clone(null));
     valuesClone.setWithClause(cloneWithClause());
     return valuesClone;
   }

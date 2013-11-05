@@ -435,6 +435,35 @@ public class AnalyzerTest {
         "from functional.alltypes");
   }
 
+  @Test
+  public void TestLimitExpr() {
+    // Arithmetic expressions that result in a positive, integral value are OK
+    AnalyzesOk("select * from functional.AllTypes limit 10 * 10 + 10 - 10 % 10");
+    AnalyzesOk("select * from functional.AllTypes limit 1 ^ 0 | 3 & 3");
+
+    // Casting to int is fine
+    AnalyzesOk("select id, bool_col from functional.AllTypes limit CAST(10.0 AS INT)");
+    AnalyzesOk("select id, bool_col from functional.AllTypes limit " +
+               "CAST(NOT FALSE AS INT)");
+
+    // Analysis error from negative values
+    AnalysisError("select * from functional.AllTypes limit 10 - 20",
+        "LIMIT must be a non-negative integer: 10 - 20 = -10");
+
+    // Analysis error from non-integral values
+    AnalysisError("select * from functional.AllTypes limit 10.0",
+        "LIMIT expression must be an integer type but is 'FLOAT': 10.0");
+    AnalysisError("select * from functional.AllTypes limit NOT FALSE",
+        "LIMIT expression must be an integer type but is 'BOOLEAN': NOT FALSE");
+    AnalysisError("select * from functional.AllTypes limit CAST(\"asdf\" AS INT)",
+        "LIMIT expression evaluates to NULL: CAST('asdf' AS INT)");
+
+    // Analysis error from non-constant expressions
+    AnalysisError("select id, bool_col from functional.AllTypes limit id < 10",
+        "LIMIT expression must be a constant expression: id < 10");
+
+  }
+
   private Function createFunction(boolean hasVarArgs, PrimitiveType... args) {
     return new Function(
         new FunctionName("test"), args, PrimitiveType.INVALID_TYPE, hasVarArgs);

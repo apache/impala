@@ -213,12 +213,12 @@ public class ToSqlTest extends AnalyzerTest {
         "union all (select bool_col, int_col from functional.alltypessmall) " +
         "union all (select bool_col, bigint_col " +
         "from functional.alltypes order by 1 nulls first limit 1) " +
-        "order by int_col nulls first, bool_col limit 10",
+        "order by int_col nulls first, bool_col limit 5 + 5",
         "SELECT bool_col, int_col FROM functional.alltypes " +
         "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION ALL SELECT bool_col, bigint_col " +
         "FROM functional.alltypes ORDER BY 1 ASC NULLS FIRST LIMIT 1 " +
-        "ORDER BY int_col ASC NULLS FIRST, bool_col ASC LIMIT 10");
+        "ORDER BY int_col ASC NULLS FIRST, bool_col ASC LIMIT 5 + 5");
     // With 'order by' and 'limit' on union but not on last select.
     testToSql("select bool_col, int_col from functional.alltypes " +
         "union all select bool_col, int_col from functional.alltypessmall " +
@@ -332,11 +332,11 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("with t as (select int_col x, bigint_col y from functional.alltypestiny " +
         "order by id nulls first limit 2) " +
         "select * from t t1 left outer join t t2 on t1.y = t2.x " +
-        "full outer join t t3 on t2.y = t3.x order by t1.x nulls first limit 10",
+        "full outer join t t3 on t2.y = t3.x order by t1.x nulls first limit 5 * 2",
         "WITH t AS (SELECT int_col x, bigint_col y FROM functional.alltypestiny " +
         "ORDER BY id ASC NULLS FIRST LIMIT 2) " +
         "SELECT * FROM t t1 LEFT OUTER JOIN t t2 ON t1.y = t2.x " +
-        "FULL OUTER JOIN t t3 ON t2.y = t3.x ORDER BY t1.x ASC NULLS FIRST LIMIT 10");
+        "FULL OUTER JOIN t t3 ON t2.y = t3.x ORDER BY t1.x ASC NULLS FIRST LIMIT 5 * 2");
   }
 
   // Test the toSql() output of insert queries.

@@ -92,8 +92,8 @@ public class UnionStmt extends QueryStmt {
   protected TupleId tupleId;
 
   public UnionStmt(List<UnionOperand> operands,
-      ArrayList<OrderByElement> orderByElements, long limit) {
-    super(orderByElements, limit);
+      ArrayList<OrderByElement> orderByElements, Expr limitExpr) {
+    super(orderByElements, limitExpr);
     this.operands = operands;
   }
 
@@ -221,15 +221,15 @@ public class UnionStmt extends QueryStmt {
       slotDesc.setType(expr.getType());
       slotDesc.setStats(columnStats.get(i));
       SlotRef slotRef = new SlotRef(slotDesc);
-      resultExprs.add(slotRef);
+      resultExprs_.add(slotRef);
       // Add to the substitution map so that column refs in "order by" can be resolved.
-      if (orderByElements != null) {
+      if (orderByElements_ != null) {
         SlotRef aliasRef = new SlotRef(null, getColLabels().get(i));
-        if (aliasSMap.lhs.contains(aliasRef)) {
-          ambiguousAliasList.add(aliasRef);
+        if (aliasSMap_.lhs.contains(aliasRef)) {
+          ambiguousAliasList_.add(aliasRef);
         } else {
-          aliasSMap.lhs.add(aliasRef);
-          aliasSMap.rhs.add(slotRef);
+          aliasSMap_.lhs.add(aliasRef);
+          aliasSMap_.rhs.add(slotRef);
         }
       }
     }
@@ -257,13 +257,13 @@ public class UnionStmt extends QueryStmt {
         throw new AnalysisException(
             errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
       }
-      if (pos > resultExprs.size()) {
+      if (pos > resultExprs_.size()) {
         throw new AnalysisException(
             errorPrefix + ": ordinal exceeds number of items in select list: "
             + expr.toSql());
       }
       // Create copy to protect against accidentally shared state.
-      i.set(resultExprs.get((int) pos - 1).clone(null));
+      i.set(resultExprs_.get((int) pos - 1).clone(null));
     }
   }
 
@@ -281,8 +281,8 @@ public class UnionStmt extends QueryStmt {
     StringBuilder strBuilder = new StringBuilder();
     Preconditions.checkState(operands.size() > 0);
 
-    if (withClause != null) {
-      strBuilder.append(withClause.toSql());
+    if (withClause_ != null) {
+      strBuilder.append(withClause_.toSql());
       strBuilder.append(" ");
     }
 
@@ -315,15 +315,15 @@ public class UnionStmt extends QueryStmt {
     // Order By clause
     if (hasOrderByClause()) {
       strBuilder.append(" ORDER BY ");
-      for (int i = 0; i < orderByElements.size(); ++i) {
-        strBuilder.append(orderByElements.get(i).toSql());
-        strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
+      for (int i = 0; i < orderByElements_.size(); ++i) {
+        strBuilder.append(orderByElements_.get(i).toSql());
+        strBuilder.append((i+1 != orderByElements_.size()) ? ", " : "");
       }
     }
     // Limit clause.
     if (hasLimitClause()) {
       strBuilder.append(" LIMIT ");
-      strBuilder.append(limit);
+      strBuilder.append(limitExpr_.toSql());
     }
     return strBuilder.toString();
   }
@@ -340,7 +340,8 @@ public class UnionStmt extends QueryStmt {
     for (UnionOperand operand: operands) {
       operandClones.add(operand.clone());
     }
-    UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(), limit);
+    UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),
+        limitExpr_ == null ? null : limitExpr_.clone(null));
     unionClone.setWithClause(cloneWithClause());
     return unionClone;
   }

@@ -276,7 +276,7 @@ nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
 nonterminal OrderByElement order_by_element;
 nonterminal Boolean opt_order_param;
 nonterminal Boolean opt_nulls_order_param;
-nonterminal Number limit_clause;
+nonterminal Expr limit_clause;
 nonterminal Expr cast_expr, case_else_clause, aggregate_expr;
 nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
@@ -1023,7 +1023,7 @@ query_stmt ::=
     if (operands.size() == 1) {
       queryStmt = operands.get(0).getQueryStmt();
     } else {
-      queryStmt = new UnionStmt(operands, null, -1);
+      queryStmt = new UnionStmt(operands, null, null);
     }
     queryStmt.setWithClause(w);
     RESULT = queryStmt;
@@ -1081,26 +1081,26 @@ union_with_order_by_or_limit ::=
     if (operands.size() == 1) {
       parser.parseError("order", SqlParserSymbols.KW_ORDER);
     }
-    RESULT = new UnionStmt(operands, orderByClause, -1);
+    RESULT = new UnionStmt(operands, orderByClause, null);
   :}
   |
     union_operand_list:operands
-    KW_LIMIT INTEGER_LITERAL:limitClause
+    KW_LIMIT expr:limit_expr
   {:
     if (operands.size() == 1) {
       parser.parseError("limit", SqlParserSymbols.KW_LIMIT);
     }
-    RESULT = new UnionStmt(operands, null, limitClause.longValue());
+    RESULT = new UnionStmt(operands, null, limit_expr);
   :}
   |
     union_operand_list:operands
     KW_ORDER KW_BY order_by_elements:orderByClause
-    KW_LIMIT INTEGER_LITERAL:limitClause
+    KW_LIMIT expr:limit_expr
   {:
     if (operands.size() == 1) {
       parser.parseError("order", SqlParserSymbols.KW_ORDER);
     }
-    RESULT = new UnionStmt(operands, orderByClause, limitClause.longValue());
+    RESULT = new UnionStmt(operands, orderByClause, limit_expr);
   :}
   ;
 
@@ -1141,15 +1141,13 @@ values_stmt ::=
   order_by_clause:orderByClause
   limit_clause:limitClause
   {:
-    RESULT = new ValuesStmt(operands, orderByClause,
-                            (limitClause == null ? -1 : limitClause.longValue()));
+    RESULT = new ValuesStmt(operands, orderByClause, limitClause);
   :}
   | KW_VALUES LPAREN values_operand_list:operands RPAREN
     order_by_clause:orderByClause
     limit_clause:limitClause
   {:
-    RESULT = new ValuesStmt(operands, orderByClause,
-                            (limitClause == null ? -1 : limitClause.longValue()));
+    RESULT = new ValuesStmt(operands, orderByClause, limitClause);
   :}
   ;
 
@@ -1158,13 +1156,13 @@ values_operand_list ::=
   {:
     List<UnionOperand> operands = new ArrayList<UnionOperand>();
     operands.add(new UnionOperand(
-        new SelectStmt(selectList, null, null, null, null, null, -1), null));
+        new SelectStmt(selectList, null, null, null, null, null, null), null));
     RESULT = operands;
   :}
   | values_operand_list:operands COMMA LPAREN select_list:selectList RPAREN
   {:
     operands.add(new UnionOperand(
-        new SelectStmt(selectList, null, null, null, null, null, -1), Qualifier.ALL));
+        new SelectStmt(selectList, null, null, null, null, null, null), Qualifier.ALL));
     RESULT = operands;
   :}
   ;
@@ -1226,7 +1224,7 @@ describe_output_style ::=
 select_stmt ::=
     select_clause:selectList
   {:
-    RESULT = new SelectStmt(selectList, null, null, null, null, null, -1);
+    RESULT = new SelectStmt(selectList, null, null, null, null, null, null);
   :}
   |
     select_clause:selectList
@@ -1237,9 +1235,8 @@ select_stmt ::=
     order_by_clause:orderByClause
     limit_clause:limitClause
   {:
-    RESULT = new SelectStmt(selectList, tableRefList, wherePredicate,
-                            groupingExprs, havingPredicate, orderByClause,
-                            (limitClause == null ? -1 : limitClause.longValue()));
+    RESULT = new SelectStmt(selectList, tableRefList, wherePredicate, groupingExprs,
+                            havingPredicate, orderByClause, limitClause);
   :}
   ;
 
@@ -1501,8 +1498,8 @@ opt_nulls_order_param ::=
   ;
 
 limit_clause ::=
-  KW_LIMIT INTEGER_LITERAL:l
-  {: RESULT = l; :}
+  KW_LIMIT expr:e
+  {: RESULT = e; :}
   | /* empty */
   {: RESULT = null; :}
   ;

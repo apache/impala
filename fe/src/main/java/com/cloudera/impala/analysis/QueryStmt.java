@@ -19,6 +19,9 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.google.common.collect.Lists;
 
 /**
@@ -32,10 +35,13 @@ import com.google.common.collect.Lists;
  *
  */
 public abstract class QueryStmt extends StatementBase {
-  protected WithClause withClause;
+  protected WithClause withClause_;
 
-  protected ArrayList<OrderByElement> orderByElements;
-  protected final long limit;
+  protected ArrayList<OrderByElement> orderByElements_;
+  protected final Expr limitExpr_;
+
+  // Result of limitExpr, computed in analyze().
+  private long limit_;
 
   /**
    * For a select statment:
@@ -44,13 +50,13 @@ public abstract class QueryStmt extends StatementBase {
    * For a union statement:
    * List of slotrefs into the tuple materialized by the union.
    */
-  protected final ArrayList<Expr> resultExprs = Lists.newArrayList();
+  protected final ArrayList<Expr> resultExprs_ = Lists.newArrayList();
 
   /**
    * Map of expression substitutions for replacing aliases
    * in "order by" or "group by" clauses with their corresponding result expr.
    */
-  protected final Expr.SubstitutionMap aliasSMap = new Expr.SubstitutionMap();
+  protected final Expr.SubstitutionMap aliasSMap_ = new Expr.SubstitutionMap();
 
   /**
    * Select list item alias does not have to be unique.
@@ -58,28 +64,67 @@ public abstract class QueryStmt extends StatementBase {
    *   select int_col a, string_col a from alltypessmall;
    * Both columns are using the same alias "a".
    */
-  protected final ArrayList<Expr> ambiguousAliasList = Lists.newArrayList();
+  protected final ArrayList<Expr> ambiguousAliasList_ = Lists.newArrayList();
 
-  protected SortInfo sortInfo;
+  protected SortInfo sortInfo_;
 
   // True if this QueryStmt is the top level query from an EXPLAIN <query>
-  protected boolean isExplain = false;
+  protected boolean isExplain_ = false;
 
   // Analyzer that was used to analyze this query statement.
-  protected Analyzer analyzer;
+  protected Analyzer analyzer_;
 
-  QueryStmt(ArrayList<OrderByElement> orderByElements, long limit) {
-    this.orderByElements = orderByElements;
-    this.limit = limit;
-    this.sortInfo = null;
+  QueryStmt(ArrayList<OrderByElement> orderByElements, Expr limitExpr) {
+    this.orderByElements_ = orderByElements;
+    this.limitExpr_ = limitExpr;
+    this.sortInfo_ = null;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    this.analyzer = analyzer;
-    if (hasWithClause()) withClause.analyze(analyzer);
-    analyzer.setIsExplain(isExplain);
+    this.analyzer_ = analyzer;
+    analyzeLimit(analyzer);
+    if (hasWithClause()) withClause_.analyze(analyzer);
+    analyzer.setIsExplain(isExplain_);
+  }
+
+  private void analyzeLimit(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    if (limitExpr_ == null) {
+      limit_ = -1;
+    } else {
+      if (!limitExpr_.isConstant()) {
+        throw new AnalysisException("LIMIT expression must be a constant expression: " +
+            limitExpr_.toSql());
+      }
+      limitExpr_.analyze(analyzer);
+      if (!limitExpr_.getType().isIntegerType()) {
+        throw new AnalysisException("LIMIT expression must be an integer type but is '" +
+            limitExpr_.getType() + "': " + limitExpr_.toSql());
+      }
+
+      TColumnValue val = null;
+      try {
+        val = FeSupport.EvalConstExpr(limitExpr_, analyzer.getQueryGlobals());
+      } catch (InternalException e) {
+        throw new AnalysisException("Failed to evaluate expr: " + limitExpr_.toSql(), e);
+      }
+      long limitVal;
+      if (val.isSetLongVal()) {
+        limitVal = val.getLongVal();
+      } else if (val.isSetIntVal()) {
+        limitVal = val.getIntVal();
+      } else {
+        throw new AnalysisException("LIMIT expression evaluates to NULL: " +
+            limitExpr_.toSql());
+      }
+      if (limitVal < 0) {
+        throw new AnalysisException("LIMIT must be a non-negative integer: " +
+            limitExpr_.toSql() + " = " + limitVal);
+      }
+      limit_ = limitVal;
+    }
   }
 
   /**
@@ -87,7 +132,7 @@ public abstract class QueryStmt extends StatementBase {
    */
   protected void createSortInfo(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (orderByElements == null) {
+    if (orderByElements_ == null) {
       // not computing order by
       return;
     }
@@ -97,7 +142,7 @@ public abstract class QueryStmt extends StatementBase {
     ArrayList<Boolean> nullsFirstParams = Lists.newArrayList();
 
     // extract exprs
-    for (OrderByElement orderByElement: orderByElements) {
+    for (OrderByElement orderByElement: orderByElements_) {
       // create copies, we don't want to modify the original parse node, in case
       // we need to print it
       orderingExprs.add(orderByElement.getExpr().clone(null));
@@ -110,10 +155,10 @@ public abstract class QueryStmt extends StatementBase {
       throw new AnalysisException("Column " + ambiguousAlias.toSql() +
           " in order clause is ambiguous");
     }
-    Expr.substituteList(orderingExprs, aliasSMap);
+    Expr.substituteList(orderingExprs, aliasSMap_);
     Expr.analyze(orderingExprs, analyzer);
 
-    sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
+    sortInfo_ = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
   }
 
   /**
@@ -122,7 +167,7 @@ public abstract class QueryStmt extends StatementBase {
    */
   protected Expr getFirstAmbiguousAlias(List<Expr> exprs) {
     for (Expr exp: exprs) {
-      if (ambiguousAliasList.contains(exp)) {
+      if (ambiguousAliasList_.contains(exp)) {
         return exp;
       }
     }
@@ -152,64 +197,64 @@ public abstract class QueryStmt extends StatementBase {
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 
   public void setWithClause(WithClause withClause) {
-    this.withClause = withClause;
+    this.withClause_ = withClause;
   }
 
   public boolean hasWithClause() {
-    return withClause != null;
+    return withClause_ != null;
   }
 
   public WithClause getWithClause() {
-    return withClause;
+    return withClause_;
   }
 
   public ArrayList<OrderByElement> getOrderByElements() {
-    return orderByElements;
+    return orderByElements_;
   }
 
   public void removeOrderByElements() {
-    orderByElements = null;
+    orderByElements_ = null;
   }
 
   public boolean hasOrderByClause() {
-    return orderByElements != null;
+    return orderByElements_ != null;
   }
 
   public long getLimit() {
-    return limit;
+    return limit_;
   }
 
   public boolean hasLimitClause() {
-    return limit != -1;
+    return limitExpr_ != null;
   }
 
   public SortInfo getSortInfo() {
-    return sortInfo;
+    return sortInfo_;
   }
 
   public ArrayList<Expr> getResultExprs() {
-    return resultExprs;
+    return resultExprs_;
   }
 
   public void setResultExprs(List<Expr> resultExprs) {
-    this.resultExprs.clear();
-    this.resultExprs.addAll(resultExprs);
+    this.resultExprs_.clear();
+    this.resultExprs_.addAll(resultExprs);
   }
 
   public void setIsExplain(boolean isExplain) {
-    this.isExplain = isExplain;
+    this.isExplain_ = isExplain;
   }
 
   public boolean isExplain() {
-    return isExplain;
+    return isExplain_;
   }
 
   public ArrayList<OrderByElement> cloneOrderByElements() {
-    return orderByElements != null ? Lists.newArrayList(orderByElements) : null;
+    return orderByElements_ != null ? Lists.newArrayList(orderByElements_) : null;
   }
 
   public WithClause cloneWithClause() {
-    return withClause != null ? withClause.clone() : null;
+    return withClause_ != null ? withClause_.clone() : null;
   }
 
   @Override

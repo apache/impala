@@ -423,7 +423,7 @@ public class InsertStmt extends StatementBase {
         selectListItems.add(new SelectListItem(e, null));
       }
       SelectList selectList = new SelectList(selectListItems);
-      queryStmt = new SelectStmt(selectList, null, null, null, null, null, -1);
+      queryStmt = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt.analyze(analyzer);
     }
     queryStmt.setResultExprs(permutedSelectListExprs);

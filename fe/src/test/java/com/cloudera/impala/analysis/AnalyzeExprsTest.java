@@ -92,7 +92,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   private void testNumericLiteral(String literal, PrimitiveType expectedType) {
     SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + literal);
-    Assert.assertEquals(expectedType, selectStmt.resultExprs.get(0).getType());
+    Assert.assertEquals(expectedType, selectStmt.resultExprs_.get(0).getType());
   }
 
   @Test
