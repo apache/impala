@@ -64,6 +64,7 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
+#include "util/time.h"
 #include "util/url-coding.h"
 #include "util/webserver.h"
 
@@ -152,7 +153,6 @@ ThreadManager* be_tm;
 // be changed only when the file format changes.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
 const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
-const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
@@ -509,8 +509,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
 
   writer.StartObject();
   // Each log entry is a timestamp mapped to a JSON object
-  int64_t ms_since_epoch = (microsec_clock::local_time() - EPOCH).total_milliseconds();
-  ss << ms_since_epoch;
+  ss << ms_since_epoch();
   writer.String(ss.str().c_str());
   writer.StartObject();
   writer.String("query_id");
@@ -1002,7 +1001,7 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   // not writeable), FLAGS_log_query_to_file will have been set to
   // false
   if (FLAGS_log_query_to_file) {
-    int64_t timestamp = (microsec_clock::local_time() - EPOCH).total_milliseconds();
+    int64_t timestamp = time_since_epoch().total_milliseconds();
     stringstream ss;
     ss << timestamp << " " << query.query_id() << " " << encoded_profile_str;
     Status status = profile_logger_->AppendEntry(ss.str());

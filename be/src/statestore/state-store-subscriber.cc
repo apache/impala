@@ -27,6 +27,7 @@
 #include "statestore/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "rpc/thrift-util.h"
+#include "util/time.h"
 
 using namespace std;
 using namespace boost;
@@ -185,7 +186,7 @@ void StateStoreSubscriber::RecoveryModeChecker() {
           // Don't exit recovery mode, continue
           LOG(WARNING) << "Failed to re-register with state-store: "
                        << status.GetErrorMsg();
-          usleep(SLEEP_INTERVAL_MS * 1000);
+          SleepForMs(SLEEP_INTERVAL_MS);
         }
         last_recovery_time_metric_->Update(
             recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
@@ -200,7 +201,7 @@ void StateStoreSubscriber::RecoveryModeChecker() {
           recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     }
 
-    usleep(SLEEP_INTERVAL_MS * 1000);
+    SleepForMs(SLEEP_INTERVAL_MS);
   }
 }
 

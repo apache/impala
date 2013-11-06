@@ -18,8 +18,9 @@
 #include "statestore/state-store.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "statestore/failure-detector.h"
-#include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
+#include "util/stopwatch.h"
+#include "util/time.h"
 #include "util/webserver.h"
 
 #include <boost/thread.hpp>
@@ -412,7 +413,7 @@ void StateStore::UpdateSubscriber(int thread_id,
   int64_t now = TimestampValue::local_time_micros();
   int64_t diff = update.first - now;
   while (diff > 0) {
-    usleep(diff * 1000L);
+    SleepForMs(diff);
     now = TimestampValue::local_time_micros();
     diff = now - update.first;
   }

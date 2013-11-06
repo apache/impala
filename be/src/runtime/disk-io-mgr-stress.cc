@@ -14,6 +14,8 @@
 
 #include "runtime/disk-io-mgr-stress.h"
 
+#include "util/time.h"
+
 using namespace boost;
 using namespace impala;
 using namespace std;
@@ -178,7 +180,7 @@ void DiskIoMgrStress::Run(int sec) {
   for (int loop_count = 1; sec == 0 || loop_count <= sec; ++loop_count) {
     int iter = (1000) / CANCEL_READER_PERIOD_MS;
     for (int i = 0; i < iter; ++i) {
-      usleep(CANCEL_READER_PERIOD_MS * 1000);
+      SleepForMs(CANCEL_READER_PERIOD_MS);
       CancelRandomReader();
     }
     LOG(ERROR) << "Finished iteration: " << loop_count;

@@ -13,8 +13,11 @@
 // limitations under the License.
 
 #include "rpc/thrift-client.h"
+
 #include <boost/assign.hpp>
 #include <ostream>
+
+#include "util/time.h"
 
 using namespace std;
 using namespace boost;
@@ -56,7 +59,7 @@ Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
       }
       if (try_count == num_tries) return status;
     }
-    usleep(wait_ms * 1000L);
+    SleepForMs(wait_ms);
   }
 }
 

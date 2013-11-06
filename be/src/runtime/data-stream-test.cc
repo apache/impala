@@ -33,6 +33,7 @@
 #include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/thread.h"
+#include "util/time.h"
 #include "util/mem-info.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -305,7 +306,7 @@ class DataStreamTest : public testing::Test {
         TupleRow* row = batch->GetRow(i);
         info->data_values.insert(*static_cast<int64_t*>(row->GetTuple(0)->GetSlot(0)));
       }
-      usleep(100000);  // slow down receiver to exercise buffering logic
+      SleepForMs(100);  // slow down receiver to exercise buffering logic
     }
     if (is_cancelled) VLOG_QUERY << "reader is cancelled";
     info->status = (is_cancelled ? Status::CANCELLED : Status::OK);

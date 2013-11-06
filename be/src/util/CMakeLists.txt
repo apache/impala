@@ -53,6 +53,7 @@ add_library(Util
 #  perf-counters.cc
   proc-util.cc
   thread.cc
+  time.cc
   progress-updater.cc
   runtime-profile.cc
   simple-logger.cc

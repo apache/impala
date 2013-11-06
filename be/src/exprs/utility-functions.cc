@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #include "exprs/utility-functions.h"
+
 #include "exprs/function-call.h"
 #include "exprs/expr.h"
 #include "util/debug-util.h"
+#include "util/time.h"
 #include "runtime/tuple-row.h"
 
 using namespace std;
@@ -39,7 +41,7 @@ void* UtilityFunctions::Sleep(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   int* milliseconds = reinterpret_cast<int*>(e->children()[0]->GetValue(row));
   if (milliseconds == NULL) return NULL;
-  usleep(*milliseconds * 1000);
+  SleepForMs(*milliseconds);
   e->result_.bool_val = true;
   return &e->result_.bool_val;
 }

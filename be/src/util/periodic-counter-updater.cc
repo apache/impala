@@ -14,6 +14,8 @@
 
 #include "util/periodic-counter-updater.h"
 
+#include "util/time.h"
+
 using namespace boost;
 using namespace std;
 
@@ -127,7 +129,7 @@ void PeriodicCounterUpdater::StopTimeSeriesCounter(
 void PeriodicCounterUpdater::UpdateLoop() {
   while (!done_) {
     system_time before_time = get_system_time();
-    usleep(FLAGS_periodic_counter_update_period_ms * 1000);
+    SleepForMs(FLAGS_periodic_counter_update_period_ms);
     posix_time::time_duration elapsed = get_system_time() - before_time;
     int elapsed_ms = elapsed.total_milliseconds();
 

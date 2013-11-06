@@ -18,6 +18,7 @@
 #include <boost/thread.hpp>
 
 #include "util/hash-util.h"
+#include "util/time.h"
 #include "rpc/thrift-server.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Data_types.h"
@@ -125,7 +126,7 @@ Status WaitForServer(const string& host, int port, int num_retries,
                << host << ":" << port
                << " to come up, failed attempt " << retry_count
                << " of " << num_retries;
-    usleep(retry_interval_ms * 1000);
+    SleepForMs(retry_interval_ms);
   }
   return Status("Server did not come up");
 }
