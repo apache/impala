@@ -331,14 +331,17 @@ public class ParserTest {
   @Test
   public void TestLimit() {
     ParsesOk("select a, b, c from test inner join test2 using(a) limit 10");
-    ParserError("select a, b, c from test inner join test2 using(a) limit 'a'");
-    ParserError("select a, b, c from test inner join test2 using(a) limit a");
-    ParserError("select a, b, c from test inner join test2 using(a) limit 10 + 10");
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit 10 + 10");
+    // The following will parse because limit takes an expr, though they will fail in
+    // analysis
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit 'a'");
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit a");
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit true");
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit false");
+    ParsesOk("select a, b, c from test inner join test2 using(a) limit NULL");
+    // Not an expr, will not parse
     ParserError("select a, b, c from test inner join test2 using(a) limit 10 " +
         "where a > 10");
-    ParserError("select a, b, c from test inner join test2 using(a) limit true");
-    ParserError("select a, b, c from test inner join test2 using(a) limit false");
-    ParserError("select a, b, c from test inner join test2 using(a) limit NULL");
   }
 
   @Test
