@@ -42,6 +42,7 @@ add_library(Util
   logging.cc
   logging-support.cc
   mem-info.cc
+  mem-metrics.cc
   metrics.cc
   network-util.cc
   os-info.cc

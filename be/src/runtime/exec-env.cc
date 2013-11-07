@@ -31,6 +31,7 @@
 #include "statestore/simple-scheduler.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/metrics.h"
+#include "util/mem-metrics.h"
 #include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
@@ -198,6 +199,7 @@ Status ExecEnv::StartServices() {
   }
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
+  RegisterTcmallocMetrics(metrics_.get());
 
   if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
 

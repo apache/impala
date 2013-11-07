@@ -20,13 +20,14 @@
 #include "catalog/catalog-server.h"
 #include "common/init.h"
 #include "common/status.h"
-#include "util/debug-util.h"
-#include "util/jni-util.h"
-#include "util/metrics.h"
-#include "util/network-util.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
+#include "util/debug-util.h"
+#include "util/jni-util.h"
+#include "util/metrics.h"
+#include "util/mem-metrics.h"
+#include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 
@@ -62,6 +63,7 @@ int main(int argc, char** argv) {
 
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
+  RegisterTcmallocMetrics(metrics.get());
   metrics->CreateAndRegisterPrimitiveMetric<string>(
       "catalog.version", GetVersionString(true));
 

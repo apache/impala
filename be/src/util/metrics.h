@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef IMPALA_UTIL_METRICS_H
 #define IMPALA_UTIL_METRICS_H
 
@@ -66,14 +65,9 @@ class Metrics {
   class Metric : GenericMetric {
    public:
     // Sets current metric value to parameter
-    virtual void Update(const T& value) {
+    void Update(const T& value) {
       boost::lock_guard<boost::mutex> l(lock_);
       value_ = value;
-    }
-
-    void Increment(const T& delta) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      value_ += delta;
     }
 
     // If current value == test_, update with new value. In all cases return
@@ -90,17 +84,20 @@ class Metrics {
     // Reads the current value under the metric lock
     T value() {
       boost::lock_guard<boost::mutex> l(lock_);
+      CalculateValue();
       return value_;
     }
 
     virtual void Print(std::stringstream* out) {
       boost::lock_guard<boost::mutex> l(lock_);
+      CalculateValue();
       (*out) << key_ << ":";
       PrintValue(out);
     }
 
     virtual void PrintJson(std::stringstream* out) {
       boost::lock_guard<boost::mutex> l(lock_);
+      CalculateValue();
       (*out) << "\"" << key_ << "\": ";
       PrintValueJson(out);
     }
@@ -117,6 +114,10 @@ class Metrics {
     // not try and take lock_ themselves..
     virtual void PrintValue(std::stringstream* out) = 0;
     virtual void PrintValueJson(std::stringstream* out) = 0;
+
+    // Subclasses may implement this to update value_ before it's retrieved. Always called
+    // with lock_ held.
+    virtual void CalculateValue() { };
 
     // Guards access to value
     boost::mutex lock_;

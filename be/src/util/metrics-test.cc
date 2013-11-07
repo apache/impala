@@ -14,6 +14,7 @@
 
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
+#include "util/mem-metrics.h"
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 
@@ -47,6 +48,8 @@ class MetricsTest : public testing::Test {
     string_set.insert("one"); string_set.insert("two");
     string_set_metric_ = metrics_->RegisterMetric(new SetMetric<string>("string_set",
                                                                         string_set));
+
+    RegisterTcmallocMetrics(metrics_.get());
   }
   Metrics::BooleanMetric* bool_metric_;
   Metrics::IntMetric* int_metric_;
@@ -162,6 +165,34 @@ TEST_F(MetricsTest, StatsMetric) {
   EXPECT_NE(metrics()->DebugString().find(
       "stats: count: 3, last: 2, min: 0, max: 2, mean: 1, stddev: 0.816497"),
       string::npos);
+}
+
+TEST_F(MetricsTest, MemMetric) {
+#ifndef ADDRESS_SANITIZER
+  // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
+  Metrics::Metric<uint64_t>* bytes_in_use =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.bytes-in-use");
+  DCHECK(bytes_in_use != NULL);
+
+  uint64_t cur_in_use = bytes_in_use->value();
+  scoped_ptr<uint64_t> chunk(new uint64_t);
+  DCHECK_GT(cur_in_use, 0);
+  DCHECK_GT(bytes_in_use->value(), cur_in_use);
+
+  Metrics::Metric<uint64_t>* total_bytes_reserved =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.total-bytes-reserved");
+  DCHECK(total_bytes_reserved != NULL);
+  DCHECK_GT(total_bytes_reserved->value(), 0);
+
+  Metrics::Metric<uint64_t>* pageheap_free_bytes =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.pageheap-free-bytes");
+  DCHECK(pageheap_free_bytes != NULL);
+
+  Metrics::Metric<uint64_t>* pageheap_unmapped_bytes =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >(
+          "tcmalloc.pageheap-unmapped-bytes");
+  DCHECK(pageheap_unmapped_bytes != NULL);
+#endif
 }
 
 }
