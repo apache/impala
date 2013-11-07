@@ -104,6 +104,10 @@ class Frontend {
   Status DescribeTable(const TDescribeTableParams& params,
       TDescribeTableResult* response);
 
+  // Returns (in the output parameter) a string containing the CREATE TABLE command that
+  // creates the table specified in the params.
+  Status ShowCreateTable(const TTableName& table_name, std::string* response);
+
   // Validate Hadoop config; requires FE
   Status ValidateSettings();
 
@@ -135,6 +139,7 @@ class Frontend {
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
+  jmethodID show_create_table_id_; // JniFrontend.showCreateTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions

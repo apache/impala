@@ -51,10 +51,10 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
 
   @Override
   public TColumn toThrift() {
-    TColumn colDesc = new TColumn(name, type.toThrift());
-    if (comment != null) colDesc.setComment(comment);
+    TColumn colDesc = new TColumn(name_, type_.toThrift());
+    if (comment_ != null) colDesc.setComment(comment_);
     colDesc.setCol_stats(getStats().toThrift());
-    colDesc.setPosition(position);
+    colDesc.setPosition(position_);
     colDesc.setIs_hbase_column(true);
     colDesc.setColumn_family(columnFamily);
     colDesc.setColumn_qualifier(columnQualifier);

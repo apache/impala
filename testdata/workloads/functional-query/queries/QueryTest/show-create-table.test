@@ -1,0 +1,264 @@
+====
+---- CREATE_TABLE
+# Simple table
+CREATE TABLE test1 (
+  id INT
+)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test1 (
+  id INT
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# simple table with all types
+CREATE TABLE test2 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test2 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# all types and partitioned
+CREATE TABLE test3 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY (
+  x INT,
+  y INT,
+  a BOOLEAN
+)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test3 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY (
+  x INT,
+  y INT,
+  a BOOLEAN
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# With a table comment
+CREATE TABLE test4 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+COMMENT 'This is a test'
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test4 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+COMMENT 'This is a test'
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# With the row format specified
+CREATE TABLE test5 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY '\\' LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test5 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY '\\' LINES TERMINATED BY '\n'
+WITH SERDEPROPERTIES ('line.delim'='\n', 'field.delim'=',',
+                      'serialization.format'=',', 'escape.delim'='\\')
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# testing with parquetfile specified
+CREATE TABLE test6 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS PARQUETFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test6 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS PARQUETFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# with extra table properties and sequencefile
+CREATE TABLE test7 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS SEQUENCEFILE
+TBLPROPERTIES ('key3'='val3', 'key2'='val2', 'key1'='val1')
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test7 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS SEQUENCEFILE
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('key3'='val3', 'key2'='val2', 'key1'='val1')
+====
+---- CREATE_TABLE
+# testing with rcfile specified
+CREATE TABLE test8 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS RCFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test8 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment'
+)
+STORED AS RCFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# Test create table as select
+CREATE TABLE test_as_select (
+  id INT,
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP,
+  year INT,
+  month INT
+)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test_as_select (
+  id INT,
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP,
+  year INT,
+  month INT
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- QUERY
+SHOW CREATE TABLE functional_text_lzo.tinytable
+---- RESULTS
+CREATE EXTERNAL TABLE functional_text_lzo.tinytable (
+  a STRING,
+  b STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS INPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'
+          OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION '$$location_uri$$'
+====
+---- QUERY
+SHOW CREATE TABLE functional_hbase.alltypes
+---- RESULTS
+CREATE EXTERNAL TABLE functional_hbase.alltypes (
+  id INT COMMENT 'Add a comment',
+  bigint_col BIGINT,
+  bool_col BOOLEAN,
+  date_string_col STRING,
+  double_col DOUBLE,
+  float_col FLOAT,
+  int_col INT,
+  month INT,
+  smallint_col SMALLINT,
+  string_col STRING,
+  timestamp_col TIMESTAMP,
+  tinyint_col TINYINT,
+  year INT
+)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month',
+                      'serialization.format'='1')
+TBLPROPERTIES ('hbase.table.name'='functional_hbase.alltypes',
+               'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler')
+====

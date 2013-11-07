@@ -37,6 +37,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    Preconditions.checkNotNull(targetProperty);
    targetProperty_ = targetProperty;
    tblProperties_ = tblProperties;
+   CreateTableStmt.unescapeProperties(tblProperties_);
   }
 
   public HashMap<String, String> getTblProperties() { return tblProperties_; }

@@ -43,6 +43,10 @@ public enum HdfsFileFormat {
   private static final String LZO_TEXT_INPUT_FORMAT =
       "com.hadoop.mapred.DeprecatedLzoTextInputFormat";
 
+  // Output format class for LZO compressed Text tables read by Hive.
+  private static final String LZO_TEXT_OUTPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat";
+
   // Input format class for Sequence file tables read by Hive.
   private static final String SEQUENCE_INPUT_FORMAT =
       "org.apache.hadoop.mapred.SequenceFileInputFormat";
@@ -79,6 +83,15 @@ public enum HdfsFileFormat {
   }
 
   /**
+   * Returns the file format associated with the input format class, or null if
+   * the input format class is not supported.
+   */
+  public static HdfsFileFormat fromHdfsInputFormatClass(String inputFormatClass) {
+    Preconditions.checkNotNull(inputFormatClass);
+    return VALID_FORMATS.get(inputFormatClass);
+  }
+
+  /**
    * Returns the corresponding enum for a SerDe class name. If classname is not one
    * of our supported formats, throws an IllegalArgumentException like Enum.valueOf
    */
@@ -92,29 +105,48 @@ public enum HdfsFileFormat {
 
   public static HdfsFileFormat fromThrift(THdfsFileFormat thriftFormat) {
     switch (thriftFormat) {
-    case RC_FILE: return HdfsFileFormat.RC_FILE;
-    case TEXT: return HdfsFileFormat.TEXT;
-    case LZO_TEXT: return HdfsFileFormat.LZO_TEXT;
-    case SEQUENCE_FILE: return HdfsFileFormat.SEQUENCE_FILE;
-    case AVRO: return HdfsFileFormat.AVRO;
-    case PARQUET: return HdfsFileFormat.PARQUET;
-    default:
-      throw new RuntimeException("Unknown THdfsFileFormat: "
-          + thriftFormat + " - should never happen!");
+      case RC_FILE: return HdfsFileFormat.RC_FILE;
+      case TEXT: return HdfsFileFormat.TEXT;
+      case LZO_TEXT: return HdfsFileFormat.LZO_TEXT;
+      case SEQUENCE_FILE: return HdfsFileFormat.SEQUENCE_FILE;
+      case AVRO: return HdfsFileFormat.AVRO;
+      case PARQUET: return HdfsFileFormat.PARQUET;
+      default:
+        throw new RuntimeException("Unknown THdfsFileFormat: "
+            + thriftFormat + " - should never happen!");
     }
   }
 
   public THdfsFileFormat toThrift() {
     switch (this) {
-    case RC_FILE: return THdfsFileFormat.RC_FILE;
-    case TEXT: return THdfsFileFormat.TEXT;
-    case LZO_TEXT: return THdfsFileFormat.LZO_TEXT;
-    case SEQUENCE_FILE: return THdfsFileFormat.SEQUENCE_FILE;
-    case AVRO: return THdfsFileFormat.AVRO;
-    case PARQUET: return THdfsFileFormat.PARQUET;
-    default:
-      throw new RuntimeException("Unknown HdfsFormat: "
-          + this + " - should never happen!");
+      case RC_FILE: return THdfsFileFormat.RC_FILE;
+      case TEXT: return THdfsFileFormat.TEXT;
+      case LZO_TEXT: return THdfsFileFormat.LZO_TEXT;
+      case SEQUENCE_FILE: return THdfsFileFormat.SEQUENCE_FILE;
+      case AVRO: return THdfsFileFormat.AVRO;
+      case PARQUET: return THdfsFileFormat.PARQUET;
+      default:
+        throw new RuntimeException("Unknown HdfsFormat: "
+            + this + " - should never happen!");
     }
   }
+
+  public String toSql() {
+    switch (this) {
+      case RC_FILE: return "RCFILE";
+      case TEXT: return "TEXTFILE";
+      case SEQUENCE_FILE: return "SEQUENCEFILE";
+      case AVRO: return "AVROFILE";
+      case PARQUET: return "PARQUETFILE";
+      case LZO_TEXT:
+        // It is not currently possible to create a table with LZO compressed text files
+        // in Impala, but this is valid in Hive.
+        return String.format("INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
+            LZO_TEXT_INPUT_FORMAT, LZO_TEXT_OUTPUT_FORMAT);
+      default:
+        throw new RuntimeException("Unknown HdfsFormat: "
+            + this + " - should never happen!");
+    }
+  }
+
 }

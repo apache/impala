@@ -464,6 +464,17 @@ public class AnalyzerTest {
 
   }
 
+  @Test
+  public void TestAnalyzeShowCreateTable() {
+    AnalyzesOk("show create table functional.AllTypes");
+    AnalysisError("show create table functional.alltypes_view",
+        "SHOW CREATE TABLE not supported on VIEW: functional.alltypes_view");
+    AnalysisError("show create table functional.not_a_table",
+        "Table does not exist: functional.not_a_table");
+    AnalysisError("show create table doesnt_exist",
+        "Table does not exist: default.doesnt_exist");
+  }
+
   private Function createFunction(boolean hasVarArgs, PrimitiveType... args) {
     return new Function(
         new FunctionName("test"), args, PrimitiveType.INVALID_TYPE, hasVarArgs);

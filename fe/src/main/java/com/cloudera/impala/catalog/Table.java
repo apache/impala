@@ -49,6 +49,7 @@ import com.google.common.collect.Maps;
  */
 public abstract class Table implements CatalogObject {
   private static final Logger LOG = Logger.getLogger(Table.class);
+
   // Lock used to serialize calls to the Hive MetaStore to work around MetaStore
   // concurrency bugs. Currently used to serialize calls to "getTable()" due to HIVE-5457.
   private static final Object metastoreAccessLock_ = new Object();
@@ -362,6 +363,12 @@ public abstract class Table implements CatalogObject {
   public String getFullName() { return (db != null ? db.getName() + "." : "") + name; }
   public String getOwner() { return owner; }
   public ArrayList<Column> getColumns() { return colsByPos; }
+
+  /**
+   * Subclasses should override this if they provide a storage handler class. Currently
+   * only HBase tables need to provide a storage handler.
+   */
+  public String getStorageHandlerClassName() { return null; }
 
   /**
    * Returns the list of all columns, but with partition columns at the end of

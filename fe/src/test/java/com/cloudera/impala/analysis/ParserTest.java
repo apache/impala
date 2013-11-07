@@ -1185,6 +1185,14 @@ public class ParserTest {
   }
 
   @Test
+  public void TestShowCreateTable() {
+    ParsesOk("SHOW CREATE TABLE x");
+    ParsesOk("SHOW CREATE TABLE db.x");
+    ParserError("SHOW CREATE TABLE");
+    ParserError("SHOW CREATE TABLE x y z");
+  }
+
+  @Test
   public void TestDescribe() {
     // Missing argument
     ParserError("DESCRIBE");

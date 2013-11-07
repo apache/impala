@@ -30,7 +30,6 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTableName;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -93,6 +92,8 @@ public class CreateTableStmt extends StatementBase {
     this.tableName_ = tableName;
     this.tblProperties_ = tblProperties;
     this.serdeProperties_ = serdeProperties;
+    unescapeProperties(tblProperties_);
+    unescapeProperties(serdeProperties_);
   }
 
   public String getTbl() { return tableName_.getTbl(); }
@@ -106,6 +107,8 @@ public class CreateTableStmt extends StatementBase {
   public void setLocation(HdfsURI location) { this.location_ = location; }
   public THdfsFileFormat getFileFormat() { return fileFormat_; }
   public RowFormat getRowFormat() { return rowFormat_; }
+  public Map<String, String> getTblProperties() { return tblProperties_; }
+  public Map<String, String> getSerdeProperties() { return serdeProperties_; }
 
   /**
    * Can only be called after analysis, returns the owner of this table (the user from
@@ -127,56 +130,7 @@ public class CreateTableStmt extends StatementBase {
 
   @Override
   public String toSql() {
-    StringBuilder sb = new StringBuilder("CREATE ");
-    if (isExternal_) sb.append("EXTERNAL ");
-    sb.append("TABLE ");
-    if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
-    sb.append(tableName_.getTbl() + " (");
-    sb.append(Joiner.on(", ").join(columnDefs_));
-    sb.append(")");
-    if (comment_ != null) sb.append(" COMMENT = '" + comment_ + "'");
-
-    if (partitionColumnDescs_.size() > 0) {
-      sb.append(String.format(" PARTITIONED BY (%s)",
-          Joiner.on(", ").join(partitionColumnDescs_)));
-    }
-
-    if (rowFormat_ != RowFormat.DEFAULT_ROW_FORMAT) {
-      sb.append(" ROW FORMAT DELIMITED");
-      if (rowFormat_.getFieldDelimiter() != null) {
-        sb.append(" FIELDS TERMINATED BY '" + rowFormat_.getFieldDelimiter() + "'");
-      }
-      if (rowFormat_.getEscapeChar() != null) {
-        sb.append(" ESCAPED BY '" + rowFormat_.getEscapeChar() + "'");
-      }
-      if (rowFormat_.getLineDelimiter() != null) {
-        sb.append(" LINES TERMINATED BY '" + rowFormat_.getLineDelimiter() + "'");
-      }
-    }
-
-    if (serdeProperties_ != null) {
-      sb.append(
-          " WITH SERDEPROPERTIES " + propertyMapToSql(serdeProperties_));
-    }
-
-    sb.append(" STORED AS " + fileFormat_.toString());
-
-    if (location_ != null) {
-      sb.append(" LOCATION = '" + location_ + "'");
-    }
-    if (tblProperties_ != null) {
-      sb.append(" TBLPROPERTIES " + propertyMapToSql(tblProperties_));
-    }
-    return sb.toString();
-  }
-
-  private static String propertyMapToSql(Map<String, String> propertyMap) {
-    List<String> properties = Lists.newArrayList();
-    for (Map.Entry<String, String> entry: propertyMap.entrySet()) {
-      properties.add(String.format("'{0}'='{1}'", entry.getKey(), entry.getValue()));
-    }
-    return "(" + Joiner.on(", ").join(properties) + ")";
+    return ToSqlUtils.getCreateTableSql(this);
   }
 
   public TCreateTableParams toThrift() {
@@ -266,6 +220,17 @@ public class CreateTableStmt extends StatementBase {
     if (value.length() != 1) {
       throw new AnalysisException("ESCAPED BY values and LINE/FIELD " +
           "terminators must have length of 1: " + value);
+    }
+  }
+
+  /**
+   * Unescapes all values in the property map.
+   */
+  public static void unescapeProperties(Map<String, String> propertyMap) {
+    if (propertyMap == null) return;
+    for (Map.Entry<String, String> kv : propertyMap.entrySet()) {
+      propertyMap.put(kv.getKey(),
+          new StringLiteral(kv.getValue()).getUnescapedValue());
     }
   }
 }

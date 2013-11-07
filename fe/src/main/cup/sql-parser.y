@@ -252,6 +252,7 @@ nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowStatsStmt show_stats_stmt;
 nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
+nonterminal ShowCreateTableStmt show_create_tbl_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
 nonterminal ResetMetadataStmt reset_metadata_stmt;
@@ -402,6 +403,8 @@ stmt ::=
   {: RESULT = show_stats; :}
   | show_functions_stmt:show_functions
   {: RESULT = show_functions; :}
+  | show_create_tbl_stmt:show_create_tbl
+  {: RESULT = show_create_tbl; :}
   | describe_stmt:describe
   {: RESULT = describe; :}
   | alter_tbl_stmt:alter_tbl
@@ -1217,6 +1220,11 @@ show_pattern ::=
   {: RESULT = showPattern; :}
   | KW_LIKE STRING_LITERAL:showPattern
   {: RESULT = showPattern; :}
+  ;
+
+show_create_tbl_stmt ::=
+  KW_SHOW KW_CREATE KW_TABLE table_name:table
+  {: RESULT = new ShowCreateTableStmt(table); :}
   ;
 
 describe_stmt ::=

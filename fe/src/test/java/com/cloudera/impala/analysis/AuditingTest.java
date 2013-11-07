@@ -243,6 +243,14 @@ public class AuditingTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestShowCreateTable() throws AuthorizationException, AnalysisException {
+    List<TAccessEvent> accessEvents =
+        AnalyzeAccessEvents("show create table functional.alltypesagg");
+    Assert.assertEquals(accessEvents, Lists.newArrayList(new TAccessEvent(
+        "functional.alltypesagg", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+  }
+
+  @Test
   public void TestLoad() throws AuthorizationException, AnalysisException {
     List<TAccessEvent> accessEvents = AnalyzeAccessEvents("load data inpath " +
         "'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +

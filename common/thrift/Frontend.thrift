@@ -337,6 +337,7 @@ enum TCatalogOpType {
   SHOW_FUNCTIONS,
   RESET_METADATA,
   DDL,
+  SHOW_CREATE_TABLE
 }
 
 struct TCatalogOpRequest {
@@ -368,6 +369,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW TABLE/COLUMN STATS
   9: optional TShowStatsParams show_stats_params
+
+  // Parameters for SHOW CREATE TABLE
+  10: optional CatalogObjects.TTableName show_create_table_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)

@@ -164,6 +164,11 @@ public class Frontend {
       ddl.setShow_fns_params(stmt.toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", TPrimitiveType.STRING)));
+    } else if (analysis.isShowCreateTableStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_CREATE_TABLE;
+      ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("result", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());

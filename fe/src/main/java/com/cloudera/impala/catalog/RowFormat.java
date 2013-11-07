@@ -14,32 +14,37 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.Map;
+
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.thrift.TTableRowFormat;
+import com.google.common.base.Preconditions;
 
 /**
  * Defines the physical (on-disk) format for a table's data. This is used when creating
- * a new table to specify how to interpret the fields (columns) and lines (rows) in a 
+ * a new table to specify how to interpret the fields (columns) and lines (rows) in a
  * a data file.
  */
 public class RowFormat {
   // Default row format
   public final static RowFormat DEFAULT_ROW_FORMAT = new RowFormat(null, null, null);
 
-  private final String fieldDelimiter;
-  private final String lineDelimiter;
-  private final String escapeChar;
+  private final String fieldDelimiter_;
+  private final String lineDelimiter_;
+  private final String escapeChar_;
 
   private RowFormat(String fieldDelimiter, String lineDelimiter, String escapeChar,
       boolean unescape) {
     if (unescape) {
-      this.fieldDelimiter = getUnescapedValueOrNull(fieldDelimiter);
-      this.lineDelimiter = getUnescapedValueOrNull(lineDelimiter);
-      this.escapeChar = getUnescapedValueOrNull(escapeChar);
+      this.fieldDelimiter_ = getUnescapedValueOrNull(fieldDelimiter);
+      this.lineDelimiter_ = getUnescapedValueOrNull(lineDelimiter);
+      this.escapeChar_ = getUnescapedValueOrNull(escapeChar);
     } else {
-      this.fieldDelimiter = fieldDelimiter;
-      this.lineDelimiter = lineDelimiter;
-      this.escapeChar = escapeChar;
+      this.fieldDelimiter_ = fieldDelimiter;
+      this.lineDelimiter_ = lineDelimiter;
+      this.escapeChar_ = escapeChar;
     }
   }
 
@@ -52,15 +57,19 @@ public class RowFormat {
   }
 
   public String getFieldDelimiter() {
-    return fieldDelimiter;
+    return fieldDelimiter_;
   }
 
   public String getLineDelimiter() {
-    return lineDelimiter;
+    return lineDelimiter_;
   }
 
   public String getEscapeChar() {
-    return escapeChar;
+    return escapeChar_;
+  }
+
+  public boolean isDefault() {
+    return fieldDelimiter_ == null && lineDelimiter_ == null && escapeChar_ == null;
   }
 
   private static String getUnescapedValueOrNull(String value) {
@@ -83,5 +92,15 @@ public class RowFormat {
     // already been unescaped.
     return new RowFormat(tableRowFormat.getField_terminator(),
         tableRowFormat.getLine_terminator(), tableRowFormat.getEscaped_by(), false);
+  }
+
+  /**
+   * Returns the RowFormat for the storage descriptor.
+   */
+  public static RowFormat fromStorageDescriptor(StorageDescriptor sd) {
+    Preconditions.checkNotNull(sd);
+    Map<String, String> params = sd.getSerdeInfo().getParameters();
+    return new RowFormat(params.get("field.delim"), params.get("line.delim"),
+        params.get("escape.delim"));
   }
 }

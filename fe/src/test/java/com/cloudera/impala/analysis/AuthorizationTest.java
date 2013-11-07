@@ -60,6 +60,7 @@ public class AuthorizationTest {
   //   SELECT permissions on 'functional.view_view' (no INSERT permissions)
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
+  //   No permissions on database 'functional_rc'
   private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   private final static User USER = new User("test_user");
   // The admin_user has ALL privileges on the server.
@@ -714,6 +715,9 @@ public class AuthorizationTest {
     // Insufficient privileges on view.
     AuthzError("describe functional.alltypes_view",
         "User '%s' does not have privileges to access: functional.alltypes_view");
+    // Insufficient privileges on db.
+    AuthzError("describe functional_rc.alltypes",
+        "User '%s' does not have privileges to access: functional_rc.alltypes");
   }
 
   @Test
@@ -821,6 +825,25 @@ public class AuthorizationTest {
 
     tables = fe.getTableNames("functional", null, USER);
     Assert.assertEquals(expectedTbls, tables);
+  }
+
+  @Test
+  public void TestShowCreateTable() throws ImpalaException {
+    AuthzOk("show create table functional.alltypesagg");
+    AuthzOk("show create table functional.alltypes");
+
+    // Unqualified table name.
+    AuthzError("show create table alltypes",
+        "User '%s' does not have privileges to access: default.alltypes");
+    // Database doesn't exist.
+    AuthzError("show create table nodb.alltypes",
+        "User '%s' does not have privileges to access: nodb.alltypes");
+    // Insufficient privileges on table.
+    AuthzError("show create table functional.alltypestiny",
+        "User '%s' does not have privileges to access: functional.alltypestiny");
+    // Insufficient privileges on db.
+    AuthzError("show create table functional_rc.alltypes",
+        "User '%s' does not have privileges to access: functional_rc.alltypes");
   }
 
   @Test

@@ -84,8 +84,11 @@ public class HBaseTable extends Table {
   protected String hbaseTableName;
 
   // Input format class for HBase tables read by Hive.
-  private static final String hbaseInputFormat =
-    "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
+  private static final String HBASE_INPUT_FORMAT =
+      "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
+  // Storage handler class for HBase tables read by Hive.
+  private static final String HBASE_STORAGE_HANDLER =
+      "org.apache.hadoop.hive.hbase.HBaseStorageHandler";
 
   // Keep the conf around
   private final static Configuration hbaseConf = HBaseConfiguration.create();
@@ -537,7 +540,13 @@ public class HBaseTable extends Table {
   /**
    * Returns the input-format class string for HBase tables read by Hive.
    */
-  public static String getInputFormat() { return hbaseInputFormat; }
+  public static String getInputFormat() { return HBASE_INPUT_FORMAT; }
+
+  /**
+   * Returns the storage handler class for HBase tables read by Hive.
+   */
+  @Override
+  public String getStorageHandlerClassName() { return HBASE_STORAGE_HANDLER; }
 
   /**
    * Returns statistics on this table as a tabular result set. Used for the

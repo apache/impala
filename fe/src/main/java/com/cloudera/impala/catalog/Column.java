@@ -30,48 +30,48 @@ import com.google.common.base.Preconditions;
 public class Column {
   private final static Logger LOG = LoggerFactory.getLogger(Column.class);
 
-  protected final String name;
-  protected final PrimitiveType type;
-  protected final String comment;
-  protected int position;  // in table
+  protected final String name_;
+  protected final PrimitiveType type_;
+  protected final String comment_;
+  protected int position_;  // in table
 
-  protected final ColumnStats stats;
+  protected final ColumnStats stats_;
 
   public Column(String name, PrimitiveType type, int position) {
     this(name, type, null, position);
   }
 
   public Column(String name, PrimitiveType type, String comment, int position) {
-    this.name = name;
-    this.type = type;
-    this.comment = comment;
-    this.position = position;
-    this.stats = new ColumnStats(type);
+    this.name_ = name;
+    this.type_ = type;
+    this.comment_ = comment;
+    this.position_ = position;
+    this.stats_ = new ColumnStats(type);
   }
 
-  public String getComment() { return comment; }
-  public String getName() { return name; }
-  public PrimitiveType getType() { return type; }
-  public int getPosition() { return position; }
-  public void setPosition(int position) { this.position = position; }
-  public ColumnStats getStats() { return stats; }
+  public String getComment() { return comment_; }
+  public String getName() { return name_; }
+  public PrimitiveType getType() { return type_; }
+  public int getPosition() { return position_; }
+  public void setPosition(int position) { this.position_ = position; }
+  public ColumnStats getStats() { return stats_; }
 
   public boolean updateStats(ColumnStatisticsData statsData) {
-    boolean statsDataCompatibleWithColType = stats.update(type, statsData);
-    LOG.debug("col stats: " + name + " #distinct=" + stats.getNumDistinctValues());
+    boolean statsDataCompatibleWithColType = stats_.update(type_, statsData);
+    LOG.debug("col stats: " + name_ + " #distinct=" + stats_.getNumDistinctValues());
     return statsDataCompatibleWithColType;
   }
 
   public void updateStats(TColumnStats statsData) {
-    stats.update(type, statsData);
+    stats_.update(type_, statsData);
   }
 
   @Override
   public String toString() {
     return Objects.toStringHelper(this.getClass())
-                  .add("name", name)
-                  .add("type", type)
-                  .add("position", position).toString();
+                  .add("name", name_)
+                  .add("type", type_)
+                  .add("position", position_).toString();
   }
 
   public static Column fromThrift(TColumn columnDesc) {
@@ -97,9 +97,9 @@ public class Column {
   }
 
   public TColumn toThrift() {
-    TColumn colDesc = new TColumn(name, type.toThrift());
-    if (comment != null) colDesc.setComment(comment);
-    colDesc.setPosition(position);
+    TColumn colDesc = new TColumn(name_, type_.toThrift());
+    if (comment_ != null) colDesc.setComment(comment_);
+    colDesc.setPosition(position_);
     colDesc.setCol_stats(getStats().toThrift());
     return colDesc;
   }

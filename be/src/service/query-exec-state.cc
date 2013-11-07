@@ -236,6 +236,13 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       request_result_set_.reset(new vector<TResultRow>(response.results));
       return Status::OK;
     }
+    case TCatalogOpType::SHOW_CREATE_TABLE: {
+      string response;
+      RETURN_IF_ERROR(frontend_->ShowCreateTable(catalog_op.show_create_table_params,
+          &response));
+      SetResultSet(vector<string>(1, response));
+      return Status::OK;
+    }
     default: {
       stringstream ss;
       ss << "Unexpected TCatalogOpType: " << catalog_op.op_type;

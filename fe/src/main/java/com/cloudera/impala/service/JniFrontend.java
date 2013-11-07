@@ -43,8 +43,10 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.ToSqlUtils;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
+import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
@@ -67,6 +69,7 @@ import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TShowStatsParams;
+import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
@@ -287,6 +290,18 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Returns a SQL DDL string for creating the specified table.
+   */
+  public String showCreateTable(byte[] thriftTableName)
+      throws ImpalaException {
+    TTableName params = new TTableName();
+    JniUtil.deserializeThrift(protocolFactory, params, thriftTableName);
+    return ToSqlUtils.getCreateTableSql(frontend.getCatalog().getTable(
+        params.getDb_name(), params.getTable_name(),
+        ImpalaInternalAdminUser.getInstance(), Privilege.ALL));
   }
 
   /**
