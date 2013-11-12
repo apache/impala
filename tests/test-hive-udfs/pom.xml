@@ -24,7 +24,9 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
+      <scope>system</scope>
       <version>${hive.version}</version>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-exec-${hive.version}.jar</systemPath>
     </dependency>
   </dependencies>
 

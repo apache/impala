@@ -143,7 +143,7 @@
       <artifactId>commons-lang</artifactId>
       <version>2.6</version>
     </dependency>
-            
+
     <dependency>
       <groupId>net.sf.squirrel-sql.thirdparty-non-maven</groupId>
       <artifactId>java-cup</artifactId>
@@ -223,9 +223,6 @@
       <version>${hive.version}</version>
       <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/hive-shims-${hive.version}.jar</systemPath>
     </dependency>
-<<<<<<< HEAD
-
-=======
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
@@ -304,7 +301,6 @@
       <version>3.2.1</version>
       <scope>compile</scope>
     </dependency>
->>>>>>> c034ff7... Changes to make Impala work on CDH5. Mostly fixing up dependency versions. Minor code changes to address HBase API changes.
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
       <groupId>postgresql</groupId>
@@ -312,11 +308,6 @@
       <version>9.0-801.jdbc4</version>
     </dependency>
     <dependency>
-<<<<<<< HEAD
-      <groupId>org.apache.derby</groupId>
-      <artifactId>derby</artifactId>
-      <version>10.4.2.0</version>
-=======
       <groupId>commons-dbcp</groupId>
       <artifactId>commons-dbcp</artifactId>
       <version>1.4</version>
@@ -330,7 +321,6 @@
       <groupId>org.antlr</groupId>
       <artifactId>antlr-runtime</artifactId>
       <version>3.3</version>
->>>>>>> c034ff7... Changes to make Impala work on CDH5. Mostly fixing up dependency versions. Minor code changes to address HBase API changes.
     </dependency>
 
     <dependency>

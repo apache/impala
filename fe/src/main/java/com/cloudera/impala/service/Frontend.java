@@ -61,6 +61,7 @@ import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogOpRequest;
 import com.cloudera.impala.thrift.TCatalogOpType;
 import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
