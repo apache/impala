@@ -365,11 +365,13 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   DCHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
 
+  unordered_set<int64_t> partition_id_set;
   int num_ranges_missing_volume_id = 0;
   for (int i = 0; i < scan_range_params_->size(); ++i) {
     DCHECK((*scan_range_params_)[i].scan_range.__isset.hdfs_file_split);
     const THdfsFileSplit& split = (*scan_range_params_)[i].scan_range.hdfs_file_split;
     const string& path = split.path;
+    partition_id_set.insert(split.partition_id);
 
     HdfsFileDesc* file_desc = NULL;
     FileDescMap::iterator file_desc_it = file_descs_.find(path);
@@ -388,8 +390,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       }
       ++num_unqueued_files_;
       per_type_files_[partition_desc->file_format()].push_back(file_desc);
-      // Safe to call multiple times per partition
-      RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
     } else {
       // File already processed
       file_desc = file_desc_it->second;
@@ -408,6 +408,13 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->filename.c_str(), split.length, split.offset,
                           split.partition_id, (*scan_range_params_)[i].volume_id));
+  }
+
+  // Prepare all the partitions scanned by the scan node
+  BOOST_FOREACH(const int64_t& partition_id, partition_id_set) {
+    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
+    DCHECK(partition_desc != NULL);
+    RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
   }
 
   // Update server wide metrics for number of scan ranges and ranges that have

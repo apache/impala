@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
+import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TExpr;
@@ -227,6 +228,30 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   public org.apache.hadoop.hive.metastore.api.Partition getMetaStorePartition() {
     return msPartition;
+  }
+
+  /**
+   * Return a partition name formed by concatenating partition keys and their values,
+   * compatible with the way Hive names partitions. Reuses Hive's
+   * org.apache.hadoop.hive.common.FileUtils.makePartName() function to build the name
+   * string because there are a number of special cases for how partition names are URL
+   * escaped.
+   * TODO: Consider storing the PartitionKeyValue in HdfsPartition. It would simplify
+   * this code would be useful in other places, such as fromThrift().
+   */
+  public String getPartitionName() {
+    List<String> partitionCols = Lists.newArrayList();
+    List<String> partitionValues = Lists.newArrayList();
+    for (int i = 0; i < getTable().getNumClusteringCols(); ++i) {
+      partitionCols.add(getTable().getColumns().get(i).getName());
+    }
+
+    for (LiteralExpr partValue: getPartitionValues()) {
+      partitionValues.add(PartitionKeyValue.getPartitionKeyValueString(partValue,
+          getTable().getNullPartitionKeyValue()));
+    }
+    return org.apache.hadoop.hive.common.FileUtils.makePartName(
+        partitionCols, partitionValues);
   }
 
   /**

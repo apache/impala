@@ -24,59 +24,49 @@ import com.google.common.base.Preconditions;
  */
 public class PartitionKeyValue {
   // Name of partitioning column.
-  private final String colName;
+  private final String colName_;
   // Value of partitioning column. Set to null for dynamic inserts.
-  private final Expr value;
+  private final Expr value_;
   // Evaluation of value for static partition keys, null otherwise. Set in analyze().
-  private LiteralExpr literalValue;
+  private LiteralExpr literalValue_;
 
   public PartitionKeyValue(String colName, Expr value) {
-    this.colName = colName.toLowerCase();
-    this.value = value;
+    this.colName_ = colName.toLowerCase();
+    this.value_ = value;
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isStatic() && !value.isConstant()) {
+    if (isStatic() && !value_.isConstant()) {
       throw new AnalysisException(
           String.format("Non-constant expressions are not supported " +
               "as static partition-key values in '%s'.", toString()));
     }
-    if (value == null) return;
-    value.analyze(analyzer);
-    literalValue = LiteralExpr.create(value, analyzer.getQueryGlobals());
+    if (value_ == null) return;
+    value_.analyze(analyzer);
+    literalValue_ = LiteralExpr.create(value_, analyzer.getQueryGlobals());
   }
 
-  public String getColName() {
-    return colName;
-  }
-
-  public Expr getValue() {
-    return value;
-  }
-
-  public boolean isDynamic() {
-    return value == null;
-  }
-
-  public boolean isStatic() {
-    return !isDynamic();
-  }
+  public String getColName() { return colName_; }
+  public Expr getValue() { return value_; }
+  public LiteralExpr getLiteralValue() { return literalValue_; }
+  public boolean isDynamic() { return value_ == null; }
+  public boolean isStatic() { return !isDynamic(); }
 
   @Override
   public String toString() {
-    return isStatic() ? colName + "=" + value.toSql() : colName;
+    return isStatic() ? colName_ + "=" + value_.toSql() : colName_;
   }
 
   /**
    * Utility method that returns the string value for the given partition key. For
-   * NULL values (a NullLiteral type) or empty strings this will return the
-   * null partition key value.
+   * NULL values (a NullLiteral type) or empty literal values this will return the
+   * given null partition key value.
    */
-  public String getPartitionKeyValueString(String nullPartitionKeyValue) {
+  public static String getPartitionKeyValueString(LiteralExpr literalValue,
+      String nullPartitionKeyValue) {
     Preconditions.checkNotNull(literalValue);
-    if (literalValue instanceof NullLiteral
-        || literalValue.getStringValue().isEmpty()) {
+    if (literalValue instanceof NullLiteral || literalValue.getStringValue().isEmpty()) {
       return nullPartitionKeyValue;
     }
     return literalValue.getStringValue();

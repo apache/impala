@@ -26,38 +26,33 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE ADD PARTITION statement.
  */
 public class AlterTableAddPartitionStmt extends AlterTableStmt {
-  private final HdfsURI location;
-  private final boolean ifNotExists;
-  private final PartitionSpec partitionSpec;
+  private final HdfsURI location_;
+  private final boolean ifNotExists_;
+  private final PartitionSpec partitionSpec_;
 
   public AlterTableAddPartitionStmt(TableName tableName,
       PartitionSpec partitionSpec, HdfsURI location, boolean ifNotExists) {
     super(tableName);
     Preconditions.checkState(partitionSpec != null);
-    this.location = location;
-    this.ifNotExists = ifNotExists;
-    this.partitionSpec = partitionSpec;
-    this.partitionSpec.setTableName(tableName);
+    this.location_ = location;
+    this.ifNotExists_ = ifNotExists;
+    this.partitionSpec_ = partitionSpec;
+    this.partitionSpec_.setTableName(tableName);
   }
 
-  public boolean getIfNotExists() {
-    return ifNotExists;
-  }
-
-  public HdfsURI getLocation() {
-    return location;
-  }
+  public boolean getIfNotExists() { return ifNotExists_; }
+  public HdfsURI getLocation() { return location_; }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" ADD ");
-    if (ifNotExists) {
+    if (ifNotExists_) {
       sb.append("IF NOT EXISTS ");
     }
-    sb.append(" " + partitionSpec.toSql());
-    if (location != null) {
-      sb.append(String.format(" LOCATION '%s'", location));
+    sb.append(" " + partitionSpec_.toSql());
+    if (location_ != null) {
+      sb.append(String.format(" LOCATION '%s'", location_));
     }
     return sb.toString();
   }
@@ -67,9 +62,9 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.ADD_PARTITION);
     TAlterTableAddPartitionParams addPartParams = new TAlterTableAddPartitionParams();
-    addPartParams.setPartition_spec(partitionSpec.toThrift());
-    addPartParams.setLocation(location == null ? null : location.toString());
-    addPartParams.setIf_not_exists(ifNotExists);
+    addPartParams.setPartition_spec(partitionSpec_.toThrift());
+    addPartParams.setLocation(location_ == null ? null : location_.toString());
+    addPartParams.setIf_not_exists(ifNotExists_);
     params.setAdd_partition_params(addPartParams);
     return params;
   }
@@ -78,12 +73,10 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (!ifNotExists) {
-      partitionSpec.setPartitionShouldNotExist();
-    }
-    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec.analyze(analyzer);
+    if (!ifNotExists_) partitionSpec_.setPartitionShouldNotExist();
+    partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSpec_.analyze(analyzer);
 
-    if (location != null) location.analyze(analyzer, Privilege.ALL);
+    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
   }
 }

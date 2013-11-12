@@ -35,7 +35,6 @@ class TestDdlStatements(ImpalaTestSuite):
     self.cleanup_hdfs_dirs()
 
   def teardown_method(self, method):
-    self.cleanup()
     end_exception_count = self.query_exception_count()
     # The number of exceptions may be < than what was in setup if the queries in the
     # EXCEPTION state were bumped out of the FINISHED list. We should never see an
@@ -50,11 +49,13 @@ class TestDdlStatements(ImpalaTestSuite):
   def cleanup(self):
     map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
     self.cleanup_hdfs_dirs()
+    self.client.refresh()
 
   def cleanup_hdfs_dirs(self):
     # Cleanup the test table HDFS dirs between test runs so there are no errors the next
     # time a table is created with the same location. This also helps remove any stale
     # data from the last test run.
+    self.hdfs_client.delete_file_dir("test-warehouse/part_data/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
@@ -66,6 +67,10 @@ class TestDdlStatements(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
+    # Create directory for partition data that does not use the (key=value)
+    # format.
+    self.hdfs_client.make_dir("test-warehouse/part_data/", permission=777)
+    self.hdfs_client.create_file("test-warehouse/part_data/data.txt", file_data='1984')
     self.run_test_case('QueryTest/alter-table', vector)
 
   @pytest.mark.execute_serially

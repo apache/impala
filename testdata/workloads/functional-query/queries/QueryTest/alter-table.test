@@ -223,7 +223,25 @@ alter table t_part add if not exists partition (j=1, s='2012')
 ---- RESULTS
 ====
 ---- QUERY
+alter table t_part add if not exists partition (j=1, s='2012/withslash')
+---- RESULTS
+====
+---- QUERY
 alter table t_part add partition (j=1, s=substring('foo2013bar', 4, 8))
+---- RESULTS
+====
+---- QUERY
+# Add another partition that points to the same location as another partition.
+# This will cause the data to be read twice, but shouldn't result in an error.
+alter table t_part add partition (j=100, s='same_location')
+location '/test-warehouse/t_part_tmp/j=1/s=2012'
+---- RESULTS
+====
+---- QUERY
+# Add another partition that points to an existing data location that does not
+# follow the key=value directory structure.
+alter table t_part add partition (j=101, s='different_part_dir')
+location '/test-warehouse/part_data/'
 ---- RESULTS
 ====
 ---- QUERY
@@ -237,13 +255,23 @@ insert overwrite table t_part partition(j=1, s='2013') select 3 from functional.
 j=1/s=2013/: 3
 ====
 ---- QUERY
+insert overwrite table t_part partition(j=1, s='2012/withslash')
+select 1 from functional.alltypes limit 1
+---- RESULTS
+j=1/s=2012%2Fwithslash/: 1
+====
+---- QUERY
 select i, j, s from t_part
 ---- RESULTS
+1,1,'2012/withslash'
 2,1,'2012'
 2,1,'2012'
+2,100,'same_location'
+2,100,'same_location'
 3,1,'2013'
 3,1,'2013'
 3,1,'2013'
+1984,101,'different_part_dir'
 ---- TYPES
 int,int,string
 ====
@@ -256,6 +284,16 @@ alter table t_part add partition (j=NULL, s=NULL)
 ---- RESULTS
 ====
 ---- QUERY
+# Drop the partition that points to a duplication location. The data will no longer
+# be read twice.
+alter table t_part drop partition (j=100, s='same_location')
+---- RESULTS
+====
+---- QUERY
+alter table t_part drop partition (j=101, s='different_part_dir')
+---- RESULTS
+====
+---- QUERY
 insert overwrite table t_part partition(j=NULL, s=NULL)
 select 4 from functional.alltypes limit 5
 ---- RESULTS
@@ -264,6 +302,7 @@ j=__HIVE_DEFAULT_PARTITION__/s=__HIVE_DEFAULT_PARTITION__/: 5
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
+1,1,'2012/withslash'
 2,1,'2012'
 2,1,'2012'
 3,1,'2013'
@@ -286,6 +325,7 @@ j=__HIVE_DEFAULT_PARTITION__/s=2013/: 5
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
+1,1,'2012/withslash'
 2,1,'2012'
 2,1,'2012'
 3,1,'2013'
@@ -311,6 +351,7 @@ alter table t_part drop partition (j=NULL, s=NULL)
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
+1,1,'2012/withslash'
 2,1,'2012'
 2,1,'2012'
 3,1,'2013'
@@ -331,6 +372,7 @@ alter table t_part drop partition (j=NULL, s=trim('  2013  '))
 ---- QUERY
 select i, j, s from t_part
 ---- RESULTS
+1,1,'2012/withslash'
 2,1,'2012'
 2,1,'2012'
 3,1,'2013'
@@ -341,6 +383,19 @@ int,int,string
 ====
 ---- QUERY
 alter table t_part drop partition (j=1, s='2013')
+---- RESULTS
+====
+---- QUERY
+select i, j, s from t_part
+---- RESULTS
+1,1,'2012/withslash'
+2,1,'2012'
+2,1,'2012'
+---- TYPES
+int,int,string
+====
+---- QUERY
+alter table t_part drop partition (j=1, s='2012/withslash')
 ---- RESULTS
 ====
 ---- QUERY

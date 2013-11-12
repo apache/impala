@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import static com.cloudera.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -322,7 +324,8 @@ public class HdfsTable extends Table {
   public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
-      String value = kv.getPartitionKeyValueString(getNullPartitionKeyValue());
+      String value = PartitionKeyValue.getPartitionKeyValueString(
+          kv.getLiteralValue(), getNullPartitionKeyValue());
       partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
     }
     return getPartitionFromThriftPartitionSpec(partitionKeyValues);
@@ -428,8 +431,7 @@ public class HdfsTable extends Table {
   private void loadPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      Map<String, FileDescriptor> oldFileDescMap)
-      throws IOException, InvalidStorageDescriptorException, AuthorizationException {
+      Map<String, FileDescriptor> oldFileDescMap) throws IOException, CatalogException {
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
     List<FileDescriptor> newFileDescs = Lists.newArrayList();
@@ -486,17 +488,21 @@ public class HdfsTable extends Table {
         }
         HdfsPartition partition = addPartition(msPartition.getSd(), msPartition,
             keyValues, oldFileDescMap, newFileDescs);
-        if (partition != null && msPartition.getParameters() != null) {
+        // If the partition is null, its HDFS path does not exist, and it was not added to
+        // this table's partition list. Skip the partition.
+        if (partition == null) continue;
+
+        if (msPartition.getParameters() != null) {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
-          if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
-            // TODO: READ_ONLY isn't exactly correct because the it's possible the
-            // partition does not have READ permissions either. When we start checking
-            // whether we can READ from a table, this should be updated to set the
-            // table's access level to the "lowest" effective level across all
-            // partitions. That is, if one partition has READ_ONLY and another has
-            // WRITE_ONLY the table's access level should be NONE.
-            accessLevel = TAccessLevel.READ_ONLY;
-          }
+        }
+        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+          // TODO: READ_ONLY isn't exactly correct because the it's possible the
+          // partition does not have READ permissions either. When we start checking
+          // whether we can READ from a table, this should be updated to set the
+          // table's access level to the "lowest" effective level across all
+          // partitions. That is, if one partition has READ_ONLY and another has
+          // WRITE_ONLY the table's access level should be NONE.
+          accessLevel = TAccessLevel.READ_ONLY;
         }
       }
 
@@ -687,7 +693,8 @@ public class HdfsTable extends Table {
       // the table or partition has been modified.
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
           Lists.newArrayList();
-      if (cachedEntry == null || (cachedEntry.lastDdlTime != lastDdlTime)) {
+      if (cachedEntry == null || !(cachedEntry instanceof HdfsTable) ||
+          cachedEntry.lastDdlTime != lastDdlTime) {
         msPartitions.addAll(client.listPartitions(db.getName(), name, Short.MAX_VALUE));
       } else {
         // The table was already in the metadata cache and it has not been modified.
@@ -710,23 +717,22 @@ public class HdfsTable extends Table {
 
         int totalPartitions = modifiedPartitionNames.size();
         // Get all the partitions from the cached entry that have not been modified.
-        for (HdfsPartition oldPart: cachedHdfsTableEntry.getPartitions()) {
+        for (HdfsPartition cachedPart: cachedHdfsTableEntry.getPartitions()) {
           // Skip the default partition and any partitions that have been modified.
-          if (oldPart.isDirty() || oldPart.getMetaStorePartition() == null ||
-              oldPart.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+          if (cachedPart.isDirty() || cachedPart.getMetaStorePartition() == null ||
+              cachedPart.getId() == DEFAULT_PARTITION_ID) {
             continue;
           }
-          org.apache.hadoop.hive.metastore.api.Partition oldMsPart =
-              oldPart.getMetaStorePartition();
-          Preconditions.checkNotNull(oldMsPart);
+          org.apache.hadoop.hive.metastore.api.Partition cachedMsPart =
+              cachedPart.getMetaStorePartition();
+          Preconditions.checkNotNull(cachedMsPart);
 
-          String oldPartName =
-              HdfsTable.getPartitionName(cachedEntry, oldMsPart.getSd().getLocation());
           // This is a partition we already know about and it hasn't been modified.
           // No need to reload the metadata.
-          if (modifiedPartitionNames.contains(oldPartName)) {
-            msPartitions.add(oldMsPart);
-            modifiedPartitionNames.remove(oldPartName);
+          String cachedPartName = cachedPart.getPartitionName();
+          if (modifiedPartitionNames.contains(cachedPartName)) {
+            msPartitions.add(cachedMsPart);
+            modifiedPartitionNames.remove(cachedPartName);
           }
         }
         LOG.info(String.format("Incrementally refreshing %d/%d partitions.",
@@ -740,8 +746,7 @@ public class HdfsTable extends Table {
         }
       }
       Map<String, FileDescriptor> oldFileDescMap = null;
-      if (cachedEntry != null) {
-        Preconditions.checkArgument(cachedEntry instanceof HdfsTable);
+      if (cachedEntry != null && cachedEntry instanceof HdfsTable) {
         oldFileDescMap = ((HdfsTable) cachedEntry).fileDescMap_;
       }
       loadPartitions(msPartitions, msTbl, oldFileDescMap);
@@ -900,25 +905,9 @@ public class HdfsTable extends Table {
   public long getNumHdfsFiles() { return numHdfsFiles_; }
   public long getTotalHdfsBytes() { return totalHdfsBytes_; }
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
+
   @Override
   public int getNumNodes() { return uniqueHostPortsCount_; }
-
-  /**
-   * Return a partition name formed from concatenating partition keys and their values,
-   * compatible with the way Hive names partitions.
-   */
-  static public String getPartitionName(Table table, String hdfsPath) {
-    Preconditions.checkState(table.getNumClusteringCols() > 0);
-    List<Column> cols = table.getColumns();
-    int firstPartColPos = hdfsPath.indexOf(cols.get(0).getName() + "=");
-    int lastPartColPos =
-      hdfsPath.indexOf(cols.get(table.getNumClusteringCols() - 1).getName() + "=");
-    // Find the first '/' after the last partitioning-column folder.
-    lastPartColPos = hdfsPath.indexOf('/', lastPartColPos);
-    // The path didn't end in a '/'
-    if (lastPartColPos == -1) lastPartColPos = hdfsPath.length();
-    return hdfsPath.substring(firstPartColPos, lastPartColPos);
-  }
 
   /**
    * Returns the file format that the majority of partitions are stored in.

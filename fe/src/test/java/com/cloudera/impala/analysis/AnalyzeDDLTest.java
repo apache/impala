@@ -20,6 +20,7 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
@@ -27,7 +28,7 @@ import com.google.common.collect.Lists;
 public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
-  public void TestAlterTableAddDropPartition() throws AnalysisException {
+  public void TestAlterTableAddDropPartition() throws CatalogException {
     String[] addDrop = {"add if not exists", "drop if exists"};
     for (String kw: addDrop) {
       // Add different partitions for different column types
@@ -116,6 +117,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
           "Partition spec already exists: (year=2010, month=10).");
     AnalyzesOk("alter table functional.alltypes add if not exists " +
           " partition(year=2010, month=10)");
+    AnalyzesOk("alter table functional.alltypes add if not exists " +
+        " partition(year=2010, month=10) location " +
+        "'/test-warehouse/alltypes/year=2010/month=10'");
 
     // IF EXISTS properly checks for partition existence
     AnalyzesOk("alter table functional.alltypes drop " +

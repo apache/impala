@@ -179,11 +179,13 @@ public class HdfsStorageDescriptor {
    * Thrown when constructing an HdfsStorageDescriptor from an invalid
    * metatore storage descriptor.
    */
-  public static class InvalidStorageDescriptorException extends Exception {
+  public static class InvalidStorageDescriptorException extends CatalogException {
     // Mandatory since Exception implements Serialisable
     private static final long serialVersionUID = -555234913768134760L;
     public InvalidStorageDescriptorException(String s) { super(s); }
-    public InvalidStorageDescriptorException(Exception ex) { super(ex); }
+    public InvalidStorageDescriptorException(Exception ex) {
+      super(ex.getMessage(), ex);
+    }
   }
 
   /**
