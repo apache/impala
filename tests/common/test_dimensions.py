@@ -101,7 +101,8 @@ def create_single_exec_option_dimension():
 
 def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
-                                 batch_sizes=ALL_BATCH_SIZES):
+                                 batch_sizes=ALL_BATCH_SIZES,
+                                 synced_ddl=None):
   """
   Builds a query exec option test dimension
 
@@ -118,6 +119,9 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
       'batch_size': batch_sizes,
       'disable_codegen': disable_codegen_options,
       'num_nodes': cluster_sizes}
+
+  if synced_ddl is not None:
+    exec_option_dimensions['synced_ddl'] = synced_ddl
 
   # Generate the cross product (all combinations) of the exec options specified. Then
   # store them in exec_option dictionary format.

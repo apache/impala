@@ -148,7 +148,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         // CREATE TABLE AS SELECT performs its catalog update once the DML
         // portion of the operation has completed.
         RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
-            *catalog_op_executor_->update_catalog_result()));
+            *catalog_op_executor_->update_catalog_result(),
+            exec_request_.query_options.synced_ddl));
       }
       return Status::OK;
     }
@@ -170,7 +171,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       catalog_op_executor_.reset(new CatalogOpExecutor());
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
-          *catalog_op_executor_->update_catalog_result()));
+          *catalog_op_executor_->update_catalog_result(),
+          exec_request_.query_options.synced_ddl));
       return Status::OK;
     }
     default:
@@ -502,7 +504,8 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
       RETURN_IF_ERROR(status);
-      RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result));
+      RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result,
+          exec_request_.query_options.synced_ddl));
     }
   }
   query_events_->MarkEvent("DML Metastore update finished");

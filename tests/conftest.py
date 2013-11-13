@@ -18,8 +18,10 @@ def pytest_addoption(parser):
                    "Override exploration strategy for specific workloads using the "\
                    "format: workload:exploration_strategy. Ex: tpch:core,tpcds:pairwise.")
 
-  parser.addoption("--impalad", default="localhost:21000", help=\
-                   "The impalad host:port to run tests against.")
+  parser.addoption("--impalad", default="localhost:21000,localhost:21001,localhost:21002",
+                   help="A comma-separated list of impalad host:ports to target. Note: "\
+                   "Not all tests make use of all impalad, some tests target just the "\
+                   "first item in the list (it is considered the 'default'")
 
   parser.addoption("--impalad_hs2_port", default="21050", help=\
                    "The impalad HiveServer2 port.")

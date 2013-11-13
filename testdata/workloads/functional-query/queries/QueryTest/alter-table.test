@@ -1,13 +1,5 @@
 ====
 ---- QUERY
-create database alter_table_test_db
----- RESULTS
-====
----- QUERY
-create database alter_table_test_db2
----- RESULTS
-====
----- QUERY
 use alter_table_test_db
 ---- RESULTS
 ====

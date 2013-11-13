@@ -384,8 +384,7 @@ class CancellationWork {
 };
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env),
-      current_catalog_version_(0L) {
+    : exec_env_(exec_env) {
   // Initialize default config
   InitializeConfigVariables();
 
@@ -1495,6 +1494,9 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
           return Status(ss.str());
         }
         break;
+      case TImpalaQueryOptions::SYNCED_DDL:
+        query_options->__set_synced_ddl(iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1747,6 +1749,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
       case TImpalaQueryOptions::EXPLAIN_LEVEL:
         val << query_option.explain_level;
         break;
+      case TImpalaQueryOptions::SYNCED_DDL:
+        val << query_option.synced_ddl;
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1826,17 +1831,17 @@ void ImpalaServer::CatalogUpdateCallback(
     vector<TTopicDelta>* subscriber_topic_updates) {
   StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
+  if (topic == incoming_topic_deltas.end()) return;
+  const TTopicDelta& delta = topic->second;
 
-  if (topic != incoming_topic_deltas.end()) {
-    const TTopicDelta& delta = topic->second;
-    // No updates or deletions, nothing to do.
-    if (delta.topic_entries.size() == 0 && delta.topic_deletions.size() == 0) return;
 
+  // Process any updates
+  if (delta.topic_entries.size() != 0 || delta.topic_deletions.size() != 0)  {
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(delta.is_delta);
     // Process all Catalog updates (new and modified objects) and determine what the
     // new catalog version will be.
-    long new_catalog_version = current_catalog_version_;
+    int64_t new_catalog_version = catalog_update_info_.catalog_version;
     BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
       uint32_t len = item.value.size();
       TCatalogObject catalog_object;
@@ -1896,11 +1901,11 @@ void ImpalaServer::CatalogUpdateCallback(
     } else {
       {
         unique_lock<mutex> unique_lock(catalog_version_lock_);
-        current_catalog_version_ = new_catalog_version;
-        current_catalog_service_id_ = resp.catalog_service_id;
+        catalog_update_info_.catalog_version = new_catalog_version;
+        catalog_update_info_.catalog_topic_version = delta.to_version;
+        catalog_update_info_.catalog_service_id = resp.catalog_service_id;
       }
-      ImpaladMetrics::CATALOG_READY->Update(current_catalog_version_ > 0);
-      catalog_version_update_cv_.notify_all();
+      ImpaladMetrics::CATALOG_READY->Update(new_catalog_version > 0);
       UpdateCatalogMetrics();
       // Remove all dropped functions from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
@@ -1909,16 +1914,24 @@ void ImpalaServer::CatalogUpdateCallback(
       }
     }
   }
+
+  // Always update the minimum subscriber version for the catalog topic.
+  {
+    unique_lock<mutex> unique_lock(catalog_version_lock_);
+    min_subscriber_catalog_topic_version_ = delta.min_subscriber_topic_version;
+  }
+  catalog_version_update_cv_.notify_all();
 }
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
-    const TCatalogUpdateResult& catalog_update_result) {
-  // If this update result contains a catalog object to add or remove,
-  // assume it is "fast" update and directly apply the update to the local
-  // impalad's catalog cache. Otherwise, wait for a statestore heartbeat
-  // that contains this update version.
-  if (catalog_update_result.__isset.updated_catalog_object ||
-      catalog_update_result.__isset.removed_catalog_object) {
+    const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers) {
+  // If wait_for_all_subscribers is false, or if this this update result contains a
+  // catalog object to add or remove, assume it is "fast" update and directly apply the
+  // update to the local impalad's catalog cache. Otherwise, wait for a statestore
+  // heartbeat that contains this update version.
+  if ((catalog_update_result.__isset.updated_catalog_object ||
+      catalog_update_result.__isset.removed_catalog_object) &&
+      !wait_for_all_subscribers) {
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
@@ -1935,14 +1948,31 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
     return status;
   } else {
-    int64_t min_req_catalog_version = catalog_update_result.version;
     unique_lock<mutex> unique_lock(catalog_version_lock_);
-    VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
-               << " current version: " << current_catalog_version_;
+    int64_t min_req_catalog_version = catalog_update_result.version;
+    const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
 
+    // Wait for the update to be processed locally.
     // TODO: What about query cancellation?
-    while (current_catalog_version_ < min_req_catalog_version &&
-           current_catalog_service_id_ == catalog_update_result.catalog_service_id) {
+    VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
+               << " current version: " << catalog_update_info_.catalog_version;
+    while (catalog_update_info_.catalog_version < min_req_catalog_version &&
+           catalog_update_info_.catalog_service_id == catalog_service_id) {
+      catalog_version_update_cv_.wait(unique_lock);
+    }
+
+    if (!wait_for_all_subscribers) return Status::OK;
+
+    // Now wait for this update to be propagated to all catalog topic subscribers.
+    // If we make it here it implies the first condition was met (the update was processed
+    // locally or the catalog service id has changed).
+    int64_t min_req_subscriber_topic_version = catalog_update_info_.catalog_topic_version;
+
+    VLOG_QUERY << "Waiting for min subscriber topic version: "
+               << min_req_subscriber_topic_version << " current version: "
+               << min_subscriber_catalog_topic_version_;
+    while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
+           catalog_update_info_.catalog_service_id == catalog_service_id) {
       catalog_version_update_cv_.wait(unique_lock);
     }
   }

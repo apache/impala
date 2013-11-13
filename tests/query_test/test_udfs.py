@@ -38,6 +38,8 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/udf', vector, use_db=database)
 
   def test_hive_udfs(self, vector):
+    self.client.execute('create database if not exists udf_test')
+    self.client.execute('create database if not exists uda_test')
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
 
@@ -48,7 +50,7 @@ class TestUdfs(ImpalaTestSuite):
     exec_options = vector.get_value('exec_option')
     for query in queries:
       if query.strip() == '': continue
-      result = self.execute_query_expect_success(IMPALAD, query, exec_options)
+      result = self.execute_query_expect_success(self.client, query, exec_options)
       assert result is not None
 
   # Create test UDA functions in {database} from library {location}

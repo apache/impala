@@ -102,7 +102,7 @@ STRING
 drop function function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
-show functions in function_ddl_test
+show functions
 ---- RESULTS
 'fn()'
 'fn(INT)'
@@ -129,29 +129,23 @@ show functions in function_ddl_test
 STRING
 ====
 ---- QUERY
-use default
-====
----- QUERY
-show functions;
+show functions in default;
 ---- RESULTS
 'fn()'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-drop function fn()
+drop function default.fn()
 ====
 ---- QUERY
-show functions;
+show functions in default;
 ---- RESULTS
 ---- TYPES
 STRING
 ====
 ---- QUERY
-use function_ddl_test
-====
----- QUERY
-show functions;
+show functions in function_ddl_test;
 ---- RESULTS
 'fn()'
 'fn(INT)'

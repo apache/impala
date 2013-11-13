@@ -25,7 +25,8 @@ class TestInsertQueries(ImpalaTestSuite):
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+        synced_ddl=[0, 1]))
 
     cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
 
@@ -48,8 +49,10 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert1(self, vector):
     vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
-    self.run_test_case('QueryTest/insert', vector)
+    self.run_test_case('QueryTest/insert', vector,
+        multiple_impalad=vector.get_value('exec_option')['synced_ddl'] == 1)
 
   @pytest.mark.execute_serially
   def test_insert_overwrite(self, vector):
-    self.run_test_case('QueryTest/insert_overwrite', vector)
+    self.run_test_case('QueryTest/insert_overwrite', vector,
+        multiple_impalad=vector.get_value('exec_option')['synced_ddl'] == 1)

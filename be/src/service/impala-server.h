@@ -579,18 +579,20 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const CancellationWork& cancellation_work);
 
   // Processes a CatalogUpdateResult returned from the CatalogServer and ensures
-  // the update has been applied to the local impalad's catalog cache. Called from
-  // QueryExecState after executing any statement that modifies the catalog.
-  // If the TCatalogUpdateResult contains TCatalogObject(s) to add and/or remove, this
-  // function will update the cache by directly calling UpdateCatalog() with the
-  // TCatalogObject results.
-  // If the TCatalogUpdateResult does not contain any objects to apply, this function will
-  // wait until the local impalad's catalog cache has been updated from a statestore
-  // heartbeat that includes this catalog update's catalog version.
-  // TODO: This function will wait until the local impalad processed the catalog update,
-  // it would be useful to also have a way to wait until all impalad instances in the
-  // cluster have processed the metadata update.
-  Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result);
+  // the update has been applied to the local impalad's catalog cache. If
+  // wait_for_all_subscribers is true, this function will also wait until all
+  // catalog topic subscribers have processed the update. Called from QueryExecState
+  // after executing any statement that modifies the catalog.
+  // If wait_for_all_subscribers is false AND if the TCatalogUpdateResult contains
+  // TCatalogObject(s) to add and/or remove, this function will update the local cache
+  // by directly calling UpdateCatalog() with the TCatalogObject results.
+  // Otherwise this function will wait until the local impalad's catalog cache has been
+  // updated from a statestore heartbeat that includes this catalog update's catalog
+  // version. If wait_for_all_subscribers is true, this function also wait all other
+  // catalog topic subscribers to process this update by checking the current
+  // min_subscriber_topic_version included in each state store heartbeat.
+  Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
+      bool wait_for_all_subscribers);
 
   // To be run in a thread. Every FLAGS_idle_session_timeout / 2 seconds, wakes up and
   // checks all sessions for their last-idle time. Those that have been idle for longer
@@ -821,16 +823,35 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Lock to protect uuid_generator
   boost::mutex uuid_lock_;
 
-  // Lock for current_catalog_version_ and catalog_version_update_cv_
+  // Lock for catalog_update_version_info_, min_subscriber_catalog_topic_version_,
+  // and catalog_version_update_cv_
   boost::mutex catalog_version_lock_;
 
   // Variable to signal when the catalog version has been modified
   boost::condition_variable catalog_version_update_cv_;
 
-  // The current max catalog version returned from the last call to UpdateCatalog()
-  // and the CatalogService ID that this version was from.
-  int64_t current_catalog_version_;
-  TUniqueId current_catalog_service_id_;
+  // Contains details on the version information of a catalog update.
+  struct CatalogUpdateVersionInfo {
+    CatalogUpdateVersionInfo() :
+      catalog_version(0L),
+      catalog_topic_version(0L) {
+    }
+
+    // The last catalog version returned from UpdateCatalog()
+    int64_t catalog_version;
+    // The CatalogService ID that this catalog version is from.
+    TUniqueId catalog_service_id;
+    // The statestore catalog topic version this update was received in.
+    int64_t catalog_topic_version;
+  };
+
+  // The version information from the last successfull call to UpdateCatalog().
+  CatalogUpdateVersionInfo catalog_update_info_;
+
+  // The current minimum topic version processed across all subscribers of the catalog
+  // topic. Used to determine when other nodes have successfully processed a catalog
+  // update. Updated with each catalog topic heartbeat from the statestore.
+  int64_t min_subscriber_catalog_topic_version_;
 
   // Map of short usernames of authorized proxy users to the set of user(s) they are
   // allowed to impersonate. Populated by parsing the --authorized_proxy_users_config

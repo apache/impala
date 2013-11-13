@@ -116,7 +116,11 @@ enum TImpalaQueryOptions {
   PARQUET_FILE_SIZE,
 
   // Level of detail for explain output (NORMAL, VERBOSE).
-  EXPLAIN_LEVEL
+  EXPLAIN_LEVEL,
+
+  // If true, waits for the result of all catalog operations to be processed by all
+  // active impalad in the cluster before completing.
+  SYNCED_DDL,
 }
 
 // The summary of an insert.

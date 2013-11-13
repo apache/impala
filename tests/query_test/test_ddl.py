@@ -13,6 +13,8 @@ from tests.common.impala_test_suite import *
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
+  TEST_DBS = ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2']
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -20,7 +22,11 @@ class TestDdlStatements(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDdlStatements, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=ALL_NODES_ONLY,
+        disable_codegen_options=[False],
+        batch_sizes=[0],
+        synced_ddl=[0,1]))
 
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
@@ -29,6 +35,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup()
+
     # Get the current number of queries that are in the 'EXCEPTION' state. Used for
     # verification after running each test case.
     self.start_exception_count = self.query_exception_count()
@@ -47,7 +54,7 @@ class TestDdlStatements(ImpalaTestSuite):
         self.impalad_test_service.read_debug_webpage('queries')))
 
   def cleanup(self):
-    map(self.cleanup_db, ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2'])
+    map(self.cleanup_db, self.TEST_DBS)
     self.cleanup_hdfs_dirs()
 
   def cleanup_hdfs_dirs(self):
@@ -58,10 +65,19 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
+  @classmethod
+  def __use_multiple_impalad(cls, vector):
+    return vector.get_value('exec_option')['synced_ddl'] == 1
+
   @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
-    self.run_test_case('QueryTest/create', vector)
+    self.client.execute('use default')
+    self.client.set_query_options({'synced_ddl': 1})
+    self.client.execute('create database ddl_test_db')
+    self.client.set_query_options(vector.get_value('exec_option'))
+    self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
+        multiple_impalad=self.__use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
@@ -70,16 +86,29 @@ class TestDdlStatements(ImpalaTestSuite):
     # format.
     self.hdfs_client.make_dir("test-warehouse/part_data/", permission=777)
     self.hdfs_client.create_file("test-warehouse/part_data/data.txt", file_data='1984')
-    self.run_test_case('QueryTest/alter-table', vector)
+
+    self.client.execute('use default')
+    self.client.set_query_options({'synced_ddl': 1})
+    self.client.execute('create database alter_table_test_db')
+    self.client.execute('create database alter_table_test_db2')
+    self.client.set_query_options(vector.get_value('exec_option'))
+
+    self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
+        multiple_impalad=self.__use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
   def test_views_ddl(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
-    self.run_test_case('QueryTest/views-ddl', vector)
+    self.client.execute('use default')
+    self.client.set_query_options(vector.get_value('exec_option'))
+    self.client.execute('create database ddl_test_db')
+    self.run_test_case('QueryTest/views-ddl', vector, use_db='ddl_test_db',
+        multiple_impalad=self.__use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
-    self.run_test_case('QueryTest/functions-ddl', vector)
+    self.run_test_case('QueryTest/functions-ddl', vector, use_db='function_ddl_test',
+        multiple_impalad=self.__use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
   def test_create_drop_function(self, vector):
@@ -90,13 +119,14 @@ class TestDdlStatements(ImpalaTestSuite):
     # that is a bit harder and requires us to update the udf binary in
     # the middle.
     create_fn_stmt = """create function f() returns int
-        location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'""";
+        location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'"""
     drop_fn_stmt = "drop function f()"
 
     self.client.execute("create database if not exists udf_test")
     self.client.execute("use udf_test")
     self.client.execute("drop function if exists f()")
 
+    self.client.execute("use udf_test")
     for i in xrange(1, 5):
       self.client.execute(create_fn_stmt)
       self.client.execute(drop_fn_stmt)
@@ -134,8 +164,12 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_create_alter_tbl_properties(self, vector):
-    self.client.execute("use default")
-    self.client.execute("drop table if exists test_alter_tbl")
+    self.client.execute('use default')
+    self.client.set_query_options({'synced_ddl': 1})
+    self.client.execute('create database alter_table_test_db')
+    self.client.set_query_options(vector.get_value('exec_option'))
+
+    self.client.execute("use alter_table_test_db")
 
     # Specify TBLPROPERTIES and SERDEPROPERTIES at CREATE time
     self.client.execute("""create table test_alter_tbl (i int)

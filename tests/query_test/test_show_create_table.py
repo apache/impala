@@ -107,7 +107,7 @@ class TestShowCreateTable(ImpalaTestSuite):
         self.__exec(test_case.drop_table_sql)
 
   def __exec(self, sql_str):
-    return self.execute_query_expect_success(IMPALAD, sql_str)
+    return self.execute_query_expect_success(self.client, sql_str)
 
   def __get_location_uri(self, sql_str):
     m = re.search("LOCATION '([^\']+)'", sql_str)

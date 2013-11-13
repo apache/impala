@@ -1,22 +1,5 @@
 ====
 ---- QUERY
-use default
----- RESULTS
-====
----- QUERY
-# Make sure the database doesn't exist
-show databases like 'ddl_test_db'
----- SETUP
-RELOAD
----- RESULTS
----- TYPES
-STRING
-====
----- QUERY
-create database ddl_test_db
----- RESULTS
-====
----- QUERY
 # It should show up now
 show databases like 'ddl_test_db'
 ---- RESULTS
@@ -433,10 +416,7 @@ drop table if exists non_existent_db.tbl
 ====
 ---- QUERY
 # Need to switch databases before dropping
-use default
----- RESULTS
-====
----- QUERY
+use default;
 drop database ddl_test_db
 ---- RESULTS
 ====
