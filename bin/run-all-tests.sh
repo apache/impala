@@ -100,6 +100,11 @@ do
   cd $IMPALA_FE_DIR
   mvn test
 
+  # Run the custom-cluster tests after all other tests, since they will restart the
+  # cluster repeatedly and lose state.
+  # TODO: Consider moving in to run-tests.py.
+  ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh
+
   # Finally, run the process failure tests.
   # Disabled temporarily until we figure out the proper timeouts required to make the test
   # succeed.

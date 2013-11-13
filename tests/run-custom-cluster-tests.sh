@@ -1,0 +1,38 @@
+#!/bin/sh
+# Copyright 2012 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Runs the custom-cluster tests. Must be run after the query tests because any existing
+# clusters will be restarted.
+
+# Disable HEAPCHECK for the process failure tests because they can cause false positives.
+# TODO: Combine with run-process-failure-tests.sh
+export HEAPCHECK=
+set -u
+
+RESULTS_DIR=${IMPALA_HOME}/tests/custom_cluster/results
+mkdir -p ${RESULTS_DIR}
+LOG_DIR=${IMPALA_HOME}/tests/custom_cluster/logs/
+mkdir -p ${LOG_DIR}
+
+export LOG_DIR
+
+cd ${IMPALA_HOME}/tests
+. ${IMPALA_HOME}/bin/set-classpath.sh
+py.test custom_cluster/ \
+    --junitxml="${RESULTS_DIR}/TEST-impala-custom-cluster.xml" \
+    --resultlog="${RESULTS_DIR}/TEST-impala-custom-cluster.log" "$@"
+EXIT_CODE=$?
+cd ~
+exit $EXIT_CODE

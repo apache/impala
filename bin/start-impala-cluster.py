@@ -50,7 +50,6 @@ parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_t
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 
-
 options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ['IMPALA_HOME']

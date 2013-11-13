@@ -15,76 +15,17 @@
 #
 # Impala process failure test suite
 
-import logging
-import sys
 import pytest
-import time
-import os
-from random import choice
-from subprocess import call
-from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_cluster import ImpalaCluster
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.custom_cluster_test_suite import NUM_SUBSCRIBERS, CLUSTER_SIZE
 from time import sleep
-
-IMPALA_HOME = os.environ['IMPALA_HOME']
-CLUSTER_SIZE = 3
-# The number of statestore subscribers is CLUSTER_SIZE (# of impalad) + 1 (for catalogd).
-NUM_SUBSCRIBERS = CLUSTER_SIZE + 1
 
 # The exact query doesn't matter much for these tests, just want a query that touches
 # data on all nodes.
 QUERY = "select count(l_comment) from lineitem"
 
-# Validates killing and restarting impalad processes between query executions.
-# The timeout values are chosen artibrarily, to give enough time for the catalog
-# service to start up.
-class TestProcessFailures(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'tpch'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestProcessFailures, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('exec_option')['batch_size'] == 0 and\
-        v.get_value('exec_option')['disable_codegen'] == False and\
-        v.get_value('exec_option')['num_nodes'] == 0)
-
-  def setup_class(cls):
-    # No-op, but needed to override base class setup which is not wanted in this
-    # case.
-    pass
-
-  def teardown_class(cls):
-    pass
-
-  def setup_method(self, method):
-    # Start a clean new cluster before each test
-    self.__start_impala_cluster()
-    sleep(3)
-    self.cluster = ImpalaCluster()
-    statestored = self.cluster.statestored
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
-    for impalad in self.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
-
-  @classmethod
-  def __stop_impala_cluster(cls):
-    # TODO: Figure out a better way to handle case where processes are just starting
-    # / cleaning up so that sleeps are not needed.
-    sleep(2)
-    call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'), '--kill_only'])
-    sleep(2)
-
-  @classmethod
-  def __start_impala_cluster(cls):
-    call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
-       '-s %d' % CLUSTER_SIZE])
-
+# Validates killing and restarting impalad processes between query executions
+class TestProcessFailures(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_restart_coordinator(self, vector):
     """Restarts the coordinator between queries"""
