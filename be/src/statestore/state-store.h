@@ -297,14 +297,15 @@ class StateStore {
 
     const TransientEntryMap& transient_entries() const { return transient_entries_; }
 
-    // Returns the maximum version of the given TopicId which this subscriber
-    // has successfully processed.
-    const TopicEntry::Version GetMaxVersionForTopic(const TopicId& topic_id) const;
+    // Returns the last version of the topic which this subscriber has successfully
+    // processed. Will never decrease.
+    const TopicEntry::Version LastTopicVersionProcessed(const TopicId& topic_id) const;
 
-    // Updates the subscriber max version of the given TopicId to the given value.
+    // Sets the subscriber's last processed version of the topic to the given value.
     // This should only be set when once a subscriber has succesfully processed the
     // given update corresponding to this version.
-    void SetMaxVersionForTopic(const TopicId& topic_id, TopicEntry::Version version);
+    void SetLastTopicVersionProcessed(const TopicId& topic_id,
+        TopicEntry::Version version);
 
    private:
     // Unique human-readable identifier for this subscriber, set by
@@ -414,6 +415,18 @@ class StateStore {
   // TUpdateStateRequest object. Must be called while holding the topic_lock_.
   void GatherTopicUpdates(const Subscriber& subscriber,
       TUpdateStateRequest* update_state_request);
+
+  // Returns the minimum last processed topic version across all subscribers for the
+  // given topic ID. Calculated by enumerating all subscribers and looking
+  // at their LastTopicVersionProcessed() for this topic. The value returned will always
+  // be <= topics_[topic_id].last_version_. Returns TOPIC_INITIAL_VERSION if no
+  // subscribers are registered to the topic.
+  // Takes the subscribers_ lock.
+  // TODO: Update the min subscriber version only when a topic is updated, rather than
+  // each time a subscriber is updated. One way to do this would be to keep a priority
+  // queue in Topic of each subscriber's last processed version of the topic.
+  // TODO: Expose the topic version and minimum subscriber topic version in /topics.
+  const TopicEntry::Version GetMinSubscriberTopicVersion(const TopicId& topic_id);
 
   // True if the shutdown flag has been set true, false otherwise.
   bool ShouldExit();

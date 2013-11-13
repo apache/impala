@@ -76,6 +76,13 @@ struct TTopicDelta {
   // topic the subscriber successfully processed.
   5: optional i64 from_version
   6: optional i64 to_version
+
+  // The minimum topic version of all subscribers to the topic. This can be used to
+  // determine when all subscribers have successfully processed a specific update.
+  // This is guaranteed because no subscriber will ever be sent a topic containing
+  // keys with a version < min_subscriber_topic_version. Only used when sending an update
+  // from the statestore to a subscriber.
+  7: optional i64 min_subscriber_topic_version
 }
 
 // Description of a topic to subscribe to as part of a RegisterSubscriber call

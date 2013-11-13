@@ -146,14 +146,14 @@ void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
   }
 }
 
-const StateStore::TopicEntry::Version StateStore::Subscriber::GetMaxVersionForTopic(
+const StateStore::TopicEntry::Version StateStore::Subscriber::LastTopicVersionProcessed(
     const TopicId& topic_id) const {
   Topics::const_iterator itr = subscribed_topics_.find(topic_id);
   return itr == subscribed_topics_.end() ?
       TOPIC_INITIAL_VERSION : itr->second.last_version;
 }
 
-void StateStore::Subscriber::SetMaxVersionForTopic(const TopicId& topic_id,
+void StateStore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_id,
     TopicEntry::Version version) {
   subscribed_topics_[topic_id].last_version = version;
 }
@@ -314,7 +314,8 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   map<TopicEntryKey, TTopicDelta>::const_iterator topic_delta =
       update_state_request.topic_deltas.begin();
   for (; topic_delta != update_state_request.topic_deltas.end(); ++topic_delta) {
-    subscriber->SetMaxVersionForTopic(topic_delta->first, topic_delta->second.to_version);
+    subscriber->SetLastTopicVersionProcessed(topic_delta->first,
+        topic_delta->second.to_version);
   }
 
   // Thirdly: perform any / all updates returned by the subscriber
@@ -334,7 +335,7 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
         LOG(INFO) << "Received request for different delta base of topic: "
                   << update.topic_name << " from: " << subscriber->id()
                   << " subscriber from_version: " << update.from_version;
-        subscriber->SetMaxVersionForTopic(topic_it->first, update.from_version);
+        subscriber->SetLastTopicVersionProcessed(topic_it->first, update.from_version);
       }
 
       Topic* topic = &topic_it->second;
@@ -366,13 +367,16 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
     // If the subscriber version is > 0, send this update as a delta. Otherwise, this
     // is a new subscriber so send them a non-delta update that includes all items
     // in the topic.
-    TopicEntry::Version max_version = subscriber.GetMaxVersionForTopic(topic_it->first);
-    topic_delta.is_delta = max_version > Subscriber::TOPIC_INITIAL_VERSION;
-    topic_delta.__set_from_version(max_version);
+    TopicEntry::Version last_processed_version =
+        subscriber.LastTopicVersionProcessed(topic_it->first);
+    topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
+    topic_delta.__set_from_version(last_processed_version);
+    topic_delta.__set_min_subscriber_topic_version(
+        GetMinSubscriberTopicVersion(topic_it->first));
 
     const Topic& topic = topic_it->second;
     TopicUpdateLog::const_iterator next_update =
-        topic.topic_update_log().upper_bound(max_version);
+        topic.topic_update_log().upper_bound(last_processed_version);
 
     for (; next_update != topic.topic_update_log().end(); ++next_update) {
       TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
@@ -398,6 +402,23 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
       topic_delta.__set_to_version(Subscriber::TOPIC_INITIAL_VERSION);
     }
   }
+}
+
+const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
+    const TopicId& topic_id) {
+  lock_guard<mutex> l(subscribers_lock_);
+  TopicEntry::Version min_topic_version = numeric_limits<int64_t>::max();
+  bool found = false;
+  // Find the minimum version processed for this topic across all topic subscribers.
+  BOOST_FOREACH(const SubscriberMap::value_type& subscriber, subscribers_) {
+    if (subscriber.second->subscribed_topics().find(topic_id) !=
+        subscriber.second->subscribed_topics().end()) {
+      found = true;
+      min_topic_version = min(min_topic_version,
+          subscriber.second->LastTopicVersionProcessed(topic_id));
+    }
+  }
+  return found ? min_topic_version : Subscriber::TOPIC_INITIAL_VERSION;
 }
 
 bool StateStore::ShouldExit() {
