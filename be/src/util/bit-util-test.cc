@@ -84,10 +84,10 @@ TEST(BitUtil, ByteSwap) {
 }
 
 TEST(BitUtil, Log2) {
-  EXPECT_EQ(BitUtil::Log2(1), 1);
-  EXPECT_EQ(BitUtil::Log2(2), 2);
+  EXPECT_EQ(BitUtil::Log2(1), 0);
+  EXPECT_EQ(BitUtil::Log2(2), 1);
   EXPECT_EQ(BitUtil::Log2(3), 2);
-  EXPECT_EQ(BitUtil::Log2(4), 3);
+  EXPECT_EQ(BitUtil::Log2(4), 2);
   EXPECT_EQ(BitUtil::Log2(5), 3);
   EXPECT_EQ(BitUtil::Log2(INT_MAX), 31);
   EXPECT_EQ(BitUtil::Log2(UINT_MAX), 32);

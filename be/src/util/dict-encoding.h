@@ -67,8 +67,7 @@ class DictEncoderBase {
   int bit_width() const {
     if (UNLIKELY(num_entries() == 0)) return 0;
     if (UNLIKELY(num_entries() == 1)) return 1;
-    int max_id = num_entries() - 1;
-    return BitUtil::Log2(max_id);
+    return BitUtil::Log2(num_entries());
   }
 
   // Writes out any buffered indices to buffer preceded by the bit width of this data and

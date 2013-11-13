@@ -53,7 +53,6 @@ class FreePool {
 
     // Do ceil(log_2(size))
     int free_list_idx = BitUtil::Log2(size);
-    DCHECK_GT(free_list_idx, 0);
     DCHECK_LT(free_list_idx, NUM_LISTS);
 
     FreeListNode* allocation = lists_[free_list_idx].next;
