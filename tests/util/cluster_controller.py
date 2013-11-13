@@ -16,12 +16,13 @@
 import logging
 import os
 from fabric.api import sudo, local, run, execute, parallel
-from fabric.api import env as fabric_env
+from fabric.api import hide, env as fabric_env
 
 # Setup logging for this module.
-logging.basicConfig(level=logging.INFO, format='%(filename)s: %(message)s')
 LOG = logging.getLogger('cluster_controller')
-LOG.setLevel(level=logging.DEBUG)
+LOG.setLevel(logging.INFO)
+# Set paramiko's logging level to ERROR, to supress its log spew.
+logging.getLogger("paramiko").setLevel(logging.ERROR)
 
 
 class ClusterController(object):
@@ -117,9 +118,13 @@ class ClusterController(object):
     else:
       return execute(self.__run_cmd_parallel)
 
+  # The 'hide' context manager allows for selective muting of fabric's logging when
+  # running remote commands.
   @parallel
   def __run_cmd_parallel(self):
-    return sudo(self.cmd, combine_stderr=True)
+    with hide('stdout', 'running'):
+      return sudo(self.cmd, combine_stderr=True)
 
   def __run_cmd_serial(self):
-    return sudo(self.cmd, combine_stderr=True)
+    with hide('stdout', 'running'):
+      return sudo(self.cmd, combine_stderr=True)
