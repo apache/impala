@@ -38,6 +38,9 @@ parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true"
                   " the running impalads and the statestored.")
 parser.add_option("--force_kill", dest="force_kill", action="store_true", default=False,
                   help="Force kill impalad and statestore processes.")
+parser.add_option("-r", "--restart_impalad_only", dest="restart_impalad_only",
+                  action="store_true", default=False,
+                  help="Restarts only the impalad processes")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
 parser.add_option("--log_dir", dest="log_dir", default="/tmp",
@@ -77,15 +80,18 @@ def exec_impala_process(cmd, args, stderr_log_file_path):
   cmd = '%s %s %s 2>&1 &' % (cmd, args, redirect_output)
   os.system(cmd)
 
-def kill_all(force=False):
-  kill_cmd = "killall"
-  if force:
-    kill_cmd += " -9"
-  os.system("%s catalogd" % kill_cmd)
-  os.system("%s mini-impala-cluster" % kill_cmd)
-  os.system("%s impalad" % kill_cmd)
-  os.system("%s statestored" % kill_cmd)
-  sleep(1)
+def kill_cluster_processes(force=False):
+  kill_matching_processes('catalogd')
+  kill_matching_processes('impalad')
+  kill_matching_processes('statestored')
+  kill_matching_processes('mini-impala-cluster')
+
+def kill_matching_processes(binary_name, force=False):
+  """Kills all processes with the given binary name"""
+  # -w = Wait for processes to die.
+  kill_cmd = "killall -w"
+  if force: kill_cmd += " -9"
+  os.system("%s %s" % (kill_cmd, binary_name))
 
 def start_statestore():
   print "Starting State Store logging to %s/statestored.INFO" % options.log_dir
@@ -205,7 +211,7 @@ def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
 
 if __name__ == "__main__":
   if options.kill_only:
-    kill_all(force=options.force_kill)
+    kill_cluster_processes(force=options.force_kill)
     sys.exit(0)
 
   if options.build_type not in KNOWN_BUILD_TYPES:
@@ -217,8 +223,14 @@ if __name__ == "__main__":
     print 'Please specify a cluster size > 0'
     sys.exit(1)
 
-  # Kill existing processes.
-  kill_all(force=options.force_kill)
+  # Kill existing cluster processes based on the current configuration.
+  if options.restart_impalad_only:
+    if options.inprocess:
+      print 'Cannot perform individual component restarts using an in-process cluster'
+      sys.exit(1)
+    kill_matching_processes('impalad', force=options.force_kill)
+  else:
+    kill_cluster_processes(force=options.force_kill)
 
   try:
     import json
@@ -231,25 +243,28 @@ if __name__ == "__main__":
   # whether impalads/statestore are up.
   try:
     from tests.common.impala_cluster import ImpalaCluster
-    # Make sure the processes have been killed. We loop till we can't detect a single
-    # impalad or a statestore process.
-    impala_cluster = ImpalaCluster()
-    while len(impala_cluster.impalads) != 0 or impala_cluster.statestored or\
-          impala_cluster.catalogd:
-      impala_cluster.refresh()
+    if options.restart_impalad_only:
+      impala_cluster = ImpalaCluster()
+      if not impala_cluster.statestored or not impala_cluster.catalogd:
+        print 'No running statestored or catalogd detected. Restarting entire cluster.'
+        options.restart_impalad_only = False
   except ImportError:
     print 'ImpalaCluster module not found.'
+    # TODO: Update this code path to work similar to the ImpalaCluster code path when
+    # restarting only impalad processes. Specifically, we should do a full cluster
+    # restart if either the statestored or catalogd processes are down, even if
+    # restart_only_impalad=True.
     wait_for_cluster = wait_for_cluster_cmdline
 
   if options.inprocess:
-    # The statestore and the impalads start in the same process. Additionally,
-    # the statestore does not have a debug webpage.
+    # The statestore and the impalads start in the same process.
     start_mini_impala_cluster(options.cluster_size)
     wait_for_cluster_cmdline()
   else:
     try:
-      start_statestore()
-      start_catalogd()
+      if not options.restart_impalad_only:
+        start_statestore()
+        start_catalogd()
       start_impalad_instances(options.cluster_size)
       wait_for_cluster()
     except Exception, e:
