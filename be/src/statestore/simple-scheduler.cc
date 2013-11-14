@@ -269,6 +269,7 @@ void SimpleScheduler::UpdateMembership(
           list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
           be_descs->erase(
               remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
+          if (be_descs->empty()) backend_map_.erase(be_desc.ip_address);
           current_membership_.erase(backend_id);
         }
       }
