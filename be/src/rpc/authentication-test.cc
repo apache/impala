@@ -20,27 +20,21 @@
 
 using namespace std;
 
-DECLARE_string(principal);
-
 namespace impala {
 
-class AuthTest : public ::testing::Test {
- public:
-  static void SetUpTestCase() {
-    FLAGS_principal = "username/_HOST";
-    // Warning: this kicks off a kinit thread
-    EXPECT_TRUE(InitAuth("test").ok());
-  }
-};
-
-TEST_F(AuthTest, PrincipalSubstitution) {
+TEST(Auth, PrincipalSubstitution) {
   string hostname;
-  EXPECT_TRUE(GetHostname(&hostname).ok());
-  EXPECT_EQ(string::npos, FLAGS_principal.find("_HOST"));
-  EXPECT_NE(string::npos, FLAGS_principal.find(hostname));
+  ASSERT_TRUE(GetHostname(&hostname).ok());
+  KerberosAuthProvider kerberos("service_name/_HOST@some.realm", "", false);
+  ASSERT_TRUE(kerberos.Start().ok());
+  ASSERT_EQ(string::npos, kerberos.principal().find("_HOST"));
+  ASSERT_NE(string::npos, kerberos.principal().find(hostname));
+  ASSERT_EQ("service_name", kerberos.service_name());
+  ASSERT_EQ(hostname, kerberos.hostname());
 }
 
-TEST_F(AuthTest, ValidAuthProviders) {
+TEST(Auth, ValidAuthProviders) {
+  ASSERT_TRUE(AuthManager::GetInstance()->Init().ok());
   ASSERT_TRUE(AuthManager::GetInstance()->GetClientFacingAuthProvider() != NULL);
   ASSERT_TRUE(AuthManager::GetInstance()->GetServerFacingAuthProvider() != NULL);
 }

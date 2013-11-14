@@ -53,7 +53,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::InitThreading();
-  impala::InitAuth(argv[0]);
+  EXIT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize glog_flusher thread after InitGoogleLoggingSafe and InitThreading.
   glog_flusher.reset(new Thread("common", "glog-flush-thread", &GlogFlushThread));

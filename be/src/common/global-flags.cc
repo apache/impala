@@ -29,8 +29,11 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
 DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
 
 // Kerberos is enabled if and only if principal is set.
-DEFINE_string(principal, "", "Kerberos principal name");
-DEFINE_string(keytab_file, "", "Absolute path to Kerberos key file");
+DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend network"
+    "connections will use Kerberos encryption and authentication.");
+DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
+    "overriding --principal if set.");
+DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");
 
 DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
               "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "

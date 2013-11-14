@@ -34,6 +34,7 @@
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/network-util.h"
+#include "util/promise.h"
 #include "util/thread.h"
 
 using namespace std;
@@ -42,6 +43,7 @@ using namespace boost::random;
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
+DECLARE_string(be_principal);
 
 DEFINE_int32(kerberos_reinit_interval, 60,
     "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
@@ -63,9 +65,6 @@ static const string HOSTNAME_PATTERN = "_HOST";
 // Constants for the two Sasl  mechanisms we support
 static const std::string KERBEROS_MECHANISM = "GSSAPI";
 static const std::string PLAIN_MECHANISM = "PLAIN";
-
-mutex KerberosAuthProvider::kinit_lock_;
-scoped_ptr<Thread> KerberosAuthProvider::kinit_thread_;
 
 AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
@@ -134,6 +133,9 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
   if (strcmp(KERBEROS_MECHANISM.c_str(), plugin_name) == 0) {
     // Return the path to our keytab file.
     // TODO: why is this never called?
+    // TODO: Always returns FLAGS_keytab_file, even though technically we might have
+    // different keytabs for different principals. Ok for now, because in practice we
+    // never have different keytabs.
     if (strcmp("keytab", option) == 0) {
         *result = FLAGS_keytab_file.c_str();
         if (len != NULL) *len = strlen(*result);
@@ -179,7 +181,7 @@ static int SaslGetPath(void* context, const char** path) {
 
 // Periodically call kinit to get a ticket granting ticket from the kerberos server.
 // This is kept in the kerberos cache associated with this process.
-void KerberosAuthProvider::RunKinit() {
+void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
   stringstream sysstream;
@@ -193,38 +195,42 @@ void KerberosAuthProvider::RunKinit() {
 
   // Pass the path to the key file and the principal. Make the ticket renewable.
   // Calling kinit -R ensures the ticket makes it to the cache.
-  sysstream << "kinit -r " << ticket_lifetime
-            << "m -k -t " << FLAGS_keytab_file << " " << FLAGS_principal
-            << " 2>&1 && kinit -R 2>&1";
+  sysstream << "kinit -R -r " << ticket_lifetime
+            << "m -k -t " << keytab_path_ << " " << principal_ << " 2>&1";
 
-  bool started = false;
+  bool had_one_success = false;
   int failures = 0;
   string kreturn;
 
   while (true) {
-    LOG(INFO) << "Registering " << FLAGS_principal << " key_tab file "
-              << FLAGS_keytab_file;
+    LOG(INFO) << "Registering " << principal_ << " key_tab file "
+              << keytab_path_;
     bool succeeded = false;
     FILE* fp = popen(sysstream.str().c_str(), "r");
     if (fp == NULL) {
       kreturn = "Failed to execute kinit";
     } else {
-      // Read the first 1024 bytes of any output so we have some idea of what
-      // happened on failure.
+      // Read the first 1024 bytes of any output so we have some idea of what happened on
+      // failure.
       char buf[1024];
       size_t len = fread(buf, 1, 1024, fp);
       kreturn.assign(buf, len);
-      // pclose() returns -1 on error. non-zero return codes are used for
-      // other information. We only care about errors, so ignore those.
-      if (pclose(fp) != -1) succeeded = true;
+      // pclose() returns an encoded form of the sub-process' exit code.
+      int status = pclose(fp);
+      if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        succeeded = true;
+      }
     }
 
     if (!succeeded) {
       string error_msg = GetStrErrMsg();
-      if (!started) {
-        LOG(ERROR) << "Exiting: failed to register with kerberos: " << error_msg
-                   << " '" << kreturn << "'";
-        exit(1);
+      if (!had_one_success) {
+        stringstream ss;
+        ss << "Failed to obtain Kerberos ticket for principal: " << principal_
+           << " - error message is '" << error_msg << "' and output from kinit was: "
+           << "'" << kreturn << "'";
+        first_kinit->Set(Status(ss.str()));
+        return;
       }
       // We couldn't renew the ticket so just report the error. Existing connections
       // are ok and we'll try to renew the ticket later.
@@ -233,8 +239,11 @@ void KerberosAuthProvider::RunKinit() {
                  << "' " << error_msg << ". Failure count: " << failures;
     } else {
       VLOG_CONNECTION << "kinit returned: '" << kreturn << "'";
+      if (had_one_success == false) {
+        had_one_success = true;
+        first_kinit->Set(Status::OK);
+      }
     }
-    started = true;
     // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
     // avoid a storm at the KDC. Additionally, never sleep less than a minute to
     // reduce KDC stress due to frequent renewals.
@@ -276,46 +285,50 @@ Status InitAuth(const string& appname) {
 }
 
 KerberosAuthProvider::KerberosAuthProvider(const string& principal,
-    const string& keytab_path) : principal_(principal), keytab_path_(keytab_path) {
+    const string& keytab_path, bool needs_kinit)
+    : principal_(principal), keytab_path_(keytab_path), needs_kinit_(needs_kinit) {
 
 }
 
 Status KerberosAuthProvider::Start() {
   // The "keytab" callback is never called.  Set the file name in the environment.
   if (setenv("KRB5_KTNAME", keytab_path_.c_str(), 1)) {
-    string error_msg = GetStrErrMsg();
     stringstream ss;
-    ss << "Kerberos could not set KRB5_KTNAME: " << error_msg;
-    LOG(ERROR) << ss;
+    ss << "Kerberos could not set KRB5_KTNAME: " << GetStrErrMsg();
     return Status(ss.str());
   }
 
   // Replace the string _HOST with our hostname.
-  size_t off = FLAGS_principal.find(HOSTNAME_PATTERN);
+  size_t off = principal_.find(HOSTNAME_PATTERN);
   if (off != string::npos) {
     string hostname;
-    Status status = GetHostname(&hostname);
-    if (!status.ok()) {
-      status.AddErrorMsg("InitKerberos call to GetHostname failed.");
-      return status;
-    }
-    FLAGS_principal.replace(off, HOSTNAME_PATTERN.size(), hostname);
+    RETURN_IF_ERROR(GetHostname(&hostname));
+    principal_.replace(off, HOSTNAME_PATTERN.size(), hostname);
   }
 
-  off = FLAGS_principal.find("/");
-  if (off == string::npos) {
+  vector<string> names;
+  split(names, principal_, is_any_of("/@"));
+
+  if (names.size() != 3) {
     stringstream ss;
-    ss << "--principal must contain '/': " << FLAGS_principal;
-    LOG(ERROR) << ss;
+    ss << "Kerberos principal should of the form: <service>/<hostname>@<realm> - got: "
+       << principal_;
     return Status(ss.str());
   }
-  service_name_ = FLAGS_principal.substr(0, off);
 
-  // Only start Kinit thread  if we're the first initialisation of this auth provider
-  lock_guard<mutex> l(kinit_lock_);
-  if (kinit_thread_.get() == NULL) {
-    kinit_thread_.reset(
-        new Thread("authentication", "kinit", &KerberosAuthProvider::RunKinit, this));
+  service_name_ = names[0];
+  hostname_ = names[1];
+  // Realm (names[2]) is unused.
+
+  if (needs_kinit_) {
+    Promise<Status> first_kinit;
+    stringstream thread_name;
+    thread_name << "kinit-" << principal_;
+    kinit_thread_.reset(new Thread("authentication", thread_name.str(),
+        &KerberosAuthProvider::RunKinit, this, &first_kinit));
+    LOG(INFO) << "Waiting for Kerberos ticket for principal: " << principal_;
+    RETURN_IF_ERROR(first_kinit.Get());
+    LOG(INFO) << "Kerberos ticket granted to " << principal_;
   }
 
   return Status::OK;
@@ -324,23 +337,13 @@ Status KerberosAuthProvider::Start() {
 Status KerberosAuthProvider::GetServerTransportFactory(
     shared_ptr<TTransportFactory>* factory) {
   // The string should be service/hostname@realm
-  vector<string> names;
-  split(names, principal_, is_any_of("/@"));
-
-  if (names.size() != 3) {
-    stringstream ss;
-    ss << "Kerberos principal should of the form: <service>/<hostname>@<realm> - got: "
-       << principal_;
-    LOG(ERROR) << ss.str();
-    return Status(ss.str());
-  }
 
   try {
     // TSaslServerTransport::Factory doesn't actually do anything with the properties
     // argument, so we pass in an empty map
     map<string, string> sasl_props;
     factory->reset(new TSaslServerTransport::Factory(
-        KERBEROS_MECHANISM, names[0], names[1], 0, sasl_props, SASL_CALLBACKS));
+        KERBEROS_MECHANISM, service_name_, hostname_, 0, sasl_props, SASL_CALLBACKS));
   } catch (TTransportException& e) {
     LOG(ERROR) << "Failed to create a Kerberos transport factory: " << e.what();
     return Status(e.what());
@@ -401,28 +404,40 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
 }
 
 Status AuthManager::Init() {
-  // If principal is set, client-side uses Kerberos. The same is true server-side *unless*
-  // --enable_ldap_auth is true. If neither are set, we use a NoAuthProvider for both.
+  // Client-side uses LDAP if enabled, else Kerberos if FLAGS_principal is set, otherwise
+  // a NoAuthProvider.
   if (FLAGS_enable_ldap_auth) {
     client_auth_provider_.reset(new LdapAuthProvider());
     RETURN_IF_ERROR(client_auth_provider_->Start());
+  } else if (!FLAGS_principal.empty()) {
+    client_auth_provider_.reset(
+        new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file, false));
+  } else {
+    client_auth_provider_.reset(new NoAuthProvider());
   }
 
-  if (!FLAGS_principal.empty()) {
+  // Server-side uses Kerberos if either FLAGS_principal or the specific
+  // FLAGS_be_principal is set, otherwise a NoAuthProvider.
+  if (!FLAGS_principal.empty() || !FLAGS_be_principal.empty()) {
+    if (FLAGS_be_principal.empty()) FLAGS_be_principal = FLAGS_principal;
+
+    // Should init as this principal as well, in order to allow connections to other
+    // backend services.
     server_auth_provider_.reset(
-        new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file));
-    RETURN_IF_ERROR(server_auth_provider_->Start());
+        new KerberosAuthProvider(FLAGS_be_principal, FLAGS_keytab_file, true));
   } else {
     server_auth_provider_.reset(new NoAuthProvider());
-    RETURN_IF_ERROR(server_auth_provider_->Start());
   }
+
+  RETURN_IF_ERROR(server_auth_provider_->Start());
+  RETURN_IF_ERROR(client_auth_provider_->Start());
 
   return Status::OK;
 }
 
 AuthProvider* AuthManager::GetClientFacingAuthProvider() {
-  if (client_auth_provider_.get() != NULL) return client_auth_provider_.get();
-  return GetServerFacingAuthProvider();
+  DCHECK(client_auth_provider_.get() != NULL);
+  return client_auth_provider_.get();
 }
 
 AuthProvider* AuthManager::GetServerFacingAuthProvider() {

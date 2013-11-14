@@ -20,6 +20,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
+#include "util/promise.h"
 
 namespace sasl { class TSasl; }
 
@@ -55,7 +56,10 @@ class AuthProvider {
 class KerberosAuthProvider : public AuthProvider {
  public:
   // FOR NOW: keytab_path must be the same for all auth provider invocations.
-  KerberosAuthProvider(const std::string& principal, const std::string& keytab_path);
+  // If needs_kinit is true, this auth provider will also attempt to obtain credentials
+  // for the supplied principal.
+  KerberosAuthProvider(const std::string& principal, const std::string& keytab_path,
+      bool should_kinit);
 
   // Runs Kinit in a separate thread.
   virtual Status Start();
@@ -69,12 +73,15 @@ class KerberosAuthProvider : public AuthProvider {
 
   virtual bool is_sasl() { return true; }
 
- private:
-  // Protects kinit_thread_
-  static boost::mutex kinit_lock_;
+  // Used for testing
+  const std::string& principal() const { return principal_; };
+  const std::string& hostname() const { return hostname_; };
+  const std::string& service_name() const { return service_name_; };
 
-  // Only initialised once. Runs Kinit periodically
-  static boost::scoped_ptr<Thread> kinit_thread_;
+ private:
+  // Runs Kinit periodically if required for this principal, i.e. if it's going to be used
+  // to connect as a service client.
+  boost::scoped_ptr<Thread> kinit_thread_;
 
   // The Kerberos principal to kinit as. Set from FLAGS_principal usually.
   std::string principal_;
@@ -82,11 +89,19 @@ class KerberosAuthProvider : public AuthProvider {
   // The full path to the system keytab
   std::string keytab_path_;
 
-  // The service name, deduced from the principal. Used only by clients.
+  // The service name, deduced from the principal. Used by servers to indicate what
+  // service a principal must have a ticket for in order to be granted access to this
+  // service.
   std::string service_name_;
 
+  // Principal's hostname, derived from principal string.
+  std::string hostname_;
+
+  // True if tickets for this principal should be obtained.
+  bool needs_kinit_;
+
   // Runs kinit periodically to maintain a live ticket for principal_.
-  void RunKinit();
+  void RunKinit(Promise<Status>* first_kinit);
 };
 
 // Provider for Ldap-based authentication. In fact, this only sets up PLAIN/SASL as the
