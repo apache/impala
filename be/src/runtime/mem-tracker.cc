@@ -125,8 +125,8 @@ MemTracker::~MemTracker() {
 //     DataStreamSender:  Consumption=16.00 KB
 string MemTracker::LogUsage(const string& prefix) const {
   stringstream ss;
-  ss << prefix << label_ << ": ";
-  if (LimitExceeded()) ss << "memory limit exceeded.";
+  ss << prefix << label_ << ":";
+  if (LimitExceeded()) ss << " memory limit exceeded.";
   if (limit_ > 0) ss << " Limit=" << PrettyPrinter::Print(limit_, TCounterType::BYTES);
   ss << " Consumption=" << PrettyPrinter::Print(consumption(), TCounterType::BYTES);
 

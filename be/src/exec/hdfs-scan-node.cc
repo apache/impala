@@ -91,6 +91,7 @@ HdfsScanNode::~HdfsScanNode() {
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   Status status = GetNextInternal(state, row_batch, eos);
+  if (status.IsMemLimitExceeded()) state->LogMemLimitExceeded();
   if (!status.ok() || *eos) StopAndFinalizeCounters();
   return status;
 }

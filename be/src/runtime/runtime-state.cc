@@ -137,7 +137,7 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id) {
 
   // TODO: this is a stopgap until we implement ExprContext
   udf_mem_tracker_.reset(
-      new MemTracker(runtime_profile(), -1, "UDFs", instance_mem_tracker_.get()));
+      new MemTracker(-1, "UDFs", instance_mem_tracker_.get()));
   udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
   return Status::OK;
 }
@@ -218,7 +218,12 @@ void RuntimeState::LogMemLimitExceeded() {
   }
   DCHECK(query_mem_tracker_.get() != NULL);
   stringstream ss;
-  ss << "Memory Limit Exceeded\n" << query_mem_tracker_->LogUsage();
+  ss << "Memory Limit Exceeded\n";
+  if (exec_env_->process_mem_tracker()->LimitExceeded()) {
+    ss << exec_env_->process_mem_tracker()->LogUsage();
+  } else {
+    ss << query_mem_tracker_->LogUsage();
+  }
   LogError(ss.str());
 }
 

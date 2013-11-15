@@ -572,10 +572,13 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK:
       return False
 
+    log = ""
     loop_start = time.time()
     while True:
       query_state = self.__get_query_state(handle)
       if query_state == self.query_state["FINISHED"]:
+        log, get_log_status = self.__do_rpc(
+            lambda: self.imp_service.get_log(handle.log_context))
         break
       elif query_state == self.query_state["EXCEPTION"]:
         print_to_stderr('Query aborted, unable to fetch data')
@@ -618,6 +621,7 @@ class ImpalaShell(cmd.Cmd):
       if self.is_interrupted.isSet() or status != RpcStatus.OK:
         # Worth trying to cleanup the query even if fetch failed
         self.__cancel_and_close_query(handle)
+        print log
         return False
       num_rows_fetched += len(results.data)
       result_rows.extend(results.data)

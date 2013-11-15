@@ -184,6 +184,7 @@ class RuntimeState {
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
 
   // sets the state to mem limit exceeded and logs all the registered trackers
+  // Subsequent calls to this will be no-ops.
   void LogMemLimitExceeded();
 
   RuntimeProfile::Counter* total_cpu_timer() { return total_cpu_timer_; }

@@ -262,6 +262,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       // can cause us to go way over the mem limit so use TryAllocate instead.
       row_group_buffer_ = data_buffer_pool_->TryAllocate(row_group_length_);
       if (row_group_length_ > 0 && row_group_buffer_ == NULL) {
+        state_->LogMemLimitExceeded();
         return Status::MEM_LIMIT_EXCEEDED;
       }
       row_group_buffer_size_ = row_group_length_;
