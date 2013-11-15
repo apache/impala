@@ -47,3 +47,7 @@ DEFINE_bool(enable_process_lifetime_heap_profiling, false, "(Advanced) Enables h
 
 DEFINE_string(heap_profile_dir, "", "Output directory to store heap profiles. If not set "
     " profiles are stored in the current working directory.");
+
+DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
+    "configs or running on unsupported hardware.");
+

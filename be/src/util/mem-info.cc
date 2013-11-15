@@ -63,8 +63,6 @@ void MemInfo::Init() {
   if (physical_mem_ == -1) {
     LOG(WARNING) << "Could not determine amount of physical memory on this machine.";
   }
-  LOG(INFO) << "Physical Memory: "
-            << PrettyPrinter::Print(physical_mem_, TCounterType::BYTES);
 
   initialized_ = true;
 }
@@ -72,7 +70,8 @@ void MemInfo::Init() {
 string MemInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
-  stream << "Mem Info: " << PrettyPrinter::Print(physical_mem_, TCounterType::BYTES)
+  stream << "Physical Memory: "
+         << PrettyPrinter::Print(physical_mem_, TCounterType::BYTES)
          << endl;
   return stream.str();
 }

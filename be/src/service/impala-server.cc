@@ -97,6 +97,7 @@ DECLARE_int32(nn_port);
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 DECLARE_string(heap_profile_dir);
 DECLARE_string(authorized_proxy_user_config);
+DECLARE_bool(abort_on_config_error);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -114,8 +115,6 @@ DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to 
 // TODO: this logging should go into a per query log.
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
     "every log_mem_usage_interval'th fragment completion.");
-
-DEFINE_bool(abort_on_config_error, true, "Abort Impala if there are improper configs.");
 
 DEFINE_int32(max_audit_event_log_file_size, 5000, "The maximum size (in queries) of the "
     "audit event log file before a new one is created (if event logging is enabled)");

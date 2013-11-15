@@ -28,6 +28,7 @@
 
 DECLARE_string(hostname);
 DECLARE_int32(logbufsecs);
+DECLARE_bool(abort_on_config_error);
 
 using namespace boost;
 
@@ -46,6 +47,20 @@ static void GlogFlushThread() {
 }
 
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
+  CpuInfo::Init();
+  DiskInfo::Init();
+  MemInfo::Init();
+  OsInfo::Init();
+
+  if (!CpuInfo::IsSupported(CpuInfo::SSE3)) {
+    LOG(ERROR) << "Machine does not support sse3, which is currently required.";
+    if (FLAGS_abort_on_config_error) {
+      LOG(ERROR) << "Exiting process. You can disable this check by starting up with "
+                 << "--abort_on_config_error=false";
+      exit(1);
+    }
+  }
+
   // Set the default hostname. The user can override this with the hostname flag.
   GetHostname(&FLAGS_hostname);
 
@@ -63,10 +78,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   impala::LogCommandLineFlags();
 
   InitThriftLogging();
-  CpuInfo::Init();
-  DiskInfo::Init();
-  MemInfo::Init();
-  OsInfo::Init();
 
   LOG(INFO) << CpuInfo::DebugString();
   LOG(INFO) << DiskInfo::DebugString();
