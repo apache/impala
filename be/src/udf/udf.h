@@ -64,8 +64,20 @@ class FunctionContext {
     TYPE_FIXED_BUFFER,
   };
 
+  struct UniqueId {
+    int64_t hi;
+    int64_t lo;
+  };
+
   // Returns the version of Impala that's currently running.
   ImpalaVersion version() const;
+
+  // Returns the user that is running the query. Returns NULL if it is not
+  // available.
+  const char* user() const;
+
+  // Returns the query_id for the current query.
+  UniqueId query_id() const;
 
   // Sets an error for this UDF. If this is called, this will trigger the
   // query to fail.

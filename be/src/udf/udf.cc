@@ -52,10 +52,13 @@ class RuntimeState {
   void set_query_status(const std::string& error_msg) {
     assert(false);
   }
+
   bool LogError(const std::string& error) {
     assert(false);
     return false;
   }
+
+  const std::string user() const { return ""; }
 };
 }
 #else
@@ -105,6 +108,22 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
 
 FunctionContext::ImpalaVersion FunctionContext::version() const {
   return impl_->version_;
+}
+
+const char* FunctionContext::user() const {
+  if (impl_->state_ == NULL) return NULL;
+  return  impl_->state_->user().c_str();
+}
+
+FunctionContext::UniqueId FunctionContext::query_id() const {
+  UniqueId id;
+#if IMPALA_UDF_SDK_BUILD
+  id.hi = id.lo = 0;
+#else
+  id.hi = impl_->state_->query_id().hi;
+  id.lo = impl_->state_->query_id().lo;
+#endif
+  return id;
 }
 
 bool FunctionContext::has_error() const {
