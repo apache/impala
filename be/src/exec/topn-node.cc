@@ -34,7 +34,9 @@ using namespace impala;
 using namespace std;
 
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs) {
+  : ExecNode(pool, tnode, descs),
+    offset_(tnode.sort_node.__isset.offset ? tnode.sort_node.offset : 0),
+    num_rows_skipped_(0) {
 }
 
 Status TopNNode::Init(const TPlanNode& tnode) {
@@ -91,6 +93,7 @@ Status TopNNode::Open(RuntimeState* state) {
       batch.Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
       if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
+        DCHECK(offset_ == 0); // Offset should be 0 when the default limit is set.
         return Status("DEFAULT_ORDER_BY_LIMIT has been exceeded.");
       }
       for (int i = 0; i < batch.num_rows(); ++i) {
@@ -99,7 +102,7 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_ERROR(state->CheckQueryState());
     } while (!eos);
   }
-  DCHECK_LE(priority_queue_->size(), limit_);
+  DCHECK_LE(priority_queue_->size(), limit_ + offset_);
   PrepareForOutput();
   return Status::OK;
 }
@@ -110,6 +113,11 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
+    if (num_rows_skipped_ < offset_) {
+      ++get_next_iter_;
+      ++num_rows_skipped_;
+      continue;
+    }
     int row_idx = row_batch->AddRow();
     TupleRow* dst_row = row_batch->GetRow(row_idx);
     TupleRow* src_row = *get_next_iter_;
@@ -132,7 +140,7 @@ void TopNNode::Close(RuntimeState* state) {
 void TopNNode::InsertTupleRow(TupleRow* input_row) {
   TupleRow* insert_tuple_row = NULL;
 
-  if (priority_queue_->size() < limit_) {
+  if (priority_queue_->size() < limit_ + offset_) {
     insert_tuple_row = input_row->DeepCopy(tuple_descs_, tuple_pool_.get());
   } else {
     DCHECK(!priority_queue_->empty());

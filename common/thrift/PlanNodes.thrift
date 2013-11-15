@@ -194,6 +194,8 @@ struct TSortNode {
   // Indicates, for each expr, if nulls should be listed first or last. This is
   // independent of is_asc_order.
   5: optional list<bool> nulls_first
+  // If use_top_n, this is the number of rows to skip before returning results
+  6: optional i64 offset
 }
 
 struct TMergeNode {

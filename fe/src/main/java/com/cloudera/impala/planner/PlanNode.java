@@ -239,6 +239,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     expBuilder.append(rootPrefix + id.asInt() + ":" + displayName + "\n");
     expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
     if (limit != -1) expBuilder.append(detailPrefix + "limit: " + limit + "\n");
+    expBuilder.append(getOffsetExplainString(detailPrefix));
+
     // Output cardinality, cost estimates and tuple Ids only when explain plan level
     // is set to verbose
     if (detailLevel.equals(TExplainLevel.VERBOSE)) {
@@ -278,6 +280,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Each line should be prefix by detailPrefix.
    */
   protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
+    return "";
+  }
+
+  /**
+   * Return the offset details, if applicable. This is available separately from
+   * 'getNodeExplainString' because we want to output 'limit: ...' (which can be printed
+   * from PlanNode) before 'offset: ...', which is only printed from SortNodes right
+   * now.
+   */
+  protected String getOffsetExplainString(String prefix) {
     return "";
   }
 

@@ -761,3 +761,54 @@ PLAN FRAGMENT 4
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 ====
+# Subquery containing limit and offset
+select x.id from (
+  select id from functional.alltypesagg order by id limit 5 offset 5) x
+order by x.id
+limit 100 offset 4
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:TOP-N
+  |  order by: id ASC
+  |  limit: 100
+  |  offset: 4
+  |
+  1:TOP-N
+  |  order by: id ASC
+  |  limit: 5
+  |  offset: 5
+  |
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:TOP-N
+  |  order by: id ASC
+  |  limit: 100
+  |  offset: 4
+  |
+  4:TOP-N
+  |  order by: id ASC
+  |  limit: 5
+  |  offset: 5
+  |
+  3:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:TOP-N
+  |  order by: id ASC
+  |  limit: 10
+  |
+  0:SCAN HDFS
+     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+====

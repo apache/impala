@@ -796,14 +796,26 @@ public class Planner {
     PlanFragment mergeFragment = createMergeFragment(childFragment, analyzer);
     // insert sort node that repeats the child's sort
     SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
-    LOG.debug("childsortnode limit: " + Long.toString(childSortNode.getLimit()));
+    LOG.debug("childsortnode limit: " + Long.toString(childSortNode.getLimit()) +
+        " offset: " + Long.toString(childSortNode.getOffset()));
     Preconditions.checkState(childSortNode.hasLimit());
     PlanNode exchNode = mergeFragment.getPlanRoot();
-    // the merging exchange node must not apply the limit (that's done by the merging
-    // top-n)
+    // the merging exchange node must not apply the limit (that's done by the
+    // merging top-n)
     exchNode.unsetLimit();
     PlanNode mergeNode =
         new SortNode(new PlanNodeId(nodeIdGenerator), childSortNode, exchNode);
+
+    // If there is an offset, it must be applied at the top-n. Child nodes do not apply
+    // the offset, and instead must keep at least (limit+offset) rows so that the top-n
+    // node does not miss any rows that should be in the top-n.
+    long offset = childSortNode.getOffset();
+    if (offset != 0) {
+      long sortLimit = childSortNode.getLimit();
+      childSortNode.unsetLimit();
+      childSortNode.setLimit(sortLimit + offset);
+      childSortNode.setOffset(0);
+    }
     mergeNode.computeStats(analyzer);
     Preconditions.checkState(mergeNode.hasValidStats());
     mergeFragment.setPlanRoot(mergeNode);
@@ -917,7 +929,7 @@ public class Planner {
       Preconditions.checkState(selectStmt.getLimit() != -1 || defaultOrderByLimit != -1);
       boolean isDefaultLimit = (selectStmt.getLimit() == -1);
       root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true,
-          isDefaultLimit);
+          isDefaultLimit, selectStmt.getOffset());
       root.computeStats(analyzer);
       Preconditions.checkState(root.hasValidStats());
       // Don't assign conjuncts here. If this is the tree for an inline view, and
@@ -1455,7 +1467,7 @@ public class Planner {
             "ORDER BY without LIMIT currently not supported");
       }
       result = new SortNode(new PlanNodeId(nodeIdGenerator), result, sortInfo, true,
-          false);
+          false, unionStmt.getOffset());
     }
     result.setLimit(unionStmt.getLimit());
     return result;

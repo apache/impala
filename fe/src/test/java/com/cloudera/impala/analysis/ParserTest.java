@@ -345,6 +345,19 @@ public class ParserTest {
   }
 
   @Test
+  public void TestOffset() {
+    ParsesOk("select a from test order by a limit 10 offset 5");
+    ParsesOk("select a from test order by a limit 10 offset 0");
+    ParsesOk("select a from test order by a limit 10 offset 0 + 5 / 2");
+    ParsesOk("select a from test order by a asc limit 10 offset 5");
+    ParsesOk("select a from test limit 10 offset 5"); // Parses OK, doesn't analyze
+    ParserError("select a from test offset 5");
+    ParserError("select a from test order by a offset 5");
+    ParserError("select a from test order by a limit offset");
+    ParserError("select a from test order by a limit offset 5");
+  }
+
+  @Test
   public void TestUnion() {
     // Single union test.
     ParsesOk("select a from test union select a from test");
@@ -1941,8 +1954,8 @@ public class ParserTest {
         "              ^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
-        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
+        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
@@ -1951,8 +1964,8 @@ public class ParserTest {
         "^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
-        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
+        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
         "Syntax error in line 2:\n" +
@@ -1960,8 +1973,8 @@ public class ParserTest {
         "^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OR, ORDER, " +
-        "REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
+        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     // Long line: error in the middle
     ParserError("select c, b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",

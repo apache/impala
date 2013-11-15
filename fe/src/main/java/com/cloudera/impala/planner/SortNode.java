@@ -43,15 +43,20 @@ public class SortNode extends PlanNode {
   private final boolean useTopN;
   private final boolean isDefaultLimit;
 
+  protected long offset; // The offset of the first row to return
+
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
-      boolean isDefaultLimit) {
+      boolean isDefaultLimit, long offset) {
     super(id, "TOP-N");
+    // If this is the default limit, we shouldn't have a non-zero offset set.
+    Preconditions.checkArgument(!isDefaultLimit || offset == 0);
     this.info = info;
     this.useTopN = useTopN;
     this.isDefaultLimit = isDefaultLimit;
     this.tupleIds.addAll(input.getTupleIds());
     this.nullableTupleIds.addAll(input.getNullableTupleIds());
     this.children.add(input);
+    this.offset = offset;
   }
 
   /**
@@ -63,7 +68,11 @@ public class SortNode extends PlanNode {
     this.useTopN = inputSortNode.useTopN;
     this.isDefaultLimit = inputSortNode.isDefaultLimit;
     this.children.add(child);
+    this.offset = inputSortNode.offset;
   }
+
+  public long getOffset() { return offset; }
+  public void setOffset(long offset) { this.offset = offset; }
 
   @Override
   public void getMaterializedIds(Analyzer analyzer, List<SlotId> ids) {
@@ -101,6 +110,7 @@ public class SortNode extends PlanNode {
         .add("ordering_exprs", Expr.debugString(info.getOrderingExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
         .add("nulls_first", "[" + Joiner.on(" ").join(info.getNullsFirst()) + "]")
+        .add("offset", offset)
         .addValue(super.debugString())
         .toString();
   }
@@ -110,7 +120,9 @@ public class SortNode extends PlanNode {
     msg.node_type = TPlanNodeType.SORT_NODE;
     msg.sort_node = new TSortNode(
         Expr.treesToThrift(info.getOrderingExprs()), info.getIsAscOrder(), useTopN,
-        isDefaultLimit).setNulls_first(info.getNullsFirst());
+        isDefaultLimit);
+    msg.sort_node.setNulls_first(info.getNullsFirst());
+    msg.sort_node.setOffset(offset);
   }
 
   @Override
@@ -135,9 +147,14 @@ public class SortNode extends PlanNode {
   }
 
   @Override
+  protected String getOffsetExplainString(String prefix) {
+    return offset != 0 ? prefix + "offset: " + Long.toString(offset) + "\n" : "";
+  }
+
+  @Override
   public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
     Preconditions.checkState(useTopN);
-    perHostMemCost = (long) Math.ceil(cardinality * avgRowSize);
+    perHostMemCost = (long) Math.ceil((cardinality + offset) * avgRowSize);
   }
 }

@@ -57,6 +57,10 @@ class TopNNode : public ExecNode {
   // Flatten and reverse the priority queue.
   void PrepareForOutput();
 
+  // Number of rows to skip.
+  int64_t offset_;
+  int64_t num_rows_skipped_;
+
   std::vector<TupleDescriptor*> tuple_descs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
@@ -73,10 +77,10 @@ class TopNNode : public ExecNode {
 
   boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
 
-  // The priority queue will never have more elements in it than the LIMIT.  The stl
-  // priority queue doesn't support a max size, so to get that functionality, the order
-  // of the queue is the opposite of what the ORDER BY clause specifies, such that the top
-  // of the queue is the last sorted element.
+  // The priority queue will never have more elements in it than the LIMIT + OFFSET.
+  // The stl priority queue doesn't support a max size, so to get that functionality,
+  // the order of the queue is the opposite of what the ORDER BY clause specifies, such
+  // that the top of the queue is the last sorted element.
   boost::scoped_ptr<
       std::priority_queue<TupleRow*, std::vector<TupleRow*>, TupleRowComparator> >
           priority_queue_;

@@ -69,6 +69,19 @@ IMPALA=SUCCESS
 HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
+# Test that creating a view in Impala with limit and offset works in Impala and does not
+# work in Hive, which does not support offset.
+create view test as
+select id, int_col, string_col from functional.alltypesagg
+order by int_col limit 10 offset 5
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+====
+---- CREATE_VIEW
 # Test that creating a view in Impala with "NULLS FIRST/LAST" works when the nulls
 # ordering is the default behavior. View creation in Hive will fail because the NULLS
 # FIRST/LAST is not supported.

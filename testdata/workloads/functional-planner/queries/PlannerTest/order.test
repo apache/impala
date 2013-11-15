@@ -200,3 +200,93 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
+# Test that the limit/offset is propagated correctly to child nodes. The TOP-N node
+# should have the limit/offset specified in the query. Child sort nodes should have a
+# limit equal to the parent's (limit + offset) and offset equal to 0.
+select t1.int_col from functional.alltypessmall t1, functional.alltypessmall t2
+where t1.id = t2.id and t2.int_col is not null
+order by int_col
+limit 10 offset 5
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 10
+  |  offset: 5
+  |
+  2:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    t1.id = t2.id
+  |
+  |----1:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+  |       predicates: t2.int_col IS NOT NULL
+  |
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 10
+  |  offset: 5
+  |
+  6:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: t1.id
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  3:TOP-N
+  |  order by: t1.int_col ASC
+  |  limit: 15
+  |
+  2:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    t1.id = t2.id
+  |
+  |----5:EXCHANGE
+  |
+  4:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: t2.id
+
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     predicates: t2.int_col IS NOT NULL
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: t1.id
+
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+====

@@ -57,8 +57,8 @@ public class SelectStmt extends QueryStmt {
              List<TableRef> tableRefList,
              Expr wherePredicate, ArrayList<Expr> groupingExprs,
              Expr havingPredicate, ArrayList<OrderByElement> orderByElements,
-             Expr limitExpr) {
-    super(orderByElements, limitExpr);
+             LimitElement limitElement) {
+    super(orderByElements, limitElement);
     this.selectList = selectList;
     if (tableRefList == null) {
       this.tableRefs = Lists.newArrayList();
@@ -603,10 +603,7 @@ public class SelectStmt extends QueryStmt {
       }
     }
     // Limit clause.
-    if (hasLimitClause()) {
-      strBuilder.append(" LIMIT ");
-      strBuilder.append(limitExpr_.toSql());
-    }
+    strBuilder.append(limitElement_.toSql());
     return strBuilder.toString();
   }
 
@@ -643,7 +640,7 @@ public class SelectStmt extends QueryStmt {
         (groupingExprs != null) ? Expr.cloneList(groupingExprs, null) : null,
         (havingClause != null) ? havingClause.clone(null) : null,
         cloneOrderByElements(),
-        (limitExpr_ != null) ? limitExpr_.clone(null) : null);
+        (limitElement_ != null) ? limitElement_.clone(null) : null);
     selectClone.setWithClause(cloneWithClause());
     return selectClone;
   }

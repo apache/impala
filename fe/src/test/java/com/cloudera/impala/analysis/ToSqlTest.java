@@ -167,6 +167,20 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT id, string_col FROM functional.alltypes " +
         "ORDER BY string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
         "int_col DESC");
+    // Test limit/offset
+    testToSql("select id, string_col from functional.alltypes " +
+        "order by string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC LIMIT 10 OFFSET 5",
+        "SELECT id, string_col FROM functional.alltypes " +
+        "ORDER BY string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC LIMIT 10 OFFSET 5");
+    // Offset shouldn't be printed if it's not necessary
+    testToSql("select id, string_col from functional.alltypes " +
+        "order by string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC LIMIT 10 OFFSET 0",
+        "SELECT id, string_col FROM functional.alltypes " +
+        "ORDER BY string_col ASC NULLS FIRST, float_col DESC NULLS LAST, " +
+        "int_col DESC LIMIT 10");
 
     // Check we do not print NULLS FIRST/LAST unless necessary
     testToSql("select id, string_col from functional.alltypes " +

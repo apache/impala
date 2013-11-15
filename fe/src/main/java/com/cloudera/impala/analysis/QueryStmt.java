@@ -19,9 +19,6 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TColumnValue;
 import com.google.common.collect.Lists;
 
 /**
@@ -38,10 +35,7 @@ public abstract class QueryStmt extends StatementBase {
   protected WithClause withClause_;
 
   protected ArrayList<OrderByElement> orderByElements_;
-  protected final Expr limitExpr_;
-
-  // Result of limitExpr, computed in analyze().
-  private long limit_;
+  protected final LimitElement limitElement_;
 
   /**
    * For a select statment:
@@ -74,10 +68,11 @@ public abstract class QueryStmt extends StatementBase {
   // Analyzer that was used to analyze this query statement.
   protected Analyzer analyzer_;
 
-  QueryStmt(ArrayList<OrderByElement> orderByElements, Expr limitExpr) {
+  QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     this.orderByElements_ = orderByElements;
-    this.limitExpr_ = limitExpr;
     this.sortInfo_ = null;
+    this.limitElement_ =
+        limitElement == null ? new LimitElement(null, null) : limitElement;
   }
 
   @Override
@@ -91,40 +86,10 @@ public abstract class QueryStmt extends StatementBase {
 
   private void analyzeLimit(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (limitExpr_ == null) {
-      limit_ = -1;
-    } else {
-      if (!limitExpr_.isConstant()) {
-        throw new AnalysisException("LIMIT expression must be a constant expression: " +
-            limitExpr_.toSql());
-      }
-      limitExpr_.analyze(analyzer);
-      if (!limitExpr_.getType().isIntegerType()) {
-        throw new AnalysisException("LIMIT expression must be an integer type but is '" +
-            limitExpr_.getType() + "': " + limitExpr_.toSql());
-      }
-
-      TColumnValue val = null;
-      try {
-        val = FeSupport.EvalConstExpr(limitExpr_, analyzer.getQueryGlobals());
-      } catch (InternalException e) {
-        throw new AnalysisException("Failed to evaluate expr: " + limitExpr_.toSql(), e);
-      }
-      long limitVal;
-      if (val.isSetLongVal()) {
-        limitVal = val.getLongVal();
-      } else if (val.isSetIntVal()) {
-        limitVal = val.getIntVal();
-      } else {
-        throw new AnalysisException("LIMIT expression evaluates to NULL: " +
-            limitExpr_.toSql());
-      }
-      if (limitVal < 0) {
-        throw new AnalysisException("LIMIT must be a non-negative integer: " +
-            limitExpr_.toSql() + " = " + limitVal);
-      }
-      limit_ = limitVal;
+    if (limitElement_.getOffsetExpr() != null && !hasOrderByClause()) {
+      throw new AnalysisException("OFFSET requires an ORDER BY clause: " + toSql());
     }
+    limitElement_.analyze(analyzer);
   }
 
   /**
@@ -196,57 +161,23 @@ public abstract class QueryStmt extends StatementBase {
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 
-  public void setWithClause(WithClause withClause) {
-    this.withClause_ = withClause;
-  }
-
-  public boolean hasWithClause() {
-    return withClause_ != null;
-  }
-
-  public WithClause getWithClause() {
-    return withClause_;
-  }
-
-  public ArrayList<OrderByElement> getOrderByElements() {
-    return orderByElements_;
-  }
-
-  public void removeOrderByElements() {
-    orderByElements_ = null;
-  }
-
-  public boolean hasOrderByClause() {
-    return orderByElements_ != null;
-  }
-
-  public long getLimit() {
-    return limit_;
-  }
-
-  public boolean hasLimitClause() {
-    return limitExpr_ != null;
-  }
-
-  public SortInfo getSortInfo() {
-    return sortInfo_;
-  }
-
-  public ArrayList<Expr> getResultExprs() {
-    return resultExprs_;
-  }
+  public void setWithClause(WithClause withClause) { this.withClause_ = withClause; }
+  public boolean hasWithClause() { return withClause_ != null; }
+  public WithClause getWithClause() { return withClause_; }
+  public ArrayList<OrderByElement> getOrderByElements() { return orderByElements_; }
+  public void removeOrderByElements() { orderByElements_ = null; }
+  public boolean hasOrderByClause() { return orderByElements_ != null; }
+  public long getLimit() { return limitElement_.getLimit(); }
+  public boolean hasLimitClause() { return limitElement_.getLimitExpr() != null; }
+  public long getOffset() { return limitElement_.getOffset(); }
+  public SortInfo getSortInfo() { return sortInfo_; }
+  public ArrayList<Expr> getResultExprs() { return resultExprs_; }
+  public void setIsExplain(boolean isExplain) { this.isExplain_ = isExplain; }
+  public boolean isExplain() { return isExplain_; }
 
   public void setResultExprs(List<Expr> resultExprs) {
     this.resultExprs_.clear();
     this.resultExprs_.addAll(resultExprs);
-  }
-
-  public void setIsExplain(boolean isExplain) {
-    this.isExplain_ = isExplain;
-  }
-
-  public boolean isExplain() {
-    return isExplain_;
   }
 
   public ArrayList<OrderByElement> cloneOrderByElements() {

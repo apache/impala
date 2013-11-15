@@ -134,6 +134,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
     keywordMap.put("null", new Integer(SqlParserSymbols.KW_NULL));
     keywordMap.put("nulls", new Integer(SqlParserSymbols.KW_NULLS));
+    keywordMap.put("offset", new Integer(SqlParserSymbols.KW_OFFSET));
     keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));
     keywordMap.put("||", new Integer(SqlParserSymbols.KW_OR));
     keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));

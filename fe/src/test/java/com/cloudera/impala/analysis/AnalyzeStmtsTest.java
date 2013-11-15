@@ -1793,7 +1793,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void cloneTest() {
-    testNumberOfMembers(QueryStmt.class, 10);
+    testNumberOfMembers(QueryStmt.class, 9);
     testNumberOfMembers(UnionStmt.class, 2);
     testNumberOfMembers(ValuesStmt.class, 0);
 

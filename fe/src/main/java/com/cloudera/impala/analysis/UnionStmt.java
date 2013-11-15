@@ -92,8 +92,8 @@ public class UnionStmt extends QueryStmt {
   protected TupleId tupleId;
 
   public UnionStmt(List<UnionOperand> operands,
-      ArrayList<OrderByElement> orderByElements, Expr limitExpr) {
-    super(orderByElements, limitExpr);
+      ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
+    super(orderByElements, limitElement);
     this.operands = operands;
   }
 
@@ -321,10 +321,7 @@ public class UnionStmt extends QueryStmt {
       }
     }
     // Limit clause.
-    if (hasLimitClause()) {
-      strBuilder.append(" LIMIT ");
-      strBuilder.append(limitExpr_.toSql());
-    }
+    strBuilder.append(limitElement_.toSql());
     return strBuilder.toString();
   }
 
@@ -341,7 +338,7 @@ public class UnionStmt extends QueryStmt {
       operandClones.add(operand.clone());
     }
     UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),
-        limitExpr_ == null ? null : limitExpr_.clone(null));
+        limitElement_ == null ? null : limitElement_.clone(null));
     unionClone.setWithClause(cloneWithClause());
     return unionClone;
   }

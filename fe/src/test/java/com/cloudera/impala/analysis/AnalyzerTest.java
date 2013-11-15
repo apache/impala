@@ -436,19 +436,31 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestLimitExpr() {
+  public void TestLimitAndOffset() {
     // Arithmetic expressions that result in a positive, integral value are OK
     AnalyzesOk("select * from functional.AllTypes limit 10 * 10 + 10 - 10 % 10");
     AnalyzesOk("select * from functional.AllTypes limit 1 ^ 0 | 3 & 3");
+    // Test offset, requires order by and limit
+    AnalyzesOk("select * from functional.AllTypes order by id limit 10 offset 1+2*3%4");
+    // Test offset within an inline view and with-clause view
+    AnalyzesOk("select t5.id from (select id from functional.AllTypes order by id " +
+        "limit 10 offset 2) t5");
+    AnalyzesOk("with t5 as (select id from functional.AllTypes order by id limit 10 " +
+        "offset 2) select * from t5");
 
     // Casting to int is fine
     AnalyzesOk("select id, bool_col from functional.AllTypes limit CAST(10.0 AS INT)");
     AnalyzesOk("select id, bool_col from functional.AllTypes limit " +
-               "CAST(NOT FALSE AS INT)");
+        "CAST(NOT FALSE AS INT)");
+    AnalyzesOk("select * from functional.AllTypes order by id limit 10 " +
+        "offset CAST(1.0 AS INT)");
 
     // Analysis error from negative values
     AnalysisError("select * from functional.AllTypes limit 10 - 20",
         "LIMIT must be a non-negative integer: 10 - 20 = -10");
+    AnalysisError("select * from functional.AllTypes order by id limit 10 " +
+        "offset 10 - 20",
+        "OFFSET must be a non-negative integer: 10 - 20 = -10");
 
     // Analysis error from non-integral values
     AnalysisError("select * from functional.AllTypes limit 10.0",
@@ -457,11 +469,27 @@ public class AnalyzerTest {
         "LIMIT expression must be an integer type but is 'BOOLEAN': NOT FALSE");
     AnalysisError("select * from functional.AllTypes limit CAST(\"asdf\" AS INT)",
         "LIMIT expression evaluates to NULL: CAST('asdf' AS INT)");
+    AnalysisError("select * from functional.AllTypes order by id limit 10 " +
+        "OFFSET 10.0",
+        "OFFSET expression must be an integer type but is 'FLOAT': 10.0");
+    AnalysisError("select * from functional.AllTypes order by id limit 10 " +
+        "offset CAST('asdf' AS INT)",
+        "OFFSET expression evaluates to NULL: CAST('asdf' AS INT)");
 
     // Analysis error from non-constant expressions
     AnalysisError("select id, bool_col from functional.AllTypes limit id < 10",
         "LIMIT expression must be a constant expression: id < 10");
+    AnalysisError("select id, bool_col from functional.AllTypes order by id limit 10 " +
+        "offset id < 10",
+        "OFFSET expression must be a constant expression: id < 10");
 
+    // Offset is only valid with an order by
+    AnalysisError("SELECT a FROM test LIMIT 10 OFFSET 5",
+        "OFFSET requires an ORDER BY clause: SELECT a FROM test LIMIT 10 OFFSET 5");
+    AnalysisError("SELECT x.id FROM (SELECT id FROM alltypesagg LIMIT 5 OFFSET 5) x " +
+        "ORDER BY x.id LIMIT 100 OFFSET 4",
+        "OFFSET requires an ORDER BY clause: SELECT id FROM alltypesagg " +
+        "LIMIT 5 OFFSET 5");
   }
 
   @Test
