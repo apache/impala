@@ -113,6 +113,7 @@ def exec_impala_query_from_file(file_name, result_queue):
       queries = sqlparse.split(query_file.read())
     for query in queries:
       query = sqlparse.format(query.rstrip(';'), strip_comments=True)
+      print '(%s):\n%s\n' % (file_name, query.strip())
       result = impala_client.execute(query)
   except Exception as e:
     print "Data Loading from Impala failed with error: %s" % str(e)
