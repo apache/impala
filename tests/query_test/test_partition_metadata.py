@@ -18,7 +18,7 @@ import pytest
 import shlex
 import time
 from tests.common.test_result_verifier import *
-from tests.util.shell_util import exec_shell_cmd
+from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
@@ -70,14 +70,14 @@ class TestPartitionMetadata(ImpalaTestSuite):
     hive_cmd = "use %s; alter table hive_bulk_part add partition (j=1) location '%s/p'"\
         " partition(j=2) location '%s/p'" % (self.TEST_DB, location, location)
     print "Executing: %s" % hive_cmd
-    rc, stdout, stderr = exec_shell_cmd("hive -e \"%s\"" % hive_cmd)
+    rc, stdout, stderr = exec_process("hive -e \"%s\"" % hive_cmd)
     assert rc == 0, stdout + '\n' + stderr
 
     # Insert some data.
     hive_cmd = "insert into table %s.hive_bulk_part partition(j=1) select 1 from "\
                "functional.alltypes limit 1" % self.TEST_DB
     print "Executing: %s" % hive_cmd
-    rc, stdout, stderr = exec_shell_cmd("hive -e \"%s\"" % hive_cmd)
+    rc, stdout, stderr = exec_process("hive -e \"%s\"" % hive_cmd)
     assert rc == 0, stdout + '\n' + stderr
 
     # Reload the table metadata and ensure Impala detects this properly.
