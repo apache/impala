@@ -155,16 +155,30 @@ Status StateStoreSubscriber::Register() {
 }
 
 Status StateStoreSubscriber::Start() {
-  lock_guard<mutex> l(lock_);
-  LOG(INFO) << "Starting subscriber";
+  Status status;
+  {
+    // Take the lock to ensure that, if a heartbeat is received during registration
+    // (perhaps because Register() has succeeded, but we haven't finished setting up state
+    // on the client side), UpdateState() will reject the heartbeat.
+    lock_guard<mutex> l(lock_);
+    LOG(INFO) << "Starting state-store subscriber";
 
-  // Backend must be started before registration
-  shared_ptr<TProcessor> processor(new StateStoreSubscriberProcessor(thrift_iface_));
-  heartbeat_server_.reset(new ThriftServer("StateStoreSubscriber", processor,
-      heartbeat_address_.port, NULL, NULL, 5));
-  heartbeat_server_->Start();
-  Status status = Register();
-  if (status.ok()) is_registered_ = true;
+    // Backend must be started before registration
+    shared_ptr<TProcessor> processor(new StateStoreSubscriberProcessor(thrift_iface_));
+    heartbeat_server_.reset(new ThriftServer("StateStoreSubscriber", processor,
+        heartbeat_address_.port, NULL, NULL, 5));
+    heartbeat_server_->Start();
+    LOG(INFO) << "Registering with state-store";
+    status = Register();
+    if (status.ok()) {
+      is_registered_ = true;
+      LOG(INFO) << "State-store registration successful";
+    } else {
+      LOG(INFO) << "State-store registration unsuccessful: " << status.GetErrorMsg();
+    }
+  }
+
+  // Registration is finished at this point, so it's fine to release the lock.
   recovery_mode_thread_.reset(new Thread("statestore-subscriber", "recovery-mode-thread",
       &StateStoreSubscriber::RecoveryModeChecker, this));
 
@@ -187,8 +201,10 @@ void StateStoreSubscriber::RecoveryModeChecker() {
       connected_to_statestore_metric_->Update(false);
       LOG(INFO) << subscriber_id_
                 << ": Connection with state-store lost, entering recovery mode";
+      uint32_t attempt_count = 1;
       while (true) {
-        LOG(INFO) << "Trying to register...";
+        LOG(INFO) << "Trying to re-register with state-store, attempt: "
+                  << attempt_count++;
         Status status = Register();
         if (status.ok()) {
           LOG(INFO) << "Reconnected to state-store. Exiting recovery mode";
@@ -290,9 +306,9 @@ Status StateStoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     return Status::OK;
   } else {
-    VLOG(1) << "Subscriber is registering with statestore, ignoring update.";
     stringstream ss;
-    ss << "Subscriber '" << subscriber_id_ << "' is registering with statestore.";
+    ss << "Subscriber '" << subscriber_id_
+       << "' is registering with statestore, ignoring update.";
     return Status(ss.str());
   }
 }

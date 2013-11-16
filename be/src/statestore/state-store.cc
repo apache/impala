@@ -259,7 +259,9 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     subscriber_set_metric_->Add(subscriber_id);
   }
 
-  if (subscriber_heartbeat_threadpool_.GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS) {
+  // Add the subscriber to the update queue, with an immediate schedule.
+  if (subscriber_heartbeat_threadpool_.GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS
+      || !subscriber_heartbeat_threadpool_.Offer(make_pair(0L, subscriber_id))) {
     stringstream ss;
     ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
     lock_guard<mutex> l(subscribers_lock_);
@@ -270,8 +272,8 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
     return Status(ss.str());
   }
 
-  // Add the subscriber to the update queue, with an immediate schedule.
-  subscriber_heartbeat_threadpool_.Offer(make_pair(0L, subscriber_id));
+  LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
+            << PrintId(*registration_id) << ")";
   return Status::OK;
 }
 
