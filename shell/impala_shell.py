@@ -347,9 +347,7 @@ class ImpalaShell(cmd.Cmd):
     """
     # TODO: Expand set to allow for setting more than just query options.
     if not self.connected:
-      print "Query options currently set:"
-      self.__print_options(self.set_query_options)
-      print "Connect to an impalad to see the default query options"
+      print ("Connect to an impalad to view and set query options.")
       return True
     if len(args) == 0:
       print "Default query options:"
